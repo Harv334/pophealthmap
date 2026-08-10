@@ -324,32 +324,49 @@
 /* ── Assistant panel ─────────────────────────────────────────────────────
    Matches the existing panel styling: white card, 1px #DDE1E4 border, 5px radius,
    11px labels. Hidden entirely unless the Worker endpoint is configured. */
-#ai-toggle{position:absolute;right:12px;bottom:12px;z-index:1200;padding:9px 15px;
-  border:1px solid #DDE1E4;border-radius:6px;background:#212B32;color:#fff;font-size:12px;
-  font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.22)}
-#ai-toggle:hover{background:#212B32}
-#ai-panel{position:absolute;right:12px;bottom:56px;z-index:1200;width:352px;max-width:calc(100vw - 24px);
-  height:452px;max-height:calc(100vh - 120px);display:none;flex-direction:column;background:#fff;
-  border:1px solid #DDE1E4;border-radius:7px;box-shadow:0 6px 26px rgba(0,0,0,.2);overflow:hidden}
+/* The assistant sits beside the map rather than in a mode of its own. Asking
+   about an area is something you do while looking at it, so sending someone to
+   a separate screen to ask, and back again to look, was the wrong shape.
+   Positioned inside .map-wrap, which is the map's own positioned ancestor, so
+   it can never stray over the sidebar. Above the map's badges at 2500, below
+   the mode panel at 3500, so a mode still covers it. */
+#ai-toggle{position:absolute;right:12px;bottom:34px;z-index:2600;padding:10px 16px;
+  border:1px solid #005EB8;border-radius:8px;background:#005EB8;color:#fff;font-size:12.5px;
+  font-weight:600;cursor:pointer;box-shadow:0 2px 10px rgba(33,43,50,.22);
+  font-family:'Inter Tight',Inter,system-ui,sans-serif;display:flex;align-items:center;gap:7px}
+#ai-toggle:hover{background:#003087;border-color:#003087}
+#ai-toggle:focus-visible{outline:3px solid #FFB81C;outline-offset:2px}
+#ai-panel{position:absolute;right:12px;top:54px;bottom:12px;z-index:2600;
+  width:min(390px,calc(100% - 24px));display:none;flex-direction:column;background:#fff;
+  border:1px solid #DDE1E4;border-radius:10px;
+  box-shadow:0 8px 32px rgba(33,43,50,.16),0 2px 8px rgba(33,43,50,.08);overflow:hidden}
 #ai-panel.open{display:flex}
-#ai-head{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;
-  border-bottom:1px solid #E8EDEE;font-size:12px;font-weight:600;background:#FBFCFD}
-#ai-close{border:0;background:none;font-size:19px;line-height:1;cursor:pointer;color:#768692;padding:0 2px}
+#ai-head{display:flex;align-items:center;justify-content:space-between;padding:11px 13px;
+  border-bottom:1px solid #E8EDEE;font-size:13px;font-weight:600;background:#FBFCFD;color:#003087;
+  font-family:'Inter Tight',Inter,system-ui,sans-serif}
+#ai-close{border:0;background:none;font-size:20px;line-height:1;cursor:pointer;color:#768692;padding:0 2px}
 #ai-close:hover{color:#212B32}
-#ai-log{flex:1 1 auto;overflow-y:auto;padding:11px 12px;font-size:12px;line-height:1.5}
-.ai-msg{margin-bottom:10px;padding:8px 10px;border-radius:6px;white-space:normal;word-wrap:break-word}
-.ai-user{background:#212B32;color:#fff;margin-left:34px}
-.ai-bot{background:#FBFCFD;color:#212B32}
+#ai-body{flex:1 1 auto;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+#ai-log{flex:1 1 auto;overflow-y:auto;padding:12px 13px;font-size:12.5px;line-height:1.5}
+.ai-msg{margin-bottom:10px;padding:8px 10px;border-radius:8px;white-space:normal;word-wrap:break-word}
+.ai-user{background:#005EB8;color:#fff;width:fit-content;max-width:85%;margin-left:auto}
+.ai-bot{background:#F4F7F9;color:#212B32}
 .ai-thinking{color:#768692;font-style:italic}
 .ai-error{background:#FBE5E3;color:#A81A10}
 .ai-msg em{color:#4C6272}
-#ai-form{display:flex;gap:6px;padding:9px;border-top:1px solid #E8EDEE;background:#FBFCFD}
-#ai-input{flex:1 1 auto;padding:7px 9px;border:1px solid #DDE1E4;border-radius:5px;font-size:12px;
+#ai-form{display:flex;gap:6px;padding:10px;border-top:1px solid #E8EDEE;background:#FBFCFD}
+#ai-input{flex:1 1 auto;padding:8px 10px;border:1px solid #DDE1E4;border-radius:8px;font-size:12.5px;
   font-family:inherit;min-width:0}
-#ai-send{padding:7px 13px;border:0;border-radius:5px;background:#212B32;color:#fff;font-size:12px;
-  font-weight:600;cursor:pointer}
-#ai-send:disabled{background:#768692;cursor:default}
-@media (max-width:560px){#ai-panel{width:calc(100vw - 24px);height:calc(100vh - 130px)}}
+#ai-input:focus{outline:2px solid #0072CE;outline-offset:-1px;border-color:#0072CE}
+#ai-send{padding:8px 14px;border:1px solid #005EB8;border-radius:8px;background:#005EB8;color:#fff;
+  font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit}
+#ai-send:hover:not(:disabled){background:#003087;border-color:#003087}
+#ai-send:disabled{opacity:.55;cursor:default}
+.ai-examples{display:flex;flex-wrap:wrap;gap:5px;margin:10px 0 2px}
+.ai-chip{font:inherit;font-size:11.5px;cursor:pointer;text-align:left;background:#FBFCFD;
+  color:#003087;border:1px solid #DDE1E4;border-radius:13px;padding:5px 10px}
+.ai-chip:hover{background:#E5EFF8;border-color:#41B6E6}
+@media (max-width:640px){#ai-panel{width:calc(100% - 24px)}}
 
     /* Layers whose coverage is narrower than the map. Flagged rather than
        removed, because an empty layer reads as "none here" when the truth is
@@ -506,33 +523,6 @@
     border-radius: 8px; padding: 8px 15px; }
   .mode-back:hover { background: var(--nhs-dark); border-color: var(--nhs-dark); }
 
-  /* Ask mode. The assistant mounts in here rather than floating over the map. */
-  .mode-chat { background: var(--paper); border: 1px solid var(--line);
-    border-radius: 10px; box-shadow: var(--shadow); width: 100%; max-width: 720px;
-    max-height: 100%; display: flex; flex-direction: column; overflow: hidden; }
-  .mode-chat #ai-log { font-size: 13px; padding: 16px 18px; }
-  .mode-chat { min-height: min(420px, 100%); }
-  .mode-chat #ai-log { flex: 1 1 auto; }
-  .mode-chat .ai-msg { max-width: 100%; }
-  /* The question sits right, the answer left, so a long thread stays readable
-     as a conversation rather than a wall of alternating blocks. */
-  .mode-chat .ai-user { width: fit-content; max-width: 80%; margin-left: auto; }
-  .mode-chat .ai-bot { width: fit-content; max-width: 92%; }
-  .mode-chat #ai-form { padding: 11px 12px; }
-  .mode-chat #ai-input { flex: 1 1 auto; font: inherit; font-size: 13px;
-    padding: 9px 11px; border: 1px solid var(--line); border-radius: 8px; }
-  .mode-chat #ai-input:focus { outline: 2px solid var(--nhs-bright); outline-offset: -1px;
-    border-color: var(--nhs-bright); }
-  .mode-chat #ai-send { font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
-    background: var(--nhs-blue); color: #fff; border: 1px solid var(--nhs-blue);
-    border-radius: 8px; padding: 9px 16px; }
-  .mode-chat #ai-send:hover:not(:disabled) { background: var(--nhs-dark); border-color: var(--nhs-dark); }
-  .mode-chat #ai-send:disabled { opacity: .55; cursor: default; }
-  .ai-examples { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 2px; }
-  .ai-chip { font: inherit; font-size: 12px; cursor: pointer; text-align: left;
-    background: var(--paper-2); color: var(--nhs-dark); border: 1px solid var(--line);
-    border-radius: 14px; padding: 6px 11px; }
-  .ai-chip:hover { background: #E5EFF8; border-color: var(--nhs-aqua); }
 </style>
 </head>
 <body>
@@ -564,7 +554,6 @@
   <div class="mode-rail" role="tablist" aria-label="Tool mode">
     <button type="button" class="mode-btn" role="tab" data-mode="explore" aria-selected="true">Explore</button>
     <button type="button" class="mode-btn" role="tab" data-mode="compare" aria-selected="false">Compare <span class="mode-soon">Soon</span></button>
-    <button type="button" class="mode-btn" role="tab" data-mode="query" aria-selected="false">Ask <span class="mode-soon">Soon</span></button>
     <button type="button" class="mode-btn" role="tab" data-mode="tour" aria-selected="false">Take a tour <span class="mode-soon">Soon</span></button>
     <button type="button" class="mode-btn" role="tab" data-mode="directory" aria-selected="false">Directory <span class="mode-soon">Soon</span></button>
   </div>
@@ -577,7 +566,6 @@
       <ul id="mode-points"></ul>
       <button type="button" class="mode-back">Back to the map</button>
     </div>
-    <div class="mode-chat" id="mode-chat" hidden></div>
   </div>
 
   <div class="main">
@@ -7994,13 +7982,6 @@ loadData();
                'Indicators lined up in a single table, with the gap between areas shown',
                'Export the comparison as CSV'],
     },
-    query: {
-      title: 'Ask a question',
-      desc: 'Ask for a ranking, a comparison or a summary in plain English and get an answer built from the figures on this map.',
-      points: ['Answers come from the data already loaded in your browser, so nothing is uploaded',
-               'Every number is drawn from a lookup against the map, not written from memory',
-               'Works for rankings, comparisons and single-area summaries'],
-    },
     tour: {
       title: 'Take a tour',
       desc: 'A short guided walkthrough of what is on the map and how to read it, for anyone arriving without a specific question.',
@@ -8025,28 +8006,12 @@ loadData();
   var descEl = document.getElementById('mode-desc');
   var pointsEl = document.getElementById('mode-points');
 
-  var chat = document.getElementById('mode-chat');
-  var card = panel.querySelector('.mode-card');
-
   function show(mode) {
     var m = MODES[mode];
     rail.querySelectorAll('.mode-btn').forEach(function (b) {
       b.setAttribute('aria-selected', String(b.dataset.mode === (m ? mode : 'explore')));
     });
     if (!m) { panel.hidden = true; return; }
-
-    // Ask is the one mode with something behind it. It is live only once the
-    // Worker is deployed and assistant.js has an endpoint; until then it falls
-    // through to the placeholder card rather than mounting a chat box that
-    // could not answer anything.
-    var live = mode === 'query' && window.PH_ASSISTANT && window.PH_ASSISTANT.configured;
-    card.hidden = live;
-    chat.hidden = !live;
-    if (live) {
-      window.PH_ASSISTANT.mount(chat);
-      panel.hidden = false;
-      return;
-    }
 
     titleEl.textContent = m.title;
     descEl.textContent = m.desc;
@@ -8068,13 +8033,6 @@ loadData();
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && !panel.hidden) show('explore');
   });
-
-  // Drop the Soon badge from Ask once the Worker is wired up, so the rail
-  // stops advertising a mode that has in fact arrived.
-  if (window.PH_ASSISTANT && window.PH_ASSISTANT.configured) {
-    var badge = rail.querySelector('[data-mode="query"] .mode-soon');
-    if (badge && badge.parentNode) badge.parentNode.removeChild(badge);
-  }
 })();
 </script>
 </body></html>

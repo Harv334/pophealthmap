@@ -556,4 +556,78 @@ var ASSISTANT_ENDPOINT = "https://pophealthmapai.sevilleharvey.workers.dev";
   }
 
   window.PH_ASSISTANT.mount = mount;
+
+  /**
+   * Put the assistant beside the map.
+   *
+   * It briefly lived behind an Ask tab, which was the wrong shape: asking about
+   * an area is something you do while looking at it, and a tab meant leaving
+   * the map to ask and returning to look. A docked panel keeps both on screen.
+   *
+   * It attaches to .map-wrap, the map's own positioned ancestor, so it cannot
+   * stray over the sidebar, and it mounts the chat only on first open, so the
+   * thread survives closing and reopening.
+   */
+  function initFloating() {
+    if (!ASSISTANT_ENDPOINT) return; // not configured: no panel, map unaffected
+    var host = document.querySelector(".map-wrap");
+    if (!host || document.getElementById("ai-panel")) return;
+
+    var panel = document.createElement("div");
+    panel.id = "ai-panel";
+
+    var head = document.createElement("div");
+    head.id = "ai-head";
+    var heading = document.createElement("span");
+    heading.textContent = "Ask about this data";
+    var close = document.createElement("button");
+    close.id = "ai-close";
+    close.type = "button";
+    close.setAttribute("aria-label", "Close");
+    close.textContent = "×";
+    head.appendChild(heading);
+    head.appendChild(close);
+
+    var body = document.createElement("div");
+    body.id = "ai-body";
+    panel.appendChild(head);
+    panel.appendChild(body);
+
+    var toggle = document.createElement("button");
+    toggle.id = "ai-toggle";
+    toggle.type = "button";
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.textContent = "Ask about this data";
+
+    host.appendChild(panel);
+    host.appendChild(toggle);
+
+    function open() {
+      panel.classList.add("open");
+      toggle.hidden = true;
+      toggle.setAttribute("aria-expanded", "true");
+      mount(body);
+      var input = document.getElementById("ai-input");
+      if (input) input.focus();
+    }
+
+    function shut() {
+      panel.classList.remove("open");
+      toggle.hidden = false;
+      toggle.setAttribute("aria-expanded", "false");
+      toggle.focus();
+    }
+
+    toggle.addEventListener("click", open);
+    close.addEventListener("click", shut);
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && panel.classList.contains("open")) shut();
+    });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initFloating);
+  } else {
+    initFloating();
+  }
 })();
