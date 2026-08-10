@@ -441,6 +441,20 @@
   a { color: var(--nhs-blue); }
   a:hover { color: var(--nhs-dark); }
 
+  /* The hidden attribute has to actually hide things.
+     The browser implements it as [hidden] { display: none } in its own
+     stylesheet, and any author rule that sets display beats it, because the
+     author sheet wins over the user agent sheet at equal specificity. Three
+     elements here set display and start hidden: the mode panel, the Ask chat
+     and the development banner. All three were laid out at full size while
+     reporting hidden === true, so "Back to the map" set the attribute, nothing
+     moved, and the map stayed buried. The banner's dismiss button had the same
+     problem. Anything that tests element.hidden saw exactly what it expected,
+     which is why this survived a browser check.
+     A blanket rule rather than three targeted ones: the next element to start
+     hidden should not have to rediscover this. */
+  [hidden] { display: none !important; }
+
   /* ---- Mode rail -------------------------------------------------------
      The frame for where the tool is going: Explore is the map as it stands,
      the rest are placeholders so each one has somewhere to land as it is
