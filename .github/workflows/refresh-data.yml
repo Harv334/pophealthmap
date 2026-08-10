@@ -105,7 +105,23 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "Data refresh $(date -u +%Y-%m-%d)"
-          git push
+
+          # A full refresh can run for an hour, and anyone pushing to main in
+          # that window makes this a non-fast-forward. The concurrency group
+          # only stops two refreshes overlapping, not a person committing
+          # during one. Rebase onto whatever landed and try again rather than
+          # failing the run and discarding an hour of refreshed data.
+          # A rebase conflict is left to fail loudly: silently resolving one
+          # over committed data outputs would be worse than a red run.
+          for attempt in 1 2 3; do
+            if git push; then
+              exit 0
+            fi
+            echo "Push rejected (attempt $attempt); rebasing onto origin/main."
+            git pull --rebase --autostash origin main
+          done
+          echo "Could not push after 3 attempts."
+          exit 1
 
       - name: Open an issue if anything failed
         if: steps.run.outcome == 'failure' || steps.manifest.outputs.failed != ''
