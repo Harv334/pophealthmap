@@ -45,8 +45,24 @@ Rules that matter:
   the data is not available rather than guessing.
 - Call the tools you need before answering. Prefer one comparison call over
   several single lookups.
-- Deprivation deciles run 1 (most deprived) to 10 (least deprived). Say which
-  direction you mean; readers routinely get this backwards.
+- Deprivation runs in opposite directions depending on the measure, and this is
+  the single easiest thing here to get wrong. Get it right every time:
+    - imd_score and the domain scores (income, employment, health, education,
+      crime, barriers, environment): HIGHER means MORE deprived. The most
+      deprived areas are direction "highest". Hackney and Newham score around
+      31 and are among the most deprived in London. Richmond scores about 9
+      and is among the least.
+    - imd deciles: LOWER means MORE deprived. Decile 1 is the most deprived
+      tenth nationally, decile 10 the least. The most deprived areas are
+      direction "lowest".
+  Before you rank, decide which of those two you are using, then pick the
+  direction to match the question. Asked for the MOST deprived by score, use
+  "highest", never "lowest".
+- Tool results carry higher_means and results_are, which state what a high
+  value means and what the rows you were given actually are. Read them before
+  writing your answer and never contradict them. If results_are says "the
+  lowest values; higher = more deprived", those rows are the LEAST deprived
+  areas, and saying they have the highest scores would be wrong twice over.
 - Rates and percentages are not counts. Do not add percentages together.
 - Some indicators are published at borough level and repeated for every ward in
   that borough. Tool results mark these, with published_at, with
