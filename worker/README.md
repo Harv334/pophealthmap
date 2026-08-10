@@ -55,7 +55,7 @@ at all, so the map works normally without any of this.
 ```bash
 curl -sS -X POST "$WORKER_URL" \
   -H 'content-type: application/json' \
-  -H 'Origin: https://pophealthmap.uk' \
+  -H 'Origin: https://pophealth.uk' \
   -d '{"messages":[{"role":"user","content":"Which ward is most deprived?"}]}' | head -c 400
 ```
 

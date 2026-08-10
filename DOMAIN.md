@@ -1,59 +1,52 @@
-# Putting the map on pophealthmap.uk
+# The domain
 
-Not done yet, because `pophealthmap.uk` is not registered. Until it is, the
-site lives at https://harv334.github.io/pophealthmap/.
+The map is served at **https://pophealth.uk**, on GitHub Pages, with DNS at
+Cloudflare.
 
-This is written down rather than left as a `CNAME` file, because a `CNAME`
-committed before the domain resolves takes the site **offline**: GitHub Pages
-starts 301ing the `github.io` address to a hostname that does not exist. That
-is not a theory, it is what happened here, and it is why the file was removed
-again.
+## How it is wired
 
-## Order of operations
+| Record | Name | Value |
+|--------|------|-------|
+| A | `@` | `185.199.108.153` |
+| A | `@` | `185.199.109.153` |
+| A | `@` | `185.199.110.153` |
+| A | `@` | `185.199.111.153` |
+| CNAME | `www` | `harv334.github.io` |
 
-Register the domain **first**, then point it, then add the `CNAME`. Doing it in
-any other order breaks the working site for the length of the gap.
+All five are **DNS only** in Cloudflare, not proxied. Proxying them stops
+GitHub validating the domain and issuing its certificate, and visitors get an
+HTTPS warning instead of the map. You can tell which mode is live by asking for
+the A records: unproxied returns the four GitHub addresses above, proxied
+returns Cloudflare's.
 
-1. **Register** `pophealthmap.uk` with any UK registrar.
+The `CNAME` file in the repo root holds `pophealth.uk`. It is what tells GitHub
+which repo to serve for this domain. Without it, requests reach GitHub and come
+back as a 404, because the DNS is pointing at GitHub correctly but GitHub has
+nothing tying the hostname to this repository.
 
-2. **Point it at GitHub Pages.** For the apex, four `A` records:
+## If you ever move the domain
 
-   ```
-   185.199.108.153
-   185.199.109.153
-   185.199.110.153
-   185.199.111.153
-   ```
+Do it in this order. The order is the whole point of this file.
 
-   And a `CNAME` record on `www` to `harv334.github.io`.
+1. Register the new name and confirm it exists at the registry, not just in a
+   Cloudflare dashboard. For `.uk`, `https://rdap.nominet.uk/uk/domain/<name>`
+   returns a 404 for a name nobody owns. Cloudflare will happily let you add a
+   zone and fill it with DNS records for a domain you have not bought, and it
+   looks identical to one you have.
+2. Add the records above.
+3. Check it resolves before touching the repo: `nslookup <name>` must return
+   the four GitHub addresses.
+4. Only then update `CNAME` and push.
 
-   If the DNS is on Cloudflare, set these to **DNS only**, not proxied. A
-   proxied record stops Pages from issuing its certificate, and the site serves
-   an HTTPS warning instead.
+Doing step 4 first takes the site **offline**. GitHub Pages starts redirecting
+the working `github.io` address to a hostname that does not resolve, so both
+addresses break. That is not hypothetical; it is what happened here, and it is
+why the file was removed again and the domain finished afterwards.
 
-3. **Wait for it to resolve.** Check before going further:
+## Also referencing the domain
 
-   ```bash
-   nslookup pophealthmap.uk        # must return the four addresses
-   ```
-
-4. **Then** add the `CNAME` file and push:
-
-   ```bash
-   echo pophealthmap.uk > CNAME
-   git add CNAME && git commit -m "Point the site at pophealthmap.uk" && git push
-   ```
-
-5. In the repo's **Settings → Pages**, confirm the custom domain is set and
-   tick **Enforce HTTPS** once the certificate has been issued. That can take
-   up to an hour after DNS propagates.
-
-## Afterwards
-
-Two things reference the domain and should be checked once it is live:
-
-- `worker/wrangler.toml` lists the allowed origins for the AI panel. It already
-  names `https://pophealthmap.uk` and `https://www.pophealthmap.uk`, so the
-  panel will work on the new domain without a change. It also still lists the
-  `github.io` origin, which you can drop once nothing uses it.
-- `README.md` gives the live URL as the domain.
+- `worker/wrangler.toml` allows `https://pophealth.uk` and
+  `https://www.pophealth.uk` as origins for the AI panel. A domain change needs
+  this changed and the Worker redeployed, or the panel silently stops
+  answering.
+- `README.md` gives the live URL.

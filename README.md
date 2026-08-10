@@ -3,10 +3,7 @@
 An interactive map of population health across all 33 London boroughs, at ward
 and LSOA level, and a single Python script that rebuilds it from public data.
 
-Live map: https://harv334.github.io/pophealthmap/
-
-The pophealthmap.uk domain is not registered yet. See `DOMAIN.md` for how to
-move the site onto it, and why the `CNAME` file must not be added first.
+Live map: https://pophealth.uk
 
 Every figure comes from an open government or NHS source. Nothing is modelled,
 estimated or smoothed: if a number is on the map, it is in a published dataset,
