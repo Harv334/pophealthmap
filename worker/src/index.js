@@ -12,7 +12,25 @@
 
 const MODEL = "claude-haiku-4-5";
 const MAX_TOKENS = 1024;
-const DAILY_CAP = 40; // per IP, per UTC day
+const DAILY_CAP = 40; // questions per IP, per UTC day
+
+/**
+ * Billed calls per IP per day, counting every round trip.
+ *
+ * DAILY_CAP alone is not enforceable. A question takes several round trips and
+ * only the first is counted as a question, which is fine for the real client
+ * but not for anyone else: the caller supplies the whole message array, so
+ * appending a fabricated tool_result block makes every request look like a
+ * continuation and none of them get counted. That is an unauthenticated
+ * endpoint spending money with no ceiling.
+ *
+ * So there are two counters in one value. Questions give the honest user the
+ * message they expect, and requests bound what a forger can spend: six round
+ * trips per question is more than the client's five-round limit ever needs,
+ * and it caps a determined caller at a few pounds a day rather than at
+ * whatever the API will sell them.
+ */
+const REQUEST_CAP = DAILY_CAP * 6;
 
 const SYSTEM_PROMPT = `You are the assistant built into PopHealth Map, a public
 population health map of the 33 London local authorities at ward and LSOA level.
@@ -160,28 +178,54 @@ function isNewQuestion(messages) {
  * large bill. The spend limit on the Anthropic side is, and it is the one that
  * must actually be set. See worker/README.md.
  */
-async function underDailyCap(env, ip, countIt) {
-  if (!env.RATE_LIMIT) return true; // KV not bound: fail open rather than break the site
+const NOOP = async () => {};
+
+async function checkDailyCap(env, ip, isQuestion) {
+  if (!env.RATE_LIMIT) return { allowed: true, commit: NOOP }; // KV not bound: fail open
   const key = `${new Date().toISOString().slice(0, 10)}:${ip}`;
-  let used = 0;
+  let questions = 0;
+  let requests = 0;
   try {
-    used = parseInt((await env.RATE_LIMIT.get(key)) || "0", 10) || 0;
+    const raw = await env.RATE_LIMIT.get(key);
+    if (raw) {
+      // "questions,requests". A bare number is the old single-counter format;
+      // reading it as questions keeps yesterday's keys from resetting anyone.
+      const parts = String(raw).split(",");
+      questions = parseInt(parts[0], 10) || 0;
+      requests = parts.length > 1 ? parseInt(parts[1], 10) || 0 : questions;
+    }
   } catch (e) {
     console.log(`KV read failed, not counting: ${e && e.message}`);
-    return true;
+    return { allowed: true, commit: NOOP };
   }
-  if (used >= DAILY_CAP) return false;
-  if (countIt) {
-    try {
-      // 48h TTL comfortably outlives the UTC day the key is for.
-      await env.RATE_LIMIT.put(key, String(used + 1), { expirationTtl: 172800 });
-    } catch (e) {
-      // Most likely the free plan's 1,000 writes/day. Answer the question and
-      // leave the counter where it is.
-      console.log(`KV write failed, cap not incremented: ${e && e.message}`);
-    }
+
+  if (questions >= DAILY_CAP) {
+    return { allowed: false, reason: `Daily limit of ${DAILY_CAP} questions reached. Try again tomorrow.` };
   }
-  return true;
+  if (requests >= REQUEST_CAP) {
+    return { allowed: false, reason: "Daily limit reached. Try again tomorrow." };
+  }
+
+  // Counted on the way out rather than here, so a request the model never
+  // answered does not burn someone's quota. Anthropic does not bill a call
+  // that failed, and neither should we.
+  return {
+    allowed: true,
+    commit: async () => {
+      try {
+        // 48h TTL comfortably outlives the UTC day the key is for.
+        await env.RATE_LIMIT.put(
+          key,
+          `${questions + (isQuestion ? 1 : 0)},${requests + 1}`,
+          { expirationTtl: 172800 },
+        );
+      } catch (e) {
+        // Most likely the free plan's 1,000 writes/day. Answer the question and
+        // leave the counter where it is.
+        console.log(`KV write failed, cap not incremented: ${e && e.message}`);
+      }
+    },
+  };
 }
 
 export default {
@@ -210,12 +254,8 @@ export default {
     // round trip. A caller already over the cap is refused either way, so a
     // continuation cannot be used to slip past it.
     const ip = request.headers.get("CF-Connecting-IP") || "unknown";
-    if (!(await underDailyCap(env, ip, isNewQuestion(messages)))) {
-      return json(
-        { error: `Daily limit of ${DAILY_CAP} questions reached. Try again tomorrow.` },
-        429, cors,
-      );
-    }
+    const cap = await checkDailyCap(env, ip, isNewQuestion(messages));
+    if (!cap.allowed) return json({ error: cap.reason }, 429, cors);
 
     const upstream = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -239,6 +279,9 @@ export default {
       // Do not pass the upstream body back: it can echo request content.
       return json({ error: "The assistant is unavailable right now." }, 502, cors);
     }
+
+    // The call reached the model, so it counts, whatever the client does next.
+    await cap.commit();
 
     const data = await upstream.json();
     return json(data, 200, cors);

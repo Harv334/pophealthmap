@@ -313,8 +313,41 @@ var ASSISTANT_ENDPOINT = "";
   var history = [];
   var busy = false;
 
+  /**
+   * Keep the conversation under the Worker's message limit.
+   *
+   * The Worker refuses anything over 40 messages. A question costs about four
+   * messages once tool calls are counted, so without this the panel dies for
+   * good after roughly ten questions, and the only way out is a page reload.
+   *
+   * Whole exchanges are dropped, never individual messages: a tool_result must
+   * keep the assistant tool_use that produced it, and cutting between them
+   * leaves the API with an orphan block it will reject. A typed question is a
+   * user message whose content is a plain string, which is exactly where an
+   * exchange starts. Trimming happens only between questions, so the pairs
+   * built up during a tool loop are never split.
+   */
+  var MAX_HISTORY = 24; // plus at most 10 more from one question's tool rounds
+
+  function trimHistory() {
+    if (history.length <= MAX_HISTORY) return;
+    var starts = [];
+    for (var i = 0; i < history.length; i++) {
+      var m = history[i];
+      if (m.role === "user" && typeof m.content === "string") starts.push(i);
+    }
+    for (var s = 0; s < starts.length; s++) {
+      if (history.length - starts[s] <= MAX_HISTORY) {
+        history.splice(0, starts[s]);
+        return;
+      }
+    }
+    if (starts.length) history.splice(0, starts[starts.length - 1]);
+  }
+
   async function ask(question) {
     history.push({ role: "user", content: question });
+    trimHistory();
     for (var round = 0; round < MAX_TOOL_ROUNDS; round++) {
       var res = await fetch(ASSISTANT_ENDPOINT, {
         method: "POST",
