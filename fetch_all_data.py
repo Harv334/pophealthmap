@@ -1205,7 +1205,7 @@ IMD_LANDING_URL = (
 # Filtering applied to produce data/demographics/imd2025.parquet:
 #   rows    - every English LSOA 2021 in File 7 that carries an LSOA code
 #             (33,755; no geographic subsetting, since lsoa_data.json is
-#             full-England and the NWL scoping happens downstream)
+#             full-England and the scoping happens downstream)
 #   columns - 11 of File 7's ~60: LSOA21CD, the overall IMD score, decile and
 #             rank, and the seven domain scores. Population denominators and
 #             the per-domain ranks and deciles are dropped as unused.
@@ -1803,20 +1803,20 @@ def run_claimant_count() -> pd.DataFrame:
     cache_dir.mkdir(parents=True, exist_ok=True)
     # _v3: bulk queries against NOMIS TYPE298 silently cap at 25,000 rows
     # regardless of RecordLimit= for unregistered users. Switch to explicit
-    # NWL LSOA lists, chunked into ~500-code requests.
+    # LSOA lists for the boroughs in scope, chunked into ~500-code requests.
     cache = cache_dir / f"claimant_{SCOPE_KEY}_latest.csv"
 
     # The NW London LSOA set comes from the ONS best-fit lookup, which is scoped
-    # to SCOPE_LADS (the 8 NWL ICS boroughs; Camden is NCL, not NWL).
+    # to SCOPE_LADS.
     try:
-        nwl_lsoas = set(get_lsoa_ward_lookup())
+        scope_lsoas = set(get_lsoa_ward_lookup())
     except Exception as e:
         warn(f"claimant count: ONS LSOA->ward lookup unavailable ({e}); "
-             "cannot scope to NWL")
+             "cannot scope the request")
         return pd.DataFrame()
-    info(f"  NWL LSOA set: {len(nwl_lsoas):,} codes")
-    if not nwl_lsoas:
-        warn("claimant count: empty NWL LSOA set; nothing to fetch")
+    info(f"  LSOA set in scope: {len(scope_lsoas):,} codes")
+    if not scope_lsoas:
+        warn("claimant count: empty LSOA set in scope; nothing to fetch")
         return pd.DataFrame()
 
     # NOMIS accepts an explicit comma-separated geography list. Per-request cap
@@ -1830,7 +1830,7 @@ def run_claimant_count() -> pd.DataFrame:
     )
     CHUNK = 500
     if not cache.exists() or cache.stat().st_size < 4096:
-        codes = sorted(nwl_lsoas)
+        codes = sorted(scope_lsoas)
         parts: list[bytes] = []
         header: bytes | None = None
         for i in range(0, len(codes), CHUNK):
@@ -1929,11 +1929,8 @@ def run_claimant_count() -> pd.DataFrame:
     out["claimant_month"] = latest
     out = out.drop(columns=["claimant_count_yearAgo"])
 
-    # Keep only NW London LSOAs (prefix match via the LAD list used elsewhere).
-    # If NWL_LSOAS is defined (injected by run_imd), filter to that; else keep all.
-    nwl_codes = globals().get("_NWL_LSOA_SET")
-    if isinstance(nwl_codes, set) and nwl_codes:
-        out = out[out["LSOA21CD"].isin(nwl_codes)].copy()
+    # No scope filter here. The request above only asked NOMIS for LSOAs in
+    # scope, so there is nothing out of scope left to remove.
 
     out_path = DATA_DIR / "economy" / "claimant_count.parquet"
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -2066,10 +2063,8 @@ def run_dwp_benefits() -> pd.DataFrame:
                  .groupby("GEOGRAPHY_CODE", as_index=False)["OBS_VALUE"].sum()
                  .rename(columns={"GEOGRAPHY_CODE": geo_col, "OBS_VALUE": short}))
 
-        if is_lsoa:
-            nwl_codes = globals().get("_NWL_LSOA_SET")
-            if isinstance(nwl_codes, set) and nwl_codes:
-                cut = cut[cut[geo_col].isin(nwl_codes)].copy()
+        # As with the claimant count, the geography was set by the request,
+        # so no post-filter is needed.
 
         info(f"  {short}: {len(cut):,} rows at {geo_col} level (period={latest})")
 
@@ -2226,16 +2221,16 @@ def run_qof() -> pd.DataFrame:
         try:
             gps = pd.read_parquet(gps_path)
             if "code" in gps.columns:
-                nwl_codes = set(gps["code"].dropna().astype(str).str.upper())
+                gp_codes = set(gps["code"].dropna().astype(str).str.upper())
                 wide["code"] = wide["code"].astype(str).str.upper()
-                wide = wide[wide["code"].isin(nwl_codes)].copy()
+                wide = wide[wide["code"].isin(gp_codes)].copy()
         except Exception as e:
             warn(f"  practice filter skipped ({e})")
 
     out_path = DATA_DIR / "healthcare" / "qof_prevalence.parquet"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     wide = write_parquet_guarded(out_path, wide, source="qof")
-    ok(f"qof: {len(wide):,} NWL practices x {len(QOF_INDICATORS)} indicators "
+    ok(f"qof: {len(wide):,} practices in scope x {len(QOF_INDICATORS)} indicators "
        f"-> {out_path.relative_to(REPO_ROOT)}")
     return wide
 
@@ -2560,6 +2555,127 @@ def run_ptal() -> pd.DataFrame | None:
 # ============================================================================
 # SOURCE 5: Police.uk street crime  (polygon queries per borough per month)
 # ============================================================================
+# The API caps a single polygon-month at 10,000 crimes and answers a request
+# over that cap with a 503 and an empty body. Central London boroughs are over
+# it: an eight-borough NWL run stayed under by luck (Westminster peaked at
+# 8,819), but London-wide it bites, and the failure is silent. A dropped month
+# looks exactly like a quiet month, so the map would under-report crime in the
+# busiest boroughs with nothing in the output to say so.
+#
+# So a refused polygon is halved and retried rather than skipped. The halves
+# tile the original exactly, so nothing is missed at the seam, and crimes are
+# deduplicated by id because a point on the cut line can come back in both.
+POLICE_MAX_SPLIT_DEPTH = 4   # 16 pieces; ample for a 10k cap at borough size
+POLICE_MAX_POLY_POINTS = 180 # keep the poly parameter to a sane length
+
+
+def _police_poly_param(geom) -> str:
+    """Shapely polygon to police.uk's 'lat,lng:lat,lng:...' parameter."""
+    ring = list(geom.exterior.coords)
+    # Thin out until short enough. Boundaries carry far more precision than a
+    # crime-point query needs.
+    tol = 0.0002
+    while len(ring) > POLICE_MAX_POLY_POINTS and tol < 0.05:
+        simplified = geom.simplify(tol, preserve_topology=True)
+        if simplified.is_empty or simplified.geom_type != "Polygon":
+            break
+        ring = list(simplified.exterior.coords)
+        tol *= 2
+    if len(ring) > POLICE_MAX_POLY_POINTS:
+        step = len(ring) // POLICE_MAX_POLY_POINTS + 1
+        ring = ring[::step] + [ring[-1]]
+    return ":".join(f"{lat:.5f},{lng:.5f}" for lng, lat in ring)
+
+
+def _police_halve(geom) -> list:
+    """Split a polygon in two along its longer axis. The pieces tile it."""
+    from shapely.geometry import box
+    minx, miny, maxx, maxy = geom.bounds
+    if (maxx - minx) >= (maxy - miny):
+        mid = (minx + maxx) / 2
+        cuts = [box(minx, miny, mid, maxy), box(mid, miny, maxx, maxy)]
+    else:
+        mid = (miny + maxy) / 2
+        cuts = [box(minx, miny, maxx, mid), box(minx, mid, maxx, maxy)]
+    pieces = []
+    for cut in cuts:
+        part = geom.intersection(cut)
+        if part.is_empty:
+            continue
+        # An intersection can come back as a MultiPolygon or a collection;
+        # keep the polygonal parts and drop stray lines and points.
+        geoms = getattr(part, "geoms", [part])
+        for g in geoms:
+            if g.geom_type == "Polygon" and not g.is_empty and g.area > 0:
+                pieces.append(g)
+    return pieces
+
+
+def _police_request(poly_str: str, ym: str):
+    """One call. Returns (crimes, None) or (None, reason)."""
+    try:
+        r = requests.post(
+            "https://data.police.uk/api/crimes-street/all-crime",
+            data={"poly": poly_str, "date": ym}, timeout=90,
+        )
+    except requests.RequestException as e:
+        return None, f"network: {type(e).__name__}"
+    if r.status_code == 503:
+        # The documented response for "more than 10,000 crimes".
+        return None, "over_cap"
+    if r.status_code != 200:
+        return None, f"http {r.status_code}"
+    try:
+        return json.loads(r.content.decode("utf-8")), None
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return None, "unparseable body"
+
+
+def _police_fetch_area(geom, ym: str, cache_dir: pathlib.Path, stem: str,
+                       depth: int = 0):
+    """Fetch one polygon-month, halving the polygon if the API refuses it.
+
+    Returns (crimes, failures). A failure is only recorded when splitting has
+    not helped, so the caller can tell a genuinely lost area from a big one.
+    """
+    cache = cache_dir / f"{stem}__{ym}.json"
+    # Files of 3 bytes or fewer are "[]" or an empty body from an earlier bad
+    # fetch. Retry those rather than trusting them.
+    if cache.exists() and cache.stat().st_size > 3:
+        try:
+            return json.loads(cache.read_text(encoding="utf-8")), []
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            pass  # corrupt cache, refetch
+
+    data, reason = _police_request(_police_poly_param(geom), ym)
+    if data is not None:
+        cache.write_text(json.dumps(data), encoding="utf-8")
+        time.sleep(0.3)
+        return data, []
+
+    if reason == "over_cap" and depth < POLICE_MAX_SPLIT_DEPTH:
+        pieces = _police_halve(geom)
+        if len(pieces) > 1:
+            merged, failures, seen = [], [], set()
+            for i, piece in enumerate(pieces):
+                sub, sub_fail = _police_fetch_area(
+                    piece, ym, cache_dir, f"{stem}__h{depth}{i}", depth + 1)
+                failures.extend(sub_fail)
+                for c in sub:
+                    cid = c.get("id")
+                    # Halves share an edge, so a crime on the cut line can
+                    # come back twice. Keep ids once; keep id-less rows as-is
+                    # rather than guessing they are duplicates.
+                    if cid is None:
+                        merged.append(c)
+                    elif cid not in seen:
+                        seen.add(cid)
+                        merged.append(c)
+            return merged, failures
+
+    return [], [(stem, ym, reason, depth)]
+
+
 def run_police_crime(months_back: int = 12) -> pd.DataFrame:
     rule(f"Police.uk crime (last {months_back} months)")
     cache_dir = CACHE_DIR / "police_uk_crime"
@@ -2587,12 +2703,16 @@ def run_police_crime(months_back: int = 12) -> pd.DataFrame:
         # here, wards and LSOAs were already WGS84), which is why this step
         # converted. GeoJSON positions are [lng, lat]; police.uk wants lat,lng.
         # Subsampled because the poly is sent as a URL-ish parameter.
+        from shapely.geometry import Polygon
         for idx, ring in enumerate(rings):
-            pts = [(pt[1], pt[0]) for pt in ring[::5]]
-            if len(pts) < 3:
+            if len(ring) < 4:
                 continue  # degenerate, skip
-            poly_str = ":".join(f"{lat:.5f},{lng:.5f}" for lat, lng in pts)
-            polys.append((name, lad, idx, len(rings), poly_str))
+            geom = Polygon(ring)
+            if not geom.is_valid:
+                geom = geom.buffer(0)  # fix self-intersections
+            if geom.is_empty or geom.geom_type != "Polygon":
+                continue
+            polys.append((name, lad, idx, len(rings), geom))
 
     # 12 months lagged by 2 (publication delay)
     today = pd.Timestamp.now("UTC").normalize()
@@ -2600,38 +2720,41 @@ def run_police_crime(months_back: int = 12) -> pd.DataFrame:
               for i in range(2, 2 + months_back)]
 
     all_crimes: list = []
-    for name, lad, idx, total_rings, poly in polys:
+    failures: list = []
+    attempted = 0
+    for name, lad, idx, total_rings, geom in polys:
         for ym in months:
-            # Keep existing single-polygon cache layout; MultiPolygons add
-            # a __p{idx} suffix so each sub-polygon caches independently.
-            if total_rings == 1:
-                cache = cache_dir / f"{lad}__{ym}.json"
-            else:
-                cache = cache_dir / f"{lad}__p{idx}__{ym}.json"
-            # Cached files <= 3 bytes are empty responses from a bad earlier fetch;
-            # retry those.
-            if not cache.exists() or cache.stat().st_size <= 3:
-                try:
-                    r = requests.post(
-                        "https://data.police.uk/api/crimes-street/all-crime",
-                        data={"poly": poly, "date": ym}, timeout=60,
-                    )
-                    if r.status_code != 200:
-                        # Keep walking, don't crash a 12-month run on one bad hit
-                        continue
-                    cache.write_bytes(r.content)
-                    time.sleep(0.3)
-                except requests.RequestException:
-                    continue
-            try:
-                data = json.loads(cache.read_text())
-            except json.JSONDecodeError:
-                continue
+            # Keep the existing single-polygon cache layout so the months
+            # already on disk are still hits; MultiPolygons add a __p{idx}
+            # suffix so each sub-polygon caches independently.
+            stem = lad if total_rings == 1 else f"{lad}__p{idx}"
+            attempted += 1
+            data, fails = _police_fetch_area(geom, ym, cache_dir, stem)
+            failures.extend(fails)
             for c in data:
                 c["_borough_name"] = name
                 c["_borough_code"] = lad
                 c["_month"] = ym
             all_crimes.extend(data)
+
+    if failures:
+        by_reason: dict = {}
+        for _stem, _ym, reason, _depth in failures:
+            by_reason[reason] = by_reason.get(reason, 0) + 1
+        detail = ", ".join(f"{r} x{n}" for r, n in sorted(by_reason.items()))
+        share = len(failures) / max(attempted, 1)
+        # A handful of bad hits is normal over 400+ requests. A large share is
+        # a broken run, and a broken run that returns a small number quietly is
+        # worse than one that stops, because the map cannot tell the difference
+        # between little crime and little data.
+        if share > 0.25:
+            raise RuntimeError(
+                f"police.uk: {len(failures)} of {attempted} polygon-months "
+                f"failed ({share:.0%}): {detail}. Refusing to write a "
+                f"partial crime file over the previous one.")
+        warn(f"police.uk: {len(failures)} of {attempted} polygon-months "
+             f"could not be fetched ({detail}). Those areas are absent from "
+             f"this run.")
 
     # Join to ward / LSOA via point-in-polygon
     wards_idx = load_boundary_index("wards")
@@ -2857,7 +2980,7 @@ def _ccew_income_band(inc):
     return "large"
 
 
-# Map of lowercase AOO area names -> NWL LAD25CD. Keys cover the exact strings
+# Map of lowercase AOO area names -> LAD25CD in scope. Keys cover the exact strings
 # that appear in the Charity Commission area_of_operation table.
 # Charity Commission area-of-operation strings, derived from the scope list so
 # a borough cannot be missed by hand. Both "and" and "&" spellings are
@@ -2883,10 +3006,16 @@ def run_charities():
     """Place-based VCSE fetch.
 
     Filter rule: a charity is kept iff its declared area of operation covers
-    one or more NWL boroughs, OR it declares London-wide operation (Greater
-    London Region row). HQ postcode is used for map-pin placement only, not
-    for gating. Charities HQ'd outside NWL are kept (no pin, but listed in
-    the ward/LSOA panel as a service provider).
+    one or more boroughs in scope, OR it declares London-wide operation
+    (Greater London Region row). HQ postcode is used for map-pin placement
+    only, not for gating, so a charity headquartered outside London is still
+    kept if it operates here: it gets no pin, but is listed in the ward and
+    LSOA panel as a service provider.
+
+    The borough names matched against are derived from BOROUGHS, so widening
+    the scope widens this automatically. Verified against the extract: all 33
+    boroughs match at least 595 area-of-operation rows, and no London-looking
+    description fails to match.
     """
     rule("VCSE (Charity Commission bulk extract)")
     main_zip  = _ccew_zip("charity")
@@ -2928,12 +3057,12 @@ def run_charities():
             scope_map[num] = "explicit"
             continue
         if gtype.lower() == "region" and key in LONDON_WIDE_AOO:
-            # London-wide declarations cover all 9 NWL boroughs
+            # A London-wide declaration covers every borough in scope
             covers_map.setdefault(num, set()).update(ALL_SCOPE_LADS)
             if scope_map.get(num) != "explicit":
                 scope_map[num] = "london_wide"
 
-    info(f"CCEW: {len(covers_map):,} charities cover at least one NWL borough "
+    info(f"CCEW: {len(covers_map):,} charities cover at least one borough in scope "
          f"(explicit: {sum(1 for v in scope_map.values() if v == 'explicit'):,}, "
          f"london_wide only: {sum(1 for v in scope_map.values() if v == 'london_wide'):,})")
 
@@ -2944,7 +3073,7 @@ def run_charities():
 
     def _ccew_keep(r: dict) -> int:
         """Charity number if this row is a registered, non-subsidiary charity
-        covering NWL; 0 otherwise. Used both to pre-collect postcodes and to
+        covering a borough in scope; 0 otherwise. Used both to pre-collect postcodes and to
         filter the main pass, so the two stay in step."""
         if (r.get("charity_registration_status") or "").lower() != "registered":
             return 0
@@ -3035,10 +3164,10 @@ def run_charities():
 
     pinned = sum(1 for c in charities.values() if c["lat"] is not None and c["hq_in_nwl"])
     info(
-        f"CCEW: kept {len(charities):,} NWL-serving charities "
+        f"CCEW: kept {len(charities):,} charities serving the scope "
         f"(skipped: {skipped_removed:,} removed, {skipped_linked:,} subsidiary, "
-        f"{skipped_no_coverage:,} no NWL coverage) "
-        f"— pinnable on map: {pinned:,}, HQ outside NWL: {hq_outside_nwl:,}, no geocode: {no_geocode:,}"
+        f"{skipped_no_coverage:,} no coverage in scope) "
+        f"- pinnable on map: {pinned:,}, HQ outside scope: {hq_outside_nwl:,}, no geocode: {no_geocode:,}"
     )
 
     # ---- Pass 3: attach classification rows ----
@@ -3488,7 +3617,7 @@ def build_lsoa_data() -> dict:
     # 41 MB downloaded by every visitor, of which 3.5% is ever looked up.
     # It also silently corrupted a statistic. _nwlDomainMean() in index.html
     # averages over Object.values(LSOA_DATA), so an unscoped file made the
-    # "NWL mean" an England mean. Scoping makes that function mean what its
+    # the comparison mean an England mean. Scoping makes that function mean what its
     # name says.
     try:
         scope = set(get_lsoa_ward_lookup())

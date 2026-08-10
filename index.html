@@ -327,7 +327,16 @@
   font-weight:600;cursor:pointer}
 #ai-send:disabled{background:#999;cursor:default}
 @media (max-width:560px){#ai-panel{width:calc(100vw - 24px);height:calc(100vh - 130px)}}
-</style>
+
+    /* Layers whose coverage is narrower than the map. Flagged rather than
+       removed, because an empty layer reads as "none here" when the truth is
+       "not collected here". */
+    .cov-tag{display:inline-block;font-size:9px;font-weight:700;letter-spacing:.4px;
+      color:#8a5a00;background:#fdf0d5;border:1px solid #e8d3a3;border-radius:3px;
+      padding:0 3px;vertical-align:middle;margin-left:2px}
+    .cov-note{font-size:10px;line-height:1.35;color:#8a5a00;background:#fdf0d5;
+      border:1px solid #e8d3a3;border-radius:4px;padding:4px 6px;margin:2px 0 5px}
+  </style>
 </head>
 <body>
 
@@ -402,8 +411,9 @@
           <label class="lrow"><div class="ldot" style="background:#E89B1B"></div><span class="lname">Pharmacies <span class="lcount" id="pharm-count">0</span></span><input type="checkbox" id="tph"></label>
         </div>
         <div class="sb-sec" style="flex-shrink:0;border-bottom:1px solid #e5e5e0">
-          <div class="sb-lbl">Civic &amp; education<span class="lhelp" title="Schools, community centres, libraries and formal ESOL providers — sourced from the GLA ESOL Planning Map (English language proficiency planning dataset).">?</span></div>
-          <label class="lrow"><div class="ldot" style="background:#1E5BB8"></div><span class="lname">Schools <span class="lcount" id="schools-count">0</span></span><input type="checkbox" id="tsch"></label>
+          <div class="sb-lbl">Civic &amp; education<span class="lhelp" title="Schools, community centres, libraries and formal ESOL providers — sourced from the GLA ESOL Planning Map (English language proficiency planning dataset). These four layers cover the eight North West London boroughs only: Brent, Ealing, Hammersmith and Fulham, Harrow, Hillingdon, Hounslow, Kensington and Chelsea, and Westminster. Elsewhere in London they are empty because the data has not been collected yet, not because there is nothing there.">?</span></div>
+          <div class="cov-note">Covers North West London only. Blank elsewhere means not yet collected, not none.</div>
+          <label class="lrow"><div class="ldot" style="background:#1E5BB8"></div><span class="lname">Schools <span class="lcount" id="schools-count">0</span> <span class="cov-tag" title="North West London boroughs only">NWL</span></span><input type="checkbox" id="tsch"></label>
           <div id="schools-filter-wrap" style="margin:2px 0 4px 16px">
             <select id="schools-phase-filter" style="width:100%;padding:3px 6px;border:1px solid #ddd;border-radius:5px;font-size:11px;color:#333;background:#fff">
               <option value="all" selected>All schools</option>
@@ -415,9 +425,9 @@
               <option value="Not applicable">Special / Other</option>
             </select>
           </div>
-          <label class="lrow"><div class="ldot" style="background:#D87C2D"></div><span class="lname">Community centres <span class="lcount" id="cc-count">0</span></span><input type="checkbox" id="tcc"></label>
-          <label class="lrow"><div class="ldot" style="background:#00A0A0"></div><span class="lname">Libraries <span class="lcount" id="lib-count">0</span></span><input type="checkbox" id="tlib"></label>
-          <label class="lrow"><div class="ldot" style="background:#B83C3C"></div><span class="lname">Formal ESOL providers <span class="lcount" id="esol-count">0</span></span><input type="checkbox" id="tesol"></label>
+          <label class="lrow"><div class="ldot" style="background:#D87C2D"></div><span class="lname">Community centres <span class="lcount" id="cc-count">0</span> <span class="cov-tag" title="North West London boroughs only">NWL</span></span><input type="checkbox" id="tcc"></label>
+          <label class="lrow"><div class="ldot" style="background:#00A0A0"></div><span class="lname">Libraries <span class="lcount" id="lib-count">0</span> <span class="cov-tag" title="North West London boroughs only">NWL</span></span><input type="checkbox" id="tlib"></label>
+          <label class="lrow"><div class="ldot" style="background:#B83C3C"></div><span class="lname">Formal ESOL providers <span class="lcount" id="esol-count">0</span> <span class="cov-tag" title="North West London boroughs only">NWL</span></span><input type="checkbox" id="tesol"></label>
           <div id="esol-filter-wrap" style="margin:2px 0 4px 16px">
             <select id="esol-type-filter" style="width:100%;padding:3px 6px;border:1px solid #ddd;border-radius:5px;font-size:11px;color:#333;background:#fff">
               <option value="all" selected>All provider types</option>
@@ -484,12 +494,13 @@
           </label>
           <label class="lrow" style="padding:2px 0;border:none">
             <div class="ldot" style="background:#5C5C8A"></div>
-            <span class="lname">Show Community Interest Companies <span class="lcount" id="cic-tab-count">0</span></span>
+            <span class="lname">Show Community Interest Companies <span class="lcount" id="cic-tab-count">0</span> <span class="cov-tag" title="North West London boroughs only">NWL</span></span>
             <input type="checkbox" id="cic-tab-toggle">
           </label>
           <div style="font-size:10.5px;color:#888;margin:4px 0 2px 24px;line-height:1.4">
             VCSE = registered charities · CIC = Community Interest Companies (community-anchored businesses)
           </div>
+          <div class="cov-note" style="margin-left:24px">Charities cover all of London. CICs cover North West London only, so a blank borough means not yet collected.</div>
         </div>
         <div class="sb-sec" style="padding-bottom:8px">
           <div class="sb-lbl">Filter by area</div>
