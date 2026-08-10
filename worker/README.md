@@ -69,6 +69,13 @@ which is the browser's job to run. A `403` means the Origin header is not in
 marked for caching. A question costs a fraction of a penny. The per-IP cap is
 40 questions per UTC day, held in KV; change `DAILY_CAP` in `src/index.js`.
 
+The cap counts questions, not requests. Answering one question takes several
+round trips (model asks for a tool, browser posts the result back), so counting
+requests would have made 40 mean roughly 10. Continuations are identified as
+user messages carrying only `tool_result` blocks, which only the client loop
+sends. A caller already over the cap is refused either way, so a continuation
+cannot be used to slip past it.
+
 If the KV namespace is not bound the Worker **fails open** and stops counting
 rather than breaking the site. That is deliberate, but it means a missing
 binding removes your spend cap: check `wrangler kv namespace list` if usage

@@ -121,13 +121,34 @@ function json(body, status, headers) {
   });
 }
 
-async function underDailyCap(env, ip) {
+/**
+ * Is this request a fresh question, or the continuation of one?
+ *
+ * Answering a question takes several round trips: the model asks for a tool,
+ * the browser runs it and posts the result back. Those are separate requests
+ * here, so counting requests would make a 40 cap mean roughly 10 questions.
+ * A continuation is a user message carrying only tool_result blocks, which is
+ * something only the client loop sends, never a person typing.
+ */
+function isNewQuestion(messages) {
+  const last = messages[messages.length - 1];
+  if (!last || last.role !== "user") return true;
+  if (!Array.isArray(last.content)) return true; // plain string: a typed question
+  // Note the length check. An empty array satisfies every() vacuously, which
+  // would let a caller post {content: []} all day without ever being counted.
+  if (last.content.length === 0) return true;
+  return !last.content.every((b) => b && b.type === "tool_result");
+}
+
+async function underDailyCap(env, ip, countIt) {
   if (!env.RATE_LIMIT) return true; // KV not bound: fail open rather than break the site
   const key = `${new Date().toISOString().slice(0, 10)}:${ip}`;
   const used = parseInt((await env.RATE_LIMIT.get(key)) || "0", 10);
   if (used >= DAILY_CAP) return false;
-  // 48h TTL comfortably outlives the UTC day the key is for.
-  await env.RATE_LIMIT.put(key, String(used + 1), { expirationTtl: 172800 });
+  if (countIt) {
+    // 48h TTL comfortably outlives the UTC day the key is for.
+    await env.RATE_LIMIT.put(key, String(used + 1), { expirationTtl: 172800 });
+  }
   return true;
 }
 
@@ -139,14 +160,6 @@ export default {
     if (request.method !== "POST") return json({ error: "POST only" }, 405, cors);
     if (!cors["Access-Control-Allow-Origin"]) return json({ error: "Origin not allowed" }, 403, cors);
     if (!env.ANTHROPIC_API_KEY) return json({ error: "Worker is not configured" }, 500, cors);
-
-    const ip = request.headers.get("CF-Connecting-IP") || "unknown";
-    if (!(await underDailyCap(env, ip))) {
-      return json(
-        { error: `Daily limit of ${DAILY_CAP} questions reached. Try again tomorrow.` },
-        429, cors,
-      );
-    }
 
     let body;
     try {
@@ -160,6 +173,17 @@ export default {
     // Bound what a caller can push through: this is an unauthenticated endpoint.
     if (messages.length > 40) return json({ error: "Conversation too long" }, 400, cors);
     if (JSON.stringify(messages).length > 200_000) return json({ error: "Payload too large" }, 413, cors);
+
+    // Counted after parsing, so the cap can be per question rather than per
+    // round trip. A caller already over the cap is refused either way, so a
+    // continuation cannot be used to slip past it.
+    const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+    if (!(await underDailyCap(env, ip, isNewQuestion(messages)))) {
+      return json(
+        { error: `Daily limit of ${DAILY_CAP} questions reached. Try again tomorrow.` },
+        429, cors,
+      );
+    }
 
     const upstream = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
