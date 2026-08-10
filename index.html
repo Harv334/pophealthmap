@@ -890,7 +890,7 @@
       <div class="dl-badge" id="dl-badge" role="group" aria-label="Data level filter">
         <span class="dl-badge-label">Viewing</span>
         <div class="dl-seg" id="dl-seg">
-          <button type="button" data-dl="ward" class="active" title="Ward-level data (188 wards)">Ward</button>
+          <button type="button" data-dl="ward" class="active" title="Ward-level data (704 wards)">Ward</button>
           <button type="button" data-dl="lsoa" title="LSOA-level data (~1,200 areas, more granular)">LSOA</button>
         </div>
         <div class="dl-hint" id="dl-hint"></div>
@@ -1675,13 +1675,13 @@ const OV_META = {
 function ovMeta(k) { return OV_META[k] || null; }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// WARD GEOJSON — ONS WD May 2025 BFC V2 (full resolution); 188 wards across 9 London boroughs.
+// WARD GEOJSON - ONS WD May 2025 BFC V2 (full resolution); 704 wards across the 33 London boroughs.
 // Westminster wards keep original names; duplicates ("Kilburn", "Regent's Park") in non-Westminster
 // boroughs are disambiguated by appending the borough name. Properties: WD24NM, WD24CD, LAD.
 // GJ now lives in data/map/wards.js (loaded above).
 
 // ═══════════════════════════════════════════════════════════════════════════
-// NW LONDON CONTEXT WARDS — emptied; all 188 wards now in GJ above.
+// CONTEXT WARDS - emptied; all 704 wards now in GJ above.
 // ═══════════════════════════════════════════════════════════════════════════
 const NW_WARDS_GJ = {"type":"FeatureCollection","features":[]};
 
@@ -2130,7 +2130,7 @@ function _ensureGreenspaceLayer() {
 // gpL/hL/grL not added by default — toggle on via sidebar
 
 // ── Layer count badges ───────────────────────────────────────────────────────
-// Keeps the little "188", "1,234" numbers next to each Layers-tab entry in
+// Keeps the little "704", "1,234" numbers next to each Layers-tab entry in
 // sync with what's actually loaded. Idempotent — safe to call whenever a
 // data source finishes loading.
 function _updateLayerCounts() {
@@ -2184,7 +2184,7 @@ const nwWardsL = L.geoJSON(NW_WARDS_GJ, {
 });
 // Off by default — user can toggle on
 
-// Black ward-boundary layer (overlay for the full 188 London wards).
+// Black ward-boundary layer (overlay for all 704 London wards).
 // Non-interactive so ward clicks still hit the main wLyr underneath.
 // Per-feature style so when a borough is focused, wards outside it disappear.
 function _wardBoundaryStyle(feat) {
