@@ -1,0 +1,24 @@
+name = "pophealthmap-ai"
+main = "src/index.js"
+compatibility_date = "2026-01-01"
+
+# Origins allowed to call this Worker. Anything else gets no CORS header and
+# the browser refuses the response. Add a local origin here while developing.
+[vars]
+ALLOWED_ORIGINS = "https://pophealthmap.uk,https://www.pophealthmap.uk,https://harv334.github.io"
+
+# Per-IP daily counter. Create with:
+#   npx wrangler kv namespace create RATE_LIMIT
+# then paste the id it prints below.
+[[kv_namespaces]]
+binding = "RATE_LIMIT"
+id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+
+# The API key is NOT here and must never be. Set it as a secret:
+#   npx wrangler secret put ANTHROPIC_API_KEY
+# Secrets live in Cloudflare, not in this repo.
+
+# Uncomment once the domain is on Cloudflare, to serve at api.pophealthmap.uk:
+# [[routes]]
+# pattern = "api.pophealthmap.uk/*"
+# custom_domain = true

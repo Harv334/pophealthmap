@@ -1,17 +1,16 @@
-# NW London Population Health Map — Raw Data Sources
+# PopHealth Map — Raw Data Sources
 
-One-page inventory of every raw file needed to reproduce the NW London
-ward + LSOA health map. If you hand this document to a colleague, they
-can download each file themselves and re-run the pipeline — no script
-access needed.
+One-page inventory of every raw file needed to reproduce the ward + LSOA
+health map. If you hand this document to a colleague, they can obtain each
+source themselves and re-run the pipeline, with no script access needed.
 
-**Geography scope:** 9 NW London boroughs — Brent (E09000005), Camden
-(E09000007), Ealing (E09000009), Hammersmith & Fulham (E09000013),
-Harrow (E09000015), Hillingdon (E09000017), Hounslow (E09000018),
-Kensington & Chelsea (E09000020), Westminster (E09000033).
+**Geography scope:** all 33 London boroughs plus the City of London. The
+authoritative list is the `BOROUGHS` constant at the top of
+`fetch_all_data.py`; this document does not repeat it, so that the two
+cannot drift apart.
 
-**Levels used:** LSOA 2021 (≈33,755 nationally, ~1,313 in NWL),
-Ward 2024, GP practice, postcode.
+**Levels used:** LSOA 2021 (≈33,755 nationally, 4,994 in London),
+Ward 2025, GP practice, postcode.
 
 ---
 
@@ -32,8 +31,8 @@ Ward 2024, GP practice, postcode.
 > the second is now the ONS best-fit lookup, which is the authoritative
 > answer rather than an inference. Neither needs a manual download.
 
-> **Trim to NWL**: filter each GeoJSON by LAD25CD / LAD24CD in the
-> borough set above before embedding in the map to keep file size down.
+> **Trim to scope**: filter each GeoJSON by LAD25CD / LAD24CD against
+> `SCOPE_LADS` before writing it into `data/map/`, to keep file size down.
 
 ---
 
@@ -50,8 +49,8 @@ rank.
 
 **Filtering applied to the committed parquet.** Rows: every English LSOA
 2021 in File 7 carrying an LSOA code (33,755). There is no geographic
-subsetting, because `lsoa_data.json` is full-England and the NWL scoping
-happens downstream. Columns: 11 of File 7's ~60, being `LSOA21CD`, the
+subsetting at this stage: the parquet holds all of England, and the London
+scoping happens when `lsoa_data.json` is built. Columns: 11 of File 7's ~60, being `LSOA21CD`, the
 overall IMD score / decile / rank, and the seven domain scores. The
 population denominators and the per-domain ranks and deciles are dropped
 as unused.
@@ -89,7 +88,7 @@ every geography level. LSOA-level CSVs inside are named
 ## 4. Economy & benefits (NOMIS / DWP)
 
 All downloadable as CSV via NOMIS "bulk query" URL. Replace
-`{geocodes}` with comma-separated LSOA 2021 codes (NWL: ~1,313).
+`{geocodes}` with comma-separated LSOA 2021 codes (London: 4,994).
 
 | Dataset | NOMIS ID | What we pull |
 |---------|----------|--------------|
@@ -161,7 +160,7 @@ Area type 7 = GP practice. Area type 3 = MSOA.
 | **Sub-regional fuel poverty 2023, LSOA table** (XLSX) | DESNZ | https://www.gov.uk/government/collections/fuel-poverty-sub-regional-statistics | `fuel_poverty_pct` (Low Income Low Energy Efficiency metric). Open the "LSOA" sheet. |
 
 Codes in DESNZ are usually LSOA 2011 — they align with LSOA 2021 for
-NWL so no re-mapping is needed for our boroughs.
+London so no re-mapping is needed for our boroughs.
 
 ### 6b. Access to green and blue space
 
@@ -194,7 +193,7 @@ and 10% commitment — the correct LSOA figure is `(100+80) / (200+800)
 
 Aggregator: `aggregate_greenblue.py` (streaming ODS parser — the full
 file is a 1.37 GB XML once unzipped and doesn't fit in odfpy's DOM).
-Output: `data/environment/greenblue_lsoa.parquet` (1,313 NWL LSOA
+Output: `data/environment/greenblue_lsoa.parquet` (4,994 London LSOA
 rows, 38 columns — the `commitment` / `doorstep` / `local` /
 `neighbourhood` suffixes plus each pairwise + triple combination, as
 counts and as percentages).
@@ -218,7 +217,7 @@ counts and as percentages).
 |------|--------|-----|----------|
 | `publicextract.charity.json.zip` | Charity Commission public register | https://ccewuksprdoneregsadata1.blob.core.windows.net/data/json/publicextract.charity.zip | Core charity record — name, income, HQ postcode. |
 | `publicextract.charity_classification.json.zip` | Charity Commission | https://ccewuksprdoneregsadata1.blob.core.windows.net/data/json/publicextract.charity_classification.zip | What causes each charity supports (mental health, older people etc.). |
-| `publicextract.charity_area_of_operation.json.zip` | Charity Commission | https://ccewuksprdoneregsadata1.blob.core.windows.net/data/json/publicextract.charity_area_of_operation.zip | Which London boroughs / LAs each charity operates in. Used to filter to "operates in NWL" rather than "HQ in NWL". |
+| `publicextract.charity_area_of_operation.json.zip` | Charity Commission | https://ccewuksprdoneregsadata1.blob.core.windows.net/data/json/publicextract.charity_area_of_operation.zip | Which London boroughs / LAs each charity operates in. Used to filter to "operates in London" rather than "HQ in London". |
 
 All three extracts refresh monthly at the same folder:
 https://register-of-charities.charitycommission.gov.uk/register/full-register-download
@@ -231,7 +230,7 @@ https://register-of-charities.charitycommission.gov.uk/register/full-register-do
 |------|--------|-----|----------|
 | `<YYYY-MM>-{force}-street.csv` — monthly street-crime archives for Metropolitan, City of London | data.police.uk | https://data.police.uk/data/ (under "Custom download") | Crime points, aggregated to ward. We pull the last 12 months. |
 
-Select both forces for NWL coverage. Each month is one ZIP; inside,
+Select the Metropolitan Police and City of London forces for full coverage. Each month is one ZIP; inside,
 one CSV per force per month.
 
 ---
@@ -297,7 +296,7 @@ equivalent open licence.
 - LSOA 2021 is the authoritative small-area unit; NOMIS calls it
   `TYPE298` on the claimant/DWP endpoints. Any data that still comes
   in LSOA 2011 codes (DESNZ is the main one) aligns 1:1 with LSOA 2021
-  for the nine NWL boroughs — no re-mapping needed.
+  for the London boroughs, so no re-mapping is needed.
 - All authoritative URLs are stable landing pages — deep links to
   specific file versions break each release cycle. If a link 404s,
   navigate to the landing page and pick the latest release there.
