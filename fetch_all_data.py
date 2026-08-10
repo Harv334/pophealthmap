@@ -3241,14 +3241,27 @@ def build_ward_data() -> dict:
     wards_gj = DATA_DIR / "boundaries" / "wards.geojson"
     if wards_gj.exists():
         gj = json.loads(wards_gj.read_text(encoding="utf-8"))
+        # Same disambiguation as the map blob below, for the same reason: eleven
+        # ward names are shared by two boroughs, and anything keyed by name
+        # rather than code silently picks one of the pair. Kept identical to the
+        # blob so the two files always agree on what a ward is called.
+        _counts: dict = {}
+        for feat in gj.get("features", []):
+            _nm = (feat.get("properties", {}).get("WD25NM")
+                   or feat.get("properties", {}).get("WD24NM") or "")
+            _counts[_nm] = _counts.get(_nm, 0) + 1
         for feat in gj.get("features", []):
             p = feat.get("properties", {})
             code = p.get("WD25CD") or p.get("WD24CD")
             if not code:
                 continue
+            nm = p.get("WD25NM") or p.get("WD24NM") or ""
+            lad = p.get("LAD25NM") or p.get("LAD24NM") or ""
+            if _counts.get(nm, 0) > 1 and lad:
+                nm = f"{nm} ({lad})"
             wards[code] = {
-                "name": p.get("WD25NM") or p.get("WD24NM") or "",
-                "lad":  p.get("LAD25NM") or p.get("LAD24NM") or "",
+                "name": nm,
+                "lad":  lad,
                 "lad_code": p.get("LAD25CD") or p.get("LAD24CD") or "",
                 "indicators": {},
             }
@@ -3781,14 +3794,37 @@ def export_map_blobs() -> None:
     bdir = DATA_DIR / "boundaries"
     wards_gj = _read_geojson_opt(bdir / "wards.geojson")
     if wards_gj:
+        # Ward names are not unique across London. Eleven are shared by two
+        # boroughs: Kilburn is in both Brent and Camden, Village is both
+        # Wimbledon Village in Merton and a ward in Barking and Dagenham, and
+        # so on. index.html keys its ward lookup by this name, so a duplicate
+        # silently masks one of the pair and clicking that ward shows the other
+        # borough's figures. Two wards at opposite ends of the deprivation
+        # range sharing a name is exactly the case that looks plausible and is
+        # wrong.
+        #
+        # Shared names get their borough appended, which is the convention the
+        # app already expects ("Kilburn (Brent)"). Unique names are left alone,
+        # so 693 of the 704 read exactly as before.
+        name_counts: dict = {}
+        for f in wards_gj["features"]:
+            nm = f.get("properties", {}).get("WD25NM", "")
+            name_counts[nm] = name_counts.get(nm, 0) + 1
         for f in wards_gj["features"]:
             p = f.get("properties", {})
+            nm, lad = p.get("WD25NM", ""), p.get("LAD25NM", "")
+            if name_counts.get(nm, 0) > 1 and lad:
+                nm = f"{nm} ({lad})"
             # index.html reads WD24NM/WD24CD/LAD; keep those names so the app
             # does not need touching for a boundary-vintage change.
             f["properties"] = {
-                "WD24NM": p.get("WD25NM", ""), "WD24CD": p.get("WD25CD", ""),
-                "LAD": p.get("LAD25NM", ""),
+                "WD24NM": nm, "WD24CD": p.get("WD25CD", ""),
+                "LAD": lad,
             }
+        shared = sum(1 for n, c in name_counts.items() if c > 1)
+        if shared:
+            info(f"  {shared} ward name(s) shared by more than one borough; "
+                 f"disambiguated with the borough name")
         write_map_blob("GJ", wards_gj,
                        "Ward boundaries. ONS WD_MAY_2025_UK_BGC_V2, scoped to the borough list.")
         ok(f"map blob: {len(wards_gj['features']):,} wards -> data/map/{MAP_BLOBS['GJ']}")
