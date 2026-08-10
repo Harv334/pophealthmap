@@ -10,7 +10,7 @@
  * Set ASSISTANT_ENDPOINT to the deployed Worker URL. While it is empty the
  * panel stays hidden, so the map works normally without the AI layer.
  */
-var ASSISTANT_ENDPOINT = "";
+var ASSISTANT_ENDPOINT = "https://pophealthmapai.sevilleharvey.workers.dev";
 
 (function () {
   "use strict";
