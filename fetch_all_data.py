@@ -273,7 +273,7 @@ def postcode_area(pc: str) -> str:
     return m.group(0) if m else ""
 
 def _http_json(method: str, url: str, *, source: str, session=None,
-               json_body=None, params=None, timeout: int = 60,
+               json_body=None, form_body=None, params=None, timeout: int = 60,
                attempts: int = 4):
     """
     GET/POST returning parsed JSON, with exponential backoff. Returns None on a
@@ -285,8 +285,8 @@ def _http_json(method: str, url: str, *, source: str, session=None,
     last = "no attempt made"
     for i in range(attempts):
         try:
-            r = sess.request(method, url, json=json_body, params=params,
-                             timeout=timeout)
+            r = sess.request(method, url, json=json_body, data=form_body,
+                             params=params, timeout=timeout)
             if r.status_code == 404:
                 return None
             if r.status_code in (429, 500, 502, 503, 504):
@@ -968,6 +968,99 @@ def run_pharmacies() -> pd.DataFrame:
     out = write_parquet_guarded(out_path, out, source="pharmacies")
     ok(f"pharmacies: {len(out):,} rows -> {out_path.relative_to(REPO_ROOT)}")
     return out
+
+# ============================================================================
+# SOURCE 0: Boundaries  (ONS Open Geography Portal)
+# ============================================================================
+# data/boundaries/*.geojson used to be placed by hand with no generator, which
+# made the footprint impossible to change: the ward and LSOA shapes silently
+# defined the map's scope regardless of what the borough list said. These are
+# now fetched for whatever NW_LADS contains.
+#
+# Layer names are the short aliases. The portal also lists longer display names
+# with parentheses, and those do not resolve as URL segments.
+ARCGIS_BASE = ("https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/"
+               "services/{layer}/FeatureServer/0/query")
+BOUNDARY_LAYERS = {
+    "wards":    ("WD_MAY_2025_UK_BGC_V2",  "WD25CD,WD25NM,LAD25CD,LAD25NM"),
+    "boroughs": ("LAD_MAY_2025_UK_BGC_V2", "LAD25CD,LAD25NM"),
+    # No LAD column on the LSOA layer, so it is filtered by code instead.
+    "lsoa":     ("Lower_layer_Super_Output_Areas_December_2021_Boundaries_EW_BSC_V4",
+                 "LSOA21CD,LSOA21NM"),
+}
+ARCGIS_PAGE = 1000          # under the service's 2000 maxRecordCount
+
+def fetch_arcgis_geojson(layer: str, where: str, out_fields: str, *,
+                         source: str) -> dict:
+    """Page an ArcGIS FeatureServer layer into one GeoJSON FeatureCollection."""
+    feats: list = []
+    offset = 0
+    while True:
+        payload = _http_json("POST", ARCGIS_BASE.format(layer=layer), source=source,
+                             form_body={
+                                 "where": where, "outFields": out_fields,
+                                 "returnGeometry": "true",
+                                 # WGS84 throughout. The old committed boroughs
+                                 # file was British National Grid while wards and
+                                 # LSOAs were WGS84, which is why the crime code
+                                 # carried a conversion step.
+                                 "outSR": 4326,
+                                 "f": "geojson",
+                                 "resultOffset": offset,
+                                 "resultRecordCount": ARCGIS_PAGE,
+                                 "orderByFields": out_fields.split(",")[0],
+                             }, timeout=300)
+        if payload is None or "features" not in payload:
+            raise RuntimeError(
+                f"{source}: unexpected response from {layer} (no 'features'). "
+                f"Has the layer been renamed? {ARCGIS_BASE.format(layer=layer)}"
+            )
+        page = payload["features"]
+        feats.extend(page)
+        if len(page) < ARCGIS_PAGE:
+            break
+        offset += len(page)
+    return {"type": "FeatureCollection", "features": feats}
+
+def run_boundaries() -> pd.DataFrame:
+    rule("Boundaries (ONS Open Geography Portal)")
+    out_dir = DATA_DIR / "boundaries"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    lad_in = "LAD25CD IN (" + ",".join(f"'{c}'" for c in sorted(NW_LADS)) + ")"
+    counts = {}
+
+    for kind in ("wards", "boroughs"):
+        layer, fields = BOUNDARY_LAYERS[kind]
+        gj = fetch_arcgis_geojson(layer, lad_in, fields, source="boundaries")
+        write_json_atomic(out_dir / f"{kind}.geojson", gj)
+        counts[kind] = len(gj["features"])
+        ok(f"boundaries: {kind} {counts[kind]:,} features -> "
+           f"data/boundaries/{kind}.geojson")
+
+    # The LSOA layer has no LAD column, so scope comes from the ONS best-fit
+    # lookup and is applied as chunked IN clauses to keep each URL short.
+    codes = sorted(get_lsoa_ward_lookup())
+    layer, fields = BOUNDARY_LAYERS["lsoa"]
+    feats: list = []
+    CHUNK = 200
+    for i in range(0, len(codes), CHUNK):
+        batch = codes[i:i + CHUNK]
+        where = "LSOA21CD IN (" + ",".join(f"'{c}'" for c in batch) + ")"
+        feats.extend(fetch_arcgis_geojson(layer, where, fields,
+                                          source="boundaries")["features"])
+    write_json_atomic(out_dir / "lsoa.geojson",
+                      {"type": "FeatureCollection", "features": feats})
+    counts["lsoa"] = len(feats)
+    ok(f"boundaries: lsoa {len(feats):,} features -> data/boundaries/lsoa.geojson")
+
+    if counts["lsoa"] < len(codes) * 0.95:
+        raise RuntimeError(
+            f"boundaries: only {counts['lsoa']:,} of {len(codes):,} in-scope "
+            f"LSOAs returned geometry. Refusing to ship a map with holes in it."
+        )
+    load_boundary_index.cache_clear()
+    return pd.DataFrame([{"kind": k, "features": v} for k, v in counts.items()])
+
 
 # ============================================================================
 # SOURCE 2b: Dental practices  (NHS ODS egdpprac + curated private practices)
@@ -2461,9 +2554,13 @@ def run_police_crime(months_back: int = 12) -> pd.DataFrame:
             rings = [poly[0] for poly in geom["coordinates"]]
         else:
             rings = [geom["coordinates"][0]]
-        # Boundaries are BNG — convert, subsample (URL len cap)
+        # Boundaries are WGS84 since run_boundaries started fetching them with
+        # outSR=4326. They used to be British National Grid here (and only
+        # here, wards and LSOAs were already WGS84), which is why this step
+        # converted. GeoJSON positions are [lng, lat]; police.uk wants lat,lng.
+        # Subsampled because the poly is sent as a URL-ish parameter.
         for idx, ring in enumerate(rings):
-            pts = [bng_to_wgs84(pt[0], pt[1]) for pt in ring[::5]]
+            pts = [(pt[1], pt[0]) for pt in ring[::5]]
             if len(pts) < 3:
                 continue  # degenerate, skip
             poly_str = ":".join(f"{lat:.5f},{lng:.5f}" for lat, lng in pts)
@@ -3538,6 +3635,7 @@ def export_all() -> None:
 # MAIN
 # ============================================================================
 SOURCES = {
+    "boundaries":  run_boundaries,
     "gp":          run_gp_practices,
     "pharmacies":  run_pharmacies,
     "imd":         run_imd2025,
