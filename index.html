@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>London Population Health Mapping</title>
+<title>PopHealth Map - London population health</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.css">
@@ -297,6 +297,36 @@
   box-shadow: 0 1px 3px rgba(0,0,0,0.25);
 }
 .leaflet-tooltip.marker-tip::before { display: none; }
+
+/* ── Assistant panel ─────────────────────────────────────────────────────
+   Matches the existing panel styling: white card, 1px #ddd border, 5px radius,
+   11px labels. Hidden entirely unless the Worker endpoint is configured. */
+#ai-toggle{position:absolute;right:12px;bottom:12px;z-index:1200;padding:9px 15px;
+  border:1px solid #ccc;border-radius:6px;background:#1a1a1a;color:#fff;font-size:12px;
+  font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.22)}
+#ai-toggle:hover{background:#333}
+#ai-panel{position:absolute;right:12px;bottom:56px;z-index:1200;width:352px;max-width:calc(100vw - 24px);
+  height:452px;max-height:calc(100vh - 120px);display:none;flex-direction:column;background:#fff;
+  border:1px solid #ddd;border-radius:7px;box-shadow:0 6px 26px rgba(0,0,0,.2);overflow:hidden}
+#ai-panel.open{display:flex}
+#ai-head{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;
+  border-bottom:1px solid #eee;font-size:12px;font-weight:600;background:#fafafa}
+#ai-close{border:0;background:none;font-size:19px;line-height:1;cursor:pointer;color:#777;padding:0 2px}
+#ai-close:hover{color:#111}
+#ai-log{flex:1 1 auto;overflow-y:auto;padding:11px 12px;font-size:12px;line-height:1.5}
+.ai-msg{margin-bottom:10px;padding:8px 10px;border-radius:6px;white-space:normal;word-wrap:break-word}
+.ai-user{background:#1a1a1a;color:#fff;margin-left:34px}
+.ai-bot{background:#f3f4f6;color:#222}
+.ai-thinking{color:#777;font-style:italic}
+.ai-error{background:#fdeaea;color:#8c1c1c}
+.ai-msg em{color:#555}
+#ai-form{display:flex;gap:6px;padding:9px;border-top:1px solid #eee;background:#fafafa}
+#ai-input{flex:1 1 auto;padding:7px 9px;border:1px solid #ddd;border-radius:5px;font-size:12px;
+  font-family:inherit;min-width:0}
+#ai-send{padding:7px 13px;border:0;border-radius:5px;background:#1a1a1a;color:#fff;font-size:12px;
+  font-weight:600;cursor:pointer}
+#ai-send:disabled{background:#999;cursor:default}
+@media (max-width:560px){#ai-panel{width:calc(100vw - 24px);height:calc(100vh - 130px)}}
 </style>
 </head>
 <body>
@@ -403,14 +433,14 @@
         </div>
         <div class="sb-sec" style="flex-shrink:0;border-bottom:1px solid #e5e5e0">
           <div class="sb-lbl">Borough boundaries</div>
-          <label class="lrow"><div style="width:9px;height:9px;border:2px solid #1a1a1a;border-radius:2px;flex-shrink:0"></div><span class="lname">NW London boroughs</span><input type="checkbox" id="tb"></label>
+          <label class="lrow"><div style="width:9px;height:9px;border:2px solid #1a1a1a;border-radius:2px;flex-shrink:0"></div><span class="lname">London boroughs</span><input type="checkbox" id="tb"></label>
           <div style="margin:4px 0 8px 0">
             <div style="font-size:10.5px;color:#666;margin-bottom:3px">Focus by borough</div>
             <select id="borough-focus" style="width:100%;padding:4px 6px;border:1px solid #ddd;border-radius:5px;font-size:11px;color:#333;background:#fff">
-              <option value="all">All NW London</option>
+              <option value="all">All London</option>
             </select>
           </div>
-          <label class="lrow"><div style="width:9px;height:9px;border:1.5px solid #000;border-radius:2px;flex-shrink:0"></div><span class="lname">Ward boundaries <span class="lcount" id="ward-count">188</span></span><input type="checkbox" id="tnw" checked></label>
+          <label class="lrow"><div style="width:9px;height:9px;border:1.5px solid #000;border-radius:2px;flex-shrink:0"></div><span class="lname">Ward boundaries <span class="lcount" id="ward-count">704</span></span><input type="checkbox" id="tnw" checked></label>
           <label class="lrow"><div style="width:9px;height:9px;border:1.5px solid #1E4B8E;border-radius:2px;flex-shrink:0"></div><span class="lname">LSOA boundaries <span class="lcount" id="lsoa-count">0</span></span><input type="checkbox" id="tlsoa"></label>
           <label id="lsoa-imd-row" class="lrow" style="display:none;margin-left:18px;padding:3px 0 0"><div style="width:9px;height:9px;background:linear-gradient(90deg,#67000d,#cb181d,#fb6a4a,#a1d99b,#006d2c);border-radius:2px;flex-shrink:0"></div><span class="lname" style="font-size:11px">Colour by IMD decile</span><input type="checkbox" id="tlsoa-imd"></label>
           <div id="lsoa-filter-row" style="display:none;margin:4px 0 0 18px">
@@ -465,7 +495,7 @@
           <div class="sb-lbl">Filter by area</div>
           <select id="vcse-area-filter" style="width:100%;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;color:#333;background:#fff;margin-bottom:8px">
             <option value="london">All London (all organisations)</option>
-            <option value="all" selected>All NW London</option>
+            <option value="all" selected>All London</option>
             <optgroup label="── Borough ──">
               <option value="lad-E09000005">Brent</option>
               <option value="lad-E09000009">Ealing</option>
@@ -765,7 +795,7 @@
             <span style="font-size:12px;font-weight:600;color:#7a4e00">Neighbourhoods — section in development</span>
           </div>
           <div style="font-size:10.5px;color:#7a5a2a;line-height:1.55">
-            This tab is still being built. Westminster's 4-neighbourhood breakdown is shown as a preview; equivalent neighbourhood groupings for the other seven NW London boroughs are not yet wired in, and the indicators panel here will expand over coming releases.
+            This tab is still being built. Westminster's 4-neighbourhood breakdown is shown as a preview; equivalent neighbourhood groupings for the other London boroughs are not yet wired in, and the indicators panel here will expand over coming releases.
           </div>
         </div>
         <div class="sb-sec" style="padding-bottom:8px">
@@ -820,7 +850,7 @@
     <div class="map-wrap" id="map-wrap">
       <div class="viewing-strip" id="viewing-strip">
         <span class="vs-label">Viewing</span>
-        <span class="vs-digest" id="vs-digest">All of NW London</span>
+        <span class="vs-digest" id="vs-digest">All of London</span>
         <span class="chips vs-row2" id="filter-chips"></span>
       </div>
       <!-- Persistent legend strip — shows the active overlay's name + colour scale + min/max
@@ -937,7 +967,7 @@ const OV_CFG = {
   census_level4_qual_pct:          { lo:"Lower", hi:"Higher", wh:false, min:30,   max:80   },
   census_no_qual_pct:              { lo:"Lower", hi:"Higher", wh:true,  min:5,    max:25   },
   // Ethnicity (top-level Census 2021 groups). wh=false — these are descriptive,
-  // not health "worse/better" scales. Ranges chosen to span NW London spread.
+  // not health "worse/better" scales. Ranges chosen to span London spread.
   census_white_pct:                { lo:"Lower", hi:"Higher", wh:false, min:5,    max:85   },
   census_asian_pct:                { lo:"Lower", hi:"Higher", wh:false, min:2,    max:80   },
   census_black_pct:                { lo:"Lower", hi:"Higher", wh:false, min:1,    max:40   },
@@ -955,7 +985,7 @@ const OV_CFG = {
   ptai_score:                      { lo:"Lower", hi:"Higher", wh:false, min:2,    max:25   },
   // Defra 15-min green/blue space access (ODS, 2025). Higher % of UPRNs within
   // the relevant walking distance to qualifying space = BETTER access (wh:false).
-  // Ranges chosen to span the observed NW London spread (LSOA-level).
+  // Ranges chosen to span the observed London spread (LSOA-level).
   gb_commitment_pct:               { lo:"Worse", hi:"Better", wh:false, min:0,    max:100  },
   green_commitment_pct:            { lo:"Worse", hi:"Better", wh:false, min:0,    max:100  },
   green_doorstep_pct:              { lo:"Worse", hi:"Better", wh:false, min:0,    max:80   },
@@ -1634,7 +1664,7 @@ const OV_META = {
 function ovMeta(k) { return OV_META[k] || null; }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// WARD GEOJSON — ONS WD May 2025 BFC V2 (full resolution); 188 wards across 9 NW London boroughs.
+// WARD GEOJSON — ONS WD May 2025 BFC V2 (full resolution); 188 wards across 9 London boroughs.
 // Westminster wards keep original names; duplicates ("Kilburn", "Regent's Park") in non-Westminster
 // boroughs are disambiguated by appending the borough name. Properties: WD24NM, WD24CD, LAD.
 // GJ now lives in data/map/wards.js (loaded above).
@@ -1648,7 +1678,7 @@ const NW_WARDS_GJ = {"type":"FeatureCollection","features":[]};
 // STATIC POINT DATA (GPs, hospitals, green spaces — update as needed)
 // ═══════════════════════════════════════════════════════════════════════════
 // GPS now lives in data/map/gp_practices.js (loaded above).
-// Major hospitals covering the 9 NW London boroughs + adjacent catchment sites.
+// Major hospitals covering the 9 London boroughs + adjacent catchment sites.
 // t = category, trust = parent NHS trust (shown in popup).
 // HOSP now lives in data/map/hospitals.js (loaded above).
 const GRN = [
@@ -1952,7 +1982,7 @@ function mkpop(color, title, addr, rows) {
 
 // ═══════════════════════════════════════════════════════════════════════════
 // EMBEDDED LSOA BOUNDARIES + IMD 2025 (123 Westminster LSOAs)
-// Source: ONS LSOA Dec 2021 BFC V10 (full resolution). 1313 LSOAs across 9 NW London boroughs.
+// Source: ONS LSOA Dec 2021 BFC V10 (full resolution). 1313 LSOAs across 9 London boroughs.
 // ═══════════════════════════════════════════════════════════════════════════
 // LSOA_IMD now lives in data/map/lsoa_imd.js (loaded above).
 
@@ -1974,7 +2004,7 @@ LSOA_IMD.features.forEach(f => {
 // ═══════════════════════════════════════════════════════════════════════════
 // MAP SETUP
 // ═══════════════════════════════════════════════════════════════════════════
-// Start zoomed out at NW London ward level — fitBounds on wLyr refines once wards load.
+// Start zoomed out at London ward level — fitBounds on wLyr refines once wards load.
 const map = L.map('map', { center:[51.540,-0.300], zoom:10, zoomControl:true });
 // Carto Positron basemap — calm light-grey tiles that let choropleths do the
 // visual work. crossOrigin:'anonymous' is REQUIRED so html2canvas can read
@@ -2036,7 +2066,7 @@ const hL  = L.layerGroup(HOSP.map(d => {
   m._lad = ladOfLatLng(d.lat, d.lng);
   return m;
 }));
-// ── Greenspace polygon layer (OS Open Greenspace, NW London clip) ─────────
+// ── Greenspace polygon layer (OS Open Greenspace, London clip) ─────────
 // Palette keyed on OS 'function' — ranked roughly from highest to lowest
 // "recreational greenness": public parks on top, car-park-y sports courts
 // lower, cemetery/religious grounds a muted grey-tan.
@@ -2133,17 +2163,17 @@ const boroughL = L.geoJSON(BOROUGH_GJ, {
     // No tooltip — borough labels are distracting on scroll
   }
 });
-// Borough outlines start off — user toggles via 'NW London boroughs' checkbox
+// Borough outlines start off — user toggles via 'London boroughs' checkbox
 
-// ── NW London context wards layer ────────────────────────────────────────────
-// Legacy layer kept for backwards compat; the 'NW London wards' toggle now drives
+// ── London context wards layer ────────────────────────────────────────────
+// Legacy layer kept for backwards compat; the 'London wards' toggle now drives
 // `wardBoundaryLyr` below (black outlines on the full GJ ward set).
 const nwWardsL = L.geoJSON(NW_WARDS_GJ, {
   style: { color: '#999', weight: 1, fillColor: '#f0f0ec', fillOpacity: 0, opacity: 0 },
 });
 // Off by default — user can toggle on
 
-// Black ward-boundary layer (overlay for the full 188 NW London wards).
+// Black ward-boundary layer (overlay for the full 188 London wards).
 // Non-interactive so ward clicks still hit the main wLyr underneath.
 // Per-feature style so when a borough is focused, wards outside it disappear.
 function _wardBoundaryStyle(feat) {
@@ -2855,7 +2885,7 @@ function applyVCSEFilter() {
       // Show everything regardless of location
       areaMatch = true;
     } else if (areaFilter === 'all') {
-      // All NW London — no geographic filter (pinned VCSEs are already
+      // All London — no geographic filter (pinned VCSEs are already
       // restricted to the 9 NWL boroughs by the data pipeline)
       areaMatch = true;
     } else if (areaFilter.startsWith('lad-')) {
@@ -3307,7 +3337,7 @@ window.deselectWard = function() {
   const p = document.getElementById('wpanel');
   if (p) p.innerHTML = `<div class="ph"><div class="ph-icon">\u2196</div>Click any ward on the map to explore its health, crime, deprivation and service data</div>`;
   const vsd = document.getElementById('vs-digest');
-  if (vsd) vsd.textContent = 'All of NW London';
+  if (vsd) vsd.textContent = 'All of London';
 };
 window.deselectLSOA = function() {
   selLSOA = null;
@@ -3315,7 +3345,7 @@ window.deselectLSOA = function() {
   const p = document.getElementById('wpanel');
   if (p) p.innerHTML = `<div class="ph"><div class="ph-icon">\u2196</div>Click any ward on the map to explore its health, crime, deprivation and service data</div>`;
   const vsd = document.getElementById('vs-digest');
-  if (vsd) vsd.textContent = 'All of NW London';
+  if (vsd) vsd.textContent = 'All of London';
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -4003,7 +4033,7 @@ window.generateWardReport = function(wn) {
   <!-- HERO -->
   <div class="hero">
     <div class="hero-text">
-      <div class="kicker">NW London ward profile · ${_esc(today)}</div>
+      <div class="kicker">London ward profile · ${_esc(today)}</div>
       <h1>${_esc(wdata ? wdata.name : wn)}</h1>
       <div class="sub">${_esc(borough)}${borough && population !== '—' ? ' · ' : ''}${population !== '—' ? 'Population ' + population : ''}${imdRank ? ' · IMD rank ' + imdRank + ' of ' + totalWards + ' NWL wards' : ''}</div>
       <div class="badges">
@@ -4162,6 +4192,7 @@ window.generateWardReport = function(wn) {
     });
   })();
 <\/script>
+<script src="data/map/assistant.js"></script>
 </body></html>`;
 
   const w = window.open('', '_blank');
@@ -4196,7 +4227,7 @@ function buildWardLayer() {
     }
   });
   wLyr.addTo(map);
-  // Fit to the full NW London ward set with a maxZoom cap so wards stay visible as
+  // Fit to the full London ward set with a maxZoom cap so wards stay visible as
   // distinct polygons (ward-level view) rather than jumping to a zoomed-in LSOA view.
   map.fitBounds(wLyr.getBounds(), { padding:[28,28], maxZoom:11 });
   // Neighbourhood colours/borders start OFF; user can toggle on via 'Neighbourhood colours'
@@ -4367,7 +4398,7 @@ function _applyBoroughSolo() {
         currentVCSEAreaFilter = 'lad-' + code;
       }
     } else if (vcseSel.value && vcseSel.value.startsWith('lad-')) {
-      // Restore 'All NW London' only if the dropdown is currently on a lad-* filter
+      // Restore 'All London' only if the dropdown is currently on a lad-* filter
       vcseSel.value = 'all';
       currentVCSEAreaFilter = 'all';
     }
@@ -4431,7 +4462,7 @@ function _applyBoroughSolo() {
         map.fitBounds(g.getBounds(), { padding:[30,30], maxZoom:12 });
       }
     } else if (focusedBorough === 'all' && wLyr) {
-      // Restoring 'all' — re-fit to whole NW London map.
+      // Restoring 'all' — re-fit to whole London map.
       map.fitBounds(wLyr.getBounds(), { padding:[28,28] });
     }
   });
@@ -5300,7 +5331,7 @@ window.generateLSOAReport = function(code) {
 
   <div class="hero">
     <div class="hero-text">
-      <div class="kicker">NW London LSOA profile · ${_esc(today)}</div>
+      <div class="kicker">London LSOA profile · ${_esc(today)}</div>
       <h1>${_esc(props.name || code)}</h1>
       <div class="sub">${_esc(code)}${wardName ? ' · Ward: ' + _esc(wardName) : ''}${borough ? ' · ' + _esc(borough) : ''}${rank ? ' · IMD rank ' + Math.round(rank).toLocaleString() + ' of 32,844 nationally' : ''}</div>
       <div class="badges">
@@ -5661,7 +5692,7 @@ function renderTopBottom() {
 
   // Restrict the LSOA pool to codes actually rendered on the map.
   // lsoa_data.json carries all 33k+ English LSOAs, but LSOA_IMD only has the
-  // ~1,313 NW London polygons. Without this filter the rankings are dominated
+  // ~1,313 London polygons. Without this filter the rankings are dominated
   // by LSOAs the user can never see or click on.
   let mapCodes = null;
   let mapNames = null;
@@ -5998,7 +6029,7 @@ function _refreshUI() {
     if (dig) {
       const parts = [];
       parts.push(focusedBorough && focusedBorough !== 'all'
-        ? `<b>${focusedBorough}</b>` : 'All of NW London');
+        ? `<b>${focusedBorough}</b>` : 'All of London');
       if (typeof focusedNbhd !== 'undefined' && focusedNbhd && focusedNbhd !== 'all'
           && typeof NEIGHBOURHOODS !== 'undefined' && NEIGHBOURHOODS[focusedNbhd]) {
         parts.push(`nbhd <b>${NEIGHBOURHOODS[focusedNbhd].label}</b>`);
@@ -6374,7 +6405,7 @@ function _runSearch(q) {
 })();
 
 // ── PNG + CSV export ────────────────────────────────────────────────────────
-// PNG: produces a PowerPoint-ready snapshot of the NW London footprint (or
+// PNG: produces a PowerPoint-ready snapshot of the London footprint (or
 // the currently-focused borough). Procedure:
 //   1. Save the user's current map view (center + zoom).
 //   2. Fit the map to the in-scope polygon bounds (NWL or one borough).
@@ -6415,7 +6446,7 @@ function _pngScopeFeatures() {
 function _pngScopeLabel() {
   const scopeRaw = (typeof focusedBorough !== 'undefined' && focusedBorough && focusedBorough !== 'all')
     ? focusedBorough : null;
-  return scopeRaw ? scopeRaw.replace(/^City of /, '') : 'NW London';
+  return scopeRaw ? scopeRaw.replace(/^City of /, '') : 'London';
 }
 
 // L.LatLngBounds for the current scope — used both to fit the map before
@@ -6452,7 +6483,7 @@ function _buildWhiteMask() {
   });
 }
 
-// Compose a one-line caption e.g. "NW London · IMD composite · April 2026".
+// Compose a one-line caption e.g. "London · IMD composite · April 2026".
 function _pngCaption() {
   const scope = _pngScopeLabel();
   let ovTxt = '';
@@ -6641,7 +6672,7 @@ async function _downloadMapPng(opts) {
     // Step 2: capture. Bare-metal screenshot of the map element after
     // fitBounds. No SVG mask, no Canvas-2D mask, no post-capture crop —
     // every layer of complexity introduced its own bug. The user wanted
-    // a download focused on the lat/lng of NW London, which is exactly
+    // a download focused on the lat/lng of London, which is exactly
     // what fitBounds gave us; the captured viewport at that view IS the
     // output. If the user wants the eastern surplus removed they can
     // crop in their own tool. This matches what's on screen, predictably.
@@ -7032,7 +7063,7 @@ async function _prepareScreenForScreenshot(opts) {
   if (pngBtn) pngBtn.addEventListener('click', async () => {
     const focused = (typeof focusedBorough !== 'undefined' && focusedBorough && focusedBorough !== 'all') ? focusedBorough : null;
     const opts = [
-      { key: 'prepare-nwl', label: 'Entire NW London',
+      { key: 'prepare-nwl', label: 'Entire London',
         desc: 'Frames the map to all 8 NWL boroughs and whitens everything outside. Then take your own screenshot (Win+Shift+S on Windows, Cmd+Shift+4 on Mac).' },
     ];
     if (focused) opts.push({
@@ -7076,7 +7107,7 @@ async function _prepareScreenForScreenshot(opts) {
   const el = document.getElementById(id);
   if (el) el.addEventListener('change', () => setTimeout(_refreshUI, 0));
 });
-// And once at startup (nothing selected yet, but renders "All of NW London · Ward mode").
+// And once at startup (nothing selected yet, but renders "All of London · Ward mode").
 setTimeout(_refreshUI, 0);
 
 // ── Collapsible Layers-tab groups ────────────────────────────────────────────
@@ -7392,7 +7423,7 @@ document.getElementById('tspot').addEventListener('change', e => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// NBHD RADAR — indicator comparison vs NW London baseline for focused nbhd
+// NBHD RADAR — indicator comparison vs London baseline for focused nbhd
 // ═══════════════════════════════════════════════════════════════════════════
 const NBHD_RADAR_KEYS = [
   { k: 'census_bad_health_pct',     l: 'Bad health',     hi: true  },
@@ -7444,7 +7475,7 @@ function renderNbhdRadar() {
     const nbhdMean = den > 0 ? num / den : null;
     const nwMean = _nwMean(item.k);
     if (nbhdMean == null || nwMean == null) return '';
-    // Percent difference vs NW London
+    // Percent difference vs London
     const diff = nwMean > 0 ? ((nbhdMean - nwMean) / nwMean) * 100 : 0;
     const isWorse = item.hi ? diff > 0 : diff < 0;
     const barColor = isWorse ? '#A32D2D' : '#0F6E56';
@@ -7465,10 +7496,10 @@ function renderNbhdRadar() {
   }).filter(Boolean).join('');
   host.innerHTML = `
     <div style="border:1px solid #e5e5e0;border-radius:8px;padding:10px;background:#fff">
-      <div style="font-size:11px;font-weight:600;color:${nb.color};margin-bottom:6px">${nb.label} vs NW London</div>
+      <div style="font-size:11px;font-weight:600;color:${nb.color};margin-bottom:6px">${nb.label} vs London</div>
       ${rows}
       <div style="font-size:9.5px;color:#888;margin-top:6px;line-height:1.4">
-        Red = worse than NW London mean; green = better. Population-weighted.
+        Red = worse than London mean; green = better. Population-weighted.
       </div>
     </div>`;
 }

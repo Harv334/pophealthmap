@@ -3264,6 +3264,26 @@ def build_ward_data() -> dict:
                 w["indicators"][ward_key] = round(num[wd] / den[wd], 2)
 
     fp = _read_parquet_opt(DATA_DIR / "demographics" / "fuel_poverty.parquet")
+    # --- IMD: LSOA scores rolled up to wards, population weighted ------------
+    # These were missing from every pipeline-built ward_data.json. The committed
+    # file had them only because a one-off script wrote them in years ago, so
+    # regenerating the file silently dropped the map's headline deprivation
+    # measure. Population weighting matches how MHCLG aggregates IMD: a ward's
+    # score is its LSOAs' scores weighted by the people living in them, not a
+    # plain average of areas.
+    imd_ward = _read_parquet_opt(DATA_DIR / "demographics" / "imd2025.parquet")
+    if imd_ward is not None and not imd_ward.empty:
+        sources["imd"] = "MHCLG Indices of Deprivation 2025"
+        for col in ("imd_score", "income_score", "employment_score",
+                    "education_score", "health_score", "crime_score",
+                    "barriers_score", "environment_score"):
+            if col in imd_ward.columns:
+                _agg_to_wards(imd_ward, col, col)
+        # An average of deciles is not itself a decile, so it is named for what
+        # it is. The per-ward Core20 counts below remain the categorical view.
+        if "imd_decile" in imd_ward.columns:
+            _agg_to_wards(imd_ward, "imd_decile", "imd_decile_mean")
+
     _agg_to_wards(fp, "fuel_poverty_pct", "fuel_poverty_pct")
     if fp is not None:
         sources["fuel_poverty"] = "DESNZ sub-regional fuel poverty (LILEE)"
