@@ -10,7 +10,21 @@
  * the model cannot invent a statistic, and no dataset has to be uploaded.
  */
 
-const MODEL = "claude-haiku-4-5";
+/**
+ * Sonnet rather than Haiku.
+ *
+ * Haiku kept getting the deprivation scale wrong: it inverted IMD scores on the
+ * very first live question, and after that was corrected it called a mean
+ * decile of 3 "the most deprived tenth". Each fix came from a test that
+ * happened to be run, which is a poor way to reach a tool that publishes
+ * figures about real places.
+ *
+ * Roughly four times the price per question, which against the spend limit is
+ * not the deciding factor. It also puts the system block over Sonnet's 1,024
+ * token caching minimum, where Haiku's 2,048 left it just short, so the cached
+ * reads claw some of that back.
+ */
+const MODEL = "claude-sonnet-5";
 const MAX_TOKENS = 1024;
 const DAILY_CAP = 40; // questions per IP, per UTC day
 

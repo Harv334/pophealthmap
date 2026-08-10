@@ -65,12 +65,24 @@ which is the browser's job to run. A `403` means the Origin header is not in
 
 ## What it costs, and how to cap it
 
-`claude-haiku-4-5` at $1 per million input tokens and $5 per million output,
+`claude-sonnet-5` at $3 per million input tokens and $15 per million output,
 capped at 1024 output tokens, with the system prompt marked for caching.
 
 One question is roughly two API calls: the model asks for a tool, the browser
-runs it, the model answers. That works out at about **half a penny per
-question**, so a hundred questions a day is around 50p.
+runs it, the model answers. Measured on the live Worker, a call sends about
+1,500 input tokens, so a question costs roughly **a penny**, and a hundred
+questions a day is around £1.
+
+It ran on `claude-haiku-4-5` first, at a quarter of that. Haiku was changed
+because it kept getting the deprivation scale wrong: it inverted IMD scores on
+its first live question, and once corrected described a mean decile of 3 as the
+most deprived tenth. Both are the kind of error that reads as authoritative and
+gets quoted. If cost ever matters more than that, Haiku is one line in
+`src/index.js`, but test the deprivation questions before trusting it.
+
+Note the caching threshold if you change model again: a prompt must reach 1,024
+tokens to be cacheable on Sonnet and Opus, 2,048 on Haiku. The system block here
+is about 1,500, so it caches on Sonnet and did nothing at all on Haiku.
 
 Three limits sit in front of that, and only one of them is a real spend cap.
 
