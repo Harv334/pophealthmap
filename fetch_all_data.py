@@ -346,7 +346,8 @@ def _http_bytes(url: str, *, source: str, headers: dict | None = None,
     )
 
 def _validate_ods_extract(raw: bytes, *, source: str, report: str,
-                          role_codes: set[str], min_active: int,
+                          min_active: int,
+                          role_codes: set[str] | None = None,
                           code_prefix: str | None = None,
                           marker: tuple[int, str, int] | None = None) -> int:
     """
@@ -411,13 +412,16 @@ def _validate_ods_extract(raw: bytes, *, source: str, report: str,
                 f"this looks like a different ODS report "
                 f"({ODS_EXPORT_URL.format(report=report)})"
             )
-    pct_role = sum(r[13] in role_codes for r in rows) / len(rows)
-    if pct_role < 0.90:
-        raise RuntimeError(
-            f"{source}: only {pct_role:.0%} of rows in the '{report}' extract "
-            f"carry role codes {sorted(role_codes)} - this looks like a "
-            f"different ODS report ({ODS_EXPORT_URL.format(report=report)})"
-        )
+    # Not every extract populates the role column: egdpprac leaves it blank on
+    # most rows, so dentists identify themselves by code prefix instead.
+    if role_codes:
+        pct_role = sum(r[13] in role_codes for r in rows) / len(rows)
+        if pct_role < 0.90:
+            raise RuntimeError(
+                f"{source}: only {pct_role:.0%} of rows in the '{report}' extract "
+                f"carry role codes {sorted(role_codes)} - this looks like a "
+                f"different ODS report ({ODS_EXPORT_URL.format(report=report)})"
+            )
 
     active = sum(r[12] in ("A", "ACTIVE") for r in rows)
     if active < min_active:
@@ -429,7 +433,8 @@ def _validate_ods_extract(raw: bytes, *, source: str, report: str,
     return active
 
 def fetch_ods_report(report: str, cache: Path, *, source: str,
-                     role_codes: set[str], min_active: int,
+                     min_active: int,
+                     role_codes: set[str] | None = None,
                      code_prefix: str | None = None,
                      marker: tuple[int, str, int] | None = None) -> Path:
     """
@@ -963,6 +968,96 @@ def run_pharmacies() -> pd.DataFrame:
     out = write_parquet_guarded(out_path, out, source="pharmacies")
     ok(f"pharmacies: {len(out):,} rows -> {out_path.relative_to(REPO_ROOT)}")
     return out
+
+# ============================================================================
+# SOURCE 2b: Dental practices  (NHS ODS egdpprac + curated private practices)
+# ============================================================================
+# ODS is the base: it is the authoritative register, refreshes monthly and
+# covers the whole country, so it scales to any footprint. It only holds
+# practices with an NHS contract, though, and the curated file this replaces
+# was 445 private to 285 NHS-contracted. Dropping the private ones would delete
+# most of the layer and make the map's NHS/private filter meaningless, so any
+# curated practice ODS does not know about is carried through unchanged.
+CURATED_DENTAL = REPO_ROOT / "data" / "curated" / "dental_practices_curated.json"
+
+def run_dentists() -> pd.DataFrame:
+    rule("Dental practices (NHS ODS egdpprac + curated)")
+    cache_dir = CACHE_DIR / "dentists"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    cache = cache_dir / "egdpprac.csv"
+
+    # Every dental practice code is V-prefixed, which separates this extract
+    # from epraccur (Y/M/A...) and edispensary (F). The role column is blank on
+    # most rows here, so it is not used as a discriminator.
+    fetch_ods_report(
+        "egdpprac", cache, source="dentists",
+        code_prefix="V", min_active=5_000,
+    )
+    df = pd.read_csv(cache, header=None, names=EPRACCUR_HEADER,
+                     dtype=str, keep_default_na=False, encoding="latin-1")
+    df = df[df["StatusCode"].isin(["A", "ACTIVE"])]
+
+    owners = {normalise_postcode(r["Postcode"]): (r["Name"] or "").title()
+              for _, r in df.iterrows() if normalise_postcode(r["Postcode"])}
+    lookup = lookup_postcodes(owners.keys(), source="dentists", owners=owners)
+
+    by_pc: dict[str, dict] = {}
+    for _, r in df.iterrows():
+        pc = normalise_postcode(r["Postcode"])
+        hit = lookup.get(pc)
+        if not hit:
+            continue
+        lat, lng, lsoa, lad, wd = hit
+        if lad not in NW_LADS:
+            continue
+        by_pc[pc] = {
+            "name": (r["Name"] or "").title(),
+            "postcode": r["Postcode"],
+            "lat": lat, "lng": lng,
+            "nhs_contracted": True,          # presence in ODS means an NHS contract
+            "lad_code": lad,
+            "LSOA21CD": lsoa, "WD25CD": wd,
+            "source": "ods",
+        }
+    n_ods = len(by_pc)
+
+    # Merge the curated list in on postcode, not on name. ODS frequently records
+    # a generic trading name ("DENTAL SURGERY", "DENTAL PRACTICE") where the
+    # curated list has the real one, so matching on name would treat the same
+    # premises as two practices and plot it twice. Where both know a postcode,
+    # ODS is authoritative for existence and NHS status while the curated name
+    # is the more useful label, so each side contributes what it is better at.
+    n_renamed = n_curated = 0
+    if CURATED_DENTAL.exists():
+        try:
+            curated = json.loads(CURATED_DENTAL.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as e:
+            warn(f"dentists: curated file unreadable ({e}); using ODS alone")
+            curated = []
+        for c in curated:
+            pc = normalise_postcode(c.get("postcode", ""))
+            existing = by_pc.get(pc)
+            if existing:
+                name = (c.get("name") or "").strip()
+                if name and len(name) > len(existing["name"]):
+                    existing["name"] = name
+                    existing["source"] = "ods+curated"
+                    n_renamed += 1
+            elif c.get("lat") and c.get("lng"):
+                rec = dict(c)
+                rec.setdefault("nhs_contracted", False)
+                rec["source"] = "curated"
+                by_pc[pc] = rec
+                n_curated += 1
+    rows = list(by_pc.values())
+
+    out = pd.DataFrame(rows)
+    out_path = DATA_DIR / "healthcare" / "dental_practices.parquet"
+    out = write_parquet_guarded(out_path, out, source="dentists")
+    ok(f"dentists: {len(out):,} practices ({n_ods:,} from ODS, "
+       f"{n_curated:,} curated) -> {out_path.relative_to(REPO_ROOT)}")
+    return out
+
 
 # ============================================================================
 # SOURCE 3: IMD 2025  (MHCLG, LSOA-level, all 7 domains)
@@ -3361,21 +3456,42 @@ def export_map_blobs() -> None:
     # explicit stops a future change from silently destroying that file.
 
 
+def build_dental_json() -> list:
+    """dental_practices.json, in the shape loadDentalLayer() already reads."""
+    df = _read_parquet_opt(DATA_DIR / "healthcare" / "dental_practices.parquet")
+    if df is None:
+        return []
+    keep = [c for c in ["name", "postcode", "lat", "lng", "nhs_contracted",
+                        "lad_code", "imd_decile"] if c in df.columns]
+    out = df[keep].to_dict(orient="records")
+    for r in out:
+        # loadDentalLayer treats nhs_contracted as a tri-state: true, false, or
+        # null for unknown. Keep it a real bool so the filter stays meaningful.
+        if "nhs_contracted" in r and r["nhs_contracted"] is not None:
+            r["nhs_contracted"] = bool(r["nhs_contracted"])
+    return out
+
+
 def export_all() -> None:
     rule("Export Leaflet JSON outputs")
     ward_data  = build_ward_data()
     lsoa_data  = build_lsoa_data()
     pharm_data = build_pharmacies_json()
     vcse_data  = build_vcse_json()
+    dental_data = build_dental_json()
 
     write_json_atomic(REPO_ROOT / "ward_data.json",  ward_data)
     write_json_atomic(REPO_ROOT / "lsoa_data.json",  lsoa_data)
     write_json_atomic(REPO_ROOT / "pharmacies.json", pharm_data)
     write_json_atomic(REPO_ROOT / "vcse_data.json",  vcse_data)
+    if dental_data:
+        write_json_atomic(REPO_ROOT / "dental_practices.json", dental_data)
     ok(f"ward_data.json:  {len(ward_data.get('wards', {})):,} wards")
     ok(f"lsoa_data.json:  {len(lsoa_data):,} LSOAs")
     ok(f"pharmacies.json: {len(pharm_data):,} rows")
     ok(f"vcse_data.json:  {len(vcse_data):,} charities")
+    if dental_data:
+        ok(f"dental_practices.json: {len(dental_data):,} practices")
 
     export_map_blobs()
 
@@ -3396,6 +3512,7 @@ SOURCES = {
     "crime":       run_police_crime,
     "hospitals":   run_hospitals,
     "charities":   run_charities,
+    "dentists":    run_dentists,
 }
 
 def write_manifest(source_records: dict) -> None:
