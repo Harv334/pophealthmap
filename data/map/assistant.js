@@ -166,16 +166,75 @@ var ASSISTANT_ENDPOINT = "https://pophealthmapai.sevilleharvey.workers.dev";
    * "census_bad_health_pct" with nothing to go on but the key, and no unit to
    * tell it whether an answer was a count, a percentage or a score.
    */
+  /**
+   * The deprivation family, where the scale runs both ways.
+   *
+   * Scores go up with deprivation. Deciles go down with it: decile 1 is the
+   * most deprived tenth, decile 10 the least. Nothing in the data says so.
+   * OV_META spells the direction out for imd_score alone, the seven domain
+   * scores describe their subject without their direction, and the three
+   * decile fields have no entry at all.
+   *
+   * That is the whole of the trap the assistant fell into on its first live
+   * question: asked for the most deprived boroughs it returned the least, and
+   * explained that a higher score meant less deprivation.
+   */
+  var IMD_META = {
+    imd_decile_mean: "Mean IMD decile of the LSOAs in this area, population weighted. 1 is the most deprived tenth nationally, 10 the least.",
+    imd_best_decile: "The least deprived IMD decile present in this area. 1 is the most deprived tenth nationally, 10 the least.",
+    imd_worst_decile: "The most deprived IMD decile present in this area. 1 is the most deprived tenth nationally, 10 the least.",
+  };
+
+  var DIRECTION = {
+    imd_score: "more deprived",
+    barriers_score: "more deprived",
+    crime_score: "more deprived",
+    education_score: "more deprived",
+    employment_score: "more deprived",
+    environment_score: "more deprived",
+    health_score: "more deprived",
+    income_score: "more deprived",
+    imd_decile_mean: "less deprived",
+    imd_best_decile: "less deprived",
+    imd_worst_decile: "less deprived",
+  };
+
   function metaFor(key) {
     var m = (typeof OV_META === "object" && OV_META && OV_META[key]) ? OV_META[key] : null;
     if (m) return m;
     var ft = FT_META[key];
-    return ft ? { desc: ft[0], u: ft[1] || undefined, src: "OHID Fingertips", g: "Borough" } : null;
+    if (ft) return { desc: ft[0], u: ft[1] || undefined, src: "OHID Fingertips", g: "Borough" };
+    var imd = IMD_META[key];
+    return imd ? { desc: imd, u: "decile", src: "MHCLG IMD 2025" } : null;
   }
 
   function labelFor(key) {
     var m = metaFor(key);
     return (m && m.desc) ? m.desc : key;
+  }
+
+  /**
+   * Which end of the scale is which.
+   *
+   * Live, the model was asked for the three most deprived boroughs and returned
+   * the three least deprived, explaining that a higher IMD score means less
+   * deprivation. It is the other way round. The direction was already in the
+   * result, but buried in a prose label ("Composite Index of Multiple
+   * Deprivation. Higher = more deprived.") where it read as description rather
+   * than instruction, and deciles running the opposite way makes the mistake an
+   * easy one to fall into.
+   *
+   * Pulled out of that prose into a field of its own, so the direction arrives
+   * as a fact about the data rather than a sentence to be skimmed. Parsed
+   * rather than hand-listed, so it stays true to whatever the map's own legend
+   * says: the two cannot drift apart.
+   */
+  function higherMeans(key) {
+    if (DIRECTION[key]) return DIRECTION[key];
+    var m = metaFor(key);
+    if (!m || !m.desc) return undefined;
+    var hit = /higher\s*=\s*([^.;]+)/i.exec(m.desc);
+    return hit ? hit[1].trim().toLowerCase() : undefined;
   }
 
   // ---- the tools ---------------------------------------------------------
@@ -197,6 +256,7 @@ var ASSISTANT_ENDPOINT = "https://pophealthmapai.sevilleharvey.workers.dev";
             year: m && m.yr ? m.yr : undefined,
             aggregation: isAdditive(k) ? "summed across wards" : "population-weighted mean",
             published_at: isBoroughLevel(k) ? "borough" : "ward",
+            higher_means: higherMeans(k),
           };
         }),
         note: "Deprivation deciles run 1 (most deprived) to 10 (least deprived). " +
@@ -270,8 +330,13 @@ var ASSISTANT_ENDPOINT = "https://pophealthmapai.sevilleharvey.workers.dev";
       }
       rows.sort(function (x, y) { return input.direction === "lowest" ? x.value - y.value : y.value - x.value; });
       var meta = metaFor(key);
+      var hm = higherMeans(key);
       return {
         indicator: key, label: labelFor(key), direction: input.direction,
+        // Spelled out so the answer cannot invert the scale: this says what a
+        // high value means, and what the rows you are looking at therefore are.
+        higher_means: hm,
+        results_are: hm ? "the " + input.direction + " values; higher = " + hm : undefined,
         unit: meta && meta.u ? meta.u : undefined,
         source: meta && meta.src ? meta.src : undefined,
         level: input.level, of_total: rows.length, results: rows.slice(0, n),
