@@ -6316,7 +6316,7 @@ function _refreshUI() {
       }
       if (typeof showCore20Overlay !== 'undefined' && showCore20Overlay) {
         addChip('core20', 'Core20 only', () => {
-          const t = document.getElementById('tcore20');
+          const t = document.getElementById('core20-toggle');
           if (t) { t.checked = false; t.dispatchEvent(new Event('change')); }
         });
       }
@@ -6348,7 +6348,7 @@ function _resetAll() {
     const ov2 = document.getElementById('ov2');
     if (ov2 && ov2.value !== 'none') { ov2.value = 'none'; ov2.dispatchEvent(new Event('change')); }
     // Core20
-    const tc = document.getElementById('tcore20');
+    const tc = document.getElementById('core20-toggle');
     if (tc && tc.checked) { tc.checked = false; tc.dispatchEvent(new Event('change')); }
     // LSOA layer off
     const tlsoa = document.getElementById('tlsoa');
@@ -6429,7 +6429,7 @@ function _writeUrlState() {
     const ov2El = document.getElementById('ov2');
     const bfEl = document.getElementById('borough-focus');
     const lsEl = document.getElementById('tlsoa');
-    const c20El = document.getElementById('tcore20');
+    const c20El = document.getElementById('core20-toggle');
     if (ovEl && ovEl.value && ovEl.value !== 'none') p.set('ov', ovEl.value);
     if (ov2El && ov2El.value && ov2El.value !== 'none') p.set('ov2', ov2El.value);
     if (bfEl && bfEl.value && bfEl.value !== 'all') p.set('b', bfEl.value);
@@ -6458,7 +6458,7 @@ function _readUrlState() {
       if (ev) el.dispatchEvent(new Event(ev));
     };
     applyIf('borough-focus', p.get('b'), 'change');
-    applyIf('tcore20', p.get('c20'), 'change');
+    applyIf('core20-toggle', p.get('c20'), 'change');
     applyIf('tlsoa', p.get('lsoa'), 'change');
     applyIf('ov', p.get('ov'), 'change');
     applyIf('ov2', p.get('ov2'), 'change');
@@ -6476,7 +6476,7 @@ function _readUrlState() {
   } catch (e) { console.warn('_readUrlState failed', e); }
 }
 (function _wireUrlStateWriters() {
-  ['ov','ov2','borough-focus','tlsoa','tcore20'].forEach(id => {
+  ['ov','ov2','borough-focus','tlsoa','core20-toggle'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.addEventListener('change', () => setTimeout(_writeUrlState, 50));
   });
@@ -7363,7 +7363,7 @@ async function _prepareScreenForScreenshot(opts) {
 // back via location.href + navigator.clipboard.writeText.)
 
 // Keep the strip + chips in sync when any of these inputs change.
-['ov', 'ov2', 'borough-focus', 'tlsoa', 'tcore20', 'vcse-area-filter'].forEach(id => {
+['ov', 'ov2', 'borough-focus', 'tlsoa', 'core20-toggle', 'vcse-area-filter'].forEach(id => {
   const el = document.getElementById(id);
   if (el) el.addEventListener('change', () => setTimeout(_refreshUI, 0));
 });
