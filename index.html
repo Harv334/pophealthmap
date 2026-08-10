@@ -946,6 +946,7 @@
             </select>
           </div>
           <label class="lrow"><div style="width:9px;height:9px;border:1.5px solid #000;border-radius:2px;flex-shrink:0"></div><span class="lname">Ward boundaries <span class="lcount" id="ward-count">704</span></span><input type="checkbox" id="tnw" checked></label>
+          <label class="lrow"><div style="width:9px;height:9px;border:1.5px solid #7A2E8E;border-radius:2px;flex-shrink:0"></div><span class="lname">MSOA boundaries <span class="lcount" id="msoa-count">0</span></span><input type="checkbox" id="tmsoa"></label>
           <label class="lrow"><div style="width:9px;height:9px;border:1.5px solid #1E4B8E;border-radius:2px;flex-shrink:0"></div><span class="lname">LSOA boundaries <span class="lcount" id="lsoa-count">0</span></span><input type="checkbox" id="tlsoa"></label>
           <label id="lsoa-imd-row" class="lrow" style="display:none;margin-left:18px;padding:3px 0 0"><div style="width:9px;height:9px;background:linear-gradient(90deg,#67000d,#cb181d,#fb6a4a,#a1d99b,#006d2c);border-radius:2px;flex-shrink:0"></div><span class="lname" style="font-size:11px">Colour by IMD decile</span><input type="checkbox" id="tlsoa-imd"></label>
           <div id="lsoa-filter-row" style="display:none;margin:4px 0 0 18px">
@@ -6223,6 +6224,76 @@ document.getElementById('lsoa-scope').addEventListener('change', e => {
       map.fitBounds(group.getBounds(), { padding: [30, 30] });
     }
   }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MSOA BOUNDARIES
+// ═══════════════════════════════════════════════════════════════════════════
+// Outlines only, and lazy. The file is about 1.5 MB, the box is off by
+// default, and the three map blobs that do load on every visit are classic
+// scripts because their globals are read at parse time. This one is not read
+// at parse time by anything, so it is fetched the first time it is asked for
+// and kept from then on.
+//
+// MSOAs sit between wards and LSOAs and nest into neither: they are built from
+// whole LSOAs, but 41% of LSOAs cross a ward line, so an MSOA edge and a ward
+// edge agreeing is a coincidence rather than a rule. That is why this is a
+// boundary layer of its own rather than another level of the ward/LSOA switch,
+// and why it can be shown alongside either without contradicting it.
+let msoaLyr = null;
+let _msoaLoading = null;
+
+function loadMsoaBoundaries() {
+  if (msoaLyr) return Promise.resolve(msoaLyr);
+  if (_msoaLoading) return _msoaLoading;
+  _msoaLoading = fetch('data/map/msoa_boundaries.json')
+    .then(r => (r.ok ? r.json() : null))
+    .then(gj => {
+      if (!gj || !gj.features) { _msoaLoading = null; return null; }
+      msoaLyr = L.geoJSON(gj, {
+        style: { color: '#7A2E8E', weight: 1.1, fill: false, opacity: 0.85 },
+        onEachFeature: (feat, lyr) => {
+          const p = feat.properties || {};
+          lyr.bindTooltip(
+            `<b style="font-size:11px">${_esc(p.name || 'MSOA')}</b>` +
+            `<br><span style="font-size:10px;color:#888">${_esc(p.code || '')}</span>`,
+            { sticky: true, opacity: 0.94 }
+          );
+        },
+      });
+      const el = document.getElementById('msoa-count');
+      if (el) el.textContent = gj.features.length.toLocaleString();
+      _msoaLoading = null;
+      return msoaLyr;
+    })
+    .catch(() => { _msoaLoading = null; return null; });
+  return _msoaLoading;
+}
+
+document.getElementById('tmsoa').addEventListener('change', e => {
+  const on = e.target.checked;
+  const el = document.getElementById('msoa-count');
+  if (!on) {
+    if (msoaLyr && map.hasLayer(msoaLyr)) map.removeLayer(msoaLyr);
+    return;
+  }
+  if (el && !msoaLyr) el.textContent = '...';
+  loadMsoaBoundaries().then(lyr => {
+    if (!lyr) {
+      if (el) el.textContent = '0';
+      e.target.checked = false;
+      return;
+    }
+    // The box can be unticked while the fetch is in flight.
+    if (!document.getElementById('tmsoa').checked) return;
+    lyr.addTo(map);
+    // Under the ward outlines, so the coarser geography stays the one you
+    // read first when both are on.
+    if (typeof wardBoundaryLyr !== 'undefined' && wardBoundaryLyr && wardBoundaryLyr._map) {
+      wardBoundaryLyr.bringToFront();
+    }
+    if (typeof boroughL !== 'undefined' && boroughL && boroughL._map) boroughL.bringToFront();
+  });
 });
 
 document.getElementById('tlsoa').addEventListener('change', e => {

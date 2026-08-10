@@ -1023,6 +1023,12 @@ BOUNDARY_LAYERS = {
     # No LAD column on the LSOA layer, so it is filtered by code instead.
     "lsoa":     ("Lower_layer_Super_Output_Areas_December_2021_Boundaries_EW_BGC_V5",
                  "LSOA21CD,LSOA21NM"),
+    # Same 2021 census vintage and the same BGC generalisation as the LSOAs it
+    # is built from, for the reason given above: MSOA edges are LSOA edges, and
+    # generalising them at different tolerances makes the shared borders stop
+    # coinciding. No LAD column here either, so it is filtered by code.
+    "msoa":     ("Middle_layer_Super_Output_Areas_December_2021_Boundaries_EW_BGC_V3",
+                 "MSOA21CD,MSOA21NM"),
 }
 ARCGIS_PAGE = 1000          # under the service's 2000 maxRecordCount
 
@@ -1094,8 +1100,53 @@ def run_boundaries() -> pd.DataFrame:
             f"boundaries: only {counts['lsoa']:,} of {len(codes):,} in-scope "
             f"LSOAs returned geometry. Refusing to ship a map with holes in it."
         )
+
+    counts["msoa"] = fetch_msoa_boundaries(out_dir)
+
     load_boundary_index.cache_clear()
     return pd.DataFrame([{"kind": k, "features": v} for k, v in counts.items()])
+
+
+def fetch_msoa_boundaries(out_dir: Path) -> int:
+    """
+    MSOA boundaries for the in-scope area, written to data/boundaries/msoa.geojson.
+
+    Scope comes from the LSOA set the rest of the pipeline already works to,
+    mapped up through the ONS LSOA21 -> MSOA21 lookup. Going via the LSOAs
+    rather than asking for a borough's MSOAs directly keeps every geography in
+    this repo answering to the same definition of "in scope": an MSOA is
+    included exactly when one of its LSOAs is.
+
+    Split out of run_boundaries so it can be run on its own without refetching
+    the three files that are already committed.
+    """
+    out_dir.mkdir(parents=True, exist_ok=True)
+    lsoa_to_msoa = get_lsoa_to_msoa()
+    in_scope = set(get_lsoa_ward_lookup())
+    msoa_codes = sorted({m for l, m in lsoa_to_msoa.items() if l in in_scope})
+    if not msoa_codes:
+        raise RuntimeError("boundaries: no MSOA codes resolved from the LSOA lookup")
+
+    layer, fields = BOUNDARY_LAYERS["msoa"]
+    feats: list = []
+    CHUNK = 200
+    for i in range(0, len(msoa_codes), CHUNK):
+        batch = msoa_codes[i:i + CHUNK]
+        where = "MSOA21CD IN (" + ",".join(f"'{c}'" for c in batch) + ")"
+        feats.extend(fetch_arcgis_geojson(layer, where, fields,
+                                          source="boundaries")["features"])
+
+    if len(feats) < len(msoa_codes) * 0.95:
+        raise RuntimeError(
+            f"boundaries: only {len(feats):,} of {len(msoa_codes):,} in-scope "
+            f"MSOAs returned geometry. Refusing to ship a layer with holes in it."
+        )
+
+    write_json_atomic(out_dir / "msoa.geojson",
+                      {"type": "FeatureCollection", "features": feats})
+    ok(f"boundaries: msoa {len(feats):,} features -> data/boundaries/msoa.geojson")
+    export_msoa_outline(feats)
+    return len(feats)
 
 
 # ============================================================================
@@ -3995,6 +4046,38 @@ def write_map_blob(name: str, payload, description: str) -> None:
         f"// so this global is defined by the time any code reads it.\n"
         f"var {name} = {body};\n"
     ))
+
+def export_msoa_outline(feats: list) -> None:
+    """
+    The MSOA outline layer index.html lazy-loads, at data/map/msoa_boundaries.json.
+
+    Not a MAP_BLOBS entry, and deliberately not a <script src>. The map blobs
+    are classic scripts parsed on every page load because their globals are
+    read at parse time. This layer is off by default and is only outlines, so
+    paying about a megabyte on every visit for something most visits never
+    switch on would be the wrong trade. It is fetched the first time the box is
+    ticked and cached from then on.
+
+    Properties are the code and the ONS name only. MSOA21NM is already of the
+    form "Brent 001", so the borough is in the name, and no borough is derived
+    here: an MSOA's LSOAs can sit in more than one, and a modal answer stated as
+    a fact would be wrong for exactly the cases anyone would want it for.
+    """
+    MAP_DIR.mkdir(parents=True, exist_ok=True)
+    slim = []
+    for f in feats:
+        p = f.get("properties", {})
+        slim.append({
+            "type": "Feature",
+            "geometry": f.get("geometry"),
+            "properties": {"code": p.get("MSOA21CD", ""), "name": p.get("MSOA21NM", "")},
+        })
+    payload = _round_coords(_scrub_nan({"type": "FeatureCollection", "features": slim}))
+    path = MAP_DIR / "msoa_boundaries.json"
+    write_atomic(path, json.dumps(payload, separators=(",", ":"), ensure_ascii=False))
+    kb = path.stat().st_size / 1024
+    ok(f"map blob: {len(slim):,} MSOAs -> data/map/msoa_boundaries.json ({kb:,.0f} kB)")
+
 
 def export_map_blobs() -> None:
     """Regenerate the map data files the pipeline owns."""
