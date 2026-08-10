@@ -2356,7 +2356,7 @@ def run_police_crime(months_back: int = 12) -> pd.DataFrame:
             polys.append((name, lad, idx, len(rings), poly_str))
 
     # 12 months lagged by 2 (publication delay)
-    today = pd.Timestamp.utcnow().normalize()
+    today = pd.Timestamp.now("UTC").normalize()
     months = [(today - pd.DateOffset(months=i)).strftime("%Y-%m")
               for i in range(2, 2 + months_back)]
 
@@ -3439,11 +3439,24 @@ def main() -> int:
                          "output_path": "", "rows_written": 0, "schema": {}}
             try:
                 df = SOURCES[s]()
-                if df is not None and hasattr(df, "columns"):
+                if df is None:
+                    # An optional source that had nothing to do, e.g. hospitals
+                    # with no Hospital.csv. Not a failure, but not a success
+                    # either, so it is distinguishable in the manifest.
+                    rec["status"] = "skipped"
+                    rec["notes"] = "source returned no frame"
+                elif hasattr(df, "columns"):
                     rec["rows_written"] = int(len(df))
                     rec["schema"] = {str(c): str(t) for c, t in df.dtypes.items()}
-                elif df is None:
-                    rec["notes"] = "source returned no frame (skipped)"
+                    if len(df) == 0:
+                        # Several sources report total upstream failure by
+                        # warning and returning an empty frame rather than
+                        # raising, so an exception is not the only failure
+                        # signal. Without this a wholly dead source reports ok
+                        # and the refresh workflow stays silent about it.
+                        rec["status"] = "failed"
+                        rec["error"] = ("source produced no rows; see the run "
+                                        "log for the upstream error")
             except Exception as e:
                 rec["status"] = "failed"
                 rec["error"] = f"{type(e).__name__}: {e}"
