@@ -3,7 +3,10 @@
 An interactive map of population health across all 33 London boroughs, at ward
 and LSOA level, and a single Python script that rebuilds it from public data.
 
-Live map: https://pophealthmap.uk
+Live map: https://harv334.github.io/pophealthmap/
+
+The pophealthmap.uk domain is not registered yet. See `DOMAIN.md` for how to
+move the site onto it, and why the `CNAME` file must not be added first.
 
 Every figure comes from an open government or NHS source. Nothing is modelled,
 estimated or smoothed: if a number is on the map, it is in a published dataset,
@@ -134,8 +137,8 @@ worth knowing before changing paths:
 - Jekyll drops any path beginning with an underscore. That is why the manifest
   lives at `data/meta/`, not `data/_meta/`. Renaming it back will 404 in
   production while working perfectly locally.
-- The custom domain is set by the `CNAME` file. Deleting it reverts the site to
-  the `github.io` address.
+- The custom domain is set by the `CNAME` file, and adding one before the domain
+  resolves takes the site offline rather than moving it. See `DOMAIN.md`.
 
 Point the domain at Pages with four `A` records for the apex
 (`185.199.108.153`, `.109.153`, `.110.153`, `.111.153`) and a `CNAME` on `www`
