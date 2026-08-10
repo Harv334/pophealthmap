@@ -63,23 +63,42 @@ Expect JSON with `"stop_reason":"tool_use"` — the model asking for a tool,
 which is the browser's job to run. A `403` means the Origin header is not in
 `ALLOWED_ORIGINS`.
 
-## What it costs
+## What it costs, and how to cap it
 
-`claude-haiku-4-5`, capped at 1024 output tokens, with the system prompt
-marked for caching. A question costs a fraction of a penny. The per-IP cap is
-40 questions per UTC day, held in KV; change `DAILY_CAP` in `src/index.js`.
+`claude-haiku-4-5` at $1 per million input tokens and $5 per million output,
+capped at 1024 output tokens, with the system prompt marked for caching.
 
-The cap counts questions, not requests. Answering one question takes several
-round trips (model asks for a tool, browser posts the result back), so counting
-requests would have made 40 mean roughly 10. Continuations are identified as
-user messages carrying only `tool_result` blocks, which only the client loop
-sends. A caller already over the cap is refused either way, so a continuation
-cannot be used to slip past it.
+One question is roughly two API calls: the model asks for a tool, the browser
+runs it, the model answers. That works out at about **half a penny per
+question**, so a hundred questions a day is around 50p.
 
-If the KV namespace is not bound the Worker **fails open** and stops counting
-rather than breaking the site. That is deliberate, but it means a missing
-binding removes your spend cap: check `wrangler kv namespace list` if usage
-looks wrong.
+Three limits sit in front of that, and only one of them is a real spend cap.
+
+**1. The per-IP cap in this Worker.** `DAILY_CAP` in `src/index.js`, 40
+questions per IP per UTC day. Held in KV, counted per question rather than per
+round trip. It stops one person hammering it; it does not stop a thousand
+people. Note it fails open: if KV errors, the request is answered and not
+counted, because breaking the site is worse than losing the count.
+
+**2. Cloudflare's free tier.** 100,000 Worker requests a day, and 1,000 KV
+writes a day. The KV write limit is the binding one, at one write per question.
+Past it the cap simply stops counting. Neither costs money; they just stop.
+
+**3. The Anthropic spend limit.** This is the one that actually bounds the
+bill, and it is the only one that does. **Set it before you deploy.**
+
+Console → Settings → Billing → Spend limits → Set limit. Pick a number you
+would not mind paying, such as $20 a month. At half a penny a question that is
+about 4,000 questions. Usage pauses when it is reached; it does not overrun.
+
+Better still, put this project in its own Workspace (Console → Workspaces),
+create the API key inside it, and set the spend limit on the Workspace. Then
+the cap applies to this project alone and cannot be spent by anything else you
+build, and the key can be revoked without touching your other work.
+
+Your organisation also has a tier spend cap above whatever you set, $500 a
+month on the Start tier, but do not rely on that as your limit. It is a
+backstop, not a budget.
 
 ## Security notes
 
