@@ -1,0 +1,19 @@
+# Pinned so a scheduled refresh cannot break on an upstream release.
+# Versions match what the pipeline is developed and tested against.
+# Python 3.11 or newer.
+#
+# Every entry below is imported by fetch_all_data.py. pyproj and shapely are
+# imported lazily, inside the functions that need them, so an import error
+# surfaces only when a geometry-dependent source runs.
+#
+#   pandas   dataframes, every source
+#   pyarrow  parquet engine used by pandas (no direct import)
+#   requests every HTTP call
+#   shapely  point-in-polygon for crime and terminated-postcode placement
+#   pyproj   British National Grid to WGS84 conversion
+
+pandas==3.0.2
+pyarrow==23.0.1
+requests==2.33.1
+shapely==2.1.2
+pyproj==3.7.2
