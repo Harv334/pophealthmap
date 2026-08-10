@@ -366,30 +366,46 @@
 .ai-chip{font:inherit;font-size:11.5px;cursor:pointer;text-align:left;background:#FBFCFD;
   color:#003087;border:1px solid #DDE1E4;border-radius:13px;padding:5px 10px}
 .ai-chip:hover{background:#E5EFF8;border-color:#41B6E6}
-.ai-note{margin:-4px 0 8px;padding:7px 10px;border-radius:8px;background:#FDF0D5;
-  border:1px solid #E8D3A3;color:#8A5A00;font-size:11.5px;line-height:1.45}
-.ai-caution{margin:0 0 10px;padding:7px 10px;border-radius:8px;background:#FBE5E3;
-  border:1px solid #F2C4BF;color:#A81A10;font-size:11.5px;line-height:1.45;font-weight:500}
+/* Panel header: the title, then the remaining questions beside it. */
+.ai-head-l{display:flex;align-items:baseline;gap:8px;min-width:0}
+.ai-limit{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;font-weight:500;
+  color:#4C6272;background:#fff;border:1px solid #DDE1E4;border-radius:4px;padding:1px 6px;
+  white-space:nowrap;font-variant-numeric:tabular-nums;cursor:default}
+.ai-limit.spent{color:#A81A10;border-color:#F2C4BF;background:#FDF2F1}
+/* The verification caution, docked under the input rather than at the top of
+   the log. Quiet, because it is a standing condition of the panel rather than
+   an error, but always on screen next to the answers it applies to. */
+.ai-caution{flex:0 0 auto;margin:0;padding:8px 12px;border-top:1px solid #E8EDEE;
+  background:#FBFCFD;color:#4C6272;font-size:10.5px;line-height:1.45;border-radius:0}
 @media (max-width:640px){#ai-panel{width:calc(100% - 24px)}}
 
     /* Layers whose coverage is narrower than the map. Flagged rather than
        removed, because an empty layer reads as "none here" when the truth is
        "not collected here". */
-    .cov-tag{display:inline-block;font-size:9px;font-weight:700;letter-spacing:.4px;
-      color:#8a5a00;background:#fdf0d5;border:1px solid #e8d3a3;border-radius:3px;
-      padding:0 3px;vertical-align:middle;margin-left:2px}
-    .cov-note{font-size:10px;line-height:1.35;color:#8a5a00;background:#fdf0d5;
-      border:1px solid #e8d3a3;border-radius:4px;padding:4px 6px;margin:2px 0 5px}
+    /* Status labels: one family, defined once.
+       "In development", "Soon" and the NWL coverage marks were three amber
+       pills in three sizes and weights, shouting in capitals. Amber reads as a
+       warning and none of them is one: they are facts about scope and
+       readiness. Repeated eight times down the sidebar they were also the
+       loudest thing on a page whose subject is the data. Quiet, neutral,
+       one size, and the eye goes back to the figures. */
+    .cov-tag{display:inline-block;font-size:9.5px;font-weight:500;letter-spacing:.02em;
+      color:#768692;background:#FBFCFD;border:1px solid #DDE1E4;border-radius:4px;
+      padding:0 4px;vertical-align:middle;margin-left:4px;text-transform:none}
+    .cov-note{font-size:10px;line-height:1.4;color:#768692;background:transparent;
+      border:0;border-left:2px solid #DDE1E4;border-radius:0;padding:2px 0 2px 7px;
+      margin:3px 0 6px}
 
     /* Development status. The app is a fixed 100vh grid, so anything in the
        document flow pushes the map out of the viewport. Both of these are
        overlays or inline, and neither changes the layout.
        The header badge cannot be dismissed: the caveat should outlive the
        banner, because a figure read off this map is quotable either way. */
-    .dev-badge{display:inline-block;vertical-align:middle;margin-left:8px;
-      font-size:9.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;
-      color:#8a5a00;background:#fdf0d5;border:1px solid #e8d3a3;
-      border-radius:3px;padding:1px 5px}
+    .dev-badge{display:inline-block;vertical-align:middle;margin-left:9px;
+      font-family:'Inter',system-ui,sans-serif;
+      font-size:10px;font-weight:500;letter-spacing:.02em;text-transform:none;
+      color:#4C6272;background:#FBFCFD;border:1px solid #DDE1E4;
+      border-radius:4px;padding:1px 6px}
     #dev-banner{position:fixed;left:50%;transform:translateX(-50%);bottom:14px;
       /* Above the mode panel (3500). It applies to the whole tool, not just
          the map, and at 1200 it was half covered rather than hidden, which
@@ -450,7 +466,7 @@
     outline:none; border-color:var(--nhs-bright);
     box-shadow:0 0 0 3px rgba(0,114,206,.15); }
 
-  .dev-badge { color:#8a5a00; background:#FFF4D9; border-color:#F0DCA8; }
+  .dev-badge { color: var(--ink-2); background: var(--paper-2); border-color: var(--line); }
 
   /* Accent placement. The palette alone reads as a grey refresh; the design
      carries its identity in a few structural blue moments, not in tinting
@@ -512,10 +528,11 @@
   .mode-btn[aria-selected="true"] { color: var(--nhs-dark);
     border-bottom-color: var(--nhs-blue); }
   .mode-btn:focus-visible { outline: 3px solid var(--nhs-yellow); outline-offset: -3px; }
-  .mode-soon { font-family: Inter, system-ui, sans-serif; font-size: 9px;
-    font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
-    padding: 1px 5px; border-radius: 8px; background: #FDF0D5; color: #8A5A00;
-    border: 1px solid #E8D3A3; }
+  /* Same family as .dev-badge and .cov-tag. */
+  .mode-soon { font-family: Inter, system-ui, sans-serif; font-size: 9.5px;
+    font-weight: 500; letter-spacing: .02em; text-transform: none;
+    padding: 1px 5px; border-radius: 4px; background: var(--paper-2);
+    color: var(--ink-3); border: 1px solid var(--line); }
 
   .mode-panel { background: var(--bg); overflow: auto; display: flex;
     align-items: flex-start; justify-content: center; padding: 48px 24px; }
@@ -619,6 +636,10 @@
   .map-wrap.has-sheet #fingertips-banner { bottom: calc(var(--sheet-lift) + 12px) !important; }
   .map-wrap.has-sheet .leaflet-bottom { bottom: var(--sheet-lift); }
   .map-wrap.has-sheet #ai-toggle { bottom: calc(var(--sheet-lift) + 12px); }
+  /* The panel too, not just the button that opens it. At bottom:12px it ran
+     down over the sheet's figures, so the ward you were asking about was
+     half hidden by the thing you were asking with. */
+  .map-wrap.has-sheet #ai-panel { bottom: calc(var(--sheet-lift) + 12px); }
   /* The development banner is position:fixed, so it is not inside .map-wrap
      and cannot inherit the lift from there. The same value is written to the
      root element for it. Without this it sat squarely over the figures. */
@@ -802,7 +823,7 @@
     <div class="hdr-left">
       <div>
         <div class="hdr-logo">London Population Health Mapping<span class="dev-badge" title="This tool is still in development">In development</span></div>
-        <div class="hdr-sub" title="Click a ward to open its profile · use the Overlay tab to colour the map by an indicator · the VCSE tab maps charities and Community Interest Companies">Click a ward for its profile · pick an Overlay to colour-code · point layers in the sidebar</div>
+        <div class="hdr-sub" title="Click a ward for its headline figures, then Open profile for the full panel · use the Overlay tab to colour the map by an indicator · the VCSE tab maps charities and Community Interest Companies">Click a ward for its headline figures · pick an Overlay to colour-code · point layers in the sidebar</div>
       </div>
     </div>
     <div class="hdr-right">
@@ -1272,12 +1293,12 @@
 
       <!-- Neighbourhoods tab -->
       <div class="tab-pane" id="tab-nbhd">
-        <div class="sb-sec" style="padding:10px 12px;background:#fff8ea;border-left:3px solid #e5a94a;border-bottom:1px solid #ecd7aa">
+        <div class="sb-sec" style="padding:10px 12px;background:var(--paper-2);border-left:3px solid var(--line);border-bottom:1px solid var(--line)">
           <div style="display:flex;align-items:center;gap:7px;margin-bottom:4px">
-            <span style="padding:1px 6px;background:#e5a94a;color:#fff;border-radius:9px;font-size:9.5px;font-weight:700;letter-spacing:.04em">IN DEVELOPMENT</span>
-            <span style="font-size:12px;font-weight:600;color:#7a4e00">Neighbourhoods — section in development</span>
+            <span class="dev-badge" style="margin-left:0">In development</span>
+            <span style="font-size:12px;font-weight:600;color:var(--ink)">Neighbourhoods</span>
           </div>
-          <div style="font-size:10.5px;color:#7a5a2a;line-height:1.55">
+          <div style="font-size:10.5px;color:var(--ink-2);line-height:1.55">
             This tab is still being built. Westminster's 4-neighbourhood breakdown is shown as a preview; equivalent neighbourhood groupings for the other London boroughs are not yet wired in, and the indicators panel here will expand over coming releases.
           </div>
         </div>
@@ -3825,17 +3846,19 @@ function showWard(wn) {
 
   const nk = wdata.neighbourhood, nb = nk ? NEIGHBOURHOODS[nk] : null;
 
-  // Switch to ward tab — unless the selection came from a Query result row.
-  // Working through a result list means clicking ward after ward, and pulling
-  // the sidebar over to the profile each time would throw the list away on the
-  // first click. The bottom sheet already carries the ward's figures, and
-  // "Open profile" on it is there for anyone who wants the full panel.
-  const _keepPane = window.__phKeepPane;
-  window.__phKeepPane = false;
-  if (!_keepPane) {
-    document.querySelectorAll('.sb-tab').forEach(t => t.classList.toggle('active', t.dataset.tab==='ward'));
-    document.querySelectorAll('.tab-pane').forEach(t => t.classList.toggle('active', t.id==='tab-ward'));
-  }
+  // The sidebar is deliberately left where it is.
+  //
+  // Clicking a ward used to do three things at once: raise the sheet, throw
+  // the sidebar to the full profile, and rewrite the viewing strip. The sheet
+  // and the profile then showed the same population, the same GP count and the
+  // same deprivation figure in two places, and the profile arrived with every
+  // category expanded, so a single click replaced most of the screen.
+  //
+  // The sheet answers the click. "Open profile" on it opens the full panel for
+  // anyone who wants the rest, which is what the design file put that button
+  // there for. The panel below is still filled in either way, so it is ready
+  // the moment that button is pressed.
+
   // Keep the viewing-strip visible but swap its digest to the ward name so
   // the .map-wrap grid geometry never changes on click (toggling display
   // was causing the map to repaint as a blank white rectangle).
@@ -3868,7 +3891,10 @@ function showWard(wn) {
   // Ward sidebar profile: WARD-LEVEL FIELDS ONLY. LSOA-level fields belong
   // in the LSOA profile (clicking a single LSOA), not here. The CATS config
   // tags every field with .g ('ward' or 'lsoa'); we filter on that.
-  const cats = CATS.map(cat => {
+  // Only the first category starts open. All six expanded put roughly eighty
+  // rows in the panel before the user had asked for any of them, and the ones
+  // below the fold were unreachable without scrolling past the rest.
+  const cats = CATS.map((cat, catIdx) => {
     const wardFields = cat.fields.filter(f => f.g === 'ward');
     const rows = wardFields.map(f => {
       const val = inds[f.k];
@@ -3881,12 +3907,13 @@ function showWard(wn) {
     if (!rows) return '';
     // Prepend a stacked bar at the top of the ethnicity/age category bodies.
     const pre = cat.key === 'ethnicity' ? ethBar : (cat.key === 'age' ? ageBar : '');
+    const op = catIdx === 0 ? ' open' : '';
     return `<div class="cat-block">
       <div class="cat-hdr" onclick="toggleCat(this)">
         <span class="cat-hdr-l"><span class="cat-ico">${cat.ico}</span>${cat.label}</span>
-        <span class="cat-arrow open">▶</span>
+        <span class="cat-arrow${op}">▶</span>
       </div>
-      <div class="cat-body open">${pre}${rows}</div>
+      <div class="cat-body${op}">${pre}${rows}</div>
     </div>`;
   }).join('');
 
@@ -8957,7 +8984,6 @@ loadData();
     // map to add another", so a click pins rather than raising the one-ward
     // sheet over the comparison it was asked to add to.
     if (inCompareMode()) {
-      window.__phKeepPane = true;         // and it does not leave Compare either
       if (pinned.indexOf(wn) === -1 && pinned.length < PIN_MAX) pinned.push(wn);
       refreshPins();
       if (pinned.length >= 2) openCompareBar();
@@ -8979,7 +9005,11 @@ loadData();
     syncPinBtn();
     renderBody(w, null);
     sheet.classList.add('open');
-    if (sheetState === 2) { sheetState = 1; }   // a new ward is worth showing
+    // Restore a collapsed sheet fully. Collapsed shows the name and nothing
+    // else, and now that the sheet is the whole response to a ward click,
+    // leaving it that way means the click appears to do nothing. Peek is left
+    // alone: that one is a size the user chose and can still read.
+    if (sheetState === 2) { sheetState = 0; }
     applyState();
 
     // GP practices are not a pipeline indicator, so the count comes from a
@@ -9708,10 +9738,7 @@ loadData();
     target.setStyle(wstyle(wn, curOv, 'selected'));
     target.bringToFront();
     try { map.fitBounds(target.getBounds(), { padding: [40, 40], maxZoom: 13 }); } catch (err) { /* degenerate bounds */ }
-    // Keep the result list up; the sheet is what shows the ward from here.
-    window.__phKeepPane = true;
     if (typeof showWard === 'function') showWard(wn);
-    window.__phKeepPane = false;
   }
 
   $('q-run').addEventListener('click', runQuery);

@@ -20,7 +20,7 @@ var ASSISTANT_ENDPOINT = "https://pophealthmapai.sevilleharvey.workers.dev";
   // Shown to the user, and enforced by the Worker. If you change DAILY_CAP in
   // worker/src/index.js, change this too: the panel promising one number while
   // the server enforces another is worse than not mentioning it at all.
-  var DAILY_CAP = 40;
+  var DAILY_CAP = 10;
 
   // ---- data access -------------------------------------------------------
   // Read straight from the globals the map already populated.
@@ -415,15 +415,32 @@ var ASSISTANT_ENDPOINT = "https://pophealthmapai.sevilleharvey.workers.dev";
   var lastLimit = null;
   var limitEl = null;
 
+  /**
+   * The remaining count, in the panel header beside its title.
+   *
+   * It used to be a paragraph of its own at the top of the log, above a second
+   * paragraph of caution, so opening the panel showed two notices before the
+   * first thing you could actually do. The number is the part worth keeping in
+   * view, and it belongs where the panel names itself. The reasoning behind
+   * the cap moved into the opening message, said once.
+   *
+   * Before the first question the browser cannot know the count: the cap is
+   * per IP and counted by the Worker, so all it can honestly show is the cap.
+   */
   function renderLimit() {
     if (!limitEl) return;
     if (lastLimit && typeof lastLimit.remaining === "number") {
-      limitEl.textContent = lastLimit.remaining + " of " + (lastLimit.cap || DAILY_CAP)
-        + " questions left today. This is a free service with running costs, so it "
-        + "is capped per user. The map itself is unlimited.";
+      var left = lastLimit.remaining;
+      limitEl.textContent = left + " of " + (lastLimit.cap || DAILY_CAP) + " left today";
+      limitEl.title = left === 0
+        ? "You have used today's questions. The count resets at midnight UTC. The map itself is unlimited."
+        : left + " of today's " + (lastLimit.cap || DAILY_CAP) + " questions remaining. Resets at midnight UTC.";
+      limitEl.classList.toggle("spent", left === 0);
     } else {
-      limitEl.textContent = "This is a free service with running costs, so questions "
-        + "are limited to " + DAILY_CAP + " a day per user. The map itself is unlimited.";
+      limitEl.textContent = DAILY_CAP + " a day";
+      limitEl.title = "Questions are limited to " + DAILY_CAP + " a day per person. "
+        + "The count appears here once you have asked one. The map itself is unlimited.";
+      limitEl.classList.remove("spent");
     }
   }
 
@@ -533,32 +550,16 @@ var ASSISTANT_ENDPOINT = "https://pophealthmapai.sevilleharvey.workers.dev";
     var log = document.createElement("div");
     log.id = "ai-log";
 
+    // One opening message, not three stacked notices. It carries the reason
+    // for the cap as well, so the count in the header can be just a count.
     var intro = document.createElement("div");
     intro.className = "ai-msg ai-bot";
     intro.textContent = "Ask about any ward or borough on the map. Every figure " +
       "in an answer is read from the data already loaded in your browser, so " +
-      "nothing is uploaded and no number is written from memory.";
+      "nothing is uploaded and no number is written from memory. This is a free " +
+      "service with running costs, so questions are limited to " + DAILY_CAP +
+      " a day per person. The map itself is unlimited.";
     log.appendChild(intro);
-
-    // Say the limit up front. It is a shared, funded service, and finding out
-    // it is capped by being refused mid-question is a worse way to learn it.
-    // The count updates from the Worker after each answer, because the browser
-    // has no way to know it: the cap is per IP and enforced server-side.
-    var limit = document.createElement("div");
-    limit.className = "ai-note";
-    log.appendChild(limit);
-
-    limitEl = limit;
-    renderLimit();
-
-    // Answers are built from the map's own figures, but the sentence around
-    // them is still written by a model, and this data gets used to argue for
-    // where services go. Saying so once, plainly, at the top.
-    var caution = document.createElement("div");
-    caution.className = "ai-caution";
-    caution.textContent = "AI generated output should be independently verified "
-      + "before making any decisions.";
-    log.appendChild(caution);
 
     var chips = document.createElement("div");
     chips.className = "ai-examples";
@@ -585,8 +586,20 @@ var ASSISTANT_ENDPOINT = "https://pophealthmapai.sevilleharvey.workers.dev";
     form.appendChild(input);
     form.appendChild(send);
 
+    // Answers are built from the map's own figures, but the sentence around
+    // them is written by a model, and this data gets used to argue for where
+    // services go. The caution sits under the input rather than at the top of
+    // the log: at the top it was read once, before there was anything to
+    // verify, and then scrolled away above every answer it applied to. At the
+    // bottom it stays beside them.
+    var caution = document.createElement("div");
+    caution.className = "ai-caution";
+    caution.textContent = "AI generated output should be independently verified "
+      + "before making any decisions.";
+
     container.appendChild(log);
     container.appendChild(form);
+    container.appendChild(caution);
 
     function add(cls, text, asHtml) {
       var d = document.createElement("div");
@@ -656,8 +669,22 @@ var ASSISTANT_ENDPOINT = "https://pophealthmapai.sevilleharvey.workers.dev";
     close.type = "button";
     close.setAttribute("aria-label", "Close");
     close.textContent = "×";
-    head.appendChild(heading);
+
+    // The remaining count, beside the panel's own name. Built here rather than
+    // in mount() because the header outlives the body: mounting is a no-op the
+    // second time, but the header is there from the moment the panel exists.
+    var limitBadge = document.createElement("span");
+    limitBadge.id = "ai-limit";
+    limitBadge.className = "ai-limit";
+    var headLeft = document.createElement("span");
+    headLeft.className = "ai-head-l";
+    headLeft.appendChild(heading);
+    headLeft.appendChild(limitBadge);
+
+    head.appendChild(headLeft);
     head.appendChild(close);
+    limitEl = limitBadge;
+    renderLimit();
 
     var body = document.createElement("div");
     body.id = "ai-body";

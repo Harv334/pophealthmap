@@ -26,7 +26,7 @@
  */
 const MODEL = "claude-sonnet-5";
 const MAX_TOKENS = 1024;
-const DAILY_CAP = 40; // questions per IP, per UTC day
+const DAILY_CAP = 10; // questions per IP, per UTC day
 
 /**
  * Billed calls per IP per day, counting every round trip.
