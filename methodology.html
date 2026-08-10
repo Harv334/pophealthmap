@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Methodology and technical notes · PopHealth Map</title>
+<!-- Same inline map-pin icon as index.html, so the tab matches. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23005EB8'/%3E%3Cpath d='M16 6c-3.9 0-7 3.1-7 7 0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7z' fill='%23fff'/%3E%3Ccircle cx='16' cy='13' r='2.6' fill='%23005EB8'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Inter+Tight:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --nhs-blue:#005EB8; --nhs-dark:#003087; --nhs-yellow:#FFB81C;
+    --ink:#212B32; --ink-2:#4C6272; --ink-3:#768692;
+    --line:#DDE1E4; --bg:#F4F7F9; --paper:#FFFFFF;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+    font-family:Inter,system-ui,-apple-system,sans-serif; font-size:15px; line-height:1.6; }
+  header { background:var(--paper); border-top:4px solid var(--nhs-blue);
+    border-bottom:1px solid var(--line); padding:18px 24px; }
+  header h1 { font-family:'Inter Tight',Inter,sans-serif; font-size:21px; color:var(--nhs-dark);
+    margin:0 0 3px; letter-spacing:-.01em; }
+  header p { margin:0; color:var(--ink-2); font-size:13.5px; }
+  header a { color:var(--nhs-blue); }
+  main { max-width:860px; margin:0 auto; padding:28px 24px 64px; }
+  h2 { font-family:'Inter Tight',Inter,sans-serif; font-size:19px; color:var(--nhs-dark);
+    margin:34px 0 10px; padding-bottom:6px; border-bottom:1px solid var(--line); }
+  h3 { font-family:'Inter Tight',Inter,sans-serif; font-size:15.5px; margin:22px 0 6px; }
+  p, li { color:var(--ink-2); }
+  a { color:var(--nhs-blue); }
+  table { width:100%; border-collapse:collapse; margin:12px 0 18px; font-size:13.5px;
+    background:var(--paper); border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+  th, td { text-align:left; padding:8px 11px; border-bottom:1px solid var(--line);
+    vertical-align:top; }
+  th { background:#FBFCFD; font-weight:600; color:var(--ink); font-size:12.5px;
+    text-transform:uppercase; letter-spacing:.04em; }
+  tr:last-child td { border-bottom:0; }
+  code { font-family:ui-monospace,"JetBrains Mono",Menlo,monospace; font-size:12.5px;
+    background:#FBFCFD; border:1px solid var(--line); border-radius:4px; padding:1px 5px; }
+  .caution { background:#FDF0D5; border:1px solid #E8D3A3; color:#8A5A00;
+    border-radius:8px; padding:12px 14px; margin:16px 0; font-size:14px; }
+  .wrap { overflow-x:auto; }
+  footer { border-top:1px solid var(--line); margin-top:40px; padding-top:16px;
+    font-size:12.5px; color:var(--ink-3); }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#1B2227; --paper:#232C33; --ink:#E8EDEE; --ink-2:#BFC9CE;
+            --ink-3:#8FA0A8; --line:#3A464E; --nhs-dark:#8FC3F0; }
+    th { background:#1F272D; }
+    code { background:#1F272D; }
+    .caution { background:#3A2F1B; border-color:#6B5730; color:#F0D9A8; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Methodology and technical notes</h1>
+  <p><a href="/">← Back to the map</a> · PopHealth Map, London</p>
+</header>
+
+<main>
+
+<p>This page records where each figure comes from, which geography and year it
+belongs to, and what it cannot tell you. It is written to be read alongside the
+map rather than instead of it.</p>
+
+<div class="caution">
+  <strong>This tool is in development.</strong> The data is real and comes from
+  published sources, but the map is still being built and checked, so treat
+  figures as provisional.
+</div>
+
+<h2>Geographies, and which year each one is from</h2>
+
+<p>The three geographies on the map come from different censuses and boundary
+reviews. They do not nest inside one another, and that has consequences worth
+understanding before comparing them.</p>
+
+<div class="wrap">
+<table>
+  <tr><th>Level</th><th>Vintage</th><th>Count in scope</th><th>Source</th></tr>
+  <tr><td>Borough (local authority)</td><td>May 2025</td><td>33</td>
+      <td>ONS <code>LAD_MAY_2025_UK_BGC_V2</code></td></tr>
+  <tr><td>Ward</td><td>May 2025</td><td>704</td>
+      <td>ONS <code>WD_MAY_2025_UK_BGC_V2</code></td></tr>
+  <tr><td>LSOA</td><td>2021 census</td><td>4,994</td>
+      <td>ONS <code>Lower_layer_Super_Output_Areas_December_2021_..._BGC_V5</code></td></tr>
+  <tr><td>MSOA</td><td>2021 census</td><td>1,002</td>
+      <td>Used for aggregation only, not drawn</td></tr>
+</table>
+</div>
+
+<p>All boundary layers are the <strong>BGC</strong> generalisation: simplified to
+20 metres and clipped to the coastline. Keeping them at the same generalisation
+matters. LSOAs were previously taken at BSC, 200 metres, which is ten times
+coarser, and because the two had been simplified independently their shared
+borders no longer coincided: LSOA edges visibly cut across ward lines.</p>
+
+<p>Coordinates in the files the browser downloads are rounded to five decimal
+places, which moves no point by more than 0.32 metres and roughly halves the
+file size.</p>
+
+<h3>LSOAs do not sit inside wards</h3>
+
+<p>LSOA boundaries are from 2021 and wards were redrawn in 2025, so the two
+genuinely cross. Measured across the whole of London, the typical LSOA falls
+0.7% outside the ward it is assigned to, and 59% sit entirely within one, but
+41% cross a ward line somewhere and a small number straddle almost completely.</p>
+
+<p>Every LSOA is assigned to exactly one ward using the ONS best-fit lookup
+(<code>LSOA21_WD25_LAD25_EW_LU_v2</code>). So a ward figure built from LSOAs
+counts each LSOA once, in the ward it best fits, not in proportion to the area
+it shares. At high zoom you will see LSOA outlines crossing ward outlines. That
+is the geography being honest, not a drawing error.</p>
+
+<h2>How figures move between levels</h2>
+
+<table>
+  <tr><th>Direction</th><th>Method</th></tr>
+  <tr><td>LSOA → ward</td>
+      <td>Population-weighted mean for rates, scores and percentages. Sum for
+          counts.</td></tr>
+  <tr><td>MSOA → ward</td>
+      <td>Through the LSOAs the two share. Each LSOA carries its MSOA's value
+          and contributes its population as weight, so a ward straddling two
+          MSOAs gets a blend in proportion to where its people are.</td></tr>
+  <tr><td>Ward → borough</td>
+      <td>Population-weighted mean, except for genuinely additive measures
+          (population, crime totals, service counts), which are summed.</td></tr>
+</table>
+
+<p>Only counts are added up. Everything else is averaged, on the principle that
+a wrongly averaged count looks implausible and gets noticed, while a wrongly
+summed rate just looks like a number.</p>
+
+<h3>Deprivation deciles are not a decile once averaged</h3>
+
+<p>IMD deciles run 1 (the most deprived tenth nationally) to 10 (the least). A
+ward contains several LSOAs, each with its own decile, so the ward figure is a
+population-weighted <em>mean</em> of deciles and is published as
+<code>imd_decile_mean</code> rather than pretending to be a decile. A value of
+3 means the typical LSOA there sits in the third decile, among roughly the 30%
+most deprived. It does not mean the area is in the most deprived tenth.</p>
+
+<p>The scores run the other way: a higher <code>imd_score</code> means more
+deprived. Deprivation is the easiest thing on this map to state backwards.</p>
+
+<h2>Health indicators: two sets at two levels</h2>
+
+<p>The health data comes from OHID Fingertips in two separate pulls, and they
+are not interchangeable.</p>
+
+<div class="wrap">
+<table>
+  <tr><th></th><th>Local Health set</th><th>Borough set</th></tr>
+  <tr><td>Keys</td><td><code>ft_93283</code> and similar, keyed by indicator id</td>
+      <td><code>ft_life_expectancy_male</code> and similar</td></tr>
+  <tr><td>Published at</td><td>MSOA</td><td>Upper-tier local authority</td></tr>
+  <tr><td>On the map</td><td>Aggregated to wards; varies ward by ward</td>
+      <td>Repeated identically for every ward in a borough</td></tr>
+  <tr><td>Count</td><td>33 indicators, 684 wards</td><td>18 indicators, 33 boroughs</td></tr>
+</table>
+</div>
+
+<p>The borough set is the one to be careful with. Ranking wards by it produces a
+real-looking ordering that is an artefact of the geography rather than a finding
+about the wards, because every ward in a borough carries the same number. The
+map and the question panel both flag these.</p>
+
+<p>Fingertips still publishes the Local Health set against 2011 MSOA codes, and
+39 London MSOAs were renumbered in 2021. Where a code no longer matches, the
+value is left missing rather than filled from a neighbour.</p>
+
+<h2>Known gaps</h2>
+
+<ul>
+  <li><strong>City of London.</strong> Its 20 wards have no deprivation score and
+      no Local Health indicators. They are tiny and share very few LSOAs between
+      them, so there is nothing to aggregate. This is a property of the
+      geography, not a fetch failure.</li>
+  <li><strong>Five layers cover North West London only</strong> — schools,
+      community centres, libraries, ESOL providers and CICs. They are badged
+      NWL on the map. Blank elsewhere means not yet collected, not none.</li>
+  <li><strong>Suppressed values.</strong> Fingertips withholds MSOA figures
+      where small counts could identify individuals. A ward with no fill may be
+      suppressed rather than zero.</li>
+</ul>
+
+<h2>The question panel</h2>
+
+<p>The model is never given the dataset. It is given four tools, and your
+browser runs them against the JSON already loaded on the page, so every figure
+in an answer is the same number the map is drawing, nothing is uploaded, and
+the model cannot invent a statistic because it has none in its context.</p>
+
+<p>It can still describe a correct figure incorrectly, which is why answers
+carry a note asking you to verify anything you intend to act on. Questions are
+capped per user per day because the service has running costs.</p>
+
+<h2>Rebuilding this</h2>
+
+<p>The whole map is rebuilt by one script, <code>fetch_all_data.py</code>, with
+no manual downloads. Sources, licences and per-source notes are in the
+repository: <a href="https://github.com/Harv334/pophealthmap">github.com/Harv334/pophealthmap</a>.</p>
+
+<footer>
+  Questions or corrections: <a href="mailto:contact@pophealth.uk">contact@pophealth.uk</a>.
+  Data is largely Open Government Licence v3 and carries its own attribution
+  requirements; see <code>DATA_LICENCES.md</code> in the repository.
+</footer>
+
+</main>
+</body>
+</html>
