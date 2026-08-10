@@ -153,9 +153,21 @@ var ASSISTANT_ENDPOINT = "https://pophealthmapai.sevilleharvey.workers.dev";
    * That makes a ward ranking on an ft_ indicator meaningless, and worse than
    * meaningless if it is stated as a ward finding. The tools carry the caveat
    * so the model cannot present borough data as ward data.
+   *
+   * Since that was written a second Fingertips set arrived and the test had to
+   * narrow. The Local Health series is fetched at MSOA (area type 3) and
+   * carried down to wards through the LSOA bridge, and it is keyed by the
+   * numeric indicator id: ft_93283, ft_93280 and 31 others. Those genuinely
+   * differ ward by ward and ranking them is a real ward ranking. The
+   * upper-tier local authority series is keyed by name, ft_life_expectancy_male
+   * and the rest, and that is the one that repeats across a borough.
+   *
+   * Testing /^ft_/ alone put the caveat on both, telling the model not to rank
+   * wards by the 33 indicators that are the most ward-specific health data on
+   * the map.
    */
   function isBoroughLevel(key) {
-    return /^ft_/.test(key);
+    return /^ft_/.test(key) && !/^ft_\d+$/.test(key);
   }
 
   var BOROUGH_CAVEAT = "This indicator is published at borough level and " +
@@ -374,6 +386,14 @@ var ASSISTANT_ENDPOINT = "https://pophealthmapai.sevilleharvey.workers.dev";
     areasFor: areasFor,
     findArea: findArea,
     isAdditive: isAdditive,
+    // The map's query builder reads indicator metadata through these rather
+    // than repeating the OV_META / FT_META / IMD_META fallback chain. Two
+    // copies of that chain would drift, and the one that drifted would be the
+    // one nobody was testing.
+    metaFor: metaFor,
+    labelFor: labelFor,
+    higherMeans: higherMeans,
+    isBoroughLevel: isBoroughLevel,
     get configured() { return !!ASSISTANT_ENDPOINT; },
   };
 

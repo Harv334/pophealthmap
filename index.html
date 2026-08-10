@@ -535,6 +535,176 @@
     border-radius: 8px; padding: 8px 15px; }
   .mode-back:hover { background: var(--nhs-dark); border-color: var(--nhs-dark); }
 
+  /* ── Selected-ward sheet ──────────────────────────────────────────────────
+     The bar that rises from the bottom of the map when a ward is clicked.
+     Three states cycled by clicking the head: full, peek, collapsed, exactly
+     as in the design file. Everything here is namespaced ws- because .chip,
+     .kpi and .rank-row are already used elsewhere in this file and the design
+     file's own class names would have collided with all three. */
+  .map-wrap { --sheet-lift: 0px; }
+  .ws-sheet { position: absolute; left: 16px; right: 16px; bottom: 16px; z-index: 1200;
+    background: var(--paper); border: 1px solid var(--line); border-radius: 14px;
+    box-shadow: var(--shadow-lg); overflow: hidden; display: none; flex-direction: column;
+    max-height: 342px; transition: max-height .25s ease; }
+  .ws-sheet.open { display: flex; }
+  .ws-sheet.peek { max-height: 174px; }
+  .ws-sheet.collapsed { max-height: 66px; }
+  .ws-handle { width: 36px; height: 4px; background: var(--line); border-radius: 2px;
+    position: absolute; top: 6px; left: 50%; transform: translateX(-50%); pointer-events: none; }
+  .ws-head { padding: 14px 16px 12px; display: flex; align-items: center; gap: 12px;
+    border-bottom: 1px solid var(--line); cursor: pointer; flex-shrink: 0; }
+  .ws-head:hover { background: var(--paper-2); }
+  .ws-title { flex: 1; min-width: 0; }
+  .ws-title .ws-lbl { font-size: 10px; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--ink-3); font-weight: 600; }
+  .ws-title h2 { font-family: 'Inter Tight', Inter, sans-serif; font-size: 17px; font-weight: 600;
+    margin: 2px 0 0; letter-spacing: -.01em; color: var(--ink); white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; }
+  .ws-title .ws-meta { font-size: 11.5px; color: var(--ink-2); margin-top: 1px; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; }
+  .ws-acts { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .ws-btn { appearance: none; font: inherit; font-size: 11.5px; font-weight: 500; cursor: pointer;
+    background: var(--paper); color: var(--ink); border: 1px solid var(--line);
+    border-radius: 8px; padding: 6px 11px; white-space: nowrap;
+    transition: background .12s, border-color .12s, color .12s; }
+  .ws-btn:hover { background: var(--paper-2); border-color: var(--nhs-blue); color: var(--nhs-blue); }
+  .ws-btn.primary { background: var(--nhs-blue); border-color: var(--nhs-blue); color: #fff; }
+  .ws-btn.primary:hover { background: var(--nhs-dark); border-color: var(--nhs-dark); color: #fff; }
+  .ws-btn.on { background: var(--nhs-light); border-color: var(--nhs-blue); color: var(--nhs-dark); }
+  .ws-close { appearance: none; background: none; border: 0; cursor: pointer; color: var(--ink-3);
+    font-size: 17px; line-height: 1; padding: 2px 4px; border-radius: 6px; }
+  .ws-close:hover { color: var(--nhs-red); background: var(--nhs-light); }
+  .ws-body { padding: 14px 16px 16px; overflow: auto; flex: 1; min-height: 0; }
+  .ws-insight { border-left: 3px solid var(--nhs-blue); background: var(--nhs-light);
+    border-radius: 6px; padding: 10px 13px; font-size: 12.5px; line-height: 1.55; color: var(--ink-2); }
+  .ws-insight strong { color: var(--ink); font-weight: 600; }
+  .ws-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+    gap: 8px; margin-top: 12px; }
+  .ws-kpi { background: var(--paper); border: 1px solid var(--line); border-radius: 10px;
+    padding: 9px 11px; min-width: 0; }
+  .ws-kpi .ws-k-lbl { font-size: 10px; text-transform: uppercase; letter-spacing: .05em;
+    color: var(--ink-3); font-weight: 600; white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; }
+  .ws-kpi .ws-k-num { font-family: 'Inter Tight', Inter, sans-serif; font-size: 21px;
+    font-weight: 600; letter-spacing: -.02em; line-height: 1.15; margin-top: 2px;
+    font-variant-numeric: tabular-nums; }
+  .ws-kpi .ws-k-num span { font-size: 13px; font-weight: 500; margin-left: 1px; }
+  .ws-kpi .ws-k-num.dim { color: var(--ink-3); font-weight: 400; }
+  .ws-kpi .ws-k-sub { font-size: 10px; color: var(--ink-3); margin-top: 1px; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; }
+  .ws-kpi.emphasis { background: var(--nhs-dark); border-color: var(--nhs-dark); }
+  .ws-kpi.emphasis .ws-k-lbl, .ws-kpi.emphasis .ws-k-sub { color: rgba(255,255,255,.72); }
+  .ws-kpi.emphasis .ws-k-num { color: #fff; }
+  /* Pinned comparison. Six is the ceiling the assistant's compare_areas tool
+     already enforces, so the two cannot disagree about how many fit. */
+  .ws-pins { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 12px; }
+  .ws-pins-hd { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .ws-pins-hd .ws-lbl { font-size: 10px; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--ink-3); font-weight: 600; flex: 1; }
+  .ws-ptable { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+  .ws-ptable th, .ws-ptable td { text-align: right; padding: 5px 7px; border-bottom: 1px solid var(--line);
+    font-variant-numeric: tabular-nums; color: var(--ink-2); white-space: nowrap; }
+  .ws-ptable th:first-child, .ws-ptable td:first-child { text-align: left; color: var(--ink);
+    white-space: normal; min-width: 120px; }
+  .ws-ptable thead th { font-size: 10px; text-transform: uppercase; letter-spacing: .05em;
+    color: var(--ink-3); font-weight: 600; }
+  .ws-ptable tbody tr.current td:first-child { font-weight: 600; color: var(--nhs-dark); }
+  .ws-pin-x { appearance: none; background: none; border: 0; cursor: pointer; color: var(--ink-3);
+    font-size: 13px; line-height: 1; padding: 0 3px; }
+  .ws-pin-x:hover { color: var(--nhs-red); }
+  .ws-note { font-size: 10.5px; color: var(--ink-3); margin-top: 9px; line-height: 1.45; }
+  /* Keep the map's own furniture clear of the sheet. --sheet-lift is written
+     by the sheet's own state handler, so all three move together. */
+  .map-wrap.has-sheet .map-legend-strip { bottom: calc(var(--sheet-lift) + 12px); }
+  .map-wrap.has-sheet #fingertips-banner { bottom: calc(var(--sheet-lift) + 12px) !important; }
+  .map-wrap.has-sheet .leaflet-bottom { bottom: var(--sheet-lift); }
+  .map-wrap.has-sheet #ai-toggle { bottom: calc(var(--sheet-lift) + 12px); }
+  /* The development banner is position:fixed, so it is not inside .map-wrap
+     and cannot inherit the lift from there. The same value is written to the
+     root element for it. Without this it sat squarely over the figures. */
+  #dev-banner { bottom: calc(14px + var(--sheet-lift, 0px)); }
+  @media (max-width: 900px) {
+    .ws-head { flex-wrap: wrap; }
+    .ws-acts { width: 100%; justify-content: flex-end; }
+  }
+
+  /* ── Query builder ────────────────────────────────────────────────────────
+     The filter sentence from the design file: services, then a borough, then
+     any number of indicator conditions, read left to right as one sentence. */
+  /* In Query mode the sidebar is the query, so the tab strip goes: leaving it
+     visible with nothing selected reads as a bug rather than as a mode. */
+  .sidebar.query-mode > .sb-tabs { display: none; }
+  .q-pane { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  .q-head { display: flex; align-items: baseline; gap: 8px; padding: 11px 12px 0; }
+  .q-head h2 { font-family: 'Inter Tight', Inter, sans-serif; font-size: 16px; font-weight: 600;
+    letter-spacing: -.01em; color: var(--nhs-dark); margin: 0; }
+  .q-head .q-back { margin-left: auto; appearance: none; background: none; border: 0; padding: 0;
+    font: inherit; font-size: 11px; color: var(--nhs-blue); cursor: pointer; }
+  .q-head .q-back:hover { color: var(--nhs-dark); text-decoration: underline; }
+  .q-scroll { overflow-y: auto; min-height: 0; flex: 1; }
+  .q-block { padding: 12px 12px 13px; border-bottom: 1px solid var(--line); background: var(--paper-2); }
+  .q-sub { font-size: 11px; color: var(--ink-3); line-height: 1.45; margin-bottom: 9px; }
+  .q-lbl { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3);
+    font-weight: 600; margin-bottom: 6px; }
+  .q-sentence { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; font-size: 12px;
+    color: var(--ink-2); line-height: 1.6; }
+  .q-sentence .q-join { color: var(--ink-3); font-size: 11.5px; padding: 0 1px; }
+  .q-chip { display: inline-flex; align-items: center; gap: 5px; min-height: 26px; padding: 2px 10px;
+    border: 1px solid var(--line); border-radius: 999px; background: var(--paper); color: var(--ink-2);
+    font-size: 11.5px; font-weight: 500; cursor: pointer; user-select: none;
+    transition: background .12s, border-color .12s, color .12s; }
+  .q-chip:hover { border-color: var(--nhs-blue); color: var(--nhs-blue); }
+  .q-chip.on { background: var(--nhs-blue); border-color: var(--nhs-blue); color: #fff; }
+  .q-chip.on:hover { background: var(--nhs-dark); border-color: var(--nhs-dark); color: #fff; }
+  .q-chip.outline { color: var(--nhs-blue); border-color: rgba(0,94,184,.3); background: rgba(0,94,184,.04); }
+  .q-chip.add { border-style: dashed; color: var(--ink-3); }
+  select.q-chip { appearance: none; -webkit-appearance: none; padding-right: 24px; max-width: 100%;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23005EB8' stroke-width='3'><path d='M5 9l7 7 7-7'/></svg>");
+    background-repeat: no-repeat; background-position: right 9px center; }
+  .q-chip .q-x { opacity: .65; font-size: 13px; line-height: 1; margin-left: 1px; }
+  .q-chip .q-x:hover { opacity: 1; }
+  /* One condition, two rows: the indicator gets the full width because its
+     names are long, the comparison and the value share the row below. Packed
+     onto one row the indicator select truncated to "Disabil" and the
+     comparison to "≤ at mo", which is not a sentence anyone can read. */
+  .q-cond { border: 1px solid var(--line); border-radius: 8px; background: var(--paper);
+    padding: 7px 8px; margin-bottom: 6px; }
+  .q-cond-row2 { display: grid; grid-template-columns: 1fr 76px auto; gap: 5px; align-items: center; }
+  .q-f { font: inherit; font-size: 11.5px; padding: 4px 6px; border: 1px solid var(--line);
+    border-radius: 6px; background: var(--paper); color: var(--ink); min-width: 0; width: 100%; }
+  select.q-f { appearance: none; -webkit-appearance: none; padding-right: 20px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%234C6272' stroke-width='3'><path d='M5 9l7 7 7-7'/></svg>");
+    background-repeat: no-repeat; background-position: right 6px center; }
+  .q-cond .q-f-ind { margin-bottom: 5px; }
+  .q-del { appearance: none; background: none; border: 1px solid var(--line); border-radius: 6px;
+    color: var(--ink-3); cursor: pointer; font-size: 13px; line-height: 1; padding: 5px 8px; }
+  .q-del:hover { color: var(--nhs-red); border-color: var(--nhs-red); }
+  .q-caution { font-size: 10.5px; line-height: 1.45; color: #5c4115; background: #FFF8E6;
+    border: 1px solid #E0C280; border-radius: 6px; padding: 7px 9px; margin-top: 8px; }
+  .q-resultbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 10px 12px; font-size: 11.5px; color: var(--nhs-blue); font-weight: 600;
+    border-bottom: 1px solid var(--line); background: var(--paper); }
+  .q-resultbar strong { color: var(--nhs-dark); font-variant-numeric: tabular-nums; }
+  .q-resultbar .q-empty { color: var(--ink-3); font-weight: 500; }
+  .q-row { display: flex; align-items: center; gap: 8px; padding: 7px 12px; cursor: pointer;
+    border-bottom: 1px solid var(--paper-2); }
+  .q-row:hover { background: var(--nhs-light); }
+  .q-row.sel { background: var(--nhs-light); }
+  .q-row .q-rank { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10.5px;
+    color: var(--ink-3); width: 20px; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+  .q-row .q-nm { flex: 1; min-width: 0; font-size: 12px; color: var(--ink); overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; }
+  .q-row .q-nm small { display: block; font-size: 10px; color: var(--ink-3); }
+  .q-row .q-v { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10.5px;
+    color: var(--ink-2); flex-shrink: 0; font-variant-numeric: tabular-nums; }
+  .q-acts { display: flex; gap: 5px; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+  .q-acts .ws-btn { flex: 1; text-align: center; }
+  .q-sortrow { display: flex; align-items: center; gap: 6px; padding: 8px 12px;
+    border-bottom: 1px solid var(--line); font-size: 11px; color: var(--ink-3); }
+  .q-sortrow select { flex: 1; font: inherit; font-size: 11px; padding: 3px 5px;
+    border: 1px solid var(--line); border-radius: 6px; background: var(--paper); color: var(--ink);
+    min-width: 0; }
+
 </style>
 </head>
 <body>
@@ -565,6 +735,7 @@
   <!-- Mode rail. Explore is the map below; the rest are scaffolding. -->
   <div class="mode-rail" role="tablist" aria-label="Tool mode">
     <button type="button" class="mode-btn" role="tab" data-mode="explore" aria-selected="true">Explore</button>
+    <button type="button" class="mode-btn" role="tab" data-mode="query" aria-selected="false">Query</button>
     <button type="button" class="mode-btn" role="tab" data-mode="compare" aria-selected="false">Compare <span class="mode-soon">Soon</span></button>
     <button type="button" class="mode-btn" role="tab" data-mode="tour" aria-selected="false">Take a tour <span class="mode-soon">Soon</span></button>
     <button type="button" class="mode-btn" role="tab" data-mode="directory" aria-selected="false">Directory <span class="mode-soon">Soon</span></button>
@@ -596,6 +767,9 @@
              clicked, so removing the button is enough, and the one place that
              reads #tab-nbhd only checks whether it is active, which it now
              never is. Put the button back to restore it. -->
+        <!-- Query is not a tab. It is a mode, reached from the rail at the
+             top, and while it is on it takes over the whole sidebar: the tab
+             strip is hidden rather than left showing nothing selected. -->
         <div class="sb-tab" data-tab="ward">Ward</div>
       </div>
 
@@ -1039,6 +1213,47 @@
         </div>
       </div>
 
+      <!-- Query tab. Builds one sentence: which services a ward must have,
+           which borough it must be in, and which indicator conditions it must
+           meet. Everything is evaluated in the browser against the ward data
+           already loaded, so there is no request and no upload. -->
+      <div class="tab-pane q-pane" id="tab-query">
+        <div class="q-head">
+          <h2>Query</h2>
+          <button type="button" class="q-back" id="q-back">Back to Explore</button>
+        </div>
+        <div class="q-scroll">
+          <div class="q-block">
+            <div class="q-sub">Build a filter across every metric on the map. Wards that match are listed below and highlighted on the map.</div>
+            <div class="q-lbl">Show me wards with</div>
+            <div class="q-sentence" id="q-services"></div>
+            <div class="q-lbl" style="margin-top:11px">In</div>
+            <div class="q-sentence" id="q-scope"></div>
+            <div class="q-lbl" style="margin-top:11px">Where</div>
+            <div id="q-conds"></div>
+            <div class="q-sentence" style="margin-top:6px">
+              <span class="q-chip add" id="q-add-cond">+ add a condition</span>
+            </div>
+            <div id="q-caution"></div>
+          </div>
+          <div class="q-acts">
+            <button type="button" class="ws-btn primary" id="q-run">Run query</button>
+            <button type="button" class="ws-btn" id="q-clear">Clear</button>
+            <button type="button" class="ws-btn" id="q-csv">CSV</button>
+          </div>
+          <div class="q-sortrow">
+            <span>Sort by</span>
+            <select id="q-sort"></select>
+            <select id="q-sortdir" style="flex:0 0 84px">
+              <option value="desc">Highest</option>
+              <option value="asc">Lowest</option>
+            </select>
+          </div>
+          <div class="q-resultbar" id="q-resultbar"><span class="q-empty">No query run yet.</span></div>
+          <div id="q-results"></div>
+        </div>
+      </div>
+
       <!-- Ward data tab -->
       <div class="tab-pane" id="tab-ward">
         <div class="ward-scroll" id="wpanel">
@@ -1106,6 +1321,29 @@
           <button type="button" data-dl="lsoa" title="LSOA-level data (~1,200 areas, more granular)">LSOA</button>
         </div>
         <div class="dl-hint" id="dl-hint"></div>
+      </div>
+
+      <!-- Selected-ward sheet. Hidden until a ward is clicked; showWard() fills
+           it and deselectWard() puts it away again. The head cycles the three
+           heights, so the buttons inside it stop their own clicks propagating. -->
+      <div class="ws-sheet" id="ward-sheet" role="region" aria-label="Selected ward">
+        <div class="ws-handle"></div>
+        <div class="ws-head" id="ws-head" tabindex="0" role="button" aria-expanded="true"
+             title="Click to change how much of the panel is showing">
+          <div class="ws-title">
+            <div class="ws-lbl">Selected ward</div>
+            <h2 id="ws-name">&nbsp;</h2>
+            <div class="ws-meta" id="ws-meta"></div>
+          </div>
+          <div class="ws-acts">
+            <button type="button" class="ws-btn" id="ws-pin">+ Pin to compare</button>
+            <button type="button" class="ws-btn" id="ws-pdf">Download PDF</button>
+            <button type="button" class="ws-btn primary" id="ws-profile">Open profile</button>
+            <button type="button" class="ws-close" id="ws-close" title="Deselect this ward"
+                    aria-label="Deselect this ward">&times;</button>
+          </div>
+        </div>
+        <div class="ws-body" id="ws-body"></div>
       </div>
     </div>
 
@@ -3440,6 +3678,12 @@ function showWard(wn) {
                 Object.values(WARD_DATA).find(w => w.name === wn);
   const p = document.getElementById('wpanel');
 
+  // The bottom sheet follows the same selection as the sidebar, so it is
+  // raised here rather than from the polygon's own click handler: search
+  // results and restored URL state both come through showWard and would
+  // otherwise leave the sheet showing the previous ward.
+  if (window.PH_SHEET) window.PH_SHEET.show(wn);
+
   if (!wdata) {
     p.innerHTML = `<div class="ph"><div class="ph-icon">⚠</div>${wn}<br><small>No indicator data loaded yet</small></div>`;
     return;
@@ -3447,9 +3691,17 @@ function showWard(wn) {
 
   const nk = wdata.neighbourhood, nb = nk ? NEIGHBOURHOODS[nk] : null;
 
-  // Switch to ward tab
-  document.querySelectorAll('.sb-tab').forEach(t => t.classList.toggle('active', t.dataset.tab==='ward'));
-  document.querySelectorAll('.tab-pane').forEach(t => t.classList.toggle('active', t.id==='tab-ward'));
+  // Switch to ward tab — unless the selection came from a Query result row.
+  // Working through a result list means clicking ward after ward, and pulling
+  // the sidebar over to the profile each time would throw the list away on the
+  // first click. The bottom sheet already carries the ward's figures, and
+  // "Open profile" on it is there for anyone who wants the full panel.
+  const _keepPane = window.__phKeepPane;
+  window.__phKeepPane = false;
+  if (!_keepPane) {
+    document.querySelectorAll('.sb-tab').forEach(t => t.classList.toggle('active', t.dataset.tab==='ward'));
+    document.querySelectorAll('.tab-pane').forEach(t => t.classList.toggle('active', t.id==='tab-ward'));
+  }
   // Keep the viewing-strip visible but swap its digest to the ward name so
   // the .map-wrap grid geometry never changes on click (toggling display
   // was causing the map to repaint as a blank white rectangle).
@@ -3552,6 +3804,7 @@ window.toggleCat = function(hdr) {
 
 window.deselectWard = function() {
   selW = null;
+  if (window.PH_SHEET) window.PH_SHEET.hide();
   if (typeof _restyleAll === 'function') _restyleAll();
   const p = document.getElementById('wpanel');
   if (p) p.innerHTML = `<div class="ph"><div class="ph-icon">\u2196</div>Click any ward on the map to explore its health, crime, deprivation and service data</div>`;
@@ -3575,7 +3828,14 @@ window.deselectLSOA = function() {
 // All charts inline SVG (no external libraries) so the popup remains
 // fully self-contained.
 // ─────────────────────────────────────────────────────────────────────────
-window.generateWardReport = function(wn) {
+window.generateWardReport = function(wn, opts) {
+  // opts.autoPrint opens the browser's print dialogue as soon as the report
+  // has rendered, which is how "Download PDF" on the ward sheet produces a
+  // PDF: the report is a real page, and every browser can print one to PDF.
+  // There is no PDF library in this project and adding one to generate a
+  // second, worse rendering of a page that already prints well would be a
+  // strange trade.
+  const _autoPrint = !!(opts && opts.autoPrint);
   const n = norm(wn);
   const wdata = Object.values(WARD_DATA).find(w => norm(w.name) === n) ||
                 Object.values(WARD_DATA).find(w => w.name === wn);
@@ -4418,6 +4678,11 @@ window.generateWardReport = function(wn) {
   w.document.open();
   w.document.write(html);
   w.document.close();
+  if (_autoPrint) {
+    // After load, so the fonts and inline SVG charts are laid out before the
+    // print snapshot is taken.
+    w.addEventListener('load', () => { try { w.focus(); w.print(); } catch (e) { /* user can still use the button */ } });
+  }
 };
 
 function buildWardLayer() {
@@ -8027,12 +8292,45 @@ loadData();
   var descEl = document.getElementById('mode-desc');
   var pointsEl = document.getElementById('mode-points');
 
-  function show(mode) {
-    var m = MODES[mode];
+  var sidebar = document.querySelector('.sidebar');
+  var queryPane = document.getElementById('tab-query');
+
+  function markRail(mode) {
     rail.querySelectorAll('.mode-btn').forEach(function (b) {
-      b.setAttribute('aria-selected', String(b.dataset.mode === (m ? mode : 'explore')));
+      b.setAttribute('aria-selected', String(b.dataset.mode === mode));
     });
-    if (!m) { panel.hidden = true; return; }
+  }
+  function activateTab(name) {
+    document.querySelectorAll('.sb-tab').forEach(function (t) {
+      t.classList.toggle('active', t.dataset.tab === name);
+    });
+    document.querySelectorAll('.tab-pane').forEach(function (p) {
+      p.classList.toggle('active', p.id === 'tab-' + name);
+    });
+  }
+
+  function show(mode) {
+    // Query is the one rail entry that is built rather than announced, so it
+    // does not go through the placeholder card. It takes over the sidebar and
+    // leaves the map where it is, because a query you cannot see the results
+    // of on the map is a table with extra steps.
+    if (mode === 'query') {
+      panel.hidden = true;
+      activateTab('query');
+      markRail('query');
+      if (window.PH_QUERY && window.PH_QUERY.build) window.PH_QUERY.build();
+      return;
+    }
+
+    var m = MODES[mode];
+    markRail(m ? mode : 'explore');
+    if (!m) {
+      panel.hidden = true;
+      // Leaving Query has to put the sidebar somewhere, or the pane stays up
+      // under a rail that no longer says Query.
+      if (queryPane && queryPane.classList.contains('active')) activateTab('layers');
+      return;
+    }
 
     titleEl.textContent = m.title;
     descEl.textContent = m.desc;
@@ -8054,6 +8352,983 @@ loadData();
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && !panel.hidden) show('explore');
   });
+
+  /* Anything that switches the sidebar pane switches the mode with it.
+     Five different places activate a pane (the tab strip, showWard, showLSOA,
+     the overlay-info link and the restored URL state) and threading a call
+     through each of them would leave the sixth one to be found later. Watching
+     the pane's own class is the one place that cannot be missed. */
+  if (queryPane && window.MutationObserver) {
+    var sync = function () {
+      var on = queryPane.classList.contains('active');
+      if (sidebar) sidebar.classList.toggle('query-mode', on);
+      if (on) markRail('query');
+      else if (rail.querySelector('.mode-btn[data-mode="query"][aria-selected="true"]')) markRail('explore');
+    };
+    new MutationObserver(sync).observe(queryPane, { attributes: true, attributeFilter: ['class'] });
+    sync();
+  }
+})();
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SELECTED-WARD SHEET AND QUERY BUILDER
+
+   Two features that share one set of primitives, so they live in one block.
+
+   The sheet is the bar along the bottom of the map: whichever ward is
+   selected, its headline figures, and the three actions the design file asks
+   for (pin to compare, download PDF, open profile).
+
+   The query builder is the sidebar's Query tab: pick the services a ward must
+   have, the borough it must be in, and any number of indicator conditions,
+   and get back the wards that satisfy all of them.
+
+   Both read the JSON the page has already loaded. Nothing here fetches on a
+   keystroke and nothing is sent anywhere.
+   ═══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(s) {
+    return s == null ? '' : String(s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  function num(v) {
+    if (v === null || v === undefined || v === '') return null;
+    var n = parseFloat(v);
+    return isNaN(n) ? null : n;
+  }
+
+  // ── ward lookup ──────────────────────────────────────────────────────────
+  function wardRec(wn) {
+    if (typeof WARD_DATA === 'undefined' || !WARD_DATA) return null;
+    if (WARD_DATA[wn]) return WARD_DATA[wn];
+    var vals = Object.keys(WARD_DATA).map(function (k) { return WARD_DATA[k]; });
+    for (var i = 0; i < vals.length; i++) if (vals[i] && vals[i].name === wn) return vals[i];
+    return null;
+  }
+  function indsOf(wn) { var r = wardRec(wn); return (r && r.indicators) || {}; }
+
+  // Canonical ward list, taken from the boundary file rather than from
+  // WARD_DATA: the map draws GJ, so a name that is not in GJ is a ward the
+  // user cannot click, and a result row that cannot be clicked is a dead end.
+  //
+  // GJ is a classic script and is there at parse time; WARD_DATA arrives over
+  // the network some seconds later. So the list is stamped with how many wards
+  // WARD_DATA held when it was built and rebuilt when that changes. Caching it
+  // unconditionally was the first version, and it froze an indicator menu of
+  // nothing in place: the menu is derived from this list, the list was built
+  // before the fetch returned, and nothing ever asked again.
+  var _wards = null, _stamp = -1;
+  function invalidate() { _wards = null; _indKeys = null; _dist = {}; _codeToName = null; _counts = {}; }
+  function allWards() {
+    var size = (typeof WARD_DATA !== 'undefined' && WARD_DATA) ? Object.keys(WARD_DATA).length : 0;
+    if (_wards && _stamp === size) return _wards;
+    if (_wards) invalidate();
+    _stamp = size;
+    _wards = [];
+    if (typeof GJ === 'undefined' || !GJ.features) return _wards;
+    GJ.features.forEach(function (f) {
+      var p = f.properties || {};
+      if (!p.WD24NM) return;
+      var rec = wardRec(p.WD24NM);
+      _wards.push({
+        name: p.WD24NM,
+        code: p.WD24CD,
+        lad: (rec && rec.lad) || p.LAD || '',
+        inds: (rec && rec.indicators) || {},
+      });
+    });
+    return _wards;
+  }
+  function boroughList() {
+    var seen = {};
+    allWards().forEach(function (w) { if (w.lad) seen[w.lad] = 1; });
+    return Object.keys(seen).sort();
+  }
+
+  // ── indicator metadata ───────────────────────────────────────────────────
+  function metaOf(k) {
+    if (window.PH_ASSISTANT && typeof PH_ASSISTANT.metaFor === 'function') {
+      var m = PH_ASSISTANT.metaFor(k);
+      if (m) return m;
+    }
+    return (typeof OV_META === 'object' && OV_META && OV_META[k]) || null;
+  }
+  function labelOf(k) {
+    var fromCats = (typeof ovLabel === 'function') ? ovLabel(k) : k;
+    if (fromCats && fromCats !== k) return fromCats;
+    var m = metaOf(k);
+    if (m && m.desc) {
+      var first = String(m.desc).split(/\.\s|\. *$/)[0];
+      return first.length > 78 ? first.slice(0, 75) + '...' : first;
+    }
+    return k;
+  }
+  function unitOf(k) { var m = metaOf(k); return (m && m.u) || ''; }
+
+  /**
+   * Is this indicator published above ward level?
+   *
+   * The Fingertips data arrives in two namespaces that look alike and are not
+   * alike. ft_<number> is the Local Health series, fetched at MSOA and carried
+   * down to wards, so it genuinely differs ward by ward. ft_<name> is the
+   * upper-tier local authority series, written unchanged onto every ward in
+   * the borough, so a filter on it selects whole boroughs and a ranking on it
+   * is a ranking of boroughs with their wards tied.
+   *
+   * Only the second kind earns the caveat. Testing /^ft_/ alone, as the
+   * assistant's tool layer did before the ward series existed, would put the
+   * warning on all 33 ward-level indicators as well and teach people to
+   * distrust the one Fingertips series that is safe to use here.
+   */
+  function isBoroughLevelKey(k) { return /^ft_/.test(k) && !/^ft_\d+$/.test(k); }
+
+  function fmtVal(v, k) {
+    if (v == null) return '—';
+    if (typeof fmtOv === 'function') return fmtOv(v, k);
+    return String(v);
+  }
+
+  // Distribution helpers, cached: percentile and median across every London
+  // ward, so the sheet can say where this ward sits rather than only what its
+  // value is.
+  var _dist = {};
+  function values(k) {
+    if (_dist[k]) return _dist[k];
+    var out = [];
+    allWards().forEach(function (w) {
+      var v = num(w.inds[k]);
+      if (v !== null) out.push(v);
+    });
+    out.sort(function (a, b) { return a - b; });
+    _dist[k] = out;
+    return out;
+  }
+  function median(k) {
+    var s = values(k);
+    if (!s.length) return null;
+    var m = Math.floor(s.length / 2);
+    return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+  }
+  function percentile(k, v) {
+    if (v == null) return null;
+    var s = values(k);
+    if (!s.length) return null;
+    var below = 0;
+    for (var i = 0; i < s.length; i++) { if (s[i] < v) below++; else break; }
+    return Math.round(100 * below / s.length);
+  }
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     SERVICE COUNTS
+
+     Where the pipeline already publishes a per-ward count, that figure is
+     used, so the query and the ward profile cannot disagree about the same
+     ward. Where it does not, points are assigned to wards here: by the ward
+     code the source carries if it has one, and otherwise by testing the point
+     against the ward polygon.
+     ───────────────────────────────────────────────────────────────────────── */
+  var SERVICES = [
+    { id: 'gp',       label: 'GP practices',      mode: 'pip',       glob: 'GPS' },
+    { id: 'pharmacy', label: 'Pharmacies',        mode: 'indicator', key: 'pharmacy_count' },
+    { id: 'hospital', label: 'Hospitals',         mode: 'pip',       glob: 'HOSP' },
+    { id: 'dentist',  label: 'Dental practices',  mode: 'pip',       src: 'dental_practices.json' },
+    { id: 'school',   label: 'Schools',           mode: 'code',      src: 'schools.json',           nwlOnly: true },
+    { id: 'library',  label: 'Libraries',         mode: 'code',      src: 'libraries.json',         nwlOnly: true },
+    { id: 'cc',       label: 'Community centres', mode: 'code',      src: 'community_centres.json', nwlOnly: true },
+    { id: 'esol',     label: 'ESOL providers',    mode: 'pip',       src: 'esol_providers.json',    nwlOnly: true },
+    { id: 'cic',      label: 'CICs',              mode: 'pip',       src: 'cics.json' },
+  ];
+  function serviceById(id) {
+    for (var i = 0; i < SERVICES.length; i++) if (SERVICES[i].id === id) return SERVICES[i];
+    return null;
+  }
+
+  // Bounding box per ward, so a point is tested against the handful of wards
+  // whose box it falls in rather than against all 704 polygons.
+  var _boxes = null;
+  function wardBoxes() {
+    if (_boxes) return _boxes;
+    _boxes = [];
+    if (typeof GJ === 'undefined' || !GJ.features) return _boxes;
+    GJ.features.forEach(function (f) {
+      if (!f.geometry) return;
+      var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      (function walk(c) {
+        if (!c) return;
+        if (typeof c[0] === 'number') {
+          if (c[0] < minX) minX = c[0];
+          if (c[0] > maxX) maxX = c[0];
+          if (c[1] < minY) minY = c[1];
+          if (c[1] > maxY) maxY = c[1];
+          return;
+        }
+        for (var i = 0; i < c.length; i++) walk(c[i]);
+      })(f.geometry.coordinates);
+      _boxes.push({
+        name: f.properties.WD24NM, geom: f.geometry,
+        minX: minX, minY: minY, maxX: maxX, maxY: maxY,
+      });
+    });
+    return _boxes;
+  }
+  function wardOfPoint(lat, lng) {
+    if (lat == null || lng == null) return '';
+    var b = wardBoxes();
+    for (var i = 0; i < b.length; i++) {
+      var w = b[i];
+      if (lng < w.minX || lng > w.maxX || lat < w.minY || lat > w.maxY) continue;
+      if (typeof _pointInGeom === 'function' && _pointInGeom(lng, lat, w.geom)) return w.name;
+    }
+    return '';
+  }
+  var _codeToName = null;
+  function codeToName(code) {
+    if (!_codeToName) {
+      _codeToName = {};
+      allWards().forEach(function (w) { if (w.code) _codeToName[w.code] = w.name; });
+    }
+    return _codeToName[code] || '';
+  }
+
+  var _json = {};
+  function loadJson(path) {
+    if (!_json[path]) {
+      _json[path] = fetch(path)
+        .then(function (r) { return r.ok ? r.json() : []; })
+        .catch(function () { return []; });
+    }
+    return _json[path];
+  }
+
+  var _counts = {};
+  function serviceCounts(id) {
+    if (_counts[id]) return _counts[id];
+    var s = serviceById(id);
+    if (!s) return Promise.resolve({});
+
+    if (s.mode === 'indicator') {
+      var out = {};
+      allWards().forEach(function (w) {
+        var v = num(w.inds[s.key]);
+        if (v !== null) out[w.name] = v;
+      });
+      _counts[id] = Promise.resolve(out);
+      return _counts[id];
+    }
+
+    var rows = s.glob
+      ? Promise.resolve((typeof window[s.glob] !== 'undefined' && window[s.glob]) || [])
+      : loadJson(s.src);
+
+    _counts[id] = rows.then(function (data) {
+      var out = {};
+      (data || []).forEach(function (r) {
+        var wn = '';
+        if (s.mode === 'code') wn = codeToName(r.ward_code || r.wd || '');
+        if (!wn) wn = wardOfPoint(r.lat, r.lng);
+        if (!wn) return;
+        out[wn] = (out[wn] || 0) + 1;
+      });
+      return out;
+    });
+    return _counts[id];
+  }
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     THE SHEET
+     ───────────────────────────────────────────────────────────────────────── */
+  var sheet   = $('ward-sheet');
+  var headEl  = $('ws-head');
+  var bodyEl  = $('ws-body');
+  var nameEl  = $('ws-name');
+  var metaEl  = $('ws-meta');
+  var pinBtn  = $('ws-pin');
+  var pdfBtn  = $('ws-pdf');
+  var profBtn = $('ws-profile');
+  var closeBtn = $('ws-close');
+  var mapWrap = $('map-wrap');
+
+  var STATE_H = [342, 174, 66];   // full, peek, collapsed
+  var sheetState = 0;
+  var currentWard = null;
+  var PIN_MAX = 6;                // the ceiling compare_areas already enforces
+  var pinned = [];
+  var pinLyr = null;
+
+  function lift() {
+    if (!mapWrap) return;
+    var open = sheet.classList.contains('open');
+    mapWrap.classList.toggle('has-sheet', open);
+    var h = open ? Math.min(sheet.offsetHeight || STATE_H[sheetState], STATE_H[sheetState]) : 0;
+    var px = (open ? h + 16 : 0) + 'px';
+    mapWrap.style.setProperty('--sheet-lift', px);
+    // Also on the root, for the development banner, which is position:fixed
+    // and so is not a descendant of .map-wrap.
+    document.documentElement.style.setProperty('--sheet-lift', px);
+  }
+  function applyState() {
+    sheet.classList.toggle('peek', sheetState === 1);
+    sheet.classList.toggle('collapsed', sheetState === 2);
+    headEl.setAttribute('aria-expanded', String(sheetState === 0));
+    lift();
+  }
+  // The height animates, so the value read straight after the class change is
+  // mid-transition. Set the optimistic one now and correct it when the
+  // transition lands.
+  sheet.addEventListener('transitionend', function (e) {
+    if (e.propertyName === 'max-height') lift();
+  });
+
+  function cycle() { sheetState = (sheetState + 1) % 3; applyState(); }
+  headEl.addEventListener('click', function (e) {
+    if (e.target.closest('.ws-acts')) return;   // buttons act, they do not resize
+    cycle();
+  });
+  headEl.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); cycle(); }
+  });
+
+  function kpi(label, value, sub, opts) {
+    opts = opts || {};
+    var cls = 'ws-kpi' + (opts.emphasis ? ' emphasis' : '');
+    var numCls = 'ws-k-num' + (value == null ? ' dim' : '');
+    var shown = value == null ? '—' : value;
+    return '<div class="' + cls + '">' +
+      '<div class="ws-k-lbl">' + esc(label) + '</div>' +
+      '<div class="' + numCls + '">' + shown + '</div>' +
+      (sub ? '<div class="ws-k-sub">' + esc(sub) + '</div>' : '') +
+      '</div>';
+  }
+
+  /**
+   * The sentence above the figures.
+   *
+   * Built only from fields this ward actually has, and each clause states the
+   * comparison it is making. imd_decile_mean is a mean of the LSOA deciles in
+   * the ward, not a decile of the ward, so it is described as where the
+   * typical LSOA sits rather than as a decile the ward is in.
+   */
+  function insight(w) {
+    var bits = [], i = w.inds;
+    var dec = num(i.imd_decile_mean);
+    if (dec !== null) {
+      var share = Math.min(100, Math.max(1, Math.round(dec * 10)));
+      bits.push('The typical neighbourhood here sits in national deprivation decile <strong>' +
+        dec.toFixed(1) + '</strong>, among roughly the most deprived <strong>' + share +
+        '%</strong> of England.');
+    }
+    var score = num(i.imd_score);
+    if (score !== null) {
+      var pc = percentile('imd_score', score);
+      if (pc !== null) {
+        bits.push('On the IMD score it is more deprived than <strong>' + pc +
+          '%</strong> of London wards.');
+      }
+    }
+    var bad = num(i.census_bad_health_pct), badMed = median('census_bad_health_pct');
+    if (bad !== null && badMed !== null) {
+      var dir = bad > badMed ? 'above' : (bad < badMed ? 'below' : 'level with');
+      bits.push('Bad or very bad self-reported health is <strong>' + bad.toFixed(1) +
+        '%</strong>, ' + dir + ' the London ward median of ' + badMed.toFixed(1) + '%.');
+    }
+    if (!bits.length) return '<div class="ws-insight">No indicator data has loaded for this ward yet.</div>';
+    return '<div class="ws-insight">' + bits.join(' ') + '</div>';
+  }
+
+  function pinTable() {
+    if (!pinned.length) return '';
+    var ROWS = [
+      { k: 'census_population',        l: 'Population',        dp: 0 },
+      { k: 'imd_decile_mean',          l: 'IMD decile (mean)', dp: 1 },
+      { k: 'imd_score',                l: 'IMD score',         dp: 1 },
+      { k: 'census_over65_pct',        l: 'Aged 65+',          dp: 1, pct: true },
+      { k: 'census_disability_any_pct', l: 'Disability (any)', dp: 1, pct: true },
+      { k: 'census_bad_health_pct',    l: 'Bad health',        dp: 1, pct: true },
+    ];
+    var head = '<th>Indicator</th>' + pinned.map(function (n) {
+      return '<th>' + esc(n.length > 16 ? n.slice(0, 15) + '…' : n) +
+        ' <button type="button" class="ws-pin-x" data-unpin="' + esc(n) +
+        '" title="Remove ' + esc(n) + '" aria-label="Remove ' + esc(n) + '">&times;</button></th>';
+    }).join('');
+    var body = ROWS.map(function (r) {
+      var cells = pinned.map(function (n) {
+        var v = num(indsOf(n)[r.k]);
+        return '<td>' + (v == null ? '—' :
+          v.toLocaleString(undefined, { maximumFractionDigits: r.dp }) + (r.pct ? '%' : '')) + '</td>';
+      }).join('');
+      return '<tr><td>' + esc(r.l) + '</td>' + cells + '</tr>';
+    }).join('');
+    return '<div class="ws-pins">' +
+      '<div class="ws-pins-hd"><span class="ws-lbl">Pinned comparison (' + pinned.length + ' of ' + PIN_MAX + ')</span>' +
+      '<button type="button" class="ws-btn" id="ws-unpin-all">Clear pins</button>' +
+      '<button type="button" class="ws-btn" id="ws-pin-csv">CSV</button></div>' +
+      '<table class="ws-ptable"><thead><tr>' + head + '</tr></thead><tbody>' + body + '</tbody></table>' +
+      '<div class="ws-note">Deprivation deciles run 1 (the most deprived tenth nationally) to 10 (the least). ' +
+      'The ward figure is a population-weighted mean of the deciles of the LSOAs inside it, so it is not itself a decile.</div>' +
+      '</div>';
+  }
+
+  function renderBody(w, gpCount) {
+    var i = w.inds;
+    var pop = num(i.census_population);
+    var dec = num(i.imd_decile_mean);
+    var o65 = num(i.census_over65_pct);
+    var dis = num(i.census_disability_any_pct);
+    var ph  = num(i.pharmacy_count);
+
+    var strip = '<div class="ws-strip">' +
+      kpi('IMD decile', dec == null ? null : dec.toFixed(1),
+          '1 = most deprived', { emphasis: true }) +
+      kpi('Population', pop == null ? null : (pop >= 10000
+            ? (pop / 1000).toFixed(1) + '<span>k</span>'
+            : Math.round(pop).toLocaleString()), 'Census 2021') +
+      kpi('Aged 65+', o65 == null ? null : o65.toFixed(0) + '<span>%</span>', 'of residents') +
+      kpi('Disability (any)', dis == null ? null : dis.toFixed(0) + '<span>%</span>', 'Equality Act') +
+      kpi('GP practices', gpCount == null ? null : String(gpCount), 'in this ward') +
+      kpi('Pharmacies', ph == null ? null : String(Math.round(ph)), 'in this ward') +
+      '</div>';
+
+    bodyEl.innerHTML = insight(w) + strip + pinTable();
+  }
+
+  function show(wn) {
+    buildOnce();          // the ward data has clearly arrived if a ward was clicked
+    var rec = wardRec(wn);
+    var w = { name: wn, inds: (rec && rec.indicators) || {}, lad: (rec && rec.lad) || '' };
+    currentWard = wn;
+
+    nameEl.textContent = wn;
+    var pop = num(w.inds.census_population);
+    var dec = num(w.inds.imd_decile_mean);
+    var meta = [];
+    if (w.lad) meta.push(w.lad);
+    if (pop !== null) meta.push(Math.round(pop).toLocaleString() + ' residents');
+    if (dec !== null) meta.push('IMD decile ' + dec.toFixed(1));
+    metaEl.textContent = meta.join(' · ');
+
+    syncPinBtn();
+    renderBody(w, null);
+    sheet.classList.add('open');
+    if (sheetState === 2) { sheetState = 1; }   // a new ward is worth showing
+    applyState();
+
+    // GP practices are not a pipeline indicator, so the count comes from a
+    // spatial test. It resolves in the same tick once GPS is loaded, but it is
+    // a promise, so the strip is filled in when it lands rather than blocking.
+    serviceCounts('gp').then(function (m) {
+      if (currentWard !== wn) return;
+      renderBody(w, m[wn] || 0);
+    });
+  }
+
+  function hide() {
+    currentWard = null;
+    sheet.classList.remove('open');
+    lift();
+  }
+
+  function syncPinBtn() {
+    var on = currentWard && pinned.indexOf(currentWard) !== -1;
+    pinBtn.textContent = on ? 'Pinned ✓' : '+ Pin to compare';
+    pinBtn.classList.toggle('on', !!on);
+  }
+
+  function drawPins() {
+    if (pinLyr && typeof map !== 'undefined') { map.removeLayer(pinLyr); pinLyr = null; }
+    if (!pinned.length || typeof GJ === 'undefined' || !GJ.features || typeof map === 'undefined') return;
+    var feats = GJ.features.filter(function (f) {
+      return pinned.indexOf(f.properties.WD24NM) !== -1;
+    });
+    if (!feats.length) return;
+    pinLyr = L.geoJSON({ type: 'FeatureCollection', features: feats }, {
+      style: { color: '#AE2573', weight: 3, fill: false, opacity: .9, dashArray: '5,4' },
+      interactive: false,
+    }).addTo(map);
+  }
+
+  function refreshPins() {
+    drawPins();
+    syncPinBtn();
+    if (currentWard) {
+      var rec = wardRec(currentWard);
+      serviceCounts('gp').then(function (m) {
+        renderBody({ name: currentWard, inds: (rec && rec.indicators) || {} }, m[currentWard] || 0);
+      });
+    }
+  }
+
+  pinBtn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    if (!currentWard) return;
+    var at = pinned.indexOf(currentWard);
+    if (at !== -1) pinned.splice(at, 1);
+    else if (pinned.length >= PIN_MAX) {
+      alert('Six wards is the most that fit side by side. Remove one before pinning another.');
+      return;
+    } else pinned.push(currentWard);
+    if (sheetState !== 0) { sheetState = 0; applyState(); }
+    refreshPins();
+  });
+
+  pdfBtn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    if (!currentWard) return;
+    if (typeof generateWardReport === 'function') generateWardReport(currentWard, { autoPrint: true });
+  });
+
+  profBtn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    if (!currentWard) return;
+    document.querySelectorAll('.sb-tab').forEach(function (t) {
+      t.classList.toggle('active', t.dataset.tab === 'ward');
+    });
+    document.querySelectorAll('.tab-pane').forEach(function (p) {
+      p.classList.toggle('active', p.id === 'tab-ward');
+    });
+    var wp = $('wpanel');
+    if (wp) wp.scrollTop = 0;
+    sheetState = 2; applyState();   // out of the way of the profile it just opened
+  });
+
+  closeBtn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    if (typeof deselectWard === 'function') deselectWard();
+    else hide();
+  });
+
+  bodyEl.addEventListener('click', function (e) {
+    var x = e.target.closest('[data-unpin]');
+    if (x) {
+      var at = pinned.indexOf(x.getAttribute('data-unpin'));
+      if (at !== -1) pinned.splice(at, 1);
+      refreshPins();
+      return;
+    }
+    if (e.target.id === 'ws-unpin-all') { pinned = []; refreshPins(); return; }
+    if (e.target.id === 'ws-pin-csv') { pinCsv(); }
+  });
+
+  function pinCsv() {
+    if (!pinned.length) return;
+    var keys = ['census_population', 'imd_decile_mean', 'imd_score', 'census_over65_pct',
+                'census_disability_any_pct', 'census_bad_health_pct'];
+    var head = ['indicator'].concat(pinned);
+    var lines = [head.map(csvCell).join(',')];
+    keys.forEach(function (k) {
+      lines.push([labelOf(k)].concat(pinned.map(function (n) {
+        var v = num(indsOf(n)[k]);
+        return v == null ? '' : v;
+      })).map(csvCell).join(','));
+    });
+    download('pinned-wards.csv', lines.join('\n'), 'text/csv;charset=utf-8');
+  }
+
+  function csvCell(v) {
+    var s = v == null ? '' : String(v);
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+  function download(filename, text, mime) {
+    var blob = new Blob([text], { type: mime || 'text/plain;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 500);
+  }
+
+  // showWard() and deselectWard() call these, so the sheet follows the map's
+  // own idea of what is selected rather than keeping a second one.
+  window.PH_SHEET = { show: show, hide: hide };
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     THE QUERY BUILDER
+     ───────────────────────────────────────────────────────────────────────── */
+  var qServicesEl = $('q-services');
+  var qScopeEl    = $('q-scope');
+  var qCondsEl    = $('q-conds');
+  var qCautionEl  = $('q-caution');
+  var qBarEl      = $('q-resultbar');
+  var qResEl      = $('q-results');
+  var qSortEl     = $('q-sort');
+  var qSortDirEl  = $('q-sortdir');
+  var qLyr = null;
+
+  var OPS = [
+    { v: 'lte', l: '≤ at most' },
+    { v: 'gte', l: '≥ at least' },
+    { v: 'eq',  l: '= equals' },
+  ];
+
+  var q = { services: [], scope: '', conds: [], sort: 'imd_score', dir: 'desc' };
+
+  // The indicator menu. Grouped so 99 keys are navigable, and the
+  // borough-level Fingertips series is last and labelled, because filtering
+  // wards on it selects every ward in a borough at once.
+  var GROUP_ORDER = [
+    'Deprivation (IMD 2025)', 'Census 2021', 'Local Health (ward)', 'Crime',
+    'Civic Strength Index', 'Other', 'Fingertips (borough level)',
+  ];
+  function groupOf(k) {
+    if (/^imd_/.test(k) || (/_score$/.test(k) && !/^crime_/.test(k))) return 'Deprivation (IMD 2025)';
+    if (/^census_/.test(k)) return 'Census 2021';
+    if (/^ft_\d+$/.test(k)) return 'Local Health (ward)';
+    if (/^ft_/.test(k)) return 'Fingertips (borough level)';
+    if (/^crime_/.test(k) || /^claimant_/.test(k)) return 'Crime';
+    if (/^cst_/.test(k)) return 'Civic Strength Index';
+    return 'Other';
+  }
+  var _indKeys = null;
+  function indicatorKeys() {
+    if (_indKeys) return _indKeys;
+    var seen = {};
+    allWards().forEach(function (w) {
+      Object.keys(w.inds).forEach(function (k) {
+        if (num(w.inds[k]) !== null) seen[k] = 1;
+      });
+    });
+    _indKeys = Object.keys(seen);
+    return _indKeys;
+  }
+  function indicatorOptions(selected) {
+    var byGroup = {};
+    indicatorKeys().forEach(function (k) {
+      var g = groupOf(k);
+      (byGroup[g] = byGroup[g] || []).push(k);
+    });
+    var html = '';
+    GROUP_ORDER.forEach(function (g) {
+      var keys = byGroup[g];
+      if (!keys || !keys.length) return;
+      keys.sort(function (a, b) { return labelOf(a).localeCompare(labelOf(b)); });
+      html += '<optgroup label="' + esc(g) + '">';
+      keys.forEach(function (k) {
+        var l = labelOf(k), u = unitOf(k);
+        // Several CATS labels already end in their unit, so appending it again
+        // produced "Disability, any (%) (%)".
+        var suffix = (u && l.indexOf('(' + u + ')') === -1) ? ' (' + u + ')' : '';
+        html += '<option value="' + esc(k) + '"' + (k === selected ? ' selected' : '') + '>' +
+          esc(l) + esc(suffix) + '</option>';
+      });
+      html += '</optgroup>';
+    });
+    return html;
+  }
+
+  function renderServices() {
+    qServicesEl.innerHTML = SERVICES.map(function (s) {
+      var on = q.services.indexOf(s.id) !== -1;
+      return '<span class="q-chip' + (on ? ' on' : '') + '" data-svc="' + s.id + '" role="button" tabindex="0">' +
+        esc(s.label) + '</span>';
+    }).join('<span class="q-join">+</span>');
+  }
+  function renderScope() {
+    var opts = ['<option value="">All of London</option>'].concat(boroughList().map(function (b) {
+      return '<option value="' + esc(b) + '"' + (b === q.scope ? ' selected' : '') + '>' + esc(b) + '</option>';
+    })).join('');
+    qScopeEl.innerHTML = '<select class="q-chip outline" id="q-scope-sel" aria-label="Borough">' + opts + '</select>';
+  }
+  function renderConds() {
+    if (!q.conds.length) {
+      qCondsEl.innerHTML = '<div class="q-sub" style="margin:0">No conditions yet. Every ward in scope will match.</div>';
+      return;
+    }
+    qCondsEl.innerHTML = q.conds.map(function (c, idx) {
+      var u = unitOf(c.key);
+      return '<div class="q-cond" data-cond="' + idx + '">' +
+        '<select class="q-f q-f-ind" data-key="' + idx + '" aria-label="Indicator">' +
+          indicatorOptions(c.key) + '</select>' +
+        '<div class="q-cond-row2">' +
+          '<select class="q-f" data-op="' + idx + '" aria-label="Comparison">' + OPS.map(function (o) {
+            return '<option value="' + o.v + '"' + (o.v === c.op ? ' selected' : '') + '>' + o.l + '</option>';
+          }).join('') + '</select>' +
+          '<input class="q-f" type="number" step="any" data-val="' + idx + '" value="' +
+            (c.value == null ? '' : c.value) + '" placeholder="value" ' +
+            'aria-label="Value' + (u ? ' in ' + esc(u) : '') + '"' + (u ? ' title="' + esc(u) + '"' : '') + '>' +
+          '<button type="button" class="q-del" data-del="' + idx + '" title="Remove this condition" ' +
+            'aria-label="Remove this condition">&times;</button>' +
+        '</div>' +
+        '</div>';
+    }).join('');
+  }
+  function renderCaution() {
+    var notes = [];
+    var boroughKeys = q.conds.map(function (c) { return c.key; }).filter(isBoroughLevelKey);
+    if (boroughKeys.length) {
+      notes.push('<strong>' + esc(boroughKeys.map(labelOf).join(', ')) + '</strong> ' +
+        (boroughKeys.length > 1 ? 'are' : 'is') + ' published at borough level and written onto every ward ' +
+        'in the borough. Filtering on ' + (boroughKeys.length > 1 ? 'them' : 'it') +
+        ' selects whole boroughs, not wards within them.');
+    }
+    var nwl = q.services.map(serviceById).filter(function (s) { return s && s.nwlOnly; });
+    if (nwl.length) {
+      notes.push('<strong>' + esc(nwl.map(function (s) { return s.label; }).join(', ')) + '</strong> ' +
+        (nwl.length > 1 ? 'cover' : 'covers') + ' the eight North West London boroughs only. ' +
+        'Wards elsewhere will show a count of zero because the data is missing, not because the service is.');
+    }
+    qCautionEl.innerHTML = notes.map(function (n) {
+      return '<div class="q-caution">' + n + '</div>';
+    }).join('');
+  }
+  function renderSort() {
+    qSortEl.innerHTML = indicatorOptions(q.sort);
+    qSortDirEl.value = q.dir;
+  }
+  function renderBuilder() {
+    renderServices(); renderScope(); renderConds(); renderCaution();
+  }
+
+  qServicesEl.addEventListener('click', function (e) {
+    var chip = e.target.closest('[data-svc]');
+    if (!chip) return;
+    var id = chip.getAttribute('data-svc');
+    var at = q.services.indexOf(id);
+    if (at === -1) q.services.push(id); else q.services.splice(at, 1);
+    renderServices(); renderCaution();
+  });
+  qServicesEl.addEventListener('keydown', function (e) {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.closest('[data-svc]')) {
+      e.preventDefault(); e.target.click();
+    }
+  });
+  qScopeEl.addEventListener('change', function (e) {
+    if (e.target.id === 'q-scope-sel') q.scope = e.target.value;
+  });
+  qCondsEl.addEventListener('change', function (e) {
+    var t = e.target;
+    if (t.dataset.op   != null) q.conds[+t.dataset.op].op = t.value;
+    if (t.dataset.key  != null) { q.conds[+t.dataset.key].key = t.value; renderCaution(); }
+    if (t.dataset.val  != null) q.conds[+t.dataset.val].value = t.value === '' ? null : parseFloat(t.value);
+  });
+  qCondsEl.addEventListener('click', function (e) {
+    var del = e.target.closest('[data-del]');
+    if (!del) return;
+    q.conds.splice(+del.getAttribute('data-del'), 1);
+    renderConds(); renderCaution();
+  });
+  $('q-add-cond').addEventListener('click', function () {
+    var used = q.conds.map(function (c) { return c.key; });
+    var next = ['imd_decile_mean', 'census_disability_any_pct', 'census_over65_pct', 'imd_score']
+      .filter(function (k) { return indicatorKeys().indexOf(k) !== -1 && used.indexOf(k) === -1; })[0]
+      || indicatorKeys()[0];
+    q.conds.push({ key: next, op: 'lte', value: null });
+    renderConds(); renderCaution();
+  });
+  qSortEl.addEventListener('change', function () { q.sort = qSortEl.value; });
+  qSortDirEl.addEventListener('change', function () { q.dir = qSortDirEl.value; });
+
+  function passes(v, op, target) {
+    if (v == null || target == null) return false;
+    if (op === 'lte') return v <= target;
+    if (op === 'gte') return v >= target;
+    return Math.abs(v - target) < 1e-9;
+  }
+
+  function runQuery() {
+    qBarEl.innerHTML = '<span class="q-empty">Working…</span>';
+    var live = q.conds.filter(function (c) { return c.key && c.value != null; });
+
+    Promise.all(q.services.map(serviceCounts)).then(function (maps) {
+      var rows = [], skipped = 0, svcTotals = {};
+      q.services.forEach(function (id) { svcTotals[id] = 0; });
+
+      allWards().forEach(function (w) {
+        if (q.scope && w.lad !== q.scope) return;
+
+        for (var s = 0; s < q.services.length; s++) {
+          if (!(maps[s][w.name] > 0)) return;
+        }
+        // A ward with no figure for a condition is not a ward that passes it.
+        // It is dropped, and counted, because a filter that silently discards
+        // the areas it cannot judge reports a shorter list as if it were the
+        // whole answer.
+        for (var c = 0; c < live.length; c++) {
+          var v = num(w.inds[live[c].key]);
+          if (v == null) { skipped++; return; }
+          if (!passes(v, live[c].op, live[c].value)) return;
+        }
+
+        q.services.forEach(function (id, si) { svcTotals[id] += (maps[si][w.name] || 0); });
+        rows.push({
+          name: w.name, lad: w.lad,
+          sortVal: num(w.inds[q.sort]),
+          counts: q.services.map(function (id, si) { return maps[si][w.name] || 0; }),
+        });
+      });
+
+      rows.sort(function (a, b) {
+        if (a.sortVal == null && b.sortVal == null) return a.name.localeCompare(b.name);
+        if (a.sortVal == null) return 1;
+        if (b.sortVal == null) return -1;
+        return q.dir === 'asc' ? a.sortVal - b.sortVal : b.sortVal - a.sortVal;
+      });
+
+      renderResults(rows, skipped, svcTotals);
+    });
+  }
+
+  function renderResults(rows, skipped, svcTotals) {
+    // Each figure and its noun are one unbreakable unit, so the bar never
+    // wraps to leave a bare "21" on one line and "pharmacies" on the next.
+    var unit = function (n, label) {
+      return '<span style="white-space:nowrap"><strong>' + n + '</strong> ' + esc(label) + '</span>';
+    };
+    var bits = [unit(rows.length, 'ward' + (rows.length === 1 ? '' : 's'))];
+    q.services.forEach(function (id) {
+      bits.push(unit(Math.round(svcTotals[id]), serviceById(id).label.toLowerCase()));
+    });
+    qBarEl.innerHTML = rows.length
+      ? bits.join(' <span style="color:var(--ink-3)">·</span> ')
+      : '<span class="q-empty">No ward matches every condition.</span>';
+
+    var sortLbl = labelOf(q.sort), sortUnit = unitOf(q.sort);
+    var html = rows.slice(0, 200).map(function (r, i) {
+      var v = r.sortVal == null ? '—' : fmtVal(r.sortVal, q.sort);
+      return '<div class="q-row" data-ward="' + esc(r.name) + '">' +
+        '<span class="q-rank">' + String(i + 1).padStart(2, '0') + '</span>' +
+        '<span class="q-nm">' + esc(r.name) + '<small>' + esc(r.lad) +
+          (r.counts.length ? ' · ' + r.counts.join(' / ') : '') + '</small></span>' +
+        '<span class="q-v">' + v + '</span>' +
+        '</div>';
+    }).join('');
+
+    if (rows.length > 200) {
+      html += '<div class="ws-note" style="padding:8px 12px">Showing the first 200 of ' +
+        rows.length + ' matches. Narrow the query or export the CSV for the rest.</div>';
+    }
+    if (rows.length) {
+      html += '<div class="ws-note" style="padding:8px 12px">Sorted by ' + esc(sortLbl) +
+        (sortUnit ? ' (' + esc(sortUnit) + ')' : '') + '. ' +
+        (q.services.length ? 'Counts after each ward name are ' +
+          esc(q.services.map(function (id) { return serviceById(id).label.toLowerCase(); }).join(' / ')) + '. ' : '') +
+        'Service counts other than pharmacies are a spatial test against the ward polygon.</div>';
+    }
+    if (skipped) {
+      html += '<div class="q-caution" style="margin:8px 12px">' + skipped +
+        ' ward' + (skipped === 1 ? ' was' : 's were') + ' left out because ' +
+        (skipped === 1 ? 'it has' : 'they have') + ' no figure for one of your conditions. ' +
+        'Missing is not the same as zero, so they are neither matched nor ruled out.</div>';
+    }
+    qResEl.innerHTML = html;
+    drawMatches(rows);
+    q._rows = rows;
+  }
+
+  function drawMatches(rows) {
+    if (qLyr && typeof map !== 'undefined') { map.removeLayer(qLyr); qLyr = null; }
+    if (!rows.length || typeof GJ === 'undefined' || !GJ.features || typeof map === 'undefined') return;
+    var want = {};
+    rows.forEach(function (r) { want[r.name] = 1; });
+    var feats = GJ.features.filter(function (f) { return want[f.properties.WD24NM]; });
+    if (!feats.length) return;
+    qLyr = L.geoJSON({ type: 'FeatureCollection', features: feats }, {
+      style: { color: '#003087', weight: 2.5, fill: false, opacity: .95 },
+      interactive: false,
+    }).addTo(map);
+  }
+
+  qResEl.addEventListener('click', function (e) {
+    var row = e.target.closest('[data-ward]');
+    if (!row) return;
+    qResEl.querySelectorAll('.q-row').forEach(function (r) { r.classList.remove('sel'); });
+    row.classList.add('sel');
+    selectWardByName(row.getAttribute('data-ward'));
+  });
+
+  // Selecting from a result row has to leave the map in exactly the state a
+  // click on the polygon would have left it in, or the sheet and the map
+  // disagree about what is selected.
+  function selectWardByName(wn) {
+    if (typeof wLyr === 'undefined' || !wLyr) return;
+    var target = null;
+    wLyr.eachLayer(function (l) {
+      if (l.feature && l.feature.properties.WD24NM === wn) target = l;
+    });
+    if (!target) return;
+    selW = wn;
+    wLyr.eachLayer(function (l) {
+      l.setStyle(wstyle(l.feature.properties.WD24NM, curOv, gs(l.feature.properties.WD24NM)));
+    });
+    target.setStyle(wstyle(wn, curOv, 'selected'));
+    target.bringToFront();
+    try { map.fitBounds(target.getBounds(), { padding: [40, 40], maxZoom: 13 }); } catch (err) { /* degenerate bounds */ }
+    // Keep the result list up; the sheet is what shows the ward from here.
+    window.__phKeepPane = true;
+    if (typeof showWard === 'function') showWard(wn);
+    window.__phKeepPane = false;
+  }
+
+  $('q-run').addEventListener('click', runQuery);
+  $('q-clear').addEventListener('click', function () {
+    q.services = []; q.scope = ''; q.conds = []; q._rows = null;
+    renderBuilder();
+    qBarEl.innerHTML = '<span class="q-empty">No query run yet.</span>';
+    qResEl.innerHTML = '';
+    drawMatches([]);
+  });
+  $('q-csv').addEventListener('click', function () {
+    var rows = q._rows;
+    if (!rows || !rows.length) { alert('Run a query first.'); return; }
+    var condKeys = q.conds.filter(function (c) { return c.key && c.value != null; })
+                          .map(function (c) { return c.key; });
+    var header = ['ward', 'borough']
+      .concat(q.services.map(function (id) { return serviceById(id).label; }))
+      .concat([labelOf(q.sort)])
+      .concat(condKeys.map(labelOf));
+    var lines = [header.map(csvCell).join(',')];
+    rows.forEach(function (r) {
+      var inds = indsOf(r.name);
+      lines.push([r.name, r.lad].concat(r.counts)
+        .concat([r.sortVal == null ? '' : r.sortVal])
+        .concat(condKeys.map(function (k) { var v = num(inds[k]); return v == null ? '' : v; }))
+        .map(csvCell).join(','));
+    });
+    download('pophealth-query.csv', lines.join('\n'), 'text/csv;charset=utf-8');
+  });
+
+  // The example from the brief, wired up so the pane is not an empty form on
+  // first open: services plus a borough plus two indicator conditions.
+  function seedExample() {
+    q.services = ['gp', 'pharmacy'];
+    q.scope = boroughList().indexOf('Brent') !== -1 ? 'Brent' : (boroughList()[0] || '');
+    q.conds = [
+      { key: 'imd_decile_mean', op: 'lte', value: 3 },
+      { key: 'census_disability_any_pct', op: 'gte', value: 5 },
+    ].filter(function (c) { return indicatorKeys().indexOf(c.key) !== -1; });
+    renderBuilder();
+  }
+
+  // Built once the ward data has arrived, because every menu in here is
+  // generated from the indicators that are actually present.
+  var _built = false;
+  function buildOnce() {
+    if (_built) return;
+    if (!allWards().length || !indicatorKeys().length) return;
+    _built = true;
+    if (indicatorKeys().indexOf(q.sort) === -1) q.sort = indicatorKeys()[0];
+    renderSort();
+    seedExample();
+  }
+  var _poll = setInterval(function () {
+    buildOnce();
+    if (_built) clearInterval(_poll);
+  }, 400);
+  setTimeout(function () { clearInterval(_poll); }, 30000);
+
+  // The rail calls this when Query mode is entered, in case the poll has not
+  // got there yet.
+  window.PH_QUERY = { build: buildOnce };
+
+  var backBtn = $('q-back');
+  if (backBtn) {
+    backBtn.addEventListener('click', function () {
+      var explore = document.querySelector('.mode-btn[data-mode="explore"]');
+      if (explore) explore.click();
+    });
+  }
 })();
 </script>
 </body></html>
