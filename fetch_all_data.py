@@ -1010,10 +1010,18 @@ def run_pharmacies() -> pd.DataFrame:
 ARCGIS_BASE = ("https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/"
                "services/{layer}/FeatureServer/0/query")
 BOUNDARY_LAYERS = {
+    # All three are BGC: generalised to 20m and clipped to the coastline.
+    #
+    # Keeping them at the same generalisation is the point, not a detail. LSOAs
+    # were on BSC, which is 200m, so they were drawn ten times coarser than the
+    # wards they nest inside: about 8 vertices per LSOA against 32. Shared
+    # borders had been simplified independently at different tolerances, so
+    # they no longer coincided and LSOA edges visibly cut across ward
+    # boundaries. Any future change here should move all three together.
     "wards":    ("WD_MAY_2025_UK_BGC_V2",  "WD25CD,WD25NM,LAD25CD,LAD25NM"),
     "boroughs": ("LAD_MAY_2025_UK_BGC_V2", "LAD25CD,LAD25NM"),
     # No LAD column on the LSOA layer, so it is filtered by code instead.
-    "lsoa":     ("Lower_layer_Super_Output_Areas_December_2021_Boundaries_EW_BSC_V4",
+    "lsoa":     ("Lower_layer_Super_Output_Areas_December_2021_Boundaries_EW_BGC_V5",
                  "LSOA21CD,LSOA21NM"),
 }
 ARCGIS_PAGE = 1000          # under the service's 2000 maxRecordCount
@@ -3721,6 +3729,39 @@ def _read_geojson_opt(path: Path):
         warn(f"{path.name}: unreadable ({e})")
         return None
 
+COORD_DECIMALS = 5  # ~0.7m of longitude at London's latitude
+
+
+def _round_coords(obj, nd: int = COORD_DECIMALS):
+    """
+    Trim coordinate precision in anything shipped to the browser.
+
+    ONS returns coordinates at full float precision, seventeen significant
+    digits, which is sub-nanometre on a map whose finest pixel is metres. It is
+    most of the file: at 20m generalisation the LSOA blob is 6.5MB at full
+    precision and 3.6MB at five decimal places, and no point moves more than
+    0.32m. That saving is what pays for the extra detail.
+
+    Only coordinate arrays are touched. Indicator values keep their own
+    precision, because rounding a rate and rounding a position are different
+    decisions and only one of them is being made here.
+    """
+    if isinstance(obj, dict):
+        return {k: (_round_floats(v, nd) if k == "coordinates" else _round_coords(v, nd))
+                for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_round_coords(v, nd) for v in obj]
+    return obj
+
+
+def _round_floats(obj, nd: int):
+    if isinstance(obj, float):
+        return round(obj, nd)
+    if isinstance(obj, list):
+        return [_round_floats(v, nd) for v in obj]
+    return obj
+
+
 def write_map_blob(name: str, payload, description: str) -> None:
     """
     Write one of index.html's data globals to data/map/<name>.js.
@@ -3738,7 +3779,8 @@ def write_map_blob(name: str, payload, description: str) -> None:
             f"be undefined at parse time."
         )
     MAP_DIR.mkdir(parents=True, exist_ok=True)
-    body = json.dumps(_scrub_nan(payload), separators=(",", ":"), ensure_ascii=False)
+    body = json.dumps(_round_coords(_scrub_nan(payload)),
+                      separators=(",", ":"), ensure_ascii=False)
     write_atomic(MAP_DIR / MAP_BLOBS[name], (
         f"// {description}\n"
         f"// Loaded by index.html as a classic script before the main block,\n"
