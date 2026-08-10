@@ -2181,6 +2181,25 @@ def run_fingertips() -> pd.DataFrame:
         df = df[df["Area Code"].isin(NW_LADS)]
         if df.empty:
             continue
+        # Fingertips returns Male, Female and Persons rows for the same
+        # indicator. Without choosing, the tail(1) below takes whichever sorts
+        # last, which silently produced Female figures for the two _male
+        # indicators. Pick explicitly: the indicator name says what it wants,
+        # and everything else wants Persons.
+        if "Sex" in df.columns:
+            if short.endswith("_male"):
+                want = "Male"
+            elif short.endswith("_female"):
+                want = "Female"
+            else:
+                want = "Persons"
+            sub = df[df["Sex"] == want]
+            if sub.empty and want == "Persons":
+                sub = df          # some indicators are single-sex by nature
+            if sub.empty:
+                warn(f"fingertips {ind_id} ({short}): no '{want}' rows; skipping")
+                continue
+            df = sub
         df = df.sort_values("Time period Sortable").groupby("Area Code", as_index=False).tail(1)
         for _, row in df.iterrows():
             rows.append({
@@ -3315,6 +3334,26 @@ def build_lsoa_data() -> dict:
                 v = row.get(c)
                 if pd.notna(v):
                     out[code][c] = round(float(v), 2)
+
+    # Scope to the LSOAs the map can actually render. The IMD parquet is
+    # national, so without this the file carries all 33,755 English LSOAs:
+    # 41 MB downloaded by every visitor, of which 3.5% is ever looked up.
+    # It also silently corrupted a statistic. _nwlDomainMean() in index.html
+    # averages over Object.values(LSOA_DATA), so an unscoped file made the
+    # "NWL mean" an England mean. Scoping makes that function mean what its
+    # name says.
+    try:
+        scope = set(get_lsoa_ward_lookup())
+    except Exception as e:
+        warn(f"lsoa_data: scope lookup unavailable ({e}); emitting unscoped")
+        scope = set()
+    if scope:
+        kept = {k: v for k, v in out.items() if k in scope}
+        if kept:
+            info(f"lsoa_data: scoped {len(out):,} -> {len(kept):,} LSOAs")
+            out = kept
+        else:
+            warn("lsoa_data: scope filter matched nothing; emitting unscoped")
     return out
 
 def build_vcse_json():
