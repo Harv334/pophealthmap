@@ -1,10 +1,10 @@
 {
-  "last_run": "2026-08-10T08:48:41.591757+00:00",
+  "last_run": "2026-08-10T09:04:18.301761+00:00",
   "sources": {
     "boundaries": {
-      "duration_s": 7.7,
+      "duration_s": 29.3,
       "error": "",
-      "fetched_at": "2026-08-10T08:48:33.898598+00:00",
+      "fetched_at": "2026-08-10T09:02:18.487905+00:00",
       "notes": "",
       "output_path": "",
       "rows_written": 3,
@@ -15,9 +15,9 @@
       "status": "ok"
     },
     "census": {
-      "duration_s": 80.4,
+      "duration_s": 1.4,
       "error": "",
-      "fetched_at": "2026-08-10T07:24:09.206276+00:00",
+      "fetched_at": "2026-08-10T09:02:55.068953+00:00",
       "notes": "",
       "output_path": "data/demographics/census2021.parquet",
       "rows_written": 35672,
@@ -59,12 +59,12 @@
       "status": "ok"
     },
     "charities": {
-      "duration_s": 46.5,
+      "duration_s": 26.3,
       "error": "",
-      "fetched_at": "2026-08-10T07:31:59.956142+00:00",
+      "fetched_at": "2026-08-10T09:03:46.141754+00:00",
       "notes": "",
       "output_path": "data/vcse/charities.parquet",
-      "rows_written": 9011,
+      "rows_written": 9020,
       "schema": {
         "LAD25CD": "str",
         "LSOA21CD": "str",
@@ -97,12 +97,12 @@
       "status": "ok"
     },
     "claimant": {
-      "duration_s": 9.9,
+      "duration_s": 19.8,
       "error": "",
-      "fetched_at": "2026-08-10T07:25:29.647759+00:00",
+      "fetched_at": "2026-08-10T09:02:56.492548+00:00",
       "notes": "",
       "output_path": "data/economy/claimant_count.parquet",
-      "rows_written": 1183,
+      "rows_written": 4994,
       "schema": {
         "LSOA21CD": "str",
         "claimant_count": "float64",
@@ -114,32 +114,22 @@
       "status": "ok"
     },
     "crime": {
-      "duration_s": 238.1,
-      "error": "",
-      "fetched_at": "2026-08-10T07:28:01.905443+00:00",
+      "duration_s": 0.0,
+      "error": "UnicodeEncodeError: 'charmap' codec can't encode characters in position 9-11: character maps to <undefined>",
+      "fetched_at": "2026-08-10T09:00:33.747543+00:00",
       "notes": "",
-      "output_path": "data/crime/police_uk_crime.parquet",
-      "rows_written": 319318,
-      "schema": {
-        "LAD25CD": "str",
-        "LSOA21CD": "str",
-        "WD25CD": "str",
-        "borough_name": "str",
-        "category": "str",
-        "lat": "float64",
-        "lng": "float64",
-        "month": "str",
-        "street_name": "str"
-      },
-      "status": "ok"
+      "output_path": "",
+      "rows_written": 0,
+      "schema": {},
+      "status": "failed"
     },
     "dentists": {
       "duration_s": 5.8,
       "error": "",
-      "fetched_at": "2026-08-10T08:05:00.041817+00:00",
+      "fetched_at": "2026-08-10T09:04:12.483383+00:00",
       "notes": "",
       "output_path": "data/healthcare/dental_practices.parquet",
-      "rows_written": 699,
+      "rows_written": 1877,
       "schema": {
         "LSOA21CD": "str",
         "WD25CD": "str",
@@ -155,9 +145,9 @@
       "status": "ok"
     },
     "dwp": {
-      "duration_s": 13.5,
+      "duration_s": 13.3,
       "error": "source produced no rows; see the run log for the upstream error",
-      "fetched_at": "2026-08-10T07:25:39.551559+00:00",
+      "fetched_at": "2026-08-10T09:03:16.269715+00:00",
       "notes": "",
       "output_path": "",
       "rows_written": 0,
@@ -165,12 +155,12 @@
       "status": "failed"
     },
     "fingertips": {
-      "duration_s": 62.0,
+      "duration_s": 0.8,
       "error": "",
-      "fetched_at": "2026-08-10T08:21:24.706260+00:00",
+      "fetched_at": "2026-08-10T09:03:43.997087+00:00",
       "notes": "",
       "output_path": "data/outcomes/fingertips.parquet",
-      "rows_written": 120,
+      "rows_written": 494,
       "schema": {
         "LAD25CD": "str",
         "age": "str",
@@ -187,22 +177,22 @@
       "status": "ok"
     },
     "fuel_poverty": {
-      "duration_s": 0.7,
-      "error": "",
-      "fetched_at": "2026-08-10T07:28:00.703049+00:00",
-      "notes": "source returned no frame",
+      "duration_s": 0.0,
+      "error": "ImportError: `Import openpyxl` failed.  Use pip or conda to install the openpyxl package.",
+      "fetched_at": "2026-08-10T09:03:44.759330+00:00",
+      "notes": "",
       "output_path": "",
       "rows_written": 0,
       "schema": {},
-      "status": "skipped"
+      "status": "failed"
     },
     "gp": {
-      "duration_s": 6.0,
+      "duration_s": 2.8,
       "error": "",
-      "fetched_at": "2026-08-10T07:23:55.320290+00:00",
+      "fetched_at": "2026-08-10T09:02:47.836654+00:00",
       "notes": "",
       "output_path": "data/healthcare/gp_practices.parquet",
-      "rows_written": 336,
+      "rows_written": 1146,
       "schema": {
         "LAD25CD": "str",
         "LSOA21CD": "str",
@@ -221,7 +211,7 @@
     "hospitals": {
       "duration_s": 0.0,
       "error": "",
-      "fetched_at": "2026-08-10T07:31:59.955730+00:00",
+      "fetched_at": "2026-08-10T09:03:46.141348+00:00",
       "notes": "source returned no frame",
       "output_path": "",
       "rows_written": 0,
@@ -229,11 +219,11 @@
       "status": "skipped"
     },
     "imd": {
-      "duration_s": 0.0,
+      "duration_s": 0.2,
       "error": "",
-      "fetched_at": "2026-08-10T07:24:09.191783+00:00",
+      "fetched_at": "2026-08-10T09:02:54.847374+00:00",
       "notes": "",
-      "output_path": "",
+      "output_path": "data/demographics/imd2025.parquet",
       "rows_written": 33755,
       "schema": {
         "LSOA21CD": "str",
@@ -251,12 +241,12 @@
       "status": "ok"
     },
     "pharmacies": {
-      "duration_s": 7.8,
+      "duration_s": 4.2,
       "error": "",
-      "fetched_at": "2026-08-10T07:24:01.349749+00:00",
+      "fetched_at": "2026-08-10T09:02:50.663325+00:00",
       "notes": "",
       "output_path": "data/healthcare/pharmacies.parquet",
-      "rows_written": 480,
+      "rows_written": 1737,
       "schema": {
         "LAD25CD": "str",
         "LSOA21CD": "str",
@@ -272,9 +262,9 @@
       "status": "ok"
     },
     "ptal": {
-      "duration_s": 0.5,
+      "duration_s": 1.4,
       "error": "",
-      "fetched_at": "2026-08-10T07:28:01.362331+00:00",
+      "fetched_at": "2026-08-10T09:03:44.760584+00:00",
       "notes": "source returned no frame",
       "output_path": "",
       "rows_written": 0,
@@ -282,12 +272,12 @@
       "status": "skipped"
     },
     "qof": {
-      "duration_s": 50.0,
+      "duration_s": 14.5,
       "error": "",
-      "fetched_at": "2026-08-10T07:25:53.091648+00:00",
+      "fetched_at": "2026-08-10T09:03:29.543292+00:00",
       "notes": "",
       "output_path": "data/healthcare/qof_prevalence.parquet",
-      "rows_written": 333,
+      "rows_written": 1119,
       "schema": {
         "code": "str",
         "qof_asthma_pct": "float64",

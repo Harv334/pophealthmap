@@ -58,6 +58,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import io
 import json
 import os
@@ -76,27 +77,51 @@ except ImportError as e:
     print(f"ERROR: missing dependency ({e.name}). Run: pip install pandas pyarrow requests pyproj shapely")
     sys.exit(1)
 
+# Section headers use box-drawing characters. A Windows console, or any run
+# with stdout redirected to a file, defaults to cp1252 and cannot encode them,
+# which killed a full run at a log line rather than at anything real. Force
+# UTF-8 and degrade gracefully if the stream does not support reconfiguring.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
+
 REPO_ROOT = Path(__file__).resolve().parent
 CACHE_DIR = REPO_ROOT / ".cache"
 DATA_DIR  = REPO_ROOT / "data"
 
 # ============================================================================
-# SCOPE: 8 NW London boroughs (NWL ICS, LAD24CD). Camden is NCL, not NWL.
+# SCOPE: the 33 London local authorities (32 boroughs + the City of London).
+# Codes and names are the ONS LAD25 set, taken from LAD_MAY_2025_UK_BGC_V2.
+# This single list is what defines the map's footprint. Everything else, the
+# boundaries, the LSOA set, the ward set, the facility filters, derives from it.
 # ============================================================================
+SCOPE_NAME = "London"
 BOROUGHS = [
-    ("Brent",                 "E09000005", ["HA", "NW", "W"]),
-    ("Ealing",                "E09000009", ["W", "UB", "TW", "NW"]),
-    ("Hammersmith & Fulham",  "E09000013", ["W", "SW"]),
-    ("Harrow",                "E09000015", ["HA", "NW"]),
-    ("Hillingdon",            "E09000017", ["UB", "HA", "TW"]),
-    ("Hounslow",              "E09000018", ["TW", "W", "UB"]),
-    ("Kensington & Chelsea",  "E09000020", ["W", "SW"]),
-    ("City of Westminster",   "E09000033", ["W", "NW", "WC", "SW"]),
+    ("City of London",         "E09000001"), ("Barking and Dagenham",   "E09000002"),
+    ("Barnet",                 "E09000003"), ("Bexley",                 "E09000004"),
+    ("Brent",                  "E09000005"), ("Bromley",                "E09000006"),
+    ("Camden",                 "E09000007"), ("Croydon",                "E09000008"),
+    ("Ealing",                 "E09000009"), ("Enfield",                "E09000010"),
+    ("Greenwich",              "E09000011"), ("Hackney",                "E09000012"),
+    ("Hammersmith and Fulham", "E09000013"), ("Haringey",               "E09000014"),
+    ("Harrow",                 "E09000015"), ("Havering",               "E09000016"),
+    ("Hillingdon",             "E09000017"), ("Hounslow",               "E09000018"),
+    ("Islington",              "E09000019"), ("Kensington and Chelsea", "E09000020"),
+    ("Kingston upon Thames",   "E09000021"), ("Lambeth",                "E09000022"),
+    ("Lewisham",               "E09000023"), ("Merton",                 "E09000024"),
+    ("Newham",                 "E09000025"), ("Redbridge",              "E09000026"),
+    ("Richmond upon Thames",   "E09000027"), ("Southwark",              "E09000028"),
+    ("Sutton",                 "E09000029"), ("Tower Hamlets",          "E09000030"),
+    ("Waltham Forest",         "E09000031"), ("Wandsworth",             "E09000032"),
+    ("Westminster",            "E09000033"),
 ]
-NW_LADS = {b[1] for b in BOROUGHS}
-POSTCODE_AREAS = sorted({p for b in BOROUGHS for p in b[2]})
-
+SCOPE_LADS = {b[1] for b in BOROUGHS}
 LAD_NAMES = {b[1]: b[0] for b in BOROUGHS}
+
+# A scope fingerprint, so caches cannot silently replay a different footprint.
+SCOPE_KEY = hashlib.sha256(",".join(sorted(SCOPE_LADS)).encode()).hexdigest()[:10]
 
 # ============================================================================
 # LOGGING (no rich dep — plain ANSI colours)
@@ -494,9 +519,12 @@ def fetch_ods_report(report: str, cache: Path, *, source: str,
 #     codes.lsoa21          -> LSOA21CD
 #     codes.admin_district  -> LAD25CD
 #     codes.admin_ward      -> WD25CD
-# Only postcodes whose area is in POSTCODE_AREAS are queried. That is the same
-# subset the ONSPD path loaded (it only opened the multi_csv files for those
-# areas), so anything outside NW London stays unresolved exactly as before.
+# Every postcode handed in is resolved. There used to be a hand-maintained
+# allowlist of postcode areas, inherited from the ONSPD files the pipeline once
+# read. At 33 local authorities that list is a silent-drop bug waiting to
+# happen: miss one area and every facility in it disappears with no error. The
+# LAD filter downstream does the real scoping, and results are cached per
+# postcode so the extra lookups are paid once.
 POSTCODES_IO_BULK       = "https://api.postcodes.io/postcodes"
 POSTCODES_IO_TERMINATED = "https://api.postcodes.io/terminated_postcodes/{pc}"
 PC_BATCH             = 100    # postcodes.io rejects bulk requests above this
@@ -616,7 +644,7 @@ def lookup_postcodes(postcodes, *, source: str,
     still unresolved can be logged against the record it belongs to.
     """
     wanted = sorted({normalise_postcode(p) for p in postcodes})
-    wanted = [p for p in wanted if p and postcode_area(p) in POSTCODE_AREAS]
+    wanted = [p for p in wanted if p]
     cache = _pc_cache()
     todo = [p for p in wanted if p not in cache]
 
@@ -703,7 +731,7 @@ ONS_LOOKUP_URL = (
     "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/"
     f"{ONS_LOOKUP_LAYER}/FeatureServer/0/query"
 )
-ONS_LOOKUP_CACHE = CACHE_DIR / "ons_lookup" / f"{ONS_LOOKUP_LAYER}_nwl.json"
+ONS_LOOKUP_CACHE = CACHE_DIR / "ons_lookup" / f"{ONS_LOOKUP_LAYER}_{SCOPE_KEY}.json"
 ONS_LOOKUP_PAGE  = 1000        # the service's maxRecordCount
 
 @lru_cache(maxsize=1)
@@ -718,8 +746,8 @@ def get_lsoa_ward_lookup() -> dict:
         except (OSError, ValueError) as e:
             warn(f"ONS lookup: cache unreadable ({e}); refetching")
 
-    info(f"ONS lookup: fetching {ONS_LOOKUP_LAYER} for {len(NW_LADS)} boroughs")
-    where = "LAD25CD IN (" + ",".join(f"'{c}'" for c in sorted(NW_LADS)) + ")"
+    info(f"ONS lookup: fetching {ONS_LOOKUP_LAYER} for {len(SCOPE_LADS)} boroughs")
+    where = "LAD25CD IN (" + ",".join(f"'{c}'" for c in sorted(SCOPE_LADS)) + ")"
     lookup: dict[str, tuple[str, str]] = {}
     offset = 0
     while True:
@@ -752,10 +780,10 @@ def get_lsoa_ward_lookup() -> dict:
     if not lookup:
         raise RuntimeError(
             f"ONS LSOA->ward lookup: {ONS_LOOKUP_LAYER} returned no rows for "
-            f"LAD25CD in {sorted(NW_LADS)}. Has the ward vintage moved on?"
+            f"LAD25CD in {sorted(SCOPE_LADS)}. Has the ward vintage moved on?"
         )
     write_json_atomic(ONS_LOOKUP_CACHE, {k: list(v) for k, v in lookup.items()})
-    ok(f"ONS lookup: {len(lookup):,} LSOAs across {len(NW_LADS)} boroughs")
+    ok(f"ONS lookup: {len(lookup):,} LSOAs across {len(SCOPE_LADS)} boroughs")
     return lookup
 
 def get_lsoa_to_ward() -> dict:
@@ -888,7 +916,7 @@ def run_gp_practices() -> pd.DataFrame:
         if not hit:
             continue
         lat, lng, lsoa, lad, wd = hit
-        if lad not in NW_LADS:
+        if lad not in SCOPE_LADS:
             continue
         rows.append({
             "code": r["OrganisationCode"],
@@ -948,7 +976,7 @@ def run_pharmacies() -> pd.DataFrame:
         if not hit:
             continue
         lat, lng, lsoa, lad, wd = hit
-        if lad not in NW_LADS:
+        if lad not in SCOPE_LADS:
             continue
         rows.append({
             "code": r.get("OrganisationCode", ""),
@@ -975,7 +1003,7 @@ def run_pharmacies() -> pd.DataFrame:
 # data/boundaries/*.geojson used to be placed by hand with no generator, which
 # made the footprint impossible to change: the ward and LSOA shapes silently
 # defined the map's scope regardless of what the borough list said. These are
-# now fetched for whatever NW_LADS contains.
+# now fetched for whatever SCOPE_LADS contains.
 #
 # Layer names are the short aliases. The portal also lists longer display names
 # with parentheses, and those do not resolve as URL segments.
@@ -1026,7 +1054,7 @@ def run_boundaries() -> pd.DataFrame:
     rule("Boundaries (ONS Open Geography Portal)")
     out_dir = DATA_DIR / "boundaries"
     out_dir.mkdir(parents=True, exist_ok=True)
-    lad_in = "LAD25CD IN (" + ",".join(f"'{c}'" for c in sorted(NW_LADS)) + ")"
+    lad_in = "LAD25CD IN (" + ",".join(f"'{c}'" for c in sorted(SCOPE_LADS)) + ")"
     counts = {}
 
     for kind in ("wards", "boroughs"):
@@ -1101,7 +1129,7 @@ def run_dentists() -> pd.DataFrame:
         if not hit:
             continue
         lat, lng, lsoa, lad, wd = hit
-        if lad not in NW_LADS:
+        if lad not in SCOPE_LADS:
             continue
         by_pc[pc] = {
             "name": (r["Name"] or "").title(),
@@ -1776,10 +1804,10 @@ def run_claimant_count() -> pd.DataFrame:
     # _v3: bulk queries against NOMIS TYPE298 silently cap at 25,000 rows
     # regardless of RecordLimit= for unregistered users. Switch to explicit
     # NWL LSOA lists, chunked into ~500-code requests.
-    cache = cache_dir / "claimant_nwl_latest_v3.csv"
+    cache = cache_dir / f"claimant_{SCOPE_KEY}_latest.csv"
 
     # The NW London LSOA set comes from the ONS best-fit lookup, which is scoped
-    # to NW_LADS (the 8 NWL ICS boroughs; Camden is NCL, not NWL).
+    # to SCOPE_LADS (the 8 NWL ICS boroughs; Camden is NCL, not NWL).
     try:
         nwl_lsoas = set(get_lsoa_ward_lookup())
     except Exception as e:
@@ -2271,7 +2299,7 @@ def run_fingertips() -> pd.DataFrame:
             continue
         if df.empty or "Area Code" not in df.columns:
             continue
-        df = df[df["Area Code"].isin(NW_LADS)]
+        df = df[df["Area Code"].isin(SCOPE_LADS)]
         if df.empty:
             continue
         # Fingertips returns Male, Female and Persons rows for the same
@@ -2547,7 +2575,7 @@ def run_police_crime(months_back: int = 12) -> pd.DataFrame:
         p = feat["properties"]
         lad = p.get("LAD25CD") or p.get("LAD24CD") or p.get("code") or ""
         name = p.get("LAD25NM") or p.get("name") or ""
-        if lad not in NW_LADS:
+        if lad not in SCOPE_LADS:
             continue
         geom = feat["geometry"]
         if geom["type"] == "MultiPolygon":
@@ -2692,7 +2720,7 @@ def run_hospitals() -> pd.DataFrame | None:
                 _, _, lsoa, lad, wd = hit2
         if lat is None or lng is None:
             continue
-        if lad and lad not in NW_LADS:
+        if lad and lad not in SCOPE_LADS:
             continue
         rows.append({
             "name": r.get(name_c, "") if name_c else "",
@@ -2831,19 +2859,23 @@ def _ccew_income_band(inc):
 
 # Map of lowercase AOO area names -> NWL LAD25CD. Keys cover the exact strings
 # that appear in the Charity Commission area_of_operation table.
-NWL_AOO_NAMES = {
-    "brent":                  "E09000005",
-    "ealing":                 "E09000009",
-    "hammersmith and fulham": "E09000013",
-    "hammersmith & fulham":   "E09000013",
-    "harrow":                 "E09000015",
-    "hillingdon":             "E09000017",
-    "hounslow":                "E09000018",
-    "kensington and chelsea": "E09000020",
-    "kensington & chelsea":   "E09000020",
-    "city of westminster":    "E09000033",
-    "westminster":            "E09000033",
-}
+# Charity Commission area-of-operation strings, derived from the scope list so
+# a borough cannot be missed by hand. Both "and" and "&" spellings are
+# accepted, plus the "City of X" forms the register uses, and a startup check
+# below fails loudly if a borough matches nothing rather than silently
+# dropping its charities.
+def _aoo_variants(name: str) -> set[str]:
+    n = name.lower()
+    out = {n, n.replace(" and ", " & ")}
+    out.add("city of " + n)
+    if n.startswith("city of "):
+        out.add(n[len("city of "):])
+    return out
+
+AOO_NAMES = {}
+for _nm, _code in BOROUGHS:
+    for _v in _aoo_variants(_nm):
+        AOO_NAMES[_v] = _code
 LONDON_WIDE_AOO = {"throughout london", "london", "greater london"}
 
 
@@ -2874,7 +2906,7 @@ def run_charities():
     area_rows = _ccew_read_json(area_zip)
     info(f"CCEW: {len(area_rows):,} area-of-operation rows")
 
-    ALL_NWL_LADS = sorted(set(NWL_AOO_NAMES.values()))
+    ALL_SCOPE_LADS = sorted(set(AOO_NAMES.values()))
     covers_map: dict[int, set[str]] = {}
     areas_map:  dict[int, list[dict]] = {}
     scope_map:  dict[int, str] = {}   # "explicit" | "london_wide"
@@ -2890,14 +2922,14 @@ def run_charities():
         if desc:
             areas_map.setdefault(num, []).append({"type": gtype, "area": desc})
         key = desc.lower()
-        hit_local = NWL_AOO_NAMES.get(key)
+        hit_local = AOO_NAMES.get(key)
         if hit_local:
             covers_map.setdefault(num, set()).add(hit_local)
             scope_map[num] = "explicit"
             continue
         if gtype.lower() == "region" and key in LONDON_WIDE_AOO:
             # London-wide declarations cover all 9 NWL boroughs
-            covers_map.setdefault(num, set()).update(ALL_NWL_LADS)
+            covers_map.setdefault(num, set()).update(ALL_SCOPE_LADS)
             if scope_map.get(num) != "explicit":
                 scope_map[num] = "london_wide"
 
@@ -2926,8 +2958,7 @@ def run_charities():
         return num if num and num in covers_map else 0
 
     # Resolve HQ postcodes for the charities we are keeping. lookup_postcodes()
-    # restricts to POSTCODE_AREAS, so an HQ outside NW London stays unplaced
-    # exactly as it did under ONSPD.
+    # An HQ outside the scope is resolved but then dropped by the LAD filter.
     ccew_owners: dict[str, str] = {}
     for r in main_rows:
         if not _ccew_keep(r):
@@ -2969,7 +3000,7 @@ def run_charities():
             hit = lookup.get(pc)
             if hit:
                 lat, lng, lsoa, lad, wd = hit
-                if lad not in NW_LADS:
+                if lad not in SCOPE_LADS:
                     hq_outside_nwl += 1
             else:
                 no_geocode += 1
@@ -2988,7 +3019,7 @@ def run_charities():
             "addr": addr, "postcode": pc or "",
             "lat": lat, "lng": lng,
             "LSOA21CD": lsoa, "WD25CD": wd, "LAD25CD": lad,
-            "hq_in_nwl": bool(lad and lad in NW_LADS),
+            "hq_in_nwl": bool(lad and lad in SCOPE_LADS),
             "income": r.get("latest_income"),
             "income_band": _ccew_income_band(r.get("latest_income")),
             "website": (r.get("charity_contact_web") or "").strip(),
@@ -3517,6 +3548,17 @@ MAP_BLOBS = {
     "BOROUGH_GJ": "boroughs.js",
 }
 
+def _read_geojson_opt(path: Path):
+    """Load a boundary GeoJSON, or None with a warning if it is not there."""
+    if not path.exists():
+        warn(f"missing (skipped): {path.relative_to(REPO_ROOT)}")
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        warn(f"{path.name}: unreadable ({e})")
+        return None
+
 def write_map_blob(name: str, payload, description: str) -> None:
     """
     Write one of index.html's data globals to data/map/<name>.js.
@@ -3584,6 +3626,71 @@ def export_map_blobs() -> None:
                        "data/healthcare/gp_practices.parquet, with QOF prevalence attached.")
         ok(f"map blob: {len(gp_records):,} GP practices -> "
            f"data/map/{MAP_BLOBS['GPS']}")
+
+    # Ward and borough outlines, straight from the fetched boundaries so the
+    # map's shapes and the pipeline's scope can never disagree.
+    bdir = DATA_DIR / "boundaries"
+    wards_gj = _read_geojson_opt(bdir / "wards.geojson")
+    if wards_gj:
+        for f in wards_gj["features"]:
+            p = f.get("properties", {})
+            # index.html reads WD24NM/WD24CD/LAD; keep those names so the app
+            # does not need touching for a boundary-vintage change.
+            f["properties"] = {
+                "WD24NM": p.get("WD25NM", ""), "WD24CD": p.get("WD25CD", ""),
+                "LAD": p.get("LAD25NM", ""),
+            }
+        write_map_blob("GJ", wards_gj,
+                       "Ward boundaries. ONS WD_MAY_2025_UK_BGC_V2, scoped to the borough list.")
+        ok(f"map blob: {len(wards_gj['features']):,} wards -> data/map/{MAP_BLOBS['GJ']}")
+
+    bor_gj = _read_geojson_opt(bdir / "boroughs.geojson")
+    if bor_gj:
+        for f in bor_gj["features"]:
+            p = f.get("properties", {})
+            f["properties"] = {"name": p.get("LAD25NM", ""), "LAD25CD": p.get("LAD25CD", "")}
+        write_map_blob("BOROUGH_GJ", bor_gj,
+                       "Borough outlines. ONS LAD_MAY_2025_UK_BGC_V2, scoped to the borough list.")
+        ok(f"map blob: {len(bor_gj['features']):,} boroughs -> data/map/{MAP_BLOBS['BOROUGH_GJ']}")
+
+    # LSOA shapes carrying the IMD figures and their ward, which is what the
+    # LSOA choropleth and the ward drill-down both read.
+    lsoa_gj = _read_geojson_opt(bdir / "lsoa.geojson")
+    imd = _read_parquet_opt(DATA_DIR / "demographics" / "imd2025.parquet")
+    if lsoa_gj and imd is not None:
+        imd_by_code = {}
+        for _, row in imd.iterrows():
+            imd_by_code[str(row["LSOA21CD"])] = (
+                None if pd.isna(row.get("imd_decile")) else int(row["imd_decile"]),
+                None if pd.isna(row.get("imd_rank")) else int(row["imd_rank"]),
+            )
+        try:
+            lookup = get_lsoa_ward_lookup()
+        except Exception as e:
+            warn(f"map blob: LSOA ward lookup unavailable ({e})")
+            lookup = {}
+        ward_names, borough_names = {}, {}
+        for f in (wards_gj or {"features": []})["features"]:
+            p = f["properties"]
+            ward_names[p["WD24CD"]] = p["WD24NM"]
+            borough_names[p["WD24CD"]] = p["LAD"]
+        kept = []
+        for f in lsoa_gj["features"]:
+            p = f.get("properties", {})
+            code = p.get("LSOA21CD", "")
+            wd = (lookup.get(code) or ("", ""))[0]
+            dec, rank = imd_by_code.get(code, (None, None))
+            f["properties"] = {
+                "code": code, "name": p.get("LSOA21NM", ""),
+                "ward": ward_names.get(wd, ""), "ward_code": wd,
+                "borough": borough_names.get(wd, ""),
+                "imd_decile": dec, "imd_rank": rank,
+            }
+            kept.append(f)
+        lsoa_gj["features"] = kept
+        write_map_blob("LSOA_IMD", lsoa_gj,
+                       "LSOA boundaries with IMD 2025 decile and rank, and their ward.")
+        ok(f"map blob: {len(kept):,} LSOAs -> data/map/{MAP_BLOBS['LSOA_IMD']}")
 
     # HOSP is deliberately not written here. data/map/hosp.js is hand-curated:
     # 20 hospitals with their parent NHS trust, which run_hospitals() does not
