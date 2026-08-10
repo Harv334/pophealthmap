@@ -63,6 +63,11 @@ Rules that matter:
   writing your answer and never contradict them. If results_are says "the
   lowest values; higher = more deprived", those rows are the LEAST deprived
   areas, and saying they have the highest scores would be wrong twice over.
+- imd_decile_mean is an average of deciles, not a decile. A value of 3 means the
+  typical LSOA there sits in the third decile, among roughly the 30 per cent
+  most deprived nationally. Do not say an area is "in the most deprived tenth"
+  unless the value is 1. Getting this wrong overstates deprivation, which is
+  the worst direction to be wrong in for this data.
 - Rates and percentages are not counts. Do not add percentages together.
 - Some indicators are published at borough level and repeated for every ward in
   that borough. Tool results mark these, with published_at, with

@@ -179,10 +179,15 @@ var ASSISTANT_ENDPOINT = "https://pophealthmapai.sevilleharvey.workers.dev";
    * question: asked for the most deprived boroughs it returned the least, and
    * explained that a higher score meant less deprivation.
    */
+  var DECILE_SCALE = "Deciles run 1 (the most deprived tenth nationally) to 10 " +
+    "(the least). This is an average of them, not a decile itself: a value of 3 " +
+    "means the typical LSOA here sits in the third decile, among roughly the 30 " +
+    "per cent most deprived. Only a value of 1 would mean the most deprived tenth.";
+
   var IMD_META = {
-    imd_decile_mean: "Mean IMD decile of the LSOAs in this area, population weighted. 1 is the most deprived tenth nationally, 10 the least.",
-    imd_best_decile: "The least deprived IMD decile present in this area. 1 is the most deprived tenth nationally, 10 the least.",
-    imd_worst_decile: "The most deprived IMD decile present in this area. 1 is the most deprived tenth nationally, 10 the least.",
+    imd_decile_mean: "Mean IMD decile of the LSOAs in this area, population weighted. " + DECILE_SCALE,
+    imd_best_decile: "The least deprived IMD decile present in this area. Deciles run 1 (the most deprived tenth nationally) to 10 (the least).",
+    imd_worst_decile: "The most deprived IMD decile present in this area. Deciles run 1 (the most deprived tenth nationally) to 10 (the least).",
   };
 
   var DIRECTION = {
