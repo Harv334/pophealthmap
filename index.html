@@ -366,6 +366,8 @@
 .ai-chip{font:inherit;font-size:11.5px;cursor:pointer;text-align:left;background:#FBFCFD;
   color:#003087;border:1px solid #DDE1E4;border-radius:13px;padding:5px 10px}
 .ai-chip:hover{background:#E5EFF8;border-color:#41B6E6}
+.ai-note{margin:-4px 0 10px;padding:7px 10px;border-radius:8px;background:#FDF0D5;
+  border:1px solid #E8D3A3;color:#8A5A00;font-size:11.5px;line-height:1.45}
 @media (max-width:640px){#ai-panel{width:calc(100% - 24px)}}
 
     /* Layers whose coverage is narrower than the map. Flagged rather than
@@ -618,13 +620,6 @@
           <!-- VCSE + CIC toggles moved to the VCSE tab; they're the only place to enable them now. -->
 
           <label class="lrow"><div class="ldot" style="background:#7B2D8E"></div><span class="lname">Dental practices <span class="lcount" id="dental-count">0</span></span><input type="checkbox" id="td"></label>
-          <div id="dental-filter-wrap" style="margin:2px 0 4px 16px">
-            <select id="dental-contract-filter" style="width:100%;padding:3px 6px;border:1px solid #ddd;border-radius:5px;font-size:11px;color:#333;background:#fff">
-              <option value="all" selected>All dental practices</option>
-              <option value="nhs">NHS / mixed</option>
-              <option value="private">Private / specialist services</option>
-            </select>
-          </div>
           <label class="lrow"><div class="ldot" style="background:#E89B1B"></div><span class="lname">Pharmacies <span class="lcount" id="pharm-count">0</span></span><input type="checkbox" id="tph"></label>
         </div>
         <div class="sb-sec" style="flex-shrink:0;border-bottom:1px solid #e5e5e0">
@@ -2700,42 +2695,31 @@ const dentalCluster = L.markerClusterGroup({
   }
 });
 let dentalData = [];
-let dentalContractFilter = 'all'; // 'all' | 'nhs' | 'private'
-function _dentalTypeLabel(nhs) {
-  if (nhs === true) return 'NHS / mixed';
-  if (nhs === false) return 'Private / specialist services';
-  return 'Unknown contract status';
-}
+// The layer is the NHS dental register from ODS, so there is nothing to filter
+// by any more: every practice here holds an NHS contract by virtue of being in
+// the register. The NHS/private split came from a hand-maintained overlay that
+// has been dropped, along with its dropdown.
 function loadDentalLayer(practices) {
   dentalCluster.clearLayers();
   dentalData = [];
   practices.forEach(p => {
     if (!p.lat || !p.lng) return;
-    const nhs = (typeof p.nhs_contracted === 'boolean') ? p.nhs_contracted : null;
     const marker = L.marker([p.lat, p.lng], {icon: mkDentalIcon()});
     const imdBadge = p.imd_decile ? `<div class="pop-row"><span class="pop-key">IMD</span><span>Decile ${p.imd_decile}</span></div>` : '';
-    const typeBadge = `<div class="pop-row"><span class="pop-key">Type</span><span>${_dentalTypeLabel(nhs)}</span></div>`;
-    marker.bindPopup(`<div class="pop-hdr" style="background:#7B2D8E">${p.name||p.n}</div><div class="pop-body"><div class="pop-addr">${p.postcode||p.pc||'—'}</div>${typeBadge}${imdBadge}</div>`);
-    marker.bindTooltip((p.name||p.n) + ' · ' + _dentalTypeLabel(nhs), { direction: 'top', className: 'marker-tip' });
-    dentalData.push({ name: p.name||p.n, postcode: p.postcode||p.pc, lat: p.lat, lng: p.lng, nhs_contracted: nhs, marker });
+    marker.bindPopup(`<div class="pop-hdr" style="background:#7B2D8E">${p.name||p.n}</div><div class="pop-body"><div class="pop-addr">${p.postcode||p.pc||'—'}</div>${imdBadge}</div>`);
+    marker.bindTooltip((p.name||p.n), { direction: 'top', className: 'marker-tip' });
+    dentalData.push({ name: p.name||p.n, postcode: p.postcode||p.pc, lat: p.lat, lng: p.lng, marker });
   });
-  _applyDentalFilter(); // loads markers into the cluster honouring the current filter
+  _applyDentalFilter();
   console.log(`Loaded ${dentalData.length} dental practices`);
 }
-// Apply the current NHS/private filter. 'all' → every marker in the cluster;
-// 'nhs' → only nhs_contracted === true; 'private' → only nhs_contracted === false.
-// (Records with null nhs_contracted are treated as non-NHS for the private view.)
+// Kept as the single place that populates the cluster and the count, because
+// the borough focus still calls it.
 function _applyDentalFilter() {
   if (!Array.isArray(dentalData)) return;
   dentalCluster.clearLayers();
   let n = 0;
-  dentalData.forEach(d => {
-    const keep =
-      dentalContractFilter === 'all' ? true :
-      dentalContractFilter === 'nhs' ? d.nhs_contracted === true :
-      dentalContractFilter === 'private' ? d.nhs_contracted !== true : true;
-    if (keep) { dentalCluster.addLayer(d.marker); n++; }
-  });
+  dentalData.forEach(d => { dentalCluster.addLayer(d.marker); n++; });
   const countEl = document.getElementById('dental-count');
   if (countEl) countEl.textContent = n;
 }
@@ -4364,7 +4348,7 @@ window.generateWardReport = function(wn) {
     <div class="locations-grid">
       ${_locBlock('GP practices',         gps,      g => `<strong>${_esc(g.name||'')}</strong> <span class="meta">${_esc(g.addr||'')}${g.postcode?' · '+_esc(g.postcode):''}${g.tel?' · '+_esc(g.tel):''}</span>`)}
       ${_locBlock('Pharmacies',           phs,      p => `<strong>${_esc(p.name||'')}</strong> <span class="meta">${_esc(p.addr||'')}${p.postcode?' · '+_esc(p.postcode):''}</span>`)}
-      ${_locBlock('Dental practices',     _dental,  d => `<strong>${_esc(d.name||'')}</strong> <span class="meta">${d.postcode?_esc(d.postcode):''}${d.nhs_contracted===true?' · NHS/mixed':d.nhs_contracted===false?' · Private':''}</span>`)}
+      ${_locBlock('Dental practices',     _dental,  d => `<strong>${_esc(d.name||'')}</strong> <span class="meta">${d.postcode?_esc(d.postcode):''}</span>`)}
       ${_locBlock('Hospitals & clinics',  _hosp,    h => `<strong>${_esc(h.n||'')}</strong> <span class="meta">${_esc(h.a||'')}${h.t?' · '+_esc(h.t):''}${h.trust?' · '+_esc(h.trust):''}</span>`, 'span-2')}
       ${_locBlock('Schools',              _schools, s => `<strong>${_esc(s.name||'')}</strong> <span class="meta">${s.phase?_esc(s.phase):''}${s.type?' · '+_esc(s.type):''}${s.postcode?' · '+_esc(s.postcode):''}${s.pupils?' · '+s.pupils+' pupils':''}${s.fsm_pct?' · FSM '+s.fsm_pct+'%':''}</span>`, 'span-2')}
       ${_locBlock('Community centres',    _cc,      c => `<strong>${_esc(c.name||'')}</strong> <span class="meta">${_esc(c.address||'')}${c.postcode?' · '+_esc(c.postcode):''}</span>`)}
@@ -4767,18 +4751,6 @@ function _setVcseLayerVisible(on) {
   if (vt) vt.addEventListener('change', e => _setVcseLayerVisible(e.target.checked));
 }
 document.getElementById('td').addEventListener('change',  e => e.target.checked ? dentalCluster.addTo(map) : map.removeLayer(dentalCluster));
-// Dental NHS / private filter. Updates `dentalContractFilter` + re-applies
-// cluster membership + count. Also ensures the cluster is on the map if the
-// user changes the filter while the 'td' toggle is off (so changing the
-// filter doesn't force the layer on) — we only re-apply, we don't toggle.
-(function(){
-  const sel = document.getElementById('dental-contract-filter');
-  if (!sel) return;
-  sel.addEventListener('change', e => {
-    dentalContractFilter = (e.target.value || 'all');
-    if (typeof _applyDentalFilter === 'function') _applyDentalFilter();
-  });
-})();
 document.getElementById('tph').addEventListener('change', e => e.target.checked ? pharmCluster.addTo(map) : map.removeLayer(pharmCluster));
 
 // ── Civic & education layer toggles (GLA ESOL Planning Map) ──
@@ -5648,7 +5620,7 @@ window.generateLSOAReport = function(code) {
     <div class="locations-grid">
       ${_locBlock('GP practices',         _gp,      g => `<strong>${_esc(g.n||g.name||'')}</strong> <span class="meta">${_esc(g.a||g.addr||'')}${g.pc?' · '+_esc(g.pc):''}</span>`)}
       ${_locBlock('Pharmacies',           _pharm,   p => `<strong>${_esc(p.name||p.n||'')}</strong> <span class="meta">${_esc(p.addr||p.a||'')}${p.postcode||p.pc?' · '+_esc(p.postcode||p.pc):''}</span>`)}
-      ${_locBlock('Dental practices',     _dental,  d => `<strong>${_esc(d.name||'')}</strong> <span class="meta">${d.postcode?_esc(d.postcode):''}${d.nhs_contracted===true?' · NHS/mixed':d.nhs_contracted===false?' · Private':''}</span>`)}
+      ${_locBlock('Dental practices',     _dental,  d => `<strong>${_esc(d.name||'')}</strong> <span class="meta">${d.postcode?_esc(d.postcode):''}</span>`)}
       ${_locBlock('Hospitals & clinics',  _hosp,    h => `<strong>${_esc(h.n||'')}</strong> <span class="meta">${_esc(h.a||'')}${h.t?' · '+_esc(h.t):''}</span>`, 'span-2')}
       ${_locBlock('Schools',              _schools, s => `<strong>${_esc(s.name||'')}</strong> <span class="meta">${s.phase?_esc(s.phase):''}${s.type?' · '+_esc(s.type):''}${s.postcode?' · '+_esc(s.postcode):''}${s.pupils?' · '+s.pupils+' pupils':''}${s.fsm_pct?' · FSM '+s.fsm_pct+'%':''}</span>`, 'span-2')}
       ${_locBlock('Community centres',    _cc,      c => `<strong>${_esc(c.name||'')}</strong> <span class="meta">${_esc(c.address||'')}${c.postcode?' · '+_esc(c.postcode):''}</span>`)}
@@ -7118,8 +7090,8 @@ function _downloadPointLayersCsv() {
     {
       id: 'td', name: 'dental-practices',
       data: typeof dentalData !== 'undefined' ? dentalData : null,
-      header: ['name','postcode','nhs_contracted','lat','lng'],
-      row: r => [r.name, r.postcode||'', r.nhs_contracted===true?'Y':r.nhs_contracted===false?'N':'', r.lat, r.lng],
+      header: ['name','postcode','lat','lng'],
+      row: r => [r.name, r.postcode||'', r.lat, r.lng],
     },
     {
       id: 'tv', name: 'vcse-organisations',

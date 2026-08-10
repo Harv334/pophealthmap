@@ -17,6 +17,11 @@ var ASSISTANT_ENDPOINT = "https://pophealthmapai.sevilleharvey.workers.dev";
 
   var MAX_TOOL_ROUNDS = 5; // model -> tools -> model, bounded so it cannot loop
 
+  // Shown to the user, and enforced by the Worker. If you change DAILY_CAP in
+  // worker/src/index.js, change this too: the panel promising one number while
+  // the server enforces another is worse than not mentioning it at all.
+  var DAILY_CAP = 40;
+
   // ---- data access -------------------------------------------------------
   // Read straight from the globals the map already populated.
 
@@ -117,20 +122,23 @@ var ASSISTANT_ENDPOINT = "https://pophealthmapai.sevilleharvey.workers.dev";
    */
   var FT_META = {
     ft_life_expectancy_male: ["Life expectancy at birth (male)", "years"],
+    ft_life_expectancy_female: ["Life expectancy at birth (female)", "years"],
     ft_healthy_life_expectancy_male: ["Healthy life expectancy at birth (male)", "years"],
-    ft_smoking_prevalence_adults: ["Smoking prevalence in adults (18+)", "%"],
-    ft_obesity_year6: ["Year 6 obesity, including severe", "%"],
+    ft_healthy_life_expectancy_female: ["Healthy life expectancy at birth (female)", "years"],
+    ft_smoking_prevalence_adults: ["Smoking prevalence in adults (18+), current smokers", "%"],
+    ft_obesity_adults: ["Overweight including obesity prevalence in adults", "%"],
+    ft_obesity_year6: ["Year 6 obesity, including severe obesity", "%"],
+    ft_physical_activity_adults: ["Physically active adults", "%"],
     ft_hypertension_qof: ["Hypertension: QOF prevalence", "%"],
-    ft_depression_qof: ["Depression: QOF prevalence (18+)", "%"],
-    ft_severe_mental_illness_qof: ["Severe mental illness: QOF prevalence", "%"],
-    ft_suicide_rate: ["Suicide rate, age standardised", "per 100,000"],
-    ft_child_poverty_low_income: ["Children in low-income families (under 16)", "%"],
-    ft_a_e_attendance_under_5: ["A&E attendances, ages 0 to 4", null],
-    ft_mmr_2_doses_age5: ["MMR, two doses by age 5", "%"],
-    ft_flu_vaccination_65plus: ["Flu vaccination uptake (65+)", "%"],
-    ft_cervical_screening_25_49: ["Cervical screening coverage (25 to 49)", "%"],
-    ft_fuel_poverty_lihc: ["Fuel poverty, low income high cost", "%"],
-    ft_gp_patient_satisfaction: ["GP patient satisfaction", "%"],
+    ft_depression_qof: ["Depression: QOF prevalence", "%"],
+    ft_mental_health_qof: ["Mental health: QOF prevalence", "%"],
+    ft_suicide_rate: ["Suicide rate", "per 100,000"],
+    ft_child_poverty_low_income: ["Children in relative low income families (under 16)", "%"],
+    ft_self_harm_admissions_10_24: ["Hospital admissions for self-harm (10 to 24)", "per 100,000"],
+    ft_a_e_attendance_under_5: ["A&E attendances, ages 0 to 4", "per 1,000"],
+    ft_mmr_2_doses_age5: ["Vaccination coverage: MMR two doses at 5 years", "%"],
+    ft_flu_vaccination_65plus: ["Vaccination coverage: flu (65 and over)", "%"],
+    ft_cervical_screening_25_49: ["Cancer screening coverage: cervical (25 to 49)", "%"],
   };
 
   /**
@@ -494,6 +502,14 @@ var ASSISTANT_ENDPOINT = "https://pophealthmapai.sevilleharvey.workers.dev";
       "in an answer is read from the data already loaded in your browser, so " +
       "nothing is uploaded and no number is written from memory.";
     log.appendChild(intro);
+
+    // Say the limit up front. It is a shared, funded service, and finding out
+    // it is capped by being refused mid-question is a worse way to learn it.
+    var limit = document.createElement("div");
+    limit.className = "ai-note";
+    limit.textContent = "This is a free service with running costs, so questions "
+      + "are limited to " + DAILY_CAP + " a day per user. The map itself is unlimited.";
+    log.appendChild(limit);
 
     var chips = document.createElement("div");
     chips.className = "ai-examples";

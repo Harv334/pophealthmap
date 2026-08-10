@@ -1099,7 +1099,7 @@ def run_boundaries() -> pd.DataFrame:
 
 
 # ============================================================================
-# SOURCE 2b: Dental practices  (NHS ODS egdpprac + curated private practices)
+# SOURCE 2b: Dental practices  (NHS ODS egdpprac)
 # ============================================================================
 # ODS is the base: it is the authoritative register, refreshes monthly and
 # covers the whole country, so it scales to any footprint. It only holds
@@ -1110,7 +1110,7 @@ def run_boundaries() -> pd.DataFrame:
 CURATED_DENTAL = REPO_ROOT / "data" / "curated" / "dental_practices_curated.json"
 
 def run_dentists() -> pd.DataFrame:
-    rule("Dental practices (NHS ODS egdpprac + curated)")
+    rule("Dental practices (NHS ODS egdpprac)")
     cache_dir = CACHE_DIR / "dentists"
     cache_dir.mkdir(parents=True, exist_ok=True)
     cache = cache_dir / "egdpprac.csv"
@@ -1150,41 +1150,22 @@ def run_dentists() -> pd.DataFrame:
         }
     n_ods = len(by_pc)
 
-    # Merge the curated list in on postcode, not on name. ODS frequently records
-    # a generic trading name ("DENTAL SURGERY", "DENTAL PRACTICE") where the
-    # curated list has the real one, so matching on name would treat the same
-    # premises as two practices and plot it twice. Where both know a postcode,
-    # ODS is authoritative for existence and NHS status while the curated name
-    # is the more useful label, so each side contributes what it is better at.
-    n_renamed = n_curated = 0
-    if CURATED_DENTAL.exists():
-        try:
-            curated = json.loads(CURATED_DENTAL.read_text(encoding="utf-8"))
-        except (OSError, ValueError) as e:
-            warn(f"dentists: curated file unreadable ({e}); using ODS alone")
-            curated = []
-        for c in curated:
-            pc = normalise_postcode(c.get("postcode", ""))
-            existing = by_pc.get(pc)
-            if existing:
-                name = (c.get("name") or "").strip()
-                if name and len(name) > len(existing["name"]):
-                    existing["name"] = name
-                    existing["source"] = "ods+curated"
-                    n_renamed += 1
-            elif c.get("lat") and c.get("lng"):
-                rec = dict(c)
-                rec.setdefault("nhs_contracted", False)
-                rec["source"] = "curated"
-                by_pc[pc] = rec
-                n_curated += 1
+    # ODS only. The curated overlay used to add private practices ODS does not
+    # list, and a nhs_contracted flag to tell the two apart, which is what the
+    # map's NHS/private filter ran on. Both are gone: this layer is now exactly
+    # the NHS dental register, which is a claim the source can support on its
+    # own and which nobody has to maintain by hand.
+    #
+    # It costs the 215 private practices the overlay contributed.
+    # data/curated/dental_practices_curated.json is still in the repo, so
+    # restoring the merge is a matter of putting this block back.
     rows = list(by_pc.values())
 
     out = pd.DataFrame(rows)
     out_path = DATA_DIR / "healthcare" / "dental_practices.parquet"
     out = write_parquet_guarded(out_path, out, source="dentists")
-    ok(f"dentists: {len(out):,} practices ({n_ods:,} from ODS, "
-       f"{n_curated:,} curated) -> {out_path.relative_to(REPO_ROOT)}")
+    ok(f"dentists: {len(out):,} NHS practices from ODS -> "
+       f"{out_path.relative_to(REPO_ROOT)}")
     return out
 
 
@@ -2248,28 +2229,44 @@ def run_qof() -> pd.DataFrame:
 # ============================================================================
 # SOURCE 4: OHID Fingertips  (public health outcomes per LAD)
 # ============================================================================
+# Every id below was checked against Fingertips' own indicator metadata, by
+# name, on 10 Aug 2026. Do not add one without doing the same:
+#
+#   https://fingertips.phe.org.uk/api/indicator_metadata/by_indicator_id?indicator_ids=<id>
+#
+# The previous table had eleven of fifteen pointing at the wrong indicator, and
+# nothing caught it because a wrong indicator still returns plausible numbers.
+# Hypertension prevalence published as "smoking prevalence" was 10.8%, which is
+# an entirely believable smoking rate. Five more ids did not exist at all and
+# returned an empty CSV, which was cached as if it were a valid answer.
+#
+# Life expectancy and healthy life expectancy carry both sexes in one
+# indicator, so the same id appears twice and the Sex column below picks which.
 FINGERTIPS_INDICATORS = [
     # id, short_name, description
-    (90366, "life_expectancy_male",        "Life expectancy at birth (Male)"),
-    (90367, "life_expectancy_female",      "Life expectancy at birth (Female)"),
-    (92901, "healthy_life_expectancy_male","Healthy life expectancy at birth (Male)"),
-    (92902, "healthy_life_expectancy_female","Healthy life expectancy at birth (Female)"),
-    (  219, "smoking_prevalence_adults",   "Smoking prevalence in adults (18+)"),
-    (90640, "obesity_adults",              "Adults overweight or obese"),
-    (90323, "obesity_year6",               "Year 6: obesity (incl. severe)"),
-    (92588, "physical_activity_adults",    "Physically active adults"),
-    (  241, "hypertension_qof",            "Hypertension: QOF prevalence"),
-    (  848, "depression_qof",              "Depression: QOF prevalence (18+)"),
-    (41001, "suicide_rate",                "Suicide rate (age standardised)"),
-    (90813, "severe_mental_illness_qof",   "Severe mental illness: QOF prevalence"),
-    (30307, "child_poverty_low_income",    "Children in low-income families (under 16)"),
-    (91142, "self_harm_admissions_10_24",  "Self-harm admissions (10-24 yrs)"),
-    (30315, "a_e_attendance_under_5",      "A&E attendances (0-4 yrs)"),
-    (30309, "mmr_2_doses_age5",            "MMR 2 doses at 5 yrs"),
-    (91361, "flu_vaccination_65plus",      "Flu vaccination (65+)"),
-    (22001, "cervical_screening_25_49",    "Cervical screening (25-49)"),
-    (93701, "fuel_poverty_lihc",           "Fuel poverty (LIHC)"),
-    (90282, "gp_patient_satisfaction",     "GP patient satisfaction"),
+    (90366, "life_expectancy_male",          "Life expectancy at birth (male)"),
+    (90366, "life_expectancy_female",        "Life expectancy at birth (female)"),
+    (90362, "healthy_life_expectancy_male",  "Healthy life expectancy at birth (male)"),
+    (90362, "healthy_life_expectancy_female","Healthy life expectancy at birth (female)"),
+    (92443, "smoking_prevalence_adults",     "Smoking prevalence in adults (18+), current smokers (APS)"),
+    (93088, "obesity_adults",                "Overweight including obesity prevalence in adults"),
+    (90323, "obesity_year6",                 "Year 6 prevalence of obesity, including severe obesity"),
+    (93014, "physical_activity_adults",      "Percentage of physically active adults"),
+    (  219, "hypertension_qof",              "Hypertension: QOF prevalence"),
+    (  848, "depression_qof",                "Depression: QOF prevalence"),
+    (90581, "mental_health_qof",             "Mental health: QOF prevalence"),
+    (41001, "suicide_rate",                  "Suicide rate"),
+    (93700, "child_poverty_low_income",      "Children in relative low income families (under 16)"),
+    (90813, "self_harm_admissions_10_24",    "Hospital admissions as a result of self-harm (10 to 24 years)"),
+    (93930, "a_e_attendance_under_5",        "A&E attendances (0 to 4 years)"),
+    (30311, "mmr_2_doses_age5",              "Vaccination coverage: MMR two doses (5 years old)"),
+    (30314, "flu_vaccination_65plus",        "Vaccination coverage: flu (65 and over)"),
+    (93560, "cervical_screening_25_49",      "Cancer screening coverage: cervical (25 to 49)"),
+    # Dropped rather than guessed at:
+    #   fuel poverty  - DESNZ LILEE is already fetched by run_fuel_poverty, at
+    #                   LSOA level, which is finer than anything here.
+    #   GP patient satisfaction - no indicator of that name could be confirmed,
+    #                   and a plausible-looking guess is what caused this mess.
 ]
 
 def run_fingertips() -> pd.DataFrame:
@@ -2291,6 +2288,16 @@ def run_fingertips() -> pd.DataFrame:
             try:
                 r = requests.get(url, timeout=30)
                 r.raise_for_status()
+                # A non-existent indicator id answers 200 with a header row and
+                # nothing under it. Caching that makes the gap permanent: the
+                # file exists, so no rerun ever asks again, and the indicator
+                # is simply absent from the map with nothing to say why. Five
+                # of them sat like that until someone counted the outputs.
+                if len(r.content.splitlines()) < 2:
+                    warn(f"fingertips {ind_id} ({short}): no rows returned; "
+                         f"not caching. Check the id exists and is published "
+                         f"for area type {AREA_TYPE_LA}.")
+                    continue
                 cache.write_bytes(r.content)
                 time.sleep(1.0)  # be polite
             except Exception as e:
@@ -2302,6 +2309,18 @@ def run_fingertips() -> pd.DataFrame:
             continue
         if df.empty or "Area Code" not in df.columns:
             continue
+
+        # Check the id is the indicator we think it is. An id that points at
+        # the wrong indicator returns a full, valid, plausible set of numbers
+        # under our own label, which is the one failure mode nothing else here
+        # can catch: hypertension prevalence published as smoking prevalence
+        # was 10.8%, and looked entirely reasonable, for months.
+        if "Indicator Name" in df.columns and not df["Indicator Name"].empty:
+            actual = str(df["Indicator Name"].iloc[0])
+            stem = re.sub(r"[^a-z]", "", desc.lower())[:14]
+            if stem and stem not in re.sub(r"[^a-z]", "", actual.lower()):
+                warn(f"fingertips {ind_id}: asked for {desc!r} but the data is "
+                     f"{actual!r}. Verify the id before trusting this column.")
         df = df[df["Area Code"].isin(SCOPE_LADS)]
         if df.empty:
             continue
