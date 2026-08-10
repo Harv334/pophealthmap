@@ -1104,8 +1104,11 @@
 
   </div>
 
+  <!-- The source list moved out of here; it is going somewhere with room to
+       credit each source properly. #src-lbl stays because it is also where a
+       failed ward_data.json load reports itself, and it is empty otherwise. -->
   <div class="sbar">
-    <span id="src-lbl">Loading...</span>
+    <span id="src-lbl"></span>
     <span id="data-date"></span>
   </div>
 
@@ -6959,22 +6962,43 @@ function _downloadOverlayCsv() {
     const scope         = (typeof lsoaScope !== 'undefined') ? lsoaScope : 'all';
     let nKept = 0, nSkipped = 0;
     if (wantLsoa && typeof LSOA_DATA !== 'undefined') {
+      // LSOA_DATA holds indicators and nothing else: it is keyed by LSOA code
+      // and every value is a number. It has no name, ward or borough on it, so
+      // the geography has to be joined from LSOA_IMD, which is where the map's
+      // own filtering reads it. Reading it off LSOA_DATA gave blank columns on
+      // every row, and worse, made every filter match nothing at all: an
+      // export with a borough or ward selected produced no file, only the "no
+      // data matches" alert.
+      const geoByCode = {};
+      if (typeof LSOA_IMD !== 'undefined' && LSOA_IMD) {
+        for (const f of (LSOA_IMD.features || LSOA_IMD)) {
+          const p = (f && f.properties) || f;
+          if (p && p.code) geoByCode[p.code] = p;
+        }
+      }
       const header = ['lsoa_code','lsoa_name','ward','borough','imd_decile','core20'];
       if (ov) header.push(ov);
       rows.push(header.map(_csvEscape).join(','));
       for (const [code, l] of Object.entries(LSOA_DATA)) {
         const ind = l.indicators || l;
-        const ward = l.ward || l.ward_name || '';
-        const lad  = l.lad  || l.borough   || '';
+        const g = geoByCode[code] || {};
+        const ward = g.ward || '';
+        const lad  = g.borough || '';
         if (boroughFilter && lad !== boroughFilter) { nSkipped++; continue; }
         if (scope && scope !== 'all') {
           if (scope.startsWith('ward:') && ward !== scope.slice(5)) { nSkipped++; continue; }
-          if (scope.startsWith('nb:')   && l.nbhd !== scope.slice(3) && l.neighbourhood !== scope.slice(3)) { nSkipped++; continue; }
+          if (scope.startsWith('nb:')) {
+            // Neighbourhoods are defined as lists of ward names, so an LSOA's
+            // neighbourhood is its ward's. There is no field to read.
+            const nk = (ward && typeof nbhdOf === 'function') ? nbhdOf(ward) : null;
+            if (nk !== scope.slice(3)) { nSkipped++; continue; }
+          }
         }
-        const dec = l.imd_decile != null ? l.imd_decile : (ind.imd_decile != null ? ind.imd_decile : '');
+        const dec = ind.imd_decile != null ? ind.imd_decile
+                  : (g.imd_decile != null ? g.imd_decile : '');
         const isCore20 = (dec === 1 || dec === 2);
         if (core20Only && !isCore20) { nSkipped++; continue; }
-        const row = [code, l.name||'', ward, lad, dec, isCore20 ? 'Y' : ''];
+        const row = [code, g.name||'', ward, lad, dec, isCore20 ? 'Y' : ''];
         if (ov) row.push(ind[resolveOvField(ov)]);
         rows.push(row.map(_csvEscape).join(','));
         nKept++;
@@ -6983,12 +7007,20 @@ function _downloadOverlayCsv() {
       const header = ['ward_code','ward_name','borough','neighbourhood'];
       if (ov) header.push(ov);
       rows.push(header.map(_csvEscape).join(','));
-      for (const [code, w] of Object.entries(WARD_DATA)) {
+      for (const [key, w] of Object.entries(WARD_DATA)) {
         const lad = w.lad || w.LAD || '';
-        const nk  = w.neighbourhood || '';
+        // WARD_DATA is keyed by ward name, not code, so the loop key is a name.
+        // Writing it into a column headed ward_code published the name twice
+        // and the code never, which would quietly break any join made against
+        // it downstream. The real code is on the record.
+        const wardCode = w.code || '';
+        // Neighbourhoods are a lookup over ward-name lists, not a field on the
+        // ward. Reading w.neighbourhood gave '' for all 704, so selecting a
+        // neighbourhood and exporting returned no file at all.
+        const nk = (typeof nbhdOf === 'function' ? nbhdOf(w.name || key) : null) || '';
         if (boroughFilter && lad !== boroughFilter) { nSkipped++; continue; }
         if (nbhdFilter    && nk  !== nbhdFilter)    { nSkipped++; continue; }
-        const row = [code, w.name||'', lad, nk];
+        const row = [wardCode, w.name || key, lad, nk];
         if (ov) row.push(w.indicators ? w.indicators[resolveOvField(ov)] : '');
         rows.push(row.map(_csvEscape).join(','));
         nKept++;
@@ -7796,33 +7828,22 @@ async function loadData() {
 
     const meta     = json.metadata || {};
     const dateStr  = meta.generated || '';
-    const sourceStr = Object.values(meta.sources || {}).join(' · ');
 
-    // Count real data points
-    let realPoints = 0;
-    for (const ward of Object.values(wards)) {
-      for (const v of Object.values(ward.indicators || {})) {
-        if (v !== null && v !== '' && v !== undefined && typeof v !== 'string') realPoints++;
-      }
-    }
-
-    document.getElementById('src-lbl').textContent =
-      `Data: police.uk (crime) · NHS Digital ODS (GP) · OHID Fingertips (health) · ONS Census 2021 · Westminster One Directory (VCSE)`;
-    const pointsLabel =
-      `${realPoints} real data points across ${Object.keys(wards).length} wards`;
-
+    // The bar carries the freshness date and nothing else now. The source list
+    // is being given a proper home, and the data-point count was a measure of
+    // how much data exists rather than anything a reader can act on.
     const setFreshness = (iso) => {
       const el = document.getElementById('data-date');
       if (!el) return;
-      let suffix = '';
+      let label = '';
       if (iso) {
         const d = new Date(iso);
         if (!isNaN(d.getTime())) {
-          suffix = ' · Data updated: ' + d.toLocaleDateString('en-GB',
+          label = 'Data updated: ' + d.toLocaleDateString('en-GB',
             { day: 'numeric', month: 'short', year: 'numeric' });
         }
       }
-      el.textContent = pointsLabel + suffix;
+      el.textContent = label;
     };
 
     // Render straight away from ward_data.json, then upgrade to the pipeline's
