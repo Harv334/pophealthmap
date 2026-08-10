@@ -339,6 +339,26 @@
       padding:0 3px;vertical-align:middle;margin-left:2px}
     .cov-note{font-size:10px;line-height:1.35;color:#8a5a00;background:#fdf0d5;
       border:1px solid #e8d3a3;border-radius:4px;padding:4px 6px;margin:2px 0 5px}
+
+    /* Development status. The app is a fixed 100vh grid, so anything in the
+       document flow pushes the map out of the viewport. Both of these are
+       overlays or inline, and neither changes the layout.
+       The header badge cannot be dismissed: the caveat should outlive the
+       banner, because a figure read off this map is quotable either way. */
+    .dev-badge{display:inline-block;vertical-align:middle;margin-left:8px;
+      font-size:9.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;
+      color:#8a5a00;background:#fdf0d5;border:1px solid #e8d3a3;
+      border-radius:3px;padding:1px 5px}
+    #dev-banner{position:fixed;left:50%;transform:translateX(-50%);bottom:14px;
+      z-index:1200;max-width:min(620px,calc(100vw - 28px));
+      display:flex;align-items:flex-start;gap:10px;
+      background:#1a1a1a;color:#fff;border-radius:8px;padding:11px 13px;
+      font-size:12.5px;line-height:1.45;box-shadow:0 4px 16px rgba(0,0,0,.28)}
+    #dev-banner b{font-weight:600}
+    #dev-banner .dev-x{flex:0 0 auto;background:none;border:0;color:#fff;opacity:.65;
+      cursor:pointer;font-size:16px;line-height:1;padding:0 2px;margin-left:2px}
+    #dev-banner .dev-x:hover{opacity:1}
+    @media (max-width:560px){#dev-banner{font-size:12px;bottom:8px}}
   </style>
 </head>
 <body>
@@ -349,7 +369,7 @@
   <div class="hdr">
     <div class="hdr-left">
       <div>
-        <div class="hdr-logo">London Population Health Mapping</div>
+        <div class="hdr-logo">London Population Health Mapping<span class="dev-badge" title="This tool is still in development">In development</span></div>
         <div class="hdr-sub" title="Click a ward to open its profile · use the Overlay tab to colour the map by an indicator · the VCSE tab maps charities and Community Interest Companies">Click a ward for its profile · pick an Overlay to colour-code · point layers in the sidebar</div>
       </div>
     </div>
@@ -7731,6 +7751,27 @@ loadData();
       clearInterval(ivl);  // give up after ~30s
     }
   }, 500);
+})();
+</script>
+
+<div id="dev-banner" role="status" hidden>
+  <div><b>This tool is in development.</b> The data is real and comes from published
+  sources, but the map is still being built and checked, so treat figures as
+  provisional. There will be an announcement when it is ready for general release.</div>
+  <button class="dev-x" type="button" aria-label="Dismiss">&times;</button>
+</div>
+<script>
+(function () {
+  var el = document.getElementById('dev-banner');
+  if (!el) return;
+  // sessionStorage, not localStorage: dismissing it should quieten this visit,
+  // not hide the caveat from someone returning weeks later.
+  try { if (sessionStorage.getItem('devBannerDismissed')) return; } catch (e) {}
+  el.hidden = false;
+  el.querySelector('.dev-x').addEventListener('click', function () {
+    el.hidden = true;
+    try { sessionStorage.setItem('devBannerDismissed', '1'); } catch (e) {}
+  });
 })();
 </script>
 
