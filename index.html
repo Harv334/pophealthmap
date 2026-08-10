@@ -370,7 +370,10 @@
       color:#8a5a00;background:#fdf0d5;border:1px solid #e8d3a3;
       border-radius:3px;padding:1px 5px}
     #dev-banner{position:fixed;left:50%;transform:translateX(-50%);bottom:14px;
-      z-index:1200;max-width:min(620px,calc(100vw - 28px));
+      /* Above the mode panel (3500). It applies to the whole tool, not just
+         the map, and at 1200 it was half covered rather than hidden, which
+         looked like a rendering fault. */
+      z-index:3600;max-width:min(620px,calc(100vw - 28px));
       display:flex;align-items:flex-start;gap:10px;
       background:#212B32;color:#fff;border-radius:8px;padding:11px 13px;
       font-size:12.5px;line-height:1.45;box-shadow:0 4px 16px rgba(0,0,0,.28)}
@@ -488,6 +491,34 @@
     cursor: pointer; background: var(--nhs-blue); color: #fff; border: 1px solid var(--nhs-blue);
     border-radius: 8px; padding: 8px 15px; }
   .mode-back:hover { background: var(--nhs-dark); border-color: var(--nhs-dark); }
+
+  /* Ask mode. The assistant mounts in here rather than floating over the map. */
+  .mode-chat { background: var(--paper); border: 1px solid var(--line);
+    border-radius: 10px; box-shadow: var(--shadow); width: 100%; max-width: 720px;
+    max-height: 100%; display: flex; flex-direction: column; overflow: hidden; }
+  .mode-chat #ai-log { font-size: 13px; padding: 16px 18px; }
+  .mode-chat { min-height: min(420px, 100%); }
+  .mode-chat #ai-log { flex: 1 1 auto; }
+  .mode-chat .ai-msg { max-width: 100%; }
+  /* The question sits right, the answer left, so a long thread stays readable
+     as a conversation rather than a wall of alternating blocks. */
+  .mode-chat .ai-user { width: fit-content; max-width: 80%; margin-left: auto; }
+  .mode-chat .ai-bot { width: fit-content; max-width: 92%; }
+  .mode-chat #ai-form { padding: 11px 12px; }
+  .mode-chat #ai-input { flex: 1 1 auto; font: inherit; font-size: 13px;
+    padding: 9px 11px; border: 1px solid var(--line); border-radius: 8px; }
+  .mode-chat #ai-input:focus { outline: 2px solid var(--nhs-bright); outline-offset: -1px;
+    border-color: var(--nhs-bright); }
+  .mode-chat #ai-send { font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+    background: var(--nhs-blue); color: #fff; border: 1px solid var(--nhs-blue);
+    border-radius: 8px; padding: 9px 16px; }
+  .mode-chat #ai-send:hover:not(:disabled) { background: var(--nhs-dark); border-color: var(--nhs-dark); }
+  .mode-chat #ai-send:disabled { opacity: .55; cursor: default; }
+  .ai-examples { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 2px; }
+  .ai-chip { font: inherit; font-size: 12px; cursor: pointer; text-align: left;
+    background: var(--paper-2); color: var(--nhs-dark); border: 1px solid var(--line);
+    border-radius: 14px; padding: 6px 11px; }
+  .ai-chip:hover { background: #E5EFF8; border-color: var(--nhs-aqua); }
 </style>
 </head>
 <body>
@@ -532,6 +563,7 @@
       <ul id="mode-points"></ul>
       <button type="button" class="mode-back">Back to the map</button>
     </div>
+    <div class="mode-chat" id="mode-chat" hidden></div>
   </div>
 
   <div class="main">
@@ -7923,6 +7955,8 @@ loadData();
 })();
 </script>
 
+<!-- Loaded before the rail script, which asks it whether Ask is live yet. -->
+<script src="data/map/assistant.js"></script>
 <script>
 /* Mode rail.
  *
@@ -7977,12 +8011,29 @@ loadData();
   var descEl = document.getElementById('mode-desc');
   var pointsEl = document.getElementById('mode-points');
 
+  var chat = document.getElementById('mode-chat');
+  var card = panel.querySelector('.mode-card');
+
   function show(mode) {
     var m = MODES[mode];
     rail.querySelectorAll('.mode-btn').forEach(function (b) {
       b.setAttribute('aria-selected', String(b.dataset.mode === (m ? mode : 'explore')));
     });
     if (!m) { panel.hidden = true; return; }
+
+    // Ask is the one mode with something behind it. It is live only once the
+    // Worker is deployed and assistant.js has an endpoint; until then it falls
+    // through to the placeholder card rather than mounting a chat box that
+    // could not answer anything.
+    var live = mode === 'query' && window.PH_ASSISTANT && window.PH_ASSISTANT.configured;
+    card.hidden = live;
+    chat.hidden = !live;
+    if (live) {
+      window.PH_ASSISTANT.mount(chat);
+      panel.hidden = false;
+      return;
+    }
+
     titleEl.textContent = m.title;
     descEl.textContent = m.desc;
     pointsEl.textContent = '';
@@ -8003,7 +8054,13 @@ loadData();
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && !panel.hidden) show('explore');
   });
+
+  // Drop the Soon badge from Ask once the Worker is wired up, so the rail
+  // stops advertising a mode that has in fact arrived.
+  if (window.PH_ASSISTANT && window.PH_ASSISTANT.configured) {
+    var badge = rail.querySelector('[data-mode="query"] .mode-soon');
+    if (badge && badge.parentNode) badge.parentNode.removeChild(badge);
+  }
 })();
 </script>
-<script src="data/map/assistant.js"></script>
 </body></html>

@@ -30,6 +30,11 @@ Rules that matter:
 - Deprivation deciles run 1 (most deprived) to 10 (least deprived). Say which
   direction you mean; readers routinely get this backwards.
 - Rates and percentages are not counts. Do not add percentages together.
+- Some indicators are published at borough level and repeated for every ward in
+  that borough. Tool results mark these, with published_at, with
+  borough_level_indicators, or with a caveat. When one appears, say the figure
+  is a borough figure. Never present it as a difference between wards, and do
+  not rank wards by it: the ordering would be an artefact, not a finding.
 - These are area statistics. They describe places, not individuals, and a
   ward-level figure says nothing about any particular person in it.
 - If asked something outside this data (medical advice, individual patients,
