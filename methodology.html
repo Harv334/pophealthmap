@@ -74,7 +74,7 @@ map rather than instead of it.</p>
 
 <h2>Geographies, and which year each one is from</h2>
 
-<p>The three geographies on the map come from different censuses and boundary
+<p>The four geographies on the map come from different censuses and boundary
 reviews. They do not nest inside one another, and that has consequences worth
 understanding before comparing them.</p>
 
@@ -88,9 +88,17 @@ understanding before comparing them.</p>
   <tr><td>LSOA</td><td>2021 census</td><td>4,994</td>
       <td>ONS <code>Lower_layer_Super_Output_Areas_December_2021_..._BGC_V5</code></td></tr>
   <tr><td>MSOA</td><td>2021 census</td><td>1,002</td>
-      <td>Used for aggregation only, not drawn</td></tr>
+      <td>ONS <code>Middle_layer_Super_Output_Areas_December_2021_..._BGC_V3</code></td></tr>
 </table>
 </div>
+
+<p>MSOAs can now be drawn as well as aggregated through. They are a layer of
+their own in the sidebar rather than a third position on the ward and LSOA
+switch, because they nest into neither: an MSOA is built from whole LSOAs, but
+41% of LSOAs cross a ward line, so an MSOA edge agreeing with a ward edge is a
+coincidence rather than a rule. The layer is fetched only when you switch it on.
+An MSOA is in scope when at least one of its LSOAs is, which is the same
+definition the rest of the pipeline works to.</p>
 
 <p>All boundary layers are the <strong>BGC</strong> generalisation: simplified to
 20 metres and clipped to the coastline. Keeping them at the same generalisation
@@ -180,13 +188,72 @@ value is left missing rather than filled from a neighbour.</p>
       no Local Health indicators. They are tiny and share very few LSOAs between
       them, so there is nothing to aggregate. This is a property of the
       geography, not a fetch failure.</li>
-  <li><strong>Five layers cover North West London only</strong> — schools,
+  <li><strong>Five layers cover North West London only</strong>: schools,
       community centres, libraries, ESOL providers and CICs. They are badged
       NWL on the map. Blank elsewhere means not yet collected, not none.</li>
   <li><strong>Suppressed values.</strong> Fingertips withholds MSOA figures
       where small counts could identify individuals. A ward with no fill may be
       suppressed rather than zero.</li>
 </ul>
+
+<h2>Query: how a filter is evaluated</h2>
+
+<p>Query mode asks for wards meeting several conditions at once. Everything runs
+in your browser against the data already on the page, so nothing is uploaded and
+no request is made while you build a filter.</p>
+
+<p>A ward matches when it satisfies <em>every</em> part: it contains at least one
+of each service ticked, it sits in the borough chosen, and it meets all of the
+indicator conditions. Ticking no services places no service condition at all,
+rather than requiring a ward to have none.</p>
+
+<h3>Where the service counts come from</h3>
+
+<table>
+  <tr><th>Service</th><th>Counted by</th></tr>
+  <tr><td>Pharmacies</td>
+      <td>The pipeline's own <code>pharmacy_count</code> ward indicator</td></tr>
+  <tr><td>Schools, libraries, community centres</td>
+      <td>The ward code the source file already carries</td></tr>
+  <tr><td>GP practices, hospitals, dental practices, ESOL providers, CICs</td>
+      <td>A spatial test of the point against the ward polygon</td></tr>
+</table>
+
+<p>These will not always agree with a count made a different way. A point sitting
+just inside a boundary is attributed by where it falls, and a service used by a
+neighbouring ward is still counted in the ward it stands in. Where the pipeline
+already publishes a count, that figure is used rather than a second one being
+derived, so the query and the ward profile cannot disagree about the same ward.</p>
+
+<h3>Missing is not zero</h3>
+
+<p>A ward with no figure for one of your conditions cannot pass it and cannot
+fail it, so it is left out of the results and the number left out is reported
+underneath them. A filter that silently discarded the areas it could not judge
+would hand back a shorter list as though it were the whole answer.</p>
+
+<p>Conditions on the borough-level Fingertips set are flagged as you build them.
+Filtering wards on a figure that is identical for every ward in a borough selects
+whole boroughs, and the panel says so rather than letting the result imply a
+distinction that is not in the data.</p>
+
+<h2>Compare: what the colours claim</h2>
+
+<p>Compare pins up to four wards and lines them up on the metrics you choose.
+On each row the highest and lowest of the pinned values are marked with a
+triangle, and coloured green for the better end and red for the worse.</p>
+
+<p>The colour follows the indicator, not the size of the number. The highest IMD
+decile is the <em>least</em> deprived tenth and the highest life expectancy is
+the best outcome, so colouring the largest value red would state the opposite of
+the truth on those rows. For the Local Health set the direction is OHID's own
+published RAG polarity, carried through from the source. For the deprivation
+family it follows the scale: scores rise with deprivation, deciles fall with it.</p>
+
+<p>Where an indicator has no better or worse end, the row is marked but left
+uncoloured, and the key names which rows those are. A high share of residents
+over 65, or in social renting, or of any ethnic group, is a fact about who lives
+there rather than a good or bad result, and the map does not colour it as one.</p>
 
 <h2>The question panel</h2>
 
@@ -195,9 +262,14 @@ browser runs them against the JSON already loaded on the page, so every figure
 in an answer is the same number the map is drawing, nothing is uploaded, and
 the model cannot invent a statistic because it has none in its context.</p>
 
-<p>It can still describe a correct figure incorrectly, which is why answers
-carry a note asking you to verify anything you intend to act on. Questions are
-capped per user per day because the service has running costs.</p>
+<p>It can still describe a correct figure incorrectly, which is why the panel
+carries a standing note asking you to verify anything you intend to act on.</p>
+
+<p>Questions are capped at <strong>10 a day per person</strong> because the
+service has running costs. The count is enforced by the server against your IP
+address and resets at midnight UTC; the panel shows what you have left beside
+its title. The map itself, including Query and Compare, is unlimited: those run
+entirely in your browser and cost nothing to serve.</p>
 
 <h2>Rebuilding this</h2>
 

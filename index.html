@@ -725,14 +725,24 @@
     color: var(--ink); font-variant-numeric: tabular-nums; flex-shrink: 0; }
   /* The point of a comparison is which one is the outlier, so say so rather
      than leaving four columns of digits to be read against each other. */
-  /* Marked, not coloured. Red for the highest would be a judgement, and it is
-     the wrong one half the time: a high IMD decile is the least deprived and a
-     high life expectancy is the best. Which end is good depends on the row, so
-     the marker says which end it is and the legend says the rest. */
+  /* Red is worse and green is better, not red is bigger.
+     Colouring the largest number red is the wrong claim half the time: the
+     highest IMD decile is the least deprived tenth and the highest life
+     expectancy is the best outcome on the row. So the colour follows the
+     indicator's own polarity, which for the Local Health series is OHID's
+     published RAG direction, and rows with no better or worse end stay
+     uncoloured rather than being given one.
+     The triangles stay regardless, so which value is highest is never carried
+     by colour alone. */
   .cmp-card .cmp-c-row .v.hi::after { content: ' \25B2'; font-size: 8px; color: var(--ink-3);
     vertical-align: 1px; }
   .cmp-card .cmp-c-row .v.lo::after { content: ' \25BC'; font-size: 8px; color: var(--ink-3);
     vertical-align: 1px; }
+  .cmp-card .cmp-c-row .v.bad  { color: #D4351C; font-weight: 600; }
+  .cmp-card .cmp-c-row .v.good { color: #00703C; font-weight: 600; }
+  .cmp-card .cmp-c-row .v.bad::after, .cmp-card .cmp-c-row .v.good::after { color: inherit; }
+  .cmp-key { display: inline-flex; align-items: center; gap: 4px; margin-right: 10px; }
+  .cmp-key i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; font-style: normal; }
   .cmp-bar .cmp-legend { font-size: 10.5px; color: var(--ink-3); margin-top: 10px; line-height: 1.45; }
 
   /* ── Query builder ────────────────────────────────────────────────────────
@@ -753,6 +763,25 @@
   .q-sub { font-size: 11px; color: var(--ink-3); line-height: 1.45; margin-bottom: 9px; }
   .q-lbl { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3);
     font-weight: 600; margin-bottom: 6px; }
+  /* Numbered steps. "Show me wards with" left the reader to guess whether the
+     chips meant at least one of each, any of them, or only those; and whether
+     picking none meant no wards or no condition. Each step now says what it
+     asks and what leaving it alone does. */
+  .q-step { display: flex; align-items: baseline; gap: 6px; font-size: 11.5px; font-weight: 600;
+    color: var(--ink); margin-bottom: 5px; }
+  .q-step-n { flex: 0 0 auto; width: 15px; height: 15px; border-radius: 50%; background: var(--nhs-blue);
+    color: #fff; font-size: 9.5px; font-weight: 700; display: inline-flex; align-items: center;
+    justify-content: center; font-family: 'JetBrains Mono', ui-monospace, monospace; }
+  .q-hint { display: block; font-size: 10.5px; font-weight: 400; color: var(--ink-3);
+    margin: 1px 0 7px 21px; line-height: 1.4; }
+  /* The whole filter, read back as one sentence. Six controls in three groups
+     is a shape, not a question; this is the question. */
+  .q-readback { margin-top: 11px; padding: 9px 11px; border-left: 3px solid var(--nhs-blue);
+    background: var(--nhs-light); border-radius: 0 6px 6px 0; font-size: 11.5px; line-height: 1.5;
+    color: var(--ink-2); }
+  .q-readback strong { color: var(--ink); font-weight: 600; }
+  .q-readback .q-rb-lbl { display: block; font-size: 9.5px; text-transform: uppercase;
+    letter-spacing: .06em; color: var(--ink-3); font-weight: 600; margin-bottom: 3px; }
   .q-sentence { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; font-size: 12px;
     color: var(--ink-2); line-height: 1.6; }
   .q-sentence .q-join { color: var(--ink-3); font-size: 11.5px; padding: 0 1px; }
@@ -1366,16 +1395,24 @@
         <div class="q-scroll">
           <div class="q-block">
             <div class="q-sub">Build a filter across every metric on the map. Wards that match are listed below and highlighted on the map.</div>
-            <div class="q-lbl">Show me wards with</div>
+            <div class="q-step"><span class="q-step-n">1</span>Which services must the ward have?</div>
+            <div class="q-hint">The ward must contain at least one of every service you tick.
+              Tick none and services are not used to filter at all.</div>
             <div class="q-sentence" id="q-services"></div>
-            <div class="q-lbl" style="margin-top:11px">In</div>
+
+            <div class="q-step" style="margin-top:12px"><span class="q-step-n">2</span>Where should it be?</div>
+            <div class="q-hint">One borough, or all 33.</div>
             <div class="q-sentence" id="q-scope"></div>
-            <div class="q-lbl" style="margin-top:11px">Where</div>
+
+            <div class="q-step" style="margin-top:12px"><span class="q-step-n">3</span>Which figures must it meet?</div>
+            <div class="q-hint">Every condition has to be true. A ward with no figure for one of
+              them is left out and counted, rather than quietly dropped.</div>
             <div id="q-conds"></div>
             <div class="q-sentence" style="margin-top:6px">
               <span class="q-chip add" id="q-add-cond">+ add a condition</span>
             </div>
             <div id="q-caution"></div>
+            <div class="q-readback" id="q-readback"></div>
           </div>
           <div class="q-acts">
             <button type="button" class="ws-btn primary" id="q-run">Run query</button>
@@ -8733,6 +8770,35 @@ loadData();
   function unitOf(k) { var m = metaOf(k); return (m && m.u) || ''; }
 
   /**
+   * A short name fit for the middle of a sentence.
+   *
+   * labelOf falls back to the OV_META description, which for the deprivation
+   * fields is a definition rather than a name: "Mean IMD decile of the LSOAs in
+   * this area, population weighted". Dropped into a readback and lowercased it
+   * came out as "mean imd decile of the lsoas in this area, population
+   * weighted is at most 3", which is not a sentence anyone would write.
+   */
+  var SHORT_LABEL = {
+    imd_decile_mean: 'mean IMD decile',
+    imd_score: 'IMD score',
+    imd_score_ward: 'ward IMD score',
+    imd_decile: 'IMD decile',
+    census_population: 'population',
+    core20_lsoa_count: 'Core20 LSOAs',
+    total_lsoa_count: 'LSOAs in the ward',
+    pharmacy_count: 'pharmacies',
+    crime_total: 'total recorded crime',
+  };
+  function phraseFor(k) {
+    if (SHORT_LABEL[k]) return SHORT_LABEL[k];
+    var l = labelOf(k);
+    if (l.length > 46) l = l.slice(0, 43).replace(/[ ,.:;]+$/, '') + '...';
+    // Acronyms keep their capitals; an ordinary label loses its leading one so
+    // it sits inside a sentence.
+    return /[A-Z]{2,}/.test(l) ? l : l.charAt(0).toLowerCase() + l.slice(1);
+  }
+
+  /**
    * Is this indicator published above ward level?
    *
    * The Fingertips data arrives in two namespaces that look alike and are not
@@ -8748,6 +8814,49 @@ loadData();
    * distrust the one Fingertips series that is safe to use here.
    */
   function isBoroughLevelKey(k) { return /^ft_/.test(k) && !/^ft_\d+$/.test(k); }
+
+  /**
+   * Which end of an indicator is the good end.
+   *
+   * Returns 'high-good', 'high-bad', or null when there is no defensible
+   * answer. Red and green are a claim about better and worse, so this decides
+   * what they are allowed to say, and it takes as little of that decision as
+   * possible on its own:
+   *
+   *   1. OHID publishes a RAG polarity for every Local Health indicator and it
+   *      is already carried in the OV_META description, so the 33 ft_ series
+   *      answer for themselves. "Not applicable" means exactly that and is
+   *      honoured as a null.
+   *   2. The deprivation family is handled by direction rather than by name.
+   *      Scores rise with deprivation, deciles fall with it, and getting that
+   *      backwards is the mistake this codebase has already made once.
+   *   3. Everything else is an explicit short list, and it is short on purpose.
+   *      A high share of over-65s, of social renting or of any ethnic group is
+   *      not good or bad, it is a fact about who lives there, and colouring it
+   *      red would be the map making a judgement it has no business making.
+   */
+  var POLARITY = {
+    census_bad_health_pct: 'high-bad',      census_good_health_pct: 'high-good',
+    census_disability_any_pct: 'high-bad',  census_disability_lot_pct: 'high-bad',
+    census_unemployed_pct: 'high-bad',      census_no_qual_pct: 'high-bad',
+    census_level4_qual_pct: 'high-good',    claimant_rate_pct: 'high-bad',
+    claimant_count: 'high-bad',             fuel_poverty_pct: 'high-bad',
+    core20_lsoa_count: 'high-bad',
+    gb_commitment_pct: 'high-good',         green_commitment_pct: 'high-good',
+    green_doorstep_pct: 'high-good',        green_local_pct: 'high-good',
+    green_neighbourhood_pct: 'high-good',   blue_commitment_pct: 'high-good',
+  };
+  function polarityOf(k) {
+    if (POLARITY[k]) return POLARITY[k];
+    if (/^crime_/.test(k) && k !== 'crime_score') return 'high-bad';
+    if (/_score$/.test(k)) return 'high-bad';          // every IMD domain score
+    if (/_decile(_mean)?$/.test(k)) return 'high-good'; // 1 is the most deprived
+    var m = metaOf(k);
+    var desc = (m && m.desc) || '';
+    if (/Polarity:\s*RAG\s*-\s*Low is good/i.test(desc))  return 'high-bad';
+    if (/Polarity:\s*RAG\s*-\s*High is good/i.test(desc)) return 'high-good';
+    return null;                                        // including "Not applicable"
+  }
 
   function fmtVal(v, k) {
     if (v == null) return '—';
@@ -8798,16 +8907,18 @@ loadData();
      code the source carries if it has one, and otherwise by testing the point
      against the ward polygon.
      ───────────────────────────────────────────────────────────────────────── */
+  // `one` is the singular for the readback sentence. Stripping a trailing s
+  // off the plural gets "pharmacie", so they are written out.
   var SERVICES = [
-    { id: 'gp',       label: 'GP practices',      mode: 'pip',       glob: 'GPS' },
-    { id: 'pharmacy', label: 'Pharmacies',        mode: 'indicator', key: 'pharmacy_count' },
-    { id: 'hospital', label: 'Hospitals',         mode: 'pip',       glob: 'HOSP' },
-    { id: 'dentist',  label: 'Dental practices',  mode: 'pip',       src: 'dental_practices.json' },
-    { id: 'school',   label: 'Schools',           mode: 'code',      src: 'schools.json',           nwlOnly: true },
-    { id: 'library',  label: 'Libraries',         mode: 'code',      src: 'libraries.json',         nwlOnly: true },
-    { id: 'cc',       label: 'Community centres', mode: 'code',      src: 'community_centres.json', nwlOnly: true },
-    { id: 'esol',     label: 'ESOL providers',    mode: 'pip',       src: 'esol_providers.json',    nwlOnly: true },
-    { id: 'cic',      label: 'CICs',              mode: 'pip',       src: 'cics.json' },
+    { id: 'gp',       label: 'GP practices',      one: 'GP practice',      mode: 'pip',       glob: 'GPS' },
+    { id: 'pharmacy', label: 'Pharmacies',        one: 'pharmacy',         mode: 'indicator', key: 'pharmacy_count' },
+    { id: 'hospital', label: 'Hospitals',         one: 'hospital',         mode: 'pip',       glob: 'HOSP' },
+    { id: 'dentist',  label: 'Dental practices',  one: 'dental practice',  mode: 'pip',       src: 'dental_practices.json' },
+    { id: 'school',   label: 'Schools',           one: 'school',           mode: 'code',      src: 'schools.json',           nwlOnly: true },
+    { id: 'library',  label: 'Libraries',         one: 'library',          mode: 'code',      src: 'libraries.json',         nwlOnly: true },
+    { id: 'cc',       label: 'Community centres', one: 'community centre', mode: 'code',      src: 'community_centres.json', nwlOnly: true },
+    { id: 'esol',     label: 'ESOL providers',    one: 'ESOL provider',    mode: 'pip',       src: 'esol_providers.json',    nwlOnly: true },
+    { id: 'cic',      label: 'CICs',              one: 'CIC',              mode: 'pip',       src: 'cics.json' },
   ];
   function serviceById(id) {
     for (var i = 0; i < SERVICES.length; i++) if (SERVICES[i].id === id) return SERVICES[i];
@@ -9428,8 +9539,12 @@ loadData();
         var v = num(inds[m.k]);
         var cls = '';
         if (v !== null && ext[m.k]) {
-          if (v === ext[m.k].hi) cls = ' hi';
-          else if (v === ext[m.k].lo) cls = ' lo';
+          var pol = polarityOf(m.k);
+          if (v === ext[m.k].hi) {
+            cls = ' hi' + (pol === 'high-bad' ? ' bad' : pol === 'high-good' ? ' good' : '');
+          } else if (v === ext[m.k].lo) {
+            cls = ' lo' + (pol === 'high-bad' ? ' good' : pol === 'high-good' ? ' bad' : '');
+          }
         }
         return '<div class="cmp-c-row"><span class="k">' + esc(m.l) + '</span>' +
           '<span class="v' + cls + '">' + (v === null ? '—' : fmtVal(v, m.k)) + '</span></div>';
@@ -9445,10 +9560,19 @@ loadData();
     $('cmp-bar-title').textContent = pinned.length
       ? 'Comparing ' + pinned.length + ' ward' + (pinned.length === 1 ? '' : 's')
       : 'Comparison';
+    var uncoloured = mets.filter(function (m) { return !polarityOf(m.k); });
     cmpLegendEl.innerHTML = mets.length
-      ? '&#9650; highest and &#9660; lowest of the pinned wards on that row. Which end is better ' +
-        'depends on the indicator: a high IMD decile is the least deprived, a high bad-health ' +
-        'percentage is the worst.'
+      ? '<span class="cmp-key"><i style="background:#00703C"></i>better</span>' +
+        '<span class="cmp-key"><i style="background:#D4351C"></i>worse</span>' +
+        '<span class="cmp-key">&#9650; highest &#9660; lowest</span>' +
+        'Colour follows the indicator, not the size of the number: the highest IMD decile is the ' +
+        'least deprived tenth, the highest bad-health percentage is the worst outcome. ' +
+        (uncoloured.length
+          ? esc(uncoloured.map(function (m) { return m.l; }).join(', ')) +
+            (uncoloured.length > 1 ? ' have' : ' has') +
+            ' no better or worse end, so ' + (uncoloured.length > 1 ? 'those rows are' : 'that row is') +
+            ' marked but not coloured.'
+          : '')
       : 'No metrics selected.';
   }
 
@@ -9715,8 +9839,51 @@ loadData();
     qSortEl.innerHTML = indicatorOptions(q.sort);
     qSortDirEl.value = q.dir;
   }
+  /**
+   * The whole filter as one sentence, updated as it is built.
+   *
+   * Three groups of controls describe a query without ever stating it, and the
+   * gaps are where the misreadings live: whether the service chips mean all of
+   * them or any of them, whether an empty group means "none" or "no
+   * condition", and whether the conditions are joined by and or by or. Reading
+   * it back leaves nothing to infer.
+   */
+  function renderReadback() {
+    var el = $('q-readback');
+    if (!el) return;
+    var parts = ['Wards'];
+    parts.push(q.scope ? 'in <strong>' + esc(q.scope) + '</strong>' : 'anywhere in London');
+
+    if (q.services.length) {
+      parts.push('containing at least one ' + q.services.map(function (id) {
+        return '<strong>' + esc(serviceById(id).one) + '</strong>';
+      }).join(' and at least one '));
+    }
+
+    var live = q.conds.filter(function (c) { return c.key && c.value != null; });
+    var where = '';
+    if (live.length) {
+      var opWord = { lte: 'is at most', gte: 'is at least', eq: 'is exactly' };
+      where = 'where ' + live.map(function (c) {
+        var u = unitOf(c.key);
+        return '<strong>' + esc(phraseFor(c.key)) + '</strong> ' +
+          opWord[c.op] + ' <strong>' + esc(String(c.value)) + (u === '%' ? '%' : '') + '</strong>';
+      }).join(' and ');
+    }
+
+    var pending = q.conds.length - live.length;
+    var tail = pending
+      ? '<br><span style="color:var(--ink-3)">' + pending + ' condition' +
+        (pending === 1 ? ' has' : 's have') + ' no value yet and ' +
+        (pending === 1 ? 'is' : 'are') + ' being ignored.</span>'
+      : '';
+
+    el.innerHTML = '<span class="q-rb-lbl">This query asks for</span>' +
+      parts.join(' ') + (where ? ', ' + where : '') + '.' + tail;
+  }
+
   function renderBuilder() {
-    renderServices(); renderScope(); renderConds(); renderCaution();
+    renderServices(); renderScope(); renderConds(); renderCaution(); renderReadback();
   }
 
   qServicesEl.addEventListener('click', function (e) {
@@ -9725,7 +9892,7 @@ loadData();
     var id = chip.getAttribute('data-svc');
     var at = q.services.indexOf(id);
     if (at === -1) q.services.push(id); else q.services.splice(at, 1);
-    renderServices(); renderCaution();
+    renderServices(); renderCaution(); renderReadback();
   });
   qServicesEl.addEventListener('keydown', function (e) {
     if ((e.key === 'Enter' || e.key === ' ') && e.target.closest('[data-svc]')) {
@@ -9733,19 +9900,20 @@ loadData();
     }
   });
   qScopeEl.addEventListener('change', function (e) {
-    if (e.target.id === 'q-scope-sel') q.scope = e.target.value;
+    if (e.target.id === 'q-scope-sel') { q.scope = e.target.value; renderReadback(); }
   });
   qCondsEl.addEventListener('change', function (e) {
     var t = e.target;
     if (t.dataset.op   != null) q.conds[+t.dataset.op].op = t.value;
     if (t.dataset.key  != null) { q.conds[+t.dataset.key].key = t.value; renderCaution(); }
     if (t.dataset.val  != null) q.conds[+t.dataset.val].value = t.value === '' ? null : parseFloat(t.value);
+    renderReadback();
   });
   qCondsEl.addEventListener('click', function (e) {
     var del = e.target.closest('[data-del]');
     if (!del) return;
     q.conds.splice(+del.getAttribute('data-del'), 1);
-    renderConds(); renderCaution();
+    renderConds(); renderCaution(); renderReadback();
   });
   $('q-add-cond').addEventListener('click', function () {
     var used = q.conds.map(function (c) { return c.key; });
@@ -9753,7 +9921,7 @@ loadData();
       .filter(function (k) { return indicatorKeys().indexOf(k) !== -1 && used.indexOf(k) === -1; })[0]
       || indicatorKeys()[0];
     q.conds.push({ key: next, op: 'lte', value: null });
-    renderConds(); renderCaution();
+    renderConds(); renderCaution(); renderReadback();
   });
   qSortEl.addEventListener('change', function () { q.sort = qSortEl.value; });
   qSortDirEl.addEventListener('change', function () { q.dir = qSortDirEl.value; });
