@@ -579,7 +579,11 @@
         <div class="sb-tab active" data-tab="layers">Layers</div>
         <div class="sb-tab" data-tab="vcse">VCSE</div>
         <div class="sb-tab" data-tab="overlay">Overlay</div>
-        <div class="sb-tab" data-tab="nbhd" title="Neighbourhoods — in development" style="position:relative">Neighbourhoods<span style="display:inline-block;margin-left:5px;padding:1px 5px;background:#fff1d6;color:#8a5a00;border:1px solid #e0c28a;border-radius:8px;font-size:9px;font-weight:600;letter-spacing:.02em;vertical-align:middle">IN DEV</span></div>
+        <!-- Neighbourhoods tab withdrawn for now. The pane below is left in
+             place, unreachable: tab switching is driven by the button that was
+             clicked, so removing the button is enough, and the one place that
+             reads #tab-nbhd only checks whether it is active, which it now
+             never is. Put the button back to restore it. -->
         <div class="sb-tab" data-tab="ward">Ward</div>
       </div>
 
@@ -681,12 +685,10 @@
             </div>
           </div>
         </div>
-        <div class="sb-sec" style="flex:1;border-bottom:none;overflow-y:auto">
-          <div class="data-note" style="margin-top:4px">
-            Switch to the <b>Neighbourhoods</b> tab to shade individual neighbourhoods and compare their indicators.
-            Click any ward to explore its data in the Ward tab.
-          </div>
-        </div>
+        <!-- The note that sat here pointed at the Neighbourhoods tab, which is
+             withdrawn. The spacer stays: it is what lets the Layers pane fill
+             the sidebar rather than the sections bunching at the top. -->
+        <div class="sb-sec" style="flex:1;border-bottom:none;overflow-y:auto"></div>
       </div>
 
       <!-- VCSE tab -->
