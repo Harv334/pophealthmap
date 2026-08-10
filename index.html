@@ -472,6 +472,14 @@
      hidden should not have to rediscover this. */
   [hidden] { display: none !important; }
 
+  /* Status bar. The address is shown rather than hidden behind "Contact us":
+     it is in the mailto either way, so hiding it stops nobody scraping it and
+     only stops a reader copying it. #src-lbl sits alongside, empty unless a
+     failed data load has something to report. */
+  .sbar-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .sbar-link { color: var(--nhs-blue); text-decoration: none; }
+  .sbar-link:hover { color: var(--nhs-dark); text-decoration: underline; }
+
   /* ---- Mode rail -------------------------------------------------------
      The frame for where the tool is going: Explore is the map as it stands,
      the rest are placeholders so each one has somewhere to land as it is
@@ -1110,7 +1118,10 @@
        credit each source properly. #src-lbl stays because it is also where a
        failed ward_data.json load reports itself, and it is empty otherwise. -->
   <div class="sbar">
-    <span id="src-lbl"></span>
+    <span class="sbar-left">
+      <a class="sbar-link" href="mailto:contact@pophealth.uk">contact@pophealth.uk</a>
+      <span id="src-lbl"></span>
+    </span>
     <span id="data-date"></span>
   </div>
 
