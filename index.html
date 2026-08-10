@@ -366,8 +366,10 @@
 .ai-chip{font:inherit;font-size:11.5px;cursor:pointer;text-align:left;background:#FBFCFD;
   color:#003087;border:1px solid #DDE1E4;border-radius:13px;padding:5px 10px}
 .ai-chip:hover{background:#E5EFF8;border-color:#41B6E6}
-.ai-note{margin:-4px 0 10px;padding:7px 10px;border-radius:8px;background:#FDF0D5;
+.ai-note{margin:-4px 0 8px;padding:7px 10px;border-radius:8px;background:#FDF0D5;
   border:1px solid #E8D3A3;color:#8A5A00;font-size:11.5px;line-height:1.45}
+.ai-caution{margin:0 0 10px;padding:7px 10px;border-radius:8px;background:#FBE5E3;
+  border:1px solid #F2C4BF;color:#A81A10;font-size:11.5px;line-height:1.45;font-weight:500}
 @media (max-width:640px){#ai-panel{width:calc(100% - 24px)}}
 
     /* Layers whose coverage is narrower than the map. Flagged rather than
@@ -4694,13 +4696,25 @@ document.getElementById('tnc').addEventListener('change', e => {
   if (wLyr) wLyr.eachLayer(l => l.setStyle(wstyle(l.feature.properties.WD24NM, curOv, gs(l.feature.properties.WD24NM))));
   if (boroughL && boroughL._map) boroughL.bringToFront();
 });
+// Ward boundaries turns the ward layer off, not just its outlines.
+//
+// There are two ward layers: wLyr carries the fill, the colouring and the
+// click handling, and wardBoundaryLyr draws the black edges on top. Removing
+// only the edges left all 704 ward polygons still filled and still catching
+// clicks, so anyone who wanted to look at LSOAs on their own could not: the
+// ward layer sat over them and there was no way to shift it.
+//
+// Turning wards off does mean losing ward colouring and ward clicks while it
+// is off. That is the point of the switch.
 document.getElementById('tnw').addEventListener('change', e => {
   if (e.target.checked) {
+    if (typeof wLyr !== 'undefined' && wLyr && !wLyr._map) wLyr.addTo(map);
     wardBoundaryLyr.addTo(map);
     wardBoundaryLyr.bringToFront();
     if (boroughL && boroughL._map) boroughL.bringToFront();
   } else {
     map.removeLayer(wardBoundaryLyr);
+    if (typeof wLyr !== 'undefined' && wLyr && wLyr._map) map.removeLayer(wLyr);
   }
 });
 // Ward boundaries on by default — layer is added once the map is ready

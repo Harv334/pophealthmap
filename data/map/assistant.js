@@ -390,6 +390,22 @@ var ASSISTANT_ENDPOINT = "https://pophealthmapai.sevilleharvey.workers.dev";
 
   var history = [];
   var busy = false;
+  // Last count the Worker reported. Null until a question has been asked,
+  // because the browser has no way to know the count on its own.
+  var lastLimit = null;
+  var limitEl = null;
+
+  function renderLimit() {
+    if (!limitEl) return;
+    if (lastLimit && typeof lastLimit.remaining === "number") {
+      limitEl.textContent = lastLimit.remaining + " of " + (lastLimit.cap || DAILY_CAP)
+        + " questions left today. This is a free service with running costs, so it "
+        + "is capped per user. The map itself is unlimited.";
+    } else {
+      limitEl.textContent = "This is a free service with running costs, so questions "
+        + "are limited to " + DAILY_CAP + " a day per user. The map itself is unlimited.";
+    }
+  }
 
   /**
    * Keep the conversation under the Worker's message limit.
@@ -434,6 +450,7 @@ var ASSISTANT_ENDPOINT = "https://pophealthmapai.sevilleharvey.workers.dev";
       });
       var data = await res.json();
       if (!res.ok) throw new Error(data && data.error ? data.error : "Request failed");
+      if (data && data._limit) lastLimit = data._limit;
 
       history.push({ role: "assistant", content: data.content });
 
@@ -505,11 +522,23 @@ var ASSISTANT_ENDPOINT = "https://pophealthmapai.sevilleharvey.workers.dev";
 
     // Say the limit up front. It is a shared, funded service, and finding out
     // it is capped by being refused mid-question is a worse way to learn it.
+    // The count updates from the Worker after each answer, because the browser
+    // has no way to know it: the cap is per IP and enforced server-side.
     var limit = document.createElement("div");
     limit.className = "ai-note";
-    limit.textContent = "This is a free service with running costs, so questions "
-      + "are limited to " + DAILY_CAP + " a day per user. The map itself is unlimited.";
     log.appendChild(limit);
+
+    limitEl = limit;
+    renderLimit();
+
+    // Answers are built from the map's own figures, but the sentence around
+    // them is still written by a model, and this data gets used to argue for
+    // where services go. Saying so once, plainly, at the top.
+    var caution = document.createElement("div");
+    caution.className = "ai-caution";
+    caution.textContent = "AI generated output should be independently verified "
+      + "before making any decisions.";
+    log.appendChild(caution);
 
     var chips = document.createElement("div");
     chips.className = "ai-examples";
@@ -561,6 +590,7 @@ var ASSISTANT_ENDPOINT = "https://pophealthmapai.sevilleharvey.workers.dev";
         var answer = await ask(q);
         thinking.className = "ai-msg ai-bot";
         thinking.innerHTML = render(answer);
+        renderLimit();
       } catch (err) {
         thinking.className = "ai-msg ai-bot ai-error";
         thinking.textContent = (err && err.message) ? err.message : "Something went wrong.";

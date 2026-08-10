@@ -246,6 +246,9 @@ async function checkDailyCap(env, ip, isQuestion) {
   // that failed, and neither should we.
   return {
     allowed: true,
+    // What the caller has left once this question is counted. The panel shows
+    // it, so someone can see the limit approaching rather than meet it.
+    remaining: Math.max(0, DAILY_CAP - questions - (isQuestion ? 1 : 0)),
     commit: async () => {
       try {
         // 48h TTL comfortably outlives the UTC day the key is for.
@@ -319,6 +322,10 @@ export default {
     await cap.commit();
 
     const data = await upstream.json();
+    // Under an underscore so it cannot collide with a field the API adds later.
+    // Undefined when KV is unbound, which the panel reads as "no count to show"
+    // rather than as zero left.
+    data._limit = { cap: DAILY_CAP, remaining: cap.remaining };
     return json(data, 200, cors);
   },
 };
