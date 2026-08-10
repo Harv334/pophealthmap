@@ -140,14 +140,41 @@ function isNewQuestion(messages) {
   return !last.content.every((b) => b && b.type === "tool_result");
 }
 
+/**
+ * Per-IP daily cap, held in KV.
+ *
+ * Every KV call is wrapped, because on Cloudflare's free plan KV allows 1,000
+ * writes a day and this writes once per question. Unwrapped, the 1,001st
+ * question of the day would throw inside the request handler and return a 500:
+ * the assistant would break outright at exactly the moment it got popular,
+ * rather than degrade.
+ *
+ * A KV failure fails open, matching the unbound-namespace case above. That is a
+ * deliberate trade: losing the per-IP cap is recoverable, taking the feature
+ * down is not. It does mean KV is not the thing standing between you and a
+ * large bill. The spend limit on the Anthropic side is, and it is the one that
+ * must actually be set. See worker/README.md.
+ */
 async function underDailyCap(env, ip, countIt) {
   if (!env.RATE_LIMIT) return true; // KV not bound: fail open rather than break the site
   const key = `${new Date().toISOString().slice(0, 10)}:${ip}`;
-  const used = parseInt((await env.RATE_LIMIT.get(key)) || "0", 10);
+  let used = 0;
+  try {
+    used = parseInt((await env.RATE_LIMIT.get(key)) || "0", 10) || 0;
+  } catch (e) {
+    console.log(`KV read failed, not counting: ${e && e.message}`);
+    return true;
+  }
   if (used >= DAILY_CAP) return false;
   if (countIt) {
-    // 48h TTL comfortably outlives the UTC day the key is for.
-    await env.RATE_LIMIT.put(key, String(used + 1), { expirationTtl: 172800 });
+    try {
+      // 48h TTL comfortably outlives the UTC day the key is for.
+      await env.RATE_LIMIT.put(key, String(used + 1), { expirationTtl: 172800 });
+    } catch (e) {
+      // Most likely the free plan's 1,000 writes/day. Answer the question and
+      // leave the counter where it is.
+      console.log(`KV write failed, cap not incremented: ${e && e.message}`);
+    }
   }
   return true;
 }
