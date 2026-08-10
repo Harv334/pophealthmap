@@ -2365,6 +2365,145 @@ def run_fingertips() -> pd.DataFrame:
     ok(f"fingertips: {len(out):,} rows -> {out_path.relative_to(REPO_ROOT)}")
     return out
 
+# ============================================================================
+# SOURCE 5b: Fingertips Local Health  (MSOA level, aggregated to wards)
+# ============================================================================
+# The indicators above are published for whole boroughs, so every ward in a
+# borough carries the same figure. The Local Health profile publishes a
+# different set at MSOA level, which is roughly four LSOAs and genuinely varies
+# within a borough, and index.html already has a dropdown expecting them.
+#
+# Those options came from scripts/import_fingertips_csv.py, a one-off that
+# patched ward_data.json by hand from a downloaded CSV. The pipeline has
+# regenerated that file many times since, so the keys were long gone and all 33
+# options selected an indicator that was not there. Fetching them here means
+# they survive every rerun.
+#
+# Ward is not an option: area type 8 exists but returns nothing for these, so
+# MSOA is the finest published geography and it has to be bridged to wards.
+FINGERTIPS_MSOA_AREA_TYPE = 3   # Middle Super Output Area
+FINGERTIPS_MSOA_INDICATORS = [
+    93465, 93233, 93229, 93227, 93115, 93280, 93089, 93232, 93241, 93240,
+    93239, 93283, 93098, 93092, 93250, 93252, 93253, 93254, 93255, 93256,
+    93480, 93257, 93260, 93259, 93105, 93106, 93231, 93097, 93114, 93219,
+    93224, 93107, 93108,
+]
+
+LSOA_MSOA_LOOKUP = ("https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/"
+                    "services/OA21_LAD23_LSOA21_MSOA21_LEP23_EN_LU/FeatureServer/0/query")
+
+
+@lru_cache(maxsize=1)
+def get_lsoa_to_msoa() -> dict:
+    """LSOA21CD -> MSOA21CD, from the ONS lookup, cached on disk."""
+    cache = CACHE_DIR / "lookups" / "lsoa21_msoa21.json"
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    if cache.exists():
+        try:
+            return json.loads(cache.read_text(encoding="utf-8"))
+        except ValueError:
+            warn("lsoa->msoa lookup cache unreadable; refetching")
+
+    codes = sorted(get_lsoa_ward_lookup())
+    pairs: dict = {}
+    CHUNK = 120  # the IN clause goes in a POST body, but keep it sane
+    for i in range(0, len(codes), CHUNK):
+        batch = codes[i:i + CHUNK]
+        payload = {
+            "where": "LSOA21CD IN (" + ",".join(f"'{c}'" for c in batch) + ")",
+            "outFields": "LSOA21CD,MSOA21CD",
+            "returnGeometry": "false",
+            "returnDistinctValues": "true",
+            "f": "json",
+            "resultRecordCount": 4000,
+        }
+        r = requests.post(LSOA_MSOA_LOOKUP, data=payload, timeout=180)
+        r.raise_for_status()
+        for feat in r.json().get("features", []):
+            a = feat.get("attributes", {})
+            if a.get("LSOA21CD") and a.get("MSOA21CD"):
+                pairs[a["LSOA21CD"]] = a["MSOA21CD"]
+
+    if len(pairs) < len(codes) * 0.95:
+        raise RuntimeError(
+            f"lsoa->msoa: only {len(pairs):,} of {len(codes):,} LSOAs mapped. "
+            f"Refusing to cache a partial lookup."
+        )
+    cache.write_text(json.dumps(pairs), encoding="utf-8")
+    ok(f"ONS lookup: {len(pairs):,} LSOAs -> {len(set(pairs.values())):,} MSOAs")
+    return pairs
+
+
+def run_fingertips_msoa() -> pd.DataFrame:
+    rule("OHID Fingertips Local Health (MSOA)")
+    cache_dir = CACHE_DIR / "fingertips_msoa"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+
+    want_msoa = set(get_lsoa_to_msoa().values())
+    rows: list = []
+    missing_codes: set = set()
+
+    for ind_id in FINGERTIPS_MSOA_INDICATORS:
+        cache = cache_dir / f"ind_{ind_id}.csv"
+        if not cache.exists():
+            url = (f"https://fingertips.phe.org.uk/api/all_data/csv/by_indicator_id"
+                   f"?indicator_ids={ind_id}"
+                   f"&child_area_type_id={FINGERTIPS_MSOA_AREA_TYPE}"
+                   f"&parent_area_type_id=502")
+            try:
+                r = requests.get(url, timeout=180)
+                r.raise_for_status()
+                if len(r.content.splitlines()) < 2:
+                    warn(f"fingertips msoa {ind_id}: no rows; not caching")
+                    continue
+                cache.write_bytes(r.content)
+                time.sleep(1.0)
+            except Exception as e:
+                warn(f"fingertips msoa {ind_id}: {e}")
+                continue
+        try:
+            df = pd.read_csv(cache, dtype=str, low_memory=False)
+        except pd.errors.EmptyDataError:
+            continue
+        if df.empty or "Area Code" not in df.columns:
+            continue
+
+        name = str(df["Indicator Name"].iloc[0]) if "Indicator Name" in df.columns else ""
+        df = df[df["Area Code"].isin(want_msoa)]
+        if df.empty:
+            # Fingertips still publishes these against 2011 MSOA codes, and 39
+            # London MSOAs were renumbered in 2021. A total miss means
+            # something else changed.
+            warn(f"fingertips msoa {ind_id}: no rows matched an in-scope MSOA")
+            continue
+        if "Sex" in df.columns and (df["Sex"] == "Persons").any():
+            df = df[df["Sex"] == "Persons"]
+        df = df.sort_values("Time period Sortable").groupby("Area Code", as_index=False).tail(1)
+
+        got = set(df["Area Code"])
+        missing_codes |= (want_msoa - got)
+        for _, row in df.iterrows():
+            rows.append({
+                "MSOA21CD": row["Area Code"],
+                "indicator_id": int(ind_id),
+                "indicator_name": name,
+                "value": _tofloat(row.get("Value")),
+                "period": row.get("Time period", ""),
+            })
+
+    out = pd.DataFrame(rows)
+    out_path = DATA_DIR / "outcomes" / "fingertips_msoa.parquet"
+    out = write_parquet_guarded(out_path, out, source="fingertips_msoa")
+    n_ind = out["indicator_id"].nunique() if not out.empty else 0
+    ok(f"fingertips msoa: {len(out):,} rows, {n_ind} indicators across "
+       f"{out['MSOA21CD'].nunique() if not out.empty else 0:,} MSOAs "
+       f"-> {out_path.relative_to(REPO_ROOT)}")
+    if missing_codes:
+        warn(f"fingertips msoa: {len(missing_codes):,} in-scope MSOAs had no data "
+             f"in at least one indicator (2011 vs 2021 MSOA codes)")
+    return out
+
+
 def _tofloat(v):
     try: return float(v)
     except (TypeError, ValueError): return None
@@ -3362,6 +3501,56 @@ def build_ward_data() -> dict:
                     if v is not None:
                         w["indicators"][f"ft_{k}"] = v
 
+    # --- Fingertips Local Health: MSOA -> ward, via the LSOA bridge --------
+    # An MSOA is a group of whole LSOAs, and a ward is a best-fit group of
+    # LSOAs, so the two are joined through the LSOAs they share rather than
+    # directly. Each LSOA carries its MSOA's value and contributes its
+    # population as weight, which is the same aggregation the census block
+    # below uses. A ward straddling two MSOAs gets a blend in proportion to
+    # where its people are, not to how much land falls in each.
+    ftm = _read_parquet_opt(DATA_DIR / "outcomes" / "fingertips_msoa.parquet")
+    if ftm is not None and not ftm.empty:
+        sources["health_msoa"] = "OHID Fingertips (Local Health, MSOA)"
+        lsoa_to_ward = get_lsoa_to_ward()
+        lsoa_to_msoa = get_lsoa_to_msoa()
+        imd = _read_parquet_opt(DATA_DIR / "demographics" / "imd2025.parquet")
+        pop_by_lsoa = {}
+        if imd is not None and "LSOA21CD" in imd.columns:
+            popcol = next((c for c in imd.columns
+                           if c.lower() in ("total_population", "population",
+                                            "pop", "total_pop")), None)
+            if popcol:
+                pop_by_lsoa = dict(zip(imd["LSOA21CD"].astype(str),
+                                       pd.to_numeric(imd[popcol], errors="coerce").fillna(0)))
+
+        by_msoa: dict = {}
+        for _, row in ftm.iterrows():
+            v = row["value"]
+            if v is None or (isinstance(v, float) and pd.isna(v)):
+                continue
+            by_msoa.setdefault(str(row["MSOA21CD"]), {})[int(row["indicator_id"])] = float(v)
+
+        from collections import defaultdict as _dd2
+        num = _dd2(lambda: _dd2(float))
+        den = _dd2(lambda: _dd2(float))
+        for lsoa, wd in lsoa_to_ward.items():
+            vals = by_msoa.get(lsoa_to_msoa.get(lsoa, ""), None)
+            if not vals:
+                continue
+            weight = float(pop_by_lsoa.get(lsoa, 0) or 0) or 1.0
+            for ind_id, v in vals.items():
+                num[wd][ind_id] += v * weight
+                den[wd][ind_id] += weight
+        n_filled = 0
+        for wd, inds in num.items():
+            w = _get(wd)
+            for ind_id, total in inds.items():
+                d = den[wd][ind_id]
+                if d > 0:
+                    w["indicators"][f"ft_{ind_id}"] = round(total / d, 4)
+                    n_filled += 1
+        info(f"fingertips msoa -> {len(num):,} wards, {n_filled:,} values")
+
     # --- Census 2021: per-LSOA -> per-ward via population-weighted mean ----
     cen = _read_parquet_opt(DATA_DIR / "demographics" / "census2021.parquet")
     if cen is not None and not cen.empty:
@@ -3997,6 +4186,7 @@ SOURCES = {
     "dwp":         run_dwp_benefits,
     "qof":         run_qof,
     "fingertips":  run_fingertips,
+    "fingertips_msoa": run_fingertips_msoa,
     "fuel_poverty": run_fuel_poverty,
     "ptal":        run_ptal,
     "crime":       run_police_crime,
