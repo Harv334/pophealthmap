@@ -437,6 +437,57 @@
   .sb-tabs { background: var(--paper-2); }
   a { color: var(--nhs-blue); }
   a:hover { color: var(--nhs-dark); }
+
+  /* ---- Mode rail -------------------------------------------------------
+     The frame for where the tool is going: Explore is the map as it stands,
+     the rest are placeholders so each one has somewhere to land as it is
+     built. Every row is placed explicitly rather than left to auto-flow, and
+     the panel shares row 3 with .main instead of being positioned over it.
+     That keeps the map's own two-column grid untouched: nothing here moves
+     the sidebar or the map, it only stacks above them. */
+  .app { grid-template-rows: auto auto minmax(0, 1fr) auto; }
+  .app > .hdr        { grid-row: 1; grid-column: 1; }
+  .app > .mode-rail  { grid-row: 2; grid-column: 1; }
+  .app > .main       { grid-row: 3; grid-column: 1; }
+  /* Above everything the map puts in this cell. The stack already runs to
+     3000 (map badges sit at 2500), so the panel has to clear that or the
+     map's floating controls show through a mode that is not the map. */
+  .app > .mode-panel { grid-row: 3; grid-column: 1; z-index: 3500; }
+  .app > .sbar       { grid-row: 4; grid-column: 1; }
+
+  .mode-rail { display: flex; align-items: stretch; gap: 2px; padding: 0 18px;
+    background: var(--paper); border-bottom: 1px solid var(--line); flex-shrink: 0; }
+  .mode-btn { appearance: none; background: none; border: 0; cursor: pointer;
+    font-family: 'Inter Tight', Inter, system-ui, sans-serif; font-size: 13px;
+    font-weight: 600; color: var(--ink-2); padding: 10px 14px 9px;
+    border-bottom: 3px solid transparent; display: flex; align-items: center;
+    gap: 7px; transition: color .15s, border-color .15s, background .12s; }
+  .mode-btn:hover { color: var(--nhs-blue); background: var(--paper-2); }
+  .mode-btn[aria-selected="true"] { color: var(--nhs-dark);
+    border-bottom-color: var(--nhs-blue); }
+  .mode-btn:focus-visible { outline: 3px solid var(--nhs-yellow); outline-offset: -3px; }
+  .mode-soon { font-family: Inter, system-ui, sans-serif; font-size: 9px;
+    font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+    padding: 1px 5px; border-radius: 8px; background: #FDF0D5; color: #8A5A00;
+    border: 1px solid #E8D3A3; }
+
+  .mode-panel { background: var(--bg); overflow: auto; display: flex;
+    align-items: flex-start; justify-content: center; padding: 48px 24px; }
+  .mode-card { background: var(--paper); border: 1px solid var(--line);
+    border-radius: 10px; box-shadow: var(--shadow); max-width: 560px; width: 100%;
+    padding: 28px 30px 26px; }
+  .mode-card h2 { font-family: 'Inter Tight', Inter, system-ui, sans-serif;
+    font-size: 20px; font-weight: 700; color: var(--nhs-dark); margin: 0 0 4px; }
+  .mode-card .mode-kicker { font-size: 11px; font-weight: 700; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--ink-3); margin-bottom: 10px; }
+  .mode-card p { font-size: 13.5px; line-height: 1.55; color: var(--ink-2); margin: 0 0 12px; }
+  .mode-card ul { font-size: 13.5px; line-height: 1.55; color: var(--ink-2);
+    margin: 0 0 16px; padding-left: 20px; }
+  .mode-card li { margin-bottom: 5px; }
+  .mode-back { appearance: none; font: inherit; font-size: 13px; font-weight: 600;
+    cursor: pointer; background: var(--nhs-blue); color: #fff; border: 1px solid var(--nhs-blue);
+    border-radius: 8px; padding: 8px 15px; }
+  .mode-back:hover { background: var(--nhs-dark); border-color: var(--nhs-dark); }
 </style>
 </head>
 <body>
@@ -461,6 +512,25 @@
       <button type="button" class="tb-btn" id="tb-cb" title="Switch to a colour-blind safe palette (deuteranopia/protanopia friendly)" aria-pressed="false">◐ CB safe</button>
       <button type="button" class="tb-btn" id="tb-png" title="Download the current map as a PNG image">⤓ PNG</button>
       <button type="button" class="tb-btn" id="tb-csv" title="Download the ward/LSOA data behind the current overlay">⤓ CSV</button>
+    </div>
+  </div>
+
+  <!-- Mode rail. Explore is the map below; the rest are scaffolding. -->
+  <div class="mode-rail" role="tablist" aria-label="Tool mode">
+    <button type="button" class="mode-btn" role="tab" data-mode="explore" aria-selected="true">Explore</button>
+    <button type="button" class="mode-btn" role="tab" data-mode="compare" aria-selected="false">Compare <span class="mode-soon">Soon</span></button>
+    <button type="button" class="mode-btn" role="tab" data-mode="query" aria-selected="false">Ask <span class="mode-soon">Soon</span></button>
+    <button type="button" class="mode-btn" role="tab" data-mode="tour" aria-selected="false">Take a tour <span class="mode-soon">Soon</span></button>
+    <button type="button" class="mode-btn" role="tab" data-mode="directory" aria-selected="false">Directory <span class="mode-soon">Soon</span></button>
+  </div>
+
+  <div class="mode-panel" id="mode-panel" hidden>
+    <div class="mode-card">
+      <div class="mode-kicker" id="mode-kicker">In development</div>
+      <h2 id="mode-title"></h2>
+      <p id="mode-desc"></p>
+      <ul id="mode-points"></ul>
+      <button type="button" class="mode-back">Back to the map</button>
     </div>
   </div>
 
@@ -7853,5 +7923,87 @@ loadData();
 })();
 </script>
 
+<script>
+/* Mode rail.
+ *
+ * Explore is the map, and it is the only mode with anything behind it yet.
+ * The others exist so the shape of the finished tool is visible while it is
+ * being built, and so each one has a place to be dropped into rather than
+ * needing the header rearranged later.
+ *
+ * The panel is built with DOM calls, not an HTML string. A markup string in
+ * this file is how the page got broken once already: a literal <\/script>
+ * inside a template literal ends the real script block. Note the escape in
+ * that sentence: it applies inside comments and strings alike, because the
+ * parser looks for the closing tag before it looks at the JavaScript.
+ */
+(function () {
+  var MODES = {
+    compare: {
+      title: 'Compare areas',
+      desc: 'Put wards or boroughs side by side and see where they actually differ, rather than reading one profile at a time and holding the numbers in your head.',
+      points: ['Pick two to six areas and pin them for comparison',
+               'Indicators lined up in a single table, with the gap between areas shown',
+               'Export the comparison as CSV'],
+    },
+    query: {
+      title: 'Ask a question',
+      desc: 'Ask for a ranking, a comparison or a summary in plain English and get an answer built from the figures on this map.',
+      points: ['Answers come from the data already loaded in your browser, so nothing is uploaded',
+               'Every number is drawn from a lookup against the map, not written from memory',
+               'Works for rankings, comparisons and single-area summaries'],
+    },
+    tour: {
+      title: 'Take a tour',
+      desc: 'A short guided walkthrough of what is on the map and how to read it, for anyone arriving without a specific question.',
+      points: ['What each overlay measures and where it comes from',
+               'How deprivation deciles work, and which direction is which',
+               'What area statistics can and cannot tell you'],
+    },
+    directory: {
+      title: 'Directory',
+      desc: 'A searchable list of the services on the map, for when you want a list of places rather than a picture of them.',
+      points: ['GP practices, pharmacies, dental practices, hospitals and clinics',
+               'Community centres, libraries, ESOL providers and VCSE organisations',
+               'Filter by borough or ward, then export'],
+    },
+  };
+
+  var rail = document.querySelector('.mode-rail');
+  var panel = document.getElementById('mode-panel');
+  if (!rail || !panel) return;
+
+  var titleEl = document.getElementById('mode-title');
+  var descEl = document.getElementById('mode-desc');
+  var pointsEl = document.getElementById('mode-points');
+
+  function show(mode) {
+    var m = MODES[mode];
+    rail.querySelectorAll('.mode-btn').forEach(function (b) {
+      b.setAttribute('aria-selected', String(b.dataset.mode === (m ? mode : 'explore')));
+    });
+    if (!m) { panel.hidden = true; return; }
+    titleEl.textContent = m.title;
+    descEl.textContent = m.desc;
+    pointsEl.textContent = '';
+    m.points.forEach(function (p) {
+      var li = document.createElement('li');
+      li.textContent = p;
+      pointsEl.appendChild(li);
+    });
+    panel.hidden = false;
+    panel.scrollTop = 0;
+  }
+
+  rail.addEventListener('click', function (e) {
+    var btn = e.target.closest('.mode-btn');
+    if (btn) show(btn.dataset.mode);
+  });
+  panel.querySelector('.mode-back').addEventListener('click', function () { show('explore'); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && !panel.hidden) show('explore');
+  });
+})();
+</script>
 <script src="data/map/assistant.js"></script>
 </body></html>
