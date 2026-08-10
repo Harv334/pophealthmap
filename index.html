@@ -628,6 +628,92 @@
     .ws-acts { width: 100%; justify-content: flex-end; }
   }
 
+  /* ── Compare mode ─────────────────────────────────────────────────────────
+     From the design file's compare pane and its .compare-bar drawer. Both are
+     namespaced cmp- here because .group, .badge and .btn already mean other
+     things in this file.
+
+     Four pins, not six. The design fixes the card grid at four across and
+     badges the count "3 of 4", and four wards side by side is the point at
+     which a row of figures is still readable. The assistant's compare_areas
+     tool stops at six, but that is a different surface with a different
+     constraint, and matching the design here is the better call. */
+  .sidebar.compare-mode > .sb-tabs { display: none; }
+  .cmp-pane { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  .cmp-scroll { overflow-y: auto; min-height: 0; flex: 1; }
+  .cmp-head { padding: 13px 14px 11px; border-bottom: 1px solid var(--line); }
+  .cmp-head .cmp-row { display: flex; align-items: baseline; gap: 8px; }
+  .cmp-head h2 { font-family: 'Inter Tight', Inter, sans-serif; font-size: 17px; font-weight: 600;
+    margin: 0; letter-spacing: -.01em; color: var(--nhs-dark); }
+  .cmp-head .cmp-sub { font-size: 11.5px; color: var(--ink-3); margin-top: 2px; }
+  .cmp-head .cmp-back { margin-left: auto; appearance: none; background: none; border: 0; padding: 0;
+    font: inherit; font-size: 11px; color: var(--nhs-blue); cursor: pointer; }
+  .cmp-head .cmp-back:hover { color: var(--nhs-dark); text-decoration: underline; }
+  .cmp-group { padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  .cmp-group h3 { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; font-weight: 600;
+    color: var(--ink-3); margin: 0 0 9px; display: flex; justify-content: space-between; align-items: baseline; }
+  .cmp-group h3 .cmp-badge { color: var(--nhs-blue); text-transform: none; letter-spacing: 0;
+    font-weight: 600; font-variant-numeric: tabular-nums; }
+  .cmp-pins { display: flex; flex-direction: column; gap: 8px; }
+  .cmp-pin { border: 1px solid var(--line); border-radius: 10px; padding: 9px 10px; display: flex;
+    gap: 9px; align-items: center; cursor: pointer; background: var(--paper); }
+  .cmp-pin:hover { border-color: var(--nhs-blue); }
+  .cmp-pin .cmp-spine { width: 4px; align-self: stretch; border-radius: 2px; flex-shrink: 0; }
+  .cmp-pin .cmp-txt { flex: 1; min-width: 0; }
+  .cmp-pin .cmp-lad { display: block; font-size: 10.5px; color: var(--ink-3); }
+  .cmp-pin .cmp-nm { display: block; font-family: 'Inter Tight', Inter, sans-serif; font-size: 12.5px;
+    font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cmp-pin .cmp-x { color: var(--ink-3); cursor: pointer; font-size: 15px; line-height: 1;
+    background: none; border: 0; padding: 0 2px; }
+  .cmp-pin .cmp-x:hover { color: var(--nhs-red); }
+  .cmp-addhint { border: 1px dashed var(--line); border-radius: 10px; height: 38px; display: flex;
+    align-items: center; justify-content: center; color: var(--ink-3); font-size: 11.5px;
+    background: var(--paper-2); text-align: center; padding: 0 8px; }
+  .cmp-chiprow { display: flex; flex-wrap: wrap; gap: 5px; }
+  .cmp-quick { font-size: 11.5px; color: var(--ink-2); line-height: 1.55; }
+  .cmp-quick strong { color: var(--ink); font-weight: 600; }
+  .cmp-empty { font-size: 11.5px; color: var(--ink-3); line-height: 1.5; }
+
+  /* The full comparison, in the same footprint as the ward sheet because the
+     two are alternatives: you are either reading one ward or several. */
+  .cmp-bar { position: absolute; left: 16px; right: 16px; bottom: 16px; z-index: 1250;
+    background: var(--paper); border: 1px solid var(--line); border-radius: 14px;
+    box-shadow: var(--shadow-lg); padding: 13px 16px 15px; display: none;
+    max-height: 342px; overflow: auto; }
+  .cmp-bar.open { display: block; }
+  .cmp-bar .cmp-bar-head { display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; margin-bottom: 11px; }
+  .cmp-bar .cmp-bar-head h3 { font-family: 'Inter Tight', Inter, sans-serif; font-size: 15px;
+    font-weight: 600; margin: 0; color: var(--ink); }
+  .cmp-bar .cmp-bar-acts { display: flex; gap: 6px; align-items: center; }
+  .cmp-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+  .cmp-card { border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; min-width: 0; }
+  .cmp-card.add { border-style: dashed; display: flex; align-items: center; justify-content: center;
+    color: var(--ink-3); font-size: 11.5px; text-align: center; min-height: 90px; }
+  .cmp-card .cmp-c-hdr { display: flex; align-items: center; gap: 6px; }
+  .cmp-card .cmp-swatch { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+  .cmp-card .cmp-c-lad { font-size: 10.5px; color: var(--ink-3); overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; }
+  .cmp-card .cmp-c-nm { font-family: 'Inter Tight', Inter, sans-serif; font-size: 13px;
+    font-weight: 600; margin: 2px 0 7px; color: var(--ink); }
+  .cmp-card .cmp-c-row { display: flex; justify-content: space-between; gap: 8px; font-size: 11px;
+    padding: 3px 0; border-bottom: 1px solid var(--paper-2); }
+  .cmp-card .cmp-c-row .k { color: var(--ink-3); overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; }
+  .cmp-card .cmp-c-row .v { font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 500;
+    color: var(--ink); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+  /* The point of a comparison is which one is the outlier, so say so rather
+     than leaving four columns of digits to be read against each other. */
+  /* Marked, not coloured. Red for the highest would be a judgement, and it is
+     the wrong one half the time: a high IMD decile is the least deprived and a
+     high life expectancy is the best. Which end is good depends on the row, so
+     the marker says which end it is and the legend says the rest. */
+  .cmp-card .cmp-c-row .v.hi::after { content: ' \25B2'; font-size: 8px; color: var(--ink-3);
+    vertical-align: 1px; }
+  .cmp-card .cmp-c-row .v.lo::after { content: ' \25BC'; font-size: 8px; color: var(--ink-3);
+    vertical-align: 1px; }
+  .cmp-bar .cmp-legend { font-size: 10.5px; color: var(--ink-3); margin-top: 10px; line-height: 1.45; }
+
   /* ── Query builder ────────────────────────────────────────────────────────
      The filter sentence from the design file: services, then a borough, then
      any number of indicator conditions, read left to right as one sentence. */
@@ -736,7 +822,7 @@
   <div class="mode-rail" role="tablist" aria-label="Tool mode">
     <button type="button" class="mode-btn" role="tab" data-mode="explore" aria-selected="true">Explore</button>
     <button type="button" class="mode-btn" role="tab" data-mode="query" aria-selected="false">Query</button>
-    <button type="button" class="mode-btn" role="tab" data-mode="compare" aria-selected="false">Compare <span class="mode-soon">Soon</span></button>
+    <button type="button" class="mode-btn" role="tab" data-mode="compare" aria-selected="false">Compare</button>
     <button type="button" class="mode-btn" role="tab" data-mode="tour" aria-selected="false">Take a tour <span class="mode-soon">Soon</span></button>
     <button type="button" class="mode-btn" role="tab" data-mode="directory" aria-selected="false">Directory <span class="mode-soon">Soon</span></button>
   </div>
@@ -1213,6 +1299,39 @@
         </div>
       </div>
 
+      <!-- Compare mode. Follows the design file's compare pane: the pinned
+           wards each with their own colour, the metrics to line them up on,
+           and a quick view written from the figures. "Open full comparison"
+           raises the card drawer over the map. -->
+      <div class="tab-pane cmp-pane" id="tab-compare">
+        <div class="cmp-head">
+          <div class="cmp-row">
+            <h2>Compare</h2>
+            <button type="button" class="cmp-back" id="cmp-back">Back to Explore</button>
+          </div>
+          <div class="cmp-sub">Pin up to 4 wards, live on the map</div>
+        </div>
+        <div class="cmp-scroll">
+          <div class="cmp-group">
+            <h3>Pinned wards <span class="cmp-badge" id="cmp-count">0 of 4</span></h3>
+            <div class="cmp-pins" id="cmp-pins"></div>
+          </div>
+          <div class="cmp-group">
+            <h3>Metrics</h3>
+            <div class="cmp-chiprow" id="cmp-metrics"></div>
+          </div>
+          <div class="cmp-group" style="background:var(--paper-2)">
+            <h3>Quick view</h3>
+            <div class="cmp-quick" id="cmp-quick"></div>
+            <div id="cmp-caution"></div>
+            <button type="button" class="ws-btn primary" id="cmp-open"
+                    style="width:100%;justify-content:center;margin-top:11px">Open full comparison &rarr;</button>
+            <button type="button" class="ws-btn" id="cmp-csv"
+                    style="width:100%;justify-content:center;margin-top:6px">Download CSV</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Query tab. Builds one sentence: which services a ward must have,
            which borough it must be in, and which indicator conditions it must
            meet. Everything is evaluated in the browser against the ward data
@@ -1344,6 +1463,21 @@
           </div>
         </div>
         <div class="ws-body" id="ws-body"></div>
+      </div>
+
+      <!-- Full comparison drawer, the design file's .compare-bar. Shares the
+           sheet's footprint: you are either reading one ward or several. -->
+      <div class="cmp-bar" id="cmp-bar" role="region" aria-label="Ward comparison">
+        <div class="cmp-bar-head">
+          <h3 id="cmp-bar-title">Comparison</h3>
+          <div class="cmp-bar-acts">
+            <button type="button" class="ws-btn" id="cmp-bar-csv">Download CSV</button>
+            <button type="button" class="ws-close" id="cmp-bar-close" title="Close the comparison"
+                    aria-label="Close the comparison">&times;</button>
+          </div>
+        </div>
+        <div class="cmp-cards" id="cmp-cards"></div>
+        <div class="cmp-legend" id="cmp-legend"></div>
       </div>
     </div>
 
@@ -8260,14 +8394,9 @@ loadData();
  * parser looks for the closing tag before it looks at the JavaScript.
  */
 (function () {
+  // Compare and Query are built, so they are not in here: this object is only
+  // the placeholder cards for the modes that are still announcements.
   var MODES = {
-    compare: {
-      title: 'Compare areas',
-      desc: 'Put wards or boroughs side by side and see where they actually differ, rather than reading one profile at a time and holding the numbers in your head.',
-      points: ['Pick two to six areas and pin them for comparison',
-               'Indicators lined up in a single table, with the gap between areas shown',
-               'Export the comparison as CSV'],
-    },
     tour: {
       title: 'Take a tour',
       desc: 'A short guided walkthrough of what is on the map and how to read it, for anyone arriving without a specific question.',
@@ -8294,6 +8423,9 @@ loadData();
 
   var sidebar = document.querySelector('.sidebar');
   var queryPane = document.getElementById('tab-query');
+  var comparePane = document.getElementById('tab-compare');
+  // Modes that own the sidebar rather than raising a placeholder card.
+  var BUILT = { query: 'query', compare: 'compare' };
 
   function markRail(mode) {
     rail.querySelectorAll('.mode-btn').forEach(function (b) {
@@ -8310,25 +8442,28 @@ loadData();
   }
 
   function show(mode) {
-    // Query is the one rail entry that is built rather than announced, so it
-    // does not go through the placeholder card. It takes over the sidebar and
-    // leaves the map where it is, because a query you cannot see the results
-    // of on the map is a table with extra steps.
-    if (mode === 'query') {
+    // Query and Compare are built rather than announced, so they skip the
+    // placeholder card. Each takes over the sidebar and leaves the map where
+    // it is: a query whose results you cannot see on the map is a table with
+    // extra steps, and a comparison you cannot locate is a list of names.
+    if (BUILT[mode]) {
       panel.hidden = true;
-      activateTab('query');
-      markRail('query');
-      if (window.PH_QUERY && window.PH_QUERY.build) window.PH_QUERY.build();
+      activateTab(mode);
+      markRail(mode);
+      if (mode === 'query' && window.PH_QUERY) window.PH_QUERY.build();
+      if (mode === 'compare' && window.PH_COMPARE) window.PH_COMPARE.enter();
       return;
     }
 
     var m = MODES[mode];
     markRail(m ? mode : 'explore');
+    if (window.PH_COMPARE) window.PH_COMPARE.leave();
     if (!m) {
       panel.hidden = true;
-      // Leaving Query has to put the sidebar somewhere, or the pane stays up
-      // under a rail that no longer says Query.
-      if (queryPane && queryPane.classList.contains('active')) activateTab('layers');
+      // Leaving a built mode has to put the sidebar somewhere, or its pane
+      // stays up under a rail that no longer names it.
+      if ((queryPane && queryPane.classList.contains('active')) ||
+          (comparePane && comparePane.classList.contains('active'))) activateTab('layers');
       return;
     }
 
@@ -8358,14 +8493,25 @@ loadData();
      the overlay-info link and the restored URL state) and threading a call
      through each of them would leave the sixth one to be found later. Watching
      the pane's own class is the one place that cannot be missed. */
-  if (queryPane && window.MutationObserver) {
+  if (queryPane && comparePane && window.MutationObserver) {
     var sync = function () {
-      var on = queryPane.classList.contains('active');
-      if (sidebar) sidebar.classList.toggle('query-mode', on);
-      if (on) markRail('query');
-      else if (rail.querySelector('.mode-btn[data-mode="query"][aria-selected="true"]')) markRail('explore');
+      var q = queryPane.classList.contains('active');
+      var c = comparePane.classList.contains('active');
+      if (sidebar) {
+        sidebar.classList.toggle('query-mode', q);
+        sidebar.classList.toggle('compare-mode', c);
+      }
+      if (q) markRail('query');
+      else if (c) markRail('compare');
+      else if (rail.querySelector('.mode-btn[aria-selected="true"][data-mode="query"], ' +
+                                  '.mode-btn[aria-selected="true"][data-mode="compare"]')) {
+        markRail('explore');
+        if (window.PH_COMPARE) window.PH_COMPARE.leave();
+      }
     };
-    new MutationObserver(sync).observe(queryPane, { attributes: true, attributeFilter: ['class'] });
+    var mo = new MutationObserver(sync);
+    mo.observe(queryPane, { attributes: true, attributeFilter: ['class'] });
+    mo.observe(comparePane, { attributes: true, attributeFilter: ['class'] });
     sync();
   }
 })();
@@ -8488,6 +8634,10 @@ loadData();
 
   function fmtVal(v, k) {
     if (v == null) return '—';
+    // fmtOv rounds anything it does not recognise to whole numbers, and the
+    // mean decile is neither a percentage nor a score nor a count, so 3.3 came
+    // out as "3". A tenth of a decile is most of the signal in that field.
+    if (/_decile_mean$/.test(k)) return parseFloat(v).toFixed(1);
     if (typeof fmtOv === 'function') return fmtOv(v, k);
     return String(v);
   }
@@ -8655,9 +8805,15 @@ loadData();
   var STATE_H = [342, 174, 66];   // full, peek, collapsed
   var sheetState = 0;
   var currentWard = null;
-  var PIN_MAX = 6;                // the ceiling compare_areas already enforces
+  // Four, from the design file: it fixes the comparison grid at four across
+  // and badges the count "3 of 4". Each pin keeps one of four colours, used on
+  // its card, its row in the pane and its outline on the map, so the three
+  // always refer to each other.
+  var PIN_MAX = 4;
+  var PIN_COLOURS = ['#005EB8', '#AE2573', '#FFB81C', '#009639'];
   var pinned = [];
   var pinLyr = null;
+  function pinColour(i) { return PIN_COLOURS[i % PIN_COLOURS.length]; }
 
   function lift() {
     if (!mapWrap) return;
@@ -8765,7 +8921,7 @@ loadData();
     return '<div class="ws-pins">' +
       '<div class="ws-pins-hd"><span class="ws-lbl">Pinned comparison (' + pinned.length + ' of ' + PIN_MAX + ')</span>' +
       '<button type="button" class="ws-btn" id="ws-unpin-all">Clear pins</button>' +
-      '<button type="button" class="ws-btn" id="ws-pin-csv">CSV</button></div>' +
+      '<button type="button" class="ws-btn primary" id="ws-open-compare">Open Compare</button></div>' +
       '<table class="ws-ptable"><thead><tr>' + head + '</tr></thead><tbody>' + body + '</tbody></table>' +
       '<div class="ws-note">Deprivation deciles run 1 (the most deprived tenth nationally) to 10 (the least). ' +
       'The ward figure is a population-weighted mean of the deciles of the LSOAs inside it, so it is not itself a decile.</div>' +
@@ -8797,6 +8953,16 @@ loadData();
 
   function show(wn) {
     buildOnce();          // the ward data has clearly arrived if a ward was clicked
+    // In Compare mode the map is a picker. The pane says "click a ward on the
+    // map to add another", so a click pins rather than raising the one-ward
+    // sheet over the comparison it was asked to add to.
+    if (inCompareMode()) {
+      window.__phKeepPane = true;         // and it does not leave Compare either
+      if (pinned.indexOf(wn) === -1 && pinned.length < PIN_MAX) pinned.push(wn);
+      refreshPins();
+      if (pinned.length >= 2) openCompareBar();
+      return;
+    }
     var rec = wardRec(wn);
     var w = { name: wn, inds: (rec && rec.indicators) || {}, lad: (rec && rec.lad) || '' };
     currentWard = wn;
@@ -8845,7 +9011,11 @@ loadData();
     });
     if (!feats.length) return;
     pinLyr = L.geoJSON({ type: 'FeatureCollection', features: feats }, {
-      style: { color: '#AE2573', weight: 3, fill: false, opacity: .9, dashArray: '5,4' },
+      // Each pin in its own colour, matching its card and its row.
+      style: function (f) {
+        return { color: pinColour(pinned.indexOf(f.properties.WD24NM)), weight: 3,
+                 fill: false, opacity: .95, dashArray: '5,4' };
+      },
       interactive: false,
     }).addTo(map);
   }
@@ -8859,6 +9029,8 @@ loadData();
         renderBody({ name: currentWard, inds: (rec && rec.indicators) || {} }, m[currentWard] || 0);
       });
     }
+    renderComparePane();
+    renderCompareBar();
   }
 
   pinBtn.addEventListener('click', function (e) {
@@ -8867,7 +9039,7 @@ loadData();
     var at = pinned.indexOf(currentWard);
     if (at !== -1) pinned.splice(at, 1);
     else if (pinned.length >= PIN_MAX) {
-      alert('Six wards is the most that fit side by side. Remove one before pinning another.');
+      alert('Four wards is the most that fit side by side. Remove one before pinning another.');
       return;
     } else pinned.push(currentWard);
     if (sheetState !== 0) { sheetState = 0; applyState(); }
@@ -8909,23 +9081,11 @@ loadData();
       return;
     }
     if (e.target.id === 'ws-unpin-all') { pinned = []; refreshPins(); return; }
-    if (e.target.id === 'ws-pin-csv') { pinCsv(); }
+    if (e.target.id === 'ws-open-compare') {
+      var btn = document.querySelector('.mode-btn[data-mode="compare"]');
+      if (btn) btn.click();
+    }
   });
-
-  function pinCsv() {
-    if (!pinned.length) return;
-    var keys = ['census_population', 'imd_decile_mean', 'imd_score', 'census_over65_pct',
-                'census_disability_any_pct', 'census_bad_health_pct'];
-    var head = ['indicator'].concat(pinned);
-    var lines = [head.map(csvCell).join(',')];
-    keys.forEach(function (k) {
-      lines.push([labelOf(k)].concat(pinned.map(function (n) {
-        var v = num(indsOf(n)[k]);
-        return v == null ? '' : v;
-      })).map(csvCell).join(','));
-    });
-    download('pinned-wards.csv', lines.join('\n'), 'text/csv;charset=utf-8');
-  }
 
   function csvCell(v) {
     var s = v == null ? '' : String(v);
@@ -8943,6 +9103,299 @@ loadData();
   // showWard() and deselectWard() call these, so the sheet follows the map's
   // own idea of what is selected rather than keeping a second one.
   window.PH_SHEET = { show: show, hide: hide };
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     COMPARE MODE
+
+     The design file's compare pane: the pinned wards each in their own colour,
+     the metrics to line them up on, a quick view written from the figures, and
+     a card drawer over the map for the full comparison.
+
+     There is one pin list, shared with the sheet's "Pin to compare" button, so
+     the two surfaces cannot hold different ideas of what is pinned.
+     ───────────────────────────────────────────────────────────────────────── */
+  var cmpPane   = $('tab-compare');
+  var cmpPinsEl = $('cmp-pins');
+  var cmpCountEl = $('cmp-count');
+  var cmpMetricsEl = $('cmp-metrics');
+  var cmpQuickEl = $('cmp-quick');
+  var cmpCautionEl = $('cmp-caution');
+  var cmpBar = $('cmp-bar');
+  var cmpCardsEl = $('cmp-cards');
+  var cmpLegendEl = $('cmp-legend');
+
+  // The design's default row: IMD, bad health and social rent on; over 65 and
+  // no qualifications offered but off.
+  var cmpMetrics = [
+    { k: 'imd_decile_mean',           l: 'IMD',          on: true  },
+    { k: 'census_bad_health_pct',     l: 'Bad health',   on: true  },
+    { k: 'census_social_rented_pct',  l: 'Soc rent',     on: true  },
+    { k: 'census_over65_pct',         l: 'Over 65',      on: false },
+    { k: 'census_no_qual_pct',        l: 'No qual',      on: false },
+    { k: 'census_population',         l: 'Population',   on: false },
+    { k: 'census_disability_any_pct', l: 'Disability',   on: false },
+  ];
+  function cmpActive() {
+    return cmpMetrics.filter(function (m) { return m.on && indicatorKeys().indexOf(m.k) !== -1; });
+  }
+  function inCompareMode() { return !!(cmpPane && cmpPane.classList.contains('active')); }
+
+  function renderComparePane() {
+    if (!cmpPinsEl) return;
+    cmpCountEl.textContent = pinned.length + ' of ' + PIN_MAX;
+
+    if (!pinned.length) {
+      cmpPinsEl.innerHTML = '<div class="cmp-empty">Nothing pinned yet. Click a ward on the map ' +
+        'and it will be added here, or use "Pin to compare" on the ward bar.</div>';
+    } else {
+      cmpPinsEl.innerHTML = pinned.map(function (n, i) {
+        var rec = wardRec(n);
+        return '<div class="cmp-pin" data-goto="' + esc(n) + '">' +
+          '<span class="cmp-spine" style="background:' + pinColour(i) + '"></span>' +
+          '<span class="cmp-txt"><span class="cmp-lad">' + esc((rec && rec.lad) || '') + '</span>' +
+          '<span class="cmp-nm">' + esc(n) + '</span></span>' +
+          '<button type="button" class="cmp-x" data-unpin="' + esc(n) + '" ' +
+          'title="Remove ' + esc(n) + '" aria-label="Remove ' + esc(n) + '">&times;</button>' +
+          '</div>';
+      }).join('') +
+      (pinned.length < PIN_MAX
+        ? '<div class="cmp-addhint">Click a ward on the map to add another</div>' : '');
+    }
+
+    cmpMetricsEl.innerHTML = cmpMetrics.map(function (m, i) {
+      var have = indicatorKeys().indexOf(m.k) !== -1;
+      return '<span class="q-chip' + (m.on && have ? ' on' : '') + '" data-metric="' + i + '"' +
+        (have ? '' : ' style="opacity:.45;cursor:not-allowed" title="Not in the loaded data"') +
+        ' role="button" tabindex="0">' + esc(m.l) + '</span>';
+    }).join('') +
+      '<select class="q-chip outline" id="cmp-add-metric" aria-label="Add a metric">' +
+      '<option value="">+ add</option>' + indicatorOptions(null) + '</select>';
+
+    cmpQuickEl.innerHTML = quickView();
+    renderCmpCaution();
+  }
+
+  /**
+   * The quick view, written from the pinned wards rather than illustrated.
+   *
+   * Every clause names the figure it rests on and the comparison it is making.
+   * Where deprivation is concerned it says where the typical neighbourhood
+   * sits, not what decile "the ward" is in, because the ward figure is a mean
+   * of its LSOAs' deciles and is not itself a decile.
+   */
+  function quickView() {
+    if (pinned.length < 2) {
+      return 'Pin at least two wards to compare them. Each one keeps its colour on the map.';
+    }
+    var bits = [];
+    var decs = pinned.map(function (n) { return num(indsOf(n).imd_decile_mean); })
+                     .filter(function (v) { return v !== null; });
+    if (decs.length === pinned.length) {
+      var worst = Math.max.apply(null, decs);
+      bits.push('All ' + pinned.length + ' pinned wards sit in the most deprived <strong>' +
+        Math.min(100, Math.round(worst * 10)) + '%</strong> of England on the mean decile of their neighbourhoods.');
+    }
+    // Name the outlier on each active metric that actually separates them.
+    cmpActive().slice(0, 3).forEach(function (m) {
+      var rows = pinned.map(function (n) { return { n: n, v: num(indsOf(n)[m.k]) }; })
+                       .filter(function (r) { return r.v !== null; });
+      if (rows.length < 2) return;
+      rows.sort(function (a, b) { return b.v - a.v; });
+      var top = rows[0];
+      if (Math.abs(top.v - rows[rows.length - 1].v) < 1e-9) return;   // all identical
+      var med = median(m.k);
+      var vs = fmtVal(top.v, m.k);
+      var context = med !== null ? ' against a London ward median of ' + fmtVal(med, m.k) : '';
+
+      // Deprivation runs backwards and saying "the highest IMD" of a decile
+      // means the least deprived, which reads as the opposite. The direction
+      // is spelled out for those two rather than left to the word "highest".
+      if (m.k === 'imd_decile_mean') {
+        bits.push('<strong>' + esc(top.n) + '</strong> is the least deprived of them on the mean ' +
+          'decile of its neighbourhoods (' + vs + ')' + context + '.');
+        return;
+      }
+      if (m.k === 'imd_score') {
+        bits.push('<strong>' + esc(top.n) + '</strong> is the most deprived of them by IMD score (' +
+          vs + ')' + context + '.');
+        return;
+      }
+      // The short chip label, not the long description: lowercasing that gave
+      // "the highest mean imd decile of the lsoas in", truncated mid-phrase.
+      var lbl = /[A-Z]{2,}/.test(m.l) ? m.l : m.l.charAt(0).toLowerCase() + m.l.slice(1);
+      bits.push('<strong>' + esc(top.n) + '</strong> has the highest ' + esc(lbl) +
+        ' at ' + vs + context + '.');
+    });
+    if (bits.length === 0) {
+      return 'The pinned wards do not differ on the metrics selected, or those figures are missing for them.';
+    }
+    return bits.join(' ');
+  }
+
+  function renderCmpCaution() {
+    if (!cmpCautionEl) return;
+    var notes = [];
+    var bl = cmpActive().map(function (m) { return m.k; }).filter(isBoroughLevelKey);
+    // Two wards in the same borough, compared on a borough figure, come out
+    // identical. That is the geography, not a finding about the wards.
+    var lads = {}, shared = false;
+    pinned.forEach(function (n) {
+      var lad = (wardRec(n) || {}).lad || '';
+      if (lad && lads[lad]) shared = true;
+      if (lad) lads[lad] = 1;
+    });
+    if (bl.length) {
+      notes.push('<strong>' + esc(bl.map(labelOf).join(', ')) + '</strong> ' +
+        (bl.length > 1 ? 'are' : 'is') + ' published at borough level and written onto every ward ' +
+        'in the borough' +
+        (shared ? ', and two or more of your pins share a borough, so they will read as identical there' : '') +
+        '.');
+    }
+    cmpCautionEl.innerHTML = notes.map(function (n) {
+      return '<div class="q-caution" style="margin-top:9px">' + n + '</div>';
+    }).join('');
+  }
+
+  function renderCompareBar() {
+    if (!cmpCardsEl) return;
+    var mets = cmpActive();
+    // Highest and lowest per metric, so a card can mark its own outliers.
+    var ext = {};
+    mets.forEach(function (m) {
+      var vs = pinned.map(function (n) { return num(indsOf(n)[m.k]); })
+                     .filter(function (v) { return v !== null; });
+      if (vs.length > 1) {
+        var hi = Math.max.apply(null, vs), lo = Math.min.apply(null, vs);
+        if (hi !== lo) ext[m.k] = { hi: hi, lo: lo };
+      }
+    });
+
+    cmpCardsEl.innerHTML = pinned.map(function (n, i) {
+      var rec = wardRec(n), inds = (rec && rec.indicators) || {};
+      var rows = mets.map(function (m) {
+        var v = num(inds[m.k]);
+        var cls = '';
+        if (v !== null && ext[m.k]) {
+          if (v === ext[m.k].hi) cls = ' hi';
+          else if (v === ext[m.k].lo) cls = ' lo';
+        }
+        return '<div class="cmp-c-row"><span class="k">' + esc(m.l) + '</span>' +
+          '<span class="v' + cls + '">' + (v === null ? '—' : fmtVal(v, m.k)) + '</span></div>';
+      }).join('');
+      return '<div class="cmp-card">' +
+        '<div class="cmp-c-hdr"><span class="cmp-swatch" style="background:' + pinColour(i) + '"></span>' +
+        '<span class="cmp-c-lad">' + esc((rec && rec.lad) || '') + '</span></div>' +
+        '<div class="cmp-c-nm">' + esc(n) + '</div>' + rows + '</div>';
+    }).join('') +
+      (pinned.length < PIN_MAX
+        ? '<div class="cmp-card add">Click a ward on the map to pin it</div>' : '');
+
+    $('cmp-bar-title').textContent = pinned.length
+      ? 'Comparing ' + pinned.length + ' ward' + (pinned.length === 1 ? '' : 's')
+      : 'Comparison';
+    cmpLegendEl.innerHTML = mets.length
+      ? '&#9650; highest and &#9660; lowest of the pinned wards on that row. Which end is better ' +
+        'depends on the indicator: a high IMD decile is the least deprived, a high bad-health ' +
+        'percentage is the worst.'
+      : 'No metrics selected.';
+  }
+
+  function openCompareBar() {
+    if (!cmpBar) return;
+    hide();                       // the sheet and the bar share the same space
+    cmpBar.classList.add('open');
+    liftFor(cmpBar);
+  }
+  function closeCompareBar() {
+    if (!cmpBar) return;
+    cmpBar.classList.remove('open');
+    if (!sheet.classList.contains('open') && mapWrap) {
+      mapWrap.classList.remove('has-sheet');
+      mapWrap.style.setProperty('--sheet-lift', '0px');
+      document.documentElement.style.setProperty('--sheet-lift', '0px');
+    }
+  }
+  function liftFor(el) {
+    if (!mapWrap) return;
+    mapWrap.classList.add('has-sheet');
+    var px = (el.offsetHeight + 16) + 'px';
+    mapWrap.style.setProperty('--sheet-lift', px);
+    document.documentElement.style.setProperty('--sheet-lift', px);
+  }
+
+  if (cmpPinsEl) {
+    cmpPinsEl.addEventListener('click', function (e) {
+      var x = e.target.closest('[data-unpin]');
+      if (x) {
+        e.stopPropagation();
+        var at = pinned.indexOf(x.getAttribute('data-unpin'));
+        if (at !== -1) pinned.splice(at, 1);
+        refreshPins();
+        return;
+      }
+      var go = e.target.closest('[data-goto]');
+      if (go) selectWardByName(go.getAttribute('data-goto'));
+    });
+    cmpMetricsEl.addEventListener('click', function (e) {
+      var chip = e.target.closest('[data-metric]');
+      if (!chip) return;
+      var m = cmpMetrics[+chip.getAttribute('data-metric')];
+      if (indicatorKeys().indexOf(m.k) === -1) return;
+      m.on = !m.on;
+      renderComparePane(); renderCompareBar();
+    });
+    cmpMetricsEl.addEventListener('keydown', function (e) {
+      if ((e.key === 'Enter' || e.key === ' ') && e.target.closest('[data-metric]')) {
+        e.preventDefault(); e.target.click();
+      }
+    });
+    cmpMetricsEl.addEventListener('change', function (e) {
+      if (e.target.id !== 'cmp-add-metric' || !e.target.value) return;
+      var k = e.target.value;
+      var found = cmpMetrics.filter(function (m) { return m.k === k; })[0];
+      if (found) found.on = true;
+      else cmpMetrics.push({ k: k, l: labelOf(k), on: true });
+      renderComparePane(); renderCompareBar();
+    });
+    $('cmp-open').addEventListener('click', function () {
+      if (pinned.length < 2) { alert('Pin at least two wards to compare them.'); return; }
+      renderCompareBar(); openCompareBar();
+    });
+    $('cmp-csv').addEventListener('click', cmpCsv);
+    $('cmp-bar-csv').addEventListener('click', cmpCsv);
+    $('cmp-bar-close').addEventListener('click', closeCompareBar);
+    $('cmp-back').addEventListener('click', function () {
+      var explore = document.querySelector('.mode-btn[data-mode="explore"]');
+      if (explore) explore.click();
+    });
+  }
+
+  function cmpCsv() {
+    if (!pinned.length) { alert('Pin at least one ward first.'); return; }
+    var mets = cmpActive();
+    var lines = [['indicator', 'unit'].concat(pinned).map(csvCell).join(',')];
+    mets.forEach(function (m) {
+      lines.push([labelOf(m.k), unitOf(m.k)].concat(pinned.map(function (n) {
+        var v = num(indsOf(n)[m.k]);
+        return v === null ? '' : v;
+      })).map(csvCell).join(','));
+    });
+    lines.push(['borough', ''].concat(pinned.map(function (n) {
+      return (wardRec(n) || {}).lad || '';
+    })).map(csvCell).join(','));
+    download('ward-comparison.csv', lines.join('\n'), 'text/csv;charset=utf-8');
+  }
+
+  window.PH_COMPARE = {
+    enter: function () {
+      buildOnce();
+      renderComparePane();
+      renderCompareBar();
+      if (pinned.length >= 2) openCompareBar();
+    },
+    leave: closeCompareBar,
+    refresh: function () { renderComparePane(); renderCompareBar(); },
+  };
 
   /* ─────────────────────────────────────────────────────────────────────────
      THE QUERY BUILDER
