@@ -136,7 +136,7 @@ def load_lsoa_ward_and_pop():
     html = (REPO / 'index.html').read_text(encoding='utf-8')
     m = re.search(r'const LSOA_IMD\s*=\s*(\{.*?\});', html, re.DOTALL)
     if not m:
-        sys.exit("LSOA_IMD not found in index.html")
+        sys.exit("LSOA_IMD not found in index.html. " "Map data moved to data/map/*.js in Phase 3.1; read it with map_data.read_blob() instead of parsing index.html.")
     gj = json.loads(m.group(1))
     lsoa_to_ward = {}
     for f in gj.get('features', []):

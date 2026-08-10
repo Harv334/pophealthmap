@@ -7,7 +7,7 @@ Produces the three JSON files consumed by index.html:
     lsoa_data.json   - LSOA-level IMD + census (33,755 LSOAs)
     pharmacies.json  - pharmacy point data (~540 rows)
 
-Plus it re-splices the GPS and HOSP constants inside index.html.
+Plus it writes the map data files under data/map/ that index.html loads.
 
 ------------------------------------------------------------------------------
 MANUAL DOWNLOADS  (none are required for a normal run)
@@ -3272,13 +3272,51 @@ def build_pharmacies_json() -> list:
     })
     return df.to_dict(orient="records")
 
-def splice_index_html() -> None:
-    """Re-splice the GPS/HOSP constants in index.html from the Parquet stores."""
+MAP_DIR = DATA_DIR / "map"
+
+# index.html's data globals and the file each one lives in. index.html loads
+# these as classic <script src> tags, in this order, before the main block.
+# Keep this in step with those tags: a mismatch means the global is undefined
+# and the map renders empty rather than erroring.
+MAP_BLOBS = {
+    "GJ":         "wards.js",
+    "GPS":        "gp_practices.js",
+    "HOSP":       "hospitals.js",
+    "LSOA_IMD":   "lsoa_imd.js",
+    "BOROUGH_GJ": "boroughs.js",
+}
+
+def write_map_blob(name: str, payload, description: str) -> None:
+    """
+    Write one of index.html's data globals to data/map/<name>.js.
+
+    These are classic scripts loaded in order before the app, so the global is
+    defined by the time any code reads it. That matters: every consumer in
+    index.html reads these at parse time, several before the map object even
+    exists, so they cannot become async fetches without restructuring the whole
+    initialisation sequence.
+    """
+    if name not in MAP_BLOBS:
+        raise RuntimeError(
+            f"write_map_blob: unknown global {name!r}. Add it to MAP_BLOBS and "
+            f"add a matching <script src> tag in index.html, or the global will "
+            f"be undefined at parse time."
+        )
+    MAP_DIR.mkdir(parents=True, exist_ok=True)
+    body = json.dumps(_scrub_nan(payload), separators=(",", ":"), ensure_ascii=False)
+    write_atomic(MAP_DIR / MAP_BLOBS[name], (
+        f"// {description}\n"
+        f"// Loaded by index.html as a classic script before the main block,\n"
+        f"// so this global is defined by the time any code reads it.\n"
+        f"var {name} = {body};\n"
+    ))
+
+def export_map_blobs() -> None:
+    """Regenerate the map data files the pipeline owns."""
     index_path = REPO_ROOT / "index.html"
     if not index_path.exists():
-        warn(f"index.html not found at {index_path} — skipping splice")
+        warn(f"index.html not found at {index_path}; skipping map blob export")
         return
-    html = index_path.read_text(encoding="utf-8")
 
     gps = _read_parquet_opt(DATA_DIR / "healthcare" / "gp_practices.parquet")
     if gps is not None:
@@ -3310,22 +3348,17 @@ def splice_index_html() -> None:
                     rec["qof"] = qof_by_code[c]
             ok(f"spliced QOF onto {sum(1 for r in gp_records if 'qof' in r):,} practices")
 
-        js = "const GPS = " + json.dumps(gp_records, ensure_ascii=False) + ";"
-        html = re.sub(r"const GPS = \[(?:\{[^\n]*\},?\s*)+\];", js, html, count=1)
+        write_map_blob("GPS", gp_records,
+                       "GP practices. Emitted by fetch_all_data.py from "
+                       "data/healthcare/gp_practices.parquet, with QOF prevalence attached.")
+        ok(f"map blob: {len(gp_records):,} GP practices -> "
+           f"data/map/{MAP_BLOBS['GPS']}")
 
-    hosp = _read_parquet_opt(DATA_DIR / "healthcare" / "hospitals.parquet")
-    if hosp is not None:
-        cols = [c for c in ["name", "addr", "lat", "lng", "type"]
-                if c in hosp.columns]
-        js = "const HOSP = " + json.dumps(
-            hosp[cols].rename(columns={"name": "n", "addr": "a", "type": "t"})
-                      .to_dict(orient="records"),
-            ensure_ascii=False,
-        ) + ";"
-        html = re.sub(r"const HOSP = \[(?:\{[^\n]*\},?\s*)+\];", js, html, count=1)
-
-    write_atomic(index_path, html)
-    ok("re-spliced index.html")
+    # HOSP is deliberately not written here. data/map/hosp.js is hand-curated:
+    # 20 hospitals with their parent NHS trust, which run_hospitals() does not
+    # produce. The old splice regex for it never matched (the block carries //
+    # comment lines), so this was already the de facto behaviour; making it
+    # explicit stops a future change from silently destroying that file.
 
 
 def export_all() -> None:
@@ -3344,7 +3377,7 @@ def export_all() -> None:
     ok(f"pharmacies.json: {len(pharm_data):,} rows")
     ok(f"vcse_data.json:  {len(vcse_data):,} charities")
 
-    splice_index_html()
+    export_map_blobs()
 
 # ============================================================================
 # MAIN
@@ -3419,7 +3452,7 @@ def main() -> int:
                    help="Skip the named sources.")
     p.add_argument("--export-only", action="store_true",
                    help="Skip all fetches; just rebuild ward/lsoa/pharmacy JSON "
-                        "from the existing parquets + re-splice index.html.")
+                        "from the existing parquets and rewrite data/map/.")
     args = p.parse_args()
 
     if not args.export_only:

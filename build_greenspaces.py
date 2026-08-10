@@ -42,7 +42,7 @@ def _extract_lsoa_imd(html: str) -> dict:
     """Extract the embedded LSOA_IMD GeoJSON object from index.html."""
     m = re.search(r"const\s+LSOA_IMD\s*=\s*(\{)", html)
     if not m:
-        sys.exit("Could not find 'const LSOA_IMD = {' in index.html")
+        sys.exit("Could not find 'const LSOA_IMD = {' in index.html. " "Map data moved to data/map/*.js in Phase 3.1; read it with map_data.read_blob() instead of parsing index.html.")
     start = m.end() - 1
     depth = 0
     i = start

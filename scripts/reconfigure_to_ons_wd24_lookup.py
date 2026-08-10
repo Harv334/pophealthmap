@@ -196,7 +196,7 @@ def rewrite_index_geojson(lookup: dict) -> tuple[int, int, int]:
     html = INDEX_HTML.read_text(encoding="utf-8")
     m = re.search(r"const LSOA_IMD = (\{.*?\});", html, re.DOTALL)
     if not m:
-        sys.exit("LSOA_IMD const not found in index.html")
+        sys.exit("LSOA_IMD const not found in index.html. " "Map data moved to data/map/*.js in Phase 3.1; read it with map_data.read_blob() instead of parsing index.html.")
     geo = json.loads(m.group(1))
 
     kept = []

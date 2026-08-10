@@ -11,8 +11,10 @@ Live map: https://harv334.github.io/NW-PH-Mapping/
 
 | Path                | What it is |
 |---------------------|----------------------------------------------------|
-| `index.html`        | The map itself - single-file Leaflet, deployed to GitHub Pages |
-| `fetch_all_data.py` | One script. Downloads everything, builds the JSON the map reads, re-splices `index.html`. |
+| `index.html`        | The map itself - Leaflet, deployed to GitHub Pages |
+| `data/map/`         | The map's data, as classic scripts loaded before the app: ward and borough boundaries, LSOA IMD, GP practices, hospitals. Moved out of `index.html` in Phase 3.1, which took it from 1.77 MB to 484 KB. |
+| `map_data.py`       | Reads `data/map/*.js` from Python. Use this rather than parsing `index.html`. |
+| `fetch_all_data.py` | One script. Downloads everything, builds the JSON the map reads, writes `data/map/`. |
 | `ward_data.json`    | Ward-level indicators (188 wards) - consumed by the map at load |
 | `lsoa_data.json`    | LSOA-level IMD scores + census columns (33,755 LSOAs) |
 | `pharmacies.json`   | Pharmacy point data (~540 rows) |

@@ -53,7 +53,7 @@ def main():
     html = INDEX_HTML.read_text(encoding='utf-8')
     m = re.search(r'const BOROUGH_GJ\s*=\s*(\{.*?\});', html, re.DOTALL)
     if not m:
-        raise SystemExit("Could not find inline BOROUGH_GJ in index.html")
+        raise SystemExit("Could not find inline BOROUGH_GJ in index.html. " "Map data moved to data/map/*.js in Phase 3.1; read it with map_data.read_blob() instead of parsing index.html.")
     bg = json.loads(m.group(1))
     feats = bg.get('features', [])
     print(f"  {len(feats)} borough polygons in BOROUGH_GJ")
