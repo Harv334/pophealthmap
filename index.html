@@ -8468,6 +8468,20 @@ loadData();
     });
   }
 
+  /* Which tab to come back to.
+     Layers, VCSE, Overlay and Ward are filters and views, not modes: they are
+     meant to hold across everything else. Query and Compare borrow the sidebar
+     while they are open, so leaving one has to give back the tab it took, not
+     drop everyone on Layers. Someone who set up an overlay, looked something up
+     in Query and came back used to find their overlay tab closed. */
+  var lastTab = 'layers';
+  function rememberTab() {
+    var pane = document.querySelector('.tab-pane.active');
+    if (!pane) return;
+    var name = pane.id.replace(/^tab-/, '');
+    if (name !== 'query' && name !== 'compare') lastTab = name;
+  }
+
   function show(mode) {
     // Query and Compare are built rather than announced, so they skip the
     // placeholder card. Each takes over the sidebar and leaves the map where
@@ -8475,22 +8489,24 @@ loadData();
     // extra steps, and a comparison you cannot locate is a list of names.
     if (BUILT[mode]) {
       panel.hidden = true;
+      rememberTab();
       activateTab(mode);
       markRail(mode);
       if (mode === 'query' && window.PH_QUERY) window.PH_QUERY.build();
-      if (mode === 'compare' && window.PH_COMPARE) window.PH_COMPARE.enter();
+      // One call owns what each mode leaves on the map, so opening any of them
+      // puts away whatever the last one drew.
+      if (window.PH_MODES) window.PH_MODES.activate(mode);
       return;
     }
 
     var m = MODES[mode];
     markRail(m ? mode : 'explore');
-    if (window.PH_COMPARE) window.PH_COMPARE.leave();
+    if (window.PH_MODES) window.PH_MODES.activate(m ? mode : 'explore');
     if (!m) {
       panel.hidden = true;
-      // Leaving a built mode has to put the sidebar somewhere, or its pane
-      // stays up under a rail that no longer names it.
+      // Leaving a built mode gives the sidebar back to whichever tab it took.
       if ((queryPane && queryPane.classList.contains('active')) ||
-          (comparePane && comparePane.classList.contains('active'))) activateTab('layers');
+          (comparePane && comparePane.classList.contains('active'))) activateTab(lastTab);
       return;
     }
 
@@ -8532,8 +8548,11 @@ loadData();
       else if (c) markRail('compare');
       else if (rail.querySelector('.mode-btn[aria-selected="true"][data-mode="query"], ' +
                                   '.mode-btn[aria-selected="true"][data-mode="compare"]')) {
+        // A pane can be switched away from without going through the rail:
+        // clicking an LSOA sends the sidebar to the Ward tab. That is still a
+        // mode change, so it tears down like one.
         markRail('explore');
-        if (window.PH_COMPARE) window.PH_COMPARE.leave();
+        if (window.PH_MODES) window.PH_MODES.activate('explore');
       }
     };
     var mo = new MutationObserver(sync);
@@ -8840,6 +8859,9 @@ loadData();
   var PIN_COLOURS = ['#005EB8', '#AE2573', '#FFB81C', '#009639'];
   var pinned = [];
   var pinLyr = null;
+  // Which of Explore / Query / Compare is open. The map layers below read it
+  // so that nothing a mode draws outlives the mode.
+  var currentMode = 'explore';
   function pinColour(i) { return PIN_COLOURS[i % PIN_COLOURS.length]; }
 
   function lift() {
@@ -9027,6 +9049,27 @@ loadData();
     lift();
   }
 
+  /* Suspend, not hide.
+     Compare puts its own drawer in the sheet's place, so the sheet has to go
+     while Compare is open. hide() forgets which ward was selected, which would
+     mean coming back to Explore with a ward still highlighted on the map and
+     nothing saying which one. This keeps the selection and only takes the
+     panel off screen. */
+  var sheetSuspended = false;
+  function suspendSheet() {
+    if (!sheet.classList.contains('open')) return;
+    sheetSuspended = true;
+    sheet.classList.remove('open');
+    lift();
+  }
+  function resumeSheet() {
+    if (sheetSuspended && currentWard) {
+      sheet.classList.add('open');
+      applyState();
+    }
+    sheetSuspended = false;
+  }
+
   function syncPinBtn() {
     var on = currentWard && pinned.indexOf(currentWard) !== -1;
     pinBtn.textContent = on ? 'Pinned ✓' : '+ Pin to compare';
@@ -9035,6 +9078,14 @@ loadData();
 
   function drawPins() {
     if (pinLyr && typeof map !== 'undefined') { map.removeLayer(pinLyr); pinLyr = null; }
+    // Pins are drawn everywhere except Query.
+    //
+    // They are not really Compare's output: pinning starts on the ward sheet,
+    // in Explore, and a "Pin to compare" that marks nothing on the map is a
+    // button with no visible effect. But Query owns the outline channel while
+    // it is open, and two sets of outlines in two colours, one of them
+    // answering a question and one of them not, is the thing being fixed here.
+    if (currentMode === 'query') return;
     if (!pinned.length || typeof GJ === 'undefined' || !GJ.features || typeof map === 'undefined') return;
     var feats = GJ.features.filter(function (f) {
       return pinned.indexOf(f.properties.WD24NM) !== -1;
@@ -9332,7 +9383,9 @@ loadData();
 
   function openCompareBar() {
     if (!cmpBar) return;
-    hide();                       // the sheet and the bar share the same space
+    // Suspend, not hide: they share the same space, but hide() forgets the
+    // selected ward and Explore needs it back when Compare closes.
+    suspendSheet();
     cmpBar.classList.add('open');
     liftFor(cmpBar);
   }
@@ -9416,16 +9469,45 @@ loadData();
     download('ward-comparison.csv', lines.join('\n'), 'text/csv;charset=utf-8');
   }
 
-  window.PH_COMPARE = {
-    enter: function () {
+  /* ─────────────────────────────────────────────────────────────────────────
+     WHICH MODE OWNS THE MAP
+
+     Explore, Query and Compare each draw something, and only the mode you are
+     in should be drawing. Query's matched wards used to stay outlined after
+     you left it, so switching to Compare gave you two sets of outlines in two
+     colours, one of them answering a question you had moved on from; and the
+     pins stayed after leaving Compare, marking four wards for no stated
+     reason. Both were the mode still running with its pane shut.
+
+     Only what is drawn is torn down. The pin list, the query and its results
+     are state, and they are still there when the mode is next opened, which is
+     the difference between a mode being closed and a mode being reset.
+
+     The sidebar tabs are not modes and are not touched: Layers, VCSE, Overlay
+     and Ward are filters and views over whatever is on the map, and they are
+     meant to hold across all of this.
+     ───────────────────────────────────────────────────────────────────────── */
+  function applyMode(mode) {
+    currentMode = (mode === 'query' || mode === 'compare') ? mode : 'explore';
+
+    // The one-ward sheet is shared by Explore and Query; Compare's drawer
+    // takes its place, so it is suspended rather than closed.
+    if (currentMode === 'compare') suspendSheet(); else resumeSheet();
+
+    drawMatches(q._rows);          // self-guards: draws only in Query
+    drawPins();                    // self-guards: draws only in Compare
+
+    if (currentMode === 'compare') {
       buildOnce();
       renderComparePane();
       renderCompareBar();
-      if (pinned.length >= 2) openCompareBar();
-    },
-    leave: closeCompareBar,
-    refresh: function () { renderComparePane(); renderCompareBar(); },
-  };
+      if (pinned.length >= 2) openCompareBar(); else closeCompareBar();
+    } else {
+      closeCompareBar();
+    }
+  }
+
+  window.PH_MODES = { activate: applyMode, current: function () { return currentMode; } };
 
   /* ─────────────────────────────────────────────────────────────────────────
      THE QUERY BUILDER
@@ -9446,7 +9528,9 @@ loadData();
     { v: 'eq',  l: '= equals' },
   ];
 
-  var q = { services: [], scope: '', conds: [], sort: 'imd_score', dir: 'desc' };
+  // _rows is the last result set, kept so re-entering Query puts its highlight
+  // back on the map rather than making you run the query again.
+  var q = { services: [], scope: '', conds: [], sort: 'imd_score', dir: 'desc', _rows: null };
 
   // The indicator menu. Grouped so 99 keys are navigable, and the
   // borough-level Fingertips series is last and labelled, because filtering
@@ -9702,7 +9786,11 @@ loadData();
 
   function drawMatches(rows) {
     if (qLyr && typeof map !== 'undefined') { map.removeLayer(qLyr); qLyr = null; }
-    if (!rows.length || typeof GJ === 'undefined' || !GJ.features || typeof map === 'undefined') return;
+    // Same rule as the pins: the highlight belongs to Query. Leaving it behind
+    // meant switching to Compare and reading two sets of outlines in two
+    // colours, one of them answering a question you were no longer asking.
+    if (currentMode !== 'query') return;
+    if (!rows || !rows.length || typeof GJ === 'undefined' || !GJ.features || typeof map === 'undefined') return;
     var want = {};
     rows.forEach(function (r) { want[r.name] = 1; });
     var feats = GJ.features.filter(function (f) { return want[f.properties.WD24NM]; });
