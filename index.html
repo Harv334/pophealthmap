@@ -1097,6 +1097,88 @@
     border: 1px solid var(--line); border-radius: 6px; background: var(--paper); color: var(--ink);
     min-width: 0; }
 
+  /* ── Narrow-screen component overrides ────────────────────────────────────
+     These sit at the end of the stylesheet on purpose. Every rule below
+     overrides a component declared further down than the layout media query
+     up top, and at equal specificity the later rule wins, so putting them
+     with the rest of the responsive block left .cmp-bar on its desktop insets
+     and .cmp-cards at four across on a phone. They belong after what they
+     override, not next to what they relate to. */
+  @media (max-width: 760px) {
+    /* ── The ward bar as a real mobile sheet ──
+       It opened at full height, which on a phone put a 342px panel over a
+       683px map and covered nearly half of it before you had asked for
+       anything. It opens at peek now: the ward's name, its borough and its
+       deprivation, which is the answer to "what did I just tap". Dragging the
+       handle up gives the rest. */
+    .ws-sheet, .cmp-bar, .tour-strip { left: 8px; right: 8px; bottom: 8px; }
+    .ws-sheet { max-height: 76vh; max-height: 76dvh; }
+    /* Peek is exactly the head. A fixed 150px left the insight card sliced
+       through the middle of a word at the bottom edge, which reads as a
+       rendering fault rather than as "there is more below". The handle is what
+       says there is more. */
+    .ws-sheet.peek { max-height: none; }
+    .ws-sheet.peek .ws-body { display: none; }
+    .ws-sheet.collapsed { max-height: 58px; }
+    .ws-head { padding: 11px 12px 10px; gap: 8px; touch-action: pan-y; }
+    .ws-title h2 { font-size: 16px; }
+    .ws-body { padding: 12px 12px 14px; }
+    /* Two columns of figures rather than one long strip of six. */
+    .ws-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+    /* Open profile is the one that leads somewhere; the other two are
+       secondary and stop competing for a 390px row. */
+    .ws-acts { width: 100%; gap: 5px; }
+    .ws-acts .ws-btn { flex: 1 1 auto; padding: 8px 6px; font-size: 11px; }
+    .ws-sheet.peek .ws-acts #ws-pin,
+    .ws-sheet.peek .ws-acts #ws-pdf,
+    .ws-sheet.collapsed .ws-acts { display: none; }
+    /* A bigger grab area for the drag, because a 4px bar is not a target. */
+    .ws-handle { width: 52px; height: 5px; top: 7px; }
+    .ws-sheet::before { content: ''; position: absolute; top: 0; left: 0; right: 0;
+      height: 20px; }
+    .cmp-bar { max-height: 76vh; max-height: 76dvh; }
+    /* Four cards across is a desktop shape. */
+    .cmp-cards { grid-template-columns: minmax(0, 1fr); }
+    .tour-strip { padding: 11px 13px 12px; }
+    .tour-narr { font-size: 12.5px; margin-bottom: 10px; }
+    .tour-ctrls { gap: 6px; }
+    .tour-next-lbl { display: none; }
+
+    /* ── The bottom-right corner ──
+       The Ask button, the Fingertips notice, the legend and the OSM
+       attribution were four things independently claiming the same corner of
+       a 390px screen. They lift above the sheet together already; here they
+       stop overlapping each other as well. */
+    #ai-toggle { right: 8px; padding: 8px 12px; font-size: 12px; }
+    #fingertips-banner { left: 8px; right: 8px !important; max-width: none;
+      font-size: 11px; padding: 8px 10px; }
+    .map-legend-strip { left: 8px; right: 8px; transform: none; max-width: none;
+      font-size: 10.5px; padding: 5px 9px; }
+    .map-legend-strip .mls-label { max-width: 45%; }
+    /* The viewing strip is scope only now; keep it to one line. */
+    .viewing-strip { padding: 4px 10px 5px; font-size: 11px; }
+  }
+
+  /* Coarse pointers get bigger targets, whatever the width. A 25px row is a
+     comfortable click and an awkward tap. */
+  @media (pointer: coarse) {
+    .lrow { padding: 9px 6px; min-height: 40px; }
+    .ov-opt { padding: 10px 10px 10px 16px; min-height: 40px; }
+    .ov-grp-hd { padding: 11px 10px; }
+    /* Padding alone left these at 35px: the text is 11px and the line box goes
+       with it, so the box needs a floor of its own. */
+    .sb-tab { padding: 12px 13px; min-height: 44px; display: flex;
+      align-items: center; justify-content: center; }
+    .dir-item { padding: 10px 14px; }
+    .q-chip, .ws-btn, .tb-btn { min-height: 34px; }
+    .cmp-pin { padding: 11px 10px; }
+    /* Pinch and the +/- control both zoom; the slider is a third way to do
+       the same thing, taking up room on the screen with the least of it.
+       Targeted by id rather than :has(), which is well supported now but is
+       not worth depending on to hide one row. */
+    #zoom-row { display: none; }
+  }
+
 </style>
 
 <!-- Structured data. Two graphs: the site itself, and the data behind it.
@@ -1794,7 +1876,7 @@
           <input type="range" id="border-weight" min="1" max="10" value="1" step="1">
           <span class="opacity-val" id="border-weight-val">1</span>
         </div>
-        <div class="opacity-row" style="margin-top:6px">
+        <div class="opacity-row" id="zoom-row" style="margin-top:6px">
           <label>Zoom</label>
           <input type="range" id="zoom-slider" min="1" max="10" value="3" step="1">
           <span class="opacity-val" id="zoom-slider-val">3</span>
@@ -5580,6 +5662,9 @@ function _applyBoroughSolo() {
 
   function setOpen(on) {
     if (!narrow()) on = false;
+    // One at a time. The drawer and a full-height ward sheet are both trying
+    // to be the thing on screen, and on a phone there is only room for one.
+    if (on && window.PH_SHEET && window.PH_SHEET.shrink) window.PH_SHEET.shrink();
     sidebar.classList.toggle('open', on);
     scrim.classList.toggle('on', on);
     scrim.hidden = !on;
@@ -7518,8 +7603,11 @@ function _refreshUI() {
           && typeof NEIGHBOURHOODS !== 'undefined' && NEIGHBOURHOODS[focusedNbhd]) {
         parts.push(`nbhd <b>${NEIGHBOURHOODS[focusedNbhd].label}</b>`);
       }
-      parts.push('<b>' + (currentDataLevel === 'lsoa' ? 'LSOA'
-                        : currentDataLevel === 'msoa' ? 'MSOA' : 'Ward') + '</b> mode');
+      // The level is not repeated here. The Viewing badge in the corner of the
+      // map is the control for it and shows which one is active, so the strip
+      // saying "Ward mode" a second time under the word "Viewing" was the same
+      // fact twice, in the two places most likely to be read together.
+      // The strip's job is the scope: where you are and what is drawn on it.
       if (typeof curOv !== 'undefined' && curOv && curOv !== 'none') {
         parts.push(`overlay <b>${_ovLabel(curOv)}</b>`);
       }
@@ -9799,7 +9887,15 @@ loadData();
   var closeBtn = $('ws-close');
   var mapWrap = $('map-wrap');
 
-  var STATE_H = [342, 174, 66];   // full, peek, collapsed
+  // full, peek, collapsed. The phone gets its own set: a fixed 342px panel is
+  // half of a 683px map, and the CSS caps the full state in dvh, so the
+  // numbers here have to follow or the lift under it would be wrong.
+  function isNarrow() { return window.matchMedia('(max-width: 760px)').matches; }
+  function stateHeights() {
+    return isNarrow()
+      ? [Math.round((window.innerHeight || 800) * 0.76), 150, 58]
+      : [342, 174, 66];
+  }
   var sheetState = 0;
   var currentWard = null;
   // Four, from the design file: it fixes the comparison grid at four across
@@ -9819,7 +9915,8 @@ loadData();
     if (!mapWrap) return;
     var open = sheet.classList.contains('open');
     mapWrap.classList.toggle('has-sheet', open);
-    var h = open ? Math.min(sheet.offsetHeight || STATE_H[sheetState], STATE_H[sheetState]) : 0;
+    var cap = stateHeights()[sheetState];
+    var h = open ? Math.min(sheet.offsetHeight || cap, cap) : 0;
     var px = (open ? h + 16 : 0) + 'px';
     mapWrap.style.setProperty('--sheet-lift', px);
     // Also on the root, for the development banner, which is position:fixed
@@ -9840,10 +9937,49 @@ loadData();
   });
 
   function cycle() { sheetState = (sheetState + 1) % 3; applyState(); }
+  function setSheetState(n) {
+    n = Math.max(0, Math.min(2, n));
+    if (n === sheetState) return;
+    sheetState = n;
+    applyState();
+    // On a phone the sheet at full height and the drawer are both trying to be
+    // the thing you are looking at. One at a time.
+    if (isNarrow() && n === 0 && window.PH_DRAWER) window.PH_DRAWER.close();
+  }
+
   headEl.addEventListener('click', function (e) {
     if (e.target.closest('.ws-acts')) return;   // buttons act, they do not resize
+    if (headEl._dragged) { headEl._dragged = false; return; }
     cycle();
   });
+
+  /* Drag the handle.
+     Click-to-cycle is fine with a mouse and unguessable with a thumb: there is
+     a handle drawn at the top of the sheet that looks exactly like every other
+     sheet handle on a phone, and it did nothing. Up opens, down closes, and a
+     tap still cycles so nothing is taken away. */
+  (function dragSheet() {
+    var startY = null, startState = 0;
+    headEl.addEventListener('pointerdown', function (e) {
+      if (e.target.closest('.ws-acts')) return;
+      startY = e.clientY;
+      startState = sheetState;
+      headEl._dragged = false;
+    });
+    headEl.addEventListener('pointerup', function (e) {
+      if (startY === null) return;
+      var dy = e.clientY - startY;
+      startY = null;
+      if (Math.abs(dy) < 24) return;            // a tap, not a drag
+      headEl._dragged = true;                   // so the click does not also fire
+      setSheetState(startState + (dy < 0 ? -1 : 1));
+    });
+    headEl.addEventListener('pointercancel', function () { startY = null; });
+  })();
+
+  // The heights are viewport-derived on a phone, so a rotate or a resize has
+  // to re-measure or the furniture above the sheet sits at the old offset.
+  window.addEventListener('resize', function () { if (sheet.classList.contains('open')) lift(); });
   headEl.addEventListener('keydown', function (e) {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); cycle(); }
   });
@@ -9977,12 +10113,21 @@ loadData();
 
     syncPinBtn();
     renderBody(w, null);
+    var wasOpen = sheet.classList.contains('open');
     sheet.classList.add('open');
-    // Restore a collapsed sheet fully. Collapsed shows the name and nothing
-    // else, and now that the sheet is the whole response to a ward click,
-    // leaving it that way means the click appears to do nothing. Peek is left
-    // alone: that one is a size the user chose and can still read.
-    if (sheetState === 2) { sheetState = 0; }
+    if (isNarrow()) {
+      // Peek is the phone's opening size: the name, the borough and the
+      // deprivation, which answers "what did I just tap" without covering the
+      // map you tapped it on. Drag up for the rest.
+      if (!wasOpen || sheetState === 2) sheetState = 1;
+      if (window.PH_DRAWER) window.PH_DRAWER.close();
+    } else if (sheetState === 2) {
+      // Restore a collapsed sheet fully. Collapsed shows the name and nothing
+      // else, and now that the sheet is the whole response to a ward click,
+      // leaving it that way means the click appears to do nothing. Peek is
+      // left alone: that one is a size the user chose and can still read.
+      sheetState = 0;
+    }
     applyState();
 
     // GP practices are not a pipeline indicator, so the count comes from a
@@ -10134,7 +10279,14 @@ loadData();
 
   // showWard() and deselectWard() call these, so the sheet follows the map's
   // own idea of what is selected rather than keeping a second one.
-  window.PH_SHEET = { show: show, hide: hide };
+  window.PH_SHEET = {
+    show: show, hide: hide,
+    // Used by the drawer to get the sheet out of its way without losing the
+    // selection, and by the tests to read the state without inferring it.
+    shrink: function () { if (sheetState === 0) setSheetState(1); },
+    state: function () { return sheetState; },
+    setState: setSheetState,
+  };
 
   /* ─────────────────────────────────────────────────────────────────────────
      COMPARE MODE
