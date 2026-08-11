@@ -356,15 +356,87 @@
   .layer-section { padding:10px 13px; border-bottom:1px solid #E8EDEE; flex-shrink:0; }
 
   /* ── Responsive ── */
-  @media (max-width: 700px) {
-    .sidebar { width: 220px; }
+  /* Hamburger. Present in the markup at every width, shown only once the
+     sidebar becomes a drawer, so there is never a drawer with no way in. */
+  .hdr-menu { display: none; appearance: none; background: none; border: 1px solid #DDE1E4;
+    border-radius: 8px; padding: 6px 9px; cursor: pointer; line-height: 0; flex: 0 0 auto; }
+  .hdr-menu:hover { border-color: #005EB8; }
+  .hdr-menu svg { display: block; }
+  .sb-scrim { position: fixed; inset: 0; background: rgba(33,43,50,.45); z-index: 3900;
+    display: none; }
+  .sb-scrim.on { display: block; }
+  .sb-tools { display: none; }
+
+  /* Below this width the sidebar stops being a column beside the map and
+     becomes a drawer over it.
+     At 500px of viewport the sidebar was taking 220 of them, permanently, and
+     the ward bar covered 65% of what was left, so the map, which is the thing
+     being looked at, had about a quarter of the screen. */
+  @media (max-width: 760px) {
+    .main { grid-template-columns: minmax(0, 1fr); }
+
+    /* Flex rather than grid: the named grid areas assume a fixed set of
+       children, and the toolbar moves in here at this width. DOM order is
+       already the order these belong in. */
+    .sidebar {
+      position: fixed; top: 0; bottom: 0; left: 0;
+      width: min(86vw, 330px); z-index: 4000;
+      display: flex; flex-direction: column;
+      transform: translateX(-100%); transition: transform .22s ease;
+      box-shadow: 8px 0 32px rgba(33,43,50,.22); border-right: 1px solid #E8EDEE;
+    }
+    .sidebar.open { transform: none; }
+    .sidebar > .tab-pane.active { flex: 1 1 auto; min-height: 0; }
+    .sidebar > .sb-sec { flex: 0 0 auto; }
     .nbadges { display: none; }
     /* Three segments plus a label is too much badge for a phone. The label
        goes, the segments stay: they are the control, the word "Viewing" is
-       only a caption for it. */
+       only a caption for it.
+       These came from the old 700px block that the drawer replaced, and have
+       moved up to 760 with it: below this width the layout is in phone mode,
+       and the badge should be too rather than staying full size for the 60px
+       in between. */
     .dl-badge { top: 8px; right: 8px; padding: 5px 6px; gap: 5px; }
     .dl-badge-label { display: none; }
     .dl-seg button { padding: 4px 7px; font-size: 10.5px; }
+
+    /* The header was 137px, a sixth of the viewport, before any content. The
+       instruction line goes: the tour now says all of it, at more length, to
+       exactly the people who needed it. */
+    .hdr { padding: 6px 10px; gap: 8px; }
+    .hdr-sub { display: none; }
+    .hdr-logo { font-size: 14px; }
+    .hdr-menu { display: inline-flex; }
+    /* Moved into the drawer, not duplicated: one set of controls, relocated. */
+    .sb-tools { display: block; padding: 9px 10px; border-bottom: 1px solid #E8EDEE;
+      background: #FBFCFD; flex: 0 0 auto; }
+    .sb-tools-hd { display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 8px; font-size: 10px; text-transform: uppercase; letter-spacing: .06em;
+      font-weight: 600; color: #768692; }
+    .sb-close { appearance: none; background: none; border: 0; cursor: pointer;
+      color: #4C6272; font-size: 22px; line-height: 1; padding: 0 4px; margin: -4px -4px 0 0; }
+    .sb-close:hover { color: #DA291C; }
+    .sb-tools .hdr-right { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .sb-tools .hdr-search { grid-column: 1 / -1; }
+    .sb-tools .hdr-search input { width: 100%; }
+    .sb-tools .tb-btn { width: 100%; justify-content: center; }
+    .sb-tools .tb-sep { display: none; }
+
+    /* Five modes will not fit across a phone, so the rail scrolls instead of
+       silently losing the ones on the end. */
+    .mode-rail { overflow-x: auto; flex-wrap: nowrap; padding: 0 10px;
+      scrollbar-width: none; -ms-overflow-style: none; }
+    .mode-rail::-webkit-scrollbar { display: none; }
+    .mode-btn { flex: 0 0 auto; padding: 10px 11px 9px; font-size: 12.5px; }
+
+    /* Same for the tab strip, which was 267px wide inside a 220px sidebar and
+       was cutting the Ward tab off the end. */
+    .sb-tabs { overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; }
+    .sb-tabs::-webkit-scrollbar { display: none; }
+    .sb-tab { flex: 0 0 auto; padding: 9px 13px; }
+
+    /* The AI panel is a floating card on a desktop and a full sheet here. */
+    #ai-panel { left: 8px; right: 8px; width: auto; top: 8px; }
   }
 
 /* Hover tooltips on map markers */
@@ -1115,6 +1187,11 @@
   <!-- Header -->
   <div class="hdr">
     <div class="hdr-left">
+      <button type="button" class="hdr-menu" id="hdr-menu" aria-label="Open the panel"
+              aria-expanded="false" aria-controls="sidebar" title="Layers, overlays and modes">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#212B32"
+             stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      </button>
       <div>
         <h1 class="hdr-logo">London Population Health Mapping<span class="dev-badge" title="This tool is still in development">In development</span></h1>
         <div class="hdr-sub" title="Click a ward for its headline figures, then Open profile for the full panel · use the Overlay tab to colour the map by an indicator · the VCSE tab maps charities and Community Interest Companies">Click a ward for its headline figures · pick an Overlay to colour-code · point layers in the sidebar</div>
@@ -1155,7 +1232,23 @@
   <div class="main">
 
     <!-- Sidebar -->
-    <div class="sidebar">
+    <div class="sb-scrim" id="sb-scrim" hidden></div>
+    <div class="sidebar" id="sidebar">
+      <!-- Where the header toolbar lands when the sidebar becomes a drawer.
+           The controls are moved into it, not copied, so there is only ever
+           one Reset button in the document. -->
+      <div class="sb-tools" id="sb-tools">
+        <!-- The drawer covers the header, so the hamburger that opened it is
+             behind it. Tapping outside works, but a panel with no visible way
+             out is a panel people get stuck in. -->
+        <div class="sb-tools-hd">
+          <!-- Not "Map controls": that is the sliders at the bottom of this
+               same drawer, and two sections under one name is worse than a
+               vaguer one. -->
+          <span>Search and tools</span>
+          <button type="button" class="sb-close" id="sb-close" aria-label="Close the panel">&times;</button>
+        </div>
+      </div>
       <div class="nbfocus-bar" id="nbfocus-bar" style="display:none">
         <button class="nbfocus-btn all active" data-nbhd="all" onclick="setNbhdFocus('all')">All wards</button>
       </div>
@@ -5460,6 +5553,82 @@ function _applyBoroughSolo() {
     }
     applyBoroughLock();
   });
+})();
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   NARROW-SCREEN DRAWER
+
+   Below 760px the sidebar is a drawer over the map rather than a column beside
+   it, and the header toolbar moves into it. The toolbar is moved rather than
+   duplicated: two Reset buttons in one document would be two things to keep in
+   step, and only one of them would ever be tested.
+
+   The modes live in the sidebar, so choosing one on a phone has to open the
+   drawer, or Query and Compare would appear to do nothing at all.
+   ═══════════════════════════════════════════════════════════════════════════ */
+(function _narrowDrawer() {
+  const mq = window.matchMedia('(max-width: 760px)');
+  const sidebar = document.getElementById('sidebar');
+  const scrim = document.getElementById('sb-scrim');
+  const tools = document.getElementById('sb-tools');
+  const btn = document.getElementById('hdr-menu');
+  const hdrRight = document.querySelector('.hdr-right');
+  const hdr = document.querySelector('.hdr');
+  if (!sidebar || !scrim || !btn || !hdrRight) return;
+
+  function narrow() { return mq.matches; }
+
+  function setOpen(on) {
+    if (!narrow()) on = false;
+    sidebar.classList.toggle('open', on);
+    scrim.classList.toggle('on', on);
+    scrim.hidden = !on;
+    btn.setAttribute('aria-expanded', String(on));
+    // Leaflet caches the container size; without this the map keeps the
+    // dimensions it had before the layout changed under it.
+    if (typeof map !== 'undefined' && map) setTimeout(() => map.invalidateSize(), 260);
+  }
+  function isOpen() { return sidebar.classList.contains('open'); }
+
+  function relocate() {
+    if (narrow()) {
+      if (hdrRight.parentNode !== tools) tools.appendChild(hdrRight);
+    } else if (hdrRight.parentNode !== hdr) {
+      hdr.appendChild(hdrRight);
+      setOpen(false);
+    }
+    if (typeof map !== 'undefined' && map) setTimeout(() => map.invalidateSize(), 60);
+  }
+
+  btn.addEventListener('click', () => setOpen(!isOpen()));
+  scrim.addEventListener('click', () => setOpen(false));
+  const closeBtn = document.getElementById('sb-close');
+  if (closeBtn) closeBtn.addEventListener('click', () => setOpen(false));
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && isOpen()) setOpen(false);
+  });
+
+  // Choosing a mode opens the drawer, because that is where the mode lives.
+  // Explore is the map itself, so it closes it instead.
+  document.querySelectorAll('.mode-btn').forEach(b => {
+    b.addEventListener('click', () => {
+      if (!narrow()) return;
+      const m = b.dataset.mode;
+      setOpen(m === 'query' || m === 'compare' || m === 'directory');
+    });
+  });
+
+  // A tap on the map is a tap on the thing the drawer is covering.
+  if (typeof map !== 'undefined' && map) {
+    map.on('click', () => { if (narrow() && isOpen()) setOpen(false); });
+  }
+
+  if (mq.addEventListener) mq.addEventListener('change', relocate);
+  else if (mq.addListener) mq.addListener(relocate);
+  relocate();
+
+  window.PH_DRAWER = { open: () => setOpen(true), close: () => setOpen(false),
+                       isOpen: isOpen, narrow: narrow };
 })();
 
 /* ═══════════════════════════════════════════════════════════════════════════
