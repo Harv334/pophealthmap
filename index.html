@@ -745,6 +745,58 @@
   .cmp-key i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; font-style: normal; }
   .cmp-bar .cmp-legend { font-size: 10.5px; color: var(--ink-3); margin-top: 10px; line-height: 1.45; }
 
+  /* ── Overlay picker ───────────────────────────────────────────────────────
+     103 indicators in one dropdown meant scrolling a list you could only see
+     eight rows of at a time, with the group headings scrolling away with it.
+     Same indicators, as tick boxes under collapsible category headings, with a
+     filter across all of them.
+
+     The <select> is still there, hidden, and is still what everything else in
+     this file reads and listens to. This is a front end for it, not a
+     replacement: the level gate, the URL state, the tour and Reset all keep
+     working through the same element they always used, and the list is built
+     from the select's own options so the two cannot drift apart. */
+  .ov-picker { border: 1px solid var(--line); border-radius: 8px; background: var(--paper);
+    margin-bottom: 9px; overflow: hidden; }
+  .ov-current { display: flex; align-items: center; gap: 7px; padding: 8px 10px;
+    border-bottom: 1px solid var(--line); background: var(--nhs-light); font-size: 11.5px; }
+  .ov-current .ov-cur-nm { flex: 1; min-width: 0; font-weight: 600; color: var(--nhs-dark);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ov-current.empty { background: var(--paper-2); }
+  .ov-current.empty .ov-cur-nm { font-weight: 500; color: var(--ink-3); }
+  .ov-clear { appearance: none; background: none; border: 0; cursor: pointer; padding: 0 2px;
+    color: var(--ink-3); font-size: 14px; line-height: 1; }
+  .ov-clear:hover { color: var(--nhs-red); }
+  .ov-search { width: 100%; border: 0; border-bottom: 1px solid var(--line); font: inherit;
+    font-size: 11.5px; padding: 7px 9px 7px 26px; color: var(--ink); background: var(--paper)
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23768692' stroke-width='2'><circle cx='11' cy='11' r='7'/><path d='m21 21-4.35-4.35'/></svg>") no-repeat 8px center; }
+  .ov-search:focus { outline: none; border-bottom-color: var(--nhs-bright); }
+  .ov-groups { max-height: 340px; overflow-y: auto; overflow-x: hidden; }
+  .ov-grp-hd { display: flex; align-items: center; gap: 6px; padding: 7px 10px; cursor: pointer;
+    background: var(--paper-2); border-bottom: 1px solid var(--line); font-size: 10.5px;
+    font-weight: 600; color: var(--ink-2); user-select: none; }
+  .ov-grp-hd:hover { background: var(--nhs-light); }
+  .ov-grp-hd .ov-arrow { color: var(--ink-3); font-size: 8px; transition: transform .12s;
+    flex-shrink: 0; }
+  .ov-grp-hd.open .ov-arrow { transform: rotate(90deg); }
+  .ov-grp-hd .ov-grp-nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; }
+  .ov-grp-hd .ov-grp-n { color: var(--ink-3); font-weight: 500;
+    font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 9.5px; }
+  .ov-grp-hd.has-sel .ov-grp-nm { color: var(--nhs-dark); }
+  .ov-grp-body { display: none; }
+  .ov-grp-body.open { display: block; }
+  .ov-opt { display: flex; align-items: flex-start; gap: 7px; padding: 5px 10px 5px 16px;
+    cursor: pointer; font-size: 11.5px; color: var(--ink); border-bottom: 1px solid var(--paper-2); }
+  .ov-opt:hover { background: var(--nhs-light); }
+  .ov-opt input { margin: 2px 0 0; flex-shrink: 0; accent-color: var(--nhs-blue); cursor: pointer; }
+  .ov-opt .ov-opt-nm { flex: 1; min-width: 0; line-height: 1.35; }
+  .ov-opt .ov-lvl { font-size: 9px; color: var(--ink-3); border: 1px solid var(--line);
+    border-radius: 3px; padding: 0 3px; flex-shrink: 0; margin-top: 1px; }
+  .ov-opt.on { background: var(--nhs-light); }
+  .ov-opt.on .ov-opt-nm { font-weight: 600; color: var(--nhs-dark); }
+  .ov-empty { padding: 12px 10px; font-size: 11px; color: var(--ink-3); text-align: center; }
+
   /* ── Tour ─────────────────────────────────────────────────────────────────
      The design file's story strip: a chapter counter, a progress bar, one
      paragraph of narration and previous/next. It sits in the same slot as the
@@ -1152,7 +1204,22 @@
             <span id="ov-info" class="lhelp" title="About the current indicator" style="display:none">i</span>
           </div>
           <div id="ov-info-panel" style="display:none;background:#fafafa;border:1px solid #eee;border-radius:5px;padding:7px 9px;margin:0 0 8px;font-size:11px;color:#555;line-height:1.5"></div>
-          <select id="ov">
+
+          <!-- Tick-box picker. Built at run time from the options of the
+               select below, which stays in the DOM (hidden) and remains what
+               every other consumer reads and listens to. -->
+          <div class="ov-picker" id="ov-picker">
+            <div class="ov-current empty" id="ov-current">
+              <span class="ov-cur-nm" id="ov-cur-nm">No overlay</span>
+              <button type="button" class="ov-clear" id="ov-clear" title="Clear the overlay"
+                      aria-label="Clear the overlay" hidden>&times;</button>
+            </div>
+            <input type="search" class="ov-search" id="ov-search" autocomplete="off"
+                   placeholder="Filter indicators" aria-label="Filter indicators">
+            <div class="ov-groups" id="ov-groups" role="group" aria-label="Choropleth indicator"></div>
+          </div>
+
+          <select id="ov" hidden aria-hidden="true" tabindex="-1">
             <option value="none">— none (neighbourhood colours) —</option>
             <optgroup label="Health (Census 2021)">
               <option value="census_good_health_pct">Good/very good health % · Ward</option>
@@ -5217,6 +5284,171 @@ function _applyBoroughSolo() {
     }
     applyBoroughLock();
   });
+})();
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   OVERLAY PICKER
+
+   The same 103 indicators as the dropdown, as tick boxes under collapsible
+   category headings, with a filter across all of them.
+
+   Built from the select's own <optgroup>/<option> tree rather than from a
+   second hand-written list, so adding an indicator to the select adds it here
+   and the two cannot disagree. The select stays in the DOM and stays the
+   source of truth: this writes to it and fires its change event, and it
+   listens back so anything else that sets the overlay (the tour, Reset, a
+   restored URL, the level gate) leaves the ticks correct.
+
+   One at a time, because one choropleth is what the map draws. Ticking a
+   second unticks the first rather than silently doing nothing.
+   ═══════════════════════════════════════════════════════════════════════════ */
+(function _overlayPicker() {
+  const sel = document.getElementById('ov');
+  const groupsEl = document.getElementById('ov-groups');
+  const searchEl = document.getElementById('ov-search');
+  const curEl = document.getElementById('ov-current');
+  const curNm = document.getElementById('ov-cur-nm');
+  const clearBtn = document.getElementById('ov-clear');
+  if (!sel || !groupsEl) return;
+
+  // "Bad/very bad health % · Ward" carries its level in the label. Split it out
+  // so the level can be a pill and the filter can match the name alone.
+  function splitLabel(text) {
+    const t = String(text || '').trim();
+    const at = t.lastIndexOf(' · ');
+    if (at === -1) return { name: t, level: '' };
+    const level = t.slice(at + 3).trim();
+    return /^(Ward|LSOA|MSOA|Borough)$/i.test(level)
+      ? { name: t.slice(0, at).trim(), level: level }
+      : { name: t, level: '' };
+  }
+
+  const model = [];      // [{ label, opts: [{value, name, level}] }]
+  (function readSelect() {
+    let loose = null;
+    Array.prototype.forEach.call(sel.children, node => {
+      if (node.tagName === 'OPTGROUP') {
+        const g = { label: node.label, opts: [] };
+        Array.prototype.forEach.call(node.children, o => {
+          if (o.tagName !== 'OPTION' || o.value === 'none') return;
+          g.opts.push(Object.assign({ value: o.value }, splitLabel(o.textContent)));
+        });
+        if (g.opts.length) model.push(g);
+      } else if (node.tagName === 'OPTION' && node.value !== 'none') {
+        // An option outside any group still needs a home.
+        if (!loose) { loose = { label: 'Other', opts: [] }; model.push(loose); }
+        loose.opts.push(Object.assign({ value: node.value }, splitLabel(node.textContent)));
+      }
+    });
+  })();
+
+  const openGroups = {};   // label -> bool
+  let filter = '';
+
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function render() {
+    const cur = sel.value;
+    const q = filter.trim().toLowerCase();
+    let html = '';
+    let shown = 0;
+
+    model.forEach((g, gi) => {
+      const hits = q
+        ? g.opts.filter(o => o.name.toLowerCase().indexOf(q) !== -1 ||
+                             g.label.toLowerCase().indexOf(q) !== -1)
+        : g.opts;
+      if (!hits.length) return;
+      shown += hits.length;
+      const hasSel = hits.some(o => o.value === cur);
+      // A filter opens what it matched; otherwise the group holding the current
+      // overlay is the one open, so the pane opens on what is actually drawn.
+      const open = q ? true : (openGroups[g.label] != null ? openGroups[g.label] : hasSel);
+      html += '<div class="ov-grp">' +
+        '<div class="ov-grp-hd' + (open ? ' open' : '') + (hasSel ? ' has-sel' : '') +
+          '" data-grp="' + gi + '" role="button" tabindex="0" aria-expanded="' + open + '">' +
+          '<span class="ov-arrow">&#9654;</span>' +
+          '<span class="ov-grp-nm">' + esc(g.label) + '</span>' +
+          '<span class="ov-grp-n">' + hits.length + '</span>' +
+        '</div>' +
+        '<div class="ov-grp-body' + (open ? ' open' : '') + '">' +
+          hits.map(o =>
+            '<label class="ov-opt' + (o.value === cur ? ' on' : '') + '">' +
+              '<input type="checkbox" data-ov="' + esc(o.value) + '"' +
+                (o.value === cur ? ' checked' : '') + '>' +
+              '<span class="ov-opt-nm">' + esc(o.name) + '</span>' +
+              (o.level ? '<span class="ov-lvl">' + esc(o.level) + '</span>' : '') +
+            '</label>').join('') +
+        '</div></div>';
+    });
+
+    groupsEl.innerHTML = html || '<div class="ov-empty">No indicator matches that.</div>';
+
+    const curOpt = cur && cur !== 'none'
+      ? [].concat.apply([], model.map(g => g.opts)).filter(o => o.value === cur)[0]
+      : null;
+    curNm.textContent = curOpt
+      ? curOpt.name + (curOpt.level ? ' · ' + curOpt.level : '')
+      : 'No overlay';
+    curEl.classList.toggle('empty', !curOpt);
+    clearBtn.hidden = !curOpt;
+
+    // Keep the chosen one in view when the list is rebuilt from elsewhere.
+    if (curOpt && !q) {
+      const on = groupsEl.querySelector('.ov-opt.on');
+      if (on && on.scrollIntoView) on.scrollIntoView({ block: 'nearest' });
+    }
+  }
+
+  function choose(value) {
+    // Through the select, so the level gate, the legend, the URL writer and
+    // everything else downstream behave exactly as they did for the dropdown.
+    sel.value = value;
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+    // The gate can refuse the change and put the value back; render after it
+    // has had its say rather than assuming the tick took.
+    setTimeout(render, 0);
+  }
+
+  groupsEl.addEventListener('click', e => {
+    const hd = e.target.closest('[data-grp]');
+    if (hd) {
+      const g = model[+hd.getAttribute('data-grp')];
+      const bodyOpen = hd.nextElementSibling.classList.contains('open');
+      openGroups[g.label] = !bodyOpen;
+      hd.classList.toggle('open', !bodyOpen);
+      hd.setAttribute('aria-expanded', String(!bodyOpen));
+      hd.nextElementSibling.classList.toggle('open', !bodyOpen);
+      return;
+    }
+    const box = e.target.closest('input[data-ov]');
+    if (!box) return;
+    // One at a time: unticking the current one clears the overlay, ticking a
+    // different one replaces it.
+    choose(box.checked ? box.getAttribute('data-ov') : 'none');
+  });
+
+  groupsEl.addEventListener('keydown', e => {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.closest('[data-grp]')) {
+      e.preventDefault(); e.target.click();
+    }
+  });
+
+  let searchT = null;
+  searchEl.addEventListener('input', () => {
+    clearTimeout(searchT);
+    searchT = setTimeout(() => { filter = searchEl.value; render(); }, 120);
+  });
+  clearBtn.addEventListener('click', () => choose('none'));
+
+  // Anything else that changes the overlay re-syncs the ticks.
+  sel.addEventListener('change', () => setTimeout(render, 0));
+
+  render();
 })();
 
 /* ═══════════════════════════════════════════════════════════════════════════
