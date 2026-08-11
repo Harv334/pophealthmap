@@ -745,6 +745,43 @@
   .cmp-key i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; font-style: normal; }
   .cmp-bar .cmp-legend { font-size: 10.5px; color: var(--ink-3); margin-top: 10px; line-height: 1.45; }
 
+  /* ── Directory ────────────────────────────────────────────────────────────
+     Every point dataset on the map as one searchable list. The map answers
+     "what is near here"; this answers "where is this" and "how many of these
+     are there", which the map cannot do without a lot of panning. */
+  .sidebar.directory-mode > .sb-tabs { display: none; }
+  .dir-pane { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  .dir-head { padding: 13px 14px 11px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
+  .dir-head .cmp-row { display: flex; align-items: baseline; gap: 8px; }
+  .dir-head .cmp-back { flex: 0 0 auto; white-space: nowrap; }
+  .dir-head h2 { font-family: 'Inter Tight', Inter, sans-serif; font-size: 17px; font-weight: 600;
+    margin: 0; letter-spacing: -.01em; color: var(--nhs-dark); flex: 1; min-width: 0; }
+  .dir-controls { padding: 10px 14px; border-bottom: 1px solid var(--line);
+    background: var(--paper-2); flex-shrink: 0; }
+  .dir-search { width: 100%; font: inherit; font-size: 12px; padding: 7px 9px 7px 28px;
+    border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: #fff
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23768692' stroke-width='2'><circle cx='11' cy='11' r='7'/><path d='m21 21-4.35-4.35'/></svg>") no-repeat 8px center; }
+  .dir-search:focus { outline: none; border-color: var(--nhs-bright);
+    box-shadow: 0 0 0 3px rgba(0,114,206,.15); }
+  .dir-row2 { display: grid; grid-template-columns: 1fr auto; gap: 6px; margin-top: 7px; }
+  .dir-types { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+  .dir-count { padding: 8px 14px; font-size: 11.5px; color: var(--nhs-blue); font-weight: 600;
+    border-bottom: 1px solid var(--line); flex-shrink: 0; }
+  .dir-count strong { color: var(--nhs-dark); font-variant-numeric: tabular-nums; }
+  .dir-list { overflow-y: auto; overflow-x: hidden; min-height: 0; flex: 1; }
+  .dir-item { display: flex; gap: 8px; padding: 7px 14px; cursor: pointer;
+    border-bottom: 1px solid var(--paper-2); align-items: flex-start; }
+  .dir-item:hover, .dir-item.sel { background: var(--nhs-light); }
+  .dir-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+  .dir-txt { flex: 1; min-width: 0; }
+  /* Block, not inline: as spans the name and its meta line ran together into
+     one string that pushed the list sideways. */
+  .dir-nm { display: block; font-size: 12px; color: var(--ink); overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; }
+  .dir-sub { display: block; font-size: 10px; color: var(--ink-3); overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; }
+  .dir-more { padding: 10px 14px; font-size: 10.5px; color: var(--ink-3); line-height: 1.45; }
+
   /* ── Query builder ────────────────────────────────────────────────────────
      The filter sentence from the design file: services, then a borough, then
      any number of indicator conditions, read left to right as one sentence. */
@@ -874,7 +911,7 @@
     <button type="button" class="mode-btn" role="tab" data-mode="query" aria-selected="false">Query</button>
     <button type="button" class="mode-btn" role="tab" data-mode="compare" aria-selected="false">Compare</button>
     <button type="button" class="mode-btn" role="tab" data-mode="tour" aria-selected="false">Take a tour <span class="mode-soon">Soon</span></button>
-    <button type="button" class="mode-btn" role="tab" data-mode="directory" aria-selected="false">Directory <span class="mode-soon">Soon</span></button>
+    <button type="button" class="mode-btn" role="tab" data-mode="directory" aria-selected="false">Directory</button>
   </div>
 
   <div class="mode-panel" id="mode-panel" hidden>
@@ -1348,6 +1385,30 @@
           <label class="lrow" style="margin-bottom:8px"><div style="width:9px;height:9px;background:linear-gradient(90deg,#1a1a1a,#fff);border:1px solid #ccc;border-radius:2px;flex-shrink:0"></div><span class="lname">Spotlight focused neighbourhood</span><input type="checkbox" id="tspot"></label>
           <div id="nbhd-table"></div>
         </div>
+      </div>
+
+      <!-- Directory. Every point dataset on the map as one searchable list,
+           because the map answers "what is near here" and this answers "where
+           is this" and "how many are there". -->
+      <div class="tab-pane dir-pane" id="tab-directory">
+        <div class="dir-head">
+          <div class="cmp-row">
+            <h2>Directory</h2>
+            <button type="button" class="cmp-back" id="dir-back" style="margin-left:auto">Back to Explore</button>
+          </div>
+          <div class="cmp-sub" id="dir-sub">Loading the lists...</div>
+        </div>
+        <div class="dir-controls">
+          <input type="search" class="dir-search" id="dir-q" autocomplete="off"
+                 placeholder="Search by name, address or postcode" aria-label="Search the directory">
+          <div class="dir-row2">
+            <select class="q-f" id="dir-borough" aria-label="Borough"><option value="">All of London</option></select>
+            <button type="button" class="ws-btn" id="dir-csv">CSV</button>
+          </div>
+          <div class="dir-types" id="dir-types"></div>
+        </div>
+        <div class="dir-count" id="dir-count"></div>
+        <div class="dir-list" id="dir-list"></div>
       </div>
 
       <!-- Compare mode. Follows the design file's compare pane: the pinned
@@ -8539,13 +8600,6 @@ loadData();
                'How deprivation deciles work, and which direction is which',
                'What area statistics can and cannot tell you'],
     },
-    directory: {
-      title: 'Directory',
-      desc: 'A searchable list of the services on the map, for when you want a list of places rather than a picture of them.',
-      points: ['GP practices, pharmacies, dental practices, hospitals and clinics',
-               'Community centres, libraries, ESOL providers and VCSE organisations',
-               'Filter by borough or ward, then export'],
-    },
   };
 
   var rail = document.querySelector('.mode-rail');
@@ -8559,8 +8613,9 @@ loadData();
   var sidebar = document.querySelector('.sidebar');
   var queryPane = document.getElementById('tab-query');
   var comparePane = document.getElementById('tab-compare');
+  var dirPane = document.getElementById('tab-directory');
   // Modes that own the sidebar rather than raising a placeholder card.
-  var BUILT = { query: 'query', compare: 'compare' };
+  var BUILT = { query: 'query', compare: 'compare', directory: 'directory' };
 
   function markRail(mode) {
     rail.querySelectorAll('.mode-btn').forEach(function (b) {
@@ -8587,7 +8642,7 @@ loadData();
     var pane = document.querySelector('.tab-pane.active');
     if (!pane) return;
     var name = pane.id.replace(/^tab-/, '');
-    if (name !== 'query' && name !== 'compare') lastTab = name;
+    if (name !== 'query' && name !== 'compare' && name !== 'directory') lastTab = name;
   }
 
   function show(mode) {
@@ -8614,7 +8669,8 @@ loadData();
       panel.hidden = true;
       // Leaving a built mode gives the sidebar back to whichever tab it took.
       if ((queryPane && queryPane.classList.contains('active')) ||
-          (comparePane && comparePane.classList.contains('active'))) activateTab(lastTab);
+          (comparePane && comparePane.classList.contains('active')) ||
+          (dirPane && dirPane.classList.contains('active'))) activateTab(lastTab);
       return;
     }
 
@@ -8644,18 +8700,22 @@ loadData();
      the overlay-info link and the restored URL state) and threading a call
      through each of them would leave the sixth one to be found later. Watching
      the pane's own class is the one place that cannot be missed. */
-  if (queryPane && comparePane && window.MutationObserver) {
+  if (queryPane && comparePane && dirPane && window.MutationObserver) {
     var sync = function () {
       var q = queryPane.classList.contains('active');
       var c = comparePane.classList.contains('active');
+      var dr = dirPane.classList.contains('active');
       if (sidebar) {
         sidebar.classList.toggle('query-mode', q);
         sidebar.classList.toggle('compare-mode', c);
+        sidebar.classList.toggle('directory-mode', dr);
       }
       if (q) markRail('query');
       else if (c) markRail('compare');
+      else if (dr) markRail('directory');
       else if (rail.querySelector('.mode-btn[aria-selected="true"][data-mode="query"], ' +
-                                  '.mode-btn[aria-selected="true"][data-mode="compare"]')) {
+                                  '.mode-btn[aria-selected="true"][data-mode="compare"], ' +
+                                  '.mode-btn[aria-selected="true"][data-mode="directory"]')) {
         // A pane can be switched away from without going through the rail:
         // clicking an LSOA sends the sidebar to the Ward tab. That is still a
         // mode change, so it tears down like one.
@@ -8666,6 +8726,7 @@ loadData();
     var mo = new MutationObserver(sync);
     mo.observe(queryPane, { attributes: true, attributeFilter: ['class'] });
     mo.observe(comparePane, { attributes: true, attributeFilter: ['class'] });
+    mo.observe(dirPane, { attributes: true, attributeFilter: ['class'] });
     sync();
   }
 })();
@@ -9682,8 +9743,313 @@ loadData();
      and Ward are filters and views over whatever is on the map, and they are
      meant to hold across all of this.
      ───────────────────────────────────────────────────────────────────────── */
+  /* ─────────────────────────────────────────────────────────────────────────
+     DIRECTORY
+
+     Ten point datasets, about 26,000 records, as one searchable list. Most of
+     them are already on the page for their map layers; the rest come through
+     the same cached loader the query builder uses, so nothing is fetched twice.
+
+     Everything is normalised to the same five fields on the way in. Each source
+     names them differently (n/name, a/address/street, pc/postcode, lad/borough)
+     and a directory that had to remember which is which per source would get
+     one wrong the first time a source changed.
+     ───────────────────────────────────────────────────────────────────────── */
+  var DIR_SOURCES = [
+    { id: 'gp',       label: 'GP practices',      colour: '#185FA5', glob: 'GPS' },
+    { id: 'pharmacy', label: 'Pharmacies',        colour: '#E89B1B', src: 'pharmacies.json' },
+    { id: 'hospital', label: 'Hospitals',         colour: '#A32D2D', glob: 'HOSP' },
+    { id: 'dentist',  label: 'Dental practices',  colour: '#7B2D8E', src: 'dental_practices.json' },
+    { id: 'school',   label: 'Schools',           colour: '#1E5BB8', src: 'schools.json' },
+    { id: 'cc',       label: 'Community centres', colour: '#D87C2D', src: 'community_centres.json' },
+    { id: 'library',  label: 'Libraries',         colour: '#00A0A0', src: 'libraries.json' },
+    { id: 'esol',     label: 'ESOL providers',    colour: '#B83C3C', src: 'esol_providers.json' },
+    { id: 'cic',      label: 'CICs',              colour: '#7A7A75', src: 'cics.json' },
+    { id: 'vcse',     label: 'Charities (VCSE)',  colour: '#AE2573', src: 'vcse_data.json' },
+  ];
+  var DIR_CAP = 250;               // rows rendered; the count and the CSV are complete
+  var dirRecords = null;
+  var dirOutOfScope = 0;
+  var dirLoading = null;
+  var dirState = { q: '', types: {}, borough: '' };
+  var dirMarker = null;
+  var dirFiltered = [];
+
+  /**
+   * A borough name, from whatever the source happened to record.
+   *
+   * Half these files write the borough as a name and half as an ONS code, so
+   * the filter came out with 319 options: 33 boroughs listed twice under two
+   * spellings, plus every local authority in England that the national charity
+   * register knows about. Codes are resolved against the map's own borough
+   * layer, which is also what defines "in scope": a code that is not one of the
+   * 33 resolves to nothing and the record is dropped.
+   */
+  var _ladByCode = null, _ladByName = null;
+  function buildLadIndex() {
+    if (_ladByCode) return;
+    _ladByCode = {}; _ladByName = {};
+    if (typeof BOROUGH_GJ === 'undefined' || !BOROUGH_GJ.features) return;
+    BOROUGH_GJ.features.forEach(function (f) {
+      var p = f.properties || {}, nm = p.name || '';
+      if (!nm) return;
+      if (p.LAD25CD) _ladByCode[p.LAD25CD] = nm;
+      _ladByName[ladKey(nm)] = nm;
+    });
+  }
+  // "Hammersmith & Fulham", "Hammersmith and Fulham" and "London Borough of
+  // Hammersmith & Fulham" are one borough written three ways, and the sources
+  // between them use all three. Reduce to a key and they collapse.
+  function ladKey(s) {
+    return String(s).toLowerCase()
+      .replace(/&/g, 'and')
+      .replace(/\b(london borough of|royal borough of|city of|the)\b/g, '')
+      .replace(/[^a-z0-9]/g, '');
+  }
+  function ladNameOf(v) {
+    if (!v) return '';
+    buildLadIndex();
+    if (/^E\d{8}$/.test(v)) return _ladByCode[v] || '';
+    return _ladByName[ladKey(v)] || '';
+  }
+  // Bounding boxes so 23,000 points are not tested against 33 full polygons.
+  var _ladBoxes = null;
+  function ladOfPoint(lat, lng) {
+    if (lat == null || lng == null) return '';
+    if (!_ladBoxes) {
+      _ladBoxes = [];
+      if (typeof BOROUGH_GJ === 'undefined' || !BOROUGH_GJ.features) return '';
+      BOROUGH_GJ.features.forEach(function (f) {
+        if (!f.geometry) return;
+        var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        (function walk(c) {
+          if (!c) return;
+          if (typeof c[0] === 'number') {
+            if (c[0] < minX) minX = c[0];
+            if (c[0] > maxX) maxX = c[0];
+            if (c[1] < minY) minY = c[1];
+            if (c[1] > maxY) maxY = c[1];
+            return;
+          }
+          for (var i = 0; i < c.length; i++) walk(c[i]);
+        })(f.geometry.coordinates);
+        _ladBoxes.push({ name: (f.properties || {}).name || '', geom: f.geometry,
+                         minX: minX, minY: minY, maxX: maxX, maxY: maxY });
+      });
+    }
+    for (var i = 0; i < _ladBoxes.length; i++) {
+      var b = _ladBoxes[i];
+      if (lng < b.minX || lng > b.maxX || lat < b.minY || lat > b.maxY) continue;
+      if (typeof _pointInGeom === 'function' && _pointInGeom(lng, lat, b.geom)) return b.name;
+    }
+    return '';
+  }
+
+  function dirNorm(r, src) {
+    // One shape out of ten. Field names differ per source and the fallbacks
+    // are ordered most-specific first so a source that has both wins sensibly.
+    var addr = r.a || r.address ||
+      [r.street, r.town].filter(Boolean).join(', ') || '';
+    return {
+      t: src.id,
+      label: src.label,
+      colour: src.colour,
+      n: r.n || r.name || '(unnamed)',
+      a: addr,
+      pc: r.pc || r.postcode || '',
+      lad: ladNameOf(r.lad || r.borough || r.lad_code || ''),
+      lat: r.lat, lng: r.lng,
+      sub: r.type || r.phase || r.t || '',
+    };
+  }
+
+  function loadDirectory() {
+    if (dirRecords) return Promise.resolve(dirRecords);
+    if (dirLoading) return dirLoading;
+    dirLoading = Promise.all(DIR_SOURCES.map(function (s) {
+      var rows = s.glob
+        ? Promise.resolve((typeof window[s.glob] !== 'undefined' && window[s.glob]) || [])
+        : loadJson(s.src);
+      return rows.then(function (data) {
+        return (data || [])
+          .filter(function (r) { return r && (r.lat || r.lng); })
+          .map(function (r) { return dirNorm(r, s); });
+      }).catch(function () { return []; });
+    })).then(function (lists) {
+      var all = [];
+      lists.forEach(function (l) { all = all.concat(l); });
+      // Borough is missing on several sources; fill it from the point itself
+      // rather than leaving the filter unable to see two thousand records.
+      // The source's own borough where it resolves to one of the 33, and the
+      // point's own position where it does not. Trusting the field first keeps
+      // DfE's attribution of a school rather than overruling it with geometry;
+      // falling through to the point covers the sources that record no borough
+      // at all and the ones that record a local authority outside London.
+      all.forEach(function (r) {
+        if (!r.lad) r.lad = ladOfPoint(r.lat, r.lng);
+      });
+      // Anything that lands in no London borough is out of scope. The charity
+      // register is national: it brought in about eighteen thousand
+      // organisations from the rest of England, which is not what a London
+      // population health directory is for and made the borough filter
+      // unusable. The number dropped is reported rather than hidden.
+      dirRecords = all.filter(function (r) { return r.lad; });
+      dirOutOfScope = all.length - dirRecords.length;
+      dirRecords.sort(function (a, b) { return a.n.localeCompare(b.n); });
+      dirLoading = null;
+      return dirRecords;
+    });
+    return dirLoading;
+  }
+
+  function dirFilter() {
+    var q = dirState.q.trim().toLowerCase();
+    var anyType = Object.keys(dirState.types).some(function (k) { return dirState.types[k]; });
+    return (dirRecords || []).filter(function (r) {
+      if (anyType && !dirState.types[r.t]) return false;
+      if (dirState.borough && r.lad !== dirState.borough) return false;
+      if (!q) return true;
+      return r.n.toLowerCase().indexOf(q) !== -1 ||
+             r.a.toLowerCase().indexOf(q) !== -1 ||
+             r.pc.toLowerCase().indexOf(q) !== -1;
+    });
+  }
+
+  function renderDirectory() {
+    var listEl = $('dir-list'), countEl = $('dir-count');
+    if (!listEl) return;
+    if (!dirRecords) { countEl.textContent = 'Loading...'; listEl.innerHTML = ''; return; }
+
+    dirFiltered = dirFilter();
+    var shown = dirFiltered.slice(0, DIR_CAP);
+    countEl.innerHTML = '<strong>' + dirFiltered.length.toLocaleString() + '</strong> of ' +
+      dirRecords.length.toLocaleString() + ' places';
+
+    listEl.innerHTML = shown.map(function (r, i) {
+      // The address is shown because it is searched. Without it, a search for
+      // "wembley" returned rows with no "wembley" anywhere on them, which reads
+      // as a broken filter rather than as a match on a field being hidden.
+      var meta = [r.label, r.sub, r.a, r.pc].filter(Boolean).join(' · ');
+      var full = [r.n, r.label, r.sub, r.a, r.pc, r.lad].filter(Boolean).join(' · ');
+      return '<div class="dir-item" data-i="' + i + '" title="' + esc(full) + '">' +
+        '<span class="dir-dot" style="background:' + r.colour + '"></span>' +
+        '<span class="dir-txt"><span class="dir-nm">' + esc(r.n) + '</span>' +
+        '<span class="dir-sub">' + esc(meta) + '</span></span></div>';
+    }).join('') || '<div class="dir-more">Nothing matches that search.</div>';
+
+    if (dirFiltered.length > DIR_CAP) {
+      listEl.insertAdjacentHTML('beforeend',
+        '<div class="dir-more">Showing the first ' + DIR_CAP + '. Narrow the search, ' +
+        'or use CSV to export all ' + dirFiltered.length.toLocaleString() + '.</div>');
+    }
+  }
+
+  function renderDirControls() {
+    var typesEl = $('dir-types');
+    if (!typesEl || !dirRecords) return;
+    var counts = {};
+    dirRecords.forEach(function (r) { counts[r.t] = (counts[r.t] || 0) + 1; });
+    typesEl.innerHTML = DIR_SOURCES.map(function (s) {
+      if (!counts[s.id]) return '';
+      return '<span class="q-chip' + (dirState.types[s.id] ? ' on' : '') + '" data-dtype="' + s.id +
+        '" role="button" tabindex="0">' + esc(s.label) + ' ' +
+        '<span style="opacity:.7">' + counts[s.id].toLocaleString() + '</span></span>';
+    }).join('');
+
+    var bEl = $('dir-borough');
+    if (bEl && bEl.options.length <= 1) {
+      var seen = {};
+      dirRecords.forEach(function (r) { if (r.lad) seen[r.lad] = 1; });
+      bEl.innerHTML = '<option value="">All of London</option>' +
+        Object.keys(seen).sort().map(function (b) {
+          return '<option value="' + esc(b) + '">' + esc(b) + '</option>';
+        }).join('');
+    }
+    var sub = $('dir-sub');
+    if (sub) {
+      sub.textContent = dirRecords.length.toLocaleString() + ' places across ' +
+        DIR_SOURCES.length + ' datasets' +
+        (dirOutOfScope ? ', with ' + dirOutOfScope.toLocaleString() +
+          ' outside London left out' : '');
+    }
+  }
+
+  function dirShowOnMap(rec) {
+    if (typeof map === 'undefined' || rec.lat == null || rec.lng == null) return;
+    if (dirMarker) { map.removeLayer(dirMarker); dirMarker = null; }
+    dirMarker = L.circleMarker([rec.lat, rec.lng], {
+      radius: 9, color: '#fff', weight: 2.5, fillColor: rec.colour, fillOpacity: 1,
+    }).addTo(map);
+    dirMarker.bindPopup(
+      '<div class="pop-hdr" style="background:' + rec.colour + '">' + _esc(rec.n) + '</div>' +
+      '<div class="pop-body"><div class="pop-addr">' +
+      _esc([rec.a, rec.pc].filter(Boolean).join(', ')) + '</div>' +
+      '<div class="pop-row"><span class="pop-key">Type</span><span>' + _esc(rec.label) + '</span></div>' +
+      (rec.lad ? '<div class="pop-row"><span class="pop-key">Borough</span><span>' +
+        _esc(rec.lad) + '</span></div>' : '') + '</div>'
+    ).openPopup();
+    map.setView([rec.lat, rec.lng], Math.max(map.getZoom(), 15));
+  }
+
+  function clearDirMarker() {
+    if (dirMarker && typeof map !== 'undefined') { map.removeLayer(dirMarker); dirMarker = null; }
+  }
+
+  (function wireDirectory() {
+    var listEl = $('dir-list'), typesEl = $('dir-types'), qEl = $('dir-q');
+    if (!listEl) return;
+    var t = null;
+    qEl.addEventListener('input', function () {
+      // Debounced: 26,000 records filtered on every keystroke is wasted work,
+      // and the list flickering under the cursor reads as lag.
+      clearTimeout(t);
+      t = setTimeout(function () { dirState.q = qEl.value; renderDirectory(); }, 140);
+    });
+    $('dir-borough').addEventListener('change', function (e) {
+      dirState.borough = e.target.value; renderDirectory();
+    });
+    typesEl.addEventListener('click', function (e) {
+      var c = e.target.closest('[data-dtype]');
+      if (!c) return;
+      var id = c.getAttribute('data-dtype');
+      dirState.types[id] = !dirState.types[id];
+      renderDirControls(); renderDirectory();
+    });
+    typesEl.addEventListener('keydown', function (e) {
+      if ((e.key === 'Enter' || e.key === ' ') && e.target.closest('[data-dtype]')) {
+        e.preventDefault(); e.target.click();
+      }
+    });
+    listEl.addEventListener('click', function (e) {
+      var row = e.target.closest('[data-i]');
+      if (!row) return;
+      listEl.querySelectorAll('.dir-item').forEach(function (r) { r.classList.remove('sel'); });
+      row.classList.add('sel');
+      dirShowOnMap(dirFiltered[+row.getAttribute('data-i')]);
+    });
+    $('dir-csv').addEventListener('click', function () {
+      if (!dirFiltered.length) { alert('Nothing to export.'); return; }
+      var lines = [['name', 'type', 'address', 'postcode', 'borough', 'lat', 'lng']
+        .map(csvCell).join(',')];
+      dirFiltered.forEach(function (r) {
+        lines.push([r.n, r.label, r.a, r.pc, r.lad, r.lat, r.lng].map(csvCell).join(','));
+      });
+      download('pophealth-directory.csv', lines.join('\n'), 'text/csv;charset=utf-8');
+    });
+    $('dir-back').addEventListener('click', function () {
+      var explore = document.querySelector('.mode-btn[data-mode="explore"]');
+      if (explore) explore.click();
+    });
+  })();
+
   function applyMode(mode) {
     currentMode = (mode === 'query' || mode === 'compare') ? mode : 'explore';
+
+    // The Directory's pin is its own mark on the map and goes with it.
+    if (mode !== 'directory') clearDirMarker();
+    if (mode === 'directory') {
+      loadDirectory().then(function () { renderDirControls(); renderDirectory(); });
+    }
 
     // The one-ward sheet is shared by Explore and Query; Compare's drawer
     // takes its place, so it is suspended rather than closed.
@@ -9703,6 +10069,15 @@ loadData();
   }
 
   window.PH_MODES = { activate: applyMode, current: function () { return currentMode; } };
+
+  // Read-only handles, for the same reason PH_ASSISTANT exposes its tool layer:
+  // the parts that decide what the user sees should be checkable from outside
+  // without reaching into the DOM and inferring it.
+  window.PH_DIR = {
+    records: function () { return dirRecords; },
+    filtered: function () { return dirFiltered; },
+    marked: function () { return !!dirMarker; },
+  };
 
   /* ─────────────────────────────────────────────────────────────────────────
      THE QUERY BUILDER
