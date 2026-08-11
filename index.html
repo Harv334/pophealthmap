@@ -1,11 +1,37 @@
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en-GB">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PopHealth Map - London population health</title>
-<meta name="description" content="Population health across all 33 London boroughs at ward and LSOA level, built entirely from open NHS and government data.">
+<title>PopHealth Map - London population health by ward and LSOA</title>
+<meta name="description" content="Population health across all 33 London boroughs at ward and LSOA level. Deprivation, life expectancy, GP and pharmacy access, crime and green space, built entirely from open NHS and government data.">
+
+<!-- One canonical address. The site also answers on www and on the GitHub
+     Pages address, both of which redirect here, and any mirror carries a
+     noindex. Without this, a shared link with a tracking parameter reads as
+     a separate page competing with this one. -->
+<link rel="canonical" href="https://pophealth.uk/">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta name="theme-color" content="#005EB8">
+
+<!-- Link previews. These decide what appears when the map is shared into
+     Teams, Slack or LinkedIn, which is where most of its traffic starts. -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="PopHealth Map">
+<meta property="og:locale" content="en_GB">
+<meta property="og:url" content="https://pophealth.uk/">
+<meta property="og:title" content="PopHealth Map - London population health by ward and LSOA">
+<meta property="og:description" content="Deprivation, life expectancy, GP and pharmacy access, crime and green space for all 704 London wards and 4,994 LSOAs. Open data, nothing modelled or estimated.">
+<meta property="og:image" content="https://pophealth.uk/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="PopHealth Map: population health across the 33 London boroughs at ward and LSOA level">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="PopHealth Map - London population health by ward and LSOA">
+<meta name="twitter:description" content="Deprivation, life expectancy, GP and pharmacy access, crime and green space for all 704 London wards and 4,994 LSOAs.">
+<meta name="twitter:image" content="https://pophealth.uk/og.png">
+
 <!-- Inline so it costs no request and cannot 404. A map pin in the map's own ink. -->
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1a1a'/%3E%3Cpath d='M16 6c-3.9 0-7 3.1-7 7 0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7z' fill='%23fff'/%3E%3Ccircle cx='16' cy='13' r='2.6' fill='%231a1a1a'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -37,10 +63,18 @@
 
   /* ── Layout ── */
   /* Root layout uses CSS grid (not flex) — grid rows are mathematically rigid so the header/main/status bar cannot be pushed out of their slots. */
-  .app { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; height: 100vh; max-height: 100vh; overflow: hidden; }
+  /* dvh after vh, so browsers that do not know dynamic viewport units keep the
+     old value. On a phone, 100vh is the height with the browser toolbar
+     retracted, so the last few centimetres of the app sat underneath the
+     toolbar with overflow:hidden over the top of them: the sidebar footer and
+     the foot of the layers list were unreachable rather than merely awkward. */
+  .app { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; height: 100vh; max-height: 100vh; height: 100dvh; max-height: 100dvh; overflow: hidden; }
   .hdr { background: #FBFCFD; border-bottom: 1px solid #E8EDEE; padding: 8px 16px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; gap: 12px; }
   .hdr-left { display: flex; align-items: center; gap: 12px; }
-  .hdr-logo { font-size: 15px; font-weight: 600; color: #212B32; }
+  /* The page's h1. Margin zeroed because the browser default would push the
+     header out of alignment; everything else it inherits is what the div
+     had before. */
+  .hdr-logo { font-size: 15px; font-weight: 600; color: #212B32; margin: 0; }
   .hdr-sub { font-size: 12px; color: #4C6272; margin-top: 1px; }
   .hdr-right { display: flex; align-items: center; gap: 8px; }
 
@@ -116,8 +150,24 @@
   .sidebar { width: 268px; border-right: 1px solid #E8EDEE; flex-shrink: 0; background: #fff; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; grid-template-areas: "focus" "tabs" "pane" "footer"; height: 100%; min-height: 0; overflow: hidden; }
   .sidebar > .nbfocus-bar { grid-area: focus; }
   .sidebar > .sb-tabs     { grid-area: tabs; }
-  .sidebar > .tab-pane    { grid-area: pane; display: none; min-height: 0; overflow: hidden; flex-direction: column; }
+  /* Panes scroll. They used to be overflow:hidden, with the only scrollable
+     thing in the Layers pane being the empty spacer at the bottom, so on a
+     short window or a phone the boundary toggles simply could not be reached:
+     the sections below the fold were clipped with no way to scroll to them.
+     overscroll-behavior stops a flick at the end of the list scrolling the
+     page behind it. */
+  .sidebar > .tab-pane    { grid-area: pane; display: none; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; flex-direction: column; }
   .sidebar > .tab-pane.active { display: flex; }
+  /* Sections keep their natural height and let the pane above do the
+     scrolling. Without this the first section shrinks and clips its own rows
+     rather than pushing the pane into scroll. */
+  #tab-layers > .sb-sec { flex-shrink: 0; }
+  /* A visible track, so it is obvious there is more below rather than the
+     content just appearing to stop. */
+  .sidebar > .tab-pane::-webkit-scrollbar { width: 9px; }
+  .sidebar > .tab-pane::-webkit-scrollbar-thumb { background: #CBD5DA; border-radius: 5px; border: 2px solid #fff; }
+  .sidebar > .tab-pane::-webkit-scrollbar-thumb:hover { background: #A8B6BD; }
+  .sidebar > .tab-pane { scrollbar-width: thin; scrollbar-color: #CBD5DA transparent; }
   .sidebar > .sb-sec      { grid-area: footer; background: #FBFCFD; }
   .sb-tabs { display: flex; border-bottom: 1px solid #E8EDEE; background: #FBFCFD; min-height: 36px; }
   .sb-tab { flex: 1 1 0; min-width: 0; padding: 9px 2px; font-size: 11px; font-weight: 600; color: #4C6272; text-align: center; cursor: pointer; border-bottom: 2px solid transparent; transition: color .15s, background .12s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -305,6 +355,12 @@
   @media (max-width: 700px) {
     .sidebar { width: 220px; }
     .nbadges { display: none; }
+    /* Three segments plus a label is too much badge for a phone. The label
+       goes, the segments stay: they are the control, the word "Viewing" is
+       only a caption for it. */
+    .dl-badge { top: 8px; right: 8px; padding: 5px 6px; gap: 5px; }
+    .dl-badge-label { display: none; }
+    .dl-seg button { padding: 4px 7px; font-size: 10.5px; }
   }
 
 /* Hover tooltips on map markers */
@@ -966,6 +1022,87 @@
     min-width: 0; }
 
 </style>
+
+<!-- Structured data. Two graphs: the site itself, and the data behind it.
+     The Dataset entry is the one that earns its keep: it makes the map
+     eligible for Google Dataset Search, a far less crowded index than
+     general web search and the one an analyst looking for London ward
+     health data is most likely to be using. `dateModified` below is a
+     starting value and is refreshed from the pipeline manifest at runtime,
+     so it cannot drift out of step with the data. -->
+<script type="application/ld+json" id="ld-dataset">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": "https://pophealth.uk/#website",
+      "url": "https://pophealth.uk/",
+      "name": "PopHealth Map",
+      "alternateName": "London Population Health Mapping",
+      "description": "An interactive map of population health across all 33 London boroughs, at ward and LSOA level.",
+      "inLanguage": "en-GB",
+      "publisher": { "@id": "https://pophealth.uk/#creator" }
+    },
+    {
+      "@type": "Person",
+      "@id": "https://pophealth.uk/#creator",
+      "name": "Harvey Seville",
+      "email": "contact@pophealth.uk"
+    },
+    {
+      "@type": "Dataset",
+      "@id": "https://pophealth.uk/#dataset",
+      "name": "London population health by ward and LSOA",
+      "description": "Population health, deprivation and service access indicators for all 33 London local authorities, published at 2024 ward and 2021 LSOA level. Covers 704 wards, 4,994 LSOAs, 1,146 GP practices, 1,737 pharmacies and 1,877 dental practices. Sources include OHID Fingertips, ONS Census 2021, IMD 2025, NHS ODS registers, QOF prevalence, police.uk recorded crime, DWP claimant count, fuel poverty and Charity Commission registers. Nothing is modelled or estimated.",
+      "url": "https://pophealth.uk/",
+      "sameAs": "https://github.com/Harv334/pophealthmap",
+      "isAccessibleForFree": true,
+      "inLanguage": "en-GB",
+      "creator": { "@id": "https://pophealth.uk/#creator" },
+      "license": "https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/",
+      "dateModified": "2026-08-10",
+      "keywords": [
+        "population health",
+        "public health",
+        "London",
+        "ward",
+        "LSOA",
+        "deprivation",
+        "index of multiple deprivation",
+        "life expectancy",
+        "health inequalities",
+        "GP practices",
+        "pharmacies",
+        "NHS",
+        "open data"
+      ],
+      "spatialCoverage": {
+        "@type": "Place",
+        "name": "Greater London, United Kingdom",
+        "geo": {
+          "@type": "GeoShape",
+          "box": "51.28 -0.51 51.69 0.33"
+        }
+      },
+      "distribution": [
+        {
+          "@type": "DataDownload",
+          "name": "Ward-level indicators",
+          "encodingFormat": "application/json",
+          "contentUrl": "https://pophealth.uk/ward_data.json"
+        },
+        {
+          "@type": "DataDownload",
+          "name": "LSOA-level indicators",
+          "encodingFormat": "application/json",
+          "contentUrl": "https://pophealth.uk/lsoa_data.json"
+        }
+      ]
+    }
+  ]
+}
+</script>
 </head>
 <body>
 
@@ -975,7 +1112,7 @@
   <div class="hdr">
     <div class="hdr-left">
       <div>
-        <div class="hdr-logo">London Population Health Mapping<span class="dev-badge" title="This tool is still in development">In development</span></div>
+        <h1 class="hdr-logo">London Population Health Mapping<span class="dev-badge" title="This tool is still in development">In development</span></h1>
         <div class="hdr-sub" title="Click a ward for its headline figures, then Open profile for the full panel · use the Overlay tab to colour the map by an indicator · the VCSE tab maps charities and Community Interest Companies">Click a ward for its headline figures · pick an Overlay to colour-code · point layers in the sidebar</div>
       </div>
     </div>
@@ -1602,6 +1739,7 @@
         <span class="dl-badge-label">Viewing</span>
         <div class="dl-seg" id="dl-seg">
           <button type="button" data-dl="ward" class="active" title="Ward-level data (704 wards)">Ward</button>
+          <button type="button" data-dl="msoa" title="MSOA boundaries. MSOAs sit between wards and LSOAs and do not nest into wards, so this draws the geography rather than reshading the map.">MSOA</button>
           <button type="button" data-dl="lsoa" title="LSOA-level data (~1,200 areas, more granular)">LSOA</button>
         </div>
         <div class="dl-hint" id="dl-hint"></div>
@@ -1695,6 +1833,39 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // CONFIGURATION
 // ═══════════════════════════════════════════════════════════════════════════
+
+// ── Data versioning ─────────────────────────────────────────────────────────
+// The large payloads used to be fetched with `?v=' + Date.now()` and
+// `cache: 'no-store'`, which guaranteed a fresh copy but re-downloaded roughly
+// 9MB on every single visit and defeated the Pages CDN as well as the browser
+// cache. The manifest is 9KB and is the pipeline's own record of when the data
+// last changed, so it is the one thing fetched uncached; its `last_run` then
+// versions everything else. A refresh still lands within one page load, and a
+// repeat visitor downloads nothing that has not changed.
+//
+// If the manifest cannot be read, the version stays empty and URLs go out bare
+// rather than pinned to a stale token: worst case is the previous default
+// caching behaviour, never a permanently stuck copy.
+let DATA_VERSION = '';
+let _manifestPromise = null;
+
+function loadManifest() {
+  if (_manifestPromise) return _manifestPromise;
+  _manifestPromise = fetch('data/meta/manifest.json', { cache: 'no-store' })
+    .then(r => (r.ok ? r.json() : null))
+    .catch(() => null)
+    .then(m => {
+      if (m && m.last_run) DATA_VERSION = encodeURIComponent(m.last_run);
+      return m;
+    });
+  return _manifestPromise;
+}
+
+// A data URL stamped with the current data version. Callers that can run
+// before the manifest resolves should await loadManifest() first.
+function dataUrl(path) {
+  return DATA_VERSION ? path + '?v=' + DATA_VERSION : path;
+}
 
 const NEIGHBOURHOODS = {
   sw: { label: "South Westminster",           short: "S Westminster", color: "#185FA5", bg: "#E6F1FB",
@@ -2872,7 +3043,8 @@ let _grLLoading = null;
 function _ensureGreenspaceLayer() {
   if (grL) return Promise.resolve(grL);
   if (_grLLoading) return _grLLoading;
-  _grLLoading = fetch('greenspaces.geojson?v=' + Date.now(), { cache: 'no-store' })
+  _grLLoading = loadManifest()
+    .then(() => fetch(dataUrl('greenspaces.geojson')))
     .then(r => r.ok ? r.json() : null)
     .then(gj => {
       if (!gj) { _grLLoading = null; return null; }
@@ -6994,19 +7166,28 @@ document.getElementById('ov').addEventListener('change', e => {
 // toggles the LSOA layer directly.
 // ═══════════════════════════════════════════════════════════════════════════
 let currentDataLevel = 'ward';
+// Raised while the badge is driving the boundary checkboxes, so their own
+// badge-sync listeners stay quiet. Without it, switching LSOA to MSOA unticks
+// the LSOA box, and that box's listener reports "ward" straight back, undoing
+// the switch the user just made.
+let _dlDriving = false;
+
+function _dlHint(msg, ms) {
+  const hintEl = document.getElementById('dl-hint');
+  if (!hintEl) return;
+  hintEl.textContent = msg;
+  hintEl.classList.add('show');
+  clearTimeout(_setDataLevel._t);
+  _setDataLevel._t = setTimeout(() => hintEl.classList.remove('show'), ms || 2400);
+}
+
 function _setDataLevel(level, opts) {
   opts = opts || {};
-  const hintEl = document.getElementById('dl-hint');
   if (level === 'nbhd') {
-    if (hintEl) {
-      hintEl.textContent = 'Neighbourhood-level data — in development';
-      hintEl.classList.add('show');
-      clearTimeout(_setDataLevel._t);
-      _setDataLevel._t = setTimeout(() => hintEl.classList.remove('show'), 2400);
-    }
+    _dlHint('Neighbourhood-level data — in development');
     return;
   }
-  if (level !== 'ward' && level !== 'lsoa') return;
+  if (level !== 'ward' && level !== 'lsoa' && level !== 'msoa') return;
 
   // ── Compatibility gate ───────────────────────────────────────────────
   // When the user clicks a Ward/LSOA badge button (i.e. not via the
@@ -7014,7 +7195,8 @@ function _setDataLevel(level, opts) {
   // available at that level. Show a toast and bail before mutating any
   // state. Auto-sync paths (fromOverlay / fromLsoaToggle) skip the gate
   // because they reflect a level switch the system has already validated.
-  if (!opts.fromOverlay && !opts.fromLsoaToggle && level !== currentDataLevel
+  if (!opts.fromOverlay && !opts.fromLsoaToggle && !opts.fromMsoaToggle
+      && level !== currentDataLevel
       && typeof curOv !== 'undefined' && curOv && curOv !== 'none'
       && typeof ovLevel === 'function') {
     const lvl = ovLevel(curOv);
@@ -7024,7 +7206,7 @@ function _setDataLevel(level, opts) {
       _levelToast(`<b>Ward-only indicator</b><br>"${ovTxt}"<br>is published at ward level only — switching to LSOA mode would hide its shading.`);
       return;
     }
-    if (lvl === 'lsoa' && level === 'ward') {
+    if (lvl === 'lsoa' && (level === 'ward' || level === 'msoa')) {
       _levelToast(`<b>LSOA-only indicator</b><br>"${ovTxt}"<br>has no ward-level value — clear the overlay first if you want to leave LSOA mode.`);
       return;
     }
@@ -7036,16 +7218,35 @@ function _setDataLevel(level, opts) {
       b.classList.toggle('active', b.dataset.dl === level);
     }
   });
-  if (opts.fromOverlay || opts.fromLsoaToggle) return;  // avoid feedback loops
-  const lsoaToggle = document.getElementById('tlsoa');
-  if (lsoaToggle) {
-    const wantLsoa = (level === 'lsoa');
-    if (lsoaToggle.checked !== wantLsoa) {
-      lsoaToggle.checked = wantLsoa;
-      lsoaToggle.__skipLevelGate = true;  // gate already passed at the dl-badge level
-      lsoaToggle.dispatchEvent(new Event('change'));
-    }
+  // MSOA is a geography, not a shading level. Ward figures are what the map
+  // colours, and they stay coloured underneath: MSOAs are built from whole
+  // LSOAs but 41% of LSOAs cross a ward line, so MSOA edges and ward edges
+  // agreeing is a coincidence. Say so once, each time the level is chosen,
+  // rather than letting someone wait for a recolour that is never coming.
+  if (level === 'msoa' && !opts.fromMsoaToggle) {
+    _dlHint('MSOA boundaries drawn. Shading stays at ward level.', 3200);
   }
+
+  if (opts.fromOverlay || opts.fromLsoaToggle || opts.fromMsoaToggle) return;  // avoid feedback loops
+
+  // Drive the two boundary layers to match the level. Guarded, because each
+  // checkbox has its own listener that syncs the badge back the other way.
+  _dlDriving = true;
+  try {
+    const want = { tlsoa: level === 'lsoa', tmsoa: level === 'msoa' };
+    for (const id in want) {
+      const box = document.getElementById(id);
+      if (!box || box.checked === want[id]) continue;
+      box.checked = want[id];
+      if (id === 'tlsoa') box.__skipLevelGate = true;  // gate already passed above
+      box.dispatchEvent(new Event('change'));
+    }
+  } finally {
+    _dlDriving = false;
+  }
+  // Previously done by the LSOA toggle's sync listener, which the guard above
+  // now silences. The refresh still has to happen.
+  if (typeof _refreshUI === 'function') _refreshUI();
   // (No overlay-reset here. The gate above means we never reach this
   // function with an LSOA-only overlay active and level === 'ward'.)
 }
@@ -7068,8 +7269,20 @@ document.querySelectorAll('#dl-seg button').forEach(b => {
   const t = document.getElementById('tlsoa');
   if (!t) return;
   t.addEventListener('change', () => {
+    if (_dlDriving) return;  // the badge is already setting the level
     _setDataLevel(t.checked ? 'lsoa' : 'ward', { fromLsoaToggle: true });
     _refreshUI();
+  });
+})();
+// Same for the MSOA boundary toggle, so the sidebar box and the badge always
+// agree whichever one was used. Unticking it falls back to Ward, matching the
+// LSOA box above.
+(function _wireDlBadgeFromMsoaToggle() {
+  const t = document.getElementById('tmsoa');
+  if (!t) return;
+  t.addEventListener('change', () => {
+    if (_dlDriving) return;
+    _setDataLevel(t.checked ? 'msoa' : 'ward', { fromMsoaToggle: true });
   });
 })();
 
@@ -7132,7 +7345,8 @@ function _refreshUI() {
           && typeof NEIGHBOURHOODS !== 'undefined' && NEIGHBOURHOODS[focusedNbhd]) {
         parts.push(`nbhd <b>${NEIGHBOURHOODS[focusedNbhd].label}</b>`);
       }
-      parts.push((currentDataLevel === 'lsoa' ? '<b>LSOA</b>' : '<b>Ward</b>') + ' mode');
+      parts.push('<b>' + (currentDataLevel === 'lsoa' ? 'LSOA'
+                        : currentDataLevel === 'msoa' ? 'MSOA' : 'Ward') + '</b> mode');
       if (typeof curOv !== 'undefined' && curOv && curOv !== 'none') {
         parts.push(`overlay <b>${_ovLabel(curOv)}</b>`);
       }
@@ -8693,9 +8907,12 @@ async function loadData() {
     ldrTxt.textContent = 'Loading ward data...';
     ldrSub.textContent = 'Fetching ward_data.json';
 
-    // Cache-bust so newly patched fields (ethnic/age) always load fresh
-    // rather than showing a stale browser copy.
-    const response = await fetch('ward_data.json?v=' + Date.now(), { cache: 'no-store' });
+    // The manifest first, uncached and small. It gives the data version every
+    // other payload is stamped with, so a refreshed dataset is picked up
+    // immediately while an unchanged one is served from cache.
+    const manifest = await loadManifest();
+
+    const response = await fetch(dataUrl('ward_data.json'));
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
     const json = await response.json();
@@ -8747,15 +8964,25 @@ async function loadData() {
       el.textContent = label;
     };
 
-    // Render straight away from ward_data.json, then upgrade to the pipeline's
-    // own last_run once the manifest arrives. Done in that order so a missing
-    // or unreadable manifest degrades to the previous behaviour rather than
-    // leaving the panel blank while a fetch is in flight.
-    setFreshness(dateStr);
-    fetch('data/meta/manifest.json', { cache: 'no-store' })
-      .then(r => (r.ok ? r.json() : null))
-      .then(m => { if (m && m.last_run) setFreshness(m.last_run); })
-      .catch(() => { /* manifest is optional; the ward_data date already shows */ });
+    // Prefer the pipeline's own last_run, and fall back to the date stamped
+    // into ward_data.json if the manifest could not be read. The manifest is
+    // already in hand by this point, so there is no second fetch and no
+    // window where the panel sits blank.
+    setFreshness((manifest && manifest.last_run) || dateStr);
+
+    // Keep the Dataset structured data in step with the data itself, so the
+    // dateModified a crawler reads is never the one hardcoded in the head.
+    if (manifest && manifest.last_run) {
+      try {
+        const ldEl = document.getElementById('ld-dataset');
+        const ld = JSON.parse(ldEl.textContent);
+        const ds = ld['@graph'].find(n => n['@type'] === 'Dataset');
+        if (ds) {
+          ds.dateModified = String(manifest.last_run).slice(0, 10);
+          ldEl.textContent = JSON.stringify(ld);
+        }
+      } catch (e) { /* structured data is decoration; never break the map for it */ }
+    }
 
     // Update overlay vintage note
     document.getElementById('data-vintage').innerHTML =
@@ -8773,7 +9000,7 @@ async function loadData() {
     // and restyle the LSOA layer so overlays picked before the fetch
     // resolved (or auto-enabled by the overlay dropdown) pick up real data
     // instead of staying grey.
-    fetch('lsoa_data.json?v=' + Date.now(), { cache: 'no-store' }).then(r => r.ok ? r.json() : null).catch(() => null)
+    fetch(dataUrl('lsoa_data.json')).then(r => r.ok ? r.json() : null).catch(() => null)
       .then(ld => {
         if (!ld) return;
         LSOA_DATA = ld;
