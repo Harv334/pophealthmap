@@ -174,7 +174,11 @@
   .sb-tab:hover { color: #005EB8; background: #fff; }
   .sb-tab.active { color: #212B32; border-bottom-color: #005EB8; background: #fff; }
   .tab-pane { display: none; }
-  .tab-pane.active { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  /* This used to say overflow: hidden, which quietly beat the scrolling rule
+     on .sidebar > .tab-pane above: same specificity, declared later, and it
+     matches only the pane that is actually on screen. The pane must scroll,
+     or the toggles below the fold cannot be reached on a short window. */
+  .tab-pane.active { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; overflow-x: hidden; }
   .ward-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
   .sb-sec { padding: 11px 13px; border-bottom: 1px solid #E8EDEE; flex-shrink: 0; }
   .deselect-btn { border: 1px solid #DDE1E4; background: #fff; color: #4C6272; font-size: 10.5px; font-weight: 500; padding: 3px 8px; border-radius: 5px; cursor: pointer; line-height: 1.2; white-space: nowrap; flex-shrink: 0; }
