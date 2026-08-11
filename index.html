@@ -745,6 +745,41 @@
   .cmp-key i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; font-style: normal; }
   .cmp-bar .cmp-legend { font-size: 10.5px; color: var(--ink-3); margin-top: 10px; line-height: 1.45; }
 
+  /* ── Tour ─────────────────────────────────────────────────────────────────
+     The design file's story strip: a chapter counter, a progress bar, one
+     paragraph of narration and previous/next. It sits in the same slot as the
+     ward sheet, so while it runs the sheet is pushed above it rather than
+     fighting it for the space. */
+  .tour-strip { position: absolute; left: 16px; right: 16px; bottom: 16px; z-index: 1300;
+    background: var(--paper); border: 1px solid var(--line); border-radius: 14px;
+    box-shadow: var(--shadow-lg); padding: 13px 18px 14px; display: none; }
+  .tour-strip.open { display: block; }
+  .tour-hd { display: flex; align-items: baseline; justify-content: space-between;
+    gap: 12px; margin-bottom: 9px; }
+  .tour-hd .tour-title { font-family: 'Inter Tight', Inter, sans-serif; font-size: 16px;
+    font-weight: 600; color: var(--ink); margin: 0; }
+  .tour-hd .tour-ctr { font-size: 10.5px; color: var(--ink-3); text-transform: uppercase;
+    letter-spacing: .06em; font-weight: 600; white-space: nowrap; }
+  .tour-hd .tour-end { background: none; border: 0; padding: 0 0 0 8px; cursor: pointer;
+    color: var(--ink-2); font: inherit; font-size: 10.5px; text-transform: uppercase;
+    letter-spacing: .06em; font-weight: 600; }
+  .tour-hd .tour-end:hover { color: var(--nhs-red); }
+  .tour-prog { display: flex; gap: 4px; margin-bottom: 11px; }
+  .tour-prog .seg { flex: 1; height: 3px; border-radius: 2px; background: var(--line); }
+  .tour-prog .seg.done, .tour-prog .seg.on { background: var(--nhs-blue); }
+  .tour-narr { font-size: 13.5px; line-height: 1.6; color: var(--ink); margin-bottom: 12px;
+    max-width: 760px; }
+  .tour-narr strong { font-weight: 600; }
+  .tour-ctrls { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .tour-next-lbl { font-size: 11px; color: var(--ink-3); overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; }
+  /* While the tour runs the sheet stacks above the strip instead of under it.
+     252px because a full sheet is about 250: at 210 the chapter that opens it
+     sliced the row of figures in half, which looks like a rendering fault
+     rather than a panel you can scroll. */
+  .map-wrap.touring .ws-sheet { bottom: calc(var(--tour-h, 150px) + 26px); max-height: 252px; }
+  .map-wrap.touring .cmp-bar { bottom: calc(var(--tour-h, 150px) + 26px); max-height: 252px; }
+
   /* ── Directory ────────────────────────────────────────────────────────────
      Every point dataset on the map as one searchable list. The map answers
      "what is near here"; this answers "where is this" and "how many of these
@@ -910,7 +945,7 @@
     <button type="button" class="mode-btn" role="tab" data-mode="explore" aria-selected="true">Explore</button>
     <button type="button" class="mode-btn" role="tab" data-mode="query" aria-selected="false">Query</button>
     <button type="button" class="mode-btn" role="tab" data-mode="compare" aria-selected="false">Compare</button>
-    <button type="button" class="mode-btn" role="tab" data-mode="tour" aria-selected="false">Take a tour <span class="mode-soon">Soon</span></button>
+    <button type="button" class="mode-btn" role="tab" data-mode="tour" aria-selected="false">Take a tour</button>
     <button type="button" class="mode-btn" role="tab" data-mode="directory" aria-selected="false">Directory</button>
   </div>
 
@@ -1583,6 +1618,22 @@
           </div>
         </div>
         <div class="ws-body" id="ws-body"></div>
+      </div>
+
+      <!-- Guided tour, the design file's story strip. -->
+      <div class="tour-strip" id="tour-strip" role="region" aria-label="Guided tour">
+        <div class="tour-hd">
+          <h3 class="tour-title" id="tour-title"></h3>
+          <div><span class="tour-ctr" id="tour-ctr"></span><button type="button" class="tour-end"
+               id="tour-end">End tour &times;</button></div>
+        </div>
+        <div class="tour-prog" id="tour-prog"></div>
+        <div class="tour-narr" id="tour-narr"></div>
+        <div class="tour-ctrls">
+          <button type="button" class="ws-btn" id="tour-prev">&larr; Previous</button>
+          <span class="tour-next-lbl" id="tour-next-lbl"></span>
+          <button type="button" class="ws-btn primary" id="tour-next">Next chapter &rarr;</button>
+        </div>
       </div>
 
       <!-- Full comparison drawer, the design file's .compare-bar. Shares the
@@ -8590,16 +8641,12 @@ loadData();
  * parser looks for the closing tag before it looks at the JavaScript.
  */
 (function () {
-  // Compare and Query are built, so they are not in here: this object is only
-  // the placeholder cards for the modes that are still announcements.
+  /* Placeholder cards for modes that are still announcements.
+     Empty, because there are none left: Explore, Query, Compare, Directory and
+     the tour are all built. The machinery stays rather than being deleted,
+     because the next mode to be announced before it exists will want it, and
+     re-deriving it costs more than the forty inert lines. */
   var MODES = {
-    tour: {
-      title: 'Take a tour',
-      desc: 'A short guided walkthrough of what is on the map and how to read it, for anyone arriving without a specific question.',
-      points: ['What each overlay measures and where it comes from',
-               'How deprivation deciles work, and which direction is which',
-               'What area statistics can and cannot tell you'],
-    },
   };
 
   var rail = document.querySelector('.mode-rail');
@@ -8650,6 +8697,12 @@ loadData();
     // placeholder card. Each takes over the sidebar and leaves the map where
     // it is: a query whose results you cannot see on the map is a table with
     // extra steps, and a comparison you cannot locate is a list of names.
+    if (mode === 'tour') {
+      panel.hidden = true;
+      if (window.PH_TOUR) window.PH_TOUR.start();
+      return;
+    }
+
     if (BUILT[mode]) {
       panel.hidden = true;
       rememberTab();
@@ -10041,6 +10094,210 @@ loadData();
       if (explore) explore.click();
     });
   })();
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     THE TOUR
+
+     Six chapters, and each one does the thing it is describing rather than
+     describing it. A chapter drives the real controls, so what you are shown
+     is the map behaving normally and you can carry on from wherever it leaves
+     you. That is also why the last chapter is about what the figures cannot
+     support: a tour that only sells the features would leave someone confident
+     enough to misread them.
+     ───────────────────────────────────────────────────────────────────────── */
+  function railClick(mode) {
+    var b = document.querySelector('.mode-btn[data-mode="' + mode + '"]');
+    if (b) b.click();
+  }
+  function sidebarTab(name) {
+    document.querySelectorAll('.sb-tab').forEach(function (t) {
+      t.classList.toggle('active', t.dataset.tab === name);
+    });
+    document.querySelectorAll('.tab-pane').forEach(function (p) {
+      p.classList.toggle('active', p.id === 'tab-' + name);
+    });
+  }
+  function setOverlay(key) {
+    var el = $('ov');
+    if (!el) return;
+    if (!Array.prototype.some.call(el.options, function (o) { return o.value === key; })) return;
+    el.value = key;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  var TOUR = [
+    {
+      t: 'What you are looking at',
+      n: 'Every ward in all 33 London boroughs, built only from published NHS and ' +
+         'government data. There are three levels underneath: <strong>704 wards</strong>, ' +
+         '<strong>4,994 LSOAs</strong> and <strong>1,002 MSOAs</strong>, and they do not ' +
+         'nest inside one another. Everything runs in your browser, so nothing you do ' +
+         'here is uploaded anywhere.',
+      go: function () {
+        railClick('explore');
+        sidebarTab('layers');
+        setOverlay('none');
+      },
+    },
+    {
+      t: 'Colour the map by any figure',
+      n: 'The Overlay tab shades every ward by one of 67 indicators, and the strip along ' +
+         'the bottom of the map gives the scale it is using. This one is the ' +
+         '<strong>IMD 2025 score</strong>, a ward aggregate of the deprivation of the ' +
+         'neighbourhoods inside it. Darker is more deprived.',
+      go: function () {
+        railClick('explore');
+        sidebarTab('overlay');
+        setOverlay('imd_score_ward');
+      },
+    },
+    {
+      t: 'Deprivation runs in two directions',
+      n: 'This is the easiest thing on the map to state backwards, so the map has ' +
+         'switched to deciles at neighbourhood level to show it. A higher ' +
+         '<strong>score</strong> means more deprived. A higher <strong>decile</strong> ' +
+         'means <em>less</em> deprived, because decile 1 is the most deprived tenth of ' +
+         'England. A ward has no decile of its own: its figure is a population-weighted ' +
+         'mean of the deciles of the neighbourhoods inside it, so a ward at 3 is not ' +
+         '"in the third decile", the typical neighbourhood in it is.',
+      go: function () {
+        // imd_decile is published at LSOA, so choosing it moves the map to
+        // neighbourhood level. That is the point of the chapter rather than a
+        // side effect: these are real deciles, not an average of them.
+        railClick('explore'); sidebarTab('overlay'); setOverlay('imd_decile');
+      },
+    },
+    {
+      t: 'Click a ward for its figures',
+      n: 'Any ward on the map opens the bar along the bottom: a sentence placing it ' +
+         'against London, then its headline numbers. From there you can pin it to ' +
+         'compare, download a printable profile, or open the full panel of every ' +
+         'indicator the ward has.',
+      go: function () {
+        railClick('explore');
+        // A real ward, chosen from the data rather than hard-coded, so the
+        // chapter cannot end up pointing at somewhere that has been renamed.
+        var best = null;
+        allWards().forEach(function (w) {
+          var v = num(w.inds.imd_decile_mean);
+          if (v === null) return;
+          if (!best || v < best.v) best = { n: w.name, v: v };
+        });
+        if (best) selectWardByName(best.n);
+      },
+    },
+    {
+      t: 'Ask a sharper question',
+      n: '<strong>Query</strong> finds the wards meeting several conditions at once, and ' +
+         'this one is running now: wards in Brent with a GP practice and a pharmacy, ' +
+         'where deprivation and disability are both above a threshold. ' +
+         '<strong>Compare</strong> puts up to four wards side by side, and ' +
+         '<strong>Directory</strong> lists all 23,000 services and organisations on the ' +
+         'map in one searchable place.',
+      go: function () {
+        railClick('query');
+        if (window.PH_QUERY) window.PH_QUERY.build();
+        var run = $('q-run');
+        if (run) run.click();
+      },
+    },
+    {
+      t: 'What these figures cannot tell you',
+      n: 'An area figure describes an area, not the people in it: a ward being deprived ' +
+         'on average says nothing about any particular household there. Some health ' +
+         'indicators are published at borough level and repeated across every ward in ' +
+         'that borough, so they cannot separate wards, and the map says so wherever they ' +
+         'appear. A blank ward may be suppressed for privacy rather than zero. And this ' +
+         'tool is still in development, so treat what you find as provisional and check ' +
+         'it before acting on it.',
+      go: function () {
+        railClick('explore');
+        sidebarTab('layers');
+        setOverlay('none');
+      },
+    },
+  ];
+
+  var tourAt = -1;
+  var tourStrip = $('tour-strip');
+
+  function tourLift() {
+    if (!mapWrap || !tourStrip) return;
+    var on = tourStrip.classList.contains('open');
+    mapWrap.classList.toggle('touring', on);
+    mapWrap.style.setProperty('--tour-h', (on ? tourStrip.offsetHeight : 0) + 'px');
+    // The strip is the lowest thing on the map while it runs, so the legend
+    // and the attribution clear it rather than the sheet.
+    if (on) {
+      var px = (tourStrip.offsetHeight + 16) + 'px';
+      mapWrap.classList.add('has-sheet');
+      mapWrap.style.setProperty('--sheet-lift', px);
+      document.documentElement.style.setProperty('--sheet-lift', px);
+    }
+  }
+
+  function renderTour() {
+    if (tourAt < 0 || tourAt >= TOUR.length) return;
+    var c = TOUR[tourAt];
+    $('tour-title').textContent = c.t;
+    $('tour-ctr').textContent = 'Chapter ' + (tourAt + 1) + ' of ' + TOUR.length;
+    $('tour-narr').innerHTML = c.n;
+    $('tour-prog').innerHTML = TOUR.map(function (_, i) {
+      return '<span class="seg' + (i < tourAt ? ' done' : i === tourAt ? ' on' : '') + '"></span>';
+    }).join('');
+    $('tour-prev').disabled = tourAt === 0;
+    $('tour-prev').style.visibility = tourAt === 0 ? 'hidden' : 'visible';
+    var last = tourAt === TOUR.length - 1;
+    $('tour-next').textContent = last ? 'Finish' : 'Next chapter →';
+    $('tour-next-lbl').textContent = last ? '' : 'Up next: ' + TOUR[tourAt + 1].t;
+    try { c.go(); } catch (e) { /* a chapter must never strand the tour */ }
+    tourLift();
+  }
+
+  function tourStart() {
+    if (!tourStrip) return;
+    tourAt = 0;
+    tourStrip.classList.add('open');
+    renderTour();
+  }
+  function tourEnd() {
+    if (!tourStrip) return;
+    tourAt = -1;
+    tourStrip.classList.remove('open');
+    if (mapWrap) {
+      mapWrap.classList.remove('touring');
+      mapWrap.style.setProperty('--tour-h', '0px');
+    }
+    railClick('explore');
+    lift();
+  }
+  function tourStep(d) {
+    var nx = tourAt + d;
+    if (nx < 0) return;
+    if (nx >= TOUR.length) { tourEnd(); return; }
+    tourAt = nx;
+    renderTour();
+  }
+
+  if (tourStrip) {
+    $('tour-next').addEventListener('click', function () { tourStep(1); });
+    $('tour-prev').addEventListener('click', function () { tourStep(-1); });
+    $('tour-end').addEventListener('click', tourEnd);
+    document.addEventListener('keydown', function (e) {
+      if (tourAt < 0) return;
+      var tag = (e.target.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'select' || tag === 'textarea') return;
+      if (e.key === 'ArrowRight') { e.preventDefault(); tourStep(1); }
+      if (e.key === 'ArrowLeft') { e.preventDefault(); tourStep(-1); }
+      if (e.key === 'Escape') { e.preventDefault(); tourEnd(); }
+    });
+  }
+  window.PH_TOUR = {
+    start: tourStart, end: tourEnd,
+    running: function () { return tourAt >= 0; },
+    at: function () { return tourAt; },
+    length: TOUR.length,
+  };
 
   function applyMode(mode) {
     currentMode = (mode === 'query' || mode === 'compare') ? mode : 'explore';
