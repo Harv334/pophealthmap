@@ -1294,67 +1294,10 @@
             <div id="sc-meta" style="margin-top:5px;font-size:10.5px;color:#888;line-height:1.4"></div>
           </div>
 
-          <div style="margin-top:14px;padding-top:12px;border-top:1px solid #eee">
-            <div class="sb-lbl">Bivariate (second indicator)</div>
-            <select id="ov2" style="width:100%;padding:5px 6px;border:1px solid #ddd;border-radius:5px;font-size:11px;color:#333;background:#fff">
-              <option value="none">— none —</option>
-              <optgroup label="Health (Census 2021)">
-                <option value="census_bad_health_pct">Bad/very bad health % · Ward</option>
-                <option value="census_disability_any_pct">Disability (any) % · Ward</option>
-                <option value="census_provides_unpaid_care_pct">Provides unpaid care % · Ward</option>
-              </optgroup>
-              <optgroup label="Crime &amp; deprivation">
-                <option value="crime_total">Total crimes (12 months) · Ward</option>
-                <option value="core20_lsoa_count">Core20 LSOAs in ward · Ward</option>
-                <option value="census_unemployed_pct">Unemployed % · Ward</option>
-              </optgroup>
-              <optgroup label="Crime — by category (MPS, 12mo)">
-                <option value="crime_violence_12mo">Violence · Ward</option>
-                <option value="crime_theft_12mo">Theft · Ward</option>
-                <option value="crime_burglary_12mo">Burglary · Ward</option>
-                <option value="crime_robbery_12mo">Robbery · Ward</option>
-                <option value="crime_vehicle_12mo">Vehicle offences · Ward</option>
-                <option value="crime_drug_offences_12mo">Drug offences · Ward</option>
-              </optgroup>
-              <optgroup label="Deprivation">
-                <option value="imd_score_ward">IMD composite (pop-weighted) · Ward</option>
-                <option value="imd_score">IMD composite · LSOA</option>
-              </optgroup>
-              <optgroup label="Environment &amp; access">
-                <option value="fuel_poverty_pct">Fuel poverty % · LSOA</option>
-                <option value="gb_commitment_pct">Green or blue space 15-min % · LSOA</option>
-                <option value="green_commitment_pct">Green space 15-min % · LSOA</option>
-                <option value="blue_commitment_pct">Blue space 15-min % · LSOA</option>
-              </optgroup>
-              <optgroup label="Housing &amp; age">
-                <option value="census_social_rented_pct">Social rented % · Ward</option>
-                <option value="census_no_car_pct">No car/van % · Ward</option>
-                <option value="census_over65_pct">65+ % · Ward</option>
-                <option value="census_under16_pct">Under 16 % · Ward</option>
-              </optgroup>
-              <optgroup label="Civic strength (London Datastore)">
-                <option value="cst_number_of_community_sport_and_physical_activity_offerings">Community sport &amp; activity · Ward</option>
-                <option value="cst_number_of_community_interest_companies_cics">CICs · Ward</option>
-                <option value="cst_number_and_proximity_of_libraries">Libraries proximity · Ward</option>
-                <option value="cst_number_and_proximity_of_community_centres">Community centres proximity · Ward</option>
-                <option value="cst_number_and_proximity_of_cultural_spaces">Cultural spaces proximity · Ward</option>
-                <option value="cst_number_of_faith_centres">Faith centres · Ward</option>
-                <option value="cst_passive_green_space">Passive green space · Ward</option>
-              </optgroup>
-            </select>
-            <div id="biv-legend" style="display:none;margin-top:10px">
-              <div style="display:grid;grid-template-columns:22px repeat(3,1fr);grid-template-rows:1fr 1fr 1fr 22px;gap:0;width:140px">
-                <div style="grid-row:1/4;grid-column:1;writing-mode:vertical-rl;transform:rotate(180deg);font-size:9px;color:#666;text-align:center;padding:2px 0" id="biv-y-label">Indicator 2 &rarr;</div>
-                <div style="background:#e8e8e8"></div><div style="background:#b0d5df"></div><div style="background:#64acbe"></div>
-                <div style="background:#e4acac"></div><div style="background:#ad9ea5"></div><div style="background:#627f8c"></div>
-                <div style="background:#c85a5a"></div><div style="background:#985356"></div><div style="background:#574249"></div>
-                <div style="grid-column:2/5;font-size:9px;color:#666;text-align:center;padding:3px 0" id="biv-x-label">Indicator 1 &rarr;</div>
-              </div>
-              <div style="font-size:10px;color:#666;margin-top:4px;line-height:1.4">
-                Each ward is binned into thirds (low/mid/high) for each indicator. Teal = ov1 high, pink = ov2 high, dark slate = both high.
-              </div>
-            </div>
-          </div>
+          <!-- The bivariate (second indicator) control was removed for now.
+               curOv2 stays 'none', so bivariateColor() and every bivActive
+               branch downstream are inert rather than deleted: putting it back
+               is re-adding this block, not rebuilding the colouring. -->
 
           <!-- Top 20 / Bottom 20 rankings — single-indicator mode only -->
           <div id="rank-panel" style="display:none;margin-top:14px;padding-top:12px;border-top:1px solid #eee">
@@ -5002,6 +4945,10 @@ function buildWardLayer() {
     onEachFeature: (feat, lyr) => {
       const wn = feat.properties.WD24NM;
       lyr.on('click', () => {
+        // Out-of-borough wards are not clickable while a borough is focused.
+        // They stay drawn for context, but selecting one would put a ward in
+        // the panel that the filter above it says is out of scope.
+        if (typeof wardInFocus === 'function' && !wardInFocus(wn)) return;
         // Update selection BEFORE the reset so the previously-selected ward
         // actually loses its 'selected' style (gs() reads selW).
         selW = wn;
@@ -5011,6 +4958,7 @@ function buildWardLayer() {
         showWard(wn);
       });
       lyr.on('mouseover', e => {
+        if (typeof wardInFocus === 'function' && !wardInFocus(wn)) return;
         if (wn !== selW) lyr.setStyle(wstyle(wn, curOv, 'hover'));
         const nk = nbhdOf(wn), nb = nk ? NEIGHBOURHOODS[nk] : null;
         const _wardRec = WARD_DATA[wn] || (typeof WARD_DATA === 'object' && Object.values(WARD_DATA).find(w => w && w.name === wn));
@@ -5247,6 +5195,14 @@ function _applyBoroughSolo() {
   sel.addEventListener('change', e => {
     focusedBorough = e.target.value || 'all';
     _applyBoroughSolo();
+    // A ward selected in the borough you have just left should not stay
+    // selected, with its bar still on screen, behind a view it is not in.
+    if (focusedBorough !== 'all' && selW) {
+      const rec = (typeof WARD_DATA !== 'undefined' && WARD_DATA) ? WARD_DATA[selW] : null;
+      if (!rec || rec.lad !== focusedBorough) {
+        if (typeof deselectWard === 'function') deselectWard();
+      }
+    }
     // Zoom to the focused borough's wards
     if (focusedBorough !== 'all' && wLyr) {
       const matched = wLyr.getLayers().filter(l =>
@@ -5259,8 +5215,54 @@ function _applyBoroughSolo() {
       // Restoring 'all' — re-fit to whole London map.
       map.fitBounds(wLyr.getBounds(), { padding:[28,28] });
     }
+    applyBoroughLock();
   });
 })();
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BOROUGH LOCK
+
+   Focusing a borough is a statement about what you are looking at, and the
+   map was still letting you drag across the rest of London and click wards
+   that the view had just excluded. Both are noise, and clicking one of them
+   put a ward in the panel that the borough filter said was not in scope.
+
+   Panning is constrained to the borough's own bounds with a margin, and the
+   click and hover handlers ignore wards outside it. Nothing is hidden that was
+   not already dimmed by the solo view: this stops you interacting with it, it
+   does not remove the context around it.
+   ═══════════════════════════════════════════════════════════════════════════ */
+function wardInFocus(wardName) {
+  if (!focusedBorough || focusedBorough === 'all') return true;
+  const w = (typeof WARD_DATA !== 'undefined' && WARD_DATA) ? WARD_DATA[wardName] : null;
+  if (w && w.lad) return w.lad === focusedBorough;
+  // Fall back to the boundary file, which is what the solo view filters on.
+  if (typeof GJ !== 'undefined' && GJ.features) {
+    const f = GJ.features.find(x => (x.properties || {}).WD24NM === wardName);
+    if (f) return (f.properties || {}).LAD === focusedBorough;
+  }
+  return true;
+}
+
+function applyBoroughLock() {
+  if (typeof map === 'undefined' || !map) return;
+  if (!focusedBorough || focusedBorough === 'all' || typeof wLyr === 'undefined' || !wLyr) {
+    map.setMaxBounds(null);
+    map.setMinZoom(0);
+    return;
+  }
+  const matched = wLyr.getLayers().filter(l =>
+    (l.feature.properties || {}).LAD === focusedBorough);
+  if (!matched.length) { map.setMaxBounds(null); map.setMinZoom(0); return; }
+  // A margin, so the borough is not jammed against the edge of the frame and
+  // you can still see which way it faces.
+  const b = L.featureGroup(matched).getBounds().pad(0.25);
+  map.setMaxBounds(b);
+  try {
+    const fit = map.getBoundsZoom(b);
+    if (isFinite(fit)) map.setMinZoom(Math.max(0, Math.floor(fit) - 1));
+  } catch (e) { /* degenerate bounds: leave the zoom range alone */ }
+}
 document.getElementById('tnc').addEventListener('change', e => {
   showNbhdColors = e.target.checked;
   if (showNbhdColors) {
@@ -6989,10 +6991,23 @@ function _resetAll() {
     // VCSE area filter
     const vsel = document.getElementById('vcse-area-filter');
     if (vsel && vsel.value !== 'all') { vsel.value = 'all'; vsel.dispatchEvent(new Event('change')); }
+    // MSOA boundaries off, alongside the LSOA layer above
+    const tmsoa = document.getElementById('tmsoa');
+    if (tmsoa && tmsoa.checked) { tmsoa.checked = false; tmsoa.dispatchEvent(new Event('change')); }
+    // Whatever is selected, selected. Reset says it clears everything and
+    // returns to the default view, and it was leaving a ward highlighted with
+    // its bar across the bottom of the map, plus any Directory pin and its
+    // popup. Back to Explore also takes down the query highlight, the pinned
+    // outlines and the comparison drawer.
+    if (typeof deselectWard === 'function') deselectWard();
+    if (typeof map !== 'undefined' && map && map.closePopup) map.closePopup();
+    const _explore = document.querySelector('.mode-btn[data-mode="explore"]');
+    if (_explore) _explore.click();
     // Data level back to Ward
     _setDataLevel('ward');
     // Apply borough-solo clear + fit bounds
     if (typeof _applyBoroughSolo === 'function') _applyBoroughSolo();
+    if (typeof applyBoroughLock === 'function') applyBoroughLock();
     if (typeof BOROUGH_GJ !== 'undefined' && BOROUGH_GJ.features && typeof boroughL !== 'undefined' && boroughL) {
       map.fitBounds(boroughL.getBounds(), { padding: [20, 20] });
     }
@@ -8277,7 +8292,14 @@ function bivariateColor(id, ov1, ov2, type) {
 
 // Secondary indicator select: when non-'none', switch to bivariate mode and
 // show the 3x3 legend; otherwise hide it and revert to univariate.
-document.getElementById('ov2').addEventListener('change', e => {
+//
+// The control is not in the page at the moment, so this binds only if it comes
+// back. Every other #ov2 lookup in this file was already null-guarded; this one
+// was the exception and would have thrown on load.
+(function () {
+  var _ov2 = document.getElementById('ov2');
+  if (!_ov2) return;
+  _ov2.addEventListener('change', e => {
   curOv2 = e.target.value;
   const leg = document.getElementById('biv-legend');
   const scale = document.getElementById('scale');
@@ -8298,7 +8320,8 @@ document.getElementById('ov2').addEventListener('change', e => {
   // Hide the Top/Bottom 20 panel in bivariate mode; show it otherwise.
   renderTopBottom();
   _restyleAll();
-});
+  });
+})();
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SPOTLIGHT MODE — hard-dim wards outside focused neighbourhood
@@ -10135,8 +10158,10 @@ loadData();
          'here is uploaded anywhere.',
       go: function () {
         railClick('explore');
-        sidebarTab('layers');
+        // Overlay first: changing #ov pulls the sidebar to the Overlay tab, so
+        // setting the tab before it would be immediately undone.
         setOverlay('none');
+        sidebarTab('layers');
       },
     },
     {
@@ -10202,6 +10227,23 @@ loadData();
       },
     },
     {
+      t: 'Asking it a question',
+      n: 'The panel on the right answers questions in plain English, and it is built so ' +
+         'it cannot make a figure up: the model is never given the data. It is given ' +
+         'four tools, your browser runs them against the numbers already loaded on this ' +
+         'page, and it only writes the sentence around what they return. Nothing you ' +
+         'type is used to look anything up anywhere else. It is capped at ' +
+         '<strong>10 questions a day</strong> because it costs money to run, and the ' +
+         'count sits next to the panel’s title. The map, Query, Compare and Directory ' +
+         'are not capped, because they cost nothing to serve.',
+      go: function () {
+        railClick('explore');
+        var t = document.getElementById('ai-toggle');
+        var p = document.getElementById('ai-panel');
+        if (t && p && !p.classList.contains('open')) t.click();
+      },
+    },
+    {
       t: 'What these figures cannot tell you',
       n: 'An area figure describes an area, not the people in it: a ward being deprived ' +
          'on average says nothing about any particular household there. Some health ' +
@@ -10212,14 +10254,40 @@ loadData();
          'it before acting on it.',
       go: function () {
         railClick('explore');
-        sidebarTab('layers');
         setOverlay('none');
+        sidebarTab('layers');
+        var c = document.getElementById('ai-close');
+        var p = document.getElementById('ai-panel');
+        if (c && p && p.classList.contains('open')) c.click();
       },
     },
   ];
 
   var tourAt = -1;
   var tourStrip = $('tour-strip');
+
+  /**
+   * The tour is the landing experience, once.
+   *
+   * Someone arriving with no idea what this is gets walked through it; someone
+   * who has been here before does not, which is the whole point of remembering.
+   * There is no "would you like a tour?" box in front of it: the tour itself is
+   * the thing, and it has End tour in its own header.
+   *
+   * It also stays out of the way of a shared link. A URL carrying state was
+   * sent to show someone a particular view, and opening a tour over it would
+   * throw away the thing they were sent.
+   */
+  var TOUR_SEEN = 'phTourSeen';
+  function maybeAutoStart() {
+    if (tourAt >= 0) return;
+    if (window.location.search && window.location.search.length > 1) return;
+    var seen = null;
+    try { seen = window.localStorage.getItem(TOUR_SEEN); } catch (e) { return; }
+    if (seen) return;
+    try { window.localStorage.setItem(TOUR_SEEN, '1'); } catch (e) { /* private mode */ }
+    tourStart();
+  }
 
   function tourLift() {
     if (!mapWrap || !tourStrip) return;
@@ -10750,6 +10818,10 @@ loadData();
     if (indicatorKeys().indexOf(q.sort) === -1) q.sort = indicatorKeys()[0];
     renderSort();
     seedExample();
+    // The ward data has arrived, so a first-time visitor can be shown round.
+    // Hooked here rather than to a timer because chapter 4 picks its ward out
+    // of the data and there is nothing to pick from before this point.
+    maybeAutoStart();
   }
   var _poll = setInterval(function () {
     buildOnce();

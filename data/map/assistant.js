@@ -427,21 +427,56 @@ var ASSISTANT_ENDPOINT = "https://pophealthmapai.sevilleharvey.workers.dev";
    * Before the first question the browser cannot know the count: the cap is
    * per IP and counted by the Worker, so all it can honestly show is the cap.
    */
+  /**
+   * How many questions today's allowance has left, counted down as it is used.
+   *
+   * The cap is enforced by the Worker against an IP, so the browser cannot know
+   * the true figure until the server has answered at least once. It used to say
+   * "10 a day" until then, which is a fact about the policy rather than a
+   * countdown, and asking a question and watching a static number is not a
+   * countdown either.
+   *
+   * So this browser keeps its own tally for the UTC day, decremented the moment
+   * a question is sent, and every reply the Worker gives overwrites it with the
+   * authoritative number. It is a running count that is right from the first
+   * question and self-corrects if it drifts, rather than nothing until the
+   * first answer lands. It can undercount an allowance shared across an office
+   * IP, which the tooltip says.
+   */
+  var USED_KEY = "phAskUsed";
+
+  function utcDay() { return new Date().toISOString().slice(0, 10); }
+
+  function readUsed() {
+    try {
+      var raw = window.localStorage.getItem(USED_KEY);
+      if (!raw) return 0;
+      var o = JSON.parse(raw);
+      return (o && o.day === utcDay()) ? (parseInt(o.used, 10) || 0) : 0;
+    } catch (e) { return 0; }
+  }
+
+  function writeUsed(n) {
+    try {
+      window.localStorage.setItem(USED_KEY,
+        JSON.stringify({ day: utcDay(), used: Math.max(0, n) }));
+    } catch (e) { /* private mode: the count is per-session then */ }
+  }
+
+  function capNow() { return (lastLimit && lastLimit.cap) || DAILY_CAP; }
+
   function renderLimit() {
     if (!limitEl) return;
-    if (lastLimit && typeof lastLimit.remaining === "number") {
-      var left = lastLimit.remaining;
-      limitEl.textContent = left + " of " + (lastLimit.cap || DAILY_CAP) + " left today";
-      limitEl.title = left === 0
-        ? "You have used today's questions. The count resets at midnight UTC. The map itself is unlimited."
-        : left + " of today's " + (lastLimit.cap || DAILY_CAP) + " questions remaining. Resets at midnight UTC.";
-      limitEl.classList.toggle("spent", left === 0);
-    } else {
-      limitEl.textContent = DAILY_CAP + " a day";
-      limitEl.title = "Questions are limited to " + DAILY_CAP + " a day per person. "
-        + "The count appears here once you have asked one. The map itself is unlimited.";
-      limitEl.classList.remove("spent");
-    }
+    var cap = capNow();
+    var left = Math.max(0, cap - readUsed());
+    limitEl.textContent = left + " of " + cap + " left today";
+    limitEl.classList.toggle("spent", left === 0);
+    limitEl.title = left === 0
+      ? "You have used today's questions. The count resets at midnight UTC. "
+        + "The map, Query, Compare and Directory are not capped."
+      : left + " of today's " + cap + " questions left. Resets at midnight UTC. "
+        + "The cap is counted per network address, so if you share one this may "
+        + "read higher than what is actually left until the server corrects it.";
   }
 
   /**
@@ -487,7 +522,15 @@ var ASSISTANT_ENDPOINT = "https://pophealthmapai.sevilleharvey.workers.dev";
       });
       var data = await res.json();
       if (!res.ok) throw new Error(data && data.error ? data.error : "Request failed");
-      if (data && data._limit) lastLimit = data._limit;
+      // The Worker's count is the real one. Whenever it reports, this browser's
+      // running tally is set to match rather than being trusted over it.
+      if (data && data._limit) {
+        lastLimit = data._limit;
+        if (typeof lastLimit.remaining === "number") {
+          writeUsed((lastLimit.cap || DAILY_CAP) - lastLimit.remaining);
+          renderLimit();
+        }
+      }
 
       history.push({ role: "assistant", content: data.content });
 
@@ -618,6 +661,10 @@ var ASSISTANT_ENDPOINT = "https://pophealthmapai.sevilleharvey.workers.dev";
       send.disabled = true;
       if (chips.parentNode) chips.parentNode.removeChild(chips);
       add("ai-user", q);
+      // Count it down as it is spent, not once the answer arrives. The Worker
+      // counts the question when it receives it, so this is when it is gone.
+      writeUsed(readUsed() + 1);
+      renderLimit();
       var thinking = add("ai-bot ai-thinking", "Reading the data...");
       try {
         var answer = await ask(q);
