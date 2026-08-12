@@ -11120,9 +11120,24 @@ loadData();
     var box = $('tlsoa');
     if (!box) return;
     if (box.checked !== on) {
-      box.__skipLevelGate = true;
-      box.checked = on;
-      box.dispatchEvent(new Event('change'));
+      // Two listeners sit on this checkbox. __skipLevelGate is read and then
+      // deleted by the layer's own handler, and the badge's sync listener
+      // never sees it, so without _dlDriving as well the badge reads this tick
+      // as the user choosing LSOA and moves the level with it. The map would
+      // then be shaded by a ward indicator, with ward boundaries on, under a
+      // badge saying LSOA: an exclusive control with no state for "both",
+      // reporting a level the map is not at and contradicting the chapter's
+      // own text a few pixels away. A CSV taken during the chapter would take
+      // the LSOA branch too, and export 4,994 rows of a field only wards
+      // carry instead of the 704 rows on screen.
+      _dlDriving = true;
+      try {
+        box.__skipLevelGate = true;
+        box.checked = on;
+        box.dispatchEvent(new Event('change'));
+      } finally {
+        _dlDriving = false;
+      }
     }
     var col = $('tlsoa-imd');
     if (col && col.checked !== !!byDecile) {
