@@ -717,7 +717,7 @@
   .ws-sheet.collapsed { max-height: 66px; }
   .ws-handle { width: 36px; height: 4px; background: var(--line); border-radius: 2px;
     position: absolute; top: 6px; left: 50%; transform: translateX(-50%); pointer-events: none; }
-  .ws-head { padding: 14px 16px 12px; display: flex; align-items: center; gap: 12px;
+  .ws-head { padding: 11px 15px 10px; display: flex; align-items: center; gap: 12px;
     border-bottom: 1px solid var(--line); cursor: pointer; flex-shrink: 0; }
   .ws-head:hover { background: var(--paper-2); }
   .ws-title { flex: 1; min-width: 0; }
@@ -740,18 +740,28 @@
   .ws-close { appearance: none; background: none; border: 0; cursor: pointer; color: var(--ink-3);
     font-size: 17px; line-height: 1; padding: 2px 4px; border-radius: 6px; }
   .ws-close:hover { color: var(--nhs-red); background: var(--nhs-light); }
-  .ws-body { padding: 14px 16px 16px; overflow: auto; flex: 1; min-height: 0; }
+  .ws-body { padding: 11px 14px 13px; overflow: auto; flex: 1; min-height: 0; }
+  /* On a wide screen the sentence and the figures sit beside each other.
+     Stacked, they made a 1,400px bar 250px tall, a third of the map, to hold
+     one paragraph and one row of numbers with the whole right-hand half of it
+     empty. Side by side that comes down to about 170. */
+  @media (min-width: 1100px) {
+    .ws-body { display: flex; align-items: flex-start; gap: 14px; }
+    .ws-body .ws-insight { flex: 1 1 44%; min-width: 0; }
+    .ws-body .ws-strip { flex: 1 1 56%; margin-top: 0; min-width: 0; }
+    .ws-body .ws-pins { flex: 1 1 100%; margin-top: 4px; }
+  }
   .ws-insight { border-left: 3px solid var(--nhs-blue); background: var(--nhs-light);
-    border-radius: 6px; padding: 10px 13px; font-size: 12.5px; line-height: 1.55; color: var(--ink-2); }
+    border-radius: 6px; padding: 8px 11px; font-size: 12px; line-height: 1.5; color: var(--ink-2); }
   .ws-insight strong { color: var(--ink); font-weight: 600; }
-  .ws-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
-    gap: 8px; margin-top: 12px; }
+  .ws-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+    gap: 7px; margin-top: 10px; }
   .ws-kpi { background: var(--paper); border: 1px solid var(--line); border-radius: 10px;
-    padding: 9px 11px; min-width: 0; }
+    padding: 7px 10px; min-width: 0; }
   .ws-kpi .ws-k-lbl { font-size: 10px; text-transform: uppercase; letter-spacing: .05em;
     color: var(--ink-3); font-weight: 600; white-space: nowrap; overflow: hidden;
     text-overflow: ellipsis; }
-  .ws-kpi .ws-k-num { font-family: 'Inter Tight', Inter, sans-serif; font-size: 21px;
+  .ws-kpi .ws-k-num { font-family: 'Inter Tight', Inter, sans-serif; font-size: 19px;
     font-weight: 600; letter-spacing: -.02em; line-height: 1.15; margin-top: 2px;
     font-variant-numeric: tabular-nums; }
   .ws-kpi .ws-k-num span { font-size: 13px; font-weight: 500; margin-left: 1px; }
@@ -2239,6 +2249,23 @@ const OV_CFG = {
 
 // Transparency state — controlled by sliders
 // fillOpacityMult is an absolute fill opacity in [0,1]; 0 = fully transparent, 1 = opaque.
+/**
+ * The Border slider, as the layer you are looking at actually sees it.
+ *
+ * borderWeightMult was read by the ward styler and by nothing else, so the
+ * slider only ever thickened ward outlines. Switch to LSOA or MSOA and it did
+ * nothing at all, which is worse than it looks: those are the two levels where
+ * the boundaries are the whole point of the layer, because neither of them is
+ * carrying a choropleth.
+ *
+ * The slider runs 1 to 10 and borderWeightMult is that halved, so this turns
+ * it back into the slider's own number and scales each layer from its own
+ * resting weight. Multiplying instead would take MSOA's 1.1px to 11 at the top
+ * of the range, which is not a boundary any more, it is a wall.
+ */
+function borderStep() { return Math.max(0, borderWeightMult / 0.5); }   // 1..10
+function scaledWeight(base) { return Math.max(0.3, base + (borderStep() - 1) * 0.5); }
+
 // borderWeightMult is an absolute black-border weight in px (0 = no border).
 let fillOpacityMult = 0.40;  // matches the #fill-opacity slider default of 40
 let borderWeightMult = 0.5;  // matches the #border-weight slider default of 1 on the 1–10 scale (0.5 px)
@@ -6118,7 +6145,9 @@ function imdStyle(feat, state) {
   // Navy blue palette — sits cleanly alongside the black ward outlines so
   // users can tell ward (black) and LSOA (navy) borders apart at a glance.
   const base = {
-    color: '#1E4B8E', weight: 1.2,
+    // Follows the Border slider from its own resting 1.2px, the same way the
+    // ward outlines follow it from theirs.
+    color: '#1E4B8E', weight: scaledWeight(1.2),
     fillColor: (lsoaIMDColour && d) ? (imdDecileColor(d) || '#ccc') : '#ccc',
     fillOpacity: lsoaIMDColour ? 0.45 : 0.05, opacity: 0.75,
   };
@@ -7122,7 +7151,12 @@ function loadMsoaBoundaries() {
     .then(gj => {
       if (!gj || !gj.features) { _msoaLoading = null; return null; }
       msoaLyr = L.geoJSON(gj, {
-        style: { color: '#7A2E8E', weight: 1.1, fill: false, opacity: 0.85 },
+        // A function, not a literal, so _restyleAll can re-evaluate it when
+        // the Border slider moves. As a literal it was fixed at 1.1px for the
+        // life of the layer.
+        style: function () {
+          return { color: '#7A2E8E', weight: scaledWeight(1.1), fill: false, opacity: 0.85 };
+        },
         onEachFeature: (feat, lyr) => {
           const p = feat.properties || {};
           lyr.bindTooltip(
@@ -8948,6 +8982,9 @@ function _restyleAll() {
   if (typeof lsoaLyr !== 'undefined' && lsoaLyr) lsoaLyr.eachLayer(l =>
     l.setStyle(imdStyle(l.feature,
       l.feature === (selLSOA && selLSOA.feature) ? 'selected' : 'default')));
+  // The MSOA layer was never in here, so nothing the sliders did reached it.
+  if (typeof msoaLyr !== 'undefined' && msoaLyr) msoaLyr.setStyle(
+    { color: '#7A2E8E', weight: scaledWeight(1.1), fill: false, opacity: 0.85 });
 }
 (function wireSliders() {
   const fo = document.getElementById('fill-opacity');
@@ -10048,6 +10085,21 @@ loadData();
   // The heights are viewport-derived on a phone, so a rotate or a resize has
   // to re-measure or the furniture above the sheet sits at the old offset.
   window.addEventListener('resize', function () { if (sheet.classList.contains('open')) lift(); });
+
+  /* The bar and the full profile are the same ward twice.
+     "Open profile" already stood the bar down, but the Ward tab can also be
+     reached from the tab strip and from clicking an LSOA, and either of those
+     left the ward's figures on screen in two places at once with the map
+     squeezed between them. Watching the pane catches all three routes in.
+     Peek, not closed: the bar is also the thing that says which ward the
+     profile belongs to. */
+  (function standDownForProfile() {
+    var wardPane = document.getElementById('tab-ward');
+    if (!wardPane || !window.MutationObserver) return;
+    new MutationObserver(function () {
+      if (wardPane.classList.contains('active') && sheetState === 0) setSheetState(1);
+    }).observe(wardPane, { attributes: true, attributeFilter: ['class'] });
+  })();
   headEl.addEventListener('keydown', function (e) {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); cycle(); }
   });
