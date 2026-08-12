@@ -1669,16 +1669,6 @@
               <option value="census_public_transport_pct">Public transport to work % · Ward</option>
               <option value="census_car_to_work_pct">Car/van to work % · Ward</option>
             </optgroup>
-            <optgroup label="Civic strength (London Datastore, Round 3)">
-              <option value="cst_number_of_community_sport_and_physical_activity_offerings">Community sport &amp; physical-activity offerings · Ward</option>
-              <option value="cst_number_of_community_interest_companies_cics">Community Interest Companies (CICs) · Ward</option>
-              <option value="cst_number_and_proximity_of_libraries">Libraries — count &amp; proximity · Ward</option>
-              <option value="cst_number_and_proximity_of_community_centres">Community centres — count &amp; proximity · Ward</option>
-              <option value="cst_number_and_proximity_of_cultural_spaces">Cultural spaces — count &amp; proximity · Ward</option>
-              <option value="cst_number_of_faith_centres">Faith centres · Ward</option>
-              <option value="cst_passive_green_space">Passive green space (proportion) · Ward</option>
-              <option value="cst_gentrification_change_in_occupational_classes">Gentrification — change in occupational classes · Ward</option>
-            </optgroup>
                                                                                                                               <optgroup label="Health (Fingertips, MSOA → ward)">
                 <option value="ft_93465">Alcohol-related conditions: admission episodes (all primary and secondary diagnoses) · Ward</option>
                 <option value="ft_93233">Chronic obstructive pulmonary disease (COPD): emergency hospital admissions · Ward</option>
@@ -2221,25 +2211,6 @@ const OV_CFG = {
   // car to work = negative (wh:true) at ward level for air-quality framing.
   census_active_travel_pct:        { lo:"Lower", hi:"Higher", wh:false, min:5,    max:40   },
   census_car_to_work_pct:          { lo:"Lower", hi:"Higher", wh:true,  min:10,   max:70   },
-  census_public_transport_pct:     { lo:"Lower", hi:"Higher", wh:false, min:10,   max:60   },
-  // London Civic Strength Index (Round 3), London Datastore. Higher score / count =
-  // more civic assets / greater participation for most fields, so wh:false (lower is
-  // worse, higher is better). Gentrification is descriptive (wh:false) rather than
-  // loaded. Ranges chosen from the observed NW-London ward spread.
-  cst_number_of_community_sport_and_physical_activity_offerings:
-                                   { lo:"Fewer", hi:"More",   wh:false, min:0,    max:40   },
-  cst_number_of_community_interest_companies_cics:
-                                   { lo:"Fewer", hi:"More",   wh:false, min:0,    max:40   },
-  cst_gentrification_change_in_occupational_classes:
-                                   { lo:"Less change", hi:"More change", wh:false, min:-3, max:10 },
-  cst_number_and_proximity_of_libraries:
-                                   { lo:"Lower", hi:"Higher", wh:true,  min:100,  max:1800 },
-  cst_passive_green_space:         { lo:"Lower", hi:"Higher", wh:false, min:0,    max:0.6  },
-  cst_number_and_proximity_of_community_centres:
-                                   { lo:"Lower", hi:"Higher", wh:true,  min:0,    max:1700 },
-  cst_number_and_proximity_of_cultural_spaces:
-                                   { lo:"Lower", hi:"Higher", wh:true,  min:0,    max:700  },
-  cst_number_of_faith_centres:     { lo:"Fewer", hi:"More",   wh:false, min:0,    max:15   },
   ft_93280                      : { lo:"Lower", hi:"Higher", wh:true, min:5.5132, max:14.2429 },
   ft_93097                      : { lo:"Lower", hi:"Higher", wh:true, min:0.7017, max:13.1514 },
   ft_93098                      : { lo:"Lower", hi:"Higher", wh:true, min:-0.1326, max:2.784 },
@@ -2397,16 +2368,6 @@ const CATS = [
     { k: "crime_weapons_12mo",               l: "Possession of weapons",             g: "ward" },
     { k: "crime_misc_society_12mo",          l: "Other crime",      g: "ward" },
   ]},
-  { key: "civic_strength", label: "Civic strength (London Datastore, Round 3)", ico: "🏛", fields: [
-    { k: "cst_number_of_community_sport_and_physical_activity_offerings", l: "Community sport & physical activity offerings", g: "ward" },
-    { k: "cst_number_of_community_interest_companies_cics",               l: "Community Interest Companies (CICs)",           g: "ward" },
-    { k: "cst_number_and_proximity_of_libraries",                         l: "Libraries — count & proximity score",           g: "ward" },
-    { k: "cst_number_and_proximity_of_community_centres",                 l: "Community centres — count & proximity score",   g: "ward" },
-    { k: "cst_number_and_proximity_of_cultural_spaces",                   l: "Cultural spaces — count & proximity score",     g: "ward" },
-    { k: "cst_number_of_faith_centres",                                   l: "Faith centres",                                 g: "ward" },
-    { k: "cst_passive_green_space",                                       l: "Passive green space (proportion)",              g: "ward" },
-    { k: "cst_gentrification_change_in_occupational_classes",             l: "Gentrification — change in occupational classes", g: "ward" },
-  ]},
   { key: "health_fingertips", label: "Health & wellbeing (Fingertips, MSOA \u2192 ward)", ico: "⚕", fields: [
     { k: "ft_93280", l: "Fuel poverty (low income, low energy efficiency methodology)", g: "ward" },
     { k: "ft_93097", l: "Unemployment: people claiming out of work benefit (aged 16 to 64)", g: "ward" },
@@ -2559,24 +2520,6 @@ const OV_META = {
   crime_score:                    { src: "MHCLG IMD 2025",       yr: "2025", g: "LSOA", u: "score",  desc: "Crime domain score." },
   barriers_score:                 { src: "MHCLG IMD 2025",       yr: "2025", g: "LSOA", u: "score",  desc: "Barriers to Housing & Services domain score." },
   environment_score:              { src: "MHCLG IMD 2025",       yr: "2025", g: "LSOA", u: "score",  desc: "Living Environment domain score." },
-
-  // London Civic Strength Index (Round 3), London Datastore — ward-level civic
-  // assets and participation indicators. Higher scores/counts generally indicate
-  // a stronger civic ecosystem; gentrification is descriptive only.
-  cst_number_of_community_sport_and_physical_activity_offerings:
-                                   { src: "London Civic Strength Index (Round 3), London Datastore", yr: "2024", g: "Ward", u: "count",       desc: "Number of community sport and physical-activity offerings in the ward." },
-  cst_number_of_community_interest_companies_cics:
-                                   { src: "London Civic Strength Index (Round 3), London Datastore", yr: "2024", g: "Ward", u: "count",       desc: "Number of registered Community Interest Companies (CICs) based in the ward." },
-  cst_gentrification_change_in_occupational_classes:
-                                   { src: "London Civic Strength Index (Round 3), London Datastore", yr: "2024", g: "Ward", u: "index",       desc: "Change in occupational-class composition — a gentrification signal. Positive = shift toward higher occupational classes." },
-  cst_number_and_proximity_of_libraries:
-                                   { src: "London Civic Strength Index (Round 3), London Datastore", yr: "2024", g: "Ward", u: "score",       desc: "Composite score reflecting library count and proximity. Lower = better (closer/more libraries)." },
-  cst_passive_green_space:         { src: "London Civic Strength Index (Round 3), London Datastore", yr: "2024", g: "Ward", u: "proportion",  desc: "Proportion of ward area covered by passive green space (parks, commons, quiet gardens)." },
-  cst_number_and_proximity_of_community_centres:
-                                   { src: "London Civic Strength Index (Round 3), London Datastore", yr: "2024", g: "Ward", u: "score",       desc: "Composite score reflecting community-centre count and proximity. Lower = better (closer/more community centres)." },
-  cst_number_and_proximity_of_cultural_spaces:
-                                   { src: "London Civic Strength Index (Round 3), London Datastore", yr: "2024", g: "Ward", u: "score",       desc: "Composite score reflecting cultural-space count and proximity. Lower = better (closer/more cultural spaces)." },
-  cst_number_of_faith_centres:     { src: "London Civic Strength Index (Round 3), London Datastore", yr: "2024", g: "Ward", u: "count",       desc: "Number of faith centres (churches, mosques, synagogues, temples and other places of worship) in the ward." },
   ft_93280                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "latest", g: "Ward (MSOA-derived)", u: "%", desc: "Fuel poverty (low income, low energy efficiency methodology). Polarity: RAG - Low is good" },
   ft_93097                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "latest", g: "Ward (MSOA-derived)", u: "%", desc: "Unemployment: people claiming out of work benefit (aged 16 to 64). Polarity: RAG - Low is good" },
   ft_93098                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "latest", g: "Ward (MSOA-derived)", u: "per 1,000", desc: "Long-term unemployment: people claiming out of work benefit for over 12 months (aged 16 to 64). Polarity: RAG - Low is good" },
@@ -3072,11 +3015,6 @@ function fmtOv(v, k) {
   const key = k || '';
   if (/_pct$|_rate$/.test(key))  return fmtNum(v, 1) + '%';
   if (/_score$/.test(key))       return fmtNum(v, 2);           // IMD domain scores
-  // CST indicators that are proportions or small signed indices — two decimals.
-  if (key === 'cst_passive_green_space' ||
-      key === 'cst_gentrification_change_in_occupational_classes') {
-    return fmtNum(v, 2);
-  }
   // Fingertips ft_* keys (numeric IDs and named) — published as %/rate/years.
   // Default to 1dp so values like life expectancy 80.6 don't render as "81".
   if (key.startsWith('ft_')) return fmtNum(v, 1);
@@ -5040,24 +4978,6 @@ window.generateWardReport = function(wn, opts) {
   const crimeSVG = crimeRows.length ? _chartHbar(crimeRows, { width: 760, padL: 170, dp: 0, unit: '' }) : '';
   const crimeTotal = _fmt(inds.crime_total);
 
-  // ── Civic strength — 7 indicators, ward percentile in NWL ──
-  const civicFields = [
-    { k:'cst_number_of_community_sport_and_physical_activity_offerings', l:'Sport & activity offerings' },
-    { k:'cst_number_of_community_interest_companies_cics',               l:'Community Interest Companies' },
-    { k:'cst_number_and_proximity_of_libraries',                         l:'Libraries — count & proximity' },
-    { k:'cst_number_and_proximity_of_community_centres',                 l:'Community centres — count & proximity' },
-    { k:'cst_number_and_proximity_of_cultural_spaces',                   l:'Cultural spaces — count & proximity' },
-    { k:'cst_number_of_faith_centres',                                   l:'Faith centres' },
-    { k:'cst_passive_green_space',                                       l:'Passive green space' },
-  ];
-  const civicRows = civicFields.map(f => {
-    const v = _fmt(inds[f.k]);
-    const pct = _pctile(f.k, v);
-    return { l: f.l, v: pct == null ? null : pct, sub: v == null ? '' : ` (${v.toLocaleString(undefined,{maximumFractionDigits:2})})`, c:'#1a5c2e' };
-  });
-  const civicSVG = _chartHbar(civicRows, { width: 760, padL: 200, max: 100, dp: 0, unit: 'pctile' });
-
-
   // ── Mini-map SVG: ward polygon on a borough-context backdrop ────────────
   // Find the ward + borough features in GJ, project lng/lat into a 260×200 SVG.
   let miniMapSVG = '';
@@ -5356,15 +5276,6 @@ window.generateWardReport = function(wn, opts) {
         <div class="legend"><span class="legend-tick"></span> NWL median · sorted by ward count · source: data.police.uk street-level crime</div>
       </div>
     </div>` : ''}
-
-    <div class="section-h">Civic strength &amp; community assets</div>
-    <div class="row">
-      <div class="panel" style="flex:1">
-        <h3>Civic strength — NWL percentile (higher = stronger)</h3>
-        ${civicSVG}
-        <div class="legend">Each bar = % of 168 NWL wards this ward beats · London Civic Strength Index R3 (2024)</div>
-      </div>
-    </div>
   </div>
 
   <!-- ═══════════════ PHYSICAL LOCATIONS — comprehensive named lists ═══════════════ -->
@@ -5385,7 +5296,7 @@ window.generateWardReport = function(wn, opts) {
   </div>
 
   <div class="footer">
-    <strong>Data sources:</strong> ONS Census 2021 (demographics, health, household language, travel-to-work) · MHCLG Indices of Deprivation 2025, mid-2022 population-weighted · data.police.uk street-level crime (crime, Apr 2025 – Mar 2026) · London Civic Strength Index Round 3, London Datastore (2024) · DESNZ LILEE (fuel poverty) · NOMIS / DWP (claimant count, working-age) · NHS Digital ODS (GP, pharmacy, dental practice registers) · DfE GIAS (schools) · GLA ESOL Planning Map (community centres, libraries, formal ESOL providers).
+    <strong>Data sources:</strong> ONS Census 2021 (demographics, health, household language, travel-to-work) · MHCLG Indices of Deprivation 2025, mid-2022 population-weighted · data.police.uk street-level crime (crime, Apr 2025 – Mar 2026) · DESNZ LILEE (fuel poverty) · NOMIS / DWP (claimant count, working-age) · NHS Digital ODS (GP, pharmacy, dental practice registers) · DfE GIAS (schools) · GLA ESOL Planning Map (community centres, libraries, formal ESOL providers).
     <div style="margin-top:6px">Service counts use ward_code attribution where present (schools, community centres, libraries) and spatial test against the ward polygon otherwise (hospitals, dental, ESOL, VCSE). GP and pharmacy counts come from the ward indicator. "vs NWL median" bars use the median across all 168 NWL wards. "NWL percentile" = % of NWL wards below this ward on that indicator.</div>
   </div>
 </div>
@@ -11593,7 +11504,7 @@ loadData();
   // wards on it selects every ward in a borough at once.
   var GROUP_ORDER = [
     'Deprivation (IMD 2025)', 'Census 2021', 'Local Health (ward)', 'Crime',
-    'Civic Strength Index', 'Other', 'Fingertips (borough level)',
+    'Other', 'Fingertips (borough level)',
   ];
   function groupOf(k) {
     if (/^imd_/.test(k) || (/_score$/.test(k) && !/^crime_/.test(k))) return 'Deprivation (IMD 2025)';
@@ -11601,7 +11512,6 @@ loadData();
     if (/^ft_\d+$/.test(k)) return 'Local Health (ward)';
     if (/^ft_/.test(k)) return 'Fingertips (borough level)';
     if (/^crime_/.test(k) || /^claimant_/.test(k)) return 'Crime';
-    if (/^cst_/.test(k)) return 'Civic Strength Index';
     return 'Other';
   }
   var _indKeys = null;
