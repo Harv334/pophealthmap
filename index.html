@@ -180,7 +180,8 @@
      short window or a phone the boundary toggles simply could not be reached:
      the sections below the fold were clipped with no way to scroll to them.
      overscroll-behavior stops a flick at the end of the list scrolling the
-     page behind it. */
+     page behind it.
+
      The right margin keeps this scrollbar clear of the resize grip, which sits
      on the same edge. Without it the grip covers the only way to reach the
      toggles at the bottom of the Layers list, which is what the scrolling was
@@ -6258,9 +6259,24 @@ function imdStyle(feat, state) {
         }
       }
     }
-    base.fillOpacity = {default: 0.4, hover: 0.6, selected: 0.7}[state] || 0.4;
-    base.color = '#555';
-    base.weight = state === 'selected' ? 2.5 : 1;
+    // Fill follows the Fill slider, the way the ward fill does. It was pinned
+    // at 0.4, which happens to be the slider's resting value, so the two agreed
+    // until the moment anyone moved it and then the LSOA layer stayed put.
+    const _lift = {hover: 1.5, selected: 1.75}[state] || 1;
+    base.fillOpacity = Math.max(0, Math.min(0.9, fillOpacityMult * _lift));
+    // Keep the navy, and keep the Border slider. This dropped to a flat #555 at
+    // a fixed 1px the moment any overlay came on, which threw away both the
+    // colour that tells LSOA boundaries apart from the black ward outlines and
+    // the slider that says how heavy boundaries should be. Against a full-
+    // strength ward choropleth a thin mid-grey line is the definition of faded,
+    // and it could not be turned up.
+    if (state === 'selected') {
+      base.color = '#081A3C'; base.weight = scaledWeight(3.2); base.opacity = 1;
+    } else if (state === 'hover') {
+      base.color = '#0F2D5C'; base.weight = scaledWeight(2.6); base.opacity = 1;
+    } else {
+      base.color = '#16336B'; base.weight = scaledWeight(1.6); base.opacity = 0.95;
+    }
   }
   return base;
 }
@@ -7379,8 +7395,12 @@ document.getElementById('tlsoa').addEventListener('change', e => {
 document.getElementById('tlsoa-imd').addEventListener('change', e => {
   lsoaIMDColour = e.target.checked;
   if (lsoaLyr) {
+    // selLSOA is a code string, not a feature, so `selLSOA.feature` was always
+    // undefined and this could never match: restyling here silently dropped the
+    // selected LSOA's heavier outline. Compared the way every other caller
+    // compares it.
     lsoaLyr.eachLayer(l => l.setStyle(imdStyle(l.feature,
-      l.feature === (selLSOA && selLSOA.feature) ? 'selected' : 'default')));
+      l.feature.properties.code === selLSOA ? 'selected' : 'default')));
   }
 });
 
@@ -7668,20 +7688,28 @@ document.getElementById('ov').addEventListener('change', e => {
   // "Income deprivation" and see an empty grey ward layer — because wards
   // don't carry those indicators. We leave ward colouring active for
   // dual-level indicators (census_unemployed_pct, crime_total etc.).
-  // Auto-sync the LSOA layer to the new overlay's level. If the user picks
-  // an LSOA-only indicator we turn the LSOA layer ON; if they pick a ward-
-  // only indicator we turn it OFF (so LSOA boundaries don't sit on top of
-  // and obscure the ward shading). Both flips bypass the mismatch gate
-  // because they're system-driven corrections, not user-attempted changes.
-  if (curOv && curOv !== 'none' && typeof ovLevel === 'function') {
-    const _lvl = ovLevel(curOv);
+  // Auto-sync the LSOA layer to the new overlay. If the indicator has nowhere
+  // to live but LSOA we turn the layer ON; if it has no LSOA figures at all we
+  // turn it OFF, because an LSOA layer with nothing to shade paints a flat grey
+  // sheet on top of the ward choropleth and the map goes pale. Indicators that
+  // have both levels are left alone: that is the user's choice to make.
+  //
+  // This asked whether the indicator's *native* level was exactly 'ward', which
+  // was true of everything ward-shaped until the Local Health series was marked
+  // as published per MSOA and the Fingertips series per borough. After that
+  // neither branch matched for either group, the layer stayed on with no
+  // figures, and the grey sheet is exactly what "much more faded" looked like.
+  // It asks what the indicator can be drawn at now, like both level gates do.
+  if (curOv && curOv !== 'none' && typeof ovHasLevel === 'function') {
     const _t = document.getElementById('tlsoa');
     if (_t) {
-      if (_lvl === 'lsoa' && !_t.checked) {
+      const _hasLsoa = ovHasLevel(curOv, 'lsoa');
+      const _lsoaOnly = _hasLsoa && ovLevels(curOv).length === 1;
+      if (_lsoaOnly && !_t.checked) {
         _t.checked = true;
         _t.__skipLevelGate = true;
         _t.dispatchEvent(new Event('change'));
-      } else if (_lvl === 'ward' && _t.checked) {
+      } else if (!_hasLsoa && _t.checked) {
         _t.checked = false;
         _t.__skipLevelGate = true;
         _t.dispatchEvent(new Event('change'));
@@ -9224,9 +9252,12 @@ function renderNbhdTable() {
 function _restyleAll() {
   if (typeof wLyr !== 'undefined' && wLyr) wLyr.eachLayer(l =>
     l.setStyle(wstyle(l.feature.properties.WD24NM, curOv, gs(l.feature.properties.WD24NM))));
+  // Same comparison bug as the IMD-colour toggle had: selLSOA holds a code, so
+  // `selLSOA.feature` was undefined and nothing was ever 'selected'. Every
+  // slider move quietly reset the selected LSOA to a plain outline.
   if (typeof lsoaLyr !== 'undefined' && lsoaLyr) lsoaLyr.eachLayer(l =>
     l.setStyle(imdStyle(l.feature,
-      l.feature === (selLSOA && selLSOA.feature) ? 'selected' : 'default')));
+      l.feature.properties.code === selLSOA ? 'selected' : 'default')));
   // The MSOA layer was never in here, so nothing the sliders did reached it.
   // Through msoaStyle rather than a literal now, or a slider would repaint the
   // choropleth back to bare outlines.
@@ -11296,7 +11327,7 @@ loadData();
   /* ─────────────────────────────────────────────────────────────────────────
      THE TOUR
 
-     Six chapters, and each one does the thing it is describing rather than
+     Seven chapters, and each one does the thing it is describing rather than
      describing it. A chapter drives the real controls, so what you are shown
      is the map behaving normally and you can carry on from wherever it leaves
      you. That is also why the last chapter is about what the figures cannot
@@ -11360,6 +11391,26 @@ loadData();
   function wardLevelKeepOverlay() {
     lsoaLayer(false, false);
     if (typeof _setDataLevel === 'function') _setDataLevel('ward');
+  }
+
+  /**
+   * Put the ward bar away.
+   *
+   * Opening it is the whole point of the chapter that clicks a ward, and the
+   * three chapters after it are about other surfaces. Left up, it sits across
+   * the bottom of the map naming a ward none of them mention, stacked above the
+   * tour strip, with the query matches or the answer panel behind it.
+   *
+   * deselectWard rather than PH_SHEET.hide, for the same reason the bar's own
+   * close button takes that route: hide leaves the ward still lit on the map
+   * with nothing on screen saying why, and during the Query chapter that stale
+   * highlight competes with the match outlines.
+   *
+   * Going back re-opens it, because renderTour re-runs a chapter's go() every
+   * time it is entered from either direction.
+   */
+  function closeWardSheet() {
+    if (typeof deselectWard === 'function') deselectWard();
   }
 
   /**
@@ -11535,6 +11586,10 @@ loadData();
         // neighbourhood level with the LSOA layer drawn over everything, so
         // the matches this chapter is about would arrive underneath 4,994
         // boundaries that have nothing to do with them.
+        //
+        // The previous chapter's ward bar comes down with them: this chapter is
+        // about the wards a query returns, not the one that was clicked.
+        closeWardSheet();
         wardLevel();
         railClick('query');
         if (window.PH_QUERY) window.PH_QUERY.build();
@@ -11553,6 +11608,10 @@ loadData();
          'count sits next to the panel’s title. The map, Query, Compare and Directory ' +
          'are not capped, because they cost nothing to serve.',
       go: function () {
+        // Idempotent: chapter 5 will normally have closed it, but the tour
+        // drives the real controls, so a ward clicked by hand during that
+        // chapter would otherwise arrive here under the answer panel.
+        closeWardSheet();
         railClick('explore');
         var t = document.getElementById('ai-toggle');
         var p = document.getElementById('ai-panel');
@@ -11569,6 +11628,9 @@ loadData();
          'tool is still in development, so treat what you find as provisional and check ' +
          'it before acting on it.',
       go: function () {
+        // Also reachable by pressing Back from the end, so it cannot rely on
+        // the chapter before it having run.
+        closeWardSheet();
         railClick('explore');
         setOverlay('none');
         sidebarTab('layers');
