@@ -2372,63 +2372,93 @@ const CATS = [
     { k: "crime_misc_society_12mo",          l: "Other crime",      g: "ward" },
   ]},
   { key: "health_fingertips", label: "Health & wellbeing (Fingertips, MSOA \u2192 ward)", ico: "⚕", fields: [
-    { k: "ft_93280", l: "Fuel poverty (low income, low energy efficiency methodology)", g: "ward" },
-    { k: "ft_93097", l: "Unemployment: people claiming out of work benefit (aged 16 to 64)", g: "ward" },
-    { k: "ft_93098", l: "Long-term unemployment: people claiming out of work benefit for over 12 months (aged 16 to 64)", g: "ward" },
-    { k: "ft_93105", l: "Reception prevalence of obesity (including severe obesity), 3 years data combined", g: "ward" },
-    { k: "ft_93106", l: "Reception prevalence of overweight (including obesity), 3 years data combined", g: "ward" },
-    { k: "ft_93107", l: "Year 6 prevalence of obesity (including severe obesity), 3 years data combined", g: "ward" },
-    { k: "ft_93108", l: "Year 6 prevalence of overweight (including obesity), 3 years data combined", g: "ward" },
-    { k: "ft_93089", l: "General fertility rate (women aged 15 to 44)", g: "ward" },
-    { k: "ft_93092", l: "Low birth weight of live babies", g: "ward" },
-    { k: "ft_93115", l: "Emergency hospital admissions: all causes (aged under 5)", g: "ward" },
-    { k: "ft_93114", l: "Unintentional and deliberate injuries: emergency hospital admissions in children (aged under 5)", g: "ward" },
-    { k: "ft_93219", l: "Unintentional and deliberate injuries: hospital admissions in children (aged under 15)", g: "ward" },
-    { k: "ft_93224", l: "Unintentional and deliberate injuries: hospital admissions in young people (aged 15 to 24)", g: "ward" },
-    { k: "ft_93227", l: "Emergency hospital admissions: all causes", g: "ward" },
-    { k: "ft_93229", l: "Coronary heart disease: emergency hospital admissions", g: "ward" },
-    { k: "ft_93231", l: "Stroke: emergency hospital admissions", g: "ward" },
-    { k: "ft_93232", l: "Heart attack (myocardial infarction): emergency hospital admissions", g: "ward" },
-    { k: "ft_93233", l: "Chronic obstructive pulmonary disease (COPD): emergency hospital admissions", g: "ward" },
-    { k: "ft_93239", l: "Intentional self-harm: emergency hospital admissions", g: "ward" },
-    { k: "ft_93241", l: "Hip fracture: emergency hospital admissions (aged 65 and over)", g: "ward" },
-    { k: "ft_93465", l: "Alcohol-related conditions: admission episodes (all primary and secondary diagnoses)", g: "ward" },
-    { k: "ft_93240", l: "Hospital admissions for alcohol attributable conditions, narrow definition", g: "ward" },
-    { k: "ft_93283", l: "Life expectancy at birth", g: "ward" },
-    { k: "ft_93250", l: "Mortality from all causes", g: "ward" },
-    { k: "ft_93252", l: "Mortality from all causes (aged under 75)", g: "ward" },
-    { k: "ft_93253", l: "Mortality from cancer", g: "ward" },
-    { k: "ft_93254", l: "Mortality from cancer (aged under 75)", g: "ward" },
-    { k: "ft_93255", l: "Mortality from cardiovascular disease", g: "ward" },
-    { k: "ft_93256", l: "Mortality from cardiovascular disease (aged under 75)", g: "ward" },
-    { k: "ft_93257", l: "Mortality from coronary heart disease", g: "ward" },
-    { k: "ft_93259", l: "Mortality from stroke", g: "ward" },
-    { k: "ft_93260", l: "Mortality from respiratory diseases", g: "ward" },
-    { k: "ft_93480", l: "Mortality from causes considered preventable (aged under 75)", g: "ward" }
+    { k: "ft_93280", l: "Fuel poverty (low income, low energy efficiency methodology)", g: "msoa", lv: ["ward","msoa"] },
+    { k: "ft_93097", l: "Unemployment: people claiming out of work benefit (aged 16 to 64)", g: "msoa", lv: ["ward","msoa"] },
+    { k: "ft_93098", l: "Long-term unemployment: people claiming out of work benefit for over 12 months (aged 16 to 64)", g: "msoa", lv: ["ward","msoa"] },
+    { k: "ft_93105", l: "Reception prevalence of obesity (including severe obesity), 3 years data combined", g: "msoa", lv: ["ward","msoa"] },
+    { k: "ft_93106", l: "Reception prevalence of overweight (including obesity), 3 years data combined", g: "msoa", lv: ["ward","msoa"] },
+    { k: "ft_93107", l: "Year 6 prevalence of obesity (including severe obesity), 3 years data combined", g: "msoa", lv: ["ward","msoa"] },
+    { k: "ft_93108", l: "Year 6 prevalence of overweight (including obesity), 3 years data combined", g: "msoa", lv: ["ward","msoa"] },
+    { k: "ft_93089", l: "General fertility rate (women aged 15 to 44)", g: "msoa", lv: ["ward","msoa"] },
+    { k: "ft_93092", l: "Low birth weight of live babies", g: "msoa", lv: ["ward","msoa"] },
+    { k: "ft_93115", l: "Emergency hospital admissions: all causes (aged under 5)", g: "msoa", lv: ["ward","msoa"] },
+    { k: "ft_93114", l: "Unintentional and deliberate injuries: emergency hospital admissions in children (aged under 5)", g: "msoa", lv: ["ward","msoa"] },
+    { k: "ft_93219", l: "Unintentional and deliberate injuries: hospital admissions in children (aged under 15)", g: "msoa", lv: ["ward","msoa"] },
+    { k: "ft_93224", l: "Unintentional and deliberate injuries: hospital admissions in young people (aged 15 to 24)", g: "msoa", lv: ["ward","msoa"] },
+    { k: "ft_93227", l: "Emergency hospital admissions: all causes", g: "msoa", lv: ["ward","msoa"] },
+    { k: "ft_93229", l: "Coronary heart disease: emergency hospital admissions", g: "msoa", lv: ["ward","msoa"] },
+    { k: "ft_93231", l: "Stroke: emergency hospital admissions", g: "msoa", lv: ["ward","msoa"] },
+    { k: "ft_93232", l: "Heart attack (myocardial infarction): emergency hospital admissions", g: "msoa", lv: ["ward","msoa"] },
+    { k: "ft_93233", l: "Chronic obstructive pulmonary disease (COPD): emergency hospital admissions", g: "msoa", lv: ["ward","msoa"] },
+    { k: "ft_93239", l: "Intentional self-harm: emergency hospital admissions", g: "msoa", lv: ["ward","msoa"] },
+    { k: "ft_93241", l: "Hip fracture: emergency hospital admissions (aged 65 and over)", g: "msoa", lv: ["ward","msoa"] },
+    { k: "ft_93465", l: "Alcohol-related conditions: admission episodes (all primary and secondary diagnoses)", g: "msoa", lv: ["ward","msoa"] },
+    { k: "ft_93240", l: "Hospital admissions for alcohol attributable conditions, narrow definition", g: "msoa", lv: ["ward","msoa"] },
+    { k: "ft_93283", l: "Life expectancy at birth", g: "msoa", lv: ["ward","msoa"] },
+    { k: "ft_93250", l: "Mortality from all causes", g: "msoa", lv: ["ward","msoa"] },
+    { k: "ft_93252", l: "Mortality from all causes (aged under 75)", g: "msoa", lv: ["ward","msoa"] },
+    { k: "ft_93253", l: "Mortality from cancer", g: "msoa", lv: ["ward","msoa"] },
+    { k: "ft_93254", l: "Mortality from cancer (aged under 75)", g: "msoa", lv: ["ward","msoa"] },
+    { k: "ft_93255", l: "Mortality from cardiovascular disease", g: "msoa", lv: ["ward","msoa"] },
+    { k: "ft_93256", l: "Mortality from cardiovascular disease (aged under 75)", g: "msoa", lv: ["ward","msoa"] },
+    { k: "ft_93257", l: "Mortality from coronary heart disease", g: "msoa", lv: ["ward","msoa"] },
+    { k: "ft_93259", l: "Mortality from stroke", g: "msoa", lv: ["ward","msoa"] },
+    { k: "ft_93260", l: "Mortality from respiratory diseases", g: "msoa", lv: ["ward","msoa"] },
+    { k: "ft_93480", l: "Mortality from causes considered preventable (aged under 75)", g: "msoa", lv: ["ward","msoa"] }
   ]}
 ];
 
-// Set of overlay keys that only have LSOA-level data (no ward aggregate).
-// Used by the overlay change handler to auto-enable the LSOA layer so
-// choropleths actually render instead of leaving a grey ward layer.
-const LSOA_ONLY_OVS = new Set(
-  CATS.flatMap(c => c.fields.filter(f => f.g === 'lsoa').map(f => f.k))
-);
-function isLsoaOnlyOv(k) { return LSOA_ONLY_OVS.has(k); }
-
-// Look up an overlay's declared geography level from CATS (returns 'ward' or
-// 'lsoa', or '' if unknown). Used to nudge the user when the layer they have
-// toggled on doesn't match the overlay's level.
-function ovLevel(k) {
-  if (!k || k === 'none') return '';
+/**
+ * Two different questions about an indicator's geography, kept apart.
+ *
+ * `g` is where the publisher releases it. That is a fact about the source and
+ * it never changes: IMD is published per LSOA, the Local Health set per MSOA,
+ * the borough Fingertips series per local authority.
+ *
+ * `lv` is which levels this map can honestly draw it at, which is a different
+ * thing and is often more than one. The Local Health indicators are published
+ * per MSOA and also carried on wards, population-weighted through the LSOA
+ * bridge, so they are drawable at both.
+ *
+ * Until now a single `g` did both jobs, which is why the map could only ever
+ * think in two levels. Everything that gates on a level reads ovLevels() now;
+ * `g` is left to say where the numbers came from, which is what the reader
+ * actually wants to know. An entry with no `lv` means its only level is `g`,
+ * so nothing had to be restated to keep working.
+ */
+function ovField(k) {
+  if (!k || k === 'none') return null;
   for (const cat of CATS) {
     if (!cat) continue;
     for (const f of (cat.fields || [])) {
-      if (f && f.k === k) return f.g || '';
+      if (f && f.k === k) return f;
     }
   }
-  return '';
+  return null;
 }
+function ovLevels(k) {
+  const f = ovField(k);
+  if (!f) return [];
+  if (Array.isArray(f.lv) && f.lv.length) return f.lv;
+  return f.g ? [f.g] : [];
+}
+function ovHasLevel(k, level) { return ovLevels(k).indexOf(level) !== -1; }
+
+// The native publication geography, for saying so on screen.
+function ovNativeLevel(k) { const f = ovField(k); return (f && f.g) || ''; }
+
+// Overlay keys with no ward figure, so choosing one has to bring the LSOA
+// layer up or the map stays a grey ward layer.
+const LSOA_ONLY_OVS = new Set(
+  CATS.flatMap(c => c.fields
+    .filter(f => ovLevels(f.k).length === 1 && ovLevels(f.k)[0] === 'lsoa')
+    .map(f => f.k))
+);
+function isLsoaOnlyOv(k) { return LSOA_ONLY_OVS.has(k); }
+
+// Kept for the level gate's toast, which names the level an indicator is
+// published at. Returns the native geography, as it always did.
+function ovLevel(k) { return ovNativeLevel(k); }
 
 // Brief floating toast for level-mismatch blocking. Shows for ~4s then
 // auto-dismisses. Stacked z-index to sit above the map and any banners.
@@ -6142,6 +6172,28 @@ function imdStyle(feat, state) {
   return base;
 }
 
+// MSOA indicators, at the level they are published at. Empty until the fetch
+// in loadData lands, so every reader has to tolerate that window, exactly as
+// LSOA_DATA does.
+let MSOA_DATA = {};
+function msoaOvValue(code, k) {
+  const d = MSOA_DATA[code];
+  if (!d) return null;
+  return (d.indicators || d)[resolveOvField(k)];
+}
+const _msoaRange = {};
+function getMsoaRange(ovKey) {
+  if (_msoaRange[ovKey]) return _msoaRange[ovKey];
+  const vals = Object.values(MSOA_DATA)
+    .map(d => parseFloat((d.indicators || d)?.[resolveOvField(ovKey)]))
+    .filter(v => !isNaN(v));
+  if (vals.length < 2) return getOvRange(ovKey);
+  const sorted = vals.slice().sort((a, b) => a - b);
+  _msoaRange[ovKey] = { lo: sorted[Math.floor(sorted.length * 0.05)],
+                        hi: sorted[Math.ceil(sorted.length * 0.95 - 1)] };
+  return _msoaRange[ovKey];
+}
+
 // Dynamic LSOA range for overlays
 const _lsoaRange = {};
 function getLsoaRange(ovKey) {
@@ -7091,6 +7143,42 @@ document.getElementById('lsoa-scope').addEventListener('change', e => {
 let msoaLyr = null;
 let _msoaLoading = null;
 
+/**
+ * Shade an MSOA when the active overlay has MSOA figures, outline it otherwise.
+ *
+ * The layer used to be outlines only, because there was no MSOA payload to
+ * shade with. Now that msoa_data.json publishes the Local Health set at the
+ * level it comes from, an overlay that has MSOA figures fills, and one that
+ * does not falls back to the plain purple outline rather than filling with a
+ * colour it has no number for.
+ */
+function msoaStyle(feat) {
+  const base = { color: '#7A2E8E', weight: scaledWeight(1.1), fill: false, opacity: 0.85 };
+  if (!curOv || curOv === 'none' || !ovHasLevel(curOv, 'msoa')) return base;
+  const cfg = OV_CFG[curOv];
+  if (!cfg) return base;
+  const val = msoaOvValue((feat.properties || {}).code, curOv);
+  if (val == null) return base;
+  const v = parseFloat(val);
+  if (isNaN(v)) return base;
+  const range = getMsoaRange(curOv);
+  if (!range || range.hi === range.lo) return base;
+  // Same ramp and polarity the ward and LSOA layers use, so one indicator
+  // reads the same way whichever level it is drawn at.
+  const t = (v - range.lo) / (range.hi - range.lo);
+  return Object.assign(base, {
+    fill: true,
+    fillColor: ramp(Math.max(0, Math.min(1, t)), !cfg.wh),
+    fillOpacity: 0.45,
+    color: '#555',
+  });
+}
+
+function restyleMsoa() {
+  if (!msoaLyr) return;
+  msoaLyr.eachLayer(l => l.setStyle(msoaStyle(l.feature)));
+}
+
 function loadMsoaBoundaries() {
   if (msoaLyr) return Promise.resolve(msoaLyr);
   if (_msoaLoading) return _msoaLoading;
@@ -7102,16 +7190,20 @@ function loadMsoaBoundaries() {
         // A function, not a literal, so _restyleAll can re-evaluate it when
         // the Border slider moves. As a literal it was fixed at 1.1px for the
         // life of the layer.
-        style: function () {
-          return { color: '#7A2E8E', weight: scaledWeight(1.1), fill: false, opacity: 0.85 };
-        },
+        style: msoaStyle,
         onEachFeature: (feat, lyr) => {
           const p = feat.properties || {};
-          lyr.bindTooltip(
-            `<b style="font-size:11px">${_esc(p.name || 'MSOA')}</b>` +
-            `<br><span style="font-size:10px;color:#888">${_esc(p.code || '')}</span>`,
-            { sticky: true, opacity: 0.94 }
-          );
+          // Bound once at load, so the value is read when the tooltip opens
+          // rather than frozen at whatever overlay was active back then.
+          lyr.bindTooltip(function () {
+            const v = msoaOvValue(p.code, curOv);
+            const shown = (curOv && curOv !== 'none' && ovHasLevel(curOv, 'msoa')
+                           && v != null && !isNaN(parseFloat(v)))
+              ? `<br><span style="font-size:10px">${_esc(_ovLabel(curOv))}: <b>${fmtOv(parseFloat(v), curOv)}</b></span>`
+              : '';
+            return `<b style="font-size:11px">${_esc(p.name || 'MSOA')}</b>` +
+                   `<br><span style="font-size:10px;color:#888">${_esc(p.code || '')}</span>` + shown;
+          }, { sticky: true, opacity: 0.94 });
         },
       });
       const el = document.getElementById('msoa-count');
@@ -7157,18 +7249,20 @@ document.getElementById('tlsoa').addEventListener('change', e => {
   if (!e.target.__skipLevelGate) {
     const k = (typeof curOv !== 'undefined') ? curOv : 'none';
     if (k && k !== 'none') {
-      const lvl = ovLevel(k);
+      // Same rule as the badge's gate, asked of whichever level this tick
+      // would move the map to.
       const wantsLsoa = e.target.checked;
-      if (lvl === 'ward' && wantsLsoa) {
-        e.target.checked = false;
-        const lbl = (document.getElementById('ov').selectedOptions[0] || {}).text || k;
-        _levelToast(`<b>Ward-only indicator</b><br>"${lbl.replace(/ · (Ward|LSOA|MSOA|Borough)$/i,'')}"<br>is published at ward level only — switching to LSOA mode would hide its shading.`);
-        return;
-      }
-      if (lvl === 'lsoa' && !wantsLsoa) {
-        e.target.checked = true;
-        const lbl = (document.getElementById('ov').selectedOptions[0] || {}).text || k;
-        _levelToast(`<b>LSOA-only indicator</b><br>"${lbl.replace(/ · (Ward|LSOA|MSOA|Borough)$/i,'')}"<br>has no ward-level value — turn off the overlay first if you want to leave LSOA mode.`);
+      const target = wantsLsoa ? 'lsoa' : 'ward';
+      if (!ovHasLevel(k, target)) {
+        e.target.checked = !wantsLsoa;
+        const lbl = ((document.getElementById('ov').selectedOptions[0] || {}).text || k)
+                      .replace(/ · (Ward|MSOA|LSOA|Borough)$/i, '');
+        const have = ovLevels(k).map(_levelName).join(' and ');
+        _levelToast(`<b>Not available at ${_levelName(target)} level</b><br>"${lbl}"<br>`
+          + (have ? `has figures at ${have} level only. ${wantsLsoa
+              ? 'Turning this on would leave the map unshaded.'
+              : 'Turn the overlay off first if you want to leave that level.'}`
+                  : 'has no figures to shade with.'));
         return;
       }
     }
@@ -7503,6 +7597,8 @@ document.getElementById('ov').addEventListener('change', e => {
   }
   if (wLyr) wLyr.eachLayer(l => l.setStyle(wstyle(l.feature.properties.WD24NM, curOv, gs(l.feature.properties.WD24NM))));
   if (lsoaLyr) { lsoaLyr.eachLayer(l => l.setStyle(imdStyle(l.feature, l.feature.properties.code === selLSOA ? 'selected' : 'default'))); applyLSOAFilter(); }
+  // The MSOA layer picks up the new overlay too, when it has figures for it.
+  restyleMsoa();
   // Keep neighbourhood borders visible on top of choropleth
   if (nbhdBorderLyr) { nbhdBorderLyr.bringToFront(); if (boroughL._map) boroughL.bringToFront(); }
   // Refresh the Top/Bottom 20 rankings for the new indicator.
@@ -7524,6 +7620,11 @@ let currentDataLevel = 'ward';
 // the LSOA box, and that box's listener reports "ward" straight back, undoing
 // the switch the user just made.
 let _dlDriving = false;
+
+// Level names as a reader would say them, for the toasts and the badges.
+function _levelName(level) {
+  return { borough: 'borough', ward: 'ward', msoa: 'MSOA', lsoa: 'LSOA' }[level] || level;
+}
 
 function _dlHint(msg, ms) {
   const hintEl = document.getElementById('dl-hint');
@@ -7552,15 +7653,16 @@ function _setDataLevel(level, opts) {
       && level !== currentDataLevel
       && typeof curOv !== 'undefined' && curOv && curOv !== 'none'
       && typeof ovLevel === 'function') {
-    const lvl = ovLevel(curOv);
-    const ovTxt = ((document.getElementById('ov').selectedOptions[0] || {}).text || curOv)
-                    .replace(/ · (Ward|LSOA|MSOA|Borough)$/i, '');
-    if (lvl === 'ward' && level === 'lsoa') {
-      _levelToast(`<b>Ward-only indicator</b><br>"${ovTxt}"<br>is published at ward level only — switching to LSOA mode would hide its shading.`);
-      return;
-    }
-    if (lvl === 'lsoa' && (level === 'ward' || level === 'msoa')) {
-      _levelToast(`<b>LSOA-only indicator</b><br>"${ovTxt}"<br>has no ward-level value — clear the overlay first if you want to leave LSOA mode.`);
+    // Refuse a level the active indicator has no figures at, and say where it
+    // does have them. This used to be two hardcoded ward-or-LSOA cases, so a
+    // third level would have slipped straight through and shaded nothing.
+    if (!ovHasLevel(curOv, level)) {
+      const ovTxt = ((document.getElementById('ov').selectedOptions[0] || {}).text || curOv)
+                      .replace(/ · (Ward|MSOA|LSOA|Borough)$/i, '');
+      const have = ovLevels(curOv).map(_levelName).join(' and ');
+      _levelToast(`<b>Not available at ${_levelName(level)} level</b><br>"${ovTxt}"<br>`
+        + (have ? `has figures at ${have} level only. Switching would leave the map unshaded.`
+                : 'has no figures to shade with.'));
       return;
     }
   }
@@ -8986,8 +9088,9 @@ function _restyleAll() {
     l.setStyle(imdStyle(l.feature,
       l.feature === (selLSOA && selLSOA.feature) ? 'selected' : 'default')));
   // The MSOA layer was never in here, so nothing the sliders did reached it.
-  if (typeof msoaLyr !== 'undefined' && msoaLyr) msoaLyr.setStyle(
-    { color: '#7A2E8E', weight: scaledWeight(1.1), fill: false, opacity: 0.85 });
+  // Through msoaStyle rather than a literal now, or a slider would repaint the
+  // choropleth back to bare outlines.
+  if (typeof msoaLyr !== 'undefined' && msoaLyr) restyleMsoa();
 }
 (function wireSliders() {
   const fo = document.getElementById('fill-opacity');
@@ -9381,6 +9484,19 @@ async function loadData() {
         }
         // LSOA-only rankings rely on LSOA_DATA — refresh once it arrives.
         if (typeof renderTopBottom === 'function') renderTopBottom();
+      });
+
+    // MSOA indicators, published at that level rather than derived onto it.
+    // Fetched the same fire-and-forget way as the LSOA payload: a slow or
+    // missing file delays nothing and leaves MSOA_DATA an empty object, which
+    // every reader already tolerates. The boundary layer is lazy and usually
+    // is not up yet, so the restyle is guarded rather than assumed.
+    fetch(dataUrl('msoa_data.json')).then(r => r.ok ? r.json() : null).catch(() => null)
+      .then(md => {
+        if (!md) return;
+        MSOA_DATA = md;
+        for (const k in _msoaRange) delete _msoaRange[k];
+        if (msoaLyr) restyleMsoa();
       });
 
     // Now ward layer exists — init VCSE filters
