@@ -147,7 +147,11 @@
   .main { display: grid; grid-template-columns: auto minmax(0, 1fr); overflow: hidden; min-height: 0; min-width: 0; }
 
   /* ── Sidebar ── CSS Grid: native layout guarantees [focus] [tabs] [flexible pane] [footer] stack. No JS measurement needed. */
-  .sidebar { width: 268px; border-right: 1px solid #E8EDEE; flex-shrink: 0; background: #fff; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; grid-template-areas: "focus" "tabs" "pane" "footer"; height: 100%; min-height: 0; overflow: hidden; }
+  .sidebar { width: 268px; border-right: 1px solid #E8EDEE; flex-shrink: 0; background: #fff; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; grid-template-areas: "focus" "tabs" "pane" "footer"; height: 100%; min-height: 0; overflow: hidden; transition: width .18s ease; }
+  /* Collapsed to nothing, so the map gets the whole window. The same button
+     that opens the drawer on a phone does this on a desktop: one control, and
+     the same idea behind it, which is that the panel is optional. */
+  .sidebar.collapsed { width: 0; border-right: 0; }
   .sidebar > .nbfocus-bar { grid-area: focus; }
   .sidebar > .sb-tabs     { grid-area: tabs; }
   /* Panes scroll. They used to be overflow:hidden, with the only scrollable
@@ -301,6 +305,11 @@
 
   /* ── Status bar ── */
   .sbar { background: #fff; border-top: 1px solid #E8EDEE; padding: 4px 14px; font-size: 10px; color: #768692; display: flex; justify-content: space-between; flex-shrink: 0; }
+  .sbar-right { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+  .sbar-btn { appearance: none; background: none; border: 0; padding: 0; cursor: pointer;
+    font: inherit; font-size: 10px; color: #005EB8; text-decoration: underline;
+    text-underline-offset: 2px; }
+  .sbar-btn:hover { color: #003087; }
 
   /* ── Leaflet overrides ── */
   .leaflet-popup-content-wrapper { border-radius: 8px !important; box-shadow: 0 2px 12px rgba(0,0,0,.12) !important; border: none !important; padding: 0 !important; overflow: hidden; }
@@ -358,7 +367,9 @@
   /* ── Responsive ── */
   /* Hamburger. Present in the markup at every width, shown only once the
      sidebar becomes a drawer, so there is never a drawer with no way in. */
-  .hdr-menu { display: none; appearance: none; background: none; border: 1px solid #DDE1E4;
+  /* Shown at every width now: a drawer toggle on a phone, a collapse toggle
+     on a desktop. */
+  .hdr-menu { display: inline-flex; appearance: none; background: none; border: 1px solid #DDE1E4;
     border-radius: 8px; padding: 6px 9px; cursor: pointer; line-height: 0; flex: 0 0 auto; }
   .hdr-menu:hover { border-color: #005EB8; }
   .hdr-menu svg { display: block; }
@@ -386,6 +397,10 @@
       box-shadow: 8px 0 32px rgba(33,43,50,.22); border-right: 1px solid #E8EDEE;
     }
     .sidebar.open { transform: none; }
+    /* The desktop collapse does not apply here: at this width the drawer's
+       own transform is what hides it, and a zero width would leave nothing
+       to slide in. */
+    .sidebar.collapsed { width: min(86vw, 330px); border-right: 1px solid #E8EDEE; }
     .sidebar > .tab-pane.active { flex: 1 1 auto; min-height: 0; }
     .sidebar > .sb-sec { flex: 0 0 auto; }
     .nbadges { display: none; }
@@ -603,7 +618,9 @@
   /* Accent placement. The palette alone reads as a grey refresh; the design
      carries its identity in a few structural blue moments, not in tinting
      everything. Keep it to the header rule, the wordmark and section heads. */
-  header, .hdr { border-top: 4px solid var(--nhs-blue); }
+  /* The 4px blue rule across the top has gone. It was pure decoration and it
+     was costing four rows of pixels on every screen, which the map wanted
+     more than the identity did. The wordmark still carries the colour. */
   .hdr-logo { color: var(--nhs-dark); letter-spacing: -.01em; }
   .section-h { color: var(--nhs-dark); }
   .sb-tabs { background: var(--paper-2); }
@@ -1297,7 +1314,6 @@
     <button type="button" class="mode-btn" role="tab" data-mode="explore" aria-selected="true">Explore</button>
     <button type="button" class="mode-btn" role="tab" data-mode="query" aria-selected="false">Query</button>
     <button type="button" class="mode-btn" role="tab" data-mode="compare" aria-selected="false">Compare</button>
-    <button type="button" class="mode-btn" role="tab" data-mode="tour" aria-selected="false">Take a tour</button>
     <button type="button" class="mode-btn" role="tab" data-mode="directory" aria-selected="false">Directory</button>
   </div>
 
@@ -1463,7 +1479,6 @@
           <div style="font-size:10.5px;color:#888;margin:4px 0 2px 24px;line-height:1.4">
             VCSE = registered charities · CIC = Community Interest Companies (community-anchored businesses)
           </div>
-          <div class="cov-note" style="margin-left:24px">Charities cover all of London. CICs cover North West London only, so a blank borough means not yet collected.</div>
         </div>
         <div class="sb-sec" style="padding-bottom:8px">
           <div class="sb-lbl">Filter by area</div>
@@ -1495,6 +1510,13 @@
             <div class="sb-lbl" style="margin-bottom:0">Filter by tags</div>
             <button type="button" id="vcse-tag-clear" style="font-size:11px;color:#666;background:none;border:none;cursor:pointer;padding:0;text-decoration:underline;display:none">clear</button>
           </div>
+          <!-- The tags come from the Charity Commission's own classification of
+               what a charity does, who it helps and how. CICs are registered
+               with Companies House and carry none of it, so a tag filter is
+               not a filter that can include or exclude them. Saying so here
+               stops the count looking like it has lost the CICs. -->
+          <div class="cov-note" style="margin:0 0 6px">These tags are the Charity Commission's own, so they filter
+            registered charities only. Community Interest Companies are not tagged and are unaffected.</div>
           <details class="vcse-tag-group" data-fam="wt">
             <summary>What they do <span class="vcse-tag-count"></span></summary>
             <div class="vcse-tag-list"></div>
@@ -1990,7 +2012,15 @@
       <a class="sbar-link" href="mailto:contact@pophealth.uk">contact@pophealth.uk</a>
       <span id="src-lbl"></span>
     </span>
-    <span id="data-date"></span>
+    <span class="sbar-right">
+      <!-- The tour used to sit in the mode rail beside Explore, Query, Compare
+           and Directory, which are the four things you work in. It is not one
+           of those: it runs once, over the top of whichever of them you are
+           in. Down here it is out of the way of the row it was crowding, and
+           still on screen for anyone who wants it a second time. -->
+      <button type="button" class="sbar-btn" id="sbar-tour">Take a tour</button>
+      <span id="data-date"></span>
+    </span>
   </div>
 
 </div><!-- .app -->
@@ -5685,7 +5715,31 @@ function _applyBoroughSolo() {
     if (typeof map !== 'undefined' && map) setTimeout(() => map.invalidateSize(), 60);
   }
 
-  btn.addEventListener('click', () => setOpen(!isOpen()));
+  /* On a desktop the same button collapses the panel instead of drawering it.
+     The panel is optional either way; the difference is only that there is
+     room to slide it out of rather than over the map. Remembered, because
+     someone who wants the whole window for the map wants it next time too. */
+  const COLLAPSE_KEY = 'phPanelCollapsed';
+  function setCollapsed(on) {
+    sidebar.classList.toggle('collapsed', on);
+    btn.setAttribute('aria-expanded', String(!on));
+    btn.title = on ? 'Show the panel' : 'Hide the panel';
+    try { window.localStorage.setItem(COLLAPSE_KEY, on ? '1' : ''); } catch (e) {}
+    if (typeof map !== 'undefined' && map) setTimeout(() => map.invalidateSize(), 220);
+  }
+  function isCollapsed() { return sidebar.classList.contains('collapsed'); }
+  try {
+    if (window.localStorage.getItem(COLLAPSE_KEY)) {
+      sidebar.classList.add('collapsed');
+      btn.setAttribute('aria-expanded', 'false');
+      btn.title = 'Show the panel';
+    }
+  } catch (e) { /* private mode: starts expanded */ }
+
+  btn.addEventListener('click', () => {
+    if (narrow()) setOpen(!isOpen());
+    else setCollapsed(!isCollapsed());
+  });
   scrim.addEventListener('click', () => setOpen(false));
   const closeBtn = document.getElementById('sb-close');
   if (closeBtn) closeBtn.addEventListener('click', () => setOpen(false));
@@ -5693,13 +5747,17 @@ function _applyBoroughSolo() {
     if (e.key === 'Escape' && isOpen()) setOpen(false);
   });
 
-  // Choosing a mode opens the drawer, because that is where the mode lives.
-  // Explore is the map itself, so it closes it instead.
+  // Choosing a mode reveals the panel, because that is where the mode lives.
+  // A collapsed panel makes Query, Compare and Directory look like dead
+  // buttons on a desktop in exactly the way a closed drawer does on a phone.
+  // Explore is the map itself, so on a phone it closes the drawer; on a
+  // desktop it leaves a collapsed panel collapsed, which is a state the user
+  // chose rather than one to undo for them.
   document.querySelectorAll('.mode-btn').forEach(b => {
     b.addEventListener('click', () => {
-      if (!narrow()) return;
-      const m = b.dataset.mode;
-      setOpen(m === 'query' || m === 'compare' || m === 'directory');
+      const wantsPanel = ['query', 'compare', 'directory'].indexOf(b.dataset.mode) !== -1;
+      if (narrow()) setOpen(wantsPanel);
+      else if (wantsPanel && isCollapsed()) setCollapsed(false);
     });
   });
 
@@ -7476,22 +7534,32 @@ function _setDataLevel(level, opts) {
       b.classList.toggle('active', b.dataset.dl === level);
     }
   });
-  // MSOA is a geography, not a shading level. Ward figures are what the map
-  // colours, and they stay coloured underneath: MSOAs are built from whole
-  // LSOAs but 41% of LSOAs cross a ward line, so MSOA edges and ward edges
-  // agreeing is a coincidence. Say so once, each time the level is chosen,
-  // rather than letting someone wait for a recolour that is never coming.
+  // MSOA has no indicator data of its own on this page, so choosing it draws
+  // the geography and nothing shades it. Now that the badge is exclusive and
+  // the ward layer goes off with it, that means the choropleth goes too, and
+  // it is better to say so than to let someone watch for a recolour that is
+  // never coming.
   if (level === 'msoa' && !opts.fromMsoaToggle) {
-    _dlHint('MSOA boundaries drawn. Shading stays at ward level.', 3200);
+    var _ovOn = typeof curOv !== 'undefined' && curOv && curOv !== 'none';
+    _dlHint(_ovOn
+      ? 'MSOA boundaries only. The shading is drawn on the ward layer, so it is off too.'
+      : 'MSOA boundaries drawn. There is no MSOA-level indicator to shade them with.', 3600);
   }
 
   if (opts.fromOverlay || opts.fromLsoaToggle || opts.fromMsoaToggle) return;  // avoid feedback loops
 
   // Drive the two boundary layers to match the level. Guarded, because each
   // checkbox has its own listener that syncs the badge back the other way.
+  // The badge is a segmented control, so it picks one geography and turns the
+  // other two off. Ward was previously left alone, which meant choosing MSOA
+  // drew MSOA boundaries on top of the ward ones and the box for the level you
+  // had just left stayed ticked.
+  //
+  // Ward is the exception in one direction only: it carries the choropleth, so
+  // leaving Ward drops the shading with it. That is what the hint above says.
   _dlDriving = true;
   try {
-    const want = { tlsoa: level === 'lsoa', tmsoa: level === 'msoa' };
+    const want = { tnw: level === 'ward', tlsoa: level === 'lsoa', tmsoa: level === 'msoa' };
     for (const id in want) {
       const box = document.getElementById(id);
       if (!box || box.checked === want[id]) continue;
@@ -11144,6 +11212,13 @@ loadData();
       if (e.key === 'Escape') { e.preventDefault(); tourEnd(); }
     });
   }
+  // The tour no longer has a rail button, so it needs its own trigger. Bound
+  // here rather than in the rail, which is now only the four working modes.
+  var sbarTour = document.getElementById('sbar-tour');
+  if (sbarTour) sbarTour.addEventListener('click', function () {
+    if (tourAt >= 0) tourEnd(); else tourStart();
+  });
+
   window.PH_TOUR = {
     start: tourStart, end: tourEnd,
     running: function () { return tourAt >= 0; },
