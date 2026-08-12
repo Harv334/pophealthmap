@@ -292,7 +292,20 @@
   .loading-sub { font-size: 11px; color: #768692; }
 
   /* ── Data-level badge (floating overlay, top-right of map) ── */
-  .dl-badge { position: absolute; top: 12px; right: 12px; z-index: 2500; background: rgba(255,255,255,0.96); border: 1px solid #DDE1E4; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); padding: 6px 8px; display: flex; align-items: center; gap: 8px; user-select: none; }
+  /* The corner stack: version label, then the Viewing badge under it. The
+     wrapper carries the anchoring so the two move together, and the badge
+     keeps position: relative because .dl-hint hangs off it at top:100% and
+     would otherwise re-anchor to the wrapper and appear below the whole
+     stack instead of below the badge. */
+  /* pointer-events: none on the wrapper, auto on the two things in it. The
+     wrapper is as wide as its widest child and has a gap down the middle of
+     it, all of it transparent and all of it over live map. Without this it
+     would quietly eat drags that start in the empty space beside the version
+     label, and the map would refuse to pan for no visible reason. */
+  .map-corner { position: absolute; top: 12px; right: 12px; z-index: 2500; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; pointer-events: none; }
+  .map-corner > * { pointer-events: auto; }
+  .site-ver { font-size: 10px; line-height: 1; letter-spacing: .02em; color: #4C6272; background: rgba(255,255,255,0.96); border: 1px solid #DDE1E4; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); padding: 4px 8px; white-space: nowrap; user-select: none; font-variant-numeric: tabular-nums; }
+  .dl-badge { position: relative; background: rgba(255,255,255,0.96); border: 1px solid #DDE1E4; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); padding: 6px 8px; display: flex; align-items: center; gap: 8px; user-select: none; }
   .dl-badge-label { font-weight: 600; color: #4C6272; letter-spacing: 0.04em; text-transform: uppercase; font-size: 9px; }
   .dl-seg { display: flex; background: #FBFCFD; border-radius: 6px; padding: 2px; gap: 2px; }
   .dl-seg button { background: transparent; border: none; padding: 4px 10px; font-size: 11px; color: #4C6272; border-radius: 4px; cursor: pointer; font-weight: 500; transition: background .12s, color .12s; }
@@ -411,7 +424,10 @@
        moved up to 760 with it: below this width the layout is in phone mode,
        and the badge should be too rather than staying full size for the 60px
        in between. */
-    .dl-badge { top: 8px; right: 8px; padding: 5px 6px; gap: 5px; }
+    /* The corner's offsets live on .map-corner now, and its narrow override
+       went with them, into the late 760 block at the end of the stylesheet
+       where the rest of the component overrides sit. */
+    .dl-badge { padding: 5px 6px; gap: 5px; }
     .dl-badge-label { display: none; }
     .dl-seg button { padding: 4px 7px; font-size: 10.5px; }
 
@@ -483,7 +499,11 @@
   font-family:'Inter Tight',Inter,system-ui,sans-serif;display:flex;align-items:center;gap:7px}
 #ai-toggle:hover{background:#003087;border-color:#003087}
 #ai-toggle:focus-visible{outline:3px solid #FFB81C;outline-offset:2px}
-#ai-panel{position:absolute;right:12px;top:54px;bottom:12px;z-index:2600;
+/* top clears the corner stack. The version label added a row above the
+   Viewing badge, taking the badge's bottom edge from about 42px to about 68px,
+   and at 54px this panel opened straight through the middle of it: the level
+   switcher was sliced in half and its buttons went under the panel. */
+#ai-panel{position:absolute;right:12px;top:78px;bottom:12px;z-index:2600;
   width:min(390px,calc(100% - 24px));display:none;flex-direction:column;background:#fff;
   border:1px solid #DDE1E4;border-radius:10px;
   box-shadow:0 8px 32px rgba(33,43,50,.16),0 2px 8px rgba(33,43,50,.08);overflow:hidden}
@@ -1140,6 +1160,10 @@
        handle up gives the rest. */
     .ws-sheet, .cmp-bar, .tour-strip { left: 8px; right: 8px; bottom: 8px; }
     .ws-sheet { max-height: 76vh; max-height: 76dvh; }
+    /* The corner tightens to the same 8px inset the rest of the phone layout
+       uses. One rule moves the version and the badge together. */
+    .map-corner { top: 8px; right: 8px; gap: 4px; }
+    .site-ver { font-size: 9.5px; padding: 3px 6px; }
     /* Peek is exactly the head. A fixed 150px left the insight card sliced
        through the middle of a word at the bottom edge, which reads as a
        rendering fault rather than as "there is more below". The handle is what
@@ -1946,6 +1970,13 @@
         Hover a grey ward to see whether it's "Suppressed" (privacy rule) or just "no data" (indicator not published).
         <button id="fingertips-banner-close" style="float:right;background:none;border:none;color:#5c4115;font-size:16px;cursor:pointer;padding:0 0 0 8px;margin:-4px 0 0 0;line-height:1;pointer-events:auto" title="Dismiss this notice for this session">&times;</button>
       </div>
+      <!-- Top-right corner stack. One anchored wrapper rather than two boxes
+           positioned separately, so the version and the badge cannot drift
+           apart at a breakpoint, and so the screenshot flow has one id to
+           hide instead of two. -->
+      <div class="map-corner" id="map-corner">
+        <span class="site-ver" id="site-ver"
+              title="Version of the website itself. When the data was last refreshed is shown separately, in the status bar at the foot of the page.">v0.9.0</span>
       <div class="dl-badge" id="dl-badge" role="group" aria-label="Data level filter">
         <span class="dl-badge-label">Viewing</span>
         <div class="dl-seg" id="dl-seg">
@@ -1955,6 +1986,7 @@
         </div>
         <div class="dl-hint" id="dl-hint"></div>
       </div>
+      </div><!-- .map-corner -->
 
       <!-- Selected-ward sheet. Hidden until a ward is clicked; showWard() fills
            it and deselectWard() puts it away again. The head cycles the three
@@ -8249,7 +8281,9 @@ async function _downloadMapPng(opts) {
   // UI chrome to hide in the capture. Leaflet attribution stays (legally
   // required) — it's a thin line at the bottom-right and doesn't fight
   // the caption.
-  const dlBadge = document.getElementById('dl-badge');
+  // The whole corner stack, not just the badge: the version label is its
+  // sibling now, and hiding one without the other would leave it in the shot.
+  const dlBadge = document.getElementById('map-corner');
   const dlPrevVis = dlBadge ? dlBadge.style.visibility : '';
   // Hide ALL Leaflet control corners (top-left/top-right/bottom-left/bottom-right)
   // so the capture excludes the zoom control, the legend control in the
@@ -8697,7 +8731,9 @@ async function _prepareScreenForScreenshot(opts) {
 
   const savedCenter = map.getCenter();
   const savedZoom = map.getZoom();
-  const dlBadge = document.getElementById('dl-badge');
+  // The corner stack, so the version label goes with the badge rather than
+  // sitting in the middle of everybody's screenshot.
+  const dlBadge = document.getElementById('map-corner');
   const dlPrevVis = dlBadge ? dlBadge.style.visibility : '';
   const ctrlCorners = Array.from(document.querySelectorAll(
     '.leaflet-top, .leaflet-bottom, .leaflet-control-attribution'
@@ -11080,28 +11116,69 @@ loadData();
     setOverlay('none');
     if (typeof _setDataLevel === 'function') _setDataLevel('ward');
   }
+  /**
+   * Drop the neighbourhood layer but keep whatever the map is shaded by.
+   *
+   * Used between the deciles chapter and the one after it, which is about
+   * ward figures and wants the ward choropleth to itself.
+   */
+  function wardLevelKeepOverlay() {
+    lsoaLayer(false, false);
+    if (typeof _setDataLevel === 'function') _setDataLevel('ward');
+  }
 
   /**
-   * Little Venice, Westminster.
+   * Turn the LSOA layer on or off without disturbing the overlay.
+   *
+   * The deciles chapter needs both layers at once: wards shaded by IMD score,
+   * and the neighbourhoods inside them drawn and shaded by decile. The level
+   * gate refuses that pairing by default, because turning on LSOAs while a
+   * ward-only overlay is up normally hides the shading the user just chose.
+   * Here it is the point rather than an accident, so the tour passes the same
+   * __skipLevelGate flag the overlay handler already uses for its own
+   * automatic switches.
+   */
+  function lsoaLayer(on, byDecile) {
+    var box = $('tlsoa');
+    if (!box) return;
+    if (box.checked !== on) {
+      box.__skipLevelGate = true;
+      box.checked = on;
+      box.dispatchEvent(new Event('change'));
+    }
+    var col = $('tlsoa-imd');
+    if (col && col.checked !== !!byDecile) {
+      col.checked = !!byDecile;
+      col.dispatchEvent(new Event('change'));
+    }
+  }
+
+  /**
+   * Telegraph Hill, Lewisham.
    *
    * The deciles chapter says a ward figure is a mean of the neighbourhoods
-   * inside it, which only reads clearly if the neighbourhoods on screen are
-   * actually inside the ward on screen. 41% of London's LSOAs cross a ward
-   * line, so a chapter that opens on all of London is arguing against its own
-   * picture.
+   * inside it, which only reads if the neighbourhoods on screen are inside
+   * the ward on screen. 41% of London's LSOAs cross a ward line, so a chapter
+   * that opens on all of London argues against its own picture.
    *
-   * Picked by testing every LSOA vertex against its own ward's polygon, using
-   * the same data/map blobs the browser draws, so what nests in the check
-   * nests on screen. 31 of the 704 wards qualify. This one has five LSOAs, few
-   * enough to take in at a glance, spanning deciles 1, 7 and 8: the most
-   * deprived tenth of England and the least deprived third, inside one ward,
-   * which is exactly the point the chapter is making.
+   * Chosen by measuring, over the same data/map blobs the browser draws, three
+   * things for every ward with four to twelve LSOAs: how far any LSOA vertex
+   * strays outside its ward, how far any ward vertex sits from the nearest
+   * LSOA edge, and how closely the LSOA areas sum to the ward's. Nothing fits
+   * perfectly and nothing can: ward and LSOA boundaries are separately
+   * generalised ONS products, so a shared edge is drawn twice, slightly
+   * differently. Of the 129 candidates Telegraph Hill is the closest to exact,
+   * with its LSOA areas summing to within 0.04% of the ward, roughly six times
+   * tighter than the next ward with a comparable decile range, and both
+   * boundary discrepancies inside 14m, which is around a pixel at the zoom
+   * this frames to. Its ten LSOAs run from decile 2 to decile 7, so the range
+   * inside one ward is visible without being freakish.
    *
    * Held by code rather than name, because codes survive the renaming that
    * comes with a boundary review. If the code ever stops matching, frameWard
    * returns false and the chapter leaves the map where it was.
    */
-  var NESTED_WARD = 'E05013799';
+  var NESTED_WARD = 'E05013732';
 
   var TOUR = [
     {
@@ -11133,20 +11210,38 @@ loadData();
     },
     {
       t: 'Deprivation runs in two directions',
-      n: 'This is the easiest thing on the map to state backwards, so the map has ' +
-         'switched to deciles at neighbourhood level to show it. A higher ' +
-         '<strong>score</strong> means more deprived. A higher <strong>decile</strong> ' +
-         'means <em>less</em> deprived, because decile 1 is the most deprived tenth of ' +
-         'England. A ward has no decile of its own: its figure is a population-weighted ' +
-         'mean of the deciles of the neighbourhoods inside it, so a ward at 3 is not ' +
-         '"in the third decile", the typical neighbourhood in it is.',
+      n: 'The map has not changed: the wards are still shaded by IMD <strong>score</strong>. ' +
+         'What is new is the neighbourhood boundaries drawn inside them, and this ward is ' +
+         'one of the few whose neighbourhoods sit entirely within it. Those are the ' +
+         'neighbourhoods the ward figure is made of. A higher <strong>score</strong> means ' +
+         'more deprived. A higher <strong>decile</strong> means <em>less</em> deprived, ' +
+         'because decile 1 is the most deprived tenth of England, which is the easiest ' +
+         'thing on this map to state backwards. And a ward has no decile of its own: its ' +
+         'figure is a population-weighted mean of the deciles of the neighbourhoods you ' +
+         'can now see inside it, so a ward at 3 is not "in the third decile", the typical ' +
+         'neighbourhood in it is.',
       go: function () {
-        // imd_decile is published at LSOA, so choosing it moves the map to
-        // neighbourhood level. That is the point of the chapter rather than a
-        // side effect: these are real deciles, not an average of them.
-        railClick('explore'); sidebarTab('overlay'); setOverlay('imd_decile');
-        // And frame a ward whose neighbourhoods are all inside it, so the
-        // sentence above can be read straight off the map.
+        // The ward shading stays up, and the neighbourhoods go on as outlines
+        // over it rather than as a second choropleth.
+        //
+        // Two things ruled the alternatives out. Choosing the imd_decile
+        // overlay moves the map to LSOA level and takes the ward shading with
+        // it, because wstyle drops ward fill to zero whenever the overlay is
+        // LSOA-only: the chapter would contrast a score with a decile while
+        // only the decile was on screen. Colouring the LSOA layer by decile
+        // instead paints 40% fills over every ward in view, in the same
+        // red-to-green hues as the score ramp, while the only key on screen
+        // is still the score legend. That is not two things being compared,
+        // it is one muddy composite inviting exactly the backwards reading
+        // this chapter exists to prevent.
+        //
+        // Outlines leave the ward's own colour legible and put the
+        // neighbourhoods it is built from around it, which is what the
+        // sentence is actually about.
+        railClick('explore'); sidebarTab('overlay'); setOverlay('imd_score_ward');
+        lsoaLayer(true, false);
+        // Framed on a ward whose neighbourhoods are all inside it, so the
+        // sentence can be read straight off the map.
         frameWard(NESTED_WARD);
       },
     },
@@ -11158,6 +11253,14 @@ loadData();
          'indicator the ward has.',
       go: function () {
         railClick('explore');
+        // The deciles chapter has served its purpose by here. Its
+        // neighbourhood outlines come down so the ward being clicked is the
+        // thing on screen, and the ward shading is set rather than inherited:
+        // arriving here backwards from the Query chapter, which clears the
+        // overlay, otherwise left this chapter looking at a blank grey map.
+        wardLevelKeepOverlay();
+        sidebarTab('layers');
+        setOverlay('imd_score_ward');
         // A real ward, chosen from the data rather than hard-coded, so the
         // chapter cannot end up pointing at somewhere that has been renamed.
         var best = null;
@@ -11311,6 +11414,14 @@ loadData();
     // first, so the level gate lets go of LSOA, then the layers, then the
     // selection, then fit London. The tour ends by pressing it rather than
     // reimplementing it and drifting from it later.
+    //
+    // The one thing Reset does not know about is the deciles chapter's
+    // "colour by IMD decile" tick, which it leaves armed: Reset takes the LSOA
+    // layer down, so the tick has nothing to colour and the row it lives in is
+    // hidden, and it would sit there until the next person turned LSOAs on and
+    // got a choropleth they never asked for. The tour turns on what the tour
+    // turns off.
+    lsoaLayer(false, false);
     if (typeof _resetAll === 'function') _resetAll(); else railClick('explore');
     lift();
   }
