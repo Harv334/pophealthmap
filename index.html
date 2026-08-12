@@ -292,20 +292,7 @@
   .loading-sub { font-size: 11px; color: #768692; }
 
   /* ── Data-level badge (floating overlay, top-right of map) ── */
-  /* The corner stack: version label, then the Viewing badge under it. The
-     wrapper carries the anchoring so the two move together, and the badge
-     keeps position: relative because .dl-hint hangs off it at top:100% and
-     would otherwise re-anchor to the wrapper and appear below the whole
-     stack instead of below the badge. */
-  /* pointer-events: none on the wrapper, auto on the two things in it. The
-     wrapper is as wide as its widest child and has a gap down the middle of
-     it, all of it transparent and all of it over live map. Without this it
-     would quietly eat drags that start in the empty space beside the version
-     label, and the map would refuse to pan for no visible reason. */
-  .map-corner { position: absolute; top: 12px; right: 12px; z-index: 2500; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; pointer-events: none; }
-  .map-corner > * { pointer-events: auto; }
-  .site-ver { font-size: 10px; line-height: 1; letter-spacing: .02em; color: #4C6272; background: rgba(255,255,255,0.96); border: 1px solid #DDE1E4; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); padding: 4px 8px; white-space: nowrap; user-select: none; font-variant-numeric: tabular-nums; }
-  .dl-badge { position: relative; background: rgba(255,255,255,0.96); border: 1px solid #DDE1E4; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); padding: 6px 8px; display: flex; align-items: center; gap: 8px; user-select: none; }
+  .dl-badge { position: absolute; top: 12px; right: 12px; z-index: 2500; background: rgba(255,255,255,0.96); border: 1px solid #DDE1E4; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); padding: 6px 8px; display: flex; align-items: center; gap: 8px; user-select: none; }
   .dl-badge-label { font-weight: 600; color: #4C6272; letter-spacing: 0.04em; text-transform: uppercase; font-size: 9px; }
   .dl-seg { display: flex; background: #FBFCFD; border-radius: 6px; padding: 2px; gap: 2px; }
   .dl-seg button { background: transparent; border: none; padding: 4px 10px; font-size: 11px; color: #4C6272; border-radius: 4px; cursor: pointer; font-weight: 500; transition: background .12s, color .12s; }
@@ -319,6 +306,12 @@
   /* ── Status bar ── */
   .sbar { background: #fff; border-top: 1px solid #E8EDEE; padding: 4px 14px; font-size: 10px; color: #768692; display: flex; justify-content: space-between; flex-shrink: 0; }
   .sbar-right { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+  /* Sits with the data date and is deliberately quieter than it: the date is
+     the one people need, the version is the one they get asked for. The empty
+     rule on #data-date stops a stray gap opening between the tour button and
+     the version while the manifest is still in flight. */
+  #site-ver { color: #A3AEB5; font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+  #data-date:empty { display: none; }
   .sbar-btn { appearance: none; background: none; border: 0; padding: 0; cursor: pointer;
     font: inherit; font-size: 10px; color: #005EB8; text-decoration: underline;
     text-underline-offset: 2px; }
@@ -424,10 +417,7 @@
        moved up to 760 with it: below this width the layout is in phone mode,
        and the badge should be too rather than staying full size for the 60px
        in between. */
-    /* The corner's offsets live on .map-corner now, and its narrow override
-       went with them, into the late 760 block at the end of the stylesheet
-       where the rest of the component overrides sit. */
-    .dl-badge { padding: 5px 6px; gap: 5px; }
+    .dl-badge { top: 8px; right: 8px; padding: 5px 6px; gap: 5px; }
     .dl-badge-label { display: none; }
     .dl-seg button { padding: 4px 7px; font-size: 10.5px; }
 
@@ -499,11 +489,7 @@
   font-family:'Inter Tight',Inter,system-ui,sans-serif;display:flex;align-items:center;gap:7px}
 #ai-toggle:hover{background:#003087;border-color:#003087}
 #ai-toggle:focus-visible{outline:3px solid #FFB81C;outline-offset:2px}
-/* top clears the corner stack. The version label added a row above the
-   Viewing badge, taking the badge's bottom edge from about 42px to about 68px,
-   and at 54px this panel opened straight through the middle of it: the level
-   switcher was sliced in half and its buttons went under the panel. */
-#ai-panel{position:absolute;right:12px;top:78px;bottom:12px;z-index:2600;
+#ai-panel{position:absolute;right:12px;top:54px;bottom:12px;z-index:2600;
   width:min(390px,calc(100% - 24px));display:none;flex-direction:column;background:#fff;
   border:1px solid #DDE1E4;border-radius:10px;
   box-shadow:0 8px 32px rgba(33,43,50,.16),0 2px 8px rgba(33,43,50,.08);overflow:hidden}
@@ -1160,10 +1146,6 @@
        handle up gives the rest. */
     .ws-sheet, .cmp-bar, .tour-strip { left: 8px; right: 8px; bottom: 8px; }
     .ws-sheet { max-height: 76vh; max-height: 76dvh; }
-    /* The corner tightens to the same 8px inset the rest of the phone layout
-       uses. One rule moves the version and the badge together. */
-    .map-corner { top: 8px; right: 8px; gap: 4px; }
-    .site-ver { font-size: 9.5px; padding: 3px 6px; }
     /* Peek is exactly the head. A fixed 150px left the insight card sliced
        through the middle of a word at the bottom edge, which reads as a
        rendering fault rather than as "there is more below". The handle is what
@@ -1970,13 +1952,6 @@
         Hover a grey ward to see whether it's "Suppressed" (privacy rule) or just "no data" (indicator not published).
         <button id="fingertips-banner-close" style="float:right;background:none;border:none;color:#5c4115;font-size:16px;cursor:pointer;padding:0 0 0 8px;margin:-4px 0 0 0;line-height:1;pointer-events:auto" title="Dismiss this notice for this session">&times;</button>
       </div>
-      <!-- Top-right corner stack. One anchored wrapper rather than two boxes
-           positioned separately, so the version and the badge cannot drift
-           apart at a breakpoint, and so the screenshot flow has one id to
-           hide instead of two. -->
-      <div class="map-corner" id="map-corner">
-        <span class="site-ver" id="site-ver"
-              title="Version of the website itself. When the data was last refreshed is shown separately, in the status bar at the foot of the page.">v0.9.0</span>
       <div class="dl-badge" id="dl-badge" role="group" aria-label="Data level filter">
         <span class="dl-badge-label">Viewing</span>
         <div class="dl-seg" id="dl-seg">
@@ -1986,7 +1961,6 @@
         </div>
         <div class="dl-hint" id="dl-hint"></div>
       </div>
-      </div><!-- .map-corner -->
 
       <!-- Selected-ward sheet. Hidden until a ward is clicked; showWard() fills
            it and deselectWard() puts it away again. The head cycles the three
@@ -2062,6 +2036,14 @@
            still on screen for anyone who wants it a second time. -->
       <button type="button" class="sbar-btn" id="sbar-tour">Take a tour</button>
       <span id="data-date"></span>
+      <!-- The version of the site, next to the date the data was last
+           refreshed, which is the other question anyone reporting a problem
+           gets asked. Rightmost because #data-date is empty until the manifest
+           arrives, so anything to its left would jump when the date lands.
+           A literal, not a fetched value: a version injected from another file
+           would report the new number over a stale page, which is the one
+           thing it exists to tell you. -->
+      <span id="site-ver" title="Version of the website itself. The date beside it is when the data was last refreshed.">v0.9.0</span>
     </span>
   </div>
 
@@ -8281,9 +8263,7 @@ async function _downloadMapPng(opts) {
   // UI chrome to hide in the capture. Leaflet attribution stays (legally
   // required) — it's a thin line at the bottom-right and doesn't fight
   // the caption.
-  // The whole corner stack, not just the badge: the version label is its
-  // sibling now, and hiding one without the other would leave it in the shot.
-  const dlBadge = document.getElementById('map-corner');
+  const dlBadge = document.getElementById('dl-badge');
   const dlPrevVis = dlBadge ? dlBadge.style.visibility : '';
   // Hide ALL Leaflet control corners (top-left/top-right/bottom-left/bottom-right)
   // so the capture excludes the zoom control, the legend control in the
@@ -8731,9 +8711,7 @@ async function _prepareScreenForScreenshot(opts) {
 
   const savedCenter = map.getCenter();
   const savedZoom = map.getZoom();
-  // The corner stack, so the version label goes with the badge rather than
-  // sitting in the middle of everybody's screenshot.
-  const dlBadge = document.getElementById('map-corner');
+  const dlBadge = document.getElementById('dl-badge');
   const dlPrevVis = dlBadge ? dlBadge.style.visibility : '';
   const ctrlCorners = Array.from(document.querySelectorAll(
     '.leaflet-top, .leaflet-bottom, .leaflet-control-attribution'
