@@ -184,7 +184,8 @@ function json(body, status, headers) {
  *
  * Answering a question takes several round trips: the model asks for a tool,
  * the browser runs it and posts the result back. Those are separate requests
- * here, so counting requests would make a 40 cap mean roughly 10 questions.
+ * here, so counting requests rather than questions would make a cap of 10 mean
+ * two or three questions, and the panel promises ten.
  * A continuation is a user message carrying only tool_result blocks, which is
  * something only the client loop sends, never a person typing.
  */
