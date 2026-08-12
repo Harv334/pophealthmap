@@ -530,6 +530,10 @@
    an error, but always on screen next to the answers it applies to. */
 .ai-caution{flex:0 0 auto;margin:0;padding:8px 12px;border-top:1px solid #E8EDEE;
   background:#FBFCFD;color:#4C6272;font-size:10.5px;line-height:1.45;border-radius:0}
+/* Which model is answering, under the caution it belongs with. Quieter again
+   and without a second rule above it, so the two read as one footer rather
+   than as two separate warnings. */
+.ai-model{border-top:0;padding-top:0;color:#768692;font-size:10px}
 @media (max-width:640px){#ai-panel{width:calc(100% - 24px)}}
 
     /* Layers whose coverage is narrower than the map. Flagged rather than
@@ -798,7 +802,9 @@
   /* Keep the map's own furniture clear of the sheet. --sheet-lift is written
      by the sheet's own state handler, so all three move together. */
   .map-wrap.has-sheet .map-legend-strip { bottom: calc(var(--sheet-lift) + 12px); }
-  .map-wrap.has-sheet #fingertips-banner { bottom: calc(var(--sheet-lift) + 12px) !important; }
+  /* The banner is anchored to the top of the map now, so it no longer rides
+     the ward sheet. Setting a bottom here as well would stretch it down the
+     whole map, since it already has a top. */
   .map-wrap.has-sheet .leaflet-bottom { bottom: var(--sheet-lift); }
   .map-wrap.has-sheet #ai-toggle { bottom: calc(var(--sheet-lift) + 12px); }
   /* The panel too, not just the button that opens it. At bottom:12px it ran
@@ -1183,7 +1189,7 @@
        a 390px screen. They lift above the sheet together already; here they
        stop overlapping each other as well. */
     #ai-toggle { right: 8px; padding: 8px 12px; font-size: 12px; }
-    #fingertips-banner { left: 8px; right: 8px !important; max-width: none;
+    #fingertips-banner { top: 64px; left: 8px; right: 8px; max-width: none;
       font-size: 11px; padding: 8px 10px; }
     .map-legend-strip { left: 8px; right: 8px; transform: none; max-width: none;
       font-size: 10.5px; padding: 5px 9px; }
@@ -1945,7 +1951,12 @@
       </div>
       <div id="map"></div>
       <!-- Fingertips suppression banner: shown when a Fingertips overlay is selected -->
-      <div id="fingertips-banner" style="position:absolute;bottom:18px;right:18px;max-width:340px;background:#fff8e6;border:1px solid #e0c280;color:#5c4115;padding:9px 12px;border-radius:6px;box-shadow:0 2px 10px rgba(0,0,0,.10);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;font-size:11.5px;line-height:1.45;z-index:550;display:none;pointer-events:none">
+      <!-- Top left, under the zoom control. It used to sit bottom right, where
+           the Ask button covers it and the Ask panel hides it completely: the
+           notice explaining why wards are blank was itself invisible exactly
+           when someone had a blank ward in front of them. Nothing else lives
+           in this corner below the zoom buttons. -->
+      <div id="fingertips-banner" style="position:absolute;top:78px;left:12px;max-width:320px;background:#fff8e6;border:1px solid #e0c280;color:#5c4115;padding:9px 12px;border-radius:6px;box-shadow:0 2px 10px rgba(0,0,0,.10);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;font-size:11.5px;line-height:1.45;z-index:550;display:none;pointer-events:none">
         <span style="display:inline-block;background:#b88030;color:#fff;border-radius:50%;width:18px;height:18px;text-align:center;line-height:18px;font-weight:700;margin-right:6px;font-size:11px;vertical-align:middle">i</span>
         <strong>Fingertips overlay active.</strong>
         Some wards may show no fill — OHID Fingertips suppresses MSOA values where small counts could risk identifying individuals.

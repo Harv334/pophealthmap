@@ -12,6 +12,16 @@
  */
 var ASSISTANT_ENDPOINT = "https://pophealthmapai.sevilleharvey.workers.dev";
 
+/**
+ * What the panel says is writing the answers, before the first answer arrives.
+ *
+ * Keep this in step with MODEL in worker/src/index.js, which is the thing that
+ * actually decides. Once a reply comes back the panel takes the model name off
+ * the reply itself, so a drift here is corrected by the first question anyone
+ * asks; it is only the opening state that depends on this line.
+ */
+var MODEL_LABEL = "Claude Sonnet 5";
+
 (function () {
   "use strict";
 
@@ -21,6 +31,29 @@ var ASSISTANT_ENDPOINT = "https://pophealthmapai.sevilleharvey.workers.dev";
   // worker/src/index.js, change this too: the panel promising one number while
   // the server enforces another is worse than not mentioning it at all.
   var DAILY_CAP = 10;
+
+  /**
+   * Turn a model id into something a reader recognises.
+   *
+   * "claude-sonnet-5" becomes "Claude Sonnet 5", "claude-haiku-4-5" becomes
+   * "Claude Haiku 4.5". Anything that does not look like a Claude id is shown
+   * verbatim rather than mangled into a wrong name.
+   */
+  function prettyModel(id) {
+    if (!id) return MODEL_LABEL;
+    var m = String(id).match(/^claude-([a-z]+)-(\d+)(?:-(\d+))?$/);
+    if (!m) return String(id);
+    return "Claude " + m[1].charAt(0).toUpperCase() + m[1].slice(1)
+      + " " + (m[3] ? m[2] + "." + m[3] : m[2]);
+  }
+  function modelSentence(label) {
+    return "Answers are written by " + label
+      + ". The figures in them come from this page.";
+  }
+  function reportModel(id) {
+    var el = document.getElementById("ai-model-note");
+    if (el) el.textContent = modelSentence(prettyModel(id));
+  }
 
   // ---- data access -------------------------------------------------------
   // Read straight from the globals the map already populated.
@@ -524,6 +557,11 @@ var ASSISTANT_ENDPOINT = "https://pophealthmapai.sevilleharvey.workers.dev";
       if (!res.ok) throw new Error(data && data.error ? data.error : "Request failed");
       // The Worker's count is the real one. Whenever it reports, this browser's
       // running tally is set to match rather than being trusted over it.
+      // The reply carries the model that actually served it, so the panel can
+      // name it rather than trusting a constant on this side to have been kept
+      // in step with the Worker.
+      if (data && data.model) reportModel(data.model);
+
       if (data && data._limit) {
         lastLimit = data._limit;
         if (typeof lastLimit.remaining === "number") {
@@ -640,9 +678,20 @@ var ASSISTANT_ENDPOINT = "https://pophealthmapai.sevilleharvey.workers.dev";
     caution.textContent = "AI generated output should be independently verified "
       + "before making any decisions.";
 
+    // Which model wrote the sentence, named on the page rather than left to be
+    // guessed. Read from the Worker's reply when it says so, and falling back
+    // to the constant below, which has to be kept in step with MODEL in
+    // worker/src/index.js by hand. A wrong name here would be worse than none,
+    // so the fallback names what that file currently deploys.
+    var modelNote = document.createElement("div");
+    modelNote.className = "ai-caution ai-model";
+    modelNote.id = "ai-model-note";
+    modelNote.textContent = modelSentence(MODEL_LABEL);
+
     container.appendChild(log);
     container.appendChild(form);
     container.appendChild(caution);
+    container.appendChild(modelNote);
 
     function add(cls, text, asHtml) {
       var d = document.createElement("div");
@@ -742,7 +791,10 @@ var ASSISTANT_ENDPOINT = "https://pophealthmapai.sevilleharvey.workers.dev";
     toggle.id = "ai-toggle";
     toggle.type = "button";
     toggle.setAttribute("aria-expanded", "false");
-    toggle.textContent = "Ask about this data";
+    // "(AI)" in the label rather than only in the panel: the button is the
+    // last thing someone reads before deciding to use this, and what answers
+    // them should not be a surprise once they are already typing.
+    toggle.textContent = "Ask about this data (AI)";
 
     host.appendChild(panel);
     host.appendChild(toggle);
