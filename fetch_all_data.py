@@ -3814,6 +3814,47 @@ def build_ward_data() -> dict:
         },
     }
 
+def build_msoa_data() -> dict:
+    """Indicators at MSOA level, which is the level they are published at.
+
+    The Fingertips Local Health set is released per MSOA. Until now the
+    pipeline read it, population-weighted it down onto wards through the LSOA
+    bridge, and discarded the MSOA detail: 1,002 published figures per
+    indicator became 704 derived ones, and the geography the publisher
+    actually used never reached the map. The ward figures stay exactly as they
+    were, because a ward map is what most people want; this adds the
+    underlying level rather than replacing anything.
+
+    Nothing is aggregated or split here. Every value is the published figure
+    for that MSOA, so this file is the only one in the export with no
+    derivation in it at all.
+
+    Records are flat and keyed by MSOA21CD, mirroring lsoa_data.json rather
+    than ward_data.json's nested shape: index.html reads both through
+    (record.indicators || record), and an MSOA carries no name or parent worth
+    storing. Names come from data/map/msoa_boundaries.json, the same way LSOA
+    names come from LSOA_IMD.
+    """
+    out: dict = {}
+    ftm = _read_parquet_opt(DATA_DIR / "outcomes" / "fingertips_msoa.parquet")
+    if ftm is None or ftm.empty:
+        warn("msoa_data: no fingertips_msoa parquet, so nothing to write")
+        return out
+
+    for _, row in ftm.iterrows():
+        v = row["value"]
+        if v is None or (isinstance(v, float) and pd.isna(v)):
+            continue
+        code = str(row["MSOA21CD"])
+        # Same key as the ward-level copy carries, so one overlay can be drawn
+        # at either level without a second name for the same indicator.
+        out.setdefault(code, {})[f"ft_{int(row['indicator_id'])}"] = round(float(v), 4)
+
+    n_vals = sum(len(v) for v in out.values())
+    info(f"msoa_data: {len(out):,} MSOAs, {n_vals:,} published values, none derived")
+    return out
+
+
 def build_lsoa_data() -> dict:
     out: dict[str, dict] = {}
     imd = _read_parquet_opt(DATA_DIR / "demographics" / "imd2025.parquet")
@@ -4278,18 +4319,21 @@ def export_all() -> None:
     rule("Export Leaflet JSON outputs")
     ward_data  = build_ward_data()
     lsoa_data  = build_lsoa_data()
+    msoa_data  = build_msoa_data()
     pharm_data = build_pharmacies_json()
     vcse_data  = build_vcse_json()
     dental_data = build_dental_json()
 
     write_json_atomic(REPO_ROOT / "ward_data.json",  ward_data)
     write_json_atomic(REPO_ROOT / "lsoa_data.json",  lsoa_data)
+    write_json_atomic(REPO_ROOT / "msoa_data.json",  msoa_data)
     write_json_atomic(REPO_ROOT / "pharmacies.json", pharm_data)
     write_json_atomic(REPO_ROOT / "vcse_data.json",  vcse_data)
     if dental_data:
         write_json_atomic(REPO_ROOT / "dental_practices.json", dental_data)
     ok(f"ward_data.json:  {len(ward_data.get('wards', {})):,} wards")
     ok(f"lsoa_data.json:  {len(lsoa_data):,} LSOAs")
+    ok(f"msoa_data.json:  {len(msoa_data):,} MSOAs")
     ok(f"pharmacies.json: {len(pharm_data):,} rows")
     ok(f"vcse_data.json:  {len(vcse_data):,} charities")
     if dental_data:
