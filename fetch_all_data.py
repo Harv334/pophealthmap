@@ -3814,6 +3814,44 @@ def build_ward_data() -> dict:
         },
     }
 
+def build_borough_data() -> dict:
+    """Indicators at borough level, which is the level they are published at.
+
+    The main Fingertips series is released per upper-tier local authority. The
+    pipeline has been copying each borough's value onto every ward inside it,
+    so a borough of twenty wards showed the same life expectancy twenty times
+    and the map implied a ward-level figure that does not exist. The site's own
+    caveats say so; this gives the numbers a level where they are simply true
+    instead of apologising for them at ward level.
+
+    Nothing is aggregated or split. Every value is the published figure for
+    that local authority.
+
+    Flat records keyed by LAD25CD, matching msoa_data.json and lsoa_data.json.
+    Names come from data/map/boroughs.js, which the browser already loads.
+    """
+    out: dict = {}
+    ft = _read_parquet_opt(DATA_DIR / "outcomes" / "fingertips.parquet")
+    if ft is None or ft.empty:
+        warn("borough_data: no fingertips parquet, so nothing to write")
+        return out
+
+    for _, row in ft.iterrows():
+        v = row["value"]
+        if v is None or (isinstance(v, float) and pd.isna(v)):
+            continue
+        lad = str(row["LAD25CD"])
+        if not lad:
+            continue
+        # Same key the ward copies carry, so one overlay can be drawn at
+        # either level without a second name for the same indicator.
+        out.setdefault(lad, {})[f"ft_{row['indicator_short']}"] = float(v)
+
+    n_vals = sum(len(v) for v in out.values())
+    info(f"borough_data: {len(out):,} boroughs, {n_vals:,} published values, none derived")
+    return out
+
+
 def build_msoa_data() -> dict:
     """Indicators at MSOA level, which is the level they are published at.
 
@@ -4320,6 +4358,7 @@ def export_all() -> None:
     ward_data  = build_ward_data()
     lsoa_data  = build_lsoa_data()
     msoa_data  = build_msoa_data()
+    boro_data  = build_borough_data()
     pharm_data = build_pharmacies_json()
     vcse_data  = build_vcse_json()
     dental_data = build_dental_json()
@@ -4327,6 +4366,7 @@ def export_all() -> None:
     write_json_atomic(REPO_ROOT / "ward_data.json",  ward_data)
     write_json_atomic(REPO_ROOT / "lsoa_data.json",  lsoa_data)
     write_json_atomic(REPO_ROOT / "msoa_data.json",  msoa_data)
+    write_json_atomic(REPO_ROOT / "borough_data.json", boro_data)
     write_json_atomic(REPO_ROOT / "pharmacies.json", pharm_data)
     write_json_atomic(REPO_ROOT / "vcse_data.json",  vcse_data)
     if dental_data:
@@ -4334,6 +4374,7 @@ def export_all() -> None:
     ok(f"ward_data.json:  {len(ward_data.get('wards', {})):,} wards")
     ok(f"lsoa_data.json:  {len(lsoa_data):,} LSOAs")
     ok(f"msoa_data.json:  {len(msoa_data):,} MSOAs")
+    ok(f"borough_data.json: {len(boro_data):,} boroughs")
     ok(f"pharmacies.json: {len(pharm_data):,} rows")
     ok(f"vcse_data.json:  {len(vcse_data):,} charities")
     if dental_data:
