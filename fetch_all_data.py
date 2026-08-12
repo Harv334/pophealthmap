@@ -3522,6 +3522,21 @@ def build_ward_data() -> dict:
             ]
         sources["pharmacy"] = "NHS ODS (edispensary)"
 
+    # Dental practices. The parquet has carried WD25CD on every row since the
+    # ODS rewrite, and nothing counted them: GP and pharmacy got a ward count
+    # each and dental was left out, so no ward has ever reported one.
+    #
+    # No named list to go with it, unlike GP and pharmacy. This is the NHS
+    # contracted register only, so a ward with private-only practices reads as
+    # empty; a count carries that caveat more honestly than a list of names
+    # that looks complete and is not.
+    dent = _read_parquet_opt(DATA_DIR / "healthcare" / "dental_practices.parquet")
+    if dent is not None and "WD25CD" in dent.columns:
+        for wd, n in dent.groupby("WD25CD").size().items():
+            if wd:
+                _get(wd)["indicators"]["dental_practice_count"] = int(n)
+        sources["dental"] = "NHS ODS (egdpprac), NHS contracted practices only"
+
     crime = _read_parquet_opt(DATA_DIR / "crime" / "police_uk_crime.parquet")
     if crime is not None and "WD25CD" in crime.columns:
         for wd, n in crime.groupby("WD25CD").size().items():
@@ -3854,6 +3869,32 @@ def build_lsoa_data() -> dict:
             v = row.get("ptai_score")
             if code in out and pd.notna(v):
                 out[code]["ptai_score"] = round(float(v), 2)
+
+    # Green and blue space access (Natural England / OS, via build_greenspaces.py)
+    #
+    # The parquet has been in the repo unread: nothing here ever joined it, so
+    # the seven green and blue overlays in index.html rendered an all-grey map
+    # while the columns they name sat on disk. Only the fields the map actually
+    # offers are carried, matching how vcse_data.json is trimmed to what is
+    # read; the parquet's other 31 columns stay out of the payload.
+    #
+    # Coverage is 1,313 of the 4,994 LSOAs in scope, all of them inside it, so
+    # the join is exact but partial. Every LSOA without a row simply has no
+    # field, which the map already treats as no data rather than as a zero.
+    GB_FIELDS = ("gb_total_uprn", "gb_commitment_pct", "blue_commitment_pct",
+                 "green_commitment_pct", "green_doorstep_pct",
+                 "green_local_pct", "green_neighbourhood_pct")
+    gb = _read_parquet_opt(DATA_DIR / "environment" / "greenblue_lsoa.parquet")
+    if gb is not None and not gb.empty:
+        gb_cols = [c for c in GB_FIELDS if c in gb.columns]
+        for _, row in gb.iterrows():
+            code = str(row["LSOA21CD"])
+            if code not in out:
+                continue
+            for col in gb_cols:
+                v = row.get(col)
+                if pd.notna(v):
+                    out[code][col] = round(float(v), 2)
 
     # Claimant count (NOMIS CLA01)
     cl = _read_parquet_opt(DATA_DIR / "economy" / "claimant_count.parquet")

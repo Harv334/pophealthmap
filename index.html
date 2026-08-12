@@ -1589,7 +1589,8 @@
               <option value="census_provides_unpaid_care_pct">Provides unpaid care % · Ward</option>
             </optgroup>
             <optgroup label="Crime &amp; deprivation">
-              <option value="crime_total">Total crimes (12 months) · Ward</option>
+              <option value="dental_practice_count">Dental practices (NHS) · Ward</option>
+            <option value="crime_total">Total crimes (12 months) · Ward</option>
               <option value="core20_lsoa_count">Core20 LSOAs in ward · Ward</option>
               <option value="census_unemployed_pct">Unemployed % · Ward</option>
               <option value="census_no_qual_pct">No qualifications % · Ward</option>
@@ -2143,6 +2144,7 @@ const OV_CFG = {
   core20_lsoa_count:               { lo:"Fewer", hi:"More",   wh:true,  min:0,    max:15   },
   // Population & demographics
   census_population:               { lo:"Fewer", hi:"More",   wh:false, min:6000, max:16000},
+  dental_practice_count:           { lo:"Fewer", hi:"More",   wh:false, min:0,    max:8    },
   census_non_white_pct:            { lo:"Lower", hi:"Higher", wh:false, min:10,   max:80   },
   census_born_outside_uk_pct:      { lo:"Lower", hi:"Higher", wh:false, min:20,   max:70   },
   // Housing & transport
@@ -2275,6 +2277,7 @@ const CATS = [
     { k: "census_population",                l: "Census 2021 population",        g: "ward" },
     { k: "gp_practice_count",                l: "GP practices",                  g: "ward" },
     { k: "pharmacy_count",                   l: "Pharmacies",                    g: "ward" },
+    { k: "dental_practice_count",            l: "Dental practices (NHS)",        g: "ward" },
     { k: "crime_total",                      l: "Total crimes (12 months)",      g: "ward" },
     { k: "core20_lsoa_count",                l: "Core20 LSOAs in ward",          g: "ward" },
     { k: "total_lsoa_count",                 l: "Total LSOAs in ward",           g: "ward" },
@@ -2451,6 +2454,7 @@ function _levelToast(msg) {
 const OV_META = {
   // Census (TS tables) — all ward-level via NOMIS
   census_population:              { src: "ONS mid-2024",  yr: "2024", g: "Ward", u: "people",  desc: "Usual resident population." },
+  dental_practice_count:          { src: "NHS ODS (egdpprac)", yr: "current register", g: "Ward, counted from point data", u: "practices", desc: "NHS contracted dental practices with a postcode in the ward. Private-only practices are not in the register, so a ward can read as empty when it is not, and people register across boundaries freely: this counts buildings, not access." },
   census_good_health_pct:         { src: "Census 2021 (TS037)",  yr: "2021", g: "Ward", u: "%",       desc: "Self-reported 'Good' or 'Very good' general health." },
   census_bad_health_pct:          { src: "Census 2021 (TS037)",  yr: "2021", g: "Ward", u: "%",       desc: "Self-reported 'Bad' or 'Very bad' general health." },
   census_disability_any_pct:      { src: "Census 2021 (TS038)",  yr: "2021", g: "Ward", u: "%",       desc: "Activities limited a little or a lot under the Equality Act." },
