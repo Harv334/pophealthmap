@@ -147,11 +147,32 @@
   .main { display: grid; grid-template-columns: auto minmax(0, 1fr); overflow: hidden; min-height: 0; min-width: 0; }
 
   /* ── Sidebar ── CSS Grid: native layout guarantees [focus] [tabs] [flexible pane] [footer] stack. No JS measurement needed. */
-  .sidebar { width: 268px; border-right: 1px solid #E8EDEE; flex-shrink: 0; background: #fff; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; grid-template-areas: "focus" "tabs" "pane" "footer"; height: 100%; min-height: 0; overflow: hidden; transition: width .18s ease; }
+  .sidebar { position: relative; width: var(--sb-w, 268px); border-right: 1px solid #E8EDEE; flex-shrink: 0; background: #fff; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; grid-template-areas: "focus" "tabs" "pane" "footer"; height: 100%; min-height: 0; overflow: hidden; transition: width .18s ease; }
   /* Collapsed to nothing, so the map gets the whole window. The same button
      that opens the drawer on a phone does this on a desktop: one control, and
      the same idea behind it, which is that the panel is optional. */
   .sidebar.collapsed { width: 0; border-right: 0; }
+
+  /* ── Sidebar edge, draggable ──
+     Collapsing is all or nothing. This is the in-between: the Query builder
+     and the Directory list want the width, the map also wants it, and which
+     one wins depends on what is being done right now rather than on a number
+     chosen once. Absolutely positioned so it stays out of the grid areas. */
+  .sidebar { --grip: 8px; }
+  .sb-grip { position: absolute; top: 0; right: 0; bottom: 0; width: var(--grip); z-index: 6;
+    cursor: col-resize; background: transparent; border: 0; padding: 0;
+    -webkit-appearance: none; appearance: none; touch-action: none; }
+  /* Invisible until wanted. A permanent handle down the edge of a panel that
+     most people never resize is a line competing with the content. */
+  .sb-grip::before { content: ''; position: absolute; top: 50%; right: 2px;
+    width: 3px; height: 36px; margin-top: -18px; border-radius: 2px;
+    background: #A8B6BD; opacity: 0; transition: opacity .15s; }
+  .sb-grip:hover::before, .sb-grip:focus-visible::before { opacity: 1; }
+  .sb-grip:focus-visible { outline: 2px solid #005EB8; outline-offset: -2px; }
+  .sidebar.resizing { transition: none; user-select: none; }
+  .sidebar.resizing .sb-grip::before { opacity: 1; background: #005EB8; }
+  /* Nothing to grab on a zero-width panel, and nothing to give it to. */
+  .sidebar.collapsed .sb-grip { display: none; }
   .sidebar > .nbfocus-bar { grid-area: focus; }
   .sidebar > .sb-tabs     { grid-area: tabs; }
   /* Panes scroll. They used to be overflow:hidden, with the only scrollable
@@ -160,7 +181,11 @@
      the sections below the fold were clipped with no way to scroll to them.
      overscroll-behavior stops a flick at the end of the list scrolling the
      page behind it. */
-  .sidebar > .tab-pane    { grid-area: pane; display: none; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; flex-direction: column; }
+     The right margin keeps this scrollbar clear of the resize grip, which sits
+     on the same edge. Without it the grip covers the only way to reach the
+     toggles at the bottom of the Layers list, which is what the scrolling was
+     added for in the first place. */
+  .sidebar > .tab-pane    { grid-area: pane; display: none; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; flex-direction: column; margin-right: var(--grip, 0px); }
   .sidebar > .tab-pane.active { display: flex; }
   /* Sections keep their natural height and let the pane above do the
      scrolling. Without this the first section shrinks and clips its own rows
@@ -407,6 +432,11 @@
        own transform is what hides it, and a zero width would leave nothing
        to slide in. */
     .sidebar.collapsed { width: min(86vw, 330px); border-right: 1px solid #E8EDEE; }
+    /* The drawer is already a fraction of the screen, and there is no second
+       pane on screen to trade width with, so there is nothing to drag against.
+       Zeroing the width also reclaims the gutter the panes leave for it. */
+    .sidebar { --grip: 0px; }
+    .sb-grip { display: none; }
     .sidebar > .tab-pane.active { flex: 1 1 auto; min-height: 0; }
     .sidebar > .sb-sec { flex: 0 0 auto; }
     .nbadges { display: none; }
@@ -5679,6 +5709,116 @@ function _applyBoroughSolo() {
 
   window.PH_DRAWER = { open: () => setOpen(true), close: () => setOpen(false),
                        isOpen: isOpen, narrow: narrow };
+})();
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SIDEBAR WIDTH — drag the edge
+
+   The collapse button above is all or nothing. This is the in-between, and the
+   reason it is worth having is that the panel's own contents disagree about how
+   much room they want: the Query builder and the Directory list are tables, the
+   Layers list is a column of checkboxes, and the map wants everything left over.
+   Which of those matters is a question about the next five minutes, not a number
+   to settle once.
+
+   Remembered, because it is a preference rather than a gesture. Desktop only:
+   on a phone the panel is a drawer over the map at a fixed fraction of the
+   screen, so there is no second thing on screen to take width from.
+   ═══════════════════════════════════════════════════════════════════════════ */
+(function _wireSidebarResize() {
+  const sidebar = document.getElementById('sidebar');
+  if (!sidebar) return;
+  // Below MIN the tab strip starts dropping labels; above MAX the map stops
+  // being the larger half of the window, which is the wrong way round for a map.
+  const MIN = 210, MAX = 560, DEFAULT = 268, KEY = 'phPanelWidth';
+  const mq = window.matchMedia('(max-width: 760px)');
+
+  const grip = document.createElement('button');
+  grip.type = 'button';
+  grip.className = 'sb-grip';
+  grip.setAttribute('role', 'separator');
+  grip.setAttribute('aria-orientation', 'vertical');
+  grip.setAttribute('aria-label', 'Panel width');
+  grip.setAttribute('aria-valuemin', String(MIN));
+  grip.setAttribute('aria-valuemax', String(MAX));
+  grip.title = 'Drag to resize the panel · double-click to reset';
+  sidebar.appendChild(grip);
+
+  function width() { return sidebar.getBoundingClientRect().width; }
+
+  function apply(px, save) {
+    const w = Math.round(Math.max(MIN, Math.min(MAX, px)));
+    sidebar.style.setProperty('--sb-w', w + 'px');
+    grip.setAttribute('aria-valuenow', String(w));
+    if (save) { try { window.localStorage.setItem(KEY, String(w)); } catch (e) {} }
+    return w;
+  }
+
+  try {
+    const saved = parseInt(window.localStorage.getItem(KEY), 10);
+    if (saved) apply(saved, false);
+  } catch (e) { /* private mode: the default width, every time */ }
+
+  // Leaflet caches its container size, so it has to be told the map got wider
+  // or narrower. Once per frame during a drag, and pan:false so the view stays
+  // put rather than drifting with every pixel.
+  let raf = 0;
+  function nudgeMap() {
+    if (raf) return;
+    raf = requestAnimationFrame(() => {
+      raf = 0;
+      if (typeof map !== 'undefined' && map) map.invalidateSize({ pan: false });
+    });
+  }
+
+  let startX = 0, startW = 0;
+  function dragging() { return sidebar.classList.contains('resizing'); }
+
+  grip.addEventListener('pointerdown', e => {
+    if (mq.matches || e.button !== 0) return;
+    startX = e.clientX;
+    startW = width();
+    sidebar.classList.add('resizing');   // also kills the width transition
+    // Not preventDefault: on a mouse that suppresses the click and the
+    // double-click that resets the width. Selection is stopped directly
+    // instead, on the body rather than the panel, because the pointer spends
+    // the drag out over the map.
+    document.body.style.userSelect = 'none';
+    try { grip.setPointerCapture(e.pointerId); } catch (err) {}
+  });
+  grip.addEventListener('pointermove', e => {
+    if (!dragging()) return;
+    apply(startW + (e.clientX - startX), false);
+    nudgeMap();
+  });
+  function endDrag(e) {
+    if (!dragging()) return;
+    sidebar.classList.remove('resizing');
+    document.body.style.userSelect = '';
+    try { if (e) grip.releasePointerCapture(e.pointerId); } catch (err) {}
+    apply(width(), true);               // save where it actually ended up
+    nudgeMap();
+  }
+  grip.addEventListener('pointerup', endDrag);
+  grip.addEventListener('pointercancel', endDrag);
+  // A pointer released outside the window never reaches pointerup on the grip,
+  // which would otherwise leave the panel stuck to the cursor.
+  window.addEventListener('blur', () => endDrag(null));
+
+  grip.addEventListener('dblclick', () => { apply(DEFAULT, true); nudgeMap(); });
+  grip.addEventListener('keydown', e => {
+    const step = e.shiftKey ? 48 : 16;
+    let w = null;
+    if (e.key === 'ArrowLeft')  w = width() - step;
+    else if (e.key === 'ArrowRight') w = width() + step;
+    else if (e.key === 'Home') w = DEFAULT;
+    if (w == null) return;
+    e.preventDefault();
+    apply(w, true);
+    nudgeMap();
+  });
+  // It is a <button> for the focus and keyboard handling, not to be pressed.
+  grip.addEventListener('click', e => e.preventDefault());
 })();
 
 /* ═══════════════════════════════════════════════════════════════════════════
