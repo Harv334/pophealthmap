@@ -11051,6 +11051,57 @@ loadData();
     el.value = key;
     el.dispatchEvent(new Event('change', { bubbles: true }));
   }
+  /**
+   * Frame a ward without selecting it.
+   *
+   * selectWardByName also opens the ward bar, which belongs to the chapter
+   * after this one. This only moves the map.
+   */
+  function frameWard(code) {
+    if (typeof wLyr === 'undefined' || !wLyr || typeof map === 'undefined') return false;
+    var target = null;
+    wLyr.eachLayer(function (l) {
+      var p = l.feature && l.feature.properties;
+      if (p && p.WD24CD === code) target = l;
+    });
+    if (!target) return false;
+    try { map.fitBounds(target.getBounds(), { padding: [60, 60], maxZoom: 14 }); }
+    catch (e) { return false; }
+    return true;
+  }
+  /**
+   * Return the map to ward level, whatever the tour has done to it.
+   *
+   * Overlay first, then the level. An LSOA-only overlay makes the level gate
+   * refuse a move back to Ward, and rightly so, since it would hide the
+   * shading. Clearing the overlay first means there is nothing left to hide.
+   */
+  function wardLevel() {
+    setOverlay('none');
+    if (typeof _setDataLevel === 'function') _setDataLevel('ward');
+  }
+
+  /**
+   * Little Venice, Westminster.
+   *
+   * The deciles chapter says a ward figure is a mean of the neighbourhoods
+   * inside it, which only reads clearly if the neighbourhoods on screen are
+   * actually inside the ward on screen. 41% of London's LSOAs cross a ward
+   * line, so a chapter that opens on all of London is arguing against its own
+   * picture.
+   *
+   * Picked by testing every LSOA vertex against its own ward's polygon, using
+   * the same data/map blobs the browser draws, so what nests in the check
+   * nests on screen. 31 of the 704 wards qualify. This one has five LSOAs, few
+   * enough to take in at a glance, spanning deciles 1, 7 and 8: the most
+   * deprived tenth of England and the least deprived third, inside one ward,
+   * which is exactly the point the chapter is making.
+   *
+   * Held by code rather than name, because codes survive the renaming that
+   * comes with a boundary review. If the code ever stops matching, frameWard
+   * returns false and the chapter leaves the map where it was.
+   */
+  var NESTED_WARD = 'E05013799';
 
   var TOUR = [
     {
@@ -11094,6 +11145,9 @@ loadData();
         // neighbourhood level. That is the point of the chapter rather than a
         // side effect: these are real deciles, not an average of them.
         railClick('explore'); sidebarTab('overlay'); setOverlay('imd_decile');
+        // And frame a ward whose neighbourhoods are all inside it, so the
+        // sentence above can be read straight off the map.
+        frameWard(NESTED_WARD);
       },
     },
     {
@@ -11124,6 +11178,11 @@ loadData();
          '<strong>Directory</strong> lists all 23,000 services and organisations on the ' +
          'map in one searchable place.',
       go: function () {
+        // Query answers in wards. The deciles chapter left the map at
+        // neighbourhood level with the LSOA layer drawn over everything, so
+        // the matches this chapter is about would arrive underneath 4,994
+        // boundaries that have nothing to do with them.
+        wardLevel();
         railClick('query');
         if (window.PH_QUERY) window.PH_QUERY.build();
         var run = $('q-run');
@@ -11240,7 +11299,19 @@ loadData();
       mapWrap.classList.remove('touring');
       mapWrap.style.setProperty('--tour-h', '0px');
     }
-    railClick('explore');
+    // The tour drives the real controls, so it leaves real state behind: the
+    // LSOA layer from the deciles chapter, a selected ward, a query still
+    // drawn, and the map sitting on whichever ward it last visited. Ending
+    // used to leave every bit of that, so the first job after a tour was to
+    // undo it, starting with hunting down the LSOA toggle to turn off
+    // boundaries you never turned on.
+    //
+    // Reset is already the control that means "clear everything and go back to
+    // the default view", and it does it in the order that works: overlay
+    // first, so the level gate lets go of LSOA, then the layers, then the
+    // selection, then fit London. The tour ends by pressing it rather than
+    // reimplementing it and drifting from it later.
+    if (typeof _resetAll === 'function') _resetAll(); else railClick('explore');
     lift();
   }
   function tourStep(d) {
