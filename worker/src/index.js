@@ -216,7 +216,11 @@ function isNewQuestion(messages) {
 const NOOP = async () => {};
 
 async function checkDailyCap(env, ip, isQuestion) {
-  if (!env.RATE_LIMIT) return { allowed: true, commit: NOOP }; // KV not bound: fail open
+  // KV not bound: fail open. `enforced` says so out loud, because this is the
+  // one failure that looks exactly like success -- questions are answered, the
+  // panel still counts down from its own localStorage, and nothing anywhere
+  // reveals that the cap is not actually being applied to anyone.
+  if (!env.RATE_LIMIT) return { allowed: true, enforced: false, commit: NOOP };
   const key = `${new Date().toISOString().slice(0, 10)}:${ip}`;
   let questions = 0;
   let requests = 0;
@@ -231,7 +235,7 @@ async function checkDailyCap(env, ip, isQuestion) {
     }
   } catch (e) {
     console.log(`KV read failed, not counting: ${e && e.message}`);
-    return { allowed: true, commit: NOOP };
+    return { allowed: true, enforced: false, commit: NOOP };
   }
 
   if (questions >= DAILY_CAP) {
@@ -246,6 +250,7 @@ async function checkDailyCap(env, ip, isQuestion) {
   // that failed, and neither should we.
   return {
     allowed: true,
+    enforced: true,
     // What the caller has left once this question is counted. The panel shows
     // it, so someone can see the limit approaching rather than meet it.
     remaining: Math.max(0, DAILY_CAP - questions - (isQuestion ? 1 : 0)),
@@ -323,9 +328,10 @@ export default {
 
     const data = await upstream.json();
     // Under an underscore so it cannot collide with a field the API adds later.
-    // Undefined when KV is unbound, which the panel reads as "no count to show"
-    // rather than as zero left.
-    data._limit = { cap: DAILY_CAP, remaining: cap.remaining };
+    // remaining is undefined when KV is unbound, which the panel reads as "no
+    // count to show" rather than as zero left; enforced === false is how you
+    // tell that case apart from a working cap without reading Worker logs.
+    data._limit = { cap: DAILY_CAP, remaining: cap.remaining, enforced: cap.enforced !== false };
     return json(data, 200, cors);
   },
 };

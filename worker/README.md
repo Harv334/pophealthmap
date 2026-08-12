@@ -25,6 +25,13 @@ returns nothing, there is nothing for it to report.
 
 You need a Cloudflare account and an Anthropic API key.
 
+The Worker is deployed as **`pophealthmapai`**. Keep the `name` in
+`wrangler.toml` matching it: wrangler deploys to whatever that says, so a
+mismatch quietly creates a second Worker at a second URL, with no KV namespace
+and no secret, while the site carries on calling the first.
+
+### With wrangler
+
 ```bash
 cd worker
 npm install -g wrangler          # if you do not have it
@@ -39,6 +46,27 @@ wrangler secret put ANTHROPIC_API_KEY
 # 3. Ship it
 wrangler deploy
 ```
+
+### Without Node installed, from the dashboard
+
+Same three things in the same order, and the order matters: bindings are read at
+request time, so a Worker deployed before its namespace exists answers questions
+with the cap silently switched off.
+
+1. **Storage & Databases → KV → Create a namespace**, call it `RATE_LIMIT`.
+2. **Workers & Pages → pophealthmapai → Settings → Bindings**
+   - *Add → KV namespace*: variable name `RATE_LIMIT`, pointing at the namespace
+     from step 1. The variable name is what `env.RATE_LIMIT` reads, so it has to
+     be exactly that.
+   - *Add → Secret*: name `ANTHROPIC_API_KEY`, value your key. A secret, not a
+     plaintext variable — plaintext ones are readable from the dashboard.
+   - Confirm the plaintext variable `ALLOWED_ORIGINS` is present and lists
+     `https://pophealth.uk,https://www.pophealth.uk,https://harv334.github.io`.
+     The third is the mirror; without it the Ask panel is dead there.
+3. **Edit code**, paste `src/index.js` over what is there, **Deploy**.
+
+Then ask the assistant one question and confirm the reply has
+`_limit.enforced: true`.
 
 Wrangler prints a URL like `https://pophealthmap-ai.<subdomain>.workers.dev`.
 Put it in `data/map/assistant.js`:
@@ -63,6 +91,22 @@ Expect JSON with `"stop_reason":"tool_use"` — the model asking for a tool,
 which is the browser's job to run. A `403` means the Origin header is not in
 `ALLOWED_ORIGINS`.
 
+That reply also carries the cap:
+
+```json
+"_limit": { "cap": 10, "remaining": 9, "enforced": true }
+```
+
+`"enforced": false` means the KV namespace is not bound and the cap is not being
+applied to anyone — see the note on `RATE_LIMIT` in `wrangler.toml`. `remaining`
+is absent in that case, because there is no count to report.
+
+The checks that do not reach Anthropic cost nothing and can be run freely: `GET`
+returns 405, an unlisted `Origin` returns 403 with no CORS header, and a body
+without `messages` returns 400. Note that Cloudflare's edge may reject a plain
+scripted client with error 1010 before the Worker ever runs; send a normal
+browser `User-Agent` or you will be testing Cloudflare rather than this code.
+
 ## What it costs, and how to cap it
 
 `claude-sonnet-5` at $3 per million input tokens and $15 per million output,
@@ -86,11 +130,18 @@ is about 1,500, so it caches on Sonnet and did nothing at all on Haiku.
 
 Three limits sit in front of that, and only one of them is a real spend cap.
 
-**1. The per-IP cap in this Worker.** `DAILY_CAP` in `src/index.js`, 40
-questions per IP per UTC day. Held in KV, counted per question rather than per
-round trip. It stops one person hammering it; it does not stop a thousand
-people. Note it fails open: if KV errors, the request is answered and not
-counted, because breaking the site is worse than losing the count.
+**1. The per-IP cap in this Worker.** `DAILY_CAP` in `src/index.js`, **10**
+questions per IP per UTC day, and the panel promises that number in its opening
+message, so the two have to move together. Held in KV, counted per question
+rather than per round trip, with a second counter bounding total round trips so
+a forged continuation cannot slip past it. It stops one person hammering it; it
+does not stop a thousand people. Being per-IP, it also means everyone behind one
+NAT — an NHS trust, a school — shares a single allowance of 10.
+
+It fails open: if KV errors, or the namespace is not bound at all, the request
+is answered and not counted, because breaking the site is worse than losing the
+count. That makes an unbound namespace invisible from the outside, which is why
+replies carry `_limit.enforced`. If it is `false`, nothing is being capped.
 
 **2. Cloudflare's free tier.** 100,000 Worker requests a day, and 1,000 KV
 writes a day. The KV write limit is the binding one, at one write per question.

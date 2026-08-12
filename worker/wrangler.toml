@@ -1,4 +1,10 @@
-name = "pophealthmap-ai"
+# Must match the Worker that is actually deployed, which is
+# pophealthmapai.sevilleharvey.workers.dev -- the name is what wrangler deploys
+# to. This said "pophealthmap-ai", which is a different Worker: deploying would
+# have created a second one, at a second URL, with no KV namespace and no
+# secret, while the site carried on calling the first. Nothing would have looked
+# broken and none of the changes would have been live.
+name = "pophealthmapai"
 main = "src/index.js"
 compatibility_date = "2026-01-01"
 
@@ -7,9 +13,19 @@ compatibility_date = "2026-01-01"
 [vars]
 ALLOWED_ORIGINS = "https://pophealth.uk,https://www.pophealth.uk,https://harv334.github.io"
 
-# Per-IP daily counter. Create with:
+# Per-IP daily counter, and the thing the 10-a-day cap is actually kept in.
+#
+# THE CAP DOES NOTHING WITHOUT THIS. checkDailyCap fails open when the binding
+# is missing, so questions are answered normally, the panel still counts down
+# from its own localStorage, and there is no outward sign that nobody is being
+# limited. Check which case you are in: ask the assistant one question and look
+# at _limit.enforced in the reply, or open the Worker in the Cloudflare
+# dashboard under Settings -> Bindings and look for RATE_LIMIT.
+#
+# Create it with:
 #   npx wrangler kv namespace create RATE_LIMIT
-# then paste the id it prints below.
+# then paste the id it prints below. In the dashboard the equivalent is
+# Storage & Databases -> KV -> Create, then bind it to the Worker as RATE_LIMIT.
 [[kv_namespaces]]
 binding = "RATE_LIMIT"
 id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
