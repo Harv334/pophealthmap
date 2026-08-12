@@ -1960,7 +1960,7 @@
         <span class="dl-badge-label">Viewing</span>
         <div class="dl-seg" id="dl-seg">
           <button type="button" data-dl="ward" class="active" title="Ward-level data (704 wards)">Ward</button>
-          <button type="button" data-dl="msoa" title="MSOA boundaries. MSOAs sit between wards and LSOAs and do not nest into wards, so this draws the geography rather than reshading the map.">MSOA</button>
+          <button type="button" data-dl="msoa" title="MSOA level. MSOAs sit between wards and LSOAs and do not nest into wards. The Local Health indicators are published at this level, so they shade here; anything published elsewhere draws the boundaries only.">MSOA</button>
           <button type="button" data-dl="lsoa" title="LSOA-level data (~1,200 areas, more granular)">LSOA</button>
         </div>
         <div class="dl-hint" id="dl-hint"></div>
@@ -7680,9 +7680,12 @@ function _setDataLevel(level, opts) {
   // never coming.
   if (level === 'msoa' && !opts.fromMsoaToggle) {
     var _ovOn = typeof curOv !== 'undefined' && curOv && curOv !== 'none';
-    _dlHint(_ovOn
-      ? 'MSOA boundaries only. The shading is drawn on the ward layer, so it is off too.'
-      : 'MSOA boundaries drawn. There is no MSOA-level indicator to shade them with.', 3600);
+    _dlHint(!_ovOn
+      ? 'MSOA boundaries drawn. Pick an overlay to shade them.'
+      : (ovHasLevel(curOv, 'msoa')
+          ? 'Shaded at MSOA level, which is where these figures are published.'
+          : 'MSOA boundaries only. This indicator has no MSOA figures to shade with.'),
+      3600);
   }
 
   if (opts.fromOverlay || opts.fromLsoaToggle || opts.fromMsoaToggle) return;  // avoid feedback loops
