@@ -1601,16 +1601,21 @@
           <label class="lrow"><div style="width:9px;height:9px;border:1.5px solid #000;border-radius:2px;flex-shrink:0"></div><span class="lname">Ward boundaries <span class="lcount" id="ward-count">704</span></span><input type="checkbox" id="tnw" checked></label>
           <label class="lrow"><div style="width:9px;height:9px;border:1.5px solid #7A2E8E;border-radius:2px;flex-shrink:0"></div><span class="lname">MSOA boundaries <span class="lcount" id="msoa-count">0</span></span><input type="checkbox" id="tmsoa"></label>
           <label class="lrow"><div style="width:9px;height:9px;border:1.5px solid #1E4B8E;border-radius:2px;flex-shrink:0"></div><span class="lname">LSOA boundaries <span class="lcount" id="lsoa-count">0</span></span><input type="checkbox" id="tlsoa"></label>
-          <label id="lsoa-imd-row" class="lrow" style="display:none;margin-left:18px;padding:3px 0 0"><div style="width:9px;height:9px;background:linear-gradient(90deg,#67000d,#cb181d,#fb6a4a,#a1d99b,#006d2c);border-radius:2px;flex-shrink:0"></div><span class="lname" style="font-size:11px">Colour by IMD decile</span><input type="checkbox" id="tlsoa-imd"></label>
+          <label id="lsoa-imd-row" class="lrow" style="display:none;margin-left:18px;padding:3px 0 0"><div id="imd-row-swatch" style="width:9px;height:9px;border-radius:2px;flex-shrink:0"></div><span class="lname" style="font-size:11px">Colour by IMD decile</span><input type="checkbox" id="tlsoa-imd"></label>
           <div id="lsoa-filter-row" style="display:none;margin:4px 0 0 18px">
             <div style="margin-top:6px;display:flex;align-items:center;gap:2px;font-size:10px;color:#666">
               <span>1 (most deprived)</span>
-              <div style="display:flex;flex:1;height:10px;border-radius:3px;overflow:hidden">
-                <div style="flex:1;background:#67000d"></div><div style="flex:1;background:#a50f15"></div>
-                <div style="flex:1;background:#cb181d"></div><div style="flex:1;background:#ef3b2c"></div>
-                <div style="flex:1;background:#fb6a4a"></div><div style="flex:1;background:#fc9272"></div>
-                <div style="flex:1;background:#a1d99b"></div><div style="flex:1;background:#74c476"></div>
-                <div style="flex:1;background:#31a354"></div><div style="flex:1;background:#006d2c"></div>
+              <!-- Filled from IMD_DECILE_COLORS at load and repainted by the
+                   colour-blind toggle. It used to be ten hardcoded hex values,
+                   which meant the key kept showing the old palette after the
+                   map had changed to a new one. The data-imd-decile attribute
+                   is what _applyColourPalette looks for. -->
+              <div style="display:flex;flex:1;height:10px;border-radius:3px;overflow:hidden" id="imd-key-strip">
+                <div style="flex:1" data-imd-decile="1"></div><div style="flex:1" data-imd-decile="2"></div>
+                <div style="flex:1" data-imd-decile="3"></div><div style="flex:1" data-imd-decile="4"></div>
+                <div style="flex:1" data-imd-decile="5"></div><div style="flex:1" data-imd-decile="6"></div>
+                <div style="flex:1" data-imd-decile="7"></div><div style="flex:1" data-imd-decile="8"></div>
+                <div style="flex:1" data-imd-decile="9"></div><div style="flex:1" data-imd-decile="10"></div>
               </div>
               <span>10</span>
             </div>
@@ -1859,7 +1864,9 @@
           <div class="scale-bar" id="scale">
             <div class="scale-labels"><span id="sc-lo">Low</span><span id="sc-mid" style="color:#aaa;font-variant-numeric:tabular-nums"></span><span id="sc-hi">High</span></div>
             <!-- Gradient must match ramp() in JS exactly: rgb(15,110,86) → rgb(239,159,39) → rgb(163,45,39) -->
-            <div class="scale-grad" id="sc-grad" style="background:linear-gradient(to right, rgb(15,110,86) 0%, rgb(239,159,39) 50%, rgb(163,45,39) 100%)"></div>
+            <!-- Painted by _syncScaleGradient. The inline gradient here was a
+               third copy of a palette that has since changed twice. -->
+          <div class="scale-grad" id="sc-grad"></div>
             <div id="sc-meta" style="margin-top:5px;font-size:10.5px;color:#888;line-height:1.4"></div>
           </div>
 
@@ -2944,26 +2951,55 @@ function ladOfLatLng(lat, lng) {
   }
   return '';
 }
-function ramp(t, inv) {
+/* ── The choropleth palette ────────────────────────────────────────────────
+   Graded, not continuous, and sequential rather than red-to-green.
+
+   Two problems with what was here. Red through amber to green is the colour
+   language of pass and fail, so every indicator read as a judgement whether or
+   not one was meant: a ward high on "people aged over 65" was coloured the same
+   as a ward high on "premature mortality". And it was a smooth interpolation,
+   so no colour on the map corresponded to a number you could name. You could
+   see that one ward was darker than another and never say by how much.
+
+   Seven classes, because past about eight people stop being able to tell
+   adjacent bands apart, and a sequential light-to-dark scale, which reads as
+   "more of this" rather than "worse than that". Direction still follows the
+   indicator's own polarity through `inv`, so the dark end is consistently the
+   end that matters for health; what has gone is the claim that the light end
+   is good.
+
+   Both palettes are safe for deuteranopia and protanopia and both are
+   monotonic in luminance, so they survive greyscale printing. The toggle now
+   switches between two defensible palettes rather than from a bad one to a
+   good one. */
+const RAMP_CLASSES = 7;
+
+// Yellow-green-blue, light to dark. Sequential, no hue that means "stop".
+const RAMP_DEFAULT = [
+  '#ffffd9', '#c7e9b4', '#7fcdbb', '#41b6c4', '#1d91c0', '#225ea8', '#0c2c84',
+];
+// Viridis sampled at the same seven points, for the colour-blind toggle.
+const RAMP_CB = [
+  '#fde725', '#90d743', '#35b779', '#21918c', '#31688e', '#443983', '#440154',
+];
+
+function rampClasses() { return window.cbSafe ? RAMP_CB : RAMP_DEFAULT; }
+
+/**
+ * Which class a 0..1 position falls in, and its colour.
+ *
+ * `inv` flips the direction for "higher is better" indicators, so the dark end
+ * is the concerning end whichever way the underlying figure runs.
+ */
+function rampIndex(t, inv) {
   if (inv) t = 1 - t;
   t = Math.min(Math.max(t, 0), 1);
-  // Colour-blind safe (Viridis-ish): 5-stop piecewise interpolation through
-  // purple → blue → teal → green → yellow. Monotonic in luminance so it stays
-  // readable for deuteranopia/protanopia and desaturated print-outs alike.
-  if (window.cbSafe) {
-    const STOPS = [[68,1,84],[59,82,139],[33,145,140],[94,201,98],[253,231,37]];
-    const seg = Math.min(3, Math.floor(t * 4));
-    const f = (t * 4) - seg;
-    const a = STOPS[seg], b = STOPS[seg+1];
-    const r = Math.round(a[0] + (b[0]-a[0]) * f);
-    const g = Math.round(a[1] + (b[1]-a[1]) * f);
-    const bl = Math.round(a[2] + (b[2]-a[2]) * f);
-    return `rgb(${r},${g},${bl})`;
-  }
-  let r, g, b;
-  if (t < 0.5) { const f=t*2; r=Math.round(15+(239-15)*f); g=Math.round(110+(159-110)*f); b=Math.round(86+(39-86)*f); }
-  else { const f=(t-.5)*2; r=Math.round(239+(163-239)*f); g=Math.round(159+(45-159)*f); b=39; }
-  return `rgb(${r},${g},${b})`;
+  // The top value belongs in the last class rather than in a class of its own.
+  return Math.min(RAMP_CLASSES - 1, Math.floor(t * RAMP_CLASSES));
+}
+
+function ramp(t, inv) {
+  return rampClasses()[rampIndex(t, inv)];
 }
 function fmtNum(v, decimals=0) {
   if (v === null || v === undefined || v === '') return '—';
@@ -6189,9 +6225,19 @@ let lsoaLyr = null, LSOA_DATA = {}, selLSOA = null, lsoaActive = false;
 // overlay is active, LSOAs render as neutral dashed outlines only.
 let lsoaIMDColour = false;
 
+/* Deciles are already ten classes, so this is a grade scale by construction.
+   What it was not is legible as one: reds 1 to 6 then greens 7 to 10 put the
+   only obvious boundary between 6 and 7, which is not a boundary that means
+   anything, and made the whole thing read as pass and fail. Decile 3 and decile
+   4 were two similar reds and nobody could say which was which.
+
+   Ten steps of one sequential scale instead, dark to light, so 1 is the darkest
+   and 10 the lightest and every step in between is a visible move along the
+   same line. Same family as the seven-class ramp above, so a decile map and an
+   indicator map look like they come from the same tool. */
 const IMD_DECILE_COLORS = {
-  1:'#67000d', 2:'#a50f15', 3:'#cb181d', 4:'#ef3b2c', 5:'#fb6a4a',
-  6:'#fc9272', 7:'#a1d99b', 8:'#74c476', 9:'#31a354', 10:'#006d2c'
+  1:'#081d58',  2:'#0c2c84',  3:'#225ea8',  4:'#1d91c0',  5:'#41b6c4',
+  6:'#7fcdbb',  7:'#a8ddb5',  8:'#c7e9b4',  9:'#e0f3b2', 10:'#ffffd9'
 };
 // Cividis-inspired 10-step palette for users with red/green colour-blindness.
 // Deep blue (most deprived) → gold (least deprived) — monotonic in luminance.
@@ -6894,8 +6940,11 @@ window.generateLSOAReport = function(code) {
         const wardPath = wardFeat
           ? `<path d="${geomPath(wardFeat.geometry)}" fill="#eeeee8" stroke="#a8a8a0" stroke-width="0.8"/>`
           : '';
-        const DECILE_COLORS = {1:'#67000d',2:'#a50f15',3:'#cb181d',4:'#ef3b2c',5:'#fb6a4a',6:'#fc9272',7:'#a1d99b',8:'#74c476',9:'#31a354',10:'#006d2c'};
-        const lsoaFill = DECILE_COLORS[decile] || '#e67e22';
+        // The shared decile palette, not a private copy of it. This was ten
+        // hardcoded reds and greens, so the minimap in an LSOA report kept
+        // colouring by the old scheme after the map itself had changed, and
+        // ignored the colour-blind toggle entirely.
+        const lsoaFill = imdDecileColor(decile) || '#9e9e9e';
         const lsoaPath = `<path d="${geomPath(feat.geometry)}" fill="${lsoaFill}" fill-opacity="0.75" stroke="#1a1a1a" stroke-width="1.4"/>`;
         miniMapSVG = `<svg class="minimap" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Location of LSOA ${_esc(code)} within ${_esc(wardNm||'')}">
           <rect width="${W}" height="${H}" fill="#f6f6f1"/>
@@ -7629,6 +7678,39 @@ function ovRangeForDisplay(k) {
  * legend: the sidebar bar and the strip along the bottom of the map would keep
  * showing the previous level's minimum and maximum.
  */
+/**
+ * Paint both legend gradients from the current palette.
+ *
+ * There are two: the scale bar in the sidebar and the strip along the bottom
+ * of the map. They have to say the same thing, and the code that built them
+ * existed twice, so the colour-blind toggle updated one and left the other
+ * showing the palette you had just turned off.
+ */
+function _syncScaleGradient() {
+  if (typeof ramp !== 'function') return;
+  const cfg = (typeof OV_CFG !== 'undefined' && curOv) ? OV_CFG[curOv] : null;
+  // ramp()'s `inv` argument flips the direction for "higher is better", so the
+  // dark end of the legend is the concerning end whichever way the indicator
+  // runs.
+  const inv = cfg ? !cfg.wh : false;
+  // Hard stops, so the key shows the seven bands the map is actually painted
+  // in. A smooth blend here was a picture of a scale the map does not use: it
+  // implied every intermediate colour existed and gave no way to match a ward
+  // to a band.
+  const n = RAMP_CLASSES;
+  const stops = [];
+  for (let i = 0; i < n; i++) {
+    const c = ramp((i + 0.5) / n, inv);
+    stops.push(`${c} ${(i / n) * 100}%`, `${c} ${((i + 1) / n) * 100}%`);
+  }
+  const css = `linear-gradient(to right, ${stops.join(', ')})`;
+  ['sc-grad', 'mls-grad'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.background = css;
+  });
+  return css;
+}
+
 function _syncScaleNumbers() {
   const cfg = OV_CFG[curOv];
   if (!cfg) return;
@@ -7684,14 +7766,9 @@ document.getElementById('ov').addEventListener('change', e => {
         panel.style.display = 'none';
       }
     }
-    // Legend gradient mirrors ramp() so the CB-safe palette flows through.
-    // When wh:true (higher=worse), left=low=good → right=high=bad; the `inv`
-    // argument to ramp() flips this for "higher=better" metrics.
-    const inv = !cfg.wh;
-    const stops = [];
-    for (let i = 0; i <= 10; i++) stops.push(`${ramp(i / 10, inv)} ${i * 10}%`);
-    const gradCss = `linear-gradient(to right, ${stops.join(', ')})`;
-    document.getElementById('sc-grad').style.background = gradCss;
+    // One function paints both legends, so the colour-blind toggle and an
+    // indicator change cannot leave them showing different palettes.
+    _syncScaleGradient();
     // Mirror to the persistent map-legend strip at the bottom of the map.
     const mls    = document.getElementById('map-legend-strip');
     const mlsLbl = document.getElementById('mls-label');
@@ -7706,7 +7783,7 @@ document.getElementById('ov').addEventListener('change', e => {
       mlsLbl.textContent = cleanLbl;
       mlsMin.textContent = range ? (fmtNum(range.lo, 1) + unitSuffix) : '';
       mlsMax.textContent = range ? (fmtNum(range.hi, 1) + unitSuffix) : '';
-      mlsGrd.style.background = gradCss;
+      // gradient already painted by _syncScaleGradient above
       mls.style.display = 'flex';
     }
   } else {
@@ -8181,21 +8258,34 @@ function _applyColourPalette() {
       lsoaLyr.eachLayer(l => l.setStyle(imdStyle(l.feature,
         (typeof selLSOA !== 'undefined' && l.feature.properties.code === selLSOA) ? 'selected' : 'default')));
     }
-    // Refresh overlay legend gradient (mirror wh inversion) + IMD swatch strip
-    const scBar = document.getElementById('sc-grad');
-    if (scBar && typeof ramp === 'function') {
-      const cfg = (typeof OV_CFG !== 'undefined' && curOv) ? OV_CFG[curOv] : null;
-      const inv = cfg ? !cfg.wh : false;
-      const stops = [];
-      for (let i = 0; i <= 10; i++) stops.push(`${ramp(i / 10, inv)} ${i * 10}%`);
-      scBar.style.background = `linear-gradient(to right, ${stops.join(', ')})`;
-    }
+    // The MSOA and borough layers carry the same ramp and were not being
+    // repainted, so switching palette left whichever of them was drawn in the
+    // old colours next to a ward layer in the new ones.
+    if (typeof msoaLyr !== 'undefined' && msoaLyr && typeof restyleMsoa === 'function') restyleMsoa();
+    if (typeof boroughL !== 'undefined' && boroughL && typeof restyleBorough === 'function') restyleBorough();
+    // Both legends, not one. This refreshed the sidebar scale and left the
+    // strip along the bottom of the map on the old palette until the next
+    // indicator change rebuilt it, which is why the map and its own key
+    // disagreed about what a colour meant.
+    _syncScaleGradient();
     document.querySelectorAll('[data-imd-decile]').forEach(el => {
       const d = parseInt(el.getAttribute('data-imd-decile'), 10);
       if (d >= 1 && d <= 10) el.style.background = imdDecileColor(d);
     });
+    // The little swatch on the "colour LSOAs by decile" row, which was its own
+    // five-stop copy of the old red-to-green scale.
+    const rowSw = document.getElementById('imd-row-swatch');
+    if (rowSw) {
+      rowSw.style.background = 'linear-gradient(90deg,' +
+        [1, 3, 5, 7, 10].map(imdDecileColor).join(',') + ')';
+    }
   } catch (e) { console.warn('_applyColourPalette failed', e); }
 }
+// Paint everything that reads a palette once at load, so the decile key and
+// the two legend gradients start in the colours the map is actually using
+// rather than in whatever was written into the markup.
+_applyColourPalette();
+
 (function _wireCbSafe() {
   const btn = document.getElementById('tb-cb');
   if (!btn) return;
