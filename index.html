@@ -1067,6 +1067,56 @@
   .map-wrap.touring .ws-sheet { bottom: calc(var(--tour-h, 150px) + 26px); max-height: 252px; }
   .map-wrap.touring .cmp-bar { bottom: calc(var(--tour-h, 150px) + 26px); max-height: 252px; }
 
+  /* ── Report builder ───────────────────────────────────────────────────────
+     Pick LSOAs off the map and treat them as one area. Neighbourhoods,
+     catchments and PCN footprints do not follow ward lines, and until now the
+     only areas the map could total up were the ones ONS had already drawn. */
+  .sidebar.report-mode > .sb-tabs { display: none; }
+  .rb-pane { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  .rb-scroll { overflow-y: auto; overflow-x: hidden; min-height: 0; flex: 1; }
+  .rb-head { padding: 13px 14px 11px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
+  .rb-head .cmp-row { display: flex; align-items: baseline; gap: 8px; }
+  .rb-head h2 { font-family: 'Inter Tight', Inter, sans-serif; font-size: 17px; font-weight: 600;
+    margin: 0; letter-spacing: -.01em; color: var(--nhs-dark); flex: 1; min-width: 0; }
+  .rb-name { width: 100%; font: inherit; font-size: 12.5px; padding: 7px 9px; margin-top: 9px;
+    border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: var(--paper); }
+  .rb-name:focus { outline: none; border-color: var(--nhs-bright);
+    box-shadow: 0 0 0 3px rgba(0,114,206,.15); }
+  .rb-hint { font-size: 11px; color: var(--ink-3); line-height: 1.45; margin-top: 7px; }
+  .rb-count { padding: 9px 14px; font-size: 11.5px; font-weight: 600; color: var(--nhs-blue);
+    border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 8px; }
+  .rb-count strong { color: var(--nhs-dark); font-variant-numeric: tabular-nums; }
+  .rb-count .rb-clear { margin-left: auto; appearance: none; background: none; border: 0;
+    font: inherit; font-size: 11px; color: var(--ink-3); cursor: pointer; text-decoration: underline; }
+  .rb-count .rb-clear:hover { color: var(--nhs-red); }
+  .rb-group { padding: 11px 14px; border-bottom: 1px solid var(--line); }
+  .rb-group h3 { font-size: 10px; text-transform: uppercase; letter-spacing: .06em;
+    font-weight: 600; color: var(--ink-3); margin: 0 0 8px; }
+  .rb-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+  .rb-stat { border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; min-width: 0; }
+  .rb-stat .k { font-size: 9.5px; text-transform: uppercase; letter-spacing: .05em;
+    color: var(--ink-3); font-weight: 600; white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; }
+  .rb-stat .v { font-family: 'Inter Tight', Inter, sans-serif; font-size: 17px; font-weight: 600;
+    letter-spacing: -.02em; color: var(--ink); font-variant-numeric: tabular-nums; margin-top: 1px; }
+  .rb-stat .v span { font-size: 11px; font-weight: 500; }
+  .rb-stat.wide { grid-column: 1 / -1; }
+  .rb-list { max-height: 168px; overflow-y: auto; overflow-x: hidden; }
+  .rb-item { display: flex; align-items: center; gap: 8px; padding: 6px 14px; font-size: 11.5px;
+    border-bottom: 1px solid var(--paper-2); cursor: pointer; }
+  .rb-item:hover { background: var(--nhs-light); }
+  .rb-item .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; color: var(--ink); }
+  .rb-item .nm small { display: block; font-size: 9.5px; color: var(--ink-3); }
+  .rb-item .x { appearance: none; background: none; border: 0; cursor: pointer;
+    color: var(--ink-3); font-size: 14px; line-height: 1; padding: 0 2px; }
+  .rb-item .x:hover { color: var(--nhs-red); }
+  .rb-acts { display: flex; gap: 5px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+  .rb-acts .ws-btn { flex: 1; justify-content: center; }
+  .rb-empty { padding: 14px; font-size: 11.5px; color: var(--ink-3); line-height: 1.5; }
+  .rb-caution { font-size: 10.5px; line-height: 1.45; color: #5c4115; background: #FFF8E6;
+    border: 1px solid #E0C280; border-radius: 6px; padding: 7px 9px; margin: 9px 14px; }
+
   /* ── Directory ────────────────────────────────────────────────────────────
      Every point dataset on the map as one searchable list. The map answers
      "what is near here"; this answers "where is this" and "how many of these
@@ -1405,6 +1455,7 @@
     <button type="button" class="mode-btn" role="tab" data-mode="explore" aria-selected="true">Explore</button>
     <button type="button" class="mode-btn" role="tab" data-mode="query" aria-selected="false">Query</button>
     <button type="button" class="mode-btn" role="tab" data-mode="compare" aria-selected="false">Compare</button>
+    <button type="button" class="mode-btn" role="tab" data-mode="report" aria-selected="false">Report builder</button>
     <button type="button" class="mode-btn" role="tab" data-mode="directory" aria-selected="false">Directory</button>
   </div>
 
@@ -1878,6 +1929,37 @@
           </div>
           <label class="lrow" style="margin-bottom:8px"><div style="width:9px;height:9px;background:linear-gradient(90deg,#1a1a1a,#fff);border:1px solid #ccc;border-radius:2px;flex-shrink:0"></div><span class="lname">Spotlight focused neighbourhood</span><input type="checkbox" id="tspot"></label>
           <div id="nbhd-table"></div>
+        </div>
+      </div>
+
+      <!-- Report builder. Pick LSOAs off the map and total them up as one
+           area. Neighbourhoods, catchments and PCN footprints do not follow
+           ward lines, and every other total on this map is an area someone
+           else already drew. -->
+      <div class="tab-pane rb-pane" id="tab-report">
+        <div class="rb-head">
+          <div class="cmp-row">
+            <h2>Report builder</h2>
+            <button type="button" class="cmp-back" id="rb-back">Back to Explore</button>
+          </div>
+          <input type="text" class="rb-name" id="rb-name" maxlength="60"
+                 placeholder="Name this area" aria-label="Name for the area you are building">
+          <div class="rb-hint">Click neighbourhoods on the map to add them. Click again to take
+            one out.</div>
+        </div>
+        <div class="rb-count" id="rb-count">
+          <span>Nothing selected yet</span>
+          <button type="button" class="rb-clear" id="rb-clear" hidden>Clear</button>
+        </div>
+        <div class="rb-acts">
+          <button type="button" class="ws-btn primary" id="rb-report">Open report</button>
+          <button type="button" class="ws-btn" id="rb-csv">CSV</button>
+        </div>
+        <div class="rb-scroll">
+          <div id="rb-summary"></div>
+          <div id="rb-caution"></div>
+          <div class="rb-group" style="padding-bottom:4px"><h3>Neighbourhoods in this area</h3></div>
+          <div class="rb-list" id="rb-list"></div>
         </div>
       </div>
 
@@ -5730,7 +5812,8 @@ function _applyBoroughSolo() {
   // chose rather than one to undo for them.
   document.querySelectorAll('.mode-btn').forEach(b => {
     b.addEventListener('click', () => {
-      const wantsPanel = ['query', 'compare', 'directory'].indexOf(b.dataset.mode) !== -1;
+      const wantsPanel = ['query', 'compare', 'directory', 'report']
+        .indexOf(b.dataset.mode) !== -1;
       if (narrow()) setOpen(wantsPanel);
       else if (wantsPanel && isCollapsed()) setCollapsed(false);
     });
@@ -7206,6 +7289,13 @@ function buildEmbeddedLSOALayer() {
     onEachFeature: (feat, lyr) => {
       const p = feat.properties;
       lyr.on('click', () => {
+        // In Report builder the map is how you draw the area, so a click adds
+        // this neighbourhood to it or takes it out again, rather than opening
+        // one LSOA's profile over the panel doing the building.
+        if (window.PH_REPORT && window.PH_REPORT.active()) {
+          window.PH_REPORT.toggle(p.code);
+          return;
+        }
         if (lsoaLyr) lsoaLyr.eachLayer(l => l.setStyle(imdStyle(l.feature, 'default')));
         selLSOA = p.code;
         lyr.setStyle(imdStyle(feat, 'selected'));
@@ -9943,8 +10033,10 @@ loadData();
   var queryPane = document.getElementById('tab-query');
   var comparePane = document.getElementById('tab-compare');
   var dirPane = document.getElementById('tab-directory');
+  var reportPane = document.getElementById('tab-report');
   // Modes that own the sidebar rather than raising a placeholder card.
-  var BUILT = { query: 'query', compare: 'compare', directory: 'directory' };
+  var BUILT = { query: 'query', compare: 'compare', directory: 'directory',
+                report: 'report' };
 
   function markRail(mode) {
     rail.querySelectorAll('.mode-btn').forEach(function (b) {
@@ -9971,7 +10063,7 @@ loadData();
     var pane = document.querySelector('.tab-pane.active');
     if (!pane) return;
     var name = pane.id.replace(/^tab-/, '');
-    if (name !== 'query' && name !== 'compare' && name !== 'directory') lastTab = name;
+    if (['query', 'compare', 'directory', 'report'].indexOf(name) === -1) lastTab = name;
   }
 
   function show(mode) {
@@ -10005,7 +10097,8 @@ loadData();
       // Leaving a built mode gives the sidebar back to whichever tab it took.
       if ((queryPane && queryPane.classList.contains('active')) ||
           (comparePane && comparePane.classList.contains('active')) ||
-          (dirPane && dirPane.classList.contains('active'))) activateTab(lastTab);
+          (dirPane && dirPane.classList.contains('active')) ||
+          (reportPane && reportPane.classList.contains('active'))) activateTab(lastTab);
       return;
     }
 
@@ -10035,22 +10128,26 @@ loadData();
      the overlay-info link and the restored URL state) and threading a call
      through each of them would leave the sixth one to be found later. Watching
      the pane's own class is the one place that cannot be missed. */
-  if (queryPane && comparePane && dirPane && window.MutationObserver) {
+  if (queryPane && comparePane && dirPane && reportPane && window.MutationObserver) {
     var sync = function () {
       var q = queryPane.classList.contains('active');
       var c = comparePane.classList.contains('active');
       var dr = dirPane.classList.contains('active');
+      var rp = reportPane.classList.contains('active');
       if (sidebar) {
         sidebar.classList.toggle('query-mode', q);
         sidebar.classList.toggle('compare-mode', c);
         sidebar.classList.toggle('directory-mode', dr);
+        sidebar.classList.toggle('report-mode', rp);
       }
       if (q) markRail('query');
       else if (c) markRail('compare');
       else if (dr) markRail('directory');
+      else if (rp) markRail('report');
       else if (rail.querySelector('.mode-btn[aria-selected="true"][data-mode="query"], ' +
                                   '.mode-btn[aria-selected="true"][data-mode="compare"], ' +
-                                  '.mode-btn[aria-selected="true"][data-mode="directory"]')) {
+                                  '.mode-btn[aria-selected="true"][data-mode="directory"], ' +
+                                  '.mode-btn[aria-selected="true"][data-mode="report"]')) {
         // A pane can be switched away from without going through the rail:
         // clicking an LSOA sends the sidebar to the Ward tab. That is still a
         // mode change, so it tears down like one.
@@ -10062,6 +10159,7 @@ loadData();
     mo.observe(queryPane, { attributes: true, attributeFilter: ['class'] });
     mo.observe(comparePane, { attributes: true, attributeFilter: ['class'] });
     mo.observe(dirPane, { attributes: true, attributeFilter: ['class'] });
+    mo.observe(reportPane, { attributes: true, attributeFilter: ['class'] });
     sync();
   }
 })();
@@ -11904,8 +12002,348 @@ loadData();
     length: TOUR.length,
   };
 
+  /* ─────────────────────────────────────────────────────────────────────────
+     REPORT BUILDER
+
+     Every total on this map is an area somebody else drew: a ward, a borough,
+     an MSOA. Neighbourhoods, catchments and PCN footprints do not follow those
+     lines, and there was no way to ask what the figures are for the area you
+     actually mean. This builds one out of LSOAs, which are the smallest
+     geography here and the one the others are built from.
+
+     The arithmetic is the same rule the rest of the project uses, and it is
+     the part worth getting right: counts are summed, everything else is
+     population-weighted. Averaging percentages across LSOAs of different sizes
+     would let a 900-person LSOA pull as hard as a 3,000-person one. The
+     allow-list is explicit for the same reason it is explicit in the assistant:
+     a wrongly summed rate looks like a number, while a wrongly averaged count
+     looks implausible and gets caught.
+     ───────────────────────────────────────────────────────────────────────── */
+  var rbPane = $('tab-report');
+  var rbSelected = [];          // LSOA codes, in the order they were picked
+  var rbLyr = null;
+
+  // Summed, not averaged. Everything absent from here is a rate, a score or a
+  // percentage and gets weighted by population.
+  var RB_ADDITIVE = { census_population: 1, claimant_count: 1, gb_total_uprn: 1 };
+  function rbIsAdditive(k) { return RB_ADDITIVE[k] === 1 || /_count$/.test(k); }
+
+  // imd_rank is a national rank, not a quantity: the mean of two ranks is not
+  // the rank of anything, so it is left out rather than averaged into a number
+  // that would look like one.
+  var RB_SKIP = { imd_rank: 1 };
+
+  function rbRecord(code) {
+    var r = (typeof LSOA_DATA !== 'undefined' && LSOA_DATA) ? LSOA_DATA[code] : null;
+    return r ? (r.indicators || r) : null;
+  }
+
+  // Names, wards and boroughs are on the boundary features, not in
+  // LSOA_DATA, which is a flat bag of indicators keyed by code and holds no
+  // labels at all. Without this the list showed each LSOA's code twice.
+  var _rbProps = null;
+  function rbProps(code) {
+    if (!_rbProps) {
+      _rbProps = {};
+      if (typeof LSOA_IMD !== 'undefined' && LSOA_IMD.features) {
+        LSOA_IMD.features.forEach(function (f) {
+          var p = f.properties || {};
+          if (p.code) _rbProps[p.code] = p;
+        });
+      }
+    }
+    return _rbProps[code] || {};
+  }
+
+  function rbAggregate() {
+    var sum = {}, num = {}, den = {}, pop = 0, n = 0;
+    rbSelected.forEach(function (code) {
+      var i = rbRecord(code);
+      if (!i) return;
+      n++;
+      var p = num_(i.census_population) || 0;
+      pop += p;
+      Object.keys(i).forEach(function (k) {
+        if (RB_SKIP[k]) return;
+        var v = num_(i[k]);
+        if (v === null) return;
+        if (rbIsAdditive(k)) {
+          sum[k] = (sum[k] || 0) + v;
+        } else {
+          // No population means no weight to give it. Falling back to 1 would
+          // let an empty LSOA count as much as a full one.
+          var w = p > 0 ? p : 0;
+          if (w === 0) return;
+          num[k] = (num[k] || 0) + v * w;
+          den[k] = (den[k] || 0) + w;
+        }
+      });
+    });
+    var out = {};
+    Object.keys(sum).forEach(function (k) { out[k] = sum[k]; });
+    Object.keys(num).forEach(function (k) {
+      if (den[k] > 0) out[k] = num[k] / den[k];
+    });
+    return { indicators: out, lsoas: n, population: pop };
+  }
+  function num_(v) {
+    if (v === null || v === undefined || v === '') return null;
+    var f = parseFloat(v);
+    return isNaN(f) ? null : f;
+  }
+
+  function rbAreaName() {
+    var el = $('rb-name');
+    var v = el && el.value.trim();
+    return v || 'Unnamed area';
+  }
+
+  function rbBoroughs() {
+    var seen = {};
+    rbSelected.forEach(function (code) {
+      var b = rbProps(code).borough || '';
+      if (b) seen[b] = (seen[b] || 0) + 1;
+    });
+    return seen;
+  }
+
+  var RB_HEADLINE = [
+    { k: 'census_population',         l: 'Population',      dp: 0, wide: false },
+    { k: 'imd_decile',                l: 'IMD decile',      dp: 1 },
+    { k: 'imd_score',                 l: 'IMD score',       dp: 1 },
+    { k: 'census_bad_health_pct',     l: 'Bad health',      dp: 1, pct: true },
+    { k: 'census_disability_any_pct', l: 'Disability',      dp: 1, pct: true },
+    { k: 'census_over65_pct',         l: 'Aged 65+',        dp: 1, pct: true },
+    { k: 'census_unemployed_pct',     l: 'Unemployed',      dp: 1, pct: true },
+    { k: 'green_commitment_pct',      l: 'Green access',    dp: 1, pct: true },
+  ];
+
+  function renderReportPane() {
+    if (!rbPane) return;
+    var agg = rbAggregate();
+    var countEl = $('rb-count');
+    var clearBtn = $('rb-clear');
+    countEl.firstElementChild.innerHTML = rbSelected.length
+      ? '<strong>' + agg.lsoas + '</strong> neighbourhood' + (agg.lsoas === 1 ? '' : 's') +
+        ' · <strong>' + Math.round(agg.population).toLocaleString() + '</strong> residents'
+      : 'Nothing selected yet';
+    clearBtn.hidden = !rbSelected.length;
+
+    var sumEl = $('rb-summary');
+    if (!rbSelected.length) {
+      sumEl.innerHTML = '<div class="rb-empty">Switch on the neighbourhood layer and click the ' +
+        'areas you want. The figures for whatever you pick are totalled up here, and you can ' +
+        'open them as a report or take them away as a CSV.</div>';
+    } else {
+      var i = agg.indicators;
+      sumEl.innerHTML = '<div class="rb-group"><h3>This area</h3><div class="rb-stats">' +
+        RB_HEADLINE.map(function (m) {
+          var v = i[m.k];
+          var shown = (v === undefined || v === null) ? '—'
+            : (m.k === 'census_population'
+                ? Math.round(v).toLocaleString()
+                : v.toFixed(m.dp) + (m.pct ? '<span>%</span>' : ''));
+          return '<div class="rb-stat' + (m.wide ? ' wide' : '') + '">' +
+            '<div class="k">' + esc(m.l) + '</div><div class="v">' + shown + '</div></div>';
+        }).join('') + '</div></div>';
+    }
+
+    // Where it straddles a boundary, say so. An area assembled by hand is
+    // exactly the kind that crosses one, and a reader has no other way to tell.
+    var cautEl = $('rb-caution');
+    var bs = Object.keys(rbBoroughs());
+    cautEl.innerHTML = bs.length > 1
+      ? '<div class="rb-caution">This area crosses <strong>' + bs.length + ' boroughs</strong> (' +
+        esc(bs.sort().join(', ')) + '). Figures below are for the area as drawn, not for any ' +
+        'one of them.</div>'
+      : '';
+
+    var listEl = $('rb-list');
+    listEl.innerHTML = rbSelected.map(function (code) {
+      var pr = rbProps(code);
+      var nm = pr.name || code;
+      var sub = [pr.ward || '', pr.borough || '', code].filter(Boolean).join(' · ');
+      return '<div class="rb-item" data-zoom="' + esc(code) + '">' +
+        '<span class="nm">' + esc(nm) + '<small>' + esc(sub || code) + '</small></span>' +
+        '<button type="button" class="x" data-drop="' + esc(code) + '" ' +
+        'title="Remove" aria-label="Remove ' + esc(nm) + '">&times;</button></div>';
+    }).join('');
+
+    drawReportSelection();
+  }
+
+  function drawReportSelection() {
+    if (rbLyr && typeof map !== 'undefined') { map.removeLayer(rbLyr); rbLyr = null; }
+    if (currentMode !== 'report' || !rbSelected.length) return;
+    if (typeof LSOA_IMD === 'undefined' || !LSOA_IMD.features || typeof map === 'undefined') return;
+    var want = {};
+    rbSelected.forEach(function (c) { want[c] = 1; });
+    var feats = LSOA_IMD.features.filter(function (f) {
+      return want[(f.properties || {}).code];
+    });
+    if (!feats.length) return;
+    rbLyr = L.geoJSON({ type: 'FeatureCollection', features: feats }, {
+      style: { color: '#00703C', weight: 2.5, fill: true, fillColor: '#00703C',
+               fillOpacity: 0.22, opacity: 1 },
+      interactive: false,
+    }).addTo(map);
+  }
+
+  function rbToggle(code) {
+    var at = rbSelected.indexOf(code);
+    if (at === -1) rbSelected.push(code); else rbSelected.splice(at, 1);
+    renderReportPane();
+  }
+
+  // showLSOA calls this before doing anything else, so in Report builder mode
+  // a click on the map adds to the area instead of opening one LSOA's profile.
+  window.PH_REPORT = {
+    active: function () { return currentMode === 'report'; },
+    toggle: rbToggle,
+    selected: function () { return rbSelected.slice(); },
+    aggregate: rbAggregate,
+  };
+
+  if (rbPane) {
+    $('rb-clear').addEventListener('click', function () { rbSelected = []; renderReportPane(); });
+    $('rb-back').addEventListener('click', function () {
+      var b = document.querySelector('.mode-btn[data-mode="explore"]');
+      if (b) b.click();
+    });
+    $('rb-name').addEventListener('input', function () { /* name is read on export */ });
+    $('rb-list').addEventListener('click', function (e) {
+      var drop = e.target.closest('[data-drop]');
+      if (drop) { e.stopPropagation(); rbToggle(drop.getAttribute('data-drop')); return; }
+      var row = e.target.closest('[data-zoom]');
+      if (!row || typeof map === 'undefined') return;
+      var code = row.getAttribute('data-zoom');
+      var f = (typeof LSOA_IMD !== 'undefined' && LSOA_IMD.features || [])
+                .filter(function (x) { return (x.properties || {}).code === code; })[0];
+      if (f) { try { map.fitBounds(L.geoJSON(f).getBounds(), { maxZoom: 15 }); } catch (err) {} }
+    });
+    $('rb-csv').addEventListener('click', rbCsv);
+    $('rb-report').addEventListener('click', rbReport);
+  }
+
+  function rbCsv() {
+    if (!rbSelected.length) { alert('Pick some neighbourhoods first.'); return; }
+    var agg = rbAggregate();
+    var keys = Object.keys(agg.indicators).sort();
+    var lines = [];
+    lines.push(['area', rbAreaName()].map(csvCell).join(','));
+    lines.push(['neighbourhoods', agg.lsoas].map(csvCell).join(','));
+    lines.push([]);
+    lines.push(['indicator', 'value', 'method'].map(csvCell).join(','));
+    keys.forEach(function (k) {
+      lines.push([labelOf(k), agg.indicators[k],
+                  rbIsAdditive(k) ? 'summed' : 'population-weighted mean']
+                 .map(csvCell).join(','));
+    });
+    lines.push([]);
+    lines.push(['lsoa_code', 'lsoa_name', 'ward', 'borough', 'population'].map(csvCell).join(','));
+    rbSelected.forEach(function (code) {
+      var pr = rbProps(code);
+      var i = rbRecord(code) || {};
+      lines.push([code, pr.name || '', pr.ward || '', pr.borough || '',
+                  num_(i.census_population) || ''].map(csvCell).join(','));
+    });
+    download((rbAreaName().replace(/[^A-Za-z0-9 _-]+/g, '') || 'area') + '.csv',
+             lines.join('\n'), 'text/csv;charset=utf-8');
+  }
+
+  function rbReport() {
+    if (!rbSelected.length) { alert('Pick some neighbourhoods first.'); return; }
+    var agg = rbAggregate();
+    var bs = rbBoroughs();
+    var boroughLine = Object.keys(bs).sort().map(function (b) {
+      return esc(b) + ' (' + bs[b] + ')';
+    }).join(', ');
+    var rows = Object.keys(agg.indicators).sort(function (a, b) {
+      return labelOf(a).localeCompare(labelOf(b));
+    }).map(function (k) {
+      var v = agg.indicators[k];
+      var u = unitOf(k);
+      return '<tr><td>' + esc(labelOf(k)) + '</td>' +
+        '<td class="n">' + (rbIsAdditive(k)
+          ? Math.round(v).toLocaleString()
+          : (Math.round(v * 100) / 100).toLocaleString()) +
+        (u === '%' ? '%' : '') + '</td>' +
+        '<td class="m">' + (rbIsAdditive(k) ? 'summed' : 'population-weighted') + '</td></tr>';
+    }).join('');
+    var list = rbSelected.map(function (code) {
+      var pr = rbProps(code);
+      var i = rbRecord(code) || {};
+      return '<tr><td>' + esc(code) + '</td><td>' + esc(pr.name || '') + '</td>' +
+        '<td>' + esc(pr.ward || '') + '</td>' +
+        '<td>' + esc(pr.borough || '') + '</td>' +
+        '<td class="n">' + (num_(i.census_population) || 0).toLocaleString() + '</td></tr>';
+    }).join('');
+
+    var html = '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">' +
+      '<title>' + esc(rbAreaName()) + ' — area report</title><style>' +
+      'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;' +
+      'background:#f4f7f9;color:#212b32;margin:0;padding:24px;font-size:13px;line-height:1.5}' +
+      '.r{max-width:860px;margin:0 auto;background:#fff;border:1px solid #dde1e4;' +
+      'border-radius:10px;padding:26px 30px}' +
+      'h1{font-size:22px;margin:0 0 2px;color:#003087}' +
+      '.sub{color:#4c6272;font-size:12.5px;margin-bottom:18px}' +
+      'h2{font-size:14px;margin:22px 0 8px;color:#003087}' +
+      'table{width:100%;border-collapse:collapse;font-size:12px}' +
+      'th,td{text-align:left;padding:5px 8px;border-bottom:1px solid #e8edee}' +
+      'th{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#768692}' +
+      'td.n{text-align:right;font-variant-numeric:tabular-nums}' +
+      'td.m{color:#768692;font-size:11px}' +
+      '.note{background:#f4f7f9;border-left:3px solid #005eb8;padding:10px 12px;' +
+      'border-radius:0 6px 6px 0;color:#4c6272;font-size:12px;margin:14px 0}' +
+      '.actions{max-width:860px;margin:14px auto 0;display:flex;gap:8px}' +
+      'button{font:inherit;font-size:12.5px;padding:7px 14px;border:1px solid #005eb8;' +
+      'background:#005eb8;color:#fff;border-radius:8px;cursor:pointer}' +
+      'button.s{background:#fff;color:#212b32;border-color:#dde1e4}' +
+      '@media print{body{background:#fff;padding:0}.r{border:0;border-radius:0}.actions{display:none}}' +
+      '</style></head><body><div class="r">' +
+      '<h1>' + esc(rbAreaName()) + '</h1>' +
+      '<div class="sub">' + agg.lsoas + ' neighbourhood' + (agg.lsoas === 1 ? '' : 's') +
+      ' · ' + Math.round(agg.population).toLocaleString() + ' residents' +
+      (boroughLine ? ' · ' + boroughLine : '') + '</div>' +
+      '<div class="note">This is a custom area, assembled from ' + agg.lsoas +
+      ' LSOAs. Counts are summed across them and everything else is a ' +
+      'population-weighted mean, so a larger neighbourhood pulls the average further ' +
+      'than a smaller one. It is not an official geography and no one else publishes ' +
+      'figures for it.' +
+      (Object.keys(bs).length > 1
+        ? ' It crosses ' + Object.keys(bs).length + ' boroughs, so these are not borough figures.'
+        : '') +
+      '</div>' +
+      '<h2>Figures for this area</h2><table><tr><th>Indicator</th><th>Value</th>' +
+      '<th>How it was combined</th></tr>' + rows + '</table>' +
+      '<h2>Neighbourhoods included</h2><table><tr><th>LSOA</th><th>Name</th><th>Ward</th>' +
+      '<th>Borough</th><th>Population</th></tr>' + list + '</table>' +
+      '<h2>Source</h2><p style="color:#4c6272;font-size:12px">Built with PopHealth Map, ' +
+      'pophealth.uk. Figures are the same ones the map draws; see the methodology page ' +
+      'for where each comes from and what it cannot tell you.</p>' +
+      '</div><div class="actions">' +
+      '<button onclick="window.print()">Print or save as PDF</button>' +
+      '<button class="s" onclick="window.close()">Close</button></div></body></html>';
+
+    var w = window.open('', '_blank');
+    if (!w) { alert('Please allow pop-ups to open the report.'); return; }
+    w.document.open(); w.document.write(html); w.document.close();
+  }
+
   function applyMode(mode) {
-    currentMode = (mode === 'query' || mode === 'compare') ? mode : 'explore';
+    currentMode = (mode === 'query' || mode === 'compare' || mode === 'report')
+      ? mode : 'explore';
+
+    // The area is built out of LSOAs, so the LSOA layer has to be the one on
+    // the map. Without this the mode opens onto wards and clicking does
+    // nothing at all.
+    if (mode === 'report') {
+      if (typeof _setDataLevel === 'function' && currentDataLevel !== 'lsoa') {
+        _setDataLevel('lsoa');
+      }
+      renderReportPane();
+    }
+    drawReportSelection();
 
     // The Directory's pin is its own mark on the map and goes with it.
     if (mode !== 'directory') clearDirMarker();
