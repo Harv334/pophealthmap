@@ -904,9 +904,20 @@
   .cmp-head h2 { font-family: 'Inter Tight', Inter, sans-serif; font-size: 17px; font-weight: 600;
     margin: 0; letter-spacing: -.01em; color: var(--nhs-dark); }
   .cmp-head .cmp-sub { font-size: 11.5px; color: var(--ink-3); margin-top: 2px; }
-  .cmp-head .cmp-back { margin-left: auto; appearance: none; background: none; border: 0; padding: 0;
-    font: inherit; font-size: 11px; color: var(--nhs-blue); cursor: pointer; }
-  .cmp-head .cmp-back:hover { color: var(--nhs-dark); text-decoration: underline; }
+  /* ── Back to Explore ──
+     One rule for all four, keyed off the button rather than the header it
+     happens to sit in. This was written as `.cmp-head .cmp-back`, which is the
+     Compare header, so Compare and Query got the quiet blue link and the other
+     two got whatever the browser draws for a bare <button>: Report builder's
+     lives in .rb-head and Directory's in .dir-head, and neither matched. Four
+     buttons with the same class, the same label and the same job looked like
+     two different kinds of control. */
+  .cmp-back, .q-back { margin-left: auto; appearance: none; background: none; border: 0;
+    padding: 0; font: inherit; font-size: 11px; color: var(--nhs-blue); cursor: pointer;
+    white-space: nowrap; flex: 0 0 auto; }
+  .cmp-back:hover, .q-back:hover { color: var(--nhs-dark); text-decoration: underline; }
+  .cmp-back:focus-visible, .q-back:focus-visible { outline: 2px solid var(--nhs-blue);
+    outline-offset: 2px; border-radius: 2px; }
   .cmp-group { padding: 12px 14px; border-bottom: 1px solid var(--line); }
   .cmp-group h3 { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; font-weight: 600;
     color: var(--ink-3); margin: 0 0 9px; display: flex; justify-content: space-between; align-items: baseline; }
@@ -1135,7 +1146,6 @@
   .dir-pane { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
   .dir-head { padding: 13px 14px 11px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
   .dir-head .cmp-row { display: flex; align-items: baseline; gap: 8px; }
-  .dir-head .cmp-back { flex: 0 0 auto; white-space: nowrap; }
   .dir-head h2 { font-family: 'Inter Tight', Inter, sans-serif; font-size: 17px; font-weight: 600;
     margin: 0; letter-spacing: -.01em; color: var(--nhs-dark); flex: 1; min-width: 0; }
   .dir-controls { padding: 10px 14px; border-bottom: 1px solid var(--line);
@@ -1174,9 +1184,8 @@
   .q-head { display: flex; align-items: baseline; gap: 8px; padding: 11px 12px 0; }
   .q-head h2 { font-family: 'Inter Tight', Inter, sans-serif; font-size: 16px; font-weight: 600;
     letter-spacing: -.01em; color: var(--nhs-dark); margin: 0; }
-  .q-head .q-back { margin-left: auto; appearance: none; background: none; border: 0; padding: 0;
-    font: inherit; font-size: 11px; color: var(--nhs-blue); cursor: pointer; }
-  .q-head .q-back:hover { color: var(--nhs-dark); text-decoration: underline; }
+  /* Styled with .cmp-back above, so the two stay identical by construction
+     rather than by two copies of the same declarations being kept in step. */
   .q-scroll { overflow-y: auto; min-height: 0; flex: 1; }
   .q-block { padding: 12px 12px 13px; border-bottom: 1px solid var(--line); background: var(--paper-2); }
   .q-sub { font-size: 11px; color: var(--ink-3); line-height: 1.45; margin-bottom: 9px; }
@@ -1994,7 +2003,7 @@
         <div class="dir-head">
           <div class="cmp-row">
             <h2>Directory</h2>
-            <button type="button" class="cmp-back" id="dir-back" style="margin-left:auto">Back to Explore</button>
+            <button type="button" class="cmp-back" id="dir-back">Back to Explore</button>
           </div>
           <div class="cmp-sub" id="dir-sub">Loading the lists...</div>
         </div>
