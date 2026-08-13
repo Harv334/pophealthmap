@@ -1,5 +1,5 @@
 {
-  "last_run": "2026-08-10T16:49:13.465174+00:00",
+  "last_run": "2026-08-13T16:27:33.822067+00:00",
   "sources": {
     "boundaries": {
       "duration_s": 32.8,
@@ -154,9 +154,9 @@
       "status": "ok"
     },
     "dwp": {
-      "duration_s": 13.3,
+      "duration_s": 27.4,
       "error": "source produced no rows; see the run log for the upstream error",
-      "fetched_at": "2026-08-10T09:03:16.269715+00:00",
+      "fetched_at": "2026-08-13T16:27:06.373280+00:00",
       "notes": "",
       "output_path": "",
       "rows_written": 0,
@@ -202,14 +202,17 @@
       "status": "ok"
     },
     "fuel_poverty": {
-      "duration_s": 0.0,
-      "error": "ImportError: `Import openpyxl` failed.  Use pip or conda to install the openpyxl package.",
-      "fetched_at": "2026-08-10T09:03:44.759330+00:00",
+      "duration_s": 55.6,
+      "error": "",
+      "fetched_at": "2026-08-13T16:23:34.906238+00:00",
       "notes": "",
-      "output_path": "",
-      "rows_written": 0,
-      "schema": {},
-      "status": "failed"
+      "output_path": "data/demographics/fuel_poverty.parquet",
+      "rows_written": 33756,
+      "schema": {
+        "LSOA21CD": "str",
+        "fuel_poverty_pct": "float64"
+      },
+      "status": "ok"
     },
     "gp": {
       "duration_s": 2.8,
@@ -287,14 +290,17 @@
       "status": "ok"
     },
     "ptal": {
-      "duration_s": 1.4,
+      "duration_s": 1.0,
       "error": "",
-      "fetched_at": "2026-08-10T09:03:44.760584+00:00",
-      "notes": "source returned no frame",
-      "output_path": "",
-      "rows_written": 0,
-      "schema": {},
-      "status": "skipped"
+      "fetched_at": "2026-08-13T16:17:41.875582+00:00",
+      "notes": "",
+      "output_path": "data/demographics/ptal.parquet",
+      "rows_written": 4835,
+      "schema": {
+        "LSOA21CD": "str",
+        "ptai_score": "float64"
+      },
+      "status": "ok"
     },
     "qof": {
       "duration_s": 14.5,

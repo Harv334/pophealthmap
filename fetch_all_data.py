@@ -281,7 +281,14 @@ def browser_session(referer: str | None = None) -> requests.Session:
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,"
                   "image/avif,image/webp,*/*;q=0.8",
         "Accept-Language": "en-GB,en;q=0.9",
-        "Accept-Encoding": "gzip, deflate, br",
+        # Only what requests can actually decode. It handled gzip and deflate
+        # itself and needed the brotli package for `br`, which is not a
+        # dependency here, so any server that chose Brotli handed back bytes
+        # that r.text turned into mojibake. Nothing crashed: a regex over
+        # compressed data simply matches nothing, so a fetch would report that
+        # a page listed no links rather than that it could not read the page.
+        # Both the London Datastore and gov.uk choose Brotli when offered it.
+        "Accept-Encoding": "gzip, deflate",
         "Connection": "keep-alive",
         "Upgrade-Insecure-Requests": "1",
     })
@@ -2574,15 +2581,72 @@ def _tofloat(v):
 # "Proportion of households fuel poor (%)".
 # URLs rotate on each release, so default may 404 — drop the file manually
 # in .cache/fuel_poverty/ and the fetcher will pick it up.
-FUEL_POVERTY_DEFAULT_URL = os.environ.get(
-    "FUEL_POVERTY_URL",
-    # 2023 data (pub. Feb 2025). If 404, grab the latest XLSX from
-    # https://www.gov.uk/government/collections/fuel-poverty-sub-regional-statistics
-    # and save as .cache/fuel_poverty/fuel_poverty_lsoa.xlsx.
-    "https://assets.publishing.service.gov.uk/media/"
-    "67a5a52fd0346e3cb63419c7/"
-    "sub-regional-fuel-poverty-2025-tables.xlsx",
-)
+# A pinned asset URL points at one release and DESNZ publish a new one every
+# year under a new media id, so this rots on a schedule. The old value was the
+# 2023 data published in Feb 2025 and there have been releases since.
+#
+# gov.uk exposes a content API: any page is also JSON at
+# /api/content/<path>, and a statistics release lists its attachments there.
+# So the collection is read, the newest sub-regional release picked out of it,
+# and its spreadsheet taken from the release's own attachment list. That
+# survives a new publication without an edit here.
+# The collection is read as HTML and each release as JSON, because that is
+# where each one actually answers: /api/content on a collection returns a short
+# stub with no children in it, while /api/content on a statistics release lists
+# its attachments properly.
+FUEL_POVERTY_COLLECTION = ("https://www.gov.uk/government/collections/"
+                           "fuel-poverty-sub-regional-statistics")
+FUEL_POVERTY_URL_OVERRIDE = os.environ.get("FUEL_POVERTY_URL", "")
+
+
+def _fuel_poverty_discover_url() -> str | None:
+    """The newest DESNZ sub-regional spreadsheet, found rather than remembered."""
+    if FUEL_POVERTY_URL_OVERRIDE:
+        return FUEL_POVERTY_URL_OVERRIDE
+    sess = browser_session(referer="https://www.gov.uk/")
+    try:
+        r = sess.get(FUEL_POVERTY_COLLECTION, timeout=60)
+        r.raise_for_status()
+        slugs = re.findall(
+            r'/government/statistics/([a-z0-9-]*sub-regional-fuel-poverty[a-z0-9-]*)',
+            r.text)
+    except Exception as e:
+        warn(f"fuel_poverty: could not read the gov.uk collection ({e})")
+        return None
+    if not slugs:
+        warn("fuel_poverty: the collection listed no sub-regional releases")
+        return None
+
+    # "data" releases carry the tables; "report" releases carry the commentary.
+    #
+    # Ordered by the year in the slug, not by where it appears on the page.
+    # Document order put 2011-sub-regional-fuel-poverty-data last, so taking the
+    # last one fetched a spreadsheet from 2011 and would have quietly replaced
+    # current figures with fifteen-year-old ones. The year sits in a different
+    # place depending on the release, sometimes leading and sometimes trailing,
+    # so this takes the largest four-digit number anywhere in the slug.
+    def _slug_year(s: str) -> int:
+        # Non-capturing, or findall would return the century rather than the year.
+        years = [int(y) for y in re.findall(r"(?:19|20)\d{2}", s)]
+        return max(years) if years else 0
+
+    data_first = [s for s in dict.fromkeys(slugs) if "report" not in s]
+    ordered = sorted(data_first or list(dict.fromkeys(slugs)),
+                     key=_slug_year, reverse=True)
+    for slug in ordered:
+        try:
+            rr = sess.get(f"https://www.gov.uk/api/content/government/statistics/{slug}",
+                          timeout=60)
+            rr.raise_for_status()
+        except Exception:
+            continue
+        xlsx = re.findall(
+            r'"(https://assets\.publishing\.service\.gov\.uk/[^"]+\.xlsx)"', rr.text)
+        if xlsx:
+            info(f"fuel_poverty: newest release is {slug}")
+            return xlsx[0]
+    warn("fuel_poverty: no release in the collection had an .xlsx attachment")
+    return None
 
 
 def run_fuel_poverty() -> pd.DataFrame | None:
@@ -2590,22 +2654,27 @@ def run_fuel_poverty() -> pd.DataFrame | None:
     cache_dir = CACHE_DIR / "fuel_poverty"
     cache_dir.mkdir(parents=True, exist_ok=True)
 
-    # Prefer any XLSX the user has dropped in; else try the default URL.
+    # Prefer any XLSX the user has dropped in; else discover the current one.
     candidates = sorted(cache_dir.glob("*.xlsx"),
                         key=lambda p: p.stat().st_size, reverse=True)
     if not candidates:
-        url = FUEL_POVERTY_DEFAULT_URL
+        url = _fuel_poverty_discover_url()
         src = cache_dir / "fuel_poverty_lsoa.xlsx"
-        info(f"No local cache — downloading {url}")
+        if url:
+            info(f"No local cache — downloading {url}")
         try:
+            if not url:
+                raise RuntimeError("no download URL could be discovered")
             r = browser_session(referer="https://www.gov.uk/").get(url, timeout=120)
             r.raise_for_status()
             src.write_bytes(r.content)
             candidates = [src]
         except Exception as e:
             warn(f"fuel_poverty download failed: {e}. "
-                 f"Drop the DESNZ sub-regional XLSX (LSOA tab) in {cache_dir}/ "
-                 "and re-run `python fetch_all_data.py --only fuel_poverty`.")
+                 f"MANUAL STEP: download the newest sub-regional tables XLSX from "
+                 "https://www.gov.uk/government/collections/fuel-poverty-sub-regional-statistics "
+                 f"and save it in {cache_dir}/, then re-run "
+                 "`python fetch_all_data.py --only fuel_poverty`.")
             return None
 
     src = candidates[0]
@@ -2688,14 +2757,39 @@ def run_fuel_poverty() -> pd.DataFrame | None:
 #
 # The LSOA Atlas CSV contains a column "Average PTAI score" per LSOA. Bigger
 # is better (6b ~= 25+, 0 ~= <0.01).
-PTAL_DEFAULT_URL = os.environ.get(
-    "PTAL_URL",
-    # LSOA Atlas CSV on London Datastore. If this 404s, grab the CSV from
-    # https://data.london.gov.uk/dataset/lsoa-atlas and drop in
-    # .cache/ptal/lsoa_atlas.csv.
-    "https://data.london.gov.uk/download/lsoa-atlas/"
-    "00f1a8c6-9a8e-4d90-a48e-7b2d2b4ab15b/lsoa-data.csv",
-)
+# The download URL carries a resource id that changes whenever the GLA
+# republishes the file, so hardcoding one guarantees it eventually 404s. It did:
+# the pinned id stopped resolving and PTAL had been silently skipped ever since,
+# because a skipped optional source is not a failure and nothing said so.
+#
+# The Datastore has an API that lists a dataset's current resources, so the id
+# is asked for rather than remembered. PTAL_URL still overrides everything, for
+# pinning a specific file or pointing at a local copy.
+PTAL_DATASET_API = "https://data.london.gov.uk/api/dataset/lsoa-atlas/"
+PTAL_URL_OVERRIDE = os.environ.get("PTAL_URL", "")
+
+
+def _ptal_discover_url() -> str | None:
+    """The current LSOA Atlas CSV, from the Datastore's own resource list."""
+    if PTAL_URL_OVERRIDE:
+        return PTAL_URL_OVERRIDE
+    try:
+        r = browser_session(referer="https://data.london.gov.uk/").get(
+            PTAL_DATASET_API, timeout=60)
+        r.raise_for_status()
+        blob = r.text
+    except Exception as e:
+        warn(f"ptal: could not reach the Datastore API ({e})")
+        return None
+    # Prefer the current-boundaries file. The dataset also carries an
+    # "old-boundaries" CSV, which is the same columns on 2011 LSOAs and would
+    # join against about nothing.
+    urls = re.findall(r'"(https://data\.london\.gov\.uk/download/[^"]+\.csv)"', blob)
+    if not urls:
+        warn("ptal: the Datastore API listed no CSV resources")
+        return None
+    current = [u for u in urls if "old-boundaries" not in u.lower()]
+    return (current or urls)[0]
 
 
 def run_ptal() -> pd.DataFrame | None:
@@ -2706,10 +2800,13 @@ def run_ptal() -> pd.DataFrame | None:
     candidates = sorted(cache_dir.glob("*.csv"),
                         key=lambda p: p.stat().st_size, reverse=True)
     if not candidates:
-        url = PTAL_DEFAULT_URL
+        url = _ptal_discover_url()
         src = cache_dir / "lsoa_atlas.csv"
-        info(f"No local cache — downloading {url}")
+        if url:
+            info(f"No local cache — downloading {url}")
         try:
+            if not url:
+                raise RuntimeError("no download URL could be discovered")
             r = browser_session(referer="https://data.london.gov.uk/").get(
                 url, timeout=120)
             r.raise_for_status()
@@ -2717,8 +2814,8 @@ def run_ptal() -> pd.DataFrame | None:
             candidates = [src]
         except Exception as e:
             warn(f"PTAL download failed: {e}. "
-                 f"Download the LSOA Atlas CSV from "
-                 "https://data.london.gov.uk/dataset/lsoa-atlas and save as "
+                 f"MANUAL STEP: download the LSOA Atlas CSV from "
+                 "https://data.london.gov.uk/dataset/lsoa-atlas and save it as "
                  f"{cache_dir}/lsoa_atlas.csv, then re-run `python "
                  "fetch_all_data.py --only ptal`.")
             return None
@@ -2749,7 +2846,16 @@ def run_ptal() -> pd.DataFrame | None:
     code_col = (find_col("lower super output area")
                 or find_col("lsoa", "code")
                 or find_col("codes"))
-    ptai_col = (find_col("average", "ptai")
+    # The Atlas does not use the word PTAI anywhere. Its column is
+    #   "Public Transport Accessibility Levels (2014);Average Score;"
+    # so matching on "ptai" found nothing and the source has been reporting
+    # "no frame" for as long as that has been the heading. The PTAL spellings
+    # are tried first, and the old PTAI ones kept in case an older copy of the
+    # file is sitting in the cache.
+    ptai_col = (find_col("public transport accessibility", "average score")
+                or find_col("ptal", "average score")
+                or find_col("ptal", "average")
+                or find_col("average", "ptai")
                 or find_col("ptai", "score")
                 or find_col("ptai"))
     if not code_col or not ptai_col:

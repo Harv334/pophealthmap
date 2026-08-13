@@ -417,7 +417,27 @@ var SOURCES = [
     geo: 'LSOA',
     period: 'Latest period published per dataset',
     cadence: 'Quarterly for most of these series.',
-    manifest: 'dwp' },
+    manifest: 'dwp',
+    fix: {
+      auto: 'No file to download. This is a live API, and all five NOMIS dataset ' +
+            'ids still resolve, so the problem is the query rather than the source.',
+      steps: [
+        'Every query returns an empty body, 0.00 MB, for both geographies tried ' +
+        '(<code>TYPE298</code>, LSOA 2021, and <code>TYPE432</code>). The most ' +
+        'likely explanation is that these five series are no longer published at ' +
+        'LSOA and the geography needs changing rather than the code.',
+        'Dimension discovery also fails for three of the five with ' +
+        '<code>couldn\'t parse dim list</code>, so the request is built without ' +
+        'them. Where it does succeed it sets every dimension to <code>0</code>, ' +
+        'which may not be a valid selector for those datasets.',
+        'Run <code>python fetch_all_data.py --only dwp</code>: it prints the ' +
+        'exact URL it tried for each series, which can be pasted into a browser ' +
+        'to see what NOMIS says. <code>DWP_DATASETS</code> in the pipeline lists ' +
+        'the five ids.',
+        'Nothing on the map reads these figures yet, so this is the least urgent ' +
+        'of the four.',
+      ],
+    } },
 
   { name: 'Fuel poverty (LILEE)',
     pub: 'DESNZ',
@@ -425,7 +445,20 @@ var SOURCES = [
     geo: 'LSOA',
     period: '2022',
     cadence: 'Annually.',
-    manifest: 'fuel_poverty' },
+    manifest: 'fuel_poverty',
+    fix: {
+      auto: 'Fetched automatically. The pipeline reads the gov.uk collection, ' +
+            'picks the newest sub-regional release by the year in its name, and ' +
+            'takes the spreadsheet from that release\'s own attachment list, so ' +
+            'a new publication needs no edit here.',
+      manual: [
+        { file: 'the newest sub-regional fuel poverty tables (.xlsx)',
+          from: 'https://www.gov.uk/government/collections/fuel-poverty-sub-regional-statistics',
+          to: '.cache/fuel_poverty/' },
+      ],
+      steps: ['Only if the automatic route fails. Then run ' +
+              '<code>python fetch_all_data.py --only fuel_poverty</code>.'],
+    } },
 
   { name: 'Green and blue space',
     pub: 'Natural England and Ordnance Survey, processed by Defra',
@@ -476,7 +509,18 @@ var SOURCES = [
     geo: 'Point',
     period: 'Current register',
     cadence: 'Monthly.',
-    manifest: 'hospitals' },
+    manifest: 'hospitals',
+    fix: {
+      auto: 'This one genuinely needs a person. The NHS dataset index page has no ' +
+            'machine-readable link to the file: it is a page you click through, ' +
+            'and there is nothing stable for the pipeline to request.',
+      manual: [
+        { file: 'Hospital.csv',
+          from: 'https://www.nhs.uk/about-us/nhs-website-datasets/',
+          to: '.cache/hospitals/Hospital.csv' },
+      ],
+      steps: ['Then run <code>python fetch_all_data.py --only hospitals</code>.'],
+    } },
 
   { name: 'Charities and CICs',
     pub: 'Charity Commission for England and Wales',
@@ -493,7 +537,19 @@ var SOURCES = [
     geo: 'LSOA',
     period: 'As published in the Atlas',
     cadence: 'Ad hoc.',
-    manifest: 'ptal' },
+    manifest: 'ptal',
+    fix: {
+      auto: 'Fetched automatically. The download URL carries a resource id that ' +
+            'changes whenever the GLA republish, so the pipeline asks the ' +
+            'Datastore API which file is current rather than remembering one.',
+      manual: [
+        { file: 'the LSOA Atlas CSV',
+          from: 'https://data.london.gov.uk/dataset/lsoa-atlas',
+          to: '.cache/ptal/lsoa_atlas.csv' },
+      ],
+      steps: ['Only if the automatic route fails. Then run ' +
+              '<code>python fetch_all_data.py --only ptal</code>.'],
+    } },
 
   { name: 'Population estimates',
     pub: 'ONS',
@@ -579,9 +635,43 @@ var SOURCES = [
        '</span>' : '');
   }
 
+  /* What to do about a source that is not refreshing.
+     Shown only for the ones that are actually broken, and only once the
+     manifest says so, so the page does not carry a wall of instructions for
+     problems nobody has. It says whether a person is needed at all, because
+     "download this file" and "the query needs fixing" are jobs for different
+     people. */
+  function fixPanel(rec, s) {
+    if (!rec.fix || !s || (s.status !== 'failed' && s.status !== 'skipped')) return '';
+    var f = rec.fix;
+    var out = '<tr><td colspan="6" style="background:#FDF0D5;border-top:0">' +
+      '<div style="font-size:13px;color:#8A5A00">' +
+      '<strong>To fix ' + esc(rec.name) + '</strong>';
+    if (f.auto) out += '<div style="margin-top:5px">' + f.auto + '</div>';
+    if (f.manual && f.manual.length) {
+      out += '<div style="margin-top:7px"><strong>Files to download by hand</strong>' +
+        '<table style="margin:6px 0 0;font-size:12.5px;background:transparent;border:0">' +
+        '<tr><th style="background:transparent;border-bottom:1px solid #E8D3A3">File</th>' +
+        '<th style="background:transparent;border-bottom:1px solid #E8D3A3">From</th>' +
+        '<th style="background:transparent;border-bottom:1px solid #E8D3A3">Save it as</th></tr>' +
+        f.manual.map(function (m) {
+          return '<tr><td style="border-bottom:0"><code>' + esc(m.file) + '</code></td>' +
+            '<td style="border-bottom:0"><a href="' + esc(m.from) + '">' +
+              esc(m.from.replace(/^https?:\/\//, '').slice(0, 52)) + '</a></td>' +
+            '<td style="border-bottom:0"><code>' + esc(m.to) + '</code></td></tr>';
+        }).join('') + '</table></div>';
+    }
+    if (f.steps && f.steps.length) {
+      out += '<ol style="margin:7px 0 0;padding-left:20px">' +
+        f.steps.map(function (t) { return '<li>' + t + '</li>'; }).join('') + '</ol>';
+    }
+    return out + '</div></td></tr>';
+  }
+
   function draw(manifest) {
     var sources = (manifest && manifest.sources) || null;
     tbody.innerHTML = SOURCES.map(function (rec) {
+      var s = sources && rec.manifest ? sources[rec.manifest] : null;
       return '<tr>' +
         '<td><strong>' + esc(rec.name) + '</strong><br>' +
           '<span style="font-size:12.5px;color:var(--ink-3)">' + esc(rec.pub) + '</span></td>' +
@@ -590,7 +680,7 @@ var SOURCES = [
         '<td>' + esc(rec.period) + '</td>' +
         '<td>' + esc(rec.cadence) + '</td>' +
         '<td>' + statusCell(rec, sources) + '</td>' +
-      '</tr>';
+      '</tr>' + fixPanel(rec, s);
     }).join('');
 
     if (!sources) {
