@@ -120,6 +120,19 @@
 
   /* ── "Currently viewing" strip + filter chips (above the map) ── */
   .viewing-strip { background: #fff; border-bottom: 1px solid #E8EDEE; padding: 5px 12px 6px; font-size: 11.5px; color: #4C6272; display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 10px; row-gap: 2px; align-items: center; flex-shrink: 0; }
+  /* ── Search result pin ──
+     A teardrop rather than a circle, because the point layers are already
+     circles and the whole job of this one is to be the thing you can pick out
+     from them. Drawn in CSS so there is no image to load and nothing to go
+     missing when the page is served from the mirror. */
+  .search-pin { width: 26px; height: 34px; position: relative; }
+  .search-pin::before { content: ''; position: absolute; left: 3px; top: 0;
+    width: 20px; height: 20px; border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg); background: #005EB8; border: 2.5px solid #fff;
+    box-shadow: 0 2px 6px rgba(0,0,0,.35); }
+  .search-pin-dot { position: absolute; left: 10.5px; top: 7.5px;
+    width: 7px; height: 7px; border-radius: 50%; background: #fff; }
+
   /* ── Fingertips suppression notice ──
      Beside the zoom buttons, not under them. This lived in a style attribute on
      the element, which had two consequences. An inline style beats an id
@@ -8340,6 +8353,10 @@ function _refreshUI() {
 // Reset everything → default view.
 function _resetAll() {
   try {
+    // The search pin, which marks a place the user asked about. Reset means
+    // "put the map back to how it started", and a pin left behind outlives the
+    // search that explained it.
+    if (typeof _clearSearchPin === 'function') _clearSearchPin();
     // Borough
     focusedBorough = 'all';
     const bsel = document.getElementById('borough-focus');
@@ -8554,6 +8571,61 @@ function _searchFlyTo(lat, lng, zoom) {
     map.setView([lat, lng], zoom || 15, { animate: true });
   }
 }
+
+/**
+ * Mark what was searched for.
+ *
+ * Searching a dental practice used to move the map to it and stop there,
+ * leaving the thing you looked up indistinguishable from everything else in
+ * frame. At zoom 16 that is a street of buildings and no indication which one
+ * you asked about, and if its own layer is switched off there is nothing there
+ * at all.
+ *
+ * One pin at a time: a second search moves it rather than accumulating a trail
+ * of places you have already stopped looking at. It sits above the point
+ * layers so it is not lost among the markers it may be standing on, and it
+ * carries the same label and category the search result showed, so the pin and
+ * the row that produced it say the same thing.
+ */
+let _searchPin = null;
+function _clearSearchPin() {
+  if (_searchPin && typeof map !== 'undefined' && map) {
+    try { map.removeLayer(_searchPin); } catch (e) { /* already gone */ }
+  }
+  _searchPin = null;
+}
+function _dropSearchPin(item) {
+  if (typeof map === 'undefined' || !map) return;
+  _clearSearchPin();
+  const lat = item && item._lat, lng = item && item._lng;
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+  const label = (item.label || '').toString();
+  const sub = (item.sub || '').toString();
+  const kind = (item.type || '').toString();
+  _searchPin = L.marker([lat, lng], {
+    zIndexOffset: 1000,   // above the clustered point layers it may be sitting on
+    keyboard: false,
+    icon: L.divIcon({
+      className: '',
+      html: '<div class="search-pin"><span class="search-pin-dot"></span></div>',
+      iconSize: [26, 34],
+      iconAnchor: [13, 32],
+      popupAnchor: [0, -30],
+    }),
+  }).addTo(map);
+  const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  _searchPin.bindPopup(
+    '<div style="font-weight:600;margin-bottom:2px">' + esc(label) + '</div>' +
+    (kind ? '<div style="font-size:11px;color:#4C6272">' + esc(kind) +
+            (sub ? ' · ' + esc(sub) : '') + '</div>' : '') +
+    '<div style="margin-top:5px"><a href="#" class="search-pin-clear" ' +
+    'style="font-size:11px;color:#005EB8">Remove this pin</a></div>'
+  ).openPopup();
+  _searchPin.on('popupopen', e => {
+    const a = e.popup.getElement() && e.popup.getElement().querySelector('.search-pin-clear');
+    if (a) a.addEventListener('click', ev => { ev.preventDefault(); _clearSearchPin(); });
+  });
+}
 function _searchPickResult(item) {
   const input = document.getElementById('hdr-search-input');
   const results = document.getElementById('hdr-search-results');
@@ -8577,7 +8649,10 @@ function _searchPickResult(item) {
       }
     }
   } else {
+    // A point result: a practice, a school, a charity. Move to it and mark it,
+    // because at this zoom the map alone does not say which building was meant.
     _searchFlyTo(item._lat, item._lng, 16);
+    _dropSearchPin(item);
   }
 }
 function _runSearch(q) {
@@ -10642,14 +10717,40 @@ loadData();
    * the ward, not a decile of the ward, so it is described as where the
    * typical LSOA sits rather than as a decile the ward is in.
    */
+  /**
+   * Where a mean decile actually places somewhere, in words that do not
+   * overstate it.
+   *
+   * Deciles run 1, the most deprived tenth of England, to 10, the least. So a
+   * ward whose typical neighbourhood sits at 9.9 is inside "the most deprived
+   * 99%" of the country. That is arithmetically true and it is useless: it is
+   * true of very nearly everywhere, and it reads as a description of somewhere
+   * severely deprived. Village in Merton, one of the least deprived wards in
+   * London, was described exactly that way.
+   *
+   * Above the midpoint the informative statement is the other one, so that is
+   * the one made. 9.9 becomes "among the least deprived 11%". The two framings
+   * meet at 5.5, where both give 55% and either is fair.
+   *
+   * The site's own assistant is told not to make this mistake, in as many
+   * words, because overstating deprivation is the worst direction to be wrong
+   * in for this data. The ward summary was making it anyway.
+   */
+  function decileBand(dec) {
+    var pct = function (v) { return Math.min(100, Math.max(1, Math.round(v))); };
+    return dec > 5.5
+      ? { dir: 'least', pct: pct((11 - dec) * 10) }
+      : { dir: 'most',  pct: pct(dec * 10) };
+  }
+
   function insight(w) {
     var bits = [], i = w.inds;
     var dec = num(i.imd_decile_mean);
     if (dec !== null) {
-      var share = Math.min(100, Math.max(1, Math.round(dec * 10)));
+      var band = decileBand(dec);
       bits.push('The typical neighbourhood here sits in national deprivation decile <strong>' +
-        dec.toFixed(1) + '</strong>, among roughly the most deprived <strong>' + share +
-        '%</strong> of England.');
+        dec.toFixed(1) + '</strong>, among roughly the ' + band.dir + ' deprived <strong>' +
+        band.pct + '%</strong> of England.');
     }
     var score = num(i.imd_score);
     if (score !== null) {
@@ -11013,9 +11114,26 @@ loadData();
     var decs = pinned.map(function (n) { return num(indsOf(n).imd_decile_mean); })
                      .filter(function (v) { return v !== null; });
     if (decs.length === pinned.length) {
-      var worst = Math.max.apply(null, decs);
-      bits.push('All ' + pinned.length + ' pinned wards sit in the most deprived <strong>' +
-        Math.min(100, Math.round(worst * 10)) + '%</strong> of England on the mean decile of their neighbourhoods.');
+      // Deciles run backwards, so the highest of them is the LEAST deprived.
+      // This called that one "worst" and then reported it as "the most deprived
+      // X%", which inverted the claim and inflated it at the same time: four
+      // wards around decile 9 came out as "the most deprived 90% of England".
+      var leastDep = Math.max.apply(null, decs);
+      var mostDep  = Math.min.apply(null, decs);
+      if (leastDep <= 5.5) {
+        bits.push('All ' + pinned.length + ' pinned wards sit in the most deprived <strong>' +
+          decileBand(leastDep).pct + '%</strong> of England on the mean decile of their neighbourhoods.');
+      } else if (mostDep > 5.5) {
+        bits.push('All ' + pinned.length + ' pinned wards sit in the least deprived <strong>' +
+          decileBand(mostDep).pct + '%</strong> of England on the mean decile of their neighbourhoods.');
+      } else {
+        // Straddling the middle, where neither framing says anything: one of
+        // these wards is in the more deprived half and another is not, and any
+        // single band wide enough to hold both is too wide to be worth stating.
+        bits.push('These ' + pinned.length + ' wards sit either side of the national middle, from decile <strong>' +
+          mostDep.toFixed(1) + '</strong> to <strong>' + leastDep.toFixed(1) +
+          '</strong> on the mean decile of their neighbourhoods.');
+      }
     }
     // Name the outlier on each active metric that actually separates them.
     cmpActive().slice(0, 3).forEach(function (m) {
