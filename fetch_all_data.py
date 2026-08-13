@@ -3949,17 +3949,19 @@ def build_lsoa_data() -> dict:
             if code in out and pd.notna(v):
                 out[code]["ptai_score"] = round(float(v), 2)
 
-    # Green and blue space access (Natural England / OS, via build_greenspaces.py)
+    # Green and blue space access (Defra, via run_greenblue)
     #
-    # The parquet has been in the repo unread: nothing here ever joined it, so
-    # the seven green and blue overlays in index.html rendered an all-grey map
-    # while the columns they name sat on disk. Only the fields the map actually
-    # offers are carried, matching how vcse_data.json is trimmed to what is
-    # read; the parquet's other 31 columns stay out of the payload.
+    # Only the fields the map actually offers are carried, matching how
+    # vcse_data.json is trimmed to what is read; the parquet's other 31 columns
+    # stay out of the payload.
     #
-    # Coverage is 1,313 of the 4,994 LSOAs in scope, all of them inside it, so
-    # the join is exact but partial. Every LSOA without a row simply has no
-    # field, which the map already treats as no data rather than as a zero.
+    # Coverage is all 4,994 LSOAs in scope. It was 1,313 until the source was
+    # rebuilt: the parquet came from a one-off script scoped to the eight North
+    # West London boroughs, and stayed that size after the map went
+    # London-wide, so these seven overlays worked on a quarter of the map and
+    # looked like missing data everywhere else. run_greenblue takes its scope
+    # from the same LSOA lookup as the rest of the pipeline, so it cannot fall
+    # behind the footprint again.
     GB_FIELDS = ("gb_total_uprn", "gb_commitment_pct", "blue_commitment_pct",
                  "green_commitment_pct", "green_doorstep_pct",
                  "green_local_pct", "green_neighbourhood_pct")
@@ -4385,8 +4387,191 @@ def export_all() -> None:
 # ============================================================================
 # MAIN
 # ============================================================================
+# ============================================================================
+# SOURCE: Access to green and blue space  (Defra, with ONS, OS, Natural England)
+# ============================================================================
+# The parquet this writes was previously produced by a one-off script kept in
+# archive/, which scoped itself to the LSOA codes in data/boundaries/lsoa.geojson.
+# At the time that file held the eight North West London boroughs, so the
+# parquet held 1,313 rows, and it kept holding 1,313 after the map went
+# London-wide. The seven green and blue overlays therefore worked on a quarter
+# of the map and were empty everywhere else, which looks like missing data
+# rather than a footprint that was never widened.
+#
+# As a source it re-derives from the published table each run and takes its
+# scope from the same LSOA lookup as everything else, so it cannot fall behind
+# the footprint again.
+#
+# Geography: the table is one row per 2021 Output Area, roughly four to six per
+# LSOA. Aggregating means summing the UPRN numerator and the UPRN denominator
+# across the OAs in each LSOA and then dividing. Averaging the OA percentages
+# would weight a 40-address OA the same as a 400-address one.
+GREENBLUE_PAGE = ("https://www.gov.uk/government/statistics/"
+                  "access-to-green-and-blue-space-in-england")
+GREENBLUE_ODS = ("https://assets.publishing.service.gov.uk/media/"
+                 "69a184aef534e7e99adaeab4/"
+                 "Access_to_green_and_blue_space_England_data_table.ods")
+
+# The three sheets are named "1", "2" and "3": green-and-blue combined, blue,
+# and green. The prefix each becomes in the output columns.
+_GB_SHEETS = {"1": "gb", "2": "blue", "3": "green"}
+
+_GB_TABLE_OPEN = re.compile(rb'<table:table[^>]*table:name="([^"]+)"[^>]*>')
+_GB_TABLE_CLOSE = re.compile(rb"</table:table>")
+_GB_ROW_OPEN = re.compile(rb"<table:table-row[^>]*>")
+_GB_ROW_END = re.compile(rb"</table:table-row>")
+_GB_CELL = re.compile(
+    rb"<table:table-cell([^>]*)>((?:(?!</table:table-cell>).)*)</table:table-cell>"
+    rb"|<table:table-cell([^>]*)/>", re.DOTALL)
+_GB_REPEAT = re.compile(rb'table:number-columns-repeated="(\d+)"')
+_GB_VALUE = re.compile(rb'office:value="([^"]*)"')
+_GB_TEXT_P = re.compile(rb"<text:p[^>]*>((?:(?!</text:p>).)*)</text:p>", re.DOTALL)
+_GB_TAG = re.compile(rb"<[^>]+>")
+_GB_LSOA = re.compile(rb">(E01\d{6})<")
+
+
+def _gb_parse_row(row_xml: bytes) -> list:
+    cells = []
+    for m in _GB_CELL.finditer(row_xml):
+        attrs = m.group(1) or m.group(3) or b""
+        inner = m.group(2) or b""
+        vm = _GB_VALUE.search(attrs)
+        if vm:
+            val = vm.group(1).decode("utf-8", errors="replace")
+        else:
+            bits = [_GB_TAG.sub(b"", p).decode("utf-8", errors="replace").strip()
+                    for p in _GB_TEXT_P.findall(inner)]
+            val = " ".join(b for b in bits if b)
+        rm = _GB_REPEAT.search(attrs)
+        reps = int(rm.group(1)) if rm else 1
+        # A run of hundreds of empty repeated cells is padding at the end of a
+        # row, not data; keeping one placeholder is enough to hold the column
+        # positions of anything that follows.
+        if reps > 50 and val == "":
+            cells.append("")
+        else:
+            cells.extend([val] * min(reps, 50))
+    while cells and cells[-1] == "":
+        cells.pop()
+    return cells
+
+
+def run_greenblue() -> pd.DataFrame:
+    rule("Access to green and blue space (Defra)")
+    cache_dir = CACHE_DIR / "greenblue"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    ods = cache_dir / "Access_to_green_and_blue_space_England_data_table.ods"
+
+    if not ods.exists():
+        info(f"  downloading {GREENBLUE_ODS.rsplit('/', 1)[-1]} (about 45 MB)")
+        # Generous timeout: it is a 45 MB file and the whole source depends on
+        # getting all of it, so a slow connection should wait rather than
+        # produce a truncated archive that fails later as a zip error.
+        r = _http_bytes(GREENBLUE_ODS, source="greenblue", timeout=900)
+        write_bytes_atomic(ods, r.content)
+    else:
+        ok(f"greenblue: using cached ODS ({ods.stat().st_size / 1e6:.0f} MB)")
+
+    in_scope = set(get_lsoa_ward_lookup())
+    if not in_scope:
+        raise RuntimeError("greenblue: no in-scope LSOAs; run boundaries first")
+
+    # Streamed, not parsed into a DOM. Unzipped, content.xml is about 1.4 GB of
+    # XML; odfpy loads the whole thing and runs out of memory on it.
+    sums = {s: {} for s in _GB_SHEETS}
+    seen = {s: 0 for s in _GB_SHEETS}
+    CHUNK = 16 * 1024 * 1024
+    with zipfile.ZipFile(ods) as zf, zf.open("content.xml") as fp:
+        carry, cur, header_seen, meta = b"", None, False, (0, [])
+        while True:
+            data = fp.read(CHUNK)
+            if not data and not carry:
+                break
+            chunk = carry + data if data else carry
+            pos, N = 0, len(chunk)
+            while pos < N:
+                if cur is None:
+                    m = _GB_TABLE_OPEN.search(chunk, pos)
+                    if m is None:
+                        break
+                    name = m.group(1).decode("utf-8", errors="replace")
+                    pos = m.end()
+                    if name in _GB_SHEETS:
+                        cur, header_seen, meta = name, False, (0, [])
+                    continue
+                r = _GB_ROW_OPEN.search(chunk, pos)
+                close = _GB_TABLE_CLOSE.search(chunk, pos, r.start() if r else N)
+                if close:
+                    pos = close.end()
+                    cur = None
+                    continue
+                if r is None:
+                    break
+                rc = _GB_ROW_END.search(chunk, r.end())
+                if rc is None:
+                    break
+                row_xml = chunk[r.end():rc.start()]
+                pos = rc.end()
+                if not header_seen:
+                    cells = _gb_parse_row(row_xml)
+                    if cells and cells[0] == "OA21CD":
+                        header_seen = True
+                        meta = (cells.index("LSOA21CD"),
+                                [(h, i) for i, h in enumerate(cells)
+                                 if h == "total_uprn" or h.startswith("uprn_in_")])
+                    continue
+                m = _GB_LSOA.search(row_xml)
+                if m is None:
+                    continue
+                lsoa = m.group(1).decode("ascii")
+                if lsoa not in in_scope:
+                    continue
+                cells = _gb_parse_row(row_xml)
+                if not cells:
+                    continue
+                seen[cur] += 1
+                acc = sums[cur].setdefault(lsoa, {c: 0 for c, _ in meta[1]})
+                for name, idx in meta[1]:
+                    if idx < len(cells) and cells[idx]:
+                        try:
+                            acc[name] += int(float(cells[idx]))
+                        except ValueError:
+                            pass
+            carry = chunk[pos:]
+            if not data:
+                break
+
+    records: dict = {}
+    for sheet, pref in _GB_SHEETS.items():
+        for lsoa, acc in sums[sheet].items():
+            rec = records.setdefault(lsoa, {"LSOA21CD": lsoa})
+            total = acc.get("total_uprn", 0)
+            rec[f"{pref}_total_uprn"] = total
+            for k, v in acc.items():
+                if k == "total_uprn":
+                    continue
+                tag = k.replace("uprn_in_", "")
+                rec[f"{pref}_{tag}_uprn"] = v
+                rec[f"{pref}_{tag}_pct"] = round(100.0 * v / total, 2) if total else None
+
+    df = pd.DataFrame.from_records(list(records.values()))
+    if len(df) < len(in_scope) * 0.95:
+        raise RuntimeError(
+            f"greenblue: only {len(df):,} of {len(in_scope):,} in-scope LSOAs matched "
+            f"the published table. Refusing to ship a partial layer as a whole one, "
+            f"which is the fault this source was written to fix."
+        )
+    out_dir = DATA_DIR / "environment"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    df.to_parquet(out_dir / "greenblue_lsoa.parquet", index=False)
+    ok(f"greenblue: {len(df):,} LSOAs, {len(df.columns)} columns -> "
+       f"data/environment/greenblue_lsoa.parquet")
+    return pd.DataFrame([{"lsoas": len(df), "columns": len(df.columns)}])
+
+
 SOURCES = {
     "boundaries":  run_boundaries,
+    "greenblue":   run_greenblue,
     "gp":          run_gp_practices,
     "pharmacies":  run_pharmacies,
     "imd":         run_imd2025,

@@ -791,10 +791,13 @@ var MODEL_LABEL = "Claude Sonnet 5";
     toggle.id = "ai-toggle";
     toggle.type = "button";
     toggle.setAttribute("aria-expanded", "false");
-    // "(AI)" in the label rather than only in the panel: the button is the
-    // last thing someone reads before deciding to use this, and what answers
-    // them should not be a surprise once they are already typing.
-    toggle.textContent = "Ask about this data (AI)";
+    // No "(AI)" suffix on the button. What answers is still declared, but by
+    // the panel itself: it opens saying which model writes the answers and
+    // where the figures come from, and it carries the verification note under
+    // the input the whole time it is open. A parenthetical on the button was a
+    // third statement of the same thing in the smallest and least useful place
+    // to put it.
+    toggle.textContent = "Ask about this data";
 
     host.appendChild(panel);
     host.appendChild(toggle);

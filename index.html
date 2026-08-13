@@ -1453,7 +1453,14 @@
         <!-- Query is not a tab. It is a mode, reached from the rail at the
              top, and while it is on it takes over the whole sidebar: the tab
              strip is hidden rather than left showing nothing selected. -->
-        <div class="sb-tab" data-tab="ward">Ward</div>
+        <!-- "Ward" was wrong twice over: clicking an LSOA fills this pane too,
+             and so does an MSOA now that MSOA is a level the map draws. It is
+             whichever area is selected. Not "At a glance", which is already
+             the name of the first section inside it; "Area profile" also pairs
+             with the Open profile button on the ward bar, which is what opens
+             this. data-tab stays "ward" so the pane id and every handler that
+             names it keep working. -->
+        <div class="sb-tab" data-tab="ward">Area profile</div>
       </div>
 
       <!-- Layers tab -->
