@@ -6249,29 +6249,43 @@ function imdDecileColor(d) {
   return (window.cbSafe ? IMD_DECILE_COLORS_CB : IMD_DECILE_COLORS)[d];
 }
 
+/* ── The LSOA boundary ─────────────────────────────────────────────────────
+   One treatment, applied wherever the layer is drawn.
+
+   It used to be defined twice: navy at 1.2px in the no-overlay branch, and
+   separately in the branch that runs when an indicator is on. So the
+   boundaries changed colour and thickness depending on whether an indicator
+   happened to be selected, and switching the Viewing tab to LSOA without
+   picking one gave a different-looking layer from the same map with one on.
+
+   Neutral grey rather than a hue. Every colour on this map now means something
+   -- the choropleth runs yellow to deep blue and the deciles run the same way
+   -- so a boundary in any hue reads as data. Grey is the one thing left that
+   cannot be mistaken for a value, and it sits clear of the black ward outlines
+   in luminance, which is what tells the two geographies apart.
+
+   Thin, because they are reference rather than content and there are 4,994 of
+   them. All three states go through scaledWeight, so the Border slider moves
+   them together; hover and selected used to be raw numbers the slider could
+   not reach. */
+const LSOA_EDGE = {
+  default:  { color: '#6B6B6B', weight: 1.1, opacity: 0.90 },
+  hover:    { color: '#4F4F4F', weight: 2.0, opacity: 1.0 },
+  selected: { color: '#3A3A3A', weight: 2.6, opacity: 1.0 },
+};
+function lsoaEdge(state) { return LSOA_EDGE[state] || LSOA_EDGE.default; }
+
 function imdStyle(feat, state) {
   const d = feat.properties.imd_decile;
-  // Navy blue palette — sits cleanly alongside the black ward outlines so
-  // users can tell ward (black) and LSOA (navy) borders apart at a glance.
+  const edge = lsoaEdge(state);
   const base = {
-    // Follows the Border slider from its own resting 1.2px, the same way the
-    // ward outlines follow it from theirs.
-    color: '#1E4B8E', weight: scaledWeight(1.2),
+    color: edge.color, weight: scaledWeight(edge.weight), opacity: edge.opacity,
     fillColor: (lsoaIMDColour && d) ? (imdDecileColor(d) || '#ccc') : '#ccc',
-    fillOpacity: lsoaIMDColour ? 0.45 : 0.05, opacity: 0.75,
+    fillOpacity: lsoaIMDColour ? 0.45 : 0.05,
   };
-  if (state === 'hover') {
-    // Border-only highlight: thicker + deeper navy, but leave fillOpacity
-    // alone so any active overlay/IMD fill stays stable under the cursor.
-    base.weight = 2.6;
-    base.color = '#0F2D5C';
-    base.opacity = 1.0;
-  }
   if (state === 'selected') {
-    base.weight = 3.2;
+    // The fill lifts to say which one is selected. The edge already has.
     base.fillOpacity = lsoaIMDColour ? 0.7 : 0.3;
-    base.color = '#081A3C';
-    base.opacity = 1.0;
   }
   // If an overlay is active, blend with overlay colour
   if (curOv !== 'none') {
@@ -6318,32 +6332,11 @@ function imdStyle(feat, state) {
       const _lift = {hover: 1.5, selected: 1.75}[state] || 1;
       base.fillOpacity = Math.max(0, Math.min(0.9, fillOpacityMult * _lift));
     }
-    // Keep the navy, and keep the Border slider. This dropped to a flat #555 at
-    // a fixed 1px the moment any overlay came on, which threw away both the
-    // colour that tells LSOA boundaries apart from the black ward outlines and
-    // the slider that says how heavy boundaries should be. Against a full-
-    // strength ward choropleth a thin mid-grey line is the definition of faded,
-    // and it could not be turned up.
-    // Magenta, not navy, and thinner.
-    //
-    // The navy was chosen against a red-to-green choropleth, where it was the
-    // one hue not in the fill. The fill is now yellow through teal to deep blue,
-    // so navy boundaries sit inside the palette's own range and disappear into
-    // the dark end of it. Magenta is the far side of the colour wheel from all
-    // of it, and it is not a shade any indicator can take, so a boundary can
-    // never be mistaken for data.
-    //
-    // 1.1px rather than 1.6 at the slider's resting position. Boundaries are
-    // reference, not content, and 4,994 of them at 1.6px was a mesh over the
-    // map. The Border slider still scales all of this for anyone who wants
-    // them heavier.
-    if (state === 'selected') {
-      base.color = '#8E1655'; base.weight = scaledWeight(2.6); base.opacity = 1;
-    } else if (state === 'hover') {
-      base.color = '#A81C66'; base.weight = scaledWeight(2.0); base.opacity = 1;
-    } else {
-      base.color = '#C2185B'; base.weight = scaledWeight(1.1); base.opacity = 0.9;
-    }
+    // No edge treatment here. It was set at the top of this function, from
+    // LSOA_EDGE, and this branch used to override it with a second set of
+    // colours and widths, which is why the boundaries changed appearance the
+    // moment an indicator was picked. The fill is this branch's business; the
+    // boundary is the same boundary either way.
   }
   return base;
 }
