@@ -121,6 +121,36 @@
 
   /* ── "Currently viewing" strip + filter chips (above the map) ── */
   .viewing-strip { background: #fff; border-bottom: 1px solid #E8EDEE; padding: 5px 12px 6px; font-size: 11.5px; color: #4C6272; display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 10px; row-gap: 2px; align-items: center; flex-shrink: 0; }
+  /* ── Map chrome toggle ──
+     One handle for everything the map draws on top of itself: the Viewing
+     badge, the legend strip along the bottom, and Leaflet's zoom buttons.
+     Deliberately NOT the attribution, which has to stay, and not the transient
+     things (the ward bar, the tour strip, the compare bar) which already come
+     and go on their own and which someone hiding chrome is usually using.
+
+     It sits under the badge while the badge is there, and takes its place when
+     it is not, so the handle is always in the same corner and never on top of
+     what it hides. */
+  #map-chrome-toggle { position: absolute; top: 48px; right: 12px; z-index: 2550;
+    display: flex; align-items: center; gap: 5px;
+    background: rgba(255,255,255,0.96); border: 1px solid #DDE1E4; border-radius: 6px;
+    padding: 4px 8px; font-size: 10.5px; font-weight: 600; color: #4C6272;
+    cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,.10);
+    font-family: inherit; line-height: 1.4; }
+  #map-chrome-toggle:hover { color: #005EB8; border-color: #005EB8; }
+  #map-chrome-toggle:focus-visible { outline: 2px solid #005EB8; outline-offset: 1px; }
+  #map-chrome-toggle .mct-ico { font-size: 12px; line-height: 1; }
+  .map-wrap.chrome-off #map-chrome-toggle { top: 12px; }
+  .map-wrap.chrome-off .dl-badge,
+  .map-wrap.chrome-off .map-legend-strip,
+  .map-wrap.chrome-off .leaflet-control-zoom { display: none; }
+  /* The label is the first thing to go when there is no room for it. The icon
+     alone still reads, because the button stays in one place. */
+  @media (max-width: 900px) {
+    #map-chrome-toggle .mct-txt { display: none; }
+    #map-chrome-toggle { padding: 5px 7px; }
+  }
+
   /* ── Fingertips suppression notice ──
      Beside the zoom buttons, not under them. This lived in a style attribute on
      the element, which had two consequences. An inline style beats an id
@@ -2134,6 +2164,18 @@
         Hover a grey ward to see whether it's "Suppressed" (privacy rule) or just "no data" (indicator not published).
         <button id="fingertips-banner-close" title="Dismiss this notice for this session">&times;</button>
       </div>
+      <!-- Pops the on-map chrome in and out. The map is the thing being looked
+           at, and on a laptop the Viewing badge, the legend strip and the zoom
+           buttons sit permanently on top of it. This gets them out of the way
+           without hiding the panel as well, which is what the collapse control
+           on the sidebar is for. -->
+      <button type="button" id="map-chrome-toggle"
+              aria-expanded="true" aria-controls="dl-badge map-legend-strip"
+              title="Hide the map controls">
+        <span class="mct-ico" aria-hidden="true">⤡</span>
+        <span class="mct-txt">Hide controls</span>
+      </button>
+
       <div class="dl-badge" id="dl-badge" role="group" aria-label="Data level filter">
         <span class="dl-badge-label">Viewing</span>
         <div class="dl-seg" id="dl-seg">
@@ -5833,6 +5875,45 @@ function _applyBoroughSolo() {
 })();
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   MAP CHROME — pop the on-map controls out of the way
+
+   Remembered, for the same reason the panel's width and collapsed state are:
+   someone who wants the map to itself wants it next time too. Nothing here
+   changes the map container's size, so Leaflet does not need telling; the
+   chrome is all absolutely positioned over it.
+   ═══════════════════════════════════════════════════════════════════════════ */
+(function _wireMapChrome() {
+  const btn = document.getElementById('map-chrome-toggle');
+  const wrap = btn && btn.closest('.map-wrap');
+  if (!btn || !wrap) return;
+  const KEY = 'phMapChromeOff';
+  const txt = btn.querySelector('.mct-txt');
+  const ico = btn.querySelector('.mct-ico');
+
+  function apply(off, save) {
+    wrap.classList.toggle('chrome-off', off);
+    btn.setAttribute('aria-expanded', String(!off));
+    btn.title = off ? 'Show the map controls' : 'Hide the map controls';
+    if (txt) txt.textContent = off ? 'Show controls' : 'Hide controls';
+    if (ico) ico.textContent = off ? '⤢' : '⤡';
+    if (save) { try { window.localStorage.setItem(KEY, off ? '1' : ''); } catch (e) {} }
+  }
+
+  try { if (window.localStorage.getItem(KEY)) apply(true, false); }
+  catch (e) { /* private mode: the controls start visible, every time */ }
+
+  btn.addEventListener('click', () => apply(!wrap.classList.contains('chrome-off'), true));
+
+  // For the tour, which needs the chrome up to talk about it. Goes through
+  // apply() rather than touching the class, so the button's own label and
+  // aria-expanded cannot drift out of step with what is on screen.
+  window.PH_MAPCHROME = {
+    show: () => apply(false, false),
+    isOff: () => wrap.classList.contains('chrome-off'),
+  };
+})();
+
+/* ═══════════════════════════════════════════════════════════════════════════
    SIDEBAR WIDTH — drag the edge
 
    The collapse button above is all or nothing. This is the in-between, and the
@@ -7768,6 +7849,63 @@ function renderTopBottom() {
   panel.style.display = 'block';
 }
 
+/**
+ * The range the legend should describe: the one the visible choropleth is
+ * actually drawn from.
+ *
+ * The legend read getOvRange unconditionally, which is the ward pool. For a
+ * ward indicator that is right and for everything else it was luck. It ran out
+ * for the green and blue space overlays, which are published per LSOA and have
+ * no ward figures at all: getOvRange found nothing, returned null, and the
+ * legend printed its fallback of "Lower"/"Higher" with the numbers blank, on an
+ * overlay that was shading the map perfectly well from a pool it was not asked
+ * about.
+ *
+ * Each level keeps its own percentile pool, so this is not cosmetic. Reading a
+ * colour off a scale computed from a different set of areas would misstate
+ * every value on screen.
+ */
+function ovRangeForDisplay(k) {
+  if (!k || k === 'none') return null;
+  const lv = (typeof ovLevels === 'function') ? ovLevels(k) : [];
+  // Whatever level is being viewed, if the indicator has figures there;
+  // otherwise the level it does have, which for a single-level indicator is
+  // the only answer there is.
+  const cur = (typeof currentDataLevel !== 'undefined') ? currentDataLevel : 'ward';
+  const level = lv.indexOf(cur) !== -1 ? cur
+              : (lv.indexOf('ward') !== -1 ? 'ward' : (lv[0] || 'ward'));
+  if (level === 'lsoa') return getLsoaRange(k);
+  if (level === 'msoa') return getMsoaRange(k);
+  if (level === 'borough') return getBoroughRange(k);
+  return getOvRange(k);
+}
+
+/**
+ * Write the numbers on both scales. Split out because the level can change
+ * without the indicator changing, and when it does the pool changes under the
+ * legend: the sidebar bar and the strip along the bottom of the map would keep
+ * showing the previous level's minimum and maximum.
+ */
+function _syncScaleNumbers() {
+  const cfg = OV_CFG[curOv];
+  if (!cfg) return;
+  const range = ovRangeForDisplay(curOv);
+  const meta = ovMeta(curOv);
+  const unitSuffix = (meta && meta.u && meta.u.length <= 6) ? (' ' + meta.u) : '';
+  const fmtLo = range ? fmtNum(range.lo, 1) + unitSuffix : cfg.lo;
+  const fmtHi = range ? fmtNum(range.hi, 1) + unitSuffix : cfg.hi;
+  const lo = document.getElementById('sc-lo');
+  const hi = document.getElementById('sc-hi');
+  if (lo) lo.textContent = `${cfg.lo} (${fmtLo})`;
+  if (hi) hi.textContent = `${cfg.hi} (${fmtHi})`;
+  const midEl = document.getElementById('sc-mid');
+  if (midEl) midEl.textContent = range ? fmtNum((range.lo + range.hi) / 2, 1) + unitSuffix : '';
+  const mlsMin = document.getElementById('mls-min');
+  const mlsMax = document.getElementById('mls-max');
+  if (mlsMin) mlsMin.textContent = range ? (fmtNum(range.lo, 1) + unitSuffix) : '';
+  if (mlsMax) mlsMax.textContent = range ? (fmtNum(range.hi, 1) + unitSuffix) : '';
+}
+
 document.getElementById('ov').addEventListener('change', e => {
   curOv = e.target.value;
   const cfg = OV_CFG[curOv];
@@ -7777,7 +7915,7 @@ document.getElementById('ov').addEventListener('change', e => {
     // Clear cached range so it recomputes if data changed
     delete _ovRange[curOv];
     delete _lsoaRange[curOv];
-    const range = getOvRange(curOv);
+    const range = ovRangeForDisplay(curOv);
     const meta = ovMeta(curOv);
     const unitSuffix = (meta && meta.u && meta.u.length <= 6) ? (' ' + meta.u) : '';
     const fmtLo = range ? fmtNum(range.lo, 1) + unitSuffix : cfg.lo;
@@ -7955,6 +8093,9 @@ function _setDataLevel(level, opts) {
   // The borough outlines only carry a choropleth at borough level, so both
   // arriving and leaving have to repaint them.
   if (typeof restyleBorough === 'function') restyleBorough();
+  // Each level has its own percentile pool, so the legend has to be rewritten
+  // when the level moves or it keeps describing the pool you just left.
+  if (typeof _syncScaleNumbers === 'function') _syncScaleNumbers();
   document.querySelectorAll('#dl-seg button').forEach(b => {
     if (!b.classList.contains('disabled')) {
       b.classList.toggle('active', b.dataset.dl === level);
@@ -11932,6 +12073,11 @@ loadData();
 
   function tourStart() {
     if (!tourStrip) return;
+    // The tour drives the Viewing badge and the legend and then talks about
+    // what they say, so it puts the map chrome back if it has been popped out.
+    // Not saved: this is the tour borrowing the setting, not changing it, and
+    // the button reverts it in one click.
+    if (window.PH_MAPCHROME) window.PH_MAPCHROME.show();
     tourAt = 0;
     tourStrip.classList.add('open');
     renderTour();
