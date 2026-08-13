@@ -177,7 +177,6 @@
   .chip.vcse { background: #F6E7F0; color: #AE2573; border-color: #E6C6D8; }
   .chip-x { background: transparent; border: none; color: inherit; opacity: .6; cursor: pointer; font-size: 13px; line-height: 1; padding: 0 4px; border-radius: 8px; }
   .chip-x:hover { opacity: 1; background: rgba(0,0,0,.06); }
-  .nbadges { display: flex; gap: 5px; flex-wrap: wrap; }
   .nb { font-size: 11px; font-weight: 500; padding: 3px 10px; border-radius: 20px; cursor: pointer; opacity: .45; border: 1.5px solid transparent; white-space: nowrap; transition: opacity .15s, transform .1s; }
   .nb:hover { transform: translateY(-1px); }
   .nb.on { opacity: 1; }
@@ -210,7 +209,6 @@
   .sidebar.resizing .sb-grip::before { opacity: 1; background: #005EB8; }
   /* Nothing to grab on a zero-width panel, and nothing to give it to. */
   .sidebar.collapsed .sb-grip { display: none; }
-  .sidebar > .nbfocus-bar { grid-area: focus; }
   .sidebar > .sb-tabs     { grid-area: tabs; }
   /* Panes scroll. They used to be overflow:hidden, with the only scrollable
      thing in the Layers pane being the empty spacer at the bottom, so on a
@@ -404,31 +402,8 @@
   input[type=range] { flex:1; accent-color:#005EB8; height:4px; cursor:pointer; }
   .opacity-val { font-size:11px; color:#212B32; width:28px; text-align:right; flex-shrink:0; }
 
-  /* ── Neighbourhood summary table ── */
-  .nbhd-card { border:1px solid #E8EDEE; border-radius:8px; margin-bottom:8px; cursor:pointer; transition:box-shadow .15s, transform .15s; overflow:hidden; background:#fff; }
-  .nbhd-card:hover { box-shadow:0 2px 8px rgba(0,0,0,.07); transform:translateY(-1px); }
-  .nbhd-card.focused { box-shadow:0 0 0 2px rgba(0,94,184,.35); }
-  .nbhd-hdr { display:flex; align-items:center; gap:8px; padding:8px 10px; color:#fff; font-weight:600; font-size:12px; }
-  .nbhd-hdr .nbhd-swatch { width:12px; height:12px; border-radius:3px; background:rgba(255,255,255,.6); border:1px solid rgba(255,255,255,.9); flex-shrink:0; }
-  .nbhd-hdr .nbhd-val { margin-left:auto; font-size:11px; opacity:.92; background:rgba(0,0,0,.18); padding:2px 6px; border-radius:10px; }
-  .nbhd-body { padding:8px 10px; background:#fff; font-size:10.5px; color:#4C6272; }
-  .nbhd-stats { display:grid; grid-template-columns:1fr 1fr; gap:3px 8px; margin-bottom:6px; }
-  .nbhd-stats .k { color:#768692; }
-  .nbhd-stats .v { color:#212B32; font-weight:600; text-align:right; }
-  .nbhd-wards { display:flex; flex-wrap:wrap; gap:3px; margin-top:6px; padding-top:6px; border-top:1px solid #E8EDEE; }
-  .nbhd-ward-chip { display:inline-block; padding:1px 6px; background:#FBFCFD; border-radius:10px; font-size:10px; color:#4C6272; cursor:pointer; transition:background .12s; }
-  .nbhd-ward-chip:hover { background:#E8EDEE; color:#212B32; }
 
-  /* ── Neighbourhood focus mode ── */
-  .nbfocus-bar { display:flex; gap:4px; flex-wrap:wrap; padding:10px 13px 8px;
-                 border-bottom:1px solid #E8EDEE; flex-shrink:0; }
-  .nbfocus-btn { font-size:11px; font-weight:500; padding:4px 10px; border-radius:20px;
-                 cursor:pointer; border:1.5px solid transparent; white-space:nowrap;
-                 transition:all .15s; opacity:.5; }
-  .nbfocus-btn:hover { opacity:.85; transform:translateY(-1px); }
-  .nbfocus-btn.active { opacity:1; box-shadow:0 2px 6px rgba(0,0,0,.15); }
-  .nbfocus-btn.all { background:#E8EDEE; color:#4C6272; border-color:#DDE1E4; opacity:1; }
-  .nbfocus-btn.all.active { background:#212B32; color:#fff; border-color:#212B32; }
+
 
   /* ── GP layer toggle ── */
   .layer-section { padding:10px 13px; border-bottom:1px solid #E8EDEE; flex-shrink:0; }
@@ -477,7 +452,6 @@
     .sb-grip { display: none; }
     .sidebar > .tab-pane.active { flex: 1 1 auto; min-height: 0; }
     .sidebar > .sb-sec { flex: 0 0 auto; }
-    .nbadges { display: none; }
     /* Three segments plus a label is too much badge for a phone. The label
        goes, the segments stay: they are the control, the word "Viewing" is
        only a caption for it.
@@ -1515,9 +1489,6 @@
           <button type="button" class="sb-close" id="sb-close" aria-label="Close the panel">&times;</button>
         </div>
       </div>
-      <div class="nbfocus-bar" id="nbfocus-bar" style="display:none">
-        <button class="nbfocus-btn all active" data-nbhd="all" onclick="setNbhdFocus('all')">All wards</button>
-      </div>
       <div class="sb-tabs">
         <!-- Indicators first, and open by default. Colouring the map by a
              figure is what this site is for; Layers held that place and is a
@@ -1534,11 +1505,6 @@
         <div class="sb-tab active" data-tab="overlay">Indicators</div>
         <div class="sb-tab" data-tab="layers">Layers</div>
         <div class="sb-tab" data-tab="vcse">VCSE</div>
-        <!-- Neighbourhoods tab withdrawn for now. The pane below is left in
-             place, unreachable: tab switching is driven by the button that was
-             clicked, so removing the button is enough, and the one place that
-             reads #tab-nbhd only checks whether it is active, which it now
-             never is. Put the button back to restore it. -->
         <!-- Query is not a tab. It is a mode, reached from the rail at the
              top, and while it is on it takes over the whole sidebar: the tab
              strip is hidden rather than left showing nothing selected. -->
@@ -1622,15 +1588,6 @@
           <label class="lrow"><div style="width:9px;height:9px;border:1.5px solid #1E4B8E;border-radius:2px;flex-shrink:0"></div><span class="lname">LSOA boundaries <span class="lcount" id="lsoa-count">0</span></span><input type="checkbox" id="tlsoa"></label>
           <label id="lsoa-imd-row" class="lrow" style="display:none;margin-left:18px;padding:3px 0 0"><div style="width:9px;height:9px;background:linear-gradient(90deg,#67000d,#cb181d,#fb6a4a,#a1d99b,#006d2c);border-radius:2px;flex-shrink:0"></div><span class="lname" style="font-size:11px">Colour by IMD decile</span><input type="checkbox" id="tlsoa-imd"></label>
           <div id="lsoa-filter-row" style="display:none;margin:4px 0 0 18px">
-            <select id="lsoa-scope" style="width:100%;padding:4px 6px;border:1px solid #ddd;border-radius:5px;font-size:11px;color:#333;background:#fff">
-              <option value="all">All Westminster (123 LSOAs)</option>
-              <option disabled>── Neighbourhoods ──</option>
-              <option value="nb:sw">South Westminster</option>
-              <option value="nb:we">West End &amp; Marylebone</option>
-              <option value="nb:rh">Royal Hyde Park</option>
-              <option value="nb:sm">St John's &amp; Maida Vale</option>
-              <option disabled>── Wards ──</option>
-            </select>
             <div style="margin-top:6px;display:flex;align-items:center;gap:2px;font-size:10px;color:#666">
               <span>1 (most deprived)</span>
               <div style="display:flex;flex:1;height:10px;border-radius:3px;overflow:hidden">
@@ -1682,14 +1639,7 @@
               <option value="lad-E09000020">Kensington &amp; Chelsea</option>
               <option value="lad-E09000033">Westminster</option>
             </optgroup>
-            <option value="westminster">Westminster (by ward bounds)</option>
-            <optgroup label="── Westminster neighbourhoods ──">
-              <option value="nbhd-sw">South Westminster</option>
-              <option value="nbhd-we">West End &amp; Marylebone</option>
-              <option value="nbhd-rh">Regent Heath</option>
-              <option value="nbhd-sm">St John's Wood &amp; Maida Vale</option>
-            </optgroup>
-          </select>
+            </select>
           <input type="text" id="vcse-search" placeholder="Search organisations...">
         </div>
         <div class="sb-sec" id="vcse-tag-filter" style="padding-top:0;padding-bottom:8px">
@@ -1937,34 +1887,6 @@
       </div>
 
       <!-- Neighbourhoods tab -->
-      <div class="tab-pane" id="tab-nbhd">
-        <div class="sb-sec" style="padding:10px 12px;background:var(--paper-2);border-left:3px solid var(--line);border-bottom:1px solid var(--line)">
-          <div style="display:flex;align-items:center;gap:7px;margin-bottom:4px">
-            <span class="dev-badge" style="margin-left:0">In development</span>
-            <span style="font-size:12px;font-weight:600;color:var(--ink)">Neighbourhoods</span>
-          </div>
-          <div style="font-size:10.5px;color:var(--ink-2);line-height:1.55">
-            This tab is still being built. Westminster's 4-neighbourhood breakdown is shown as a preview; equivalent neighbourhood groupings for the other London boroughs are not yet wired in, and the indicators panel here will expand over coming releases.
-          </div>
-        </div>
-        <div class="sb-sec" style="padding-bottom:8px">
-          <div class="sb-lbl">Neighbourhoods</div>
-          <div style="font-size:10px;color:#888;line-height:1.5;margin-bottom:0">
-            4 Westminster neighbourhoods · 18 wards.
-          </div>
-        </div>
-        <div class="sb-sec" style="flex:1;border-bottom:none;overflow-y:auto;padding-top:0">
-          <label class="lrow" style="margin-bottom:8px"><div style="width:9px;height:9px;background:linear-gradient(90deg,#8ecae6,#ffb703,#fb8500,#c05299);border-radius:2px;flex-shrink:0"></div><span class="lname">Neighbourhood colours</span><input type="checkbox" id="tnc"></label>
-          <div class="sb-lbl">Shade neighbourhoods</div>
-          <div id="nfilters"></div>
-          <div class="data-note" style="margin:4px 0 10px">
-            Tick to fill an area with its neighbourhood colour. Click a card to focus / zoom.
-          </div>
-          <label class="lrow" style="margin-bottom:8px"><div style="width:9px;height:9px;background:linear-gradient(90deg,#1a1a1a,#fff);border:1px solid #ccc;border-radius:2px;flex-shrink:0"></div><span class="lname">Spotlight focused neighbourhood</span><input type="checkbox" id="tspot"></label>
-          <div id="nbhd-table"></div>
-        </div>
-      </div>
-
       <!-- Report builder. Pick LSOAs off the map and total them up as one
            area. Neighbourhoods, catchments and PCN footprints do not follow
            ward lines, and every other total on this map is an area someone
@@ -2319,16 +2241,6 @@ function dataUrl(path) {
   return DATA_VERSION ? path + '?v=' + DATA_VERSION : path;
 }
 
-const NEIGHBOURHOODS = {
-  sw: { label: "South Westminster",           short: "S Westminster", color: "#185FA5", bg: "#E6F1FB",
-        wards: ["Knightsbridge & Belgravia","Pimlico North","Pimlico South","St James's","Vincent Square"] },
-  we: { label: "West End & Marylebone",       short: "West End",      color: "#534AB7", bg: "#EEEDFE",
-        wards: ["West End","Marylebone"] },
-  rh: { label: "Regent Heath",               short: "Regent Heath",  color: "#0F6E56", bg: "#E1F5EE",
-        wards: ["Hyde Park","Church Street","Lancaster Gate","Bayswater","Westbourne","Queen's Park"] },
-  sm: { label: "St John's Wood & Maida Vale", short: "St J's Wood",   color: "#854F0B", bg: "#FAEEDA",
-        wards: ["Harrow Road","Maida Vale","Little Venice","Abbey Road","Regent's Park"] },
-};
 
 const OV_CFG = {
   // Health (ward-level Census 2021)
@@ -2913,17 +2825,7 @@ const VCSE_RAW = []; // replaced by async fetch of vcse_data.json (see wireVCSE 
 // UTILITY FUNCTIONS
 // ═══════════════════════════════════════════════════════════════════════════
 function norm(n) { return (n||'').toLowerCase().replace(/\u2019/g,"'").trim(); }
-function nbhdOf(wn) {
-  // Use norm() so curly vs straight apostrophes (St James's, Queen's Park,
-  // Regent's Park) match between the GeoJSON and the hardcoded ward lists.
-  const target = norm(wn);
-  for (const [k,n] of Object.entries(NEIGHBOURHOODS))
-    if (n.wards.some(w => norm(w) === target)) return k;
-  return null;
-}
-// Ward-name → borough (LAD) lookup, built lazily from GJ.features. Returns ''
-// if the ward isn't found.
-const _ladByWard = {};
+
 function ladOf(wn) {
   if (typeof GJ === 'undefined' || !GJ.features) return '';
   if (Object.keys(_ladByWard).length === 0) {
@@ -3628,10 +3530,6 @@ function applyCICFilter() {
       areaMatch = true;
     } else if (areaFilter.startsWith('lad-')) {
       areaMatch = (o.record.lad || '') === areaFilter.slice(4);
-    } else if (areaFilter === 'westminster') {
-      areaMatch = nbhdOfLatLng(o.lat, o.lng) !== null;
-    } else {
-      areaMatch = nbhdOfLatLng(o.lat, o.lng) === areaFilter.replace('nbhd-', '');
     }
     const focusMatch = !_focusedLadCode || (o.record.lad || '') === _focusedLadCode;
     const textMatch = !textFilter ||
@@ -3976,13 +3874,6 @@ fetch('esol_providers.json').then(r => r.ok ? r.json() : []).then(data => {
 
 
 // ── VCSE filtering ────────────────────────────────────────────────────────
-// Ward codes per neighbourhood (for spatial filtering)
-const NBHD_WARDS = {
-  'sw': ['Knightsbridge & Belgravia','Pimlico North','Pimlico South',"St James's",'Vincent Square'],
-  'we': ['West End','Marylebone'],
-  'rh': ['Hyde Park','Church Street','Lancaster Gate','Bayswater','Westbourne',"Queen's Park"],
-  'sm': ['Harrow Road','Maida Vale','Little Venice','Abbey Road',"Regent's Park"],
-};
 
 // Check if a lat/lng point falls inside a Leaflet polygon layer
 function pointInWardLayer(lat, lng, wardName) {
@@ -4010,22 +3901,6 @@ function roughPointInBounds(latlng, layer) {
 }
 
 // Get the neighbourhood key for a given lat/lng using ward bounds
-function nbhdOfLatLng(lat, lng) {
-  if (!wLyr) return null;
-  const pt = L.latLng(lat, lng);
-  let result = null;
-  wLyr.eachLayer(l => {
-    if (result) return;
-    try {
-      if (l.getBounds().contains(pt)) {
-        const wn = l.feature.properties.WD24NM;
-        const nk = nbhdOf(wn);
-        if (nk) result = nk;
-      }
-    } catch(e) {}
-  });
-  return result;
-}
 
 let currentVCSEAreaFilter = 'all';
 
@@ -4162,13 +4037,6 @@ function applyVCSEFilter() {
     } else if (areaFilter.startsWith('lad-')) {
       // Filter to a single borough by its LAD code (e.g. E09000033)
       areaMatch = (o.record.lad || '') === areaFilter.slice(4);
-    } else if (areaFilter === 'westminster') {
-      // Westminster only — must fall within one of the 18 ward bounds
-      areaMatch = nbhdOfLatLng(o.lat, o.lng) !== null;
-    } else {
-      // Specific Westminster neighbourhood
-      const nbhdKey = areaFilter.replace('nbhd-', '');
-      areaMatch = nbhdOfLatLng(o.lat, o.lng) === nbhdKey;
     }
     // Hard borough-focus gate. If a borough is focused, any pin whose LAD
     // doesn't match is hidden regardless of area-filter setting.
@@ -4198,10 +4066,6 @@ function applyVCSEFilter() {
       areaMatch = true;
     } else if (areaFilter.startsWith('lad-')) {
       areaMatch = (o.record.lad || '') === areaFilter.slice(4);
-    } else if (areaFilter === 'westminster') {
-      areaMatch = nbhdOfLatLng(o.lat, o.lng) !== null;
-    } else {
-      areaMatch = nbhdOfLatLng(o.lat, o.lng) === areaFilter.replace('nbhd-', '');
     }
     const focusMatch = !_focusedLadCode || (o.record.lad || '') === _focusedLadCode;
     return areaMatch && focusMatch && _vcseOrgMatchesTags(o.record) && _causeMatches(o.record) && (!textFilter || o.name.toLowerCase().includes(textFilter) || (o.addr||'').toLowerCase().includes(textFilter));
@@ -4237,12 +4101,8 @@ function initVCSEFilters() {
   document.getElementById('vcse-area-filter').addEventListener('change', e => {
     currentVCSEAreaFilter = e.target.value;
     const val = e.target.value;
-    // Neighbourhood filter → neighbourhood focus
-    if (val.startsWith('nbhd-')) {
-      setNbhdFocus(val.replace('nbhd-', ''));
-    } else if (val.startsWith('lad-')) {
+    if (val.startsWith('lad-')) {
       // Borough filter → solo view on that borough (mirror Layers-tab dropdown)
-      setNbhdFocus('all');
       const code = val.slice(4);
       const bname = LAD_CODE_TO_NAME[code] || '';
       if (bname) {
@@ -4261,8 +4121,7 @@ function initVCSEFilters() {
         }
       }
     } else {
-      // 'all' / 'london' / 'westminster' — clear any borough focus
-      setNbhdFocus('all');
+      // 'all' / 'london' — clear any borough focus
       if (focusedBorough !== 'all') {
         focusedBorough = 'all';
         const bsel = document.getElementById('borough-focus');
@@ -4280,65 +4139,10 @@ function initVCSEFilters() {
 let wLyr = null, selW = null, curOv = 'none';
 let WARD_DATA = {};
 let WARD_DATA_BY_CODE = {};
-let focusedNbhd = 'all';   // neighbourhood focus: 'all' or key like 'sw'
 // focusedBorough is hoisted near the top of the script (see `var focusedBorough`)
 // so boroughL / wardBoundaryLyr style callbacks can read it at construction time.
-let showNbhdColors = false; // colored neighbourhood fills/borders start OFF (blank map on load)
-let spotlightMode = false; // hard-dim everything outside focused nbhd regardless of showNbhdColors
 
-function setNbhdFocus(key) {
-  focusedNbhd = key;
 
-  // Update focus buttons
-  document.querySelectorAll('.nbfocus-btn').forEach(b => {
-    b.classList.toggle('active', b.dataset.nbhd === key);
-  });
-
-  // Update header badges opacity
-  document.querySelectorAll('#nbadges .nb').forEach(b => {
-    const bk = b.dataset.key;
-    b.classList.toggle('on', key === 'all' || bk === key);
-  });
-
-  // Redraw all ward styles
-  if (wLyr) wLyr.eachLayer(l =>
-    l.setStyle(wstyle(l.feature.properties.WD24NM, curOv, gs(l.feature.properties.WD24NM)))
-  );
-
-  // Sync VCSE area filter dropdown
-  const areaSelect = document.getElementById('vcse-area-filter');
-  if (areaSelect) {
-    // 'all' = neighbourhood focus off → Westminster filter
-    // 'nbhd-X' = neighbourhood focused → neighbourhood filter
-    areaSelect.value = key === 'all' ? 'all' : 'nbhd-' + key;
-    currentVCSEAreaFilter = areaSelect.value;
-    applyVCSEFilter();
-  }
-
-  // Sync LSOA filter if active
-  if (lsoaActive && lsoaLyr) {
-    lsoaScope = key === 'all' ? 'all' : 'nb:' + key;
-    document.getElementById('lsoa-scope').value = lsoaScope;
-    applyLSOAFilter();
-  }
-
-  // Zoom to focused neighbourhood if not 'all'
-  if (key !== 'all' && wLyr) {
-    const layers = wLyr.getLayers().filter(l => nbhdOf(l.feature.properties.WD24NM) === key);
-    if (layers.length) {
-      const bounds = L.featureGroup(layers).getBounds();
-      if (bounds.isValid()) map.fitBounds(bounds, { padding:[40,40], maxZoom:15 });
-    }
-  } else if (key === 'all' && wLyr) {
-    map.fitBounds(wLyr.getBounds(), { padding:[28,28] });
-    // Keep borough outlines on top
-    if (boroughL) setTimeout(() => boroughL.bringToFront(), 200);
-  }
-}
-
-function gs(wn) { return wn === selW ? 'selected' : 'default'; }
-
-// Compute dynamic min/max from actual ward data for each overlay key (cached)
 const _ovRange = {};
 function getOvRange(ovKey) {
   if (_ovRange[ovKey]) return _ovRange[ovKey];
@@ -4367,7 +4171,6 @@ function ovColor(wn, ovKey) {
 
 // Track which neighbourhoods are shaded (filled with their colour) via filter checkboxes.
 // Empty by default — map starts blank; ticking a checkbox in the Nbhds tab paints that area.
-const shadedNbhds = new Set();
 
 // Core20 overlay state + helper (now highlights LSOAs in IMD deciles 1-2, not wards)
 let showCore20Overlay = false;
@@ -4399,21 +4202,13 @@ function buildCore20LsoaLayer() {
 }
 
 function wstyle(wn, ov, state) {
-  const nk = nbhdOf(wn), nb = nk ? NEIGHBOURHOODS[nk] : null;
-  const shaded = !!(nk && shadedNbhds.has(nk));
-
-  // Focus dimming — neighbourhood focus AND borough focus both fade non-matching wards.
-  const outOfNbhd    = focusedNbhd && focusedNbhd !== 'all' && nk !== focusedNbhd;
-  const outOfBorough = focusedBorough && focusedBorough !== 'all' && ladOf(wn) !== focusedBorough;
-  // Borough focus = SOLO VIEW: wards outside the focused borough disappear
-  // entirely (invisible + not interactive-looking) so only the selected borough
-  // is shown. Neighbourhood focus still uses the softer dim/spotlight path.
-  if (outOfBorough) {
+  // Borough focus is a SOLO VIEW: wards outside the focused borough disappear
+  // entirely, invisible and not interactive-looking, so only the selected
+  // borough is on screen. It used to sit alongside a softer dim-and-spotlight
+  // path for neighbourhood focus, which went with the neighbourhoods.
+  if (focusedBorough && focusedBorough !== 'all' && ladOf(wn) !== focusedBorough) {
     return { color: '#000', weight: 0, fillColor: '#fff', fillOpacity: 0, opacity: 0 };
   }
-  const outOfFocus   = outOfNbhd;
-  const dimmed = outOfFocus && (shaded || spotlightMode);
-  const spot   = outOfFocus && spotlightMode;
 
   // Black border for hover + selected states so the interactive ward is unmistakable.
   const isFocus = state === 'hover' || state === 'selected';
@@ -4423,21 +4218,17 @@ function wstyle(wn, ov, state) {
   const absFill = Math.max(0, Math.min(1, fillOpacityMult));
 
   if (ov === 'none') {
-    // No overlay: fill is the neighbourhood colour when shaded, otherwise a faint neutral.
-    const fillColor = shaded ? nb.color : '#94a3b8';
-    // Shaded wards get a strong opacity floor (0.55) so the shade is clearly
-    // visible even if the Fill slider is at 0. Unshaded wards stay faint.
-    const baseFo = shaded ? Math.max(absFill, 0.55) : Math.min(absFill, 0.12);
-    const baseW  = {default:1.0, hover:3.0, selected:4.0}[state] || 1.0;
-    const fo = spot ? 0.02 : (dimmed ? Math.min(0.08, baseFo) : baseFo);
-    // Shaded wards always get a coloured outline so they stand out even when
-    // the Border slider is 0; the state weights (hover/selected) still win.
-    const sliderW = Math.max(0, baseW * borderWeightMult);
-    const shadedMinW = shaded ? Math.max(1.5, sliderW) : sliderW;
-    const w  = spot ? 0.6  : (dimmed ? 1.0 : shadedMinW);
-    const op = spot ? 0.25 : (dimmed ? 0.4 : 0.95);
-    const borderColor = shaded ? nb.color : '#000';
-    return applyCore20Outline({ color:borderColor, weight:w, fillColor, fillOpacity:fo, opacity:op }, wn);
+    // No overlay: a faint neutral, so the boundaries read and nothing claims to
+    // mean anything. This used to fill with a neighbourhood's colour when one
+    // was shaded, which is what the colour meant.
+    const baseW = {default:1.0, hover:3.0, selected:4.0}[state] || 1.0;
+    return applyCore20Outline({
+      color: '#000',
+      weight: Math.max(0, baseW * borderWeightMult),
+      fillColor: '#94a3b8',
+      fillOpacity: Math.min(absFill, 0.12),
+      opacity: 0.95,
+    }, wn);
   }
 
   // Overlay: fill comes from the chosen indicator colour.
@@ -4449,9 +4240,9 @@ function wstyle(wn, ov, state) {
   // layer carries the choropleth and wards keep their boundary reference.
   const lsoaOnly = (ov !== 'none' && isLsoaOnlyOv(ov));
   const baseFo = lsoaOnly ? 0.0 : absFill;
-  const fo = spot ? 0.05 : (dimmed ? Math.min(0.12, baseFo) : baseFo);
-  const w  = spot ? 0.6  : (dimmed ? 1.0 : Math.max(0, baseW * borderWeightMult));
-  const op = spot ? 0.25 : (dimmed ? 0.4 : (isFocus ? 1.0 : 0.9));
+  const fo = baseFo;
+  const w  = Math.max(0, baseW * borderWeightMult);
+  const op = isFocus ? 1.0 : 0.9;
   return applyCore20Outline({ color:'#000', weight:w, fillColor:fill, fillOpacity:fo, opacity:op }, wn);
 }
 
@@ -4497,7 +4288,6 @@ function showWard(wn) {
     return;
   }
 
-  const nk = wdata.neighbourhood, nb = nk ? NEIGHBOURHOODS[nk] : null;
 
   // The sidebar is deliberately left where it is.
   //
@@ -4518,12 +4308,6 @@ function showWard(wn) {
   const _vsd = document.getElementById('vs-digest');
   if (_vsd) _vsd.textContent = 'Ward: ' + wn;
 
-  // Auto-filter LSOA layer to this ward if active
-  if (lsoaActive && lsoaLyr) {
-    lsoaScope = 'ward:' + wn;
-    document.getElementById('lsoa-scope').value = lsoaScope;
-    applyLSOAFilter();
-  }
 
   const inds = wdata.indicators || {};
   const hasReal = Object.values(inds).some(v => v !== null && v !== '' && v !== undefined);
@@ -4655,8 +4439,6 @@ window.generateWardReport = function(wn, opts) {
                 Object.values(WARD_DATA).find(w => w.name === wn);
 
   const inds = (wdata && wdata.indicators) || {};
-  const nk = wdata && wdata.neighbourhood;
-  const nb = nk ? NEIGHBOURHOODS[nk] : null;
 
   // ── Helpers: NWL-wide reference stats so the report can frame this ward
   //     against its peers (median, percentile). All wards live in WARD_DATA.
@@ -5493,7 +5275,6 @@ function buildWardLayer() {
       lyr.on('mouseover', e => {
         if (typeof wardInFocus === 'function' && !wardInFocus(wn)) return;
         if (wn !== selW) lyr.setStyle(wstyle(wn, curOv, 'hover'));
-        const nk = nbhdOf(wn), nb = nk ? NEIGHBOURHOODS[nk] : null;
         const _wardRec = WARD_DATA[wn] || (typeof WARD_DATA === 'object' && Object.values(WARD_DATA).find(w => w && w.name === wn));
         const ovRows = ovTooltipRows(k => wardOvValue(wn, k), _wardRec);
         lyr.bindTooltip(`<b style="font-size:12px">${wn}</b>${nb ? `<br><span style="font-size:10px;color:${nb.color}">${nb.label}</span>` : ''}${ovRows}`, { sticky:true, opacity:.94 }).openTooltip(e.latlng);
@@ -5505,41 +5286,12 @@ function buildWardLayer() {
   // Fit to the full London ward set with a maxZoom cap so wards stay visible as
   // distinct polygons (ward-level view) rather than jumping to a zoomed-in LSOA view.
   map.fitBounds(wLyr.getBounds(), { padding:[28,28], maxZoom:11 });
-  // Neighbourhood colours/borders start OFF; user can toggle on via 'Neighbourhood colours'
-  if (showNbhdColors) buildNbhdBorders();
   if (typeof _updateLayerCounts === 'function') _updateLayerCounts();
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // NEIGHBOURHOOD BORDER LAYER — thick outlines around each neighbourhood
 // ═══════════════════════════════════════════════════════════════════════════
-let nbhdBorderLyr = null;
-
-function buildNbhdBorders() {
-  if (!wLyr) return;
-  const features = [];
-  Object.entries(NEIGHBOURHOODS).forEach(([k, nb]) => {
-    // Collect all ward polygons for this neighbourhood and merge their coords
-    const wardLayers = wLyr.getLayers().filter(l => nb.wards.includes(l.feature.properties.WD24NM));
-    wardLayers.forEach(l => {
-      const gj = l.toGeoJSON();
-      gj.properties = { _nbhd: k, _color: nb.color };
-      features.push(gj);
-    });
-  });
-  nbhdBorderLyr = L.geoJSON({ type:'FeatureCollection', features }, {
-    style: f => ({
-      color: f.properties._color,
-      weight: 3.5,
-      fill: false,
-      opacity: 0.8,
-    }),
-    interactive: false,
-  });
-  nbhdBorderLyr.addTo(map);
-  nbhdBorderLyr.bringToFront();
-  if (boroughL._map) boroughL.bringToFront();
-}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // POINT VISIBILITY — hide markers in hidden neighbourhoods
@@ -5563,26 +5315,6 @@ function refreshPointVisibility() {
 // ═══════════════════════════════════════════════════════════════════════════
 // NEIGHBOURHOOD BADGES & FILTERS
 // ═══════════════════════════════════════════════════════════════════════════
-const nfiltersEl   = document.getElementById('nfilters');
-const nbFocusBar   = document.getElementById('nbfocus-bar');
-
-Object.entries(NEIGHBOURHOODS).forEach(([k, nb]) => {
-  // Sidebar filter — unchecked by default; ticking shades that neighbourhood.
-  const r = document.createElement('label');
-  r.className = 'lrow';
-  r.innerHTML = `<div style="width:11px;height:11px;border-radius:3px;border:2px solid ${nb.color};background:${nb.bg};flex-shrink:0"></div><span class="lname" style="font-size:12px">${nb.label}</span><input type="checkbox" style="accent-color:${nb.color}">`;
-  r.querySelector('input').addEventListener('change', e => {
-    const on = e.target.checked;
-    if (on) shadedNbhds.add(k); else shadedNbhds.delete(k);
-    // Full restyle — guarantees every ward repaints (avoids stale state if a
-    // ward's nbhd mapping slipped through due to name edge-cases).
-    if (typeof _restyleAll === 'function') _restyleAll();
-    else if (wLyr) wLyr.eachLayer(l =>
-      l.setStyle(wstyle(l.feature.properties.WD24NM, curOv, gs(l.feature.properties.WD24NM))));
-    if (typeof renderNbhdTable === 'function') renderNbhdTable();
-  });
-  nfiltersEl.appendChild(r);
-});
 
 // ═══════════════════════════════════════════════════════════════════════════
 // LAYER TOGGLES & OVERLAY
@@ -6290,18 +6022,6 @@ function applyBoroughLock() {
     if (isFinite(fit)) map.setMinZoom(Math.max(0, Math.floor(fit) - 1));
   } catch (e) { /* degenerate bounds: leave the zoom range alone */ }
 }
-document.getElementById('tnc').addEventListener('change', e => {
-  showNbhdColors = e.target.checked;
-  if (showNbhdColors) {
-    buildNbhdBorders();
-  } else {
-    if (nbhdBorderLyr && nbhdBorderLyr._map) map.removeLayer(nbhdBorderLyr);
-    nbhdBorderLyr = null;
-  }
-  // Restyle all wards so stroke/fill switches between neighbourhood colour and neutral gray
-  if (wLyr) wLyr.eachLayer(l => l.setStyle(wstyle(l.feature.properties.WD24NM, curOv, gs(l.feature.properties.WD24NM))));
-  if (boroughL && boroughL._map) boroughL.bringToFront();
-});
 // Ward boundaries turns the ward layer off, not just its outlines.
 //
 // There are two ward layers: wLyr carries the fill, the colouring and the
@@ -6401,7 +6121,6 @@ document.getElementById('tesol') && document.getElementById('tesol').addEventLis
 // LSOA IMD LAYER (embedded — no external files needed)
 // ═══════════════════════════════════════════════════════════════════════════
 let lsoaLyr = null, LSOA_DATA = {}, selLSOA = null, lsoaActive = false;
-let lsoaScope = 'all'; // 'all', 'nb:sw', 'nb:we', etc., or ward name
 // User-controlled: paint LSOAs with IMD decile colours. When false and no
 // overlay is active, LSOAs render as neutral dashed outlines only.
 let lsoaIMDColour = false;
@@ -7405,36 +7124,17 @@ function buildEmbeddedLSOALayer() {
 buildEmbeddedLSOALayer();
 if (typeof _updateLayerCounts === 'function') _updateLayerCounts();
 
-// ── Populate ward dropdown in LSOA filter ──
-(function() {
-  const sel = document.getElementById('lsoa-scope');
-  const wardNames = [...new Set(LSOA_IMD.features.map(f => f.properties.ward))].sort();
-  wardNames.forEach(w => {
-    const opt = document.createElement('option');
-    opt.value = 'ward:' + w;
-    const count = LSOA_IMD.features.filter(f => f.properties.ward === w).length;
-    opt.textContent = w + ' (' + count + ')';
-    sel.appendChild(opt);
-  });
-})();
-
-// ── LSOA scope filtering ──
+// ── LSOA visibility ──
+// Borough solo view is all that is left of this. It used to intersect that with
+// a scope dropdown offering Westminster and its neighbourhoods, which was the
+// wrong control on a map of 33 boroughs and went with them.
 function applyLSOAFilter() {
   if (!lsoaLyr) return;
-  const scope = lsoaScope;
   const boroughActive = focusedBorough && focusedBorough !== 'all';
   lsoaLyr.eachLayer(lyr => {
     const ward = lyr.feature.properties.ward;
     let visible = true;
-    if (scope.startsWith('nb:')) {
-      const nbKey = scope.slice(3);
-      const nb = NEIGHBOURHOODS[nbKey];
-      visible = nb ? nb.wards.includes(ward) : true;
-    } else if (scope.startsWith('ward:')) {
-      visible = ward === scope.slice(5);
-    }
-    // Borough solo view: intersect with LSOAs whose ward is in the focused borough.
-    if (visible && boroughActive) {
+    if (boroughActive) {
       visible = ladOf(ward) === focusedBorough;
     }
     if (visible) {
@@ -7445,27 +7145,6 @@ function applyLSOAFilter() {
   });
 }
 
-document.getElementById('lsoa-scope').addEventListener('change', e => {
-  lsoaScope = e.target.value;
-  applyLSOAFilter();
-  // Zoom to filtered area
-  if (lsoaActive && lsoaLyr) {
-    const visible = [];
-    lsoaLyr.eachLayer(l => {
-      const w = l.feature.properties.ward;
-      let show = true;
-      if (lsoaScope.startsWith('nb:')) {
-        const nb = NEIGHBOURHOODS[lsoaScope.slice(3)];
-        show = nb ? nb.wards.includes(w) : true;
-      } else if (lsoaScope.startsWith('ward:')) show = w === lsoaScope.slice(5);
-      if (show) visible.push(l);
-    });
-    if (visible.length > 0) {
-      const group = L.featureGroup(visible);
-      map.fitBounds(group.getBounds(), { padding: [30, 30] });
-    }
-  }
-});
 
 // ═══════════════════════════════════════════════════════════════════════════
 // MSOA BOUNDARIES
@@ -8022,7 +7701,7 @@ document.getElementById('ov').addEventListener('change', e => {
   restyleMsoa();
   restyleBorough();
   // Keep neighbourhood borders visible on top of choropleth
-  if (nbhdBorderLyr) { nbhdBorderLyr.bringToFront(); if (boroughL._map) boroughL.bringToFront(); }
+  if (boroughL._map) boroughL.bringToFront();
   // Refresh the Top/Bottom 20 rankings for the new indicator.
   renderTopBottom();
   // Switch to overlay tab
@@ -8287,7 +7966,7 @@ document.querySelectorAll('#dl-seg button').forEach(b => {
 // ═══════════════════════════════════════════════════════════════════════════
 // VIEWING STRIP + FILTER CHIPS + RESET
 // Single source of truth for "what is the map showing right now?". Reads
-// the live state (focusedBorough, focusedNbhd, curOv, showCore20Overlay,
+// the live state (focusedBorough, curOv, showCore20Overlay,
 // vcse-area-filter, currentDataLevel) and renders the digest line + chip
 // bar above the map. Call _refreshUI() after any state mutation.
 // ═══════════════════════════════════════════════════════════════════════════
@@ -8308,10 +7987,6 @@ function _refreshUI() {
       const parts = [];
       parts.push(focusedBorough && focusedBorough !== 'all'
         ? `<b>${focusedBorough}</b>` : 'All of London');
-      if (typeof focusedNbhd !== 'undefined' && focusedNbhd && focusedNbhd !== 'all'
-          && typeof NEIGHBOURHOODS !== 'undefined' && NEIGHBOURHOODS[focusedNbhd]) {
-        parts.push(`nbhd <b>${NEIGHBOURHOODS[focusedNbhd].label}</b>`);
-      }
       // The level is not repeated here. The Viewing badge in the corner of the
       // map is the control for it and shows which one is active, so the strip
       // saying "Ward mode" a second time under the word "Viewing" was the same
@@ -8354,11 +8029,6 @@ function _refreshUI() {
           }
         });
       }
-      if (typeof focusedNbhd !== 'undefined' && focusedNbhd && focusedNbhd !== 'all'
-          && typeof NEIGHBOURHOODS !== 'undefined' && NEIGHBOURHOODS[focusedNbhd]) {
-        addChip('', 'Nbhd: ' + NEIGHBOURHOODS[focusedNbhd].label,
-          () => setNbhdFocus('all'));
-      }
       if (typeof curOv !== 'undefined' && curOv && curOv !== 'none') {
         addChip('overlay', 'Overlay: ' + _ovLabel(curOv), () => {
           const sel = document.getElementById('ov');
@@ -8395,8 +8065,6 @@ function _resetAll() {
     focusedBorough = 'all';
     const bsel = document.getElementById('borough-focus');
     if (bsel) bsel.value = 'all';
-    // Neighbourhood
-    if (typeof setNbhdFocus === 'function') setNbhdFocus('all');
     // Overlay
     const ovSel = document.getElementById('ov');
     if (ovSel && ovSel.value !== 'none') { ovSel.value = 'none'; ovSel.dispatchEvent(new Event('change')); }
@@ -9090,8 +8758,8 @@ async function _downloadMapPng(opts) {
 }
 
 // CSV: dump the ward/LSOA table behind the currently-active overlay, FILTERED
-// to the currently-visible view. Honours focusedBorough, focusedNbhd,
-// lsoaScope, and the Core20 toggle so the CSV reflects what the user sees.
+// to the currently-visible view. Honours focusedBorough, the LSOA scope and
+// the Core20 toggle so the CSV reflects what the user sees.
 function _csvEscape(v) {
   if (v == null) return '';
   const s = String(v);
@@ -9104,9 +8772,7 @@ function _downloadOverlayCsv() {
     const isLsoa = ov && typeof isLsoaOnlyOv === 'function' && isLsoaOnlyOv(ov);
     const wantLsoa = isLsoa || (typeof currentDataLevel !== 'undefined' && currentDataLevel === 'lsoa');
     const boroughFilter = (typeof focusedBorough !== 'undefined' && focusedBorough && focusedBorough !== 'all') ? focusedBorough : null;
-    const nbhdFilter    = (typeof focusedNbhd     !== 'undefined' && focusedNbhd && focusedNbhd !== 'all')    ? focusedNbhd    : null;
     const core20Only    = (typeof showCore20Overlay !== 'undefined' && showCore20Overlay) === true;
-    const scope         = (typeof lsoaScope !== 'undefined') ? lsoaScope : 'all';
     let nKept = 0, nSkipped = 0;
     if (wantLsoa && typeof LSOA_DATA !== 'undefined') {
       // LSOA_DATA holds indicators and nothing else: it is keyed by LSOA code
@@ -9132,15 +8798,6 @@ function _downloadOverlayCsv() {
         const ward = g.ward || '';
         const lad  = g.borough || '';
         if (boroughFilter && lad !== boroughFilter) { nSkipped++; continue; }
-        if (scope && scope !== 'all') {
-          if (scope.startsWith('ward:') && ward !== scope.slice(5)) { nSkipped++; continue; }
-          if (scope.startsWith('nb:')) {
-            // Neighbourhoods are defined as lists of ward names, so an LSOA's
-            // neighbourhood is its ward's. There is no field to read.
-            const nk = (ward && typeof nbhdOf === 'function') ? nbhdOf(ward) : null;
-            if (nk !== scope.slice(3)) { nSkipped++; continue; }
-          }
-        }
         const dec = ind.imd_decile != null ? ind.imd_decile
                   : (g.imd_decile != null ? g.imd_decile : '');
         const isCore20 = (dec === 1 || dec === 2);
@@ -9151,7 +8808,7 @@ function _downloadOverlayCsv() {
         nKept++;
       }
     } else if (typeof WARD_DATA !== 'undefined') {
-      const header = ['ward_code','ward_name','borough','neighbourhood'];
+      const header = ['ward_code','ward_name','borough'];
       if (ov) header.push(ov);
       rows.push(header.map(_csvEscape).join(','));
       for (const [key, w] of Object.entries(WARD_DATA)) {
@@ -9161,12 +8818,7 @@ function _downloadOverlayCsv() {
         // and the code never, which would quietly break any join made against
         // it downstream. The real code is on the record.
         const wardCode = w.code || '';
-        // Neighbourhoods are a lookup over ward-name lists, not a field on the
-        // ward. Reading w.neighbourhood gave '' for all 704, so selecting a
-        // neighbourhood and exporting returned no file at all.
-        const nk = (typeof nbhdOf === 'function' ? nbhdOf(w.name || key) : null) || '';
         if (boroughFilter && lad !== boroughFilter) { nSkipped++; continue; }
-        if (nbhdFilter    && nk  !== nbhdFilter)    { nSkipped++; continue; }
         const row = [wardCode, w.name || key, lad, nk];
         if (ov) row.push(w.indicators ? w.indicators[resolveOvField(ov)] : '');
         rows.push(row.map(_csvEscape).join(','));
@@ -9542,128 +9194,11 @@ document.querySelectorAll('.sb-tab').forEach(t => {
   t.addEventListener('click', () => {
     document.querySelectorAll('.sb-tab').forEach(x => x.classList.toggle('active', x===t));
     document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.id==='tab-'+t.dataset.tab));
-    if (t.dataset.tab === 'nbhd') renderNbhdTable();
     // Viewing-strip stays visible at all times now; the digest text is
     // kept in sync by showWard/showLSOA/deselectWard/deselectLSOA so the
     // map-wrap grid geometry never changes (prevents white-screen bug).
   });
 });
-
-// ═══════════════════════════════════════════════════════════════════════════
-// NEIGHBOURHOODS TAB — population-weighted aggregates per neighbourhood
-// ═══════════════════════════════════════════════════════════════════════════
-const NBHD_OV_LABELS = {
-  census_bad_health_pct:       { l: "Bad/very bad health", s: "%", wh: true  },
-  census_good_health_pct:      { l: "Good/very good health", s: "%", wh: false },
-  census_disability_any_pct:   { l: "Disability (any)", s: "%", wh: true  },
-  core20_lsoa_count:           { l: "Core20 LSOAs", s: "", wh: true, count: true },
-  census_unemployed_pct:       { l: "Unemployed", s: "%", wh: true  },
-  census_no_car_pct:           { l: "No car/van", s: "%", wh: false },
-  census_social_rented_pct:    { l: "Social rented", s: "%", wh: false },
-  census_over65_pct:           { l: "65+", s: "%", wh: false },
-  census_under16_pct:          { l: "Under 16", s: "%", wh: false },
-  fuel_poverty_pct:            { l: "Fuel poverty", s: "%", wh: true  },
-  crime_total:                 { l: "Crimes (12 mo.)", s: "", wh: true, count: true },
-};
-
-function _nbhdAgg(key) {
-  // Returns { sw: {val, wards, pop, core20, crime}, ... }
-  const out = {};
-  for (const [k, nb] of Object.entries(NEIGHBOURHOODS)) {
-    let num = 0, den = 0, popSum = 0, core20Sum = 0, crimeSum = 0, totalLsoa = 0;
-    let count = 0;
-    const wardList = [];
-    for (const wn of nb.wards) {
-      const w = WARD_DATA[wn] || Object.values(WARD_DATA).find(x => norm(x.name) === norm(wn));
-      if (!w) continue;
-      wardList.push(w);
-      const ind = w.indicators || {};
-      const pop = parseFloat(ind.census_population) || 0;
-      popSum   += pop;
-      core20Sum += parseInt(ind.core20_lsoa_count || 0) || 0;
-      totalLsoa += parseInt(ind.total_lsoa_count  || 0) || 0;
-      crimeSum += parseFloat(ind.crime_total || 0) || 0;
-      const v = ind[key];
-      if (v == null || v === '') continue;
-      const cfg = NBHD_OV_LABELS[key] || {};
-      if (cfg.count) { num += parseFloat(v); count += 1; }
-      else {
-        const w_ = pop > 0 ? pop : 1;
-        num += parseFloat(v) * w_;
-        den += w_;
-      }
-    }
-    const cfg = NBHD_OV_LABELS[key] || {};
-    const val = cfg.count ? num : (den > 0 ? num / den : null);
-    out[k] = {
-      val,
-      pop: popSum,
-      core20: core20Sum,
-      totalLsoa,
-      crime: crimeSum,
-      nWards: wardList.length,
-      wards: wardList,
-    };
-  }
-  return out;
-}
-
-function _fmtNbhdVal(key, v) {
-  if (v == null) return '\u2014';
-  const cfg = NBHD_OV_LABELS[key] || {};
-  if (cfg.count) return Math.round(v).toLocaleString();
-  return v.toFixed(1) + (cfg.s || '');
-}
-
-function renderNbhdTable() {
-  const host = document.getElementById('nbhd-table');
-  if (!host) return;
-  if (!WARD_DATA || Object.keys(WARD_DATA).length === 0) {
-    host.innerHTML = '<div class="data-note">Loading ward data\u2026</div>';
-    return;
-  }
-
-  // Simplified cards: colour header + ward count + ward chips. No indicator.
-  const cards = Object.entries(NEIGHBOURHOODS).map(([k, nb]) => {
-    const wardNames = nb.wards;
-    const chips = wardNames.map(w =>
-      `<span class="nbhd-ward-chip" data-ward="${w.replace(/"/g,'&quot;')}">${w}</span>`
-    ).join('');
-    const isFocus = focusedNbhd === k ? ' focused' : '';
-    const isShaded = shadedNbhds.has(k);
-    return `
-      <div class="nbhd-card${isFocus}" data-nbhd="${k}">
-        <div class="nbhd-hdr" style="background:${nb.color}">
-          <div class="nbhd-swatch"></div>
-          <div>${nb.label}</div>
-          <div class="nbhd-val" style="font-size:10px;opacity:0.9">${isShaded ? 'shaded' : ''}</div>
-        </div>
-        <div class="nbhd-body">
-          <div style="font-size:11px;color:#666;margin-bottom:6px">${wardNames.length} wards</div>
-          <div class="nbhd-wards">${chips}</div>
-        </div>
-      </div>`;
-  }).join('');
-  host.innerHTML = cards;
-
-  host.querySelectorAll('.nbhd-card').forEach(c => {
-    c.addEventListener('click', ev => {
-      if (ev.target.classList.contains('nbhd-ward-chip')) return;
-      const k = c.dataset.nbhd;
-      setNbhdFocus(focusedNbhd === k ? 'all' : k);
-      renderNbhdTable();
-    });
-  });
-  host.querySelectorAll('.nbhd-ward-chip').forEach(c => {
-    c.addEventListener('click', ev => {
-      ev.stopPropagation();
-      const wn = c.dataset.ward;
-      showWard(wn);
-      document.querySelectorAll('.sb-tab').forEach(t => t.classList.toggle('active', t.dataset.tab==='ward'));
-      document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.id==='tab-ward'));
-    });
-  });
-}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // FILL / BORDER SLIDERS — live restyle so fills & borders can be stacked
@@ -9729,128 +9264,6 @@ function _restyleAll() {
 // ── Sidebar layout helper ──────────────────────────────────────────────────
 // Sidebar footer measurement IIFE removed — sidebar now uses CSS grid, which
 // natively stacks [focus] [tabs] [1fr pane] [footer] without any JS.
-
-// ═══════════════════════════════════════════════════════════════════════════
-// SPOTLIGHT MODE — hard-dim wards outside focused neighbourhood
-// ═══════════════════════════════════════════════════════════════════════════
-document.getElementById('tspot').addEventListener('change', e => {
-  spotlightMode = e.target.checked;
-  _restyleAll();
-  if (spotlightMode && focusedNbhd === 'all') {
-    // Gentle nudge so the toggle visibly does something even before user focuses.
-    const hint = document.getElementById('nbhd-radar');
-    if (hint) hint.innerHTML = '<div class="data-note" style="color:#854F0B">Click a neighbourhood card above to focus it.</div>';
-  } else {
-    renderNbhdTable();
-  }
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// NBHD RADAR — indicator comparison vs London baseline for focused nbhd
-// ═══════════════════════════════════════════════════════════════════════════
-const NBHD_RADAR_KEYS = [
-  { k: 'census_bad_health_pct',     l: 'Bad health',     hi: true  },
-  { k: 'census_disability_any_pct', l: 'Disability',     hi: true  },
-  { k: 'census_unemployed_pct',     l: 'Unemployed',     hi: true  },
-  { k: 'fuel_poverty_pct',          l: 'Fuel poverty',   hi: true  },
-  { k: 'census_no_car_pct',         l: 'No car',         hi: false },
-  { k: 'census_over65_pct',         l: '65+',            hi: false },
-];
-
-function _nwMean(key) {
-  let num = 0, den = 0;
-  for (const w of Object.values(WARD_DATA)) {
-    const ind = w.indicators || {};
-    const v = ind[key];
-    const pop = parseFloat(ind.census_population) || 0;
-    if (v == null || v === '') continue;
-    const wt = pop > 0 ? pop : 1;
-    num += parseFloat(v) * wt;
-    den += wt;
-  }
-  return den > 0 ? num / den : null;
-}
-
-function renderNbhdRadar() {
-  const host = document.getElementById('nbhd-radar');
-  if (!host) return;
-  if (focusedNbhd === 'all' || !WARD_DATA || Object.keys(WARD_DATA).length === 0) {
-    host.innerHTML = '';
-    return;
-  }
-  const nb = NEIGHBOURHOODS[focusedNbhd];
-  if (!nb) { host.innerHTML = ''; return; }
-  const agg = _nbhdAgg('census_bad_health_pct')[focusedNbhd]; // any key fine; we re-read per-row below
-  const rows = NBHD_RADAR_KEYS.map(item => {
-    // pop-weighted neighbourhood mean for this key
-    let num = 0, den = 0;
-    for (const wn of nb.wards) {
-      const w = WARD_DATA[wn] || Object.values(WARD_DATA).find(x => norm(x.name) === norm(wn));
-      if (!w) continue;
-      const ind = w.indicators || {};
-      const v = ind[item.k];
-      const pop = parseFloat(ind.census_population) || 0;
-      if (v == null || v === '') continue;
-      const wt = pop > 0 ? pop : 1;
-      num += parseFloat(v) * wt;
-      den += wt;
-    }
-    const nbhdMean = den > 0 ? num / den : null;
-    const nwMean = _nwMean(item.k);
-    if (nbhdMean == null || nwMean == null) return '';
-    // Percent difference vs London
-    const diff = nwMean > 0 ? ((nbhdMean - nwMean) / nwMean) * 100 : 0;
-    const isWorse = item.hi ? diff > 0 : diff < 0;
-    const barColor = isWorse ? '#A32D2D' : '#0F6E56';
-    // Scale: cap at +/- 60% for bar width; center line at 50%
-    const pct = Math.max(-60, Math.min(60, diff));
-    const leftPct = pct < 0 ? 50 + pct : 50;       // bar starts here
-    const widthPct = Math.abs(pct);
-    const signLabel = (diff >= 0 ? '+' : '') + diff.toFixed(0) + '%';
-    return `
-      <div style="display:grid;grid-template-columns:78px 1fr 44px;gap:6px;align-items:center;margin-bottom:4px;font-size:10.5px">
-        <div style="color:#555;text-align:right">${item.l}</div>
-        <div style="position:relative;height:10px;background:#f5f5ef;border-radius:3px">
-          <div style="position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:#bbb"></div>
-          <div style="position:absolute;left:${leftPct}%;top:0;bottom:0;width:${widthPct}%;background:${barColor};border-radius:2px"></div>
-        </div>
-        <div style="color:${barColor};font-weight:600;text-align:right">${signLabel}</div>
-      </div>`;
-  }).filter(Boolean).join('');
-  host.innerHTML = `
-    <div style="border:1px solid #e5e5e0;border-radius:8px;padding:10px;background:#fff">
-      <div style="font-size:11px;font-weight:600;color:${nb.color};margin-bottom:6px">${nb.label} vs London</div>
-      ${rows}
-      <div style="font-size:9.5px;color:#888;margin-top:6px;line-height:1.4">
-        Red = worse than London mean; green = better. Population-weighted.
-      </div>
-    </div>`;
-}
-
-// Wrap renderNbhdTable so the radar re-renders alongside it.
-(function wrapRender() {
-  if (typeof renderNbhdTable !== 'function') return;
-  const orig = renderNbhdTable;
-  window.renderNbhdTable = function() {
-    orig.apply(this, arguments);
-    renderNbhdRadar();
-  };
-})();
-
-// Re-render radar whenever focus changes — wrap setNbhdFocus the same way.
-(function wrapFocus() {
-  if (typeof setNbhdFocus !== 'function') return;
-  const orig = setNbhdFocus;
-  window.setNbhdFocus = function() {
-    orig.apply(this, arguments);
-    if (document.getElementById('tab-nbhd') &&
-        document.getElementById('tab-nbhd').classList.contains('active')) {
-      renderNbhdTable();
-    }
-  };
-})();
-
-
 
 // (Map legend removed — sidebar Layers/Borough-boundaries swatches already
 // document each layer's colour, and the bottom-right corner is reserved
