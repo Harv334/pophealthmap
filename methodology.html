@@ -72,6 +72,44 @@ map rather than instead of it.</p>
   figures as provisional.
 </div>
 
+<h2>Every data source</h2>
+
+<p>Everything the map draws comes from one of the sources below. Each row says
+who publishes it, what it covers, the geography it is published at, the period
+the figures describe, and how often the publisher releases a new one.</p>
+
+<p>The last column is not written down here. It is read from
+<code>data/meta/manifest.json</code>, which the pipeline rewrites on every run,
+so it reports when this site last actually pulled that source and whether the
+pull worked. A source that has started failing says so here rather than quietly
+serving older figures with no sign of it.</p>
+
+<div class="wrap">
+  <table id="src-table">
+    <thead>
+      <tr>
+        <th>Source</th>
+        <th>What it provides</th>
+        <th>Published at</th>
+        <th>Period covered</th>
+        <th>Publisher updates</th>
+        <th>Last fetched here</th>
+      </tr>
+    </thead>
+    <tbody id="src-rows">
+      <tr><td colspan="6" style="color:var(--ink-3)">Loading the fetch log…</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<p id="src-note" class="caution" style="display:none"></p>
+
+<p style="font-size:13px;color:var(--ink-3)">Unless noted otherwise these are
+published under the Open Government Licence v3.0 and contain public sector
+information licensed under it. Postcodes are resolved through
+<a href="https://postcodes.io">postcodes.io</a>, which derives from ONS and
+Ordnance Survey data. The basemap is CARTO, built from OpenStreetMap.</p>
+
 <h2>Geographies, and which year each one is from</h2>
 
 <p>The four geographies on the map come from different censuses and boundary
@@ -284,5 +322,313 @@ repository: <a href="https://github.com/Harv334/pophealthmap">github.com/Harv334
 </footer>
 
 </main>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE SOURCE TABLE
+
+   Two halves, deliberately kept apart.
+
+   The static half is below: who publishes a thing, what period it describes,
+   how often a new one comes out. Those are facts about the publisher and they
+   change about once a decade, so writing them down is honest.
+
+   The live half is data/meta/manifest.json, which fetch_all_data.py rewrites
+   on every run with the outcome of each fetch. Writing THAT down would be a
+   lie within a week, and it is the half a reader most needs: a source can
+   start failing while the site carries on serving the last good figures, and
+   nothing on the page would say so. Two of them are failing right now.
+
+   `manifest` on each record is the key the pipeline files that source under.
+   Records with none are not fetched by the pipeline at all, which the table
+   says rather than leaving a blank that reads as "no data".
+   ═══════════════════════════════════════════════════════════════════════════ */
+var SOURCES = [
+  { name: 'Census 2021',
+    pub: 'ONS, via NOMIS',
+    what: '32 indicators: health, disability, ethnicity, age, housing, tenure, ' +
+          'qualifications, occupation, travel to work, household language, unpaid care.',
+    geo: 'Output area, aggregated here to LSOA and ward',
+    period: 'Census day, 21 March 2021',
+    cadence: 'Once a decade. The next is 2031.',
+    manifest: 'census' },
+
+  { name: 'Index of Multiple Deprivation 2025',
+    pub: 'MHCLG',
+    what: 'Overall IMD score and decile, and the seven domain scores: income, ' +
+          'employment, education, health, crime, barriers to housing, living environment.',
+    geo: 'LSOA',
+    period: 'Mostly 2022 to 2023 inputs, published 2025',
+    cadence: 'Irregular. 2010, 2015, 2019, 2025.',
+    manifest: 'imd' },
+
+  { name: 'Fingertips: main profiles',
+    pub: 'OHID (Office for Health Improvement and Disparities)',
+    what: '18 indicators including life expectancy, healthy life expectancy, ' +
+          'smoking, obesity, physical activity, suicide, child poverty, screening ' +
+          'and vaccination coverage.',
+    geo: 'Upper-tier local authority, so borough',
+    period: 'Latest published period, which differs per indicator',
+    cadence: 'Varies by indicator. Most are annual.',
+    manifest: 'fingertips' },
+
+  { name: 'Fingertips: Local Health',
+    pub: 'OHID',
+    what: '33 indicators at neighbourhood scale: births, low birth weight, ' +
+          'childhood obesity, emergency admissions, injuries, unemployment benefit ' +
+          'claims, fuel poverty.',
+    geo: 'MSOA',
+    period: 'Latest published period, which differs per indicator',
+    cadence: 'Varies by indicator. Most are annual.',
+    manifest: 'fingertips_msoa' },
+
+  { name: 'Quality and Outcomes Framework',
+    pub: 'NHS England',
+    what: 'Recorded prevalence from GP registers: hypertension, depression, ' +
+          'severe mental illness.',
+    geo: 'GP practice, aggregated to borough',
+    period: 'Latest published year',
+    cadence: 'Annually.',
+    manifest: 'qof' },
+
+  { name: 'Street-level crime',
+    pub: 'data.police.uk (Metropolitan Police and City of London Police)',
+    what: 'Every recorded street-level crime, counted into 11 categories and a total.',
+    geo: 'Point locations, snapped by the publisher to anonymised map points, ' +
+         'counted here into wards',
+    period: 'A rolling 12 months to the latest release',
+    cadence: 'Monthly, about two months in arrears.',
+    manifest: 'crime' },
+
+  { name: 'Claimant count',
+    pub: 'DWP and ONS, via NOMIS (CLA01)',
+    what: 'People claiming unemployment-related benefits, as a count and as a ' +
+          'rate of the working-age population.',
+    geo: 'LSOA',
+    period: 'Latest month published',
+    cadence: 'Monthly.',
+    manifest: 'claimant' },
+
+  { name: 'DWP benefits',
+    pub: 'DWP, via NOMIS',
+    what: 'Personal Independence Payment cases, Universal Credit households, ' +
+          'Employment and Support Allowance, Carer’s Allowance and Pension Credit, ' +
+          'as counts and as rates of the working-age population.',
+    geo: 'LSOA',
+    period: 'Latest period published per dataset',
+    cadence: 'Quarterly for most of these series.',
+    manifest: 'dwp' },
+
+  { name: 'Fuel poverty (LILEE)',
+    pub: 'DESNZ',
+    what: 'Households in low income, low energy efficiency fuel poverty.',
+    geo: 'LSOA',
+    period: '2022',
+    cadence: 'Annually.',
+    manifest: 'fuel_poverty' },
+
+  { name: 'Green and blue space',
+    pub: 'Natural England and Ordnance Survey, processed by Defra',
+    what: 'Access to doorstep, local and neighbourhood green space and to blue ' +
+          'space, measured over addresses.',
+    geo: 'LSOA',
+    period: '2023',
+    cadence: 'Ad hoc. There is no fixed release cycle.',
+    manifest: null,
+    note: 'Built once from the published extract rather than fetched on each run.' },
+
+  { name: 'Green space polygons',
+    pub: 'Ordnance Survey Open Greenspace',
+    what: 'The parks, playing fields and other green spaces drawn on the map.',
+    geo: 'Polygons',
+    period: 'Latest release',
+    cadence: 'Twice a year.',
+    manifest: null,
+    note: 'Built once by build_greenspaces.py. Contains OS data © Crown copyright.' },
+
+  { name: 'GP practices',
+    pub: 'NHS Organisation Data Service',
+    what: 'Practice locations and registered list sizes.',
+    geo: 'Point, from the practice postcode',
+    period: 'Current register',
+    cadence: 'Monthly.',
+    manifest: 'gp' },
+
+  { name: 'Dental practices',
+    pub: 'NHS Organisation Data Service (egdpprac)',
+    what: 'NHS dental practice locations, and the per-ward count.',
+    geo: 'Point, from the practice postcode',
+    period: 'Current register',
+    cadence: 'Monthly.',
+    manifest: 'dentists' },
+
+  { name: 'Pharmacies',
+    pub: 'NHS Organisation Data Service',
+    what: 'Community pharmacy locations.',
+    geo: 'Point, from the pharmacy postcode',
+    period: 'Current register',
+    cadence: 'Monthly.',
+    manifest: 'pharmacies' },
+
+  { name: 'Hospitals',
+    pub: 'NHS Organisation Data Service',
+    what: 'Hospital sites.',
+    geo: 'Point',
+    period: 'Current register',
+    cadence: 'Monthly.',
+    manifest: 'hospitals' },
+
+  { name: 'Charities and CICs',
+    pub: 'Charity Commission for England and Wales',
+    what: 'Registered charities with their areas of operation and classification, ' +
+          'plus Community Interest Companies.',
+    geo: 'Point, from the registered address, with stated areas of operation',
+    period: 'Current register',
+    cadence: 'The full register extract is republished monthly.',
+    manifest: 'charities' },
+
+  { name: 'Public transport accessibility (PTAL)',
+    pub: 'Greater London Authority, LSOA Atlas',
+    what: 'Average public transport accessibility score.',
+    geo: 'LSOA',
+    period: 'As published in the Atlas',
+    cadence: 'Ad hoc.',
+    manifest: 'ptal' },
+
+  { name: 'Population estimates',
+    pub: 'ONS',
+    what: 'Mid-year population, used as the denominator for rates and for ' +
+          'population-weighting figures between geographies.',
+    geo: 'LSOA, aggregated to ward',
+    period: 'Mid-2024',
+    cadence: 'Annually.',
+    manifest: null,
+    note: 'Carried with the census extract rather than fetched separately.' },
+
+  { name: 'Boundaries',
+    pub: 'ONS Open Geography Portal',
+    what: 'Ward, LSOA, MSOA and local authority boundaries, generalised for the web.',
+    geo: 'Polygons',
+    period: 'Ward 2024, LSOA and MSOA 2021, local authority 2025',
+    cadence: 'As boundaries are revised, usually annually.',
+    manifest: 'boundaries' },
+
+  { name: 'Core20PLUS5',
+    pub: 'NHS England (NHSE)',
+    what: 'Which LSOAs fall in the most deprived fifth nationally, and the count per ward.',
+    geo: 'LSOA',
+    period: 'Derived from IMD 2025',
+    cadence: 'Follows the IMD.',
+    manifest: null,
+    note: 'Derived here from the IMD rather than fetched.' },
+
+  { name: 'Schools, libraries, community centres, ESOL providers',
+    pub: 'Local authority open data and published directories',
+    what: 'Point layers for civic and education services.',
+    geo: 'Point',
+    period: 'As collected',
+    cadence: 'Not automated. These were compiled by hand.',
+    manifest: null,
+    note: 'North West London only. The map says so wherever they appear.' },
+];
+
+(function renderSources() {
+  var tbody = document.getElementById('src-rows');
+  var noteEl = document.getElementById('src-note');
+  if (!tbody) return;
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function ago(iso) {
+    if (!iso) return null;
+    var t = Date.parse(iso);
+    if (isNaN(t)) return null;
+    var days = Math.floor((Date.now() - t) / 86400000);
+    if (days <= 0) return 'today';
+    if (days === 1) return 'yesterday';
+    if (days < 31) return days + ' days ago';
+    var months = Math.round(days / 30.4);
+    return months + (months === 1 ? ' month ago' : ' months ago');
+  }
+
+  function statusCell(rec, sources) {
+    if (!rec.manifest) {
+      return '<span style="color:var(--ink-3)">Not fetched per run</span>' +
+             (rec.note ? '<br><span style="font-size:12px;color:var(--ink-3)">' +
+              esc(rec.note) + '</span>' : '');
+    }
+    var s = sources && sources[rec.manifest];
+    if (!s) return '<span style="color:var(--ink-3)">No record</span>';
+    var when = ago(s.fetched_at);
+    var rows = (typeof s.rows_written === 'number' && s.rows_written)
+      ? s.rows_written.toLocaleString('en-GB') + ' rows' : '';
+    // A failure is the thing worth reading, so it is stated rather than
+    // reduced to a colour, and it says what the consequence is.
+    if (s.status === 'failed' || s.status === 'skipped') {
+      return '<strong style="color:#A5341C">' + esc(s.status) + '</strong>' +
+        (when ? ' · last tried ' + esc(when) : '') +
+        '<br><span style="font-size:12px">The map is serving the last figures ' +
+        'that did load, which are older than the date above.</span>';
+    }
+    return esc(when || 'unknown') + (rows ? '<br><span style="font-size:12px;color:var(--ink-3)">' +
+      esc(rows) + '</span>' : '') +
+      (rec.note ? '<br><span style="font-size:12px;color:var(--ink-3)">' + esc(rec.note) +
+       '</span>' : '');
+  }
+
+  function draw(manifest) {
+    var sources = (manifest && manifest.sources) || null;
+    tbody.innerHTML = SOURCES.map(function (rec) {
+      return '<tr>' +
+        '<td><strong>' + esc(rec.name) + '</strong><br>' +
+          '<span style="font-size:12.5px;color:var(--ink-3)">' + esc(rec.pub) + '</span></td>' +
+        '<td>' + esc(rec.what) + '</td>' +
+        '<td>' + esc(rec.geo) + '</td>' +
+        '<td>' + esc(rec.period) + '</td>' +
+        '<td>' + esc(rec.cadence) + '</td>' +
+        '<td>' + statusCell(rec, sources) + '</td>' +
+      '</tr>';
+    }).join('');
+
+    if (!sources) {
+      if (noteEl) {
+        noteEl.style.display = 'block';
+        noteEl.innerHTML = '<strong>The fetch log could not be read.</strong> ' +
+          'The sources and periods above are still accurate; only the last column, ' +
+          'which reports when each was last pulled, is missing.';
+      }
+      return;
+    }
+    var bad = Object.keys(sources).filter(function (k) {
+      return sources[k].status === 'failed' || sources[k].status === 'skipped';
+    });
+    if (bad.length && noteEl) {
+      noteEl.style.display = 'block';
+      noteEl.innerHTML = '<strong>' + bad.length + ' of ' +
+        Object.keys(sources).length + ' sources did not refresh on the last run.</strong> ' +
+        'Those rows are marked below. The map still shows the last figures that ' +
+        'loaded successfully, so they are real but older than the rest, and the ' +
+        'period column tells you what they describe.' +
+        (manifest.last_run ? ' Last full run: ' + esc(String(manifest.last_run).slice(0, 10)) + '.' : '');
+    } else if (noteEl && manifest.last_run) {
+      noteEl.style.display = 'block';
+      noteEl.style.background = 'transparent';
+      noteEl.style.border = '0';
+      noteEl.style.color = 'var(--ink-3)';
+      noteEl.innerHTML = 'Every source refreshed on the last run, ' +
+        esc(String(manifest.last_run).slice(0, 10)) + '.';
+    }
+  }
+
+  fetch('data/meta/manifest.json', { cache: 'no-cache' })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .catch(function () { return null; })
+    .then(draw);
+})();
+</script>
+
 </body>
 </html>
