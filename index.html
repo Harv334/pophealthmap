@@ -1451,7 +1451,7 @@
            survives as the title attribute, so hovering the name still
            explains. -->
       <div>
-        <h1 class="hdr-logo" title="Click a ward for its headline figures, then Open profile for the full panel · use the Overlay tab to colour the map by an indicator · the VCSE tab maps charities and Community Interest Companies">London Population Health Mapping<span class="dev-badge" title="This tool is still in development">In development</span></h1>
+        <h1 class="hdr-logo" title="Click a ward for its headline figures, then Open profile for the full panel · use the Indicators tab to colour the map by a figure · the VCSE tab maps charities and Community Interest Companies">London Population Health Mapping<span class="dev-badge" title="This tool is still in development">In development</span></h1>
       </div>
     </div>
     <div class="hdr-right">
@@ -1510,9 +1510,21 @@
         <button class="nbfocus-btn all active" data-nbhd="all" onclick="setNbhdFocus('all')">All wards</button>
       </div>
       <div class="sb-tabs">
-        <div class="sb-tab active" data-tab="layers">Layers</div>
+        <!-- Indicators first, and open by default. Colouring the map by a
+             figure is what this site is for; Layers held that place and is a
+             list of things to draw on top of a map that is not yet showing
+             anything. Someone arriving was one click from the point of the
+             tool and did not necessarily know it.
+
+             "Indicators" rather than "Overlay" because it names what you pick
+             rather than what happens to it, and it is the word the audience
+             already uses. data-tab stays "overlay" so the pane id and every
+             handler that names it keep working, exactly as data-tab stayed
+             "ward" when that tab became Area profile. Body copy still says
+             overlay, which is still what it is. -->
+        <div class="sb-tab active" data-tab="overlay">Indicators</div>
+        <div class="sb-tab" data-tab="layers">Layers</div>
         <div class="sb-tab" data-tab="vcse">VCSE</div>
-        <div class="sb-tab" data-tab="overlay">Overlay</div>
         <!-- Neighbourhoods tab withdrawn for now. The pane below is left in
              place, unreachable: tab switching is driven by the button that was
              clicked, so removing the button is enough, and the one place that
@@ -1532,7 +1544,7 @@
       </div>
 
       <!-- Layers tab -->
-      <div class="tab-pane active" id="tab-layers">
+      <div class="tab-pane" id="tab-layers">
         <div class="sb-sec">
           <div class="sb-lbl">Point layers</div>
           <label class="lrow"><div class="ldot" style="background:#185FA5"></div><span class="lname">GP practices <span class="lcount" id="gp-count">0</span></span><input type="checkbox" id="tg"></label>
@@ -1701,7 +1713,7 @@
       </div>
 
       <!-- Overlay tab -->
-      <div class="tab-pane" id="tab-overlay">
+      <div class="tab-pane active" id="tab-overlay">
         <div class="sb-sec" style="flex:1;border-bottom:none;overflow-y:auto">
           <div class="sb-lbl" style="display:flex;align-items:center;gap:6px">
             <span>Choropleth overlay</span>
@@ -5870,11 +5882,24 @@ function _applyBoroughSolo() {
     sec.classList.toggle('collapsed', folded);
     lbl.setAttribute('aria-expanded', String(!folded));
     lbl.title = folded ? 'Show the map controls' : 'Hide the map controls';
-    if (save) { try { window.localStorage.setItem(KEY, folded ? '1' : ''); } catch (e) {} }
+    // 'open' and 'folded' rather than a flag, because absent has to mean
+    // something different from either: the default is folded, so a stored ''
+    // could not be told apart from never having chosen.
+    if (save) { try { window.localStorage.setItem(KEY, folded ? 'folded' : 'open'); } catch (e) {} }
   }
 
-  try { apply(!!window.localStorage.getItem(KEY), false); }
-  catch (e) { apply(false, false); }   // private mode: open, every time
+  /* Folded on a first visit.
+     Three sliders that adjust how the map is drawn are a refinement, not a
+     starting point: nobody arrives wanting to change the border weight of a map
+     they have not looked at yet. Pinned open they cost a strip off the bottom of
+     the panel on every visit, which comes out of whatever is above them.
+
+     An explicit choice still wins and is remembered in both directions, so
+     anyone who opens them finds them open next time. */
+  try {
+    var stored = window.localStorage.getItem(KEY);
+    apply(stored !== 'open', false);
+  } catch (e) { apply(true, false); }   // private mode: folded, every time
 
   lbl.addEventListener('click', () => apply(!sec.classList.contains('collapsed'), true));
   // A div with role=button is not a button, so the keys have to be wired by
@@ -10114,12 +10139,18 @@ loadData();
   }
 
   /* Which tab to come back to.
-     Layers, VCSE, Overlay and Ward are filters and views, not modes: they are
-     meant to hold across everything else. Query and Compare borrow the sidebar
-     while they are open, so leaving one has to give back the tab it took, not
-     drop everyone on Layers. Someone who set up an overlay, looked something up
-     in Query and came back used to find their overlay tab closed. */
-  var lastTab = 'layers';
+     Indicators, Layers, VCSE and Area profile are filters and views, not modes:
+     they are meant to hold across everything else. Query and Compare borrow the
+     sidebar while they are open, so leaving one has to give back the tab it
+     took, not drop everyone somewhere else. Someone who set up an overlay,
+     looked something up in Query and came back used to find their overlay tab
+     closed.
+
+     The starting value has to match the tab marked active in the markup. It
+     said 'layers' from when Layers was the tab that opened, so a first visit
+     that went into Query would have come back to a different tab than it
+     started on. */
+  var lastTab = 'overlay';
   function rememberTab() {
     var pane = document.querySelector('.tab-pane.active');
     if (!pane) return;
@@ -11825,15 +11856,15 @@ loadData();
          'here is uploaded anywhere.',
       go: function () {
         railClick('explore');
-        // Overlay first: changing #ov pulls the sidebar to the Overlay tab, so
-        // setting the tab before it would be immediately undone.
+        // The indicator first: changing #ov pulls the sidebar to the Indicators
+        // tab, so setting the tab before it would be immediately undone.
         setOverlay('none');
         sidebarTab('layers');
       },
     },
     {
       t: 'Colour the map by any figure',
-      n: 'The Overlay tab shades every ward by one of 67 indicators, and the strip along ' +
+      n: 'The Indicators tab shades every ward by one of 116 figures, and the strip along ' +
          'the bottom of the map gives the scale it is using. This one is the ' +
          '<strong>IMD 2025 score</strong>, a ward aggregate of the deprivation of the ' +
          'neighbourhoods inside it. Darker is more deprived.',
