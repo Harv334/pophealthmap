@@ -177,9 +177,6 @@
   .chip.vcse { background: #F6E7F0; color: #AE2573; border-color: #E6C6D8; }
   .chip-x { background: transparent; border: none; color: inherit; opacity: .6; cursor: pointer; font-size: 13px; line-height: 1; padding: 0 4px; border-radius: 8px; }
   .chip-x:hover { opacity: 1; background: rgba(0,0,0,.06); }
-  .nb { font-size: 11px; font-weight: 500; padding: 3px 10px; border-radius: 20px; cursor: pointer; opacity: .45; border: 1.5px solid transparent; white-space: nowrap; transition: opacity .15s, transform .1s; }
-  .nb:hover { transform: translateY(-1px); }
-  .nb.on { opacity: 1; }
   .main { display: grid; grid-template-columns: auto minmax(0, 1fr); overflow: hidden; min-height: 0; min-width: 0; }
 
   /* ── Sidebar ── CSS Grid: native layout guarantees [focus] [tabs] [flexible pane] [footer] stack. No JS measurement needed. */
@@ -293,7 +290,6 @@
   .ward-scroll { flex: 1 1 0; overflow-y: auto; padding: 11px 13px; min-height: 0; height: 0; }
   .ph { text-align: center; padding: 28px 12px; color: #768692; font-size: 12px; line-height: 1.8; }
   .ph-icon { font-size: 22px; margin-bottom: 8px; opacity: .4; }
-  .nbadge-sm { display: inline-block; font-size: 10px; font-weight: 600; padding: 3px 9px; border-radius: 20px; margin-bottom: 9px; }
   .wname { font-size: 14px; font-weight: 600; color: #212B32; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #E8EDEE; display: flex; justify-content: space-between; align-items: baseline; }
   .wpop { font-size: 11px; font-weight: 400; color: #768692; }
   .cat-block { margin-bottom: 9px; }
@@ -4146,7 +4142,16 @@ let WARD_DATA_BY_CODE = {};
 // focusedBorough is hoisted near the top of the script (see `var focusedBorough`)
 // so boroughL / wardBoundaryLyr style callbacks can read it at construction time.
 
+// Which style state a ward should draw in. Six call sites pass it straight into
+// wstyle, including the one inside buildWardLayer that runs on every load.
+//
+// It sat immediately after setNbhdFocus, so removing the neighbourhoods feature
+// took it too: the block cut ran to the next `const`, which was _ovRange below,
+// and everything in between went with it. Two letters, no relation to the
+// feature, and nothing named it in the removal.
+function gs(wn) { return wn === selW ? 'selected' : 'default'; }
 
+// Compute dynamic min/max from actual ward data for each overlay key (cached)
 const _ovRange = {};
 function getOvRange(ovKey) {
   if (_ovRange[ovKey]) return _ovRange[ovKey];
@@ -4384,7 +4389,6 @@ function showWard(wn) {
 
   p.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:8px">
-      ${nb ? `<span class="nbadge-sm" style="background:${nb.bg};color:${nb.color}">${nb.label}</span>` : '<span></span>'}
       <button class="deselect-btn" onclick="deselectWard()" title="Deselect this ward">Deselect &times;</button>
     </div>
     <div class="wname">${wdata.name} <span class="wpop">${pop}</span></div>
@@ -4929,7 +4933,7 @@ window.generateWardReport = function(wn, opts) {
           .filter(f => f !== wardFeat)
           .map(f => `<path d="${geomPath(f.geometry)}" fill="#eeeee8" stroke="#c8c8c0" stroke-width="0.6"/>`)
           .join('');
-        const wardFill = nb ? nb.color : '#2f6fb8';
+        const wardFill = '#2f6fb8';
         const wardPath = `<path d="${geomPath(wardFeat.geometry)}" fill="${wardFill}" fill-opacity="0.55" stroke="${wardFill}" stroke-width="1.6"/>`;
         // Pharmacy dots inside the ward
         let pharmDots = '';
@@ -5012,7 +5016,6 @@ window.generateWardReport = function(wn, opts) {
   .hero-text .sub { color:#555; font-size:13px; margin-top:5px; }
   .hero-text .badges { margin-top:8px; }
   .badge { display:inline-block; margin-right:5px; padding:2px 10px; border-radius:14px; font-size:10.5px; font-weight:600; vertical-align:middle; }
-  .badge.nb { ${nb ? `background:${nb.bg};color:${nb.color};` : 'background:#eee;color:#555;'} }
   .badge.core20 { background:#fde6ee; color:#8b0035; border:1px solid #f0b5cb; }
   .badge.imd { background:#1a1a1a; color:#fff; }
   .hero-map { flex:0 0 240px; }
@@ -5098,7 +5101,6 @@ window.generateWardReport = function(wn, opts) {
       <h1>${_esc(wdata ? wdata.name : wn)}</h1>
       <div class="sub">${_esc(borough)}${borough && population !== '—' ? ' · ' : ''}${population !== '—' ? 'Population ' + population : ''}${imdRank ? ' · IMD rank ' + imdRank + ' of ' + totalWards + ' NWL wards' : ''}</div>
       <div class="badges">
-        ${nb ? `<span class="badge nb">${_esc(nb.label)}</span>` : ''}
         ${core20Badge}
         ${imdW != null ? `<span class="badge imd">IMD score ${imdW.toFixed(1)}</span>` : ''}
       </div>
@@ -5281,7 +5283,7 @@ function buildWardLayer() {
         if (wn !== selW) lyr.setStyle(wstyle(wn, curOv, 'hover'));
         const _wardRec = WARD_DATA[wn] || (typeof WARD_DATA === 'object' && Object.values(WARD_DATA).find(w => w && w.name === wn));
         const ovRows = ovTooltipRows(k => wardOvValue(wn, k), _wardRec);
-        lyr.bindTooltip(`<b style="font-size:12px">${wn}</b>${nb ? `<br><span style="font-size:10px;color:${nb.color}">${nb.label}</span>` : ''}${ovRows}`, { sticky:true, opacity:.94 }).openTooltip(e.latlng);
+        lyr.bindTooltip(`<b style="font-size:12px">${wn}</b>${ovRows}`, { sticky:true, opacity:.94 }).openTooltip(e.latlng);
       });
       lyr.on('mouseout', () => { if (wn !== selW) lyr.setStyle(wstyle(wn, curOv, 'default')); });
     }
@@ -8850,7 +8852,7 @@ function _downloadOverlayCsv() {
         // it downstream. The real code is on the record.
         const wardCode = w.code || '';
         if (boroughFilter && lad !== boroughFilter) { nSkipped++; continue; }
-        const row = [wardCode, w.name || key, lad, nk];
+        const row = [wardCode, w.name || key, lad];
         if (ov) row.push(w.indicators ? w.indicators[resolveOvField(ov)] : '');
         rows.push(row.map(_csvEscape).join(','));
         nKept++;
