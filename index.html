@@ -1861,11 +1861,6 @@
             <div id="sc-meta" style="margin-top:5px;font-size:10.5px;color:#888;line-height:1.4"></div>
           </div>
 
-          <!-- The bivariate (second indicator) control was removed for now.
-               curOv2 stays 'none', so bivariateColor() and every bivActive
-               branch downstream are inert rather than deleted: putting it back
-               is re-adding this block, not rebuilding the colouring. -->
-
           <!-- Top 20 / Bottom 20 rankings — single-indicator mode only -->
           <div id="rank-panel" style="display:none;margin-top:14px;padding-top:12px;border-top:1px solid #eee">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
@@ -3038,13 +3033,12 @@ function fmtOv(v, k) {
 function ovTooltipRows(valueForKey, ward) {
   // valueForKey: function(k) -> raw value
   // ward: optional ward record (used for suppression flag lookup)
-  // Read overlay keys LIVE from the dropdowns rather than from curOv/curOv2 globals.
-  // The globals can fall out of sync if a change handler errored mid-run; the dropdown
-  // always shows what the user actually has selected, so it's the source of truth.
+  // Read the overlay key LIVE from the dropdown rather than from the curOv
+  // global. The global can fall out of sync if a change handler errored
+  // mid-run; the dropdown always shows what the user actually has selected, so
+  // it is the source of truth.
   const _ovEl  = document.getElementById('ov');
-  const _ov2El = document.getElementById('ov2');
   const _ovK   = (_ovEl  && _ovEl.value)  || (typeof curOv  !== 'undefined' ? curOv  : 'none');
-  const _ov2K  = (_ov2El && _ov2El.value) || (typeof curOv2 !== 'undefined' ? curOv2 : 'none');
   let rows = '';
   const _suppList = (ward && ward.fingertips_suppressed) || [];
   const _renderRow = (k) => {
@@ -3063,7 +3057,6 @@ function ovTooltipRows(valueForKey, ward) {
     return `<br><span style="font-size:10.5px"><b>${ovLabel(k)}:</b> ${fmtOv(v, k)}</span>`;
   };
   if (_ovK  && _ovK  !== 'none') rows += _renderRow(_ovK);
-  if (_ov2K && _ov2K !== 'none') rows += _renderRow(_ov2K);
   return rows;
 }
 function mkicon(color, label) {
@@ -4254,7 +4247,6 @@ let focusedNbhd = 'all';   // neighbourhood focus: 'all' or key like 'sw'
 // so boroughL / wardBoundaryLyr style callbacks can read it at construction time.
 let showNbhdColors = false; // colored neighbourhood fills/borders start OFF (blank map on load)
 let spotlightMode = false; // hard-dim everything outside focused nbhd regardless of showNbhdColors
-let curOv2 = 'none';       // bivariate: secondary overlay indicator
 
 function setNbhdFocus(key) {
   focusedNbhd = key;
@@ -4392,7 +4384,7 @@ function wstyle(wn, ov, state) {
   // Border slider → black outline thickness (0 hides the outline).
   const absFill = Math.max(0, Math.min(1, fillOpacityMult));
 
-  if (ov === 'none' && curOv2 === 'none') {
+  if (ov === 'none') {
     // No overlay: fill is the neighbourhood colour when shaded, otherwise a faint neutral.
     const fillColor = shaded ? nb.color : '#94a3b8';
     // Shaded wards get a strong opacity floor (0.55) so the shade is clearly
@@ -4410,19 +4402,14 @@ function wstyle(wn, ov, state) {
     return applyCore20Outline({ color:borderColor, weight:w, fillColor, fillOpacity:fo, opacity:op }, wn);
   }
 
-  // Overlay / bivariate: fill comes from the chosen indicator colour.
-  const bivActive = curOv2 && curOv2 !== 'none' && ov !== 'none';
-  const bivFill = bivActive ? bivariateColor(wn, ov, curOv2, 'ward') : null;
-  const fill = bivActive ? (bivFill || '#ccc') : ovColor(wn, ov);
+  // Overlay: fill comes from the chosen indicator colour.
+  const fill = ovColor(wn, ov);
   const baseW  = {default:1.0, hover:3.0, selected:4.0}[state] || 1.0;
   // When the overlay is LSOA-only, the ward layer has nothing meaningful to
   // colour with — making it fully opaque just hides the LSOA choropleth
   // underneath. Drop to a near-transparent fill + thin outline so the LSOA
   // layer carries the choropleth and wards keep their boundary reference.
-  // Same applies when the bivariate colour is null (either indicator is
-  // LSOA-only): the LSOA layer paints the choropleth, wards stay outlines.
-  const lsoaOnly = (ov !== 'none' && isLsoaOnlyOv(ov))
-                   || (bivActive && (isLsoaOnlyOv(ov) || isLsoaOnlyOv(curOv2)));
+  const lsoaOnly = (ov !== 'none' && isLsoaOnlyOv(ov));
   const baseFo = lsoaOnly ? 0.0 : absFill;
   const fo = spot ? 0.05 : (dimmed ? Math.min(0.12, baseFo) : baseFo);
   const w  = spot ? 0.6  : (dimmed ? 1.0 : Math.max(0, baseW * borderWeightMult));
@@ -6409,27 +6396,19 @@ function imdStyle(feat, state) {
   // If an overlay is active, blend with overlay colour
   if (curOv !== 'none') {
     const code = feat.properties.code;
-    const bivActive = curOv2 && curOv2 !== 'none';
     // Did this polygon actually get a colour from the data? Everything below
     // used to assume it had.
     let shaded = false;
-    if (bivActive) {
-      // Bivariate: colour by tercile-cross. Works even when either overlay
-      // is LSOA-only because _bivTercile now dispatches to the right pool.
-      const c = bivariateColor(code, curOv, curOv2, 'lsoa');
-      if (c) { base.fillColor = c; shaded = true; }
-    } else {
-      const cfg = OV_CFG[curOv];
-      const d2 = LSOA_DATA[code];
-      if (d2 && cfg) {
-        const val = (d2.indicators || d2)?.[curOv];
-        if (val != null) {
-          const range = getLsoaRange(curOv);
-          if (range && range.hi !== range.lo) {
-            const t = (parseFloat(val) - range.lo) / (range.hi - range.lo);
-            base.fillColor = ramp(Math.max(0, Math.min(1, t)), !cfg.wh);
-            shaded = true;
-          }
+    const cfg = OV_CFG[curOv];
+    const d2 = LSOA_DATA[code];
+    if (d2 && cfg) {
+      const val = (d2.indicators || d2)?.[curOv];
+      if (val != null) {
+        const range = getLsoaRange(curOv);
+        if (range && range.hi !== range.lo) {
+          const t = (parseFloat(val) - range.lo) / (range.hi - range.lo);
+          base.fillColor = ramp(Math.max(0, Math.min(1, t)), !cfg.wh);
+          shaded = true;
         }
       }
     }
@@ -6447,8 +6426,10 @@ function imdStyle(feat, state) {
     // overlay up on purpose and turns this layer on for its boundaries alone,
     // and it tells the reader in words that the ward shading has not changed,
     // while 4,994 grey polygons sat over it at 40%. And the green and blue
-    // space overlays only reach 1,313 of those 4,994, so the other 3,681 washed
-    // out the map for anyone who picked one.
+    // space overlays reached only 1,313 of those 4,994 at the time, so the
+    // other 3,681 washed out the map for anyone who picked one. That data now
+    // covers all of London, but partial coverage is a normal state for a
+    // dataset and the guard is what makes it harmless.
     //
     // Tested per polygon rather than per indicator on purpose: partial coverage
     // is the common case, and an indicator that has figures for some LSOAs
@@ -7709,8 +7690,7 @@ function injectWardIMD() {
 function renderTopBottom() {
   const panel = document.getElementById('rank-panel');
   if (!panel) return;
-  const bivActive = curOv2 && curOv2 !== 'none';
-  if (!curOv || curOv === 'none' || bivActive) {
+  if (!curOv || curOv === 'none') {
     panel.style.display = 'none';
     return;
   }
@@ -8231,8 +8211,7 @@ document.querySelectorAll('#dl-seg button').forEach(b => {
   }
 
   const update = () => {
-    const ftActive = (typeof curOv  !== 'undefined' && isFt(curOv)) ||
-                     (typeof curOv2 !== 'undefined' && isFt(curOv2));
+    const ftActive = (typeof curOv !== 'undefined' && isFt(curOv));
     const show = ftActive && !dismissed;
     banner.style.display = show ? 'block' : 'none';
     if (show) place();
@@ -8246,7 +8225,7 @@ document.querySelectorAll('#dl-seg button').forEach(b => {
   });
   // Listen on both overlay dropdowns; defer one tick so curOv has been
   // updated by the existing handler first.
-  ['ov', 'ov2'].forEach(id => {
+  ['ov'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.addEventListener('change', () => setTimeout(update, 0));
   });
@@ -8366,8 +8345,6 @@ function _resetAll() {
     // Overlay
     const ovSel = document.getElementById('ov');
     if (ovSel && ovSel.value !== 'none') { ovSel.value = 'none'; ovSel.dispatchEvent(new Event('change')); }
-    const ov2 = document.getElementById('ov2');
-    if (ov2 && ov2.value !== 'none') { ov2.value = 'none'; ov2.dispatchEvent(new Event('change')); }
     // Core20
     const tc = document.getElementById('core20-toggle');
     if (tc && tc.checked) { tc.checked = false; tc.dispatchEvent(new Event('change')); }
@@ -8460,12 +8437,10 @@ function _writeUrlState() {
   try {
     const p = new URLSearchParams();
     const ovEl = document.getElementById('ov');
-    const ov2El = document.getElementById('ov2');
     const bfEl = document.getElementById('borough-focus');
     const lsEl = document.getElementById('tlsoa');
     const c20El = document.getElementById('core20-toggle');
     if (ovEl && ovEl.value && ovEl.value !== 'none') p.set('ov', ovEl.value);
-    if (ov2El && ov2El.value && ov2El.value !== 'none') p.set('ov2', ov2El.value);
     if (bfEl && bfEl.value && bfEl.value !== 'all') p.set('b', bfEl.value);
     if (lsEl && lsEl.checked) p.set('lsoa', '1');
     if (c20El && c20El.checked) p.set('c20', '1');
@@ -8495,7 +8470,6 @@ function _readUrlState() {
     applyIf('core20-toggle', p.get('c20'), 'change');
     applyIf('tlsoa', p.get('lsoa'), 'change');
     applyIf('ov', p.get('ov'), 'change');
-    applyIf('ov2', p.get('ov2'), 'change');
     if (p.get('cb') === '1') {
       const btn = document.getElementById('tb-cb');
       if (btn) btn.click();
@@ -8510,7 +8484,7 @@ function _readUrlState() {
   } catch (e) { console.warn('_readUrlState failed', e); }
 }
 (function _wireUrlStateWriters() {
-  ['ov','ov2','borough-focus','tlsoa','core20-toggle'].forEach(id => {
+  ['ov','borough-focus','tlsoa','core20-toggle'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.addEventListener('change', () => setTimeout(_writeUrlState, 50));
   });
@@ -9425,7 +9399,7 @@ async function _prepareScreenForScreenshot(opts) {
 // back via location.href + navigator.clipboard.writeText.)
 
 // Keep the strip + chips in sync when any of these inputs change.
-['ov', 'ov2', 'borough-focus', 'tlsoa', 'core20-toggle', 'vcse-area-filter'].forEach(id => {
+['ov', 'borough-focus', 'tlsoa', 'core20-toggle', 'vcse-area-filter'].forEach(id => {
   const el = document.getElementById(id);
   if (el) el.addEventListener('change', () => setTimeout(_refreshUI, 0));
 });
@@ -9642,108 +9616,6 @@ function _restyleAll() {
 // ── Sidebar layout helper ──────────────────────────────────────────────────
 // Sidebar footer measurement IIFE removed — sidebar now uses CSS grid, which
 // natively stacks [focus] [tabs] [1fr pane] [footer] without any JS.
-
-// ═══════════════════════════════════════════════════════════════════════════
-// BIVARIATE CHOROPLETH — two-indicator 3x3 brown/green palette
-// ═══════════════════════════════════════════════════════════════════════════
-// Palette: Joshua Stevens' 3x3 "pink-teal-blue" — low-low = light grey,
-// ov1 high = teal, ov2 high = pink, both high = deep blue-purple.
-const BIV_PALETTE = [
-  ['#e8e8e8', '#b0d5df', '#64acbe'], // ov2 low row
-  ['#e4acac', '#ad9ea5', '#627f8c'], // ov2 mid
-  ['#c85a5a', '#985356', '#574249'], // ov2 high
-];
-
-// Tercile classifier — uses WARD_DATA for ward-level overlays, LSOA_DATA for
-// LSOA-only overlays. `type` tells us whether we're colouring a ward or an
-// LSOA feature (identified by `id`: ward name or LSOA code). Returns 0/1/2.
-function _bivTercile(id, key, type) {
-  type = type || 'ward';
-  const useLsoaPool = isLsoaOnlyOv(key);
-  const fld = resolveOvField(key);
-  const pool = useLsoaPool ? (typeof LSOA_DATA !== 'undefined' ? LSOA_DATA : null)
-                           : (typeof WARD_DATA !== 'undefined' ? WARD_DATA : null);
-  if (!pool || Object.keys(pool).length === 0) return 1;
-  const vals = [];
-  for (const row of Object.values(pool)) {
-    const v = (row.indicators || row)[fld];
-    if (v != null && v !== '' && !isNaN(parseFloat(v))) vals.push(parseFloat(v));
-  }
-  if (vals.length < 3) return 1;
-  vals.sort((a, b) => a - b);
-  const t1 = vals[Math.floor(vals.length / 3)];
-  const t2 = vals[Math.floor(vals.length * 2 / 3)];
-
-  // Find the feature's own value for this key.
-  let v = null;
-  if (type === 'lsoa') {
-    // LSOA feature: read LSOA_DATA[code]; if the key is ward-only (not LSOA)
-    // fall back to the parent ward's value via LSOA_DATA[code].ward_name.
-    const row = pool[id];
-    if (row) v = parseFloat((row.indicators || row)[fld]);
-    if ((v == null || isNaN(v)) && !useLsoaPool && typeof LSOA_DATA !== 'undefined') {
-      const lrow = LSOA_DATA[id];
-      const wn = lrow && (lrow.ward_name || lrow.ward);
-      if (wn && WARD_DATA) {
-        const wobj = WARD_DATA[wn] || Object.values(WARD_DATA).find(w => w.name === wn);
-        if (wobj && wobj.indicators) v = parseFloat(wobj.indicators[fld]);
-      }
-    }
-  } else {
-    // Ward feature: read WARD_DATA[wn]; if the key is LSOA-only, we can't
-    // colour the ward on an LSOA-only metric — return -1 to signal "no colour".
-    if (useLsoaPool) return -1;
-    const wobj = WARD_DATA[id] || Object.values(WARD_DATA).find(w => w.name === id);
-    if (wobj && wobj.indicators) v = parseFloat(wobj.indicators[fld]);
-  }
-  if (v == null || isNaN(v)) return 1;
-  if (v <= t1) return 0;
-  if (v <= t2) return 1;
-  return 2;
-}
-
-function bivariateColor(id, ov1, ov2, type) {
-  const a = _bivTercile(id, ov1, type);
-  const b = _bivTercile(id, ov2, type);
-  // -1 means "feature has no value for this LSOA-only overlay" (only hits on
-  // ward features). In that case return null so the caller can fall through
-  // to a transparent fill and let the LSOA layer carry the choropleth.
-  if (a < 0 || b < 0) return null;
-  return BIV_PALETTE[b][a];
-}
-
-// Secondary indicator select: when non-'none', switch to bivariate mode and
-// show the 3x3 legend; otherwise hide it and revert to univariate.
-//
-// The control is not in the page at the moment, so this binds only if it comes
-// back. Every other #ov2 lookup in this file was already null-guarded; this one
-// was the exception and would have thrown on load.
-(function () {
-  var _ov2 = document.getElementById('ov2');
-  if (!_ov2) return;
-  _ov2.addEventListener('change', e => {
-  curOv2 = e.target.value;
-  const leg = document.getElementById('biv-legend');
-  const scale = document.getElementById('scale');
-  if (curOv2 !== 'none') {
-    if (leg) leg.style.display = 'block';
-    if (scale) scale.style.display = 'none';
-    // Populate legend labels from the two indicator keys (stripped keys).
-    const name1 = (document.getElementById('ov').selectedOptions[0] || {}).text || 'Indicator 1';
-    const name2 = (document.getElementById('ov2').selectedOptions[0] || {}).text || 'Indicator 2';
-    const xl = document.getElementById('biv-x-label');
-    const yl = document.getElementById('biv-y-label');
-    if (xl) xl.textContent = name1 + ' →';
-    if (yl) yl.textContent = name2 + ' →';
-  } else {
-    if (leg) leg.style.display = 'none';
-    if (scale) scale.style.display = curOv !== 'none' ? 'block' : 'none';
-  }
-  // Hide the Top/Bottom 20 panel in bivariate mode; show it otherwise.
-  renderTopBottom();
-  _restyleAll();
-  });
-})();
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SPOTLIGHT MODE — hard-dim wards outside focused neighbourhood
