@@ -121,36 +121,6 @@
 
   /* ── "Currently viewing" strip + filter chips (above the map) ── */
   .viewing-strip { background: #fff; border-bottom: 1px solid #E8EDEE; padding: 5px 12px 6px; font-size: 11.5px; color: #4C6272; display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 10px; row-gap: 2px; align-items: center; flex-shrink: 0; }
-  /* ── Map chrome toggle ──
-     One handle for everything the map draws on top of itself: the Viewing
-     badge, the legend strip along the bottom, and Leaflet's zoom buttons.
-     Deliberately NOT the attribution, which has to stay, and not the transient
-     things (the ward bar, the tour strip, the compare bar) which already come
-     and go on their own and which someone hiding chrome is usually using.
-
-     It sits under the badge while the badge is there, and takes its place when
-     it is not, so the handle is always in the same corner and never on top of
-     what it hides. */
-  #map-chrome-toggle { position: absolute; top: 48px; right: 12px; z-index: 2550;
-    display: flex; align-items: center; gap: 5px;
-    background: rgba(255,255,255,0.96); border: 1px solid #DDE1E4; border-radius: 6px;
-    padding: 4px 8px; font-size: 10.5px; font-weight: 600; color: #4C6272;
-    cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,.10);
-    font-family: inherit; line-height: 1.4; }
-  #map-chrome-toggle:hover { color: #005EB8; border-color: #005EB8; }
-  #map-chrome-toggle:focus-visible { outline: 2px solid #005EB8; outline-offset: 1px; }
-  #map-chrome-toggle .mct-ico { font-size: 12px; line-height: 1; }
-  .map-wrap.chrome-off #map-chrome-toggle { top: 12px; }
-  .map-wrap.chrome-off .dl-badge,
-  .map-wrap.chrome-off .map-legend-strip,
-  .map-wrap.chrome-off .leaflet-control-zoom { display: none; }
-  /* The label is the first thing to go when there is no room for it. The icon
-     alone still reads, because the button stays in one place. */
-  @media (max-width: 900px) {
-    #map-chrome-toggle .mct-txt { display: none; }
-    #map-chrome-toggle { padding: 5px 7px; }
-  }
-
   /* ── Fingertips suppression notice ──
      Beside the zoom buttons, not under them. This lived in a style attribute on
      the element, which had two consequences. An inline style beats an id
@@ -2109,7 +2079,10 @@
         </div>
       </div>
       <!-- Shared slider footer — visible on every tab -->
-      <div class="sb-sec" style="flex-shrink:0;border-top:1px solid #e5e5e0;background:#fafaf6">
+      <!-- Folds away. Pinned to the bottom of the panel, these three sliders
+           cost the same vertical strip whether or not they are being used, and
+           that strip comes off whatever is open above them. -->
+      <div class="sb-sec" id="map-controls-sec" style="flex-shrink:0;border-top:1px solid #e5e5e0;background:#fafaf6">
         <div class="sb-lbl">Map controls</div>
         <div class="opacity-row">
           <label>Fill</label>
@@ -2164,18 +2137,6 @@
         Hover a grey ward to see whether it's "Suppressed" (privacy rule) or just "no data" (indicator not published).
         <button id="fingertips-banner-close" title="Dismiss this notice for this session">&times;</button>
       </div>
-      <!-- Pops the on-map chrome in and out. The map is the thing being looked
-           at, and on a laptop the Viewing badge, the legend strip and the zoom
-           buttons sit permanently on top of it. This gets them out of the way
-           without hiding the panel as well, which is what the collapse control
-           on the sidebar is for. -->
-      <button type="button" id="map-chrome-toggle"
-              aria-expanded="true" aria-controls="dl-badge map-legend-strip"
-              title="Hide the map controls">
-        <span class="mct-ico" aria-hidden="true">⤡</span>
-        <span class="mct-txt">Hide controls</span>
-      </button>
-
       <div class="dl-badge" id="dl-badge" role="group" aria-label="Data level filter">
         <span class="dl-badge-label">Viewing</span>
         <div class="dl-seg" id="dl-seg">
@@ -5875,42 +5836,50 @@ function _applyBoroughSolo() {
 })();
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   MAP CHROME — pop the on-map controls out of the way
+   MAP CONTROLS — fold the sliders away
 
-   Remembered, for the same reason the panel's width and collapsed state are:
-   someone who wants the map to itself wants it next time too. Nothing here
-   changes the map container's size, so Leaflet does not need telling; the
-   chrome is all absolutely positioned over it.
+   The three sliders are pinned to the bottom of the panel, so they cost the
+   same vertical strip whether or not anyone is using them, and that strip
+   comes off whichever tab is open above: the Layers list, a ward's figures,
+   the Directory. Folding them gives that back.
+
+   It reuses the collapsible-section treatment the Layers tab already has,
+   rather than inventing a second idiom in the same panel: the same chevron in
+   the same place, turned the same way, and .sb-sec.collapsed already knows how
+   to hide everything in a section except its own label. The wiring is separate
+   only because this section is a sibling of the tab panes rather than inside
+   one, so _wireCollapsibleSections never reached it.
+
+   Remembered, like the panel's width and its collapsed state.
    ═══════════════════════════════════════════════════════════════════════════ */
-(function _wireMapChrome() {
-  const btn = document.getElementById('map-chrome-toggle');
-  const wrap = btn && btn.closest('.map-wrap');
-  if (!btn || !wrap) return;
-  const KEY = 'phMapChromeOff';
-  const txt = btn.querySelector('.mct-txt');
-  const ico = btn.querySelector('.mct-ico');
+(function _wireMapControlsFold() {
+  const sec = document.getElementById('map-controls-sec');
+  const lbl = sec && sec.querySelector('.sb-lbl');
+  if (!sec || !lbl) return;
+  const KEY = 'phMapControlsFolded';
 
-  function apply(off, save) {
-    wrap.classList.toggle('chrome-off', off);
-    btn.setAttribute('aria-expanded', String(!off));
-    btn.title = off ? 'Show the map controls' : 'Hide the map controls';
-    if (txt) txt.textContent = off ? 'Show controls' : 'Hide controls';
-    if (ico) ico.textContent = off ? '⤢' : '⤡';
-    if (save) { try { window.localStorage.setItem(KEY, off ? '1' : ''); } catch (e) {} }
+  lbl.classList.add('collapsible');
+  lbl.setAttribute('role', 'button');
+  lbl.setAttribute('tabindex', '0');
+
+  function apply(folded, save) {
+    sec.classList.toggle('collapsed', folded);
+    lbl.setAttribute('aria-expanded', String(!folded));
+    lbl.title = folded ? 'Show the map controls' : 'Hide the map controls';
+    if (save) { try { window.localStorage.setItem(KEY, folded ? '1' : ''); } catch (e) {} }
   }
 
-  try { if (window.localStorage.getItem(KEY)) apply(true, false); }
-  catch (e) { /* private mode: the controls start visible, every time */ }
+  try { apply(!!window.localStorage.getItem(KEY), false); }
+  catch (e) { apply(false, false); }   // private mode: open, every time
 
-  btn.addEventListener('click', () => apply(!wrap.classList.contains('chrome-off'), true));
-
-  // For the tour, which needs the chrome up to talk about it. Goes through
-  // apply() rather than touching the class, so the button's own label and
-  // aria-expanded cannot drift out of step with what is on screen.
-  window.PH_MAPCHROME = {
-    show: () => apply(false, false),
-    isOff: () => wrap.classList.contains('chrome-off'),
-  };
+  lbl.addEventListener('click', () => apply(!sec.classList.contains('collapsed'), true));
+  // A div with role=button is not a button, so the keys have to be wired by
+  // hand or it is unreachable without a mouse.
+  lbl.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();
+    apply(!sec.classList.contains('collapsed'), true);
+  });
 })();
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -12073,11 +12042,6 @@ loadData();
 
   function tourStart() {
     if (!tourStrip) return;
-    // The tour drives the Viewing badge and the legend and then talks about
-    // what they say, so it puts the map chrome back if it has been popped out.
-    // Not saved: this is the tour borrowing the setting, not changing it, and
-    // the button reverts it in one click.
-    if (window.PH_MAPCHROME) window.PH_MAPCHROME.show();
     tourAt = 0;
     tourStrip.classList.add('open');
     renderTour();
