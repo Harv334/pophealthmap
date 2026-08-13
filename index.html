@@ -134,21 +134,20 @@
     width: 7px; height: 7px; border-radius: 50%; background: #fff; }
 
   /* ── Fingertips suppression notice ──
-     Beside the zoom buttons, not under them. This lived in a style attribute on
-     the element, which had two consequences. An inline style beats an id
-     selector, so the narrow-screen rule further down was dead: it has never
-     once applied. And `top: 78px` was measured from .map-wrap, which starts at
-     the viewing strip rather than at the map, so the notice landed across the
-     zoom control instead of below it. Leaflet's controls sit at z-index 1000
-     and this at 550, so the buttons were painted over the first line of the
-     text: a notice explaining why wards are blank, itself unreadable.
+     Bottom right, which is where it belongs: it is a footnote about the
+     shading, and the top-left corner is where people are reading the map.
 
-     The exact offset comes from the control at runtime, because the viewing
-     strip above the map can wrap to two rows and move the whole map down. */
-  #fingertips-banner { position: absolute; top: 12px; left: 64px; max-width: 320px;
+     It shares that corner with the Ask panel and its button, so it hides
+     itself while the panel is open rather than being stacked behind it or
+     fighting it for the space. See _wireFingertipsBanner.
+
+     Styled from here rather than from a style attribute on the element. An
+     inline style beats an id selector, so the narrow-screen rule below it was
+     dead and had never once applied. */
+  #fingertips-banner { position: absolute; right: 12px; bottom: 54px; max-width: 300px;
     background: #fff8e6; border: 1px solid #e0c280; color: #5c4115;
     padding: 9px 12px; border-radius: 6px; box-shadow: 0 2px 10px rgba(0,0,0,.10);
-    font-size: 11.5px; line-height: 1.45; z-index: 1100; display: none;
+    font-size: 11.5px; line-height: 1.45; z-index: 560; display: none;
     pointer-events: none; }
   #fingertips-banner .ft-i { display: inline-block; background: #b88030; color: #fff;
     border-radius: 50%; width: 18px; height: 18px; text-align: center;
@@ -437,6 +436,18 @@
       box-shadow: 8px 0 32px rgba(33,43,50,.22); border-right: 1px solid #E8EDEE;
     }
     .sidebar.open { transform: none; }
+
+    /* The tour goes over the drawer, not under it.
+       The drawer is fixed at z-index 4000 and the tour strip sits at 1300, so
+       the chapters that open the panel to demonstrate Query and Compare were
+       burying their own narration behind the thing they had just opened: the
+       tour told you to read something and then covered it. On a laptop this
+       never happens, because the panel is beside the map rather than over it.
+       .map-wrap has no z-index of its own, so this competes with the drawer
+       directly rather than being trapped under it. The scrim is already below
+       at 3900, so the strip clears that too. */
+    .map-wrap.touring .tour-strip { z-index: 4200; }
+
     /* The desktop collapse does not apply here: at this width the drawer's
        own transform is what hides it, and a zero width would leave nothing
        to slide in. */
@@ -1165,6 +1176,17 @@
      chips meant at least one of each, any of them, or only those; and whether
      picking none meant no wards or no condition. Each step now says what it
      asks and what leaving it alone does. */
+  /* The optional step's own tick box. The label carries the step title so the
+     whole line is the hit target, which on a phone is the difference between a
+     14px box and something you can actually press. */
+  .q-step-opt { display: flex; align-items: center; gap: 6px; cursor: pointer;
+    font: inherit; color: inherit; }
+  .q-step-opt input { margin: 0; accent-color: var(--nhs-blue); cursor: pointer;
+    width: 14px; height: 14px; flex: 0 0 auto; }
+  /* Skipped: the chips stay visible so it is obvious what is being skipped,
+     but they are plainly out of play and cannot be clicked. */
+  .q-skip #q-services { opacity: .4; pointer-events: none; filter: grayscale(1); }
+  .q-skip #q-services-hint { color: var(--ink-3); }
   .q-step { display: flex; align-items: baseline; gap: 6px; font-size: 11.5px; font-weight: 600;
     color: var(--ink); margin-bottom: 5px; }
   .q-step-n { flex: 0 0 auto; width: 15px; height: 15px; border-radius: 50%; background: var(--nhs-blue);
@@ -1292,12 +1314,9 @@
        a 390px screen. They lift above the sheet together already; here they
        stop overlapping each other as well. */
     #ai-toggle { right: 8px; padding: 8px 12px; font-size: 12px; }
-    /* Full width under the header instead, and clear of the zoom buttons
-       vertically rather than horizontally: at this width there is no room for
-       320px of text beside a control and still a map. This rule finally
-       applies now the element has no style attribute of its own, and the
-       runtime placement below leaves it alone at this width. */
-    #fingertips-banner { top: 64px; left: 8px; right: 8px; max-width: none;
+    /* Full width along the bottom instead: at this width there is no room for
+       300px of notice beside anything and still a map. */
+    #fingertips-banner { left: 8px; right: 8px; bottom: 48px; max-width: none;
       font-size: 11px; padding: 8px 10px; }
     .map-legend-strip { left: 8px; right: 8px; transform: none; max-width: none;
       font-size: 10.5px; padding: 5px 9px; }
@@ -1441,7 +1460,7 @@
       <div class="tb-sep"></div>
       <button type="button" class="tb-btn" id="tb-reset" title="Clear all filters and return to default view">↺ Reset</button>
       <button type="button" class="tb-btn" id="tb-cb" title="Switch to a colour-blind safe palette (deuteranopia/protanopia friendly)" aria-pressed="false">◐ CB safe</button>
-      <button type="button" class="tb-btn" id="tb-png" title="Download the map as an image: this view, or framed to London or a borough. PNG or JPEG.">⤓ Image</button>
+      <button type="button" class="tb-btn" id="tb-png" title="Clear the screen for a screenshot: whitens everything outside the mapped area and hides the controls, then you capture it with your own screenshot tool.">⤓ Screenshot</button>
       <button type="button" class="tb-btn" id="tb-csv" title="Download the ward/LSOA data behind the current overlay">⤓ CSV</button>
     </div>
   </div>
@@ -1982,9 +2001,22 @@
         <div class="q-scroll">
           <div class="q-block">
             <div class="q-sub">Build a filter across every metric on the map. Wards that match are listed below and highlighted on the map.</div>
-            <div class="q-step"><span class="q-step-n">1</span>Which services must the ward have?</div>
-            <div class="q-hint">The ward must contain at least one of every service you tick.
-              Tick none and services are not used to filter at all.</div>
+            <!-- Step 1 is optional, and used to say so only in the hint: "tick
+                 none and services are not used to filter at all". That is true
+                 and it asks someone to infer a whole step's absence from
+                 having done nothing, which reads as not having started rather
+                 than as a decision. The box makes the choice a thing you make
+                 rather than a thing you omit. Off by default, which is the
+                 same behaviour as before. -->
+            <div class="q-step">
+              <span class="q-step-n">1</span>
+              <label class="q-step-opt">
+                <input type="checkbox" id="q-use-services">
+                <span>Which services must the ward have?</span>
+              </label>
+            </div>
+            <div class="q-hint" id="q-services-hint">Optional. Tick the box to filter on services;
+              leave it clear and this step is skipped.</div>
             <div class="q-sentence" id="q-services"></div>
 
             <div class="q-step" style="margin-top:12px"><span class="q-step-n">2</span>Where should it be?</div>
@@ -2084,7 +2116,6 @@
         <span class="ft-i">i</span>
         <strong>Fingertips overlay active.</strong>
         Some wards may show no fill — OHID Fingertips suppresses MSOA values where small counts could risk identifying individuals.
-        Hover a grey ward to see whether it's "Suppressed" (privacy rule) or just "no data" (indicator not published).
         <button id="fingertips-banner-close" title="Dismiss this notice for this session">&times;</button>
       </div>
       <div class="dl-badge" id="dl-badge" role="group" aria-label="Data level filter">
@@ -7947,51 +7978,43 @@ document.querySelectorAll('#dl-seg button').forEach(b => {
   const isFt = k => typeof k === 'string' && k.startsWith('ft_');
 
   /**
-   * Put the notice immediately right of the zoom buttons.
+   * The notice and the Ask panel share the bottom-right corner.
    *
-   * The CSS default assumes the control is where Leaflet usually puts it, which
-   * is right until the viewing strip above the map wraps to two rows and moves
-   * the map down with it. Measuring the control instead means the notice tracks
-   * it, and it is measured on every show rather than once, because the strip's
-   * height depends on how many filter chips are in it.
+   * Rather than stack them or shuffle one sideways, the notice stands down
+   * while the panel is open. It is a footnote about the shading and it will
+   * still be there when the panel closes; the panel is what the person is
+   * actively using. Overlapping them was the original complaint and moving the
+   * notice to the opposite corner solved it by putting a footnote in the part
+   * of the map people read first.
    *
-   * Left alone on a narrow screen, where the stylesheet spreads the notice
-   * across the full width and there is no room beside a control for it.
+   * The panel is built by assistant.js after this runs and toggles a class on
+   * itself, so this watches the DOM rather than listening for an event that
+   * would have to be added there and kept in step.
    */
-  const narrow = window.matchMedia('(max-width: 760px)');
-  function place() {
-    const wrap = banner.offsetParent;
-    const zoom = document.querySelector('.leaflet-control-zoom');
-    if (narrow.matches || !wrap || !zoom) {
-      banner.style.top = '';
-      banner.style.left = '';
-      return;
-    }
-    const w = wrap.getBoundingClientRect();
-    const z = zoom.getBoundingClientRect();
-    banner.style.top = Math.round(z.top - w.top) + 'px';
-    banner.style.left = Math.round(z.right - w.left + 10) + 'px';
+  function askOpen() {
+    const p = document.getElementById('ai-panel');
+    return !!(p && p.classList.contains('open'));
   }
 
   const update = () => {
     const ftActive = (typeof curOv !== 'undefined' && isFt(curOv));
-    const show = ftActive && !dismissed;
-    banner.style.display = show ? 'block' : 'none';
-    if (show) place();
+    banner.style.display = (ftActive && !dismissed && !askOpen()) ? 'block' : 'none';
   };
-  window.addEventListener('resize', () => {
-    if (banner.style.display === 'block') place();
+
+  // The Ask panel appears late and its open state is a class, so this observes
+  // the document for it rather than assuming it exists at wiring time.
+  const obs = new MutationObserver(update);
+  obs.observe(document.body, {
+    subtree: true, attributes: true, attributeFilter: ['class'], childList: true,
   });
+
   if (closeBtn) closeBtn.addEventListener('click', () => {
     dismissed = true;
     banner.style.display = 'none';
   });
-  // Listen on both overlay dropdowns; defer one tick so curOv has been
-  // updated by the existing handler first.
-  ['ov'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.addEventListener('change', () => setTimeout(update, 0));
-  });
+  const ovEl = document.getElementById('ov');
+  // Deferred a tick so curOv has been updated by the existing handler first.
+  if (ovEl) ovEl.addEventListener('change', () => setTimeout(update, 0));
   // Also surface on initial page load (in case of URL state restoration).
   setTimeout(update, 100);
 })();
@@ -9139,41 +9162,35 @@ async function _prepareScreenForScreenshot(opts) {
   const pngBtn = document.getElementById('tb-png');
   const csvBtn = document.getElementById('tb-csv');
 
-  // The button downloads an image now. It used to only rearrange the screen and
-  // then tell you to press Win+Shift+S yourself, which is not what a button
-  // labelled "⤓ PNG" promises: the whole working exporter below it, caption and
-  // all, was written and never wired to anything.
-  //
-  // Three choices, in the order people want them. What is on screen is the
-  // common case and comes first. The framed options re-fit the map and whiten
-  // everything outside the scope, which is the presentation-ready version.
+  /* Prepare the screen, and let the operating system take the picture.
+     I wired this to the html2canvas exporter below, on the reasoning that a
+     button offering a download should download. It does not work well enough
+     to keep: the capture misframes the map, and it depends on every basemap
+     tile having loaded with usable CORS headers, which is not something the
+     button can promise.
+
+     The screen-preparation route has none of that. It whitens everything
+     outside the area being mapped, hides the controls, and hands over to the
+     screenshot tool the person is already using, which captures exactly what
+     they can see at the resolution of their own display. */
   if (pngBtn) pngBtn.addEventListener('click', async () => {
     const focused = (typeof focusedBorough !== 'undefined' && focusedBorough && focusedBorough !== 'all') ? focusedBorough : null;
     const opts = [
-      { key: 'current', label: 'This view, as PNG',
-        desc: 'Exactly what is on screen now, at your current pan and zoom. Lossless.' },
-      { key: 'current-jpg', label: 'This view, as JPEG',
-        desc: 'The same picture as a smaller file, for email or slides where size matters.' },
-      { key: 'london', label: 'All of London, framed',
-        desc: 'Refits to the whole London footprint and whitens everything outside it, then restores your view.' },
+      { key: 'prepare-current', label: 'This view',
+        desc: 'Keeps your current pan and zoom, whitens everything outside London and clears the controls out of the way.' },
+      { key: 'prepare-london', label: 'All of London, framed',
+        desc: 'Refits to the whole London footprint first, then whitens everything outside it.' },
     ];
     if (focused) opts.push({
-      key: 'borough', label: `Just ${focused}, framed`,
+      key: 'prepare-borough', label: `Just ${focused}, framed`,
       desc: 'Refits to the focused borough and whitens everything outside it.'
     });
-    const choice = await _exportDialog('Download the map as an image', opts);
+    const choice = await _exportDialog('Prepare the map for a screenshot', opts);
     if (!choice) return;
-    const mode = choice.key === 'london' ? 'nwl'
-               : choice.key === 'borough' ? 'borough'
+    const mode = choice.key === 'prepare-london' ? 'nwl'
+               : choice.key === 'prepare-borough' ? 'borough'
                : 'wysiwyg';
-    // Only the framed exports whiten outside the scope. Doing it to "this view"
-    // would contradict the one thing that option promises, which is that the
-    // file matches what you were looking at.
-    await _downloadMapPng({
-      mode,
-      format: choice.key === 'current-jpg' ? 'jpeg' : 'png',
-      whiteOutside: mode !== 'wysiwyg',
-    });
+    _prepareScreenForScreenshot({ mode, whiteOutside: true });
   });
 
   if (csvBtn) csvBtn.addEventListener('click', async () => {
@@ -12150,6 +12167,26 @@ loadData();
     renderServices(); renderScope(); renderConds(); renderCaution(); renderReadback();
   }
 
+  /* Step 1 on or off.
+     Unticking empties q.services rather than just dimming the chips. A filter
+     that is switched off but still holding a selection would go on narrowing
+     the results with nothing on screen to say why, which is a worse version of
+     the problem the box was added to solve. Turning it back on starts empty,
+     which is the same state the panel opens in. */
+  var qUseServices = $('q-use-services');
+  function applyServicesToggle(on, rerender) {
+    var block = qUseServices && qUseServices.closest('.q-block');
+    if (block) block.classList.toggle('q-skip', !on);
+    if (!on && q.services.length) q.services = [];
+    if (rerender) { renderServices(); renderCaution(); renderReadback(); }
+  }
+  if (qUseServices) {
+    qUseServices.addEventListener('change', function (e) {
+      applyServicesToggle(e.target.checked, true);
+    });
+    applyServicesToggle(qUseServices.checked, false);
+  }
+
   qServicesEl.addEventListener('click', function (e) {
     var chip = e.target.closest('[data-svc]');
     if (!chip) return;
@@ -12364,6 +12401,14 @@ loadData();
   // first open: services plus a borough plus two indicator conditions.
   function seedExample() {
     q.services = ['gp', 'pharmacy'];
+    // The worked example filters on services, so step 1 is switched on to match
+    // it. Without this the panel would open showing two service chips selected
+    // under a box saying the step is skipped, and the first thing the toggle
+    // does on any interaction is clear them.
+    if (qUseServices && !qUseServices.checked) {
+      qUseServices.checked = true;
+      applyServicesToggle(true, false);
+    }
     q.scope = boroughList().indexOf('Brent') !== -1 ? 'Brent' : (boroughList()[0] || '');
     q.conds = [
       { key: 'imd_decile_mean', op: 'lte', value: 3 },
