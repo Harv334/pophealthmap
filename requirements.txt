@@ -11,9 +11,19 @@
 #   requests every HTTP call
 #   shapely  point-in-polygon for crime and terminated-postcode placement
 #   pyproj   British National Grid to WGS84 conversion
+#   openpyxl the .xlsx reader pandas dispatches to (no direct import)
+#
+# openpyxl is the reason to read the note above about indirect dependencies.
+# DESNZ publish sub-regional fuel poverty as .xlsx and nothing else, so
+# pd.ExcelFile and pd.read_excel are the only way in, and pandas hands both to
+# openpyxl without importing it itself. It was never listed, so the fuel poverty
+# fetch failed on every scheduled run with ImportError while the other fifteen
+# sources succeeded: the pipeline reported "ok" overall and the map served
+# figures that had quietly stopped refreshing.
 
 pandas==3.0.2
 pyarrow==23.0.1
 requests==2.33.1
 shapely==2.1.2
 pyproj==3.7.2
+openpyxl==3.1.5
