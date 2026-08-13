@@ -1627,18 +1627,17 @@
         <div class="sb-sec" style="padding-bottom:8px">
           <div class="sb-lbl">Filter by area</div>
           <select id="vcse-area-filter" style="width:100%;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;color:#333;background:#fff;margin-bottom:8px">
-            <option value="london">All London (all organisations)</option>
+            <!-- One "All London", not two. There were two options with that
+                 label, 'london' and 'all', and every branch that read them
+                 treated them identically, so the dropdown offered the same
+                 result twice under slightly different words.
+
+                 The borough list is filled from BOROUGH_GJ at load rather than
+                 typed here. It was eight hand-written boroughs, from when the
+                 map covered eight, so the other 25 could not be picked at all.
+                 See initVcseBoroughs. -->
             <option value="all" selected>All London</option>
-            <optgroup label="── Borough ──">
-              <option value="lad-E09000005">Brent</option>
-              <option value="lad-E09000009">Ealing</option>
-              <option value="lad-E09000013">Hammersmith &amp; Fulham</option>
-              <option value="lad-E09000015">Harrow</option>
-              <option value="lad-E09000017">Hillingdon</option>
-              <option value="lad-E09000018">Hounslow</option>
-              <option value="lad-E09000020">Kensington &amp; Chelsea</option>
-              <option value="lad-E09000033">Westminster</option>
-            </optgroup>
+            <optgroup label="── Borough ──" id="vcse-borough-group"></optgroup>
             </select>
           <input type="text" id="vcse-search" placeholder="Search organisations...">
         </div>
@@ -2844,19 +2843,35 @@ function ladOf(wn) {
 // leaving the page stuck on "Loading ward data".
 var focusedBorough = 'all';
 
-// LAD code ↔ borough name mapping (Charity Commission / VCSE records use
-// E09xxxxxxx codes; ward GeoJSON + BOROUGH_GJ use the friendly name).
-const LAD_NAME_TO_CODE = {
-  'Brent': 'E09000005',
-  'Ealing': 'E09000009',
-  'Hammersmith & Fulham': 'E09000013',
-  'Harrow': 'E09000015',
-  'Hillingdon': 'E09000017',
-  'Hounslow': 'E09000018',
-  'Kensington & Chelsea': 'E09000020',
-  'City of Westminster': 'E09000033',
-  'Westminster': 'E09000033',
-};
+/* LAD code ↔ borough name mapping. Charity Commission and VCSE records carry
+   E09xxxxxxx codes; the ward GeoJSON and BOROUGH_GJ carry the friendly name, so
+   anything that filters organisations by the focused borough has to cross
+   between the two.
+
+   Built from BOROUGH_GJ, which has all 33 with both. It used to be a hand-typed
+   list of the eight North West London boroughs, left over from when that was
+   the whole map. The consequence was quiet: _focusedLadCode looks a borough up
+   here, gets undefined for the other 25, and falls back to '', and the VCSE
+   filter reads `!_focusedLadCode || code matches` — so an empty string means no
+   filtering at all. Focusing Camden or Newham left every charity in London on
+   the map, with the borough name in the strip above it saying otherwise.
+
+   The two hand-written entries stay on top: 'Westminster' as an alias for the
+   name the Charity Commission uses, and City of London, which BOROUGH_GJ calls
+   by the same name the GeoJSON does but is worth pinning in case it does not. */
+const LAD_NAME_TO_CODE = {};
+(function buildLadLookup() {
+  const feats = (typeof BOROUGH_GJ !== 'undefined' && BOROUGH_GJ.features) || [];
+  feats.forEach(f => {
+    const p = f.properties || {};
+    const name = p.name, code = p.LAD25CD || p.lad_code || p.code;
+    if (name && code) LAD_NAME_TO_CODE[name] = code;
+  });
+  // Charity records say "Westminster"; the map says "City of Westminster".
+  if (LAD_NAME_TO_CODE['City of Westminster']) {
+    LAD_NAME_TO_CODE['Westminster'] = LAD_NAME_TO_CODE['City of Westminster'];
+  }
+})();
 const LAD_CODE_TO_NAME = {};
 Object.entries(LAD_NAME_TO_CODE).forEach(([n, c]) => {
   if (!LAD_CODE_TO_NAME[c]) LAD_CODE_TO_NAME[c] = n;
@@ -3525,10 +3540,8 @@ function applyCICFilter() {
        || '')
     : '';
   cicData.forEach(o => {
-    let areaMatch;
-    if (areaFilter === 'london' || areaFilter === 'all') {
-      areaMatch = true;
-    } else if (areaFilter.startsWith('lad-')) {
+    let areaMatch = true;
+    if (areaFilter.startsWith('lad-')) {
       areaMatch = (o.record.lad || '') === areaFilter.slice(4);
     }
     const focusMatch = !_focusedLadCode || (o.record.lad || '') === _focusedLadCode;
@@ -4026,15 +4039,10 @@ function applyVCSEFilter() {
 
   // Determine visibility for each org
   vcseData.forEach(o => {
-    let areaMatch;
-    if (areaFilter === 'london') {
-      // Show everything regardless of location
-      areaMatch = true;
-    } else if (areaFilter === 'all') {
-      // All London — no geographic filter (pinned VCSEs are already
-      // restricted to the 9 NWL boroughs by the data pipeline)
-      areaMatch = true;
-    } else if (areaFilter.startsWith('lad-')) {
+    let areaMatch = true;
+    // 'all' is no geographic filter, which is the starting value, so only a
+    // borough narrows anything.
+    if (areaFilter.startsWith('lad-')) {
       // Filter to a single borough by its LAD code (e.g. E09000033)
       areaMatch = (o.record.lad || '') === areaFilter.slice(4);
     }
@@ -4059,12 +4067,8 @@ function applyVCSEFilter() {
 
   // Rebuild sidebar list with same logic
   const visible = vcseData.filter(o => {
-    let areaMatch;
-    if (areaFilter === 'london') {
-      areaMatch = true;
-    } else if (areaFilter === 'all') {
-      areaMatch = true;
-    } else if (areaFilter.startsWith('lad-')) {
+    let areaMatch = true;
+    if (areaFilter.startsWith('lad-')) {
       areaMatch = (o.record.lad || '') === areaFilter.slice(4);
     }
     const focusMatch = !_focusedLadCode || (o.record.lad || '') === _focusedLadCode;
@@ -4121,7 +4125,7 @@ function initVCSEFilters() {
         }
       }
     } else {
-      // 'all' / 'london' — clear any borough focus
+      // 'all' — clear any borough focus
       if (focusedBorough !== 'all') {
         focusedBorough = 'all';
         const bsel = document.getElementById('borough-focus');
@@ -5445,6 +5449,33 @@ function _applyBoroughSolo() {
   if (boroughL && boroughL._map) boroughL.bringToFront();
   if (wardBoundaryLyr && wardBoundaryLyr._map) wardBoundaryLyr.bringToFront();
 }
+
+/* ── VCSE borough filter — the same 33, from the same place ──
+   The markup used to carry eight boroughs, hand-typed when the map covered
+   eight, so a quarter of the list was pickable and three quarters were not.
+   Filled from BOROUGH_GJ, which is what draws the outlines, so the filter and
+   the map cannot disagree about which boroughs exist.
+
+   Sorted by name, and the value keeps the lad- prefix the filter branches
+   already parse. */
+(function initVcseBoroughs() {
+  const group = document.getElementById('vcse-borough-group');
+  if (!group || typeof BOROUGH_GJ === 'undefined' || !BOROUGH_GJ.features) return;
+  const seen = new Set();
+  BOROUGH_GJ.features
+    .map(f => f.properties || {})
+    .filter(p => p.name && (p.LAD25CD || p.lad_code || p.code))
+    .sort((a, b) => a.name.localeCompare(b.name, 'en-GB'))
+    .forEach(p => {
+      const code = p.LAD25CD || p.lad_code || p.code;
+      if (seen.has(code)) return;
+      seen.add(code);
+      const opt = document.createElement('option');
+      opt.value = 'lad-' + code;
+      opt.textContent = p.name;
+      group.appendChild(opt);
+    });
+})();
 
 // ── Borough focus dropdown — populate from the ward GeoJSON LAD property ──
 (function initBoroughFocus() {
