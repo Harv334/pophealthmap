@@ -372,6 +372,27 @@ var SOURCES = [
     cadence: 'Varies by indicator. Most are annual.',
     manifest: 'fingertips' },
 
+  { name: 'Fingertips: the other profiles',
+    pub: 'OHID',
+    what: 'The rest of the Fingertips library that publishes at a geography this ' +
+          'map can draw: the Public Health Outcomes Framework, mortality, ' +
+          'cardiovascular disease, diabetes, respiratory disease, mental health, ' +
+          'alcohol, smoking, sexual and reproductive health, child and maternal ' +
+          'health, and the wider determinants of health.',
+    geo: 'Upper-tier local authority, so borough',
+    period: 'Latest published period, which differs per indicator',
+    cadence: 'Varies by indicator. Most are annual.',
+    manifest: 'fingertips_profiles',
+    fix: {
+      auto: 'Fetched automatically, and by profile rather than by a list of ' +
+            'indicator ids. Both the ids and the names come from the API, so an ' +
+            'indicator cannot end up on the map under the wrong label, which is ' +
+            'what happened when that list was maintained by hand.',
+      steps: ['Run <code>python fetch_all_data.py --only fingertips_profiles</code>. ' +
+              'Set <code>FINGERTIPS_PER_PROFILE</code> to change how many ' +
+              'indicators are taken from each profile.'],
+    } },
+
   { name: 'Fingertips: Local Health',
     pub: 'OHID',
     what: '33 indicators at neighbourhood scale: births, low birth weight, ' +

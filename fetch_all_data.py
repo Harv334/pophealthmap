@@ -2424,6 +2424,168 @@ def run_fingertips() -> pd.DataFrame:
     return out
 
 # ============================================================================
+# SOURCE 4b: OHID Fingertips, the rest of the profiles
+# ----------------------------------------------------------------------------
+# Fingertips publishes 38 profiles and this project was reading two of them.
+# The other 26 that publish at a geography this map can draw are worth having,
+# and they are the same API, so this is a list of profile ids rather than a new
+# fetcher.
+#
+# Deliberately NOT a hand-typed list of indicator ids. The comment above
+# FINGERTIPS_INDICATORS records what happened last time that was done: eleven of
+# fifteen ids pointed at the wrong indicator, and nothing caught it because a
+# wrong id still returns a full set of plausible numbers under your own label.
+# Typing several hundred more by hand would be the same bet at twenty times the
+# stake. So the ids and their names both come from the API, and the name that
+# ends up on the map is the publisher's own.
+#
+#   profiles                                   -> the 38 profiles
+#   indicator_metadata/by_profile_id?...       -> every indicator id + its name
+#   all_data/csv/by_indicator_id?...           -> the figures
+#
+# Area type 502 is upper-tier local authority, which is a London borough. The
+# three profiles that also publish at MSOA are fetched by run_fingertips_msoa
+# instead, where they can vary within a borough.
+FINGERTIPS_PROFILES = [
+    # (profile_id, short prefix, human label for the picker group)
+    ( 19, "phof",     "Public Health Outcomes Framework"),
+    ( 50, "mh",       "Adult mental health and wellbeing"),
+    (139, "diab",     "Diabetes"),
+    (105, "cmh",      "Child and maternal health"),
+    ( 30, "hp",       "Health protection"),
+    (125, "mort",     "Mortality"),
+    ( 45, "srh",      "Sexual and reproductive health"),
+    (135, "cvd",      "Cardiovascular disease"),
+    ( 18, "smok",     "Smoking"),
+    (130, "wider",    "Wider determinants of health"),
+    ( 87, "alc",      "Alcohol"),
+    ( 29, "resp",     "Respiratory disease"),
+    ( 91, "suic",     "Suicide prevention"),
+    ( 26, "laprof",   "Local authority health profile"),
+    ( 84, "dem",      "Dementia"),
+    ( 76, "msk",      "Musculoskeletal health"),
+    ( 55, "liver",    "Liver disease"),
+    ( 65, "hcheck",   "NHS health check"),
+    ( 58, "ld",       "Learning disability"),
+    (159, "cypmh",    "Children and young people's mental health"),
+    ( 86, "tb",       "Tuberculosis"),
+    (165, "vis",      "Vision"),
+]
+
+# A profile can carry a couple of hundred indicators and most of them are
+# breakdowns of a headline. Past this many per profile the picker stops being
+# something anyone can read, so the most recently published are taken and the
+# rest reported rather than silently dropped.
+FINGERTIPS_PER_PROFILE = int(os.environ.get("FINGERTIPS_PER_PROFILE", "40"))
+
+
+def _ft_profile_indicators(profile_id: int, cache_dir: "Path") -> dict[int, str]:
+    """Indicator id -> published name, straight from Fingertips."""
+    cache = cache_dir / f"profile_{profile_id}_meta.json"
+    if not cache.exists():
+        url = ("https://fingertips.phe.org.uk/api/indicator_metadata/by_profile_id"
+               f"?profile_id={profile_id}")
+        try:
+            r = requests.get(url, timeout=60)
+            r.raise_for_status()
+            cache.write_bytes(r.content)
+            time.sleep(0.5)
+        except Exception as e:
+            warn(f"fingertips profile {profile_id}: metadata fetch failed ({e})")
+            return {}
+    try:
+        meta = json.loads(cache.read_text(encoding="utf-8"))
+    except Exception as e:
+        warn(f"fingertips profile {profile_id}: unreadable metadata ({e})")
+        return {}
+    out: dict[int, str] = {}
+    for ind_id, m in (meta or {}).items():
+        try:
+            name = (m.get("Descriptive", {}) or {}).get("Name") or ""
+        except AttributeError:
+            continue
+        if name:
+            out[int(ind_id)] = name
+    return out
+
+
+def run_fingertips_profiles() -> pd.DataFrame:
+    rule("OHID Fingertips (the other profiles, borough level)")
+    cache_dir = CACHE_DIR / "fingertips_profiles"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    AREA_TYPE_LA = 502
+
+    rows: list = []
+    for profile_id, prefix, label in FINGERTIPS_PROFILES:
+        inds = _ft_profile_indicators(profile_id, cache_dir)
+        if not inds:
+            continue
+        chosen = sorted(inds)[:FINGERTIPS_PER_PROFILE]
+        if len(inds) > len(chosen):
+            info(f"  {label}: {len(inds)} indicators published, taking {len(chosen)}")
+        kept = 0
+        for ind_id in chosen:
+            cache = cache_dir / f"ind_{ind_id}.csv"
+            if not cache.exists():
+                url = ("https://fingertips.phe.org.uk/api/all_data/csv/by_indicator_id"
+                       f"?indicator_ids={ind_id}"
+                       f"&child_area_type_id={AREA_TYPE_LA}"
+                       f"&parent_area_type_id=15")
+                try:
+                    r = requests.get(url, timeout=60)
+                    r.raise_for_status()
+                    # Same trap as the older fetcher: an id with nothing behind
+                    # it answers 200 with a header row. Caching that makes the
+                    # gap permanent.
+                    if len(r.content.splitlines()) < 2:
+                        continue
+                    cache.write_bytes(r.content)
+                    time.sleep(0.4)
+                except Exception:
+                    continue
+            try:
+                df = pd.read_csv(cache, dtype=str, low_memory=False)
+            except Exception:
+                continue
+            if df.empty or "Area Code" not in df.columns:
+                continue
+            df = df[df["Area Code"].isin(SCOPE_LADS)]
+            if df.empty:
+                continue
+            if "Sex" in df.columns:
+                persons = df[df["Sex"] == "Persons"]
+                df = persons if not persons.empty else df
+            if "Time period Sortable" in df.columns:
+                df = df.sort_values("Time period Sortable")
+            df = df.groupby("Area Code", as_index=False).tail(1)
+            # The name comes from the API, so the label on the map is the
+            # publisher's and cannot disagree with the id it was fetched under.
+            name = inds[ind_id]
+            for _, row in df.iterrows():
+                rows.append({
+                    "LAD25CD": row["Area Code"],
+                    "lad_name": row.get("Area Name", ""),
+                    "profile_id": profile_id,
+                    "profile": label,
+                    "indicator_id": ind_id,
+                    "indicator_short": f"{prefix}_{ind_id}",
+                    "indicator_name": name,
+                    "value": _tofloat(row.get("Value")),
+                    "period": row.get("Time period", ""),
+                    "unit": row.get("Value note", ""),
+                })
+            kept += 1
+        ok(f"  {label}: {kept} indicators with London figures")
+
+    out = pd.DataFrame(rows)
+    out_path = DATA_DIR / "outcomes" / "fingertips_profiles.parquet"
+    out = write_parquet_guarded(out_path, out, source="fingertips_profiles")
+    n_ind = out["indicator_short"].nunique() if not out.empty else 0
+    ok(f"fingertips_profiles: {len(out):,} rows, {n_ind} indicators "
+       f"-> {out_path.relative_to(REPO_ROOT)}")
+    return out
+
+# ============================================================================
 # SOURCE 5b: Fingertips Local Health  (MSOA level, aggregated to wards)
 # ============================================================================
 # The indicators above are published for whole boroughs, so every ward in a
@@ -4687,6 +4849,7 @@ SOURCES = {
     "qof":         run_qof,
     "fingertips":  run_fingertips,
     "fingertips_msoa": run_fingertips_msoa,
+    "fingertips_profiles": run_fingertips_profiles,
     "fuel_poverty": run_fuel_poverty,
     "ptal":        run_ptal,
     "crime":       run_police_crime,

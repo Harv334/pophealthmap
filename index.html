@@ -6324,12 +6324,25 @@ function imdStyle(feat, state) {
     // the slider that says how heavy boundaries should be. Against a full-
     // strength ward choropleth a thin mid-grey line is the definition of faded,
     // and it could not be turned up.
+    // Magenta, not navy, and thinner.
+    //
+    // The navy was chosen against a red-to-green choropleth, where it was the
+    // one hue not in the fill. The fill is now yellow through teal to deep blue,
+    // so navy boundaries sit inside the palette's own range and disappear into
+    // the dark end of it. Magenta is the far side of the colour wheel from all
+    // of it, and it is not a shade any indicator can take, so a boundary can
+    // never be mistaken for data.
+    //
+    // 1.1px rather than 1.6 at the slider's resting position. Boundaries are
+    // reference, not content, and 4,994 of them at 1.6px was a mesh over the
+    // map. The Border slider still scales all of this for anyone who wants
+    // them heavier.
     if (state === 'selected') {
-      base.color = '#081A3C'; base.weight = scaledWeight(3.2); base.opacity = 1;
+      base.color = '#8E1655'; base.weight = scaledWeight(2.6); base.opacity = 1;
     } else if (state === 'hover') {
-      base.color = '#0F2D5C'; base.weight = scaledWeight(2.6); base.opacity = 1;
+      base.color = '#A81C66'; base.weight = scaledWeight(2.0); base.opacity = 1;
     } else {
-      base.color = '#16336B'; base.weight = scaledWeight(1.6); base.opacity = 0.95;
+      base.color = '#C2185B'; base.weight = scaledWeight(1.1); base.opacity = 0.9;
     }
   }
   return base;
@@ -8324,9 +8337,20 @@ function _writeUrlState() {
     history.replaceState(null, '', url);
   } catch (e) { /* ignore */ }
 }
+/* The inbound query string, taken once, before anything can overwrite it.
+   _writeUrlState rewrites location.search from the live state via
+   replaceState, and it is wired to the map's moveend, which the initial
+   fitBounds fires as soon as the ward layer is built. So an inbound
+   ?ov=... was being erased about 400ms in, and whether a shared link worked
+   came down to whether the read happened before that write. That is why the
+   same link gave a shaded map one time and a flat grey one the next.
+   Reading from this snapshot instead means the link says what it said when
+   the page opened, whatever the map has done since. */
+const _INBOUND_URL_STATE = (typeof location !== 'undefined') ? location.search : '';
+
 function _readUrlState() {
   try {
-    const p = new URLSearchParams(location.search);
+    const p = new URLSearchParams(_INBOUND_URL_STATE);
     const applyIf = (id, val, ev) => {
       if (!val) return;
       const el = document.getElementById(id);
@@ -8363,8 +8387,29 @@ function _readUrlState() {
     map.on('moveend zoomend', sched);
   }
 })();
-// Apply any inbound URL state once everything is wired up.
-setTimeout(_readUrlState, 600);
+/* Apply any inbound URL state once the data it refers to exists.
+   This was setTimeout(_readUrlState, 600): a fixed guess racing a 2.3 MB fetch.
+   Win the race and the overlay applies; lose it and ?ov=... sets curOv while
+   there is no ward layer to paint, so the map opens flat and grey with the
+   legend still reading "Low ... High". Loading the same shared link twice gave
+   different maps, which is the worst kind of bug to be told about because it
+   does not reproduce.
+
+   loadData calls this when the wards are on the map. The timeouts stay as a
+   fallback for the case where ward data never arrives, since the layer toggles
+   and the borough focus in a link should still work without figures.
+
+   Applied more than once on purpose, and deliberately not guarded to "first
+   wins". A guard was the first attempt at this and it reintroduced the same bug
+   from the other side: the fallback timer would win, apply an overlay to a map
+   with no wards on it yet, and mark the job done. Re-applying is cheap and
+   idempotent, it sets a few control values and dispatches change, so the last
+   caller settles it and the last caller is the one holding the data. */
+function _applyUrlStateOnce() {
+  try { _readUrlState(); } catch (e) { /* _readUrlState warns for itself */ }
+}
+setTimeout(_applyUrlStateOnce, 1200);
+setTimeout(_applyUrlStateOnce, 4000);
 
 // ── Free-text search (ward / LSOA / GP / charity) ───────────────────────────
 // Lightweight in-memory index — no external lib. Rebuilt lazily on first
@@ -9553,6 +9598,9 @@ async function loadData() {
 
     // Now ward layer exists — init VCSE filters
     setTimeout(initVCSEFilters, 100);
+    // And now an inbound ?ov= has something to paint. Before this it was a
+    // 600ms timer hoping the fetch above had finished.
+    if (typeof _applyUrlStateOnce === 'function') _applyUrlStateOnce();
     ldr.classList.add('hidden');
 
   } catch (err) {
@@ -9565,6 +9613,9 @@ async function loadData() {
     buildWardLayer();
     injectWardIMD();
     setTimeout(initVCSEFilters, 100);
+    // The boundaries-only fallback still honours a link's borough focus and
+    // layer toggles, even though there are no figures to shade with.
+    if (typeof _applyUrlStateOnce === 'function') _applyUrlStateOnce();
     ldr.classList.add('hidden');
   }
 }
