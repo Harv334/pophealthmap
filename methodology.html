@@ -108,7 +108,21 @@ serving older figures with no sign of it.</p>
 published under the Open Government Licence v3.0 and contain public sector
 information licensed under it. Postcodes are resolved through
 <a href="https://postcodes.io">postcodes.io</a>, which derives from ONS and
-Ordnance Survey data. The basemap is CARTO, built from OpenStreetMap.</p>
+Ordnance Survey data. The basemap is CARTO, built from OpenStreetMap.
+Air quality is modelled by Defra and carries its own citation:
+© Crown copyright Defra via uk-air.defra.gov.uk, licenced under the Open
+Government Licence (OGL).</p>
+
+<!-- TfL is the one source here that is not under OGL v3. Its licence is OGL
+     v2.0 with amendments for Transport for London, and it requires these three
+     statements verbatim; TfL's terms state that failing to carry them
+     terminates the licence automatically. Keep them on the page. -->
+<p style="font-size:13px;color:var(--ink-3)">Station and bus stop measures use
+Transport for London open data, licensed under version 2.0 of the Open
+Government Licence with amendments for Transport for London.
+<strong>Powered by TfL Open Data.</strong>
+Contains OS data © Crown copyright and database rights 2016.
+Geomni UK Map data © and database rights 2019.</p>
 
 <h2>Geographies, and which year each one is from</h2>
 
@@ -552,9 +566,60 @@ var SOURCES = [
     cadence: 'The full register extract is republished monthly.',
     manifest: 'charities' },
 
+  { name: 'Air quality',
+    pub: 'Defra UK-AIR, Pollution Climate Mapping model',
+    what: 'Modelled annual mean background concentrations of nitrogen dioxide ' +
+          '(NO₂) and particulates (PM2.5, PM10). These are modelled, not ' +
+          'measured: the model is calibrated against the national monitoring ' +
+          'network but there is no monitor in most LSOAs. They are background ' +
+          'levels over an area, so they do not capture the roadside peak on a ' +
+          'particular street.',
+    geo: 'Published on a 1 km national grid; area-weighted onto LSOAs, then ' +
+         'population-weighted onto wards',
+    period: '2024',
+    cadence: 'Annually, usually in the autumn.',
+    manifest: 'air_quality',
+    fix: {
+      auto: 'Fetched automatically. The pipeline reads the UK-AIR index and ' +
+            'takes the most recent year listed for each pollutant, rather ' +
+            'than a pinned filename, because the filenames carry a version ' +
+            'suffix that changes between releases.',
+      manual: [
+        { file: 'mapno2&lt;year&gt;.csv, mappm25&lt;year&gt;g.csv and mappm10&lt;year&gt;g.csv',
+          from: 'https://uk-air.defra.gov.uk/data/pcm-data',
+          to: '.cache/air_quality/ (named pcm_no2_&lt;year&gt;.csv and so on)' },
+      ],
+      steps: ['Only if the automatic route fails. Then run ' +
+              '<code>python fetch_all_data.py --only air_quality</code>.'],
+    } },
+
+  { name: 'Public transport stops and stations',
+    pub: 'Transport for London, Unified API',
+    what: 'Distance to the nearest station and to the nearest bus stop, and ' +
+          'how many of each are within a short walk. Distances are straight ' +
+          'lines from the LSOA centroid, not walking routes, so a real walk ' +
+          'is longer wherever a river, railway or park is in the way. ' +
+          'Stations outside the London boundary are counted, because for an ' +
+          'outer-borough LSOA the nearest station often is one.',
+    geo: 'Point register; measured per LSOA, then population-weighted onto wards',
+    period: 'Live at the time of the last run',
+    cadence: 'Continuous. The register changes as stops open and close.',
+    manifest: 'tfl',
+    fix: {
+      auto: 'Fetched automatically from the open Unified API, which needs no ' +
+            'key. Unkeyed use is rate limited to roughly 50 requests a ' +
+            'minute and this takes 43, so the pipeline paces itself. Set ' +
+            'TFL_APP_KEY to use a free key and skip the pacing.',
+      manual: [],
+      steps: ['If the API is unreachable the previous file is kept. Re-run ' +
+              '<code>python fetch_all_data.py --only tfl</code>.'],
+    } },
+
   { name: 'Public transport accessibility (PTAL)',
     pub: 'Greater London Authority, LSOA Atlas',
-    what: 'Average public transport accessibility score.',
+    what: 'TfL\'s Public Transport Accessibility Level, averaged over the ' +
+          'LSOA. The nine bands 0, 1a, 1b, 2 to 5, 6a and 6b are mapped onto ' +
+          'a 0 to 8 scale, where 8 is the best connected. Higher is better.',
     geo: 'LSOA',
     period: 'As published in the Atlas',
     cadence: 'Ad hoc.',

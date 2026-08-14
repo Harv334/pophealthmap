@@ -5,9 +5,18 @@ and LSOA level, and a single Python script that rebuilds it from public data.
 
 Live map: https://pophealth.uk
 
-Every figure comes from an open government or NHS source. Nothing is modelled,
-estimated or smoothed: if a number is on the map, it is in a published dataset,
-and `RAW_DATA_SOURCES.md` says which one.
+Every figure comes from an open government or NHS source, and
+`RAW_DATA_SOURCES.md` says which one. Almost nothing is smoothed or estimated:
+if a number is on the map, it is in a published dataset. Two exceptions are
+worth naming rather than burying, because they are the only places the map
+shows a figure that was not published for that exact area:
+
+- **Air quality** is Defra model output, not measurement. There is no monitor
+  in most LSOAs; the PCM model is calibrated against the national network and
+  published on a 1 km grid, which is then area-weighted onto LSOAs.
+- **Ward figures for LSOA-level sources** (air quality, transport access, fuel
+  poverty, IMD) are population-weighted means of their LSOAs, not separately
+  published ward statistics.
 
 ## What's in this repo
 

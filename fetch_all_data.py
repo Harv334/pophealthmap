@@ -2909,16 +2909,24 @@ def run_fuel_poverty() -> pd.DataFrame | None:
 
 
 # ============================================================================
-# SOURCE 4c: GLA LSOA Atlas — PTAI score (LSOA-level)
+# SOURCE 4c: GLA LSOA Atlas — PTAL score (LSOA-level)
 # ============================================================================
-# PTAL (Public Transport Accessibility Level) is TfL's 0-6b banded score of
-# how well-connected a location is by public transport. The underlying
-# continuous score (PTAI) is published at LSOA level in the GLA's
-# "LSOA Atlas". Source:
+# PTAL (Public Transport Accessibility Level) is TfL's banded score of how
+# well-connected a location is by public transport, published per LSOA in the
+# GLA's "LSOA Atlas". Source:
 #   https://data.london.gov.uk/dataset/lsoa-atlas
 #
-# The LSOA Atlas CSV contains a column "Average PTAI score" per LSOA. Bigger
-# is better (6b ~= 25+, 0 ~= <0.01).
+# The column is "Public Transport Accessibility Levels (2014);Average Score;",
+# and what it holds is the BAND INDEX averaged over the LSOA, not the
+# continuous accessibility index. The nine bands 0, 1a, 1b, 2, 3, 4, 5, 6a, 6b
+# map onto 0-8, and the observed London values run 0.30 to exactly 8.00, which
+# is the cap a band scale has and a continuous one does not.
+#
+# This field was named ptai_score and documented as "average PTAI score" for
+# as long as it existed. PTAI is a different quantity on a different scale —
+# it is unbounded and reaches past 40 in the West End — so anything that read
+# the name and scaled for PTAI put the whole city in the bottom fifth of its
+# ramp. Bigger is still better; the range is 0 to 8.
 # The download URL carries a resource id that changes whenever the GLA
 # republishes the file, so hardcoding one guarantees it eventually 404s. It did:
 # the pinned id stopped resolving and PTAL had been silently skipped ever since,
@@ -2955,7 +2963,7 @@ def _ptal_discover_url() -> str | None:
 
 
 def run_ptal() -> pd.DataFrame | None:
-    rule("PTAL (GLA LSOA Atlas, average PTAI)")
+    rule("PTAL (GLA LSOA Atlas, average band score 0-8)")
     cache_dir = CACHE_DIR / "ptal"
     cache_dir.mkdir(parents=True, exist_ok=True)
 
@@ -3014,26 +3022,37 @@ def run_ptal() -> pd.DataFrame | None:
     # "no frame" for as long as that has been the heading. The PTAL spellings
     # are tried first, and the old PTAI ones kept in case an older copy of the
     # file is sitting in the cache.
-    ptai_col = (find_col("public transport accessibility", "average score")
+    ptal_col = (find_col("public transport accessibility", "average score")
                 or find_col("ptal", "average score")
                 or find_col("ptal", "average")
                 or find_col("average", "ptai")
                 or find_col("ptai", "score")
                 or find_col("ptai"))
-    if not code_col or not ptai_col:
+    if not code_col or not ptal_col:
         warn(f"ptal: columns not found (code={code_col!r}, "
-             f"ptai={ptai_col!r}). Columns seen: {list(df.columns)[:10]}")
+             f"ptal={ptal_col!r}). Columns seen: {list(df.columns)[:10]}")
         return None
 
     out = pd.DataFrame({
         "LSOA21CD": df[code_col].astype(str).str.strip(),
-        "ptai_score": pd.to_numeric(df[ptai_col], errors="coerce"),
-    }).dropna(subset=["LSOA21CD", "ptai_score"])
+        "ptal_score": pd.to_numeric(df[ptal_col], errors="coerce"),
+    }).dropna(subset=["LSOA21CD", "ptal_score"])
     # Filter to well-formed E01 LSOA codes.
     out = out[out["LSOA21CD"].str.startswith("E01")]
+    # A band index cannot exceed 8 (6b). Anything above it means the Atlas has
+    # switched this column to the continuous PTAI, which is a different scale
+    # and would need a different range in the map — better to say so than to
+    # publish it under a name that promises 0-8.
+    over = out[out["ptal_score"] > 8]
+    if len(over):
+        warn(f"ptal: {len(over):,} LSOAs score above 8, which the band scale "
+             f"cannot reach (max seen {out['ptal_score'].max():.1f}). The "
+             f"Atlas column may now hold continuous PTAI.")
     out_path = DATA_DIR / "demographics" / "ptal.parquet"
     out = write_parquet_guarded(out_path, out, source="ptal")
-    ok(f"ptal: {len(out):,} LSOAs -> {out_path.relative_to(REPO_ROOT)}")
+    ok(f"ptal: {len(out):,} LSOAs, band score "
+       f"{out['ptal_score'].min():.1f}-{out['ptal_score'].max():.1f} -> "
+       f"{out_path.relative_to(REPO_ROOT)}")
     return out
 
 
@@ -3981,9 +4000,30 @@ def build_ward_data() -> dict:
         sources["fuel_poverty"] = "DESNZ sub-regional fuel poverty (LILEE)"
 
     pt = _read_parquet_opt(DATA_DIR / "demographics" / "ptal.parquet")
-    _agg_to_wards(pt, "ptai_score", "ptai_score")
+    _agg_to_wards(pt, "ptal_score", "ptal_score")
     if pt is not None:
-        sources["ptal"] = "GLA LSOA Atlas (average PTAI score)"
+        sources["ptal"] = "GLA LSOA Atlas (average PTAL band score, 0-8)"
+
+    # --- Air quality + transport access: per-LSOA -> per-ward ---------------
+    # Both are population weighted, including the two counts. A ward's
+    # "stations within 1 km" is not the sum of its LSOAs' counts — the same
+    # station is within 1 km of several of them — so summing would multiply the
+    # network. The population-weighted mean answers the question that can be
+    # answered: what the ward's average resident has within that distance.
+    aq = _read_parquet_opt(DATA_DIR / "environment" / "air_quality_lsoa.parquet")
+    if aq is not None and not aq.empty:
+        sources["air_quality"] = "Defra UK-AIR PCM 1 km background model"
+        for col in ("no2_ugm3", "pm25_ugm3", "pm10_ugm3"):
+            if col in aq.columns:
+                _agg_to_wards(aq, col, col)
+
+    tfl = _read_parquet_opt(DATA_DIR / "environment" / "tfl_transport_lsoa.parquet")
+    if tfl is not None and not tfl.empty:
+        sources["tfl"] = "TfL Unified API (StopPoint register)"
+        for col in ("rail_station_dist_m", "rail_stations_1km",
+                    "bus_stop_dist_m", "bus_stops_800m"):
+            if col in tfl.columns:
+                _agg_to_wards(tfl, col, col)
 
     # --- Claimant count: counts SUM, rates pop-weighted MEAN ----------------
     cl = _read_parquet_opt(DATA_DIR / "economy" / "claimant_count.parquet")
@@ -4208,14 +4248,40 @@ def build_lsoa_data() -> dict:
             if code in out and pd.notna(v):
                 out[code]["fuel_poverty_pct"] = round(float(v), 2)
 
-    # PTAL (GLA LSOA Atlas, average PTAI score)
+    # PTAL (GLA LSOA Atlas, average band score 0-8)
     pt = _read_parquet_opt(DATA_DIR / "demographics" / "ptal.parquet")
     if pt is not None and not pt.empty:
         for _, row in pt.iterrows():
             code = str(row["LSOA21CD"])
-            v = row.get("ptai_score")
+            v = row.get("ptal_score")
             if code in out and pd.notna(v):
-                out[code]["ptai_score"] = round(float(v), 2)
+                out[code]["ptal_score"] = round(float(v), 2)
+
+    # Air quality (Defra UK-AIR PCM) and transport access (TfL StopPoint).
+    # Both are natively LSOA-level here: the pipeline builds them per LSOA and
+    # the ward figures are derived from these, not the other way round.
+    for parquet_name, cols in (
+        ("air_quality_lsoa.parquet",
+         ("no2_ugm3", "pm25_ugm3", "pm10_ugm3")),
+        ("tfl_transport_lsoa.parquet",
+         ("rail_station_dist_m", "rail_stations_1km",
+          "bus_stop_dist_m", "bus_stops_800m")),
+    ):
+        src_df = _read_parquet_opt(DATA_DIR / "environment" / parquet_name)
+        if src_df is None or src_df.empty:
+            continue
+        present = [c for c in cols if c in src_df.columns]
+        for _, row in src_df.iterrows():
+            code = str(row["LSOA21CD"])
+            if code not in out:
+                continue
+            for col in present:
+                v = row.get(col)
+                if pd.notna(v):
+                    # The two counts are counts, so they stay integers rather
+                    # than rendering as "3.0 stations".
+                    out[code][col] = (int(v) if col.endswith(("_1km", "_800m"))
+                                      else round(float(v), 2))
 
     # Green and blue space access (Defra, via run_greenblue)
     #
@@ -4837,9 +4903,542 @@ def run_greenblue() -> pd.DataFrame:
     return pd.DataFrame([{"lsoas": len(df), "columns": len(df.columns)}])
 
 
+# ============================================================================
+# SOURCE: Background air quality  (Defra UK-AIR, PCM 1 km modelled grid)
+# ============================================================================
+# Defra's Pollution Climate Mapping model publishes modelled annual mean
+# background concentrations on a 1 km National Grid, one CSV per pollutant per
+# year, indexed at:
+#   https://uk-air.defra.gov.uk/data/pcm-data
+#
+# Air quality is the environmental exposure with the clearest link to outcomes
+# this map already carries — respiratory admissions, cardiovascular disease,
+# low birth weight — and until now nothing here measured it.
+#
+# Three properties of the published files are handled rather than assumed,
+# because each one fails silently if guessed wrong:
+#
+#   - The pollutant token runs straight into the year with no separator, and
+#     some files carry a version suffix after it (mappm252024g.csv, but
+#     mapno22024.csv). A greedy regex reads "mapno22024" as pollutant "no",
+#     year 2200. The token is therefore matched against a known vocabulary,
+#     longest first, so pm25 is never read as a variant of pm10 and no2 is
+#     never read as no.
+#   - The index's links are relative and written "../datastore/pcm/...".
+#     They resolve against /data/pcm-data as a page, not a directory: joining
+#     them onto a trailing slash puts them under /data/datastore/ and every
+#     single one 404s.
+#   - Each CSV carries five metadata lines (pollutant, year, statistic, unit,
+#     blank) ahead of the real header row.
+#
+# x and y are the CENTRE of each 1 km square rather than a corner — every x
+# satisfies x mod 1000 == 500. Cells are rebuilt as squares spanning ±500 m and
+# each LSOA takes the area-weighted mean of the cells it overlaps. Reading a
+# single cell at the LSOA centroid would be cheaper, and defensible for dense
+# inner-London LSOAs, but outer-borough ones run to several km² and would take
+# one cell's value for the whole area.
+PCM_INDEX_URL = "https://uk-air.defra.gov.uk/data/pcm-data"
+# Pollutant token -> output column. These three are the ones with published
+# health-based guideline values; nox, so2 and benzene are on the index too and
+# can be added here without other changes.
+PCM_POLLUTANTS = {
+    "no2":  "no2_ugm3",
+    "pm25": "pm25_ugm3",
+    "pm10": "pm10_ugm3",
+}
+# Every token the index publishes, so a filename is never mis-split by matching
+# a short pollutant that happens to prefix a longer one.
+PCM_ALL_TOKENS = ["coamean", "com8hr", "dgt1", "pm25", "pm10", "nox",
+                  "no2", "so2", "o3", "bz"]
+# The year the map's labels currently say. Discovery still takes whatever is
+# newest, because that is the right default, but the vintage is written on the
+# methodology page and in each indicator's metadata as fixed text. When Defra
+# publish the next year those labels become wrong silently, so the mismatch is
+# announced rather than left for someone to notice.
+PCM_LABELLED_YEAR = 2024
+# Greater London in British National Grid, with a margin. Only used to trim the
+# UK-wide grid (about 255,000 cells) down to what can possibly touch an LSOA.
+LONDON_BNG_BBOX = (495000, 148000, 570000, 208000)
+
+
+def _pcm_discover_urls() -> dict[str, tuple[int, str]]:
+    """Latest published file per pollutant: {token: (year, absolute url)}.
+
+    Read from the index rather than pinned. PTAL was skipped silently for
+    months because its URL carried a resource id that stopped resolving, and
+    a pinned PCM filename would rot the same way each time Defra republishes.
+    """
+    from urllib.parse import urljoin
+    try:
+        r = browser_session(referer="https://uk-air.defra.gov.uk/").get(
+            PCM_INDEX_URL, timeout=90)
+        r.raise_for_status()
+        html = r.text
+    except Exception as e:
+        warn(f"air_quality: could not reach the UK-AIR index ({e})")
+        return {}
+
+    found: dict[str, dict[int, str]] = {}
+    for href in re.findall(r'href="([^"]*/pcm/[^"]*\.csv)"', html, re.I):
+        # urljoin against the page URL, NOT the page URL plus a slash: these
+        # links are "../datastore/pcm/x.csv" and the extra slash sends them to
+        # /data/datastore/, which does not exist.
+        url = urljoin(PCM_INDEX_URL, href)
+        stem = url.rsplit("/", 1)[-1]
+        m = re.match(r"map(.+?)\.csv$", stem, re.I)
+        if not m:
+            continue
+        rest = m.group(1).lower()
+        token = next((t for t in PCM_ALL_TOKENS if rest.startswith(t)), None)
+        if token not in PCM_POLLUTANTS:
+            continue
+        ym = re.match(r"(\d{4})", rest[len(token):])
+        if not ym:
+            continue
+        found.setdefault(token, {})[int(ym.group(1))] = url
+
+    latest = {t: (max(yrs), yrs[max(yrs)]) for t, yrs in found.items()}
+    missing = sorted(set(PCM_POLLUTANTS) - set(latest))
+    if missing:
+        warn(f"air_quality: the index listed no files for {', '.join(missing)}")
+    return latest
+
+
+def _pcm_read_grid(token: str, year: int, url: str,
+                   cache_dir: "Path") -> "pd.DataFrame | None":
+    """One pollutant's London cells as columns gridcode, x, y, value."""
+    src = cache_dir / f"pcm_{token}_{year}.csv"
+    if not src.exists():
+        info(f"air_quality: downloading {url.rsplit('/', 1)[-1]}")
+        try:
+            r = browser_session(referer=PCM_INDEX_URL).get(url, timeout=300)
+            r.raise_for_status()
+            write_bytes_atomic(src, r.content)
+        except Exception as e:
+            warn(f"air_quality: {token} download failed: {e}. MANUAL STEP: "
+                 f"save {url} as {src}, then re-run "
+                 f"`python fetch_all_data.py --only air_quality`.")
+            return None
+    try:
+        # low_memory=False because the value column holds a literal "MISSING"
+        # for cells the model does not cover. Chunked inference types that
+        # column differently depending on where the sentinel falls, which is a
+        # warning here but a silently different dtype in other pandas versions.
+        df = pd.read_csv(src, skiprows=5, low_memory=False)
+    except Exception as e:
+        warn(f"air_quality: {token} CSV unreadable ({e})")
+        return None
+    if df.empty or not {"x", "y"} <= set(df.columns):
+        warn(f"air_quality: {token} has no x/y columns; got {list(df.columns)}")
+        return None
+
+    # The value column is named for the pollutant and year (no22024). Take the
+    # last column rather than rebuilding that name, so a change in Defra's
+    # spelling does not empty the layer without saying so.
+    val_col = df.columns[-1]
+    x0, y0, x1, y1 = LONDON_BNG_BBOX
+    df = df[df.x.between(x0, x1) & df.y.between(y0, y1)].copy()
+    # PCM writes "MISSING" into cells the model does not cover (open sea, and
+    # a few Scottish islands). Numeric coercion turns those into NaN.
+    df["value"] = pd.to_numeric(df[val_col], errors="coerce")
+    df = df.dropna(subset=["value"])
+    df = df[df["value"] > 0]
+    if df.empty:
+        warn(f"air_quality: {token} had no usable cells over London")
+        return None
+    return df[["x", "y", "value"]]
+
+
+def run_air_quality() -> "pd.DataFrame | None":
+    rule("Air quality (Defra UK-AIR, PCM 1 km grid)")
+    from shapely.geometry import box, shape
+    from shapely.ops import transform as shp_transform
+    from shapely.strtree import STRtree
+    from pyproj import Transformer
+
+    cache_dir = CACHE_DIR / "air_quality"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+
+    latest = _pcm_discover_urls()
+    if not latest:
+        warn("air_quality: nothing to fetch")
+        return None
+
+    grids: dict[str, "pd.DataFrame"] = {}
+    years: dict[str, int] = {}
+    for token in PCM_POLLUTANTS:
+        if token not in latest:
+            continue
+        year, url = latest[token]
+        g = _pcm_read_grid(token, year, url, cache_dir)
+        if g is not None:
+            grids[token] = g
+            years[token] = year
+            info(f"air_quality: {token} {year} — {len(g):,} London cells, "
+                 f"{g['value'].min():.1f}–{g['value'].max():.1f} µg/m³")
+    if not grids:
+        warn("air_quality: no pollutant grid could be read")
+        return None
+
+    # LSOA polygons are WGS84; the grid is BNG. Project the polygons rather
+    # than the grid, because a projected 1 km square stops being a square and
+    # its area weights would drift.
+    lsoa_path = DATA_DIR / "boundaries" / "lsoa.geojson"
+    if not lsoa_path.exists():
+        warn(f"air_quality: {lsoa_path} missing — run `--only boundaries` first")
+        return None
+    with open(lsoa_path, encoding="utf-8") as f:
+        feats = json.load(f)["features"]
+    to_bng = Transformer.from_crs(4326, 27700, always_xy=True).transform
+    polys, codes = [], []
+    for feat in feats:
+        code = str(feat["properties"].get("LSOA21CD") or "")
+        if not code.startswith("E01"):
+            continue
+        geom = shp_transform(to_bng, shape(feat["geometry"]))
+        if geom.is_empty:
+            continue
+        polys.append(geom)
+        codes.append(code)
+    info(f"air_quality: {len(polys):,} LSOA polygons projected to BNG")
+
+    records: dict[str, dict] = {c: {"LSOA21CD": c} for c in codes}
+    for token, grid in grids.items():
+        col = PCM_POLLUTANTS[token]
+        cells = [box(x - 500, y - 500, x + 500, y + 500)
+                 for x, y in zip(grid.x.to_numpy(), grid.y.to_numpy())]
+        values = grid["value"].to_numpy()
+        tree = STRtree(cells)
+        hit = 0
+        for code, poly in zip(codes, polys):
+            num = den = 0.0
+            for idx in tree.query(poly):
+                inter = poly.intersection(cells[idx]).area
+                if inter > 0:
+                    num += float(values[idx]) * inter
+                    den += inter
+            if den > 0:
+                records[code][col] = round(num / den, 2)
+                hit += 1
+        ok(f"air_quality: {col} on {hit:,}/{len(codes):,} LSOAs")
+
+    out = pd.DataFrame.from_records(list(records.values()))
+    value_cols = [c for c in PCM_POLLUTANTS.values() if c in out.columns]
+    if not value_cols:
+        warn("air_quality: no LSOA matched any grid cell")
+        return None
+    # Every pollutant, or none. A missing column is not a smaller file: it is a
+    # full 4,994-row frame that passes write_parquet_guarded (which only
+    # refuses EMPTY frames), so one timed-out 8 MB download would retire a
+    # published overlay from the map and still report "ok" in the manifest.
+    missing = [c for c in PCM_POLLUTANTS.values() if c not in out.columns]
+    if missing:
+        warn(f"air_quality: {', '.join(missing)} could not be built this run, "
+             f"so nothing is written and the previous file is kept. A partial "
+             f"set would silently drop those overlays. Re-run `python "
+             f"fetch_all_data.py --only air_quality`.")
+        return None
+    out = out.dropna(subset=value_cols, how="all")
+    # An LSOA that matched no cell means the bbox or the projection is wrong,
+    # not that London has a hole in it. Refuse to ship a partial layer as a
+    # whole one — the same rule run_greenblue enforces.
+    if len(out) < len(codes) * 0.99:
+        raise RuntimeError(
+            f"air_quality: only {len(out):,} of {len(codes):,} LSOAs took a "
+            f"value from the 1 km grid. That is a join fault, not missing data."
+        )
+    out_path = DATA_DIR / "environment" / "air_quality_lsoa.parquet"
+    out = write_parquet_guarded(out_path, out, source="air_quality")
+    yr_note = ", ".join(f"{t} {y}" for t, y in sorted(years.items()))
+    drifted = sorted({y for y in years.values() if y != PCM_LABELLED_YEAR})
+    if drifted:
+        warn(f"air_quality: Defra now publish {yr_note}, but the map labels "
+             f"this layer {PCM_LABELLED_YEAR}. The figures are correct and "
+             f"current; the year shown beside them is not. Update "
+             f"PCM_LABELLED_YEAR, the three `yr:` fields in index.html's "
+             f"OV_META, and the air quality `period:` in methodology.html.")
+    ok(f"air_quality: {len(out):,} LSOAs ({yr_note}) -> "
+       f"{out_path.relative_to(REPO_ROOT)}")
+    return out
+
+
+# ============================================================================
+# SOURCE: Public transport access  (TfL Unified API, StopPoint)
+# ============================================================================
+# PTAL already scores how well-connected a place is overall, but it is a single
+# banded index and it is republished rarely. Distance to the nearest station is
+# a different and more legible thing: it answers "how far is the walk", it
+# separates outer-borough LSOAs that PTAL flattens into one low band, and it
+# comes from a register that is current rather than a periodic model run.
+#
+#   https://api.tfl.gov.uk/StopPoint/Mode/{modes}?page=N
+#
+# The API returns 1,000 records a page and reports the true total, so paging
+# runs until the total is reached rather than until a short page appears — a
+# short page mid-run would otherwise truncate the network silently.
+#
+# What comes back is not a list of stations. It is a list of stop POINTS, which
+# includes platforms, entrances and access areas as separate records that all
+# share a station's name and sit within metres of each other. Counting those as
+# stations would report eleven "stations" at King's Cross. Only the station-
+# level stopTypes are kept.
+#
+# Keeping only those types is NOT enough to get one point per station, and
+# deduplicating on stationNaptan does not help: on this endpoint that field is
+# null for the hub records and equal to the record's own id for the rest, so it
+# collapses nothing at all — 955 records in, 955 out. Two things still
+# double-count, and both were measured against the cached register:
+#
+#   - TransportInterchange is the HUB* grouping record that sits ON TOP of the
+#     stations it groups, not a station in its own right. 96 of them are in
+#     scope and 95 sit within 250 m of a station that is already kept
+#     (HUBBAL is 20 m from both Balham Rail and Balham Underground). It is
+#     excluded below.
+#   - The same physical site is listed once per operator. Wimbledon appears as
+#     910GWDON and 910GWIMBLDN, 1 m apart; Weybridge twice at 0 m.
+#
+# So the kept points are collapsed spatially: anything within TFL_SITE_RADIUS_M
+# of an already-accepted station is the same site. Left uncollapsed, "stations
+# within 1 km" overstated central London by roughly a third.
+#
+# Stations outside London are deliberately NOT dropped. An LSOA in Havering may
+# have its nearest station over the Essex border, and clipping to the boundary
+# would push its distance to the next London station and overstate it. The
+# grid is trimmed to a London bbox with a margin instead.
+TFL_API = "https://api.tfl.gov.uk"
+# Unkeyed access is rate limited to about 50 requests a minute, which the 43
+# pages here fit inside with the pause below. A free app key raises the limit;
+# set TFL_APP_KEY to use one.
+TFL_APP_KEY = os.environ.get("TFL_APP_KEY", "")
+TFL_RAIL_MODES = "tube,dlr,overground,elizabeth-line,national-rail,tram"
+# Station-level records. NaptanMetroEntrance / *AccessArea / *Platform are
+# parts of a station, not stations; TransportInterchange is a grouping laid
+# over stations that are already in this set, so it is not one either.
+TFL_STATION_TYPES = {"NaptanMetroStation", "NaptanRailStation"}
+# Two station records closer than this are the same site listed twice, once per
+# operator. Generous enough for the observed duplicates (0-62 m) and well short
+# of the closest genuinely distinct pair in London.
+TFL_SITE_RADIUS_M = 150
+# Physical bus stops. The Pair and Cluster types are groupings of the stops
+# below them and would double-count.
+TFL_BUS_TYPES = {"NaptanPublicBusCoachTram", "NaptanBusCoachStation"}
+# Greater London plus roughly 8 km, in WGS84 degrees.
+TFL_BBOX = (-0.62, 51.19, 0.42, 51.78)
+
+
+def _tfl_fetch_mode(modes: str, cache_dir: "Path",
+                    stem: str) -> tuple[list[dict], bool]:
+    """Every stop point for a mode set, paged, cached a page at a time.
+
+    Returns (records, complete). `complete` is False when the API stopped
+    short of the total it advertised, which is the whole point of returning
+    it: a mid-paging HTTP error used to `return out` with whatever had
+    arrived, skipping the completeness check below entirely, and the caller
+    then measured every distance against a truncated network and wrote it out
+    as if it were the whole one. A short network does not look wrong — it
+    looks like a city with fewer stations.
+    """
+    import time
+    out: list[dict] = []
+    page, total = 1, None
+    while True:
+        cache = cache_dir / f"{stem}_p{page}.json"
+        if cache.exists():
+            try:
+                payload = json.loads(cache.read_text(encoding="utf-8"))
+            except ValueError:
+                cache.unlink()
+                continue
+        else:
+            url = f"{TFL_API}/StopPoint/Mode/{modes}?page={page}"
+            if TFL_APP_KEY:
+                url += f"&app_key={TFL_APP_KEY}"
+            try:
+                r = browser_session(referer="https://tfl.gov.uk/").get(
+                    url, timeout=180)
+                r.raise_for_status()
+                payload = r.json()
+            except Exception as e:
+                warn(f"tfl: {stem} page {page} failed: {e}")
+                return out, False
+            write_atomic(cache, json.dumps(payload))
+            if not TFL_APP_KEY:
+                time.sleep(1.3)   # stay under the unkeyed rate limit
+        sps = payload.get("stopPoints") or []
+        total = payload.get("total") if total is None else total
+        out.extend(sps)
+        if not sps or total is None or len(out) >= total:
+            break
+        page += 1
+    complete = total is not None and len(out) >= total
+    if not complete:
+        warn(f"tfl: {stem} returned {len(out):,} of "
+             f"{total if total is not None else '?'} advertised records")
+    return out, complete
+
+
+def _tfl_points(records: list[dict], keep_types: set) -> list[tuple[float, float]]:
+    """(lon, lat) for the wanted stop types, one per distinct record id.
+
+    Keyed on the record's own naptanId. For bus stops that is exactly right:
+    the two stops facing each other across a road are separate stops and must
+    stay separate. For stations it removes only exact repeats; the same site
+    listed once per operator is collapsed later, spatially, by _collapse_sites.
+    """
+    x0, y0, x1, y1 = TFL_BBOX
+    seen: dict[str, tuple[float, float]] = {}
+    for s in records:
+        if s.get("stopType") not in keep_types:
+            continue
+        lat, lon = s.get("lat"), s.get("lon")
+        # Presence, not truth. London straddles the Greenwich meridian and this
+        # bbox spans it, so a longitude of exactly 0.0 is a real place: the
+        # falsy test this replaces discarded 'Larkshall Crescent' (51.61507, 0.0).
+        if lat is None or lon is None:
+            continue
+        if not (x0 <= lon <= x1 and y0 <= lat <= y1):
+            continue
+        key = s.get("naptanId") or s.get("id")
+        seen.setdefault(str(key), (float(lon), float(lat)))
+    return list(seen.values())
+
+
+def _collapse_sites(points_xy: list[tuple[float, float]],
+                    radius_m: float) -> list[tuple[float, float]]:
+    """One point per physical site, from points already in metres.
+
+    A candidate within radius_m of an ALREADY-ACCEPTED anchor is the same site
+    and is dropped. Testing against anchors rather than against any member is
+    deliberate: single-linkage would let a row of closely spaced stations chain
+    into one blob down a line, which is exactly the failure this is meant to
+    avoid. Sorted first so the result does not depend on fetch order.
+    """
+    anchors: list[tuple[float, float]] = []
+    r2 = radius_m * radius_m
+    for x, y in sorted(points_xy):
+        if any((x - ax) ** 2 + (y - ay) ** 2 <= r2 for ax, ay in anchors):
+            continue
+        anchors.append((x, y))
+    return anchors
+
+
+def run_tfl_transport() -> "pd.DataFrame | None":
+    rule("Public transport access (TfL Unified API)")
+    from shapely.geometry import Point, shape
+    from shapely.ops import transform as shp_transform
+    from shapely.strtree import STRtree
+    from pyproj import Transformer
+
+    cache_dir = CACHE_DIR / "tfl"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+
+    rail_raw, rail_ok = _tfl_fetch_mode(TFL_RAIL_MODES, cache_dir, "rail")
+    bus_raw, bus_ok = _tfl_fetch_mode("bus", cache_dir, "bus")
+    # Refuse to publish measurements taken against a network that is known to
+    # be short. write_parquet_guarded only protects against an EMPTY frame, and
+    # a truncated register still yields a full 4,994 rows — every one of them
+    # wrong, and reported "ok" in the manifest.
+    if not rail_ok or not bus_ok:
+        warn("tfl: the register came back incomplete, so nothing is written. "
+             "Distances measured against a partial network are wrong "
+             "everywhere, not missing in places, and the previous file is the "
+             "safer thing to keep. Re-run `python fetch_all_data.py --only "
+             "tfl` once the API is healthy.")
+        return None
+    rail_pts = _tfl_points(rail_raw, TFL_STATION_TYPES)
+    bus = _tfl_points(bus_raw, TFL_BUS_TYPES)
+    if not rail_pts:
+        warn("tfl: no stations resolved; nothing to measure against")
+        return None
+
+    lsoa_path = DATA_DIR / "boundaries" / "lsoa.geojson"
+    if not lsoa_path.exists():
+        warn(f"tfl: {lsoa_path} missing — run `--only boundaries` first")
+        return None
+    with open(lsoa_path, encoding="utf-8") as f:
+        feats = json.load(f)["features"]
+
+    # Distances have to be in metres, so everything moves to British National
+    # Grid. Degrees would make a degree of longitude count the same as a degree
+    # of latitude, which at London's latitude is an error of about 38%.
+    to_bng = Transformer.from_crs(4326, 27700, always_xy=True).transform
+
+    # Collapse the same station listed once per operator, in metres. Done here
+    # rather than in _tfl_points because the radius only means anything after
+    # projection.
+    rail_xy = _collapse_sites([to_bng(lon, lat) for lon, lat in rail_pts],
+                              TFL_SITE_RADIUS_M)
+    bus_xy = [to_bng(lon, lat) for lon, lat in bus]
+    info(f"tfl: {len(rail_raw):,} rail stop points -> {len(rail_pts):,} station "
+         f"records -> {len(rail_xy):,} distinct sites")
+    info(f"tfl: {len(bus_raw):,} bus stop points -> {len(bus_xy):,} stops")
+
+    codes, origins = [], []
+    for feat in feats:
+        code = str(feat["properties"].get("LSOA21CD") or "")
+        if not code.startswith("E01"):
+            continue
+        geom = shp_transform(to_bng, shape(feat["geometry"]))
+        if geom.is_empty:
+            continue
+        # The centroid of a crescent-shaped or river-split LSOA can land
+        # outside it, sometimes in the Thames. representative_point is
+        # guaranteed to be inside the polygon.
+        pt = geom.centroid
+        if not geom.contains(pt):
+            pt = geom.representative_point()
+        codes.append(code)
+        origins.append(pt)
+    info(f"tfl: measuring from {len(codes):,} LSOA centroids")
+
+    def measure(points_xy, radius_m):
+        """(distance to nearest, count within radius) per LSOA, in BNG."""
+        geoms = [Point(x, y) for x, y in points_xy]
+        tree = STRtree(geoms)
+        dists, counts = [], []
+        for pt in origins:
+            nearest = tree.nearest(pt)
+            dists.append(round(pt.distance(geoms[int(nearest)]), 1))
+            # predicate="dwithin" is an exact radius test. A plain
+            # query(pt.buffer(r)) filters on bounding boxes, so it would count
+            # everything in the buffer's SQUARE envelope — about 27% more area
+            # than the circle, and a count that overstates most in the dense
+            # centre where it matters most.
+            counts.append(int(len(
+                tree.query(pt, predicate="dwithin", distance=radius_m))))
+        return dists, counts
+
+    rail_d, rail_n = measure(rail_xy, 1000)
+    out = pd.DataFrame({
+        "LSOA21CD": codes,
+        "rail_station_dist_m": rail_d,
+        "rail_stations_1km": rail_n,
+    })
+    if not bus_xy:
+        # Shipping three of four columns would pass every guard downstream:
+        # the frame is non-empty, so write_parquet_guarded writes it, and the
+        # builders' `col in df.columns` checks read the gap as "this source has
+        # nothing to say" and quietly drop the overlay from the map.
+        warn("tfl: no bus stops resolved, so nothing is written rather than a "
+             "rail-only file that would silently retire two published overlays")
+        return None
+    bus_d, bus_n = measure(bus_xy, 800)
+    out["bus_stop_dist_m"] = bus_d
+    out["bus_stops_800m"] = bus_n
+
+    out_path = DATA_DIR / "environment" / "tfl_transport_lsoa.parquet"
+    out = write_parquet_guarded(out_path, out, source="tfl")
+    ok(f"tfl: {len(out):,} LSOAs, median walk to a station "
+       f"{out['rail_station_dist_m'].median():,.0f} m -> "
+       f"{out_path.relative_to(REPO_ROOT)}")
+    return out
+
+
 SOURCES = {
     "boundaries":  run_boundaries,
     "greenblue":   run_greenblue,
+    "air_quality": run_air_quality,
+    "tfl":         run_tfl_transport,
     "gp":          run_gp_practices,
     "pharmacies":  run_pharmacies,
     "imd":         run_imd2025,

@@ -198,6 +198,99 @@ rows, 38 columns — the `commitment` / `doorstep` / `local` /
 `neighbourhood` suffixes plus each pairwise + triple combination, as
 counts and as percentages).
 
+### 6c. Background air quality
+
+| File | Source | URL | Used for |
+|------|--------|-----|----------|
+| `mapno2<year>.csv`, `mappm25<year>g.csv`, `mappm10<year>g.csv` | Defra UK-AIR, Pollution Climate Mapping (PCM) | https://uk-air.defra.gov.uk/data/pcm-data | `no2_ugm3`, `pm25_ugm3`, `pm10_ugm3` |
+
+Fetched automatically; nothing needs downloading by hand. The pipeline
+reads the index and takes the newest year listed **per pollutant**,
+because a pinned filename rots at every release.
+
+**Three things about these files that are easy to get wrong.**
+
+1. The pollutant token runs straight into the year with no separator,
+   and some files carry a version suffix after it (`mappm252024g.csv`
+   but `mapno22024.csv`). A greedy regex reads `mapno22024` as
+   pollutant `no`, year `2200`. Match the token against a known
+   vocabulary, longest first.
+2. The index's links are relative and written `../datastore/pcm/…`,
+   relative to `/data/pcm-data` **as a page, not a directory**. Joining
+   them onto a trailing slash puts them under `/data/datastore/`, and
+   every one 404s.
+3. Each CSV has five metadata lines (pollutant, year, statistic, unit,
+   blank) before the header row — `skiprows=5`.
+
+**Geography — a 1 km grid, not LSOA.** `x` and `y` are the **centre**
+of each square, not a corner: every `x` satisfies `x mod 1000 == 500`.
+Cells are rebuilt as squares spanning ±500 m and each LSOA takes the
+**area-weighted mean** of the cells it overlaps. Reading one cell at the
+LSOA centroid is cheaper and fine for dense inner-London LSOAs, but
+outer-borough ones run to several km² and would take a single cell's
+value for the whole area.
+
+These are **modelled**, not measured. The model is calibrated against
+the national monitoring network, but there is no monitor in most LSOAs.
+They are *background* concentrations over an area and do not capture the
+roadside peak on a particular street.
+
+Output: `data/environment/air_quality_lsoa.parquet` (4,994 London LSOA
+rows). Cells with the literal value `MISSING` (open sea, some Scottish
+islands) are dropped before weighting.
+
+### 6d. Public transport stops and stations
+
+| File | Source | URL | Used for |
+|------|--------|-----|----------|
+| `StopPoint/Mode/{modes}?page=N` (JSON) | Transport for London, Unified API | https://api.tfl.gov.uk | `rail_station_dist_m`, `rail_stations_1km`, `bus_stop_dist_m`, `bus_stops_800m` |
+
+Open API, no key needed. Unkeyed use is rate limited to roughly 50
+requests a minute and this takes 43 (10 pages of rail modes, 33 of bus),
+so the pipeline paces itself. Set `TFL_APP_KEY` to use a free key and
+skip the pacing. Pages are cached individually under `.cache/tfl/`.
+
+**What comes back is not a list of stations.** It is a list of stop
+*points*, which includes platforms, entrances and access areas as
+separate records sharing a station's name and sitting metres apart —
+counting those as stations reports eleven "stations" at King's Cross.
+Only station-level `stopType`s are kept
+(`NaptanMetroStation`, `NaptanRailStation`, `TransportInterchange`),
+then deduplicated by `stationNaptan` so a combined Tube-and-National-Rail
+interchange counts once.
+
+Bus stops are deduplicated by **`naptanId`, not `stationNaptan`** — the
+two stops facing each other across a road share a `stationNaptan`, and
+keying on it halves every stop count (21,043 stops becomes 13,160).
+
+**Stations outside London are deliberately kept.** For an LSOA in
+Havering the nearest station is often over the Essex border, and
+clipping to the boundary would push its distance to the next London
+station and overstate it. The register is trimmed to a London bounding
+box with roughly 8 km of margin instead.
+
+Distances are computed in **British National Grid**, in metres, from
+each LSOA's centroid (or `representative_point()` where the centroid
+falls outside a crescent-shaped or river-split polygon). Working in
+degrees would count a degree of longitude the same as a degree of
+latitude — at London's latitude, a 38% error. They are straight lines,
+not walking routes.
+
+Radius counts use shapely's `dwithin` predicate. A plain
+`STRtree.query(point.buffer(r))` filters on **bounding boxes**, so it
+counts everything in the buffer's square envelope — about 27% more area
+than the circle, overstating most in the dense centre where it matters
+most.
+
+Output: `data/environment/tfl_transport_lsoa.parquet` (4,994 rows).
+
+**Not built: step-free access.** `AccessViaLift` is present on only 156
+of 2,996 station records, and lift access is not the same as step-free
+access anyway (much of the Overground and Elizabeth line is step-free by
+level boarding or ramp). There is no complete step-free flag on this
+endpoint, so no step-free indicator is published rather than one that
+would silently be mostly guesswork.
+
 ---
 
 ## 7. Services — GP, pharmacy, dentist
@@ -260,6 +353,9 @@ To rebuild from scratch, a colleague needs:
    practice and pharmacy registers are fetched from the ODS API.
 9. **VCSE** — 3 Charity Commission JSON ZIPs.
 10. **Crime** — Last 12 monthly ZIPs from data.police.uk for Met + City forces.
+11. **Air quality** — 3 Defra PCM CSVs (≈10 MB each, UK-wide 1 km grid).
+12. **Transport** — nothing to download. 43 paged JSON calls to the TfL
+    Unified API, cached under `.cache/tfl/`.
 
 **Total raw data:** ≈ 350–450 MB uncompressed, from 9 distinct source
 organisations. All files are free and published under OGL or
@@ -277,6 +373,8 @@ equivalent open licence.
 | OHID Fingertips / QOF | Annually | Annually (usually Oct) |
 | Fuel poverty | Annually (Feb–Mar) | Annually |
 | Defra green/blue space access | Not yet set (first release Mar 2026) | Watch landing page — status is "in development" |
+| Defra UK-AIR PCM (air quality) | Annually (usually autumn) | Annually. Automatic — the newest year on the index is taken per pollutant, so a new release needs no edit |
+| TfL Unified API (stops and stations) | Continuously | Any run picks up the current register. Clear `.cache/tfl/` to force a refresh |
 | NHS ODS (GP practices + pharmacies) | Monthly | Automatic. The pipeline revalidates by ETag on every run and re-downloads only when the extract actually changes |
 | Charity Commission | Monthly | Monthly |
 | Crime (police.uk) | Monthly (3-month lag) | Quarterly is enough |

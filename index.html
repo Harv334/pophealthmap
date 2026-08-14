@@ -22,7 +22,7 @@
 <meta property="og:locale" content="en_GB">
 <meta property="og:url" content="https://pophealth.uk/">
 <meta property="og:title" content="PopHealth Map - London population health by ward and LSOA">
-<meta property="og:description" content="Deprivation, life expectancy, GP and pharmacy access, crime and green space for all 704 London wards and 4,994 LSOAs. Open data, nothing modelled or estimated.">
+<meta property="og:description" content="Deprivation, life expectancy, GP and pharmacy access, crime, air quality, transport access and green space for all 704 London wards and 4,994 LSOAs. Built entirely from open data.">
 <meta property="og:image" content="https://pophealth.uk/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -1378,13 +1378,14 @@
       "@type": "Dataset",
       "@id": "https://pophealth.uk/#dataset",
       "name": "London population health by ward and LSOA",
-      "description": "Population health, deprivation and service access indicators for all 33 London local authorities, published at 2024 ward and 2021 LSOA level. Covers 704 wards, 4,994 LSOAs, 1,146 GP practices, 1,737 pharmacies and 1,877 dental practices. Sources include OHID Fingertips, ONS Census 2021, IMD 2025, NHS ODS registers, QOF prevalence, police.uk recorded crime, DWP claimant count, fuel poverty and Charity Commission registers. Nothing is modelled or estimated.",
+      "description": "Population health, deprivation and service access indicators for all 33 London local authorities, published at 2024 ward and 2021 LSOA level. Covers 704 wards, 4,994 LSOAs, 1,146 GP practices, 1,737 pharmacies and 1,877 dental practices. Sources include OHID Fingertips, ONS Census 2021, IMD 2025, NHS ODS registers, QOF prevalence, police.uk recorded crime, DWP claimant count, fuel poverty, Charity Commission registers, Defra UK-AIR modelled background air quality and the Transport for London stop and station register. Every figure comes from a published source, named in the methodology. The air quality layers are Defra model output rather than measurements, and are labelled as such.",
       "url": "https://pophealth.uk/",
       "sameAs": "https://github.com/Harv334/pophealthmap",
       "isAccessibleForFree": true,
       "inLanguage": "en-GB",
       "creator": { "@id": "https://pophealth.uk/#creator" },
-      "license": "https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/",
+      "license": "https://pophealth.uk/methodology.html",
+      "usageInfo": "Most of this dataset is Open Government Licence v3.0. One source is not: the station and bus stop measures (rail_station_dist_m, rail_stations_1km, bus_stop_dist_m, bus_stops_800m) derive from Transport for London open data, licensed under version 2.0 of the Open Government Licence with amendments for Transport for London. Reusing those fields requires all three of: Powered by TfL Open Data; Contains OS data (c) Crown copyright and database rights 2016; Geomni UK Map data (c) and database rights 2019. Full terms and per-source licences: https://github.com/Harv334/pophealthmap/blob/main/DATA_LICENCES.md",
       "dateModified": "2026-08-10",
       "keywords": [
         "population health",
@@ -1789,6 +1790,14 @@
             </optgroup>
             <optgroup label="Environment &amp; access">
               <option value="fuel_poverty_pct">Fuel poverty % (DESNZ LILEE) · LSOA</option>
+              <option value="no2_ugm3">Nitrogen dioxide NO₂ µg/m³ (Defra) · LSOA</option>
+              <option value="pm25_ugm3">Fine particulates PM2.5 µg/m³ (Defra) · LSOA</option>
+              <option value="pm10_ugm3">Particulates PM10 µg/m³ (Defra) · LSOA</option>
+              <option value="ptal_score">Public transport accessibility, PTAL 0–8 (TfL/GLA) · LSOA</option>
+              <option value="rail_station_dist_m">Walk to nearest station, m (TfL) · LSOA</option>
+              <option value="rail_stations_1km">Stations within 1 km (TfL) · LSOA</option>
+              <option value="bus_stop_dist_m">Walk to nearest bus stop, m (TfL) · LSOA</option>
+              <option value="bus_stops_800m">Bus stops within 800 m (TfL) · LSOA</option>
               <option value="gb_commitment_pct">Green OR blue space within 15 min walk % (Defra) · LSOA</option>
               <option value="green_commitment_pct">Green space within 15 min walk % (Defra) · LSOA</option>
               <option value="green_doorstep_pct">Doorstep green space (&lt;200m, &ge;0.5 ha) % · LSOA</option>
@@ -2350,10 +2359,31 @@ const OV_CFG = {
   census_working_age_pct:          { lo:"Lower", hi:"Higher", wh:false, min:55,   max:80   },
   census_over65_pct:               { lo:"Lower", hi:"Higher", wh:false, min:5,    max:22   },
   census_over85_pct:               { lo:"Lower", hi:"Higher", wh:false, min:0.5,  max:4    },
-  // Environment & access. Higher fuel poverty = worse (wh:true). PTAL: higher
-  // PTAI = better transport access, so we invert with hiIsWorse:false via wh:false.
+  // Environment & access. Higher fuel poverty = worse (wh:true).
   fuel_poverty_pct:                { lo:"Lower", hi:"Higher", wh:true,  min:5,    max:25   },
-  ptai_score:                      { lo:"Lower", hi:"Higher", wh:false, min:2,    max:25   },
+  // PTAL: higher band = better transport access, so wh:false. The scale is the
+  // nine bands 0/1a/1b/2..6a/6b mapped onto 0-8 and it cannot exceed 8. It was
+  // keyed ptai_score against a range of 2-25, which is the range of the
+  // continuous PTAI — a different measure — so every London LSOA would have
+  // rendered inside the bottom quarter of the ramp had anything drawn it.
+  ptal_score:                      { lo:"Worse",  hi:"Better", wh:false, min:0,    max:8    },
+  // Defra PCM modelled annual mean background concentrations, µg/m³. Higher is
+  // worse for all three. Ranges span roughly the 1st to 99th percentile of the
+  // observed London values, so the ramp is not spent on outliers: absolute
+  // limits are far wider (the UK NO₂ limit alone is 40) and would flatten the
+  // whole city into one colour.
+  no2_ugm3:                        { lo:"Cleaner", hi:"Dirtier", wh:true, min:10,  max:30   },
+  pm25_ugm3:                       { lo:"Cleaner", hi:"Dirtier", wh:true, min:7.5, max:10.5 },
+  pm10_ugm3:                       { lo:"Cleaner", hi:"Dirtier", wh:true, min:11.5,max:17.5 },
+  // TfL StopPoint register. Distances are a walk, so shorter is better
+  // (wh:true); counts within a radius are the other way round.
+  rail_station_dist_m:             { lo:"Closer", hi:"Further", wh:true,  min:0,   max:2500 },
+  // 0-8, not 0-12. The 99th percentile is 7 stations; the max of 12 is a
+  // handful of City LSOAs, and stretching the ramp to reach them spent half
+  // its width on values almost nobody has.
+  rail_stations_1km:               { lo:"Fewer",  hi:"More",    wh:false, min:0,   max:8    },
+  bus_stop_dist_m:                 { lo:"Closer", hi:"Further", wh:true,  min:0,   max:600  },
+  bus_stops_800m:                  { lo:"Fewer",  hi:"More",    wh:false, min:0,   max:75   },
   // Defra 15-min green/blue space access (ODS, 2025). Higher % of UPRNs within
   // the relevant walking distance to qualifying space = BETTER access (wh:false).
   // Ranges chosen to span the observed London spread (LSOA-level).
@@ -2484,6 +2514,23 @@ const CATS = [
   ]},
   { key: "environment",  label: "Environment & access", ico: "🚆", fields: [
     { k: "fuel_poverty_pct",                 l: "Fuel poverty % (DESNZ LILEE)",  g: "ward" },
+  ]},
+  // Air quality and transport are published/derived at LSOA and then
+  // population-weighted onto wards, so both levels carry a real figure and
+  // lv names both. Declaring only g:"lsoa" would put them in LSOA_ONLY_OVS,
+  // which forces the LSOA layer up on selection and drops them out of the
+  // ward sidebar — neither of which is true here.
+  { key: "airquality",   label: "Air quality (Defra, LSOA)", ico: "🌫️", fields: [
+    { k: "no2_ugm3",            l: "Nitrogen dioxide NO₂ (µg/m³)",     g: "lsoa", lv: ["ward","lsoa"] },
+    { k: "pm25_ugm3",           l: "Fine particulates PM2.5 (µg/m³)",  g: "lsoa", lv: ["ward","lsoa"] },
+    { k: "pm10_ugm3",           l: "Particulates PM10 (µg/m³)",        g: "lsoa", lv: ["ward","lsoa"] },
+  ]},
+  { key: "transport",    label: "Public transport (TfL, LSOA)", ico: "🚇", fields: [
+    { k: "ptal_score",          l: "Transport accessibility (PTAL, 0–8)", g: "lsoa", lv: ["ward","lsoa"] },
+    { k: "rail_station_dist_m", l: "Walk to nearest station (m)",      g: "lsoa", lv: ["ward","lsoa"] },
+    { k: "rail_stations_1km",   l: "Stations within 1 km",             g: "lsoa", lv: ["ward","lsoa"] },
+    { k: "bus_stop_dist_m",     l: "Walk to nearest bus stop (m)",     g: "lsoa", lv: ["ward","lsoa"] },
+    { k: "bus_stops_800m",      l: "Bus stops within 800 m",           g: "lsoa", lv: ["ward","lsoa"] },
   ]},
   { key: "greenblue",    label: "Green & blue space (Defra, LSOA)", ico: "🌳", fields: [
     { k: "gb_commitment_pct",                l: "Green OR blue 15-min walk (%)", g: "lsoa" },
@@ -2765,6 +2812,22 @@ const OV_META = {
   green_neighbourhood_pct:        { src: "Defra Green/Blue Spaces",          yr: "2023", g: "LSOA", u: "%", desc: "Addresses within 1 km of neighbourhood green space (≥10 ha)." },
   blue_commitment_pct:            { src: "Defra Green/Blue Spaces",          yr: "2023", g: "LSOA", u: "%", desc: "Addresses within 15 min walk of qualifying blue space." },
 
+  // Air quality — Defra UK-AIR PCM, modelled not measured
+  no2_ugm3:                       { src: "Defra UK-AIR (PCM)",   yr: "2024", g: "LSOA", u: "µg/m³", desc: "Modelled annual mean background nitrogen dioxide. Mostly traffic. Area-weighted from Defra's 1 km grid onto the LSOA, so it is a background level across the area and does not capture the roadside peak on a specific street. UK annual limit is 40." },
+  pm25_ugm3:                      { src: "Defra UK-AIR (PCM)",   yr: "2024", g: "LSOA", u: "µg/m³", desc: "Modelled annual mean background fine particulates (under 2.5 µm), the fraction that reaches deepest into the lungs and carries the clearest link to mortality. WHO guideline is 5; the England 2040 target is 10." },
+  pm10_ugm3:                      { src: "Defra UK-AIR (PCM)",   yr: "2024", g: "LSOA", u: "µg/m³", desc: "Modelled annual mean background particulates under 10 µm. WHO guideline is 15; the UK limit is 40." },
+
+  // Public transport — TfL StopPoint register, plus the GLA's PTAL banding
+  // u is deliberately empty. It is appended to every number on both legends
+  // whenever it is six characters or fewer, so "0–8" rendered as if it were a
+  // unit: "Better (6.8 0–8)". The scale belongs in the label and the
+  // description, where it already is.
+  ptal_score:                     { src: "GLA LSOA Atlas (TfL PTAL)", yr: "2014", g: "LSOA", u: "", desc: "Public Transport Accessibility Level, averaged over the LSOA. The nine bands 0, 1a, 1b, 2–5, 6a, 6b map onto 0–8, where 8 (6b) is the best connected. Higher is better. TfL's most recent published LSOA banding." },
+  rail_station_dist_m:            { src: "TfL Unified API",      yr: "Live", g: "LSOA", u: "m", desc: "Straight-line distance from the LSOA centroid to the nearest Tube, DLR, Overground, Elizabeth line, tram or National Rail station. Straight line, not walking route, so a real walk is longer wherever a river, railway or park is in the way. Stations just outside London are counted, because for an outer-borough LSOA the nearest one often is." },
+  rail_stations_1km:              { src: "TfL Unified API",      yr: "Live", g: "LSOA", u: "stations", desc: "Stations of any rail mode within 1 km of the LSOA centroid. At ward level this is the population-weighted mean of its LSOAs, not a sum: one station is within 1 km of several LSOAs and summing would count it repeatedly." },
+  bus_stop_dist_m:                { src: "TfL Unified API",      yr: "Live", g: "LSOA", u: "m", desc: "Straight-line distance from the LSOA centroid to the nearest bus stop. Both sides of a road count as separate stops, which is how TfL registers them." },
+  bus_stops_800m:                 { src: "TfL Unified API",      yr: "Live", g: "LSOA", u: "stops", desc: "Bus stops within 800 m of the LSOA centroid, roughly a ten-minute walk. Population-weighted mean at ward level, for the same reason as the station count." },
+
   // IMD 2025
   imd_score:                      { src: "MHCLG IMD 2025",       yr: "2025", g: "LSOA", u: "score",  desc: "Composite Index of Multiple Deprivation. Higher = more deprived." },
   imd_decile_mean:                { src: "MHCLG IMD 2025", yr: "2025", g: "Ward, population-weighted mean of its LSOAs", u: "decile", desc: "Population-weighted mean of the IMD deciles of the neighbourhoods in the ward. Not a decile itself: a ward at 3 is not in the third decile, its typical neighbourhood is." },
@@ -3042,6 +3105,17 @@ function fmtOv(v, k) {
   if (typeof v === 'number' && isNaN(v)) return '—';
   const key = k || '';
   if (/_pct$|_rate$/.test(key))  return fmtNum(v, 1) + '%';
+  // Concentrations, µg/m³. These need a decimal: PM2.5 across the whole of
+  // London runs 7.0 to 11.3, so rounding to whole numbers collapses every
+  // LSOA onto four distinct values and the map stops distinguishing anything.
+  if (/_ugm3$/.test(key))        return fmtNum(v, 1);
+  // Distances in metres are whole numbers; a walk of 618.55 m is 619 m.
+  if (/_dist_m$/.test(key))      return fmtNum(v, 0);
+  // Counts within a radius. Integers at LSOA level, but at ward level they are
+  // population-weighted means, and rounding those to whole numbers reported
+  // "0 stations within 1 km" for wards whose residents average 0.4 — which
+  // reads as "none" rather than "few". One decimal keeps the distinction.
+  if (/_1km$|_800m$/.test(key))  return fmtNum(v, 1);
   if (/_score$/.test(key))       return fmtNum(v, 2);           // IMD domain scores
   // Fingertips ft_* keys (numeric IDs and named) — published as %/rate/years.
   // Default to 1dp so values like life expectancy 80.6 don't render as "81".
@@ -4401,14 +4475,23 @@ function showWard(wn) {
     { k:'census_over65_pct',       l:'65+',    v:inds.census_over65_pct,       c:'#a05a9e' },
   ]);
 
-  // Ward sidebar profile: WARD-LEVEL FIELDS ONLY. LSOA-level fields belong
-  // in the LSOA profile (clicking a single LSOA), not here. The CATS config
-  // tags every field with .g ('ward' or 'lsoa'); we filter on that.
+  // Ward sidebar profile: fields that carry a real ward figure.
+  //
+  // That means natively-ward fields, plus LSOA-native ones the pipeline
+  // population-weights onto wards — air quality and transport access are
+  // built per LSOA and aggregated, so a ward figure exists and is meaningful.
+  // The test is deliberately not "has a ward level", because the Fingertips
+  // sets declare lv:["ward","msoa"] and would put roughly six hundred rows in
+  // this panel, each repeating one borough figure across every ward in it.
+  // The pill still reads 'lsoa', which is the honest label: this is LSOA data
+  // shown at ward level, not something published per ward.
+  //
   // Only the first category starts open. All six expanded put roughly eighty
   // rows in the panel before the user had asked for any of them, and the ones
   // below the fold were unreachable without scrolling past the rest.
   const cats = CATS.map((cat, catIdx) => {
-    const wardFields = cat.fields.filter(f => f.g === 'ward');
+    const wardFields = cat.fields.filter(f =>
+      f.g === 'ward' || (f.g === 'lsoa' && ovHasLevel(f.k, 'ward')));
     const rows = wardFields.map(f => {
       const val = inds[f.k];
       if (val === null || val === undefined || val === '') return '';
@@ -4464,6 +4547,7 @@ function showWard(wn) {
     ${cats || '<div class="data-note">No indicator data — run fetch_all_data.py and re-upload ward_data.json</div>'}
     <div class="data-note">
       <span class="gpill gpill-ward">ward</span> = ward level &nbsp;
+      <span class="gpill gpill-lsoa">lsoa</span> = LSOA data, population-weighted to this ward &nbsp;
       <span class="gpill gpill-msoa">msoa</span> = MSOA (approximate) &nbsp;
       <span class="gpill gpill-la">la</span> = borough level<br>
       Crime data: police.uk · Claimants: DWP · Health: OHID Fingertips
@@ -6478,6 +6562,14 @@ function showLSOA(feat) {
     // Environment & access
     const envRows = [
       row('fuel_poverty_pct', 'Fuel poverty (%) (DESNZ LILEE)'),
+      row('no2_ugm3',  'Nitrogen dioxide NO₂ (µg/m³)'),
+      row('pm25_ugm3', 'Fine particulates PM2.5 (µg/m³)'),
+      row('pm10_ugm3', 'Particulates PM10 (µg/m³)'),
+      row('ptal_score', 'Transport accessibility (PTAL, 0–8)'),
+      row('rail_station_dist_m', 'Walk to nearest station (m)'),
+      row('rail_stations_1km',   'Stations within 1 km'),
+      row('bus_stop_dist_m',     'Walk to nearest bus stop (m)'),
+      row('bus_stops_800m',      'Bus stops within 800 m'),
     ].filter(Boolean).join('');
     if (envRows) {
       envLsoaBlock = `<div class="cat-block">
@@ -8004,8 +8096,18 @@ document.querySelectorAll('#dl-seg button').forEach(b => {
     // default because it is the view people expect and almost everything
     // reaches it; anything that does not opens at the level it is published at,
     // rather than on a ward map it cannot shade.
+    //
+    // Staying put comes first. The air quality and transport indicators are
+    // the first here to carry figures at BOTH ward and LSOA, and the #ov
+    // handler deliberately leaves the LSOA layer up for those. Defaulting to
+    // 'ward' regardless would then flip the badge to Ward without moving the
+    // map, so the legend would describe the ward spread while the polygons on
+    // screen are LSOAs — the badge contradicting what is being looked at.
+    const cur = (typeof currentDataLevel !== 'undefined') ? currentDataLevel : 'ward';
     let lv = 'ward';
-    if (typeof ovHasLevel === 'function' && !ovHasLevel(k, 'ward')) {
+    if (typeof ovHasLevel === 'function' && ovHasLevel(k, cur)) {
+      lv = cur;
+    } else if (typeof ovHasLevel === 'function' && !ovHasLevel(k, 'ward')) {
       lv = (typeof ovNativeLevel === 'function' && ovNativeLevel(k))
         || (typeof ovLevels === 'function' && ovLevels(k)[0])
         || 'ward';
@@ -10037,6 +10139,19 @@ loadData();
     gb_commitment_pct: 'high-good',         green_commitment_pct: 'high-good',
     green_doorstep_pct: 'high-good',        green_local_pct: 'high-good',
     green_neighbourhood_pct: 'high-good',   blue_commitment_pct: 'high-good',
+    // Air quality: more of any pollutant is worse.
+    no2_ugm3: 'high-bad',                   pm25_ugm3: 'high-bad',
+    pm10_ugm3: 'high-bad',
+    // Transport. A distance is a walk, so longer is worse; a count within a
+    // radius is the other way round.
+    rail_station_dist_m: 'high-bad',        bus_stop_dist_m: 'high-bad',
+    rail_stations_1km: 'high-good',         bus_stops_800m: 'high-good',
+    // MUST be listed here. ptal_score ends in _score, and the fallback below
+    // reads that shape as an IMD domain score and returns 'high-bad'. PTAL is
+    // the opposite: 8 is the best-connected band. Without this entry Compare
+    // mode paints the best-served wards red and calls them worse, which is the
+    // exact inversion the rest of this map was corrected to stop making.
+    ptal_score: 'high-good',
   };
   function polarityOf(k) {
     if (POLARITY[k]) return POLARITY[k];

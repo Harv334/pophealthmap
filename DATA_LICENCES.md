@@ -21,6 +21,32 @@ If you reuse this project's outputs, carry these attributions with them.
 > Contains Royal Mail data © Royal Mail copyright and database right 2026
 > Contains National Statistics data © Crown copyright and database right 2026
 
+**Transport for London** is the one source here that is *not* under OGL v3. It
+is licensed under **version 2.0 of the Open Government Licence with specific
+amendments for Transport for London**, and it requires all three of these
+statements to be reproduced:
+
+> Powered by TfL Open Data
+>
+> Contains OS data © Crown copyright and database rights 2016
+>
+> Geomni UK Map data © and database rights [2019]
+
+TfL's terms state that failure to comply with the attribution conditions
+terminates the licence automatically, so these three lines are not optional and
+must travel with any reuse of the station and stop measures. The same terms cap
+requests at 500 per minute per feed; the pipeline makes 43 calls per run and
+paces itself well inside that.
+
+**Defra UK-AIR** prescribes its own citation, which should be reproduced:
+
+> © Crown copyright Defra via uk-air.defra.gov.uk, licenced under the Open
+> Government Licence (OGL).
+
+The PCM landing page also asks, more loosely, that you "acknowledge Defra as
+the source for this data if using the maps for your work". Name both Defra and
+uk-air.defra.gov.uk; the site asks for the domain as well as the department.
+
 ## Source by source
 
 | Data | Publisher | Licence | Notes |
@@ -36,7 +62,9 @@ If you reuse this project's outputs, carry these attributions with them.
 | Claimant count, DWP benefits | DWP and ONS, via Nomis | OGL v3 | |
 | Sub-regional fuel poverty | DESNZ | OGL v3 | |
 | Access to green and blue space | Defra, with ONS, OS and Natural England | OGL v3 | Official statistic in development |
-| PTAL | Greater London Authority, London Datastore | OGL v3 | |
+| Background air quality (NO₂, PM2.5, PM10) | Defra UK-AIR, Pollution Climate Mapping | OGL v3 | Modelled, not measured. Acknowledge Defra as the source, per the wording above |
+| Stops and stations (distances, counts) | Transport for London, Unified API | **OGL v2 with TfL amendments** | Not OGL v3. Requires all three attribution statements above, or the licence terminates |
+| PTAL | Greater London Authority, London Datastore | OGL v3 | TfL's accessibility banding, republished by the GLA in the LSOA Atlas |
 | Street crime | data.police.uk (Home Office) | OGL v3 | |
 | Charity register | Charity Commission for England and Wales | OGL v3 | |
 | Basemap tiles | OpenStreetMap contributors | ODbL 1.0 | Attribution rendered by the map itself |
