@@ -2358,7 +2358,7 @@ const OV_CFG = {
   crime_total:                     { lo:"Fewer", hi:"More",   wh:true,  min:200,  max:5000 },
   // MPS 12-month crime breakdowns by Home Office major category. Higher = worse
   // (more reported crimes), so wh:true. Ranges chosen at roughly the p95 of the
-  // observed NWL ward distribution to avoid extreme outliers (e.g. West End)
+  // observed London ward distribution to avoid extreme outliers (e.g. West End)
   // crushing the colour ramp. Sexual offences is ward-only (data protection
   // means it's not published at LSOA).
   crime_arson_12mo:                { lo:"Fewer", hi:"More",   wh:true,  min:0,    max:200  },
@@ -3379,7 +3379,7 @@ function vcsePopupHtml(r) {
   const tags = (r.wt || []).slice(0, 4).join(' · ') || '-';
   const who  = (r.ot || []).slice(0, 3).join(' · ');
   const web  = r.w ? `<div class="pop-row"><div class="pop-key">Web</div><a href="${r.w.startsWith('http')?r.w:'https://'+r.w}" target="_blank" rel="noopener" style="color:#185FA5;text-decoration:none;word-break:break-all">${r.w}</a></div>` : '';
-  const cov  = (r.cv || []).length ? `<div class="pop-row"><div class="pop-key">Covers</div>${r.cv.length} NWL borough${r.cv.length===1?'':'s'}</div>` : '';
+  const cov  = (r.cv || []).length ? `<div class="pop-row"><div class="pop-key">Covers</div>${r.cv.length} London borough${r.cv.length===1?'':'s'}</div>` : '';
   return `<div class="pop-hdr" style="background:${color}">${r.n||'-'}</div>
     <div class="pop-body">
       <div class="pop-addr">${r.a||'Address not listed'}</div>
@@ -3732,9 +3732,14 @@ const wardBoundaryLyr = L.geoJSON(GJ, {
 
 // VCSE cluster layer
 // Data source: vcse_data.json (Charity Commission bulk extract).
-// Default mappable cut = explicit NWL borough tick AND geocoded HQ in NWL.
-// London-wide / HQ-outside-NWL / no-geocode are kept in VCSE_ALL for future
-// sidebar filters, not pinned by default.
+// Default mappable cut = an explicit London borough in the charity's own
+// area-of-operation list AND a geocoded HQ inside London. Charities with no
+// geocode stay in VCSE_ALL for the sidebar filters rather than being pinned,
+// because a marker needs a position and a borough tick is not one.
+//
+// This read "NWL borough" and "HQ in NWL" until now, from when the map was
+// eight boroughs. The filter itself was widened to all 33 some time ago; the
+// comment was not, and so described a cut that had stopped happening.
 const vcseCluster = L.markerClusterGroup({
   maxClusterRadius: 40,
   showCoverageOnHover: false,
@@ -4802,8 +4807,15 @@ window.generateWardReport = function(wn, opts) {
 
   const inds = (wdata && wdata.indicators) || {};
 
-  // ── Helpers: NWL-wide reference stats so the report can frame this ward
+  // ── Helpers: London-wide reference stats so the report can frame this ward
   //     against its peers (median, percentile). All wards live in WARD_DATA.
+  //
+  //     These read every ward in WARD_DATA, which has been all 704 London
+  //     wards since the map went London-wide. The labels said NWL for a long
+  //     time after that, so a downloaded ward report stated, specifically and
+  //     confidently, that it had been compared against 168 North West London
+  //     wards. The arithmetic was right the whole time; only the words were
+  //     wrong, which is the harder kind of error to notice.
   const _ALL_WARDS = Object.values(WARD_DATA);
   const _wardVals = (k) => _ALL_WARDS
     .map(w => parseFloat((w.indicators || {})[k]))
@@ -4827,7 +4839,7 @@ window.generateWardReport = function(wn, opts) {
   const _fmtN = (v, dp) => (v == null ? '—' : v.toLocaleString(undefined, {maximumFractionDigits: dp == null ? 1 : dp}));
 
   // ── Inline-SVG chart primitives ────────────────────────────────────────
-  // Horizontal bar chart with optional reference tick (NWL median).
+  // Horizontal bar chart with optional reference tick (London median).
   // rows: [{ l: label, v: value, ref?: median, c?: bar-colour, sub?: trailing text }]
   // opts: { width, rowH, padL, max, unit, dp, refLabel }
   function _chartHbar(rows, opts) {
@@ -4859,7 +4871,7 @@ window.generateWardReport = function(wn, opts) {
       } else {
         svg += `<text x="${padL + 4}" y="${y + 3.5}" font-size="10" fill="#bbb">no data</text>`;
       }
-      // NWL median reference tick
+      // London median reference tick
       if (r.ref != null && !isNaN(r.ref)) {
         const rx = padL + (Math.max(0, r.ref) / dmax) * barW;
         svg += `<line x1="${rx}" y1="${y - 8}" x2="${rx}" y2="${y + 7}" stroke="#1a1a1a" stroke-width="1.4" stroke-dasharray="2,1.5"/>`;
@@ -4869,7 +4881,7 @@ window.generateWardReport = function(wn, opts) {
     return svg;
   }
 
-  // Side-by-side compare bar (ward vs NWL median) — single label.
+  // Side-by-side compare bar (ward vs London median) — single label.
   function _chartCompare(rows, opts) {
     opts = opts || {};
     const W = opts.width || 360;
@@ -4938,7 +4950,7 @@ window.generateWardReport = function(wn, opts) {
       const [x, y] = pt(i, 1);
       svg += `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="#e8e8e2" stroke-width="0.8"/>`;
     });
-    // NWL median ring (if refs present)
+    // London median ring (if refs present)
     const hasRef = data.some(a => a.ref != null);
     if (hasRef) {
       const refPts = data.map((a, i) => pt(i, (a.ref || 0) / a.max).join(',')).join(' ');
@@ -5075,7 +5087,7 @@ window.generateWardReport = function(wn, opts) {
   const _vcse     = _bySpatial(typeof vcseData !== 'undefined' ? vcseData : []);
   const _green    = _bySpatial(typeof GRN !== 'undefined' ? GRN : []);
 
-  // Headline stats (ward-level only) + NWL reference values for context
+  // Headline stats (ward-level only) + London reference values for context
   const popN     = _fmt(inds.census_population);
   const goodHlt  = _fmt(inds.census_good_health_pct);
   const badHlt   = _fmt(inds.census_bad_health_pct);
@@ -5095,7 +5107,7 @@ window.generateWardReport = function(wn, opts) {
   const borough = (wdata && wdata.lad) || '';
   const population = popN ? popN.toLocaleString() : '—';
 
-  // ── KPI helper: large stat card with optional NWL-percentile micro-bar ──
+  // ── KPI helper: large stat card with optional London-percentile micro-bar ──
   const _kpi = (lbl, val, sub, extra) => {
     const dim = (val == null || val === '' || val === '—');
     return `<div class="kpi">
@@ -5105,7 +5117,7 @@ window.generateWardReport = function(wn, opts) {
       ${extra || ''}
     </div>`;
   };
-  // Build a tiny "you are here" bar showing where this ward sits in NWL
+  // Build a tiny "you are here" bar showing where this ward sits in London
   const _ctxBar = (pctile, polarity) => {
     if (pctile == null) return '';
     // polarity: 'lower-better' → green left, red right; 'higher-better' → reversed
@@ -5115,11 +5127,11 @@ window.generateWardReport = function(wn, opts) {
       <div class="kpi-ctx-bar" style="background:linear-gradient(90deg,${left},#f0c14a,${right})">
         <div class="kpi-ctx-tick" style="left:${pctile}%"></div>
       </div>
-      <div class="kpi-ctx-cap">P${pctile} in NWL</div>
+      <div class="kpi-ctx-cap">P${pctile} in London</div>
     </div>`;
   };
 
-  // ── Demographics: ethnicity + age stacked bars, plus ward-vs-NWL compare ──
+  // ── Demographics: ethnicity + age stacked bars, plus ward-vs-London compare ──
   const ethStack = _chartStack([
     { l:'White', v: inds.census_white_pct,        c:'#5b8db8' },
     { l:'Asian', v: inds.census_asian_pct,        c:'#d47a2c' },
@@ -5148,7 +5160,7 @@ window.generateWardReport = function(wn, opts) {
   // 7-domain IMD radar — aggregate LSOA-level domain scores up to ward level
   // by taking the mean across the ward's LSOAs. The LSOA → ward_code mapping
   // lives in LSOA_IMD.features (built from the ONS WD24 best-fit lookup).
-  // NWL reference ring = mean across all 1,183 NWL LSOAs.
+  // Reference ring = mean across every London LSOA in LSOA_DATA.
   const _IMD_DOMAINS = [
     { k:'income_score',      l:'Income' },
     { k:'employment_score',  l:'Employment' },
@@ -5213,7 +5225,7 @@ window.generateWardReport = function(wn, opts) {
     { l:'Claimant rate (16-64)', v: inds.claimant_rate_pct,             ref: _median(_wardVals('claimant_rate_pct')),             wh: true,  dp: 1 },
   ], { width: 380 });
 
-  // ── Crime breakdown — 11 MPS categories sorted descending, NWL median tick ──
+  // ── Crime breakdown — 11 MPS categories sorted descending, London median tick ──
   const crimeCats = [
     { k:'crime_violence_12mo',          l:'Violence' },
     { k:'crime_asb_12mo',               l:'Anti-social behaviour' },
@@ -5337,7 +5349,7 @@ window.generateWardReport = function(wn, opts) {
     return `<div class="${cls}"><h4>${_esc(title)} <span class="count">${items.length}</span></h4><ol>${lis}</ol></div>`;
   }
 
-  // Build IMD composite KPI with rank-in-NWL context
+  // Build IMD composite KPI with rank-in-London context
   const imdRank = (() => {
     if (imdW == null) return null;
     const ws = _wardVals('imd_score').sort((a,b) => b - a); // highest first
@@ -5453,7 +5465,7 @@ window.generateWardReport = function(wn, opts) {
     <div class="hero-text">
       <div class="kicker">London ward profile · ${_esc(today)}</div>
       <h1>${_esc(wdata ? wdata.name : wn)}</h1>
-      <div class="sub">${_esc(borough)}${borough && population !== '—' ? ' · ' : ''}${population !== '—' ? 'Population ' + population : ''}${imdRank ? ' · IMD rank ' + imdRank + ' of ' + totalWards + ' NWL wards' : ''}</div>
+      <div class="sub">${_esc(borough)}${borough && population !== '—' ? ' · ' : ''}${population !== '—' ? 'Population ' + population : ''}${imdRank ? ' · IMD rank ' + imdRank + ' of ' + totalWards + ' London wards' : ''}</div>
       <div class="badges">
         ${core20Badge}
         ${imdW != null ? `<span class="badge imd">IMD score ${imdW.toFixed(1)}</span>` : ''}
@@ -5504,9 +5516,9 @@ window.generateWardReport = function(wn, opts) {
     </div>
     <div class="row">
       <div class="panel" style="flex:1">
-        <h3>Demographic indicators vs NWL median</h3>
+        <h3>Demographic indicators vs London median</h3>
         ${compareCensus}
-        <div class="legend"><span class="legend-tick"></span> NWL median · <span style="color:#c9534a">red</span> = concern, <span style="color:#2c8a4a">green</span> = strength</div>
+        <div class="legend"><span class="legend-tick"></span> London median · <span style="color:#c9534a">red</span> = concern, <span style="color:#2c8a4a">green</span> = strength</div>
       </div>
     </div>
 
@@ -5515,12 +5527,12 @@ window.generateWardReport = function(wn, opts) {
       <div class="panel" style="flex:0 0 280px">
         <h3>IMD 2025 — 7-domain radar</h3>
         ${radarSVG}
-        <div class="legend">Red polygon = ward (mean of ${_wardLSOACodes.length} LSOAs) · dashed = NWL LSOA mean · axes normalised to NWL max</div>
+        <div class="legend">Red polygon = ward (mean of ${_wardLSOACodes.length} LSOAs) · dashed = London LSOA mean · axes normalised to London max</div>
       </div>
       <div class="panel" style="flex:1">
-        <h3>Health &amp; economic indicators vs NWL median</h3>
+        <h3>Health &amp; economic indicators vs London median</h3>
         ${healthBars}
-        <div class="legend"><span class="legend-tick"></span> NWL median &nbsp;·&nbsp; bar colour shows direction (red = concern, green = strength)</div>
+        <div class="legend"><span class="legend-tick"></span> London median &nbsp;·&nbsp; bar colour shows direction (red = concern, green = strength)</div>
       </div>
     </div>
 
@@ -5529,7 +5541,7 @@ window.generateWardReport = function(wn, opts) {
       <div class="panel" style="flex:1">
         <h3>MPS recorded crime — Apr 2025 to Mar 2026</h3>
         ${crimeSVG}
-        <div class="legend"><span class="legend-tick"></span> NWL median · sorted by ward count · source: data.police.uk street-level crime</div>
+        <div class="legend"><span class="legend-tick"></span> London median · sorted by ward count · source: data.police.uk street-level crime</div>
       </div>
     </div>` : ''}
   </div>
@@ -5553,7 +5565,7 @@ window.generateWardReport = function(wn, opts) {
 
   <div class="footer">
     <strong>Data sources:</strong> ONS Census 2021 (demographics, health, household language, travel-to-work) · MHCLG Indices of Deprivation 2025, mid-2022 population-weighted · data.police.uk street-level crime (crime, Apr 2025 – Mar 2026) · DESNZ LILEE (fuel poverty) · NOMIS / DWP (claimant count, working-age) · NHS Digital ODS (GP, pharmacy, dental practice registers) · DfE GIAS (schools) · GLA ESOL Planning Map (community centres, libraries, formal ESOL providers).
-    <div style="margin-top:6px">Service counts use ward_code attribution where present (schools, community centres, libraries) and spatial test against the ward polygon otherwise (hospitals, dental, ESOL, VCSE). GP and pharmacy counts come from the ward indicator. "vs NWL median" bars use the median across all 168 NWL wards. "NWL percentile" = % of NWL wards below this ward on that indicator.</div>
+    <div style="margin-top:6px">Service counts use ward_code attribution where present (schools, community centres, libraries) and spatial test against the ward polygon otherwise (hospitals, dental, ESOL, VCSE). GP and pharmacy counts come from the ward indicator. &quot;vs London median&quot; bars use the median across every London ward that has a figure for that indicator — ${_ALL_WARDS.length.toLocaleString()} wards are on the map, and an indicator published at a coarser geography, or missing for the City, is compared against fewer. &quot;London percentile&quot; = % of those wards below this one.</div>
   </div>
 </div>
 <div class="actions">
@@ -6971,7 +6983,7 @@ function showLSOA(feat) {
 // ─────────────────────────────────────────────────────────────────────────
 // ─────────────────────────────────────────────────────────────────────────
 // LSOA report — A4 dense profile (mirrors ward report design).
-// Charts inline SVG; reference values computed across all 1,183 NWL LSOAs.
+// Charts inline SVG; reference values computed across every London LSOA.
 // ─────────────────────────────────────────────────────────────────────────
 window.generateLSOAReport = function(code) {
   const feat = (LSOA_IMD && LSOA_IMD.features) ?
@@ -7313,7 +7325,7 @@ window.generateLSOAReport = function(code) {
       <div class="kpi-ctx-bar" style="background:linear-gradient(90deg,${left},#f0c14a,${right})">
         <div class="kpi-ctx-tick" style="left:${pctile}%"></div>
       </div>
-      <div class="kpi-ctx-cap">P${pctile} in NWL</div>
+      <div class="kpi-ctx-cap">P${pctile} in London</div>
     </div>`;
   };
 
@@ -7509,9 +7521,9 @@ window.generateLSOAReport = function(code) {
     </div>
     <div class="row">
       <div class="panel" style="flex:1">
-        <h3>Demographic indicators vs NWL LSOA median</h3>
+        <h3>Demographic indicators vs London LSOA median</h3>
         ${compareCensus}
-        <div class="legend"><span class="legend-tick"></span> NWL median (1,183 LSOAs) · <span style="color:#c9534a">red</span> = concern, <span style="color:#2c8a4a">green</span> = strength</div>
+        <div class="legend"><span class="legend-tick"></span> London median (${_ALL_LSOAS.length.toLocaleString()} LSOAs) · <span style="color:#c9534a">red</span> = concern, <span style="color:#2c8a4a">green</span> = strength</div>
       </div>
     </div>
 
@@ -7520,10 +7532,10 @@ window.generateLSOAReport = function(code) {
       <div class="panel" style="flex:0 0 280px">
         <h3>IMD 2025 — 7-domain radar</h3>
         ${imdRadar}
-        <div class="legend">Red polygon = this LSOA · dashed = NWL LSOA median · axes normalised to NWL max</div>
+        <div class="legend">Red polygon = this LSOA · dashed = London LSOA median · axes normalised to London max</div>
       </div>
       <div class="panel" style="flex:1">
-        <h3>Health &amp; economic indicators vs NWL LSOA median</h3>
+        <h3>Health &amp; economic indicators vs London LSOA median</h3>
         ${healthBars}
       </div>
     </div>
@@ -7542,7 +7554,7 @@ window.generateLSOAReport = function(code) {
       <div class="panel" style="flex:1">
         <h3>MPS recorded crime — Apr 2025 to Mar 2026</h3>
         ${crimeSVG}
-        <div class="legend"><span class="legend-tick"></span> NWL LSOA median · sorted by this LSOA's count · sexual offences not published at LSOA level</div>
+        <div class="legend"><span class="legend-tick"></span> London LSOA median · sorted by this LSOA's count · sexual offences not published at LSOA level</div>
       </div>
     </div>` : ''}
   </div>
@@ -7565,7 +7577,7 @@ window.generateLSOAReport = function(code) {
 
   <div class="footer">
     <strong>Data sources:</strong> MHCLG Indices of Deprivation 2025 (LSOA-level, all 7 domains) · ONS Census 2021 (NOMIS topic-summary tables) · data.police.uk street-level crime (crime, Apr 2025 – Mar 2026, 10 categories at LSOA level — sexual offences not published) · DESNZ LILEE (fuel poverty) · NOMIS / DWP (claimant rate) · Defra ANGSt / Friends of the Earth (green &amp; blue space, 2023) · NHS Digital ODS, GLA ESOL Planning Map, DfE GIAS (services).
-    <div style="margin-top:6px">Service counts use spatial point-in-polygon test against this LSOA's boundary. "vs NWL median" bars compute against all 1,183 NWL LSOAs.</div>
+    <div style="margin-top:6px">Service counts use spatial point-in-polygon test against this LSOA's boundary. &quot;vs London median&quot; bars compute against every London LSOA that has a figure for that indicator, out of ${_ALL_LSOAS.length.toLocaleString()} on the map.</div>
   </div>
 </div>
 <div class="actions">
@@ -9040,7 +9052,7 @@ function _runSearch(q) {
 // PNG: produces a PowerPoint-ready snapshot of the London footprint (or
 // the currently-focused borough). Procedure:
 //   1. Save the user's current map view (center + zoom).
-//   2. Fit the map to the in-scope polygon bounds (NWL or one borough).
+//   2. Fit the map to the in-scope polygon bounds (all London, or one borough).
 //   3. Apply a white mask so everything outside the polygon is white.
 //   4. Wait for basemap tiles + overlays to settle.
 //   5. html2canvas the map div.
@@ -9229,7 +9241,7 @@ async function _downloadMapPng(opts) {
     if (dlBadge) dlBadge.style.visibility = 'hidden';
     ctrlCorners.forEach(el => { el.style.visibility = 'hidden'; });
 
-    // Step 1: optionally fit the map to a scope (NWL or focused borough).
+    // Step 1: optionally fit the map to a scope (all London, or focused borough).
     // 'wysiwyg' mode skips this entirely — the user keeps whatever pan/zoom
     // they have on screen.
     let scopeBounds = null;
@@ -9620,7 +9632,7 @@ function _exportDialog(title, options, extras) {
 
 // ── Prepare-for-screenshot mode ─────────────────────────────────────────
 // User-driven manual screenshot. We:
-//   1. Fit the map to the chosen scope (NWL or focused borough), or skip
+//   1. Fit the map to the chosen scope (all London, or focused borough), or skip
 //      fitBounds if 'wysiwyg'.
 //   2. Paint a white Leaflet polygon overlay over everything outside the
 //      scope (uses Leaflet's projection — always lines up with basemap).
