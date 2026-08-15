@@ -422,7 +422,21 @@
      At 500px of viewport the sidebar was taking 220 of them, permanently, and
      the ward bar covered 65% of what was left, so the map, which is the thing
      being looked at, had about a quarter of the screen. */
-  @media (max-width: 760px) {
+  /* 900px, not 760px. Below this the sidebar becomes a drawer and the map gets
+     the whole width.
+
+     760px cleared phones but left tablet portrait docked: an iPad at 834px
+     gave 267px to the sidebar and 534px to the map, and since the map is
+     also taller than it is wide at that size, London ended up filling 15.7%
+     of it — the worst of any screen size tested, worse than a phone. A tablet
+     held upright is the one shape where a docked sidebar costs the most and
+     buys the least, because there is width to spare in neither direction.
+
+     This value is repeated in three matchMedia calls further down, which
+     decide the bottom-sheet heights and the drawer behaviour. They have to
+     agree with this block or the sheet sizes itself for a layout that is not
+     on screen. Change all four together. */
+  @media (max-width: 900px) {
     .main { grid-template-columns: minmax(0, 1fr); }
 
     /* Flex rather than grid: the named grid areas assume a fixed set of
@@ -492,9 +506,27 @@
     .sb-tools .tb-sep { display: none; }
 
     /* Five modes will not fit across a phone, so the rail scrolls instead of
-       silently losing the ones on the end. */
+       silently losing the ones on the end.
+
+       Scrolling alone was not enough. The scrollbar is hidden here (it has to
+       be — a permanent grey bar under the tabs looks like a broken border),
+       so at 390px the rail held 455px of buttons with 65px off the end,
+       "Directory" sliced mid-word, and nothing on screen saying there was
+       more. It read as a rendering fault rather than as a scrollable strip.
+
+       The shadows below are the standard background-attachment trick: the two
+       `local` layers scroll with the content and sit on top of the two
+       `scroll` layers, so each shadow is covered exactly when that end is
+       reached. It costs no JavaScript and cannot fall out of sync with the
+       scroll position, which a class-toggling listener eventually does. */
     .mode-rail { overflow-x: auto; flex-wrap: nowrap; padding: 0 10px;
-      scrollbar-width: none; -ms-overflow-style: none; }
+      scrollbar-width: none; -ms-overflow-style: none;
+      background:
+        linear-gradient(to right, var(--paper) 40%, rgba(255,255,255,0)) left center / 26px 100% no-repeat local,
+        linear-gradient(to left,  var(--paper) 40%, rgba(255,255,255,0)) right center / 26px 100% no-repeat local,
+        linear-gradient(to right, rgba(33,43,50,.16), rgba(33,43,50,0)) left center / 14px 100% no-repeat scroll,
+        linear-gradient(to left,  rgba(33,43,50,.16), rgba(33,43,50,0)) right center / 14px 100% no-repeat scroll,
+        var(--paper); }
     .mode-rail::-webkit-scrollbar { display: none; }
     .mode-btn { flex: 0 0 auto; padding: 10px 11px 9px; font-size: 12.5px; }
 
@@ -1268,7 +1300,7 @@
      with the rest of the responsive block left .cmp-bar on its desktop insets
      and .cmp-cards at four across on a phone. They belong after what they
      override, not next to what they relate to. */
-  @media (max-width: 760px) {
+  @media (max-width: 900px) {
     /* ── The ward bar as a real mobile sheet ──
        It opened at full height, which on a phone put a 342px panel over a
        683px map and covered nearly half of it before you had asked for
@@ -1540,7 +1572,7 @@
           <div class="sb-lbl">Point layers</div>
           <label class="lrow"><div class="ldot" style="background:#185FA5"></div><span class="lname">GP practices <span class="lcount" id="gp-count">0</span></span><input type="checkbox" id="tg"></label>
           <label class="lrow"><div class="ldot" style="background:#A32D2D"></div><span class="lname">Hospitals &amp; clinics <span class="lcount" id="hosp-count">0</span></span><input type="checkbox" id="th"></label>
-          <label class="lrow"><div class="ldot" style="background:#2E7D32"></div><span class="lname">Parks &amp; greenspaces <span class="lcount" id="greenspace-count">0</span></span><input type="checkbox" id="tgr"></label>
+          <label class="lrow"><div class="ldot" style="background:#2E7D32"></div><span class="lname">Parks &amp; greenspaces <span class="lcount" id="greenspace-count"></span></span><input type="checkbox" id="tgr"></label>
           <div id="greenspace-legend" style="display:none;margin:2px 0 6px 18px;padding:4px 6px;background:#f7f9f7;border-radius:4px">
             <div style="font-size:10px;color:#666;margin-bottom:3px">OS Open Greenspace categories</div>
             <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 6px;font-size:10px;line-height:1.2">
@@ -1600,8 +1632,8 @@
             </select>
           </div>
           <label class="lrow"><div style="width:9px;height:9px;border:1.5px solid #000;border-radius:2px;flex-shrink:0"></div><span class="lname">Ward boundaries <span class="lcount" id="ward-count">704</span></span><input type="checkbox" id="tnw" checked></label>
-          <label class="lrow"><div style="width:9px;height:9px;border:1.5px solid #7A2E8E;border-radius:2px;flex-shrink:0"></div><span class="lname">MSOA boundaries <span class="lcount" id="msoa-count">0</span></span><input type="checkbox" id="tmsoa"></label>
-          <label class="lrow"><div style="width:9px;height:9px;border:1.5px solid #1E4B8E;border-radius:2px;flex-shrink:0"></div><span class="lname">LSOA boundaries <span class="lcount" id="lsoa-count">0</span></span><input type="checkbox" id="tlsoa"></label>
+          <label class="lrow"><div style="width:9px;height:9px;border:1.5px solid #7A2E8E;border-radius:2px;flex-shrink:0"></div><span class="lname">MSOA boundaries <span class="lcount" id="msoa-count"></span></span><input type="checkbox" id="tmsoa"></label>
+          <label class="lrow"><div style="width:9px;height:9px;border:1.5px solid #1E4B8E;border-radius:2px;flex-shrink:0"></div><span class="lname">LSOA boundaries <span class="lcount" id="lsoa-count"></span></span><input type="checkbox" id="tlsoa"></label>
           <label id="lsoa-imd-row" class="lrow" style="display:none;margin-left:18px;padding:3px 0 0"><div id="imd-row-swatch" style="width:9px;height:9px;border-radius:2px;flex-shrink:0"></div><span class="lname" style="font-size:11px">Colour by IMD decile</span><input type="checkbox" id="tlsoa-imd"></label>
           <div id="lsoa-filter-row" style="display:none;margin:4px 0 0 18px">
             <div style="margin-top:6px;display:flex;align-items:center;gap:2px;font-size:10px;color:#666">
@@ -2134,8 +2166,14 @@
         Some wards may show no fill — OHID Fingertips suppresses MSOA values where small counts could risk identifying individuals.
         <button id="fingertips-banner-close" title="Dismiss this notice for this session">&times;</button>
       </div>
-      <div class="dl-badge" id="dl-badge" role="group" aria-label="Data level filter">
-        <span class="dl-badge-label">Viewing</span>
+      <!-- "Area level", not "Viewing". The strip in the top-left corner of the
+           same map is already labelled Viewing, and it answers a different
+           question: that one is WHERE (All of London, or one borough), this
+           one is HOW FINE (borough, ward, MSOA, LSOA). Two controls a few
+           hundred pixels apart carrying the same word made the second one
+           look like a restatement of the first rather than a separate axis. -->
+      <div class="dl-badge" id="dl-badge" role="group" aria-label="Area level">
+        <span class="dl-badge-label">Area level</span>
         <div class="dl-seg" id="dl-seg">
           <button type="button" data-dl="borough" title="Borough level. The main Fingertips series is published per local authority, so this is the level those figures are actually measured at rather than repeated across every ward.">Borough</button>
           <button type="button" data-dl="ward" class="active" title="Ward-level data (704 wards)">Ward</button>
@@ -3266,7 +3304,29 @@ LSOA_IMD.features.forEach(f => {
 // MAP SETUP
 // ═══════════════════════════════════════════════════════════════════════════
 // Start zoomed out at London ward level — fitBounds on wLyr refines once wards load.
-const map = L.map('map', { center:[51.540,-0.300], zoom:10, zoomControl:true });
+//
+// zoomSnap matters more here than it looks. Leaflet defaults it to 1, which
+// means fitBounds can only land on a whole zoom level and therefore rounds
+// DOWN to the nearest one. London's ideal fit is around 10.5, so it settled on
+// 10 and threw away half a zoom level — and half a zoom level is twice the
+// area. Measured before this change, London filled 38% of the map on a
+// 1440x900 desktop and 15.7% on an 834x1112 tablet, the rest being Chelmsford
+// and Brighton. At 0.25 it fits properly: 54% and 31%.
+//
+// The reason this survived so long is that the waste depends entirely on where
+// the ideal zoom happens to fall. On a 1280x800 laptop the ideal is a shade
+// over 10, so almost nothing is lost and the map looks correct — which is the
+// size it was presumably built at.
+//
+// zoomDelta is deliberately left at its default of 1. Only fitBounds needs the
+// fine grid; the +/- buttons and the keyboard should still move a whole level
+// per press, because a zoom control that advances a quarter of a step at a
+// time reads as an unresponsive one. Fractional snap and whole-step controls
+// are not in conflict — from 10.25 the + button simply goes to 11.25.
+const map = L.map('map', {
+  center:[51.540,-0.300], zoom:10, zoomControl:true,
+  zoomSnap: 0.25,
+});
 // Carto Positron basemap — calm light-grey tiles that let choropleths do the
 // visual work. crossOrigin:'anonymous' is REQUIRED so html2canvas can read
 // tile pixels during PNG export — Carto's CDN sends Access-Control-Allow-
@@ -3392,14 +3452,39 @@ function _updateLayerCounts() {
     };
     if (typeof GPS !== 'undefined' && Array.isArray(GPS)) setIf('gp-count', GPS.length);
     if (typeof HOSP !== 'undefined' && Array.isArray(HOSP)) setIf('hosp-count', HOSP.length);
-    if (typeof grL !== 'undefined' && grL && typeof grL.getLayers === 'function') {
+    // Only report a greenspace count once the layer is actually loaded. It is
+    // fetched lazily, so before the box is ticked getLayers() is legitimately
+    // empty — and writing that 0 into the label told the reader there are no
+    // parks in London, when there are 2,372. A count of nothing and a count
+    // not yet taken are different things and must not render the same.
+    if (typeof grL !== 'undefined' && grL && typeof grL.getLayers === 'function'
+        && grL.getLayers().length) {
       setIf('greenspace-count', grL.getLayers().length);
     }
     if (typeof wLyr !== 'undefined' && wLyr && typeof wLyr.getLayers === 'function') {
       setIf('ward-count', wLyr.getLayers().length);
     }
-    if (typeof lsoaLyr !== 'undefined' && lsoaLyr && typeof lsoaLyr.getLayers === 'function') {
+    // LSOA and MSOA boundaries are lazy too, but unlike greenspaces their
+    // totals are already in memory: the indicator payloads for both levels
+    // load at startup and are keyed by area code. So these can be filled in
+    // truthfully straight away rather than left blank or guessed at, and the
+    // lazy load overwrites them with the layer's own count when it arrives.
+    // Both are declared as {} and filled by a fetch, so "no keys yet" and "no
+    // areas" look identical here. Only a non-empty object is worth reporting:
+    // writing the empty one puts a hard 0 in the label, which is the exact
+    // falsehood this block exists to stop. _updateLayerCounts is idempotent
+    // and is called again when each payload lands.
+    var _n = function (o) {
+      return (o && typeof o === 'object') ? Object.keys(o).length : 0;
+    };
+    if (typeof lsoaLyr !== 'undefined' && lsoaLyr && typeof lsoaLyr.getLayers === 'function'
+        && lsoaLyr.getLayers().length) {
       setIf('lsoa-count', lsoaLyr.getLayers().length);
+    } else if (typeof LSOA_DATA !== 'undefined' && _n(LSOA_DATA)) {
+      setIf('lsoa-count', _n(LSOA_DATA));
+    }
+    if (typeof MSOA_DATA !== 'undefined' && _n(MSOA_DATA)) {
+      setIf('msoa-count', _n(MSOA_DATA));
     }
   } catch (e) { console.warn('_updateLayerCounts failed', e); }
 }
@@ -5441,8 +5526,13 @@ function buildWardLayer() {
   });
   wLyr.addTo(map);
   // Fit to the full London ward set with a maxZoom cap so wards stay visible as
-  // distinct polygons (ward-level view) rather than jumping to a zoomed-in LSOA view.
-  map.fitBounds(wLyr.getBounds(), { padding:[28,28], maxZoom:11 });
+  // distinct polygons (ward-level view) rather than jumping to a zoomed-in LSOA
+  // view. The cap is 12 rather than 11 because with zoomSnap at 0.25 the fit
+  // now lands on fractional levels, and 11 was low enough to bind on a wide
+  // desktop and hold the map out further than it needed to be. Padding is
+  // tighter for the same reason: 28px each side was a visible margin of empty
+  // countryside on top of a fit that was already too far out.
+  map.fitBounds(wLyr.getBounds(), { padding:[18,18], maxZoom:12 });
   if (typeof _updateLayerCounts === 'function') _updateLayerCounts();
 }
 
@@ -5680,7 +5770,7 @@ function _applyBoroughSolo() {
    drawer, or Query and Compare would appear to do nothing at all.
    ═══════════════════════════════════════════════════════════════════════════ */
 (function _narrowDrawer() {
-  const mq = window.matchMedia('(max-width: 760px)');
+  const mq = window.matchMedia('(max-width: 900px)');
   const sidebar = document.getElementById('sidebar');
   const scrim = document.getElementById('sb-scrim');
   const tools = document.getElementById('sb-tools');
@@ -5856,7 +5946,7 @@ function _applyBoroughSolo() {
   // Below MIN the tab strip starts dropping labels; above MAX the map stops
   // being the larger half of the window, which is the wrong way round for a map.
   const MIN = 210, MAX = 560, DEFAULT = 268, KEY = 'phPanelWidth';
-  const mq = window.matchMedia('(max-width: 760px)');
+  const mq = window.matchMedia('(max-width: 900px)');
 
   const grip = document.createElement('button');
   grip.type = 'button';
@@ -9679,6 +9769,9 @@ async function loadData() {
         MSOA_DATA = md;
         for (const k in _msoaRange) delete _msoaRange[k];
         if (msoaLyr) restyleMsoa();
+        // The MSOA boundary layer is lazy, so until this payload lands there is
+        // no honest count to show beside it. Now there is.
+        if (typeof _updateLayerCounts === 'function') _updateLayerCounts();
       });
 
     // Borough indicators, published per local authority. The borough layer is
@@ -9782,8 +9875,26 @@ loadData();
   // sessionStorage, not localStorage: dismissing it should quieten this visit,
   // not hide the caveat from someone returning weeks later.
   try { if (sessionStorage.getItem('devBannerDismissed')) return; } catch (e) {}
-  el.hidden = false;
+
+  var dismissed = false;
+  function show() { if (!dismissed) el.hidden = false; }
+
+  // Take turns with the tour rather than sitting on top of it. The tour is the
+  // landing experience on a first visit and covers about 30% of the map on its
+  // own; this banner added another 8.5% in the same corner, and the two
+  // together meant a first-time visitor's opening view of London was nearly
+  // 40% panel. The tour fires these two events, and the banner is deferred for
+  // the length of it. Both are opt-out and neither is load-bearing, so if the
+  // tour never starts the banner simply shows immediately as before.
+  var deferred = false;
+  window.addEventListener('ph:tour-start', function () { deferred = true; el.hidden = true; });
+  window.addEventListener('ph:tour-end', function () { deferred = false; show(); });
+  // The tour auto-starts from its own load handler, which may run either side
+  // of this one, so settle it on the next frame rather than racing it.
+  setTimeout(function () { if (!deferred) show(); }, 0);
+
   el.querySelector('.dev-x').addEventListener('click', function () {
+    dismissed = true;
     el.hidden = true;
     try { sessionStorage.setItem('devBannerDismissed', '1'); } catch (e) {}
   });
@@ -10340,7 +10451,7 @@ loadData();
   // full, peek, collapsed. The phone gets its own set: a fixed 342px panel is
   // half of a 683px map, and the CSS caps the full state in dvh, so the
   // numbers here have to follow or the lift under it would be wrong.
-  function isNarrow() { return window.matchMedia('(max-width: 760px)').matches; }
+  function isNarrow() { return window.matchMedia('(max-width: 900px)').matches; }
   function stateHeights() {
     return isNarrow()
       ? [Math.round((window.innerHeight || 800) * 0.76), 150, 58]
@@ -11790,12 +11901,19 @@ loadData();
     if (!tourStrip) return;
     tourAt = 0;
     tourStrip.classList.add('open');
+    // The development banner is a separate fixed element that shows itself on
+    // load, so on a first visit both landed at once and between them covered
+    // about 39% of the map — the tour strip 30% and the banner another 8.5%,
+    // measured on a 1280x800 laptop. Neither knew about the other. The banner
+    // waits its turn now and appears when the tour ends.
+    try { window.dispatchEvent(new CustomEvent('ph:tour-start')); } catch (e) {}
     renderTour();
   }
   function tourEnd() {
     if (!tourStrip) return;
     tourAt = -1;
     tourStrip.classList.remove('open');
+    try { window.dispatchEvent(new CustomEvent('ph:tour-end')); } catch (e) {}
     if (mapWrap) {
       mapWrap.classList.remove('touring');
       mapWrap.style.setProperty('--tour-h', '0px');
