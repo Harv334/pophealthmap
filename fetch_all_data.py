@@ -4239,6 +4239,7 @@ MAP_BLOBS = {
     "HOSP":       "hospitals.js",
     "LSOA_IMD":   "lsoa_imd.js",
     "BOROUGH_GJ": "boroughs.js",
+    "PH_IND_STATS": "indicators.js",
 }
 
 def _read_geojson_opt(path: Path):
@@ -4310,6 +4311,115 @@ def write_map_blob(name: str, payload, description: str) -> None:
         f"// so this global is defined by the time any code reads it.\n"
         f"var {name} = {body};\n"
     ))
+
+def build_indicator_stats(ward_data: dict, lsoa_data: dict,
+                          msoa_data: dict, borough_data: dict) -> dict:
+    """
+    Facts about every indicator, measured from the payloads just written.
+
+    This exists because the map's indicator registry is hand-written in
+    index.html — 125 entries of OV_CFG, each needing a min, a max and a
+    polarity — and ovColor() paints an indicator grey if its entry is missing.
+    That is a hard gate: adding the 600 published Fingertips indicators, or QOF
+    at LSOA, would mean hand-writing 600 more. It does not scale, and the
+    hand-written half is where the mistakes live: ptal_score was given the
+    range of a different measure entirely, and nothing noticed because a range
+    is just two numbers that look plausible.
+
+    Three of the four things an entry needs can simply be measured, so they are
+    measured here rather than typed:
+
+      lv    which levels actually carry this indicator. Derived from presence
+            in the payloads, so it cannot drift from the data the way a
+            hand-declared list does.
+      p5/p95 a sane colour range, the same 5th-95th percentile rule
+            getOvRange() already applies at run time, but computed once over
+            the whole payload rather than per session.
+      n/d   how many areas hold a value, and how many DISTINCT values there
+            are. This is the honest answer to "will this indicator actually
+            shade the map at this level". A borough series written onto every
+            ward has 704 areas and 33 distinct values, and that ratio is the
+            difference between a real choropleth and 33 blocks of colour. It
+            is not derivable from the label, and it is the single most useful
+            thing to know before choosing.
+
+    The fourth, polarity, is genuinely semantic and cannot be measured — but it
+    does not have to be guessed either, because Fingertips publishes it. Where
+    scripts/fingertips_metadata.json has an entry, its wh flag is carried
+    through, which is how the 600 can arrive without anyone deciding by hand
+    which direction is bad.
+
+    Deliberately emits FACTS ONLY, no labels, groups or descriptions. Those
+    stay hand-written in index.html where they are edited. Parsing JS object
+    literals out of a 12,000-line HTML file to round-trip them would be a
+    fragile way to gain nothing.
+    """
+    import statistics
+
+    LEVELS = [
+        ("ward",    ward_data.get("wards") or {}, True),
+        ("lsoa",    lsoa_data or {},              False),
+        ("msoa",    msoa_data or {},              False),
+        ("borough", borough_data or {},           False),
+    ]
+    # Keys that are identifiers or labels rather than measurements. Percentiles
+    # over a postcode are meaningless and a range over one would be worse.
+    SKIP = {"name", "code", "lad", "lad_name", "borough", "ward", "lsoa_name",
+            "msoa_name", "ward_code", "pop"}
+
+    stats: dict[str, dict] = {}
+    for level, payload, nested in LEVELS:
+        buckets: dict[str, list] = {}
+        for rec in payload.values():
+            inds = (rec.get("indicators") if nested else rec) or {}
+            if not isinstance(inds, dict):
+                continue
+            for k, v in inds.items():
+                if k in SKIP or k.startswith("_"):
+                    continue
+                if isinstance(v, bool) or not isinstance(v, (int, float)):
+                    continue
+                if v != v:            # NaN
+                    continue
+                buckets.setdefault(k, []).append(float(v))
+        for k, vals in buckets.items():
+            if len(vals) < 2:
+                continue
+            rec = stats.setdefault(k, {"lv": {}})
+            s = sorted(vals)
+            rec["lv"][level] = {
+                "n": len(s),
+                "d": len(set(s)),
+                # Percentiles, not min/max: one outlying ward should not spend
+                # the whole colour ramp, which is the rule the run-time
+                # fallback already follows.
+                "p5":  round(s[int(len(s) * 0.05)], 4),
+                "p95": round(s[min(len(s) - 1, int(len(s) * 0.95))], 4),
+            }
+
+    # Polarity from the publisher, for anything Fingertips describes.
+    ft_meta = REPO_ROOT / "scripts" / "fingertips_metadata.json"
+    carried = 0
+    if ft_meta.exists():
+        try:
+            for row in json.loads(ft_meta.read_text(encoding="utf-8")):
+                wh = row.get("wh")
+                if wh is None:
+                    continue
+                for key in (f"ft_{row.get('indicator_id')}",):
+                    if key in stats:
+                        stats[key]["wh"] = bool(wh)
+                        carried += 1
+        except (OSError, ValueError) as e:
+            warn(f"indicator stats: could not read fingertips metadata ({e})")
+
+    info(f"indicator stats: {len(stats):,} indicators measured across "
+         f"{sum(1 for _ in LEVELS)} levels; polarity carried for {carried}")
+    return {
+        "generated": datetime.now(timezone.utc).isoformat(),
+        "stats": stats,
+    }
+
 
 def export_msoa_outline(feats: list) -> None:
     """
@@ -4515,6 +4625,16 @@ def export_all() -> None:
     write_json_atomic(REPO_ROOT / "vcse_data.json",  vcse_data)
     if dental_data:
         write_json_atomic(REPO_ROOT / "dental_practices.json", dental_data)
+    # Measured from the four payloads above, so it can never describe a
+    # different build than the one being shipped.
+    write_map_blob(
+        "PH_IND_STATS",
+        build_indicator_stats(ward_data, lsoa_data, msoa_data, boro_data),
+        "Per-indicator facts measured from the payloads: which levels carry "
+        "it, how many distinct values it has at each, and a 5th-95th "
+        "percentile range. Generated — do not edit.",
+    )
+
     ok(f"ward_data.json:  {len(ward_data.get('wards', {})):,} wards")
     ok(f"lsoa_data.json:  {len(lsoa_data):,} LSOAs")
     ok(f"msoa_data.json:  {len(msoa_data):,} MSOAs")
