@@ -1988,189 +1988,44 @@ def run_claimant_count() -> pd.DataFrame:
 
 
 # ============================================================================
-# SOURCE 3b: DWP benefits (PIP / UC / ESA / Carer's Allowance / Pension Credit)
+# SOURCE 3b: DWP benefits — RETIRED, and why
 # ----------------------------------------------------------------------------
-# NOMIS mirrors the headline DWP Stat-Xplore datasets at LSOA 2021 (TYPE298).
-# Pull the latest period per dataset, filter to NW London, merge into one
-# parquet with count + derived per-working-age rate columns.
+# There is no DWP benefits source here any more. It ran on every scheduled
+# refresh, failed on every one, and nothing on the map ever read it.
+#
+# The five ids it used were simply the wrong datasets. They returned HTTP 200,
+# which is what made this look like an upstream outage for so long, but
+# NM_210_1 is an annual population survey by occupation, NM_189_1 is the
+# Business Register and Employment Survey, and NM_193_1 is the Annual
+# Employment Survey. None of them is a benefit. The empty bodies were NOMIS
+# correctly reporting that the requested cell does not exist.
+#
+# Looking up the real ones by name settles it, and not in favour of a fix:
+#
+#   PIP                 not on NOMIS in any form
+#   Universal Credit    not on NOMIS in any form
+#   ESA                 NM_12_1 / NM_134_1     last period 2018-11
+#   Pension Credit      NM_109_1 / NM_114_1    last period 2018-11
+#   Carer's Allowance   NM_116_1               last period 2018-11
+#   DLA                 NM_110_1 / NM_115_1    last period 2018-11
+#   Attendance Allow.   NM_78_1                last period 2019-02
+#
+# So the two benefits that matter most for a current picture were never
+# available here, and the rest stopped eight years ago on TYPE304/307/312,
+# small-area geographies that predate LSOA 2021 and would not join to anything
+# else in this repo.
+#
+# DWP moved this to Stat-Xplore, which is where the live figures are:
+#     https://stat-xplore.dwp.gov.uk/webapi/rest/v1/
+# It needs a free account and an API key sent as an APIKey header (the endpoint
+# answers 401 without one), and it speaks its own query language rather than
+# NOMIS's. That is a real piece of work and it needs a key that belongs to a
+# person, so it is not something the pipeline can quietly do for itself.
+#
+# Adding it back means writing a Stat-Xplore client, not repairing this one.
+# Deleting the broken version is the honest state in the meantime: a source
+# that always fails teaches everyone to ignore the failure list.
 # ============================================================================
-DWP_DATASETS = [
-    # (nomis_id,     short_name,          human label)
-    ("NM_208_1",     "pip_cases",         "PIP: cases in payment"),
-    ("NM_210_1",     "uc_households",     "Universal Credit households on UC"),
-    ("NM_209_1",     "esa_claimants",     "ESA claimants"),
-    ("NM_189_1",     "carers_allowance",  "Carer's Allowance recipients"),
-    ("NM_193_1",     "pension_credit",    "Pension Credit claimants (65+)"),
-]
-
-def _nomis_discover_dims(dataset_id: str, cache_dir: "Path") -> list[str]:
-    """Return the list of dimension names for a NOMIS dataset, excluding
-    the mandatory 'geography' / 'date' / 'measures' axes. Result is cached
-    under cache_dir/<id>.dims.txt so we only hit the metadata endpoint once.
-    """
-    cache = cache_dir / f"{dataset_id}.dims.txt"
-    if cache.exists() and cache.stat().st_size > 0:
-        return [l for l in cache.read_text().splitlines() if l.strip()]
-    url = f"https://www.nomisweb.co.uk/api/v01/dataset/{dataset_id}.def.sdmx.json"
-    try:
-        r = requests.get(url, timeout=60)
-        r.raise_for_status()
-        j = r.json()
-    except Exception as e:
-        warn(f"  {dataset_id}: dim discovery failed ({e})")
-        return []
-    # The SDMX JSON nests: Structure -> KeyFamilies -> KeyFamily -> Components
-    #   -> Dimension -> @conceptRef (one per dim)
-    dims: list[str] = []
-    try:
-        kfs = j["structure"]["keyfamilies"]["keyfamily"]
-        if isinstance(kfs, list):
-            kfs = kfs[0]
-        comp = kfs["components"]["dimension"]
-        if isinstance(comp, dict):
-            comp = [comp]
-        for d in comp:
-            nm = (d.get("conceptref") or d.get("@conceptRef") or
-                  d.get("conceptRef")  or "").lower()
-            if nm and nm not in ("geography", "date", "measures"):
-                dims.append(nm)
-    except Exception as e:
-        warn(f"  {dataset_id}: couldn't parse dim list ({e})")
-        return []
-    cache.write_text("\n".join(dims) + "\n")
-    info(f"  {dataset_id}: dims = {dims}")
-    return dims
-
-
-def run_dwp_benefits() -> pd.DataFrame:
-    rule("NOMIS DWP benefits (PIP / UC / ESA / Carer's / Pension Credit, LSOA)")
-    cache_dir = CACHE_DIR / "dwp"
-    cache_dir.mkdir(parents=True, exist_ok=True)
-
-    merged: pd.DataFrame | None = None
-    periods: dict[str, str] = {}
-
-    for ds_id, short, _human in DWP_DATASETS:
-        cache = cache_dir / f"{ds_id}.csv"
-        # Discover this dataset's dimensions so we can pin each to "0" (Total).
-        dims = _nomis_discover_dims(ds_id, cache_dir)
-        dim_part = "".join(f"&{d}=0" for d in dims)
-
-        if not cache.exists() or cache.stat().st_size < 4096:
-            # Hit a LAD-level fallback if LSOA path fails or returns empty.
-            tried = []
-            for geo in ("TYPE298", "TYPE432"):  # LSOA2021, then LAD2022
-                url = (
-                    f"https://www.nomisweb.co.uk/api/v01/dataset/{ds_id}.data.csv"
-                    f"?geography={geo}&date=latest{dim_part}&measures=20100"
-                )
-                tried.append(url)
-                try:
-                    r = requests.get(url, timeout=180)
-                    r.raise_for_status()
-                    body = r.content
-                    info(f"  {short} ({geo}): {len(body)/1e6:.2f} MB")
-                    if len(body) > 4096:
-                        cache.write_bytes(body)
-                        break
-                except Exception as e:
-                    warn(f"  {short} ({geo}): fetch failed ({e})")
-                    continue
-                time.sleep(0.4)
-            if not cache.exists() or cache.stat().st_size < 4096:
-                warn(f"  {short}: both LSOA and LAD came back empty")
-                for u in tried:
-                    warn(f"    tried: {u}")
-                continue
-        try:
-            df = pd.read_csv(cache, dtype=str, low_memory=False)
-        except pd.errors.EmptyDataError:
-            warn(f"  {short}: cached CSV empty - skipping")
-            continue
-
-        need = {"GEOGRAPHY_CODE", "DATE", "OBS_VALUE"}
-        if not need.issubset(df.columns):
-            warn(f"  {short}: unexpected columns {list(df.columns)[:6]} - skipping")
-            continue
-
-        df["OBS_VALUE"] = pd.to_numeric(df["OBS_VALUE"], errors="coerce")
-        dates = sorted(df["DATE"].dropna().unique())
-        if not dates:
-            warn(f"  {short}: no dates in response - skipping")
-            continue
-        latest = dates[-1]
-        periods[short] = latest
-
-        # If we fell back to LAD, rows will use LAD25CD codes. Infer which axis.
-        sample_geo = str(df["GEOGRAPHY_CODE"].iloc[0]) if len(df) else ""
-        is_lsoa = sample_geo.startswith("E0") and len(sample_geo) == 9
-        geo_col = "LSOA21CD" if is_lsoa else "LAD25CD"
-
-        cut = (df[df["DATE"] == latest]
-                 .groupby("GEOGRAPHY_CODE", as_index=False)["OBS_VALUE"].sum()
-                 .rename(columns={"GEOGRAPHY_CODE": geo_col, "OBS_VALUE": short}))
-
-        # As with the claimant count, the geography was set by the request,
-        # so no post-filter is needed.
-
-        info(f"  {short}: {len(cut):,} rows at {geo_col} level (period={latest})")
-
-        if merged is None:
-            merged = cut
-        elif geo_col in merged.columns:
-            merged = merged.merge(cut, on=geo_col, how="outer")
-        else:
-            # First merge was LSOA, this one is LAD (or vice versa) - skip.
-            warn(f"  {short}: geography mismatch with earlier dataset - skipping merge")
-            continue
-
-    if merged is None or merged.empty:
-        warn("dwp: no datasets returned any data - skipping write")
-        return pd.DataFrame()
-
-    # Derive per-working-age-pop rates if we landed at LSOA and have census.
-    if "LSOA21CD" in merged.columns:
-        cen_path = DATA_DIR / "demographics" / "census2021.parquet"
-        if cen_path.exists():
-            try:
-                cen = pd.read_parquet(cen_path)
-                wapop_col = None
-                if "census_working_age_pop" in cen.columns:
-                    wapop_col = "census_working_age_pop"
-                elif all(c in cen.columns for c in
-                         ("census_population", "census_age_under18_pct", "census_age_65plus_pct")):
-                    cen = cen.copy()
-                    cen["_wapop"] = (cen["census_population"] *
-                                     (100.0
-                                      - cen["census_age_under18_pct"].fillna(0)
-                                      - cen["census_age_65plus_pct"].fillna(0)) / 100.0)
-                    wapop_col = "_wapop"
-                if wapop_col:
-                    merged = merged.merge(
-                        cen[["LSOA21CD", wapop_col]].rename(columns={wapop_col: "_wapop"}),
-                        on="LSOA21CD", how="left")
-                    for short in ("pip_cases", "uc_households", "esa_claimants",
-                                  "carers_allowance"):
-                        if short in merged.columns:
-                            merged[f"{short}_rate_pct"] = (
-                                merged[short] / merged["_wapop"].replace(0, pd.NA) * 100
-                            ).round(2)
-                    merged = merged.drop(columns=["_wapop"])
-            except Exception as e:
-                warn(f"  rate calc skipped ({e})")
-
-    if periods:
-        merged["dwp_period"] = max(periods.values())
-
-    out_path = DATA_DIR / "economy" / "dwp_benefits.parquet"
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    merged = write_parquet_guarded(out_path, merged, source="dwp")
-    ok(f"dwp benefits: {len(merged):,} rows across {len(periods)} datasets "
-       f"-> {out_path.relative_to(REPO_ROOT)}")
-    return merged
-
-
-
 
 # ============================================================================
 # SOURCE 3c: QOF (Quality and Outcomes Framework) - practice-level prevalence
@@ -4054,33 +3909,6 @@ def build_ward_data() -> dict:
         if wards_mo:
             sources["_claimant_month"] = wards_mo
 
-    # --- DWP benefits: counts SUM, rates pop-weighted MEAN ------------------
-    dwp = _read_parquet_opt(DATA_DIR / "economy" / "dwp_benefits.parquet")
-    if dwp is not None and not dwp.empty:
-        try:
-            dwp_period = str(dwp["dwp_period"].dropna().iloc[0])
-        except Exception:
-            dwp_period = ""
-        sources["dwp"] = f"NOMIS DWP benefits (PIP/UC/ESA/CA/PC, {dwp_period})"
-        count_cols = [c for c in ("pip_cases", "uc_households", "esa_claimants",
-                                   "carers_allowance", "pension_credit")
-                      if c in dwp.columns]
-        for raw_col in count_cols:
-            agg = {}
-            for _, row in dwp.iterrows():
-                lc = str(row["LSOA21CD"])
-                wd = lsoa_to_ward.get(lc)
-                v = row.get(raw_col)
-                if not wd or pd.isna(v):
-                    continue
-                agg[wd] = agg.get(wd, 0) + int(v)
-            for wd, w in wards.items():
-                if wd in agg:
-                    w["indicators"][raw_col] = int(agg[wd])
-        rate_cols = [c for c in dwp.columns if c.endswith("_rate_pct")]
-        for raw_col in rate_cols:
-            _agg_to_wards(dwp, raw_col, raw_col)
-
     # --- Core20: ward is Core20 if any of its LSOAs is in IMD decile 1-2 -----
     # NHS Core20PLUS5 framework definition.
     imd = _read_parquet_opt(DATA_DIR / "demographics" / "imd2025.parquet")
@@ -4327,26 +4155,6 @@ def build_lsoa_data() -> dict:
                     continue
                 out[code][c] = (int(v) if c in ("claimant_count", "claimant_yoy_change")
                                 else round(float(v), 2))
-
-    # DWP benefits (PIP / UC / ESA / CA / PC)
-    dwp = _read_parquet_opt(DATA_DIR / "economy" / "dwp_benefits.parquet")
-    if dwp is not None and not dwp.empty:
-        carry_int   = [c for c in ("pip_cases", "uc_households", "esa_claimants",
-                                    "carers_allowance", "pension_credit")
-                       if c in dwp.columns]
-        carry_float = [c for c in dwp.columns if c.endswith("_rate_pct")]
-        for _, row in dwp.iterrows():
-            code = str(row["LSOA21CD"])
-            if code not in out:
-                continue
-            for c in carry_int:
-                v = row.get(c)
-                if pd.notna(v):
-                    out[code][c] = int(v)
-            for c in carry_float:
-                v = row.get(c)
-                if pd.notna(v):
-                    out[code][c] = round(float(v), 2)
 
     # Scope to the LSOAs the map can actually render. The IMD parquet is
     # national, so without this the file carries all 33,755 English LSOAs:
@@ -5444,7 +5252,6 @@ SOURCES = {
     "imd":         run_imd2025,
     "census":      run_census2021,
     "claimant":    run_claimant_count,
-    "dwp":         run_dwp_benefits,
     "qof":         run_qof,
     "fingertips":  run_fingertips,
     "fingertips_msoa": run_fingertips_msoa,

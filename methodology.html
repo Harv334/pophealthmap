@@ -445,34 +445,25 @@ var SOURCES = [
     manifest: 'claimant' },
 
   { name: 'DWP benefits',
-    pub: 'DWP, via NOMIS',
-    what: 'Personal Independence Payment cases, Universal Credit households, ' +
-          'Employment and Support Allowance, Carer’s Allowance and Pension Credit, ' +
-          'as counts and as rates of the working-age population.',
-    geo: 'LSOA',
-    period: 'Latest period published per dataset',
-    cadence: 'Quarterly for most of these series.',
-    manifest: 'dwp',
-    fix: {
-      auto: 'No file to download. This is a live API, and all five NOMIS dataset ' +
-            'ids still resolve, so the problem is the query rather than the source.',
-      steps: [
-        'Every query returns an empty body, 0.00 MB, for both geographies tried ' +
-        '(<code>TYPE298</code>, LSOA 2021, and <code>TYPE432</code>). The most ' +
-        'likely explanation is that these five series are no longer published at ' +
-        'LSOA and the geography needs changing rather than the code.',
-        'Dimension discovery also fails for three of the five with ' +
-        '<code>couldn\'t parse dim list</code>, so the request is built without ' +
-        'them. Where it does succeed it sets every dimension to <code>0</code>, ' +
-        'which may not be a valid selector for those datasets.',
-        'Run <code>python fetch_all_data.py --only dwp</code>: it prints the ' +
-        'exact URL it tried for each series, which can be pasted into a browser ' +
-        'to see what NOMIS says. <code>DWP_DATASETS</code> in the pipeline lists ' +
-        'the five ids.',
-        'Nothing on the map reads these figures yet, so this is the least urgent ' +
-        'of the four.',
-      ],
-    } },
+    pub: 'DWP — withdrawn from this map',
+    what: 'Personal Independence Payment, Universal Credit, Employment and ' +
+          'Support Allowance, Carer’s Allowance and Pension Credit. Not ' +
+          'currently shown anywhere on the map, and not fetched.',
+    geo: '—',
+    period: '—',
+    cadence: 'Not fetched.',
+    manifest: null,
+    note: 'Retired rather than broken. The pipeline had been asking NOMIS for ' +
+          'five dataset ids that turned out to be an occupation survey, a ' +
+          'business register and an employment survey rather than benefits, ' +
+          'which is why every request returned an empty body while still ' +
+          'answering 200. Looking the real ones up by name settles it: PIP and ' +
+          'Universal Credit are not on NOMIS in any form, and ESA, Pension ' +
+          'Credit, Carer’s Allowance, DLA and Attendance Allowance all stop ' +
+          'at November 2018 on small-area geographies that predate LSOA 2021. ' +
+          'The live figures are on DWP Stat-Xplore, which needs a registered ' +
+          'API key and its own query language, so adding them back means ' +
+          'writing a new client rather than repairing the old one.' },
 
   { name: 'Fuel poverty (LILEE)',
     pub: 'DESNZ',

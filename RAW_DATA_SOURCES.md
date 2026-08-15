@@ -87,30 +87,62 @@ every geography level. LSOA-level CSVs inside are named
 
 ## 4. Economy & benefits (NOMIS / DWP)
 
-All downloadable as CSV via NOMIS "bulk query" URL. Replace
-`{geocodes}` with comma-separated LSOA 2021 codes (London: 4,994).
+Downloadable as CSV via the NOMIS API. Replace `{geocodes}` with
+comma-separated LSOA 2021 codes (London: 4,994).
 
 | Dataset | NOMIS ID | What we pull |
 |---------|----------|--------------|
 | **Claimant count (CLA01)** | `NM_162_1` | Monthly claimant count at LSOA; we compute rate ÷ working-age population |
-| **PIP: cases in payment** | `NM_208_1` | PIP claimants at LSOA |
-| **Universal Credit: households on UC** | `NM_210_1` | UC households at LSOA |
-| **ESA claimants** | `NM_209_1` | ESA at LSOA |
-| **Carer's Allowance** | `NM_189_1` | CA at LSOA |
-| **Pension Credit** | `NM_193_1` | PC at LSOA (aged 65+) |
 
-**Download template** (same for all DWP datasets):
+**Download template:**
 ```
 https://www.nomisweb.co.uk/api/v01/dataset/{ID}.data.csv?date=latest&geography={geocodes}&measures=20100
 ```
 
-Limit `geography` lists to ~500 LSOA codes per request to keep URL
+Limit `geography` lists to ~500 LSOA codes per request to keep the URL
 under 8 kB. Concatenate the chunks. NOMIS silently caps unregistered
 responses at 25,000 rows, which is why we chunk by LSOA.
 
-> **Alternative**: DWP Stat-Xplore (https://stat-xplore.dwp.gov.uk/)
-> is the authoritative source and goes back further. Requires a free
-> login. NOMIS mirrors the headline tables with one month's lag.
+### The DWP benefit series are not here, and cannot be
+
+This table used to list five more: PIP `NM_208_1`, Universal Credit
+`NM_210_1`, ESA `NM_209_1`, Carer's Allowance `NM_189_1` and Pension
+Credit `NM_193_1`. **Every one of those ids is the wrong dataset.**
+They return HTTP 200 with an empty body, which is why this read as an
+upstream outage for months rather than as a mistake here:
+
+| id used | what it actually is |
+|---------|---------------------|
+| `NM_210_1` | Annual population survey — regional — occupation (SOC) |
+| `NM_189_1` | Business Register and Employment Survey |
+| `NM_193_1` | Annual Employment Survey employee analysis |
+| `NM_208_1`, `NM_209_1` | do not return a parseable definition |
+
+Asking NOMIS for the real ones by name settles it, and not in favour of
+a fix:
+
+| Benefit | Real NOMIS id | Last period published |
+|---------|---------------|-----------------------|
+| PIP | **not on NOMIS at all** | — |
+| Universal Credit | **not on NOMIS at all** | — |
+| ESA | `NM_12_1` (small areas), `NM_134_1` | 2018-11 |
+| Pension Credit | `NM_109_1` (small areas), `NM_114_1` | 2018-11 |
+| Carer's Allowance | `NM_116_1` | 2018-11 |
+| DLA | `NM_110_1` (small areas), `NM_115_1` | 2018-11 |
+| Attendance Allowance | `NM_78_1` | 2019-02 |
+
+So the two benefits that matter most for a current picture were never
+on NOMIS, and the rest stopped eight years ago. The "small areas"
+variants publish at `TYPE304` / `TYPE307` / `TYPE312`, which predate
+LSOA 2021 and would not join to anything else in this repo.
+
+**The live route is DWP Stat-Xplore**, `https://stat-xplore.dwp.gov.uk/webapi/rest/v1/`.
+It needs a free account and an API key sent as an `APIKey` header — the
+endpoint answers `401` without one — and it speaks its own query
+language rather than NOMIS's. Adding these back means writing a
+Stat-Xplore client, not repairing the NOMIS one. The broken source was
+removed rather than left failing, because a source that always fails
+teaches everyone to ignore the failure list.
 
 ---
 
@@ -345,7 +377,8 @@ To rebuild from scratch, a colleague needs:
 2. **IMD 2025**: nothing. The filtered parquet is committed; the raw File 7
    CSV is only needed to regenerate it after a new IoD release.
 3. **Census** — 15 ZIPs from NOMIS (one per TS table listed in §3).
-4. **Claimant + DWP** — 6 CSVs via NOMIS bulk (claimant + 5 DWP).
+4. **Claimant count** — 1 CSV via the NOMIS API. The five DWP benefit
+   series are not fetched; see §4 for why.
 5. **Fuel poverty** — 1 DESNZ XLSX.
 6. **Green/blue space access** — 1 Defra ODS (≈46 MB zipped, 1.37 GB uncompressed).
 7. **QOF** — 16 CSVs from Fingertips (one per indicator).
@@ -369,7 +402,7 @@ equivalent open licence.
 | postcodes.io / ONS best-fit lookup | Quarterly / annually | Automatic. Cached misses are re-checked every 90 days; bump `ONS_LOOKUP_LAYER` when the ward vintage moves past 2025 |
 | IMD | ~Every 6 years (last 2019 → 2025) | As and when released |
 | Census 2021 | One-off decennial | Fixed — refreshes in ~2031 |
-| NOMIS claimant / DWP | Monthly | Monthly |
+| NOMIS claimant count | Monthly | Monthly |
 | OHID Fingertips / QOF | Annually | Annually (usually Oct) |
 | Fuel poverty | Annually (Feb–Mar) | Annually |
 | Defra green/blue space access | Not yet set (first release Mar 2026) | Watch landing page — status is "in development" |
@@ -392,7 +425,7 @@ equivalent open licence.
   (ward-level indicators + geometry metadata). Everything above feeds
   into those two JSONs.
 - LSOA 2021 is the authoritative small-area unit; NOMIS calls it
-  `TYPE298` on the claimant/DWP endpoints. Any data that still comes
+  `TYPE298` on the claimant endpoint. Any data that still comes
   in LSOA 2011 codes (DESNZ is the main one) aligns 1:1 with LSOA 2021
   for the London boroughs, so no re-mapping is needed.
 - All authoritative URLs are stable landing pages — deep links to
