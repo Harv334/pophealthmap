@@ -2462,11 +2462,15 @@
           </div>
           <input type="text" class="rb-name" id="rb-name" maxlength="60"
                  placeholder="Name this area" aria-label="Name for the area you are building">
-          <!-- "Small area", not "neighbourhood": this map uses neighbourhood for
+          <!-- "LSOA", not "neighbourhood": this map uses neighbourhood for
                Defra's neighbourhood distance band as well, and one word cannot
-               mean two things in the same interface. -->
-          <div class="rb-hint">Click a small area on the map to add it. Click it again to
-            remove it. A small area holds about 1,500 people. It is the smallest area this
+               mean two things in the same interface. It said "small area" until
+               the rest of the tool was counted: LSOA appears over 500 times in
+               this file and "small area" thirteen, and the two sat next to each
+               other in the Data export level picker, where one button read
+               "Small areas" and the next read "MSOAs". -->
+          <div class="rb-hint">Click an LSOA on the map to add it. Click it again to
+            remove it. An LSOA holds about 1,500 people. It is the smallest area this
             map has figures for.</div>
         </div>
         <div class="rb-count" id="rb-count">
@@ -2480,7 +2484,7 @@
         <div class="rb-scroll">
           <div id="rb-summary"></div>
           <div id="rb-caution"></div>
-          <div class="rb-group" style="padding-bottom:4px"><h3>Small areas in this area</h3></div>
+          <div class="rb-group" style="padding-bottom:4px"><h3>LSOAs in this area</h3></div>
           <div class="rb-list" id="rb-list"></div>
         </div>
       </div>
@@ -2503,7 +2507,7 @@
           <div class="cb-help">Each row in the file is one area.</div>
           <div class="cb-seg" id="cb-level">
             <button type="button" data-lvl="ward" class="on">Wards</button>
-            <button type="button" data-lvl="lsoa">Small areas</button>
+            <button type="button" data-lvl="lsoa">LSOAs</button>
             <button type="button" data-lvl="msoa">MSOAs</button>
             <button type="button" data-lvl="borough">Boroughs</button>
           </div>
@@ -4772,6 +4776,20 @@ const nwWardsL = L.geoJSON(NW_WARDS_GJ, {
 function _wardBoundaryStyle(feat) {
   const lad = (feat && feat.properties && feat.properties.LAD) || '';
   const hidden = focusActive() && !ladInFocus(lad);
+  /* This overlay is drawn above the ward layer and is on by default, so its
+     hairline would run down the middle of the selected ward's yellow outline.
+     It stands aside for that one ward and lets the selection read cleanly.
+
+     Wrapped, because this function runs once at parse time to build the layer
+     and selW is a `let` declared further down the file. Reading it that early
+     is a temporal dead zone error, and `typeof` does not save you from one.
+     Nothing is selected at parse time anyway, so the catch is the right
+     answer rather than a shrug. */
+  let isSelected = false;
+  try {
+    isSelected = !!selW && (feat && feat.properties && feat.properties.WD24NM) === selW;
+  } catch (e) { /* selW not initialised yet: nothing can be selected */ }
+  if (isSelected) return { weight: 0, fill: false, opacity: 0 };
   return {
     color: _ink('#000', '#B9C7D0'),
     weight: hidden ? 0 : 1,
@@ -5678,6 +5696,27 @@ function buildCore20LsoaLayer() {
   });
 }
 
+/* The selected ward's outline.
+
+   Selection used to be signalled by line thickness alone, in the same ink as
+   every other ward edge, and the Border slider scaled it like everything else:
+   turn borders down and the ward you had just clicked became the hardest one
+   on the map to find.
+
+   It is a colour now, and one that is nowhere else on this map. The choropleth
+   ramps are blues and greens, Core20 is magenta, the ICB regions are violet,
+   amber, green and red at a wash. A saturated yellow at full opacity reads
+   against all of them and against both basemaps, and it is already in the
+   palette as --nhs-yellow.
+
+   The weight has a floor as well as a multiplier, so the slider can make the
+   selection heavier but never thin it back into the crowd. */
+const SELECTED_INK = '#FFB81C';
+const SELECTED_MIN_WEIGHT = 4.5;
+function selectedWeight(mult) {
+  return Math.max(SELECTED_MIN_WEIGHT, 4.5 * (mult || 1));
+}
+
 function wstyle(wn, ov, state) {
   // Borough focus is a SOLO VIEW: wards outside the focused borough disappear
   // entirely, invisible and not interactive-looking, so only the selected
@@ -5700,8 +5739,10 @@ function wstyle(wn, ov, state) {
     // was shaded, which is what the colour meant.
     const baseW = {default:1.0, hover:3.0, selected:4.0}[state] || 1.0;
     return applyCore20Outline({
-      color: _ink('#000', '#8FA0AC'),
-      weight: Math.max(0, baseW * borderWeightMult),
+      color: state === 'selected' ? SELECTED_INK : _ink('#000', '#8FA0AC'),
+      weight: state === 'selected'
+        ? selectedWeight(borderWeightMult)
+        : Math.max(0, baseW * borderWeightMult),
       fillColor: '#94a3b8',
       fillOpacity: Math.min(absFill, 0.12),
       opacity: 0.95,
@@ -5718,9 +5759,14 @@ function wstyle(wn, ov, state) {
   const lsoaOnly = (ov !== 'none' && isLsoaOnlyOv(ov));
   const baseFo = lsoaOnly ? 0.0 : absFill;
   const fo = baseFo;
-  const w  = Math.max(0, baseW * borderWeightMult);
+  const sel = state === 'selected';
+  const w  = sel ? selectedWeight(borderWeightMult)
+                 : Math.max(0, baseW * borderWeightMult);
   const op = isFocus ? 1.0 : 0.9;
-  return applyCore20Outline({ color:_ink('#000', '#8FA0AC'), weight:w, fillColor:fill, fillOpacity:fo, opacity:op }, wn);
+  return applyCore20Outline({
+    color: sel ? SELECTED_INK : _ink('#000', '#8FA0AC'),
+    weight: w, fillColor: fill, fillOpacity: fo, opacity: op,
+  }, wn);
 }
 
 function pillClass(g) {
@@ -5899,6 +5945,10 @@ window.deselectWard = function() {
   selW = null;
   if (window.PH_SHEET) window.PH_SHEET.hide();
   if (typeof _restyleAll === 'function') _restyleAll();
+  // Put the boundary hairline back on the ward that was selected.
+  if (typeof wardBoundaryLyr !== 'undefined' && wardBoundaryLyr) {
+    try { wardBoundaryLyr.setStyle(_wardBoundaryStyle); } catch (e) {}
+  }
   const p = document.getElementById('wpanel');
   if (p) p.innerHTML = `<div class="ph"><div class="ph-icon">\u2196</div>Click any ward on the map to explore its health, crime, deprivation and service data</div>`;
   const vsd = document.getElementById('vs-digest');
@@ -6794,6 +6844,9 @@ function buildWardLayer() {
         if (wLyr) wLyr.eachLayer(l => l.setStyle(wstyle(l.feature.properties.WD24NM, curOv, gs(l.feature.properties.WD24NM))));
         lyr.setStyle(wstyle(wn, curOv, 'selected'));
         lyr.bringToFront();
+        // The boundary overlay has to be told too: it hides its hairline on
+        // whichever ward is selected, and that is a different ward now.
+        if (wardBoundaryLyr) wardBoundaryLyr.setStyle(_wardBoundaryStyle);
         showWard(wn);
       });
       lyr.on('mouseover', e => {
@@ -13445,12 +13498,29 @@ loadData();
         wardLevelKeepOverlay();
         sidebarTab('layers');
         setOverlay('imd_score_ward');
-        // A real ward, chosen from the data rather than hard-coded, so the
-        // chapter cannot end up pointing at somewhere that has been renamed.
+        /* A real ward, chosen from the data rather than hard-coded, so the
+           chapter cannot end up pointing at somewhere that has been renamed.
+
+           Chosen from the northern half of London, not simply the most
+           deprived. The bar this chapter is describing opens along the bottom
+           of the map and the tour strip sits under that, so between them they
+           cover the lower third of the screen: a ward picked purely on
+           deprivation lands in inner south London about as often as not, and
+           the chapter then points at something hidden behind its own
+           narration. Northern wards sit clear of both. */
+        var lat = wardLats();
+        var cands = allWards().filter(function (w) {
+          return num(w.inds.imd_decile_mean) !== null && lat[w.name] !== undefined;
+        });
+        var sorted = cands.map(function (w) { return lat[w.name]; })
+                          .sort(function (a, b) { return a - b; });
+        var cut = sorted.length ? sorted[Math.floor(sorted.length * 0.6)] : null;
+        var pool = (cut === null) ? cands
+                                  : cands.filter(function (w) { return lat[w.name] >= cut; });
+        if (!pool.length) pool = cands;
         var best = null;
-        allWards().forEach(function (w) {
+        pool.forEach(function (w) {
           var v = num(w.inds.imd_decile_mean);
-          if (v === null) return;
           if (!best || v < best.v) best = { n: w.name, v: v };
         });
         if (best) selectWardByName(best.n);
@@ -13508,11 +13578,11 @@ loadData();
       t: 'Custom area: draw your own',
       n: 'A local patch, a school catchment or a primary care network does not follow ' +
          'ward lines. <strong>Custom area</strong> lets you build the area you mean. ' +
-         'Click the small areas on the map to add them. Click one again to take it out. ' +
-         'A small area holds about 1,500 people. ' +
+         'Click the LSOAs on the map to add them. Click one again to take it out. ' +
+         'An LSOA holds about 1,500 people. ' +
          'Name the area and the tool totals up its figures. ' +
          'Counts are added together. Percentages and scores are weighted by population. ' +
-         'So a bigger small area pulls each average further than a smaller one. ' +
+         'So a bigger LSOA pulls each average further than a smaller one. ' +
          'The report states the method beside every figure. ' +
          'It also says this is not an official area.',
       go: function () {
@@ -13637,6 +13707,66 @@ loadData();
     }
   }
 
+  /* Clear the stage before each chapter draws on it.
+
+     Chapters used to leave their examples behind: the ward the third chapter
+     selected was still bright on the map during the fourth, the query it ran
+     was still outlined under the fifth, the pins from Compare were still there
+     at the end. Each chapter had grown its own defensive tidying of whatever
+     the one before it happened to leave, which is a rule every new chapter has
+     to learn and one that only covers the order people happen to walk it in.
+     Going backwards was worse, because that tidying only ever looked forwards.
+
+     One reset, run before every chapter in both directions, so a chapter only
+     has to say what it wants and never what it does not. Deliberately not a
+     full _resetAll: that returns to Explore and refits the map, which would
+     undo the chapter about to run and make the whole tour flicker. */
+  /* A latitude per ward, taken from the boundary it is drawn from. The ward
+     records hold indicators and a borough and no geometry, and allWards is
+     shared with Query and Compare, so this stays local to the tour. Computed
+     once: it is 704 polygons and it never changes. */
+  var _wardLat = null;
+  function wardLats() {
+    if (_wardLat) return _wardLat;
+    _wardLat = {};
+    if (typeof GJ === 'undefined' || !GJ.features) return _wardLat;
+    GJ.features.forEach(function (f) {
+      var name = (f.properties || {}).WD24NM;
+      var g = f.geometry;
+      if (!name || !g) return;
+      var ring = (g.type === 'Polygon') ? g.coordinates[0]
+               : (g.type === 'MultiPolygon') ? g.coordinates[0][0] : null;
+      if (!ring || !ring.length) return;
+      var s = 0;
+      for (var i = 0; i < ring.length; i++) s += ring[i][1];
+      _wardLat[name] = s / ring.length;
+    });
+    return _wardLat;
+  }
+
+  function tourResetStage() {
+    try {
+      closeWardSheet();
+      if (typeof deselectWard === 'function') deselectWard();
+      // Through the buttons that already do this, rather than through an API
+      // that would have to be kept in step with them. Both are safe to press
+      // from any chapter: each resets its own mode's state and its drawing
+      // self-guards when that mode is not on screen.
+      var qc = document.getElementById('q-clear'); if (qc) qc.click();
+      var rc = document.getElementById('rb-clear'); if (rc) rc.click();
+      if (typeof clearDirMarker === 'function') clearDirMarker();
+      // Scope is a chapter's own business, and a board or borough left focused
+      // would silently narrow every chapter after it.
+      if (typeof focusActive === 'function' && focusActive()) {
+        focusedBorough = 'all';
+        focusedIcb = null;
+        var bs = document.getElementById('borough-focus'); if (bs) bs.value = 'all';
+        var is = document.getElementById('icb-focus');     if (is) is.value = 'all';
+        if (typeof _applyBoroughSolo === 'function') _applyBoroughSolo();
+      }
+    } catch (e) { /* tidying must never strand the tour */ }
+  }
+
   function renderTour() {
     if (tourAt < 0 || tourAt >= TOUR.length) return;
     var c = TOUR[tourAt];
@@ -13651,6 +13781,7 @@ loadData();
     var last = tourAt === TOUR.length - 1;
     $('tour-next').textContent = last ? 'Finish' : 'Next chapter →';
     $('tour-next-lbl').textContent = last ? '' : 'Up next: ' + TOUR[tourAt + 1].t;
+    tourResetStage();
     try { c.go(); } catch (e) { /* a chapter must never strand the tour */ }
     tourLift();
   }
@@ -13856,7 +13987,7 @@ loadData();
     var countEl = $('rb-count');
     var clearBtn = $('rb-clear');
     countEl.firstElementChild.innerHTML = rbSelected.length
-      ? '<strong>' + agg.lsoas + '</strong> small area' + (agg.lsoas === 1 ? '' : 's') +
+      ? '<strong>' + agg.lsoas + '</strong> LSOA' + (agg.lsoas === 1 ? '' : 's') +
         ' · <strong>' + Math.round(agg.population).toLocaleString() + '</strong> residents'
       : 'Nothing selected yet';
     clearBtn.hidden = !rbSelected.length;
@@ -14030,7 +14161,7 @@ loadData();
       '@media print{body{background:#fff;padding:0}.r{border:0;border-radius:0}.actions{display:none}}' +
       '</style></head><body><div class="r">' +
       '<h1>' + esc(rbAreaName()) + '</h1>' +
-      '<div class="sub">' + agg.lsoas + ' small area' + (agg.lsoas === 1 ? '' : 's') +
+      '<div class="sub">' + agg.lsoas + ' LSOA' + (agg.lsoas === 1 ? '' : 's') +
       ' · ' + Math.round(agg.population).toLocaleString() + ' residents' +
       (boroughLine ? ' · ' + boroughLine : '') + '</div>' +
       '<div class="note">This is a custom area, assembled from ' + agg.lsoas +
@@ -14044,7 +14175,7 @@ loadData();
       '</div>' +
       '<h2>Figures for this area</h2><table><tr><th>Indicator</th><th>Value</th>' +
       '<th>How it was combined</th></tr>' + rows + '</table>' +
-      '<h2>Small areas included</h2><table><tr><th>LSOA</th><th>Name</th><th>Ward</th>' +
+      '<h2>LSOAs included</h2><table><tr><th>LSOA</th><th>Name</th><th>Ward</th>' +
       '<th>Borough</th><th>Population</th></tr>' + list + '</table>' +
       '<h2>Source</h2><p style="color:var(--ink-2);font-size:var(--t-sm)">Built with PopHealth Map, ' +
       'pophealth.uk. Figures are the same ones the map draws; see the methodology page ' +
@@ -14080,7 +14211,7 @@ loadData();
 
   var CB_LEVELS = {
     ward:    { label: 'ward',          plural: 'wards' },
-    lsoa:    { label: 'small area',    plural: 'small areas' },
+    lsoa:    { label: 'LSOA',          plural: 'LSOAs' },
     msoa:    { label: 'MSOA',          plural: 'MSOAs' },
     borough: { label: 'borough',       plural: 'boroughs' },
   };
