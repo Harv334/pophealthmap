@@ -604,6 +604,26 @@
      separated by white as before. */
   .ldr-map path { fill: var(--line); stroke: var(--ldr-stroke); stroke-width: 1.1;
     stroke-linejoin: round; transition: fill .55s ease; }
+  /* ── The wait after the sweep ─────────────────────────────────────────────
+     The sweep is over in LDR_MS and the figures can take a good deal longer,
+     so London used to fill in and then sit perfectly still for the whole rest
+     of the wait. A still picture on a loading screen reads as a page that has
+     stopped rather than one that is still working, and the slower the
+     connection, the longer it says it.
+
+     So London keeps breathing until the data lands. A slow pulse rather than a
+     flash, deliberately: one cycle every 1.6 seconds is far below the three a
+     second that WCAG 2.3.1 treats as the seizure threshold, and it never
+     leaves the map faint enough to lose the shape, so nothing strobes and
+     nothing disappears.
+
+     Opacity on the one <svg>, not fill on 704 paths: the compositor carries a
+     single element, and the colours the sweep painted stay exactly as they
+     were. Someone who has asked for less motion never gets here, because the
+     sweep that calls for this is skipped for them entirely, and the global
+     prefers-reduced-motion rule further down would stop it regardless. */
+  @keyframes ldr-breathe { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+  .ldr-map.waiting { animation: ldr-breathe 1.6s ease-in-out infinite; }
   /* One word, above the map, and nothing under it. The map is the thing worth
      looking at while you wait, and a headline, a running commentary and a key
      stacked beneath it were three things competing with it. */
@@ -2997,6 +3017,9 @@ var LOADER_MAP = {w:1000,h:771,n:704,d:'IAAAAAAAAAAAAAJAAIAAFAAAIDFEECDGGCFDCCIC
     if (!dataReady || !sweepDone) return;
     var el = document.getElementById('ldr');
     if (!el || el.classList.contains('fading')) return;
+    // Stop the pulse before the fade, or the two compound and the screen
+    // leaves at whatever opacity the breath happened to be on.
+    if (svg) svg.classList.remove('waiting');
     el.style.pointerEvents = 'none';
     el.classList.add('fading');
     setTimeout(function () { el.classList.add('hidden'); }, 320);
@@ -3011,6 +3034,17 @@ var LOADER_MAP = {w:1000,h:771,n:704,d:'IAAAAAAAAAAAAAJAAIAAFAAAIDFEECDGGCFDCCIC
     if (sweepDone) return;
     paintTo(1);
     sweepDone = true;
+    /* London breathes from here until the figures arrive. Nothing else on this
+       screen moves once the sweep has run, so on a slow connection the stillness
+       was the entire rest of the wait, and a loading screen that has stopped
+       moving is indistinguishable from one that has stopped working.
+
+       Added before reveal rather than after, so the class is already on when a
+       load that is still waiting gets here, and reveal takes it off again the
+       moment the data lands. Nothing checks reduced motion here: the branch
+       that calls this is the animated one, and the stylesheet stops the pulse
+       for that reader anyway. */
+    if (svg) svg.classList.add('waiting');
     reveal();
   }
 
