@@ -1930,6 +1930,10 @@
       </div>
       <div class="tb-sep"></div>
       <button type="button" class="tb-btn" id="tb-reset" title="Clear all filters and return to default view">↺ Reset</button>
+      <!-- The address bar has always been live, rewritten as the view changes.
+           Nobody knew, because nothing on the page said so, and a share feature
+           with no affordance is not one. -->
+      <button type="button" class="tb-btn" id="tb-link" title="Copy a link to exactly this view: the indicator, the area, the layers, the selected ward, and any query or custom area open">⧉ Copy link</button>
       <button type="button" class="tb-btn" id="tb-cb" title="Switch to a colour-blind safe palette (deuteranopia/protanopia friendly)" aria-pressed="false">◐ CB safe</button>
       <!-- Three states, not two, and it says which one it is in. Auto follows
            the machine, which is what most people want and what a plain
@@ -2480,6 +2484,10 @@
         <div class="rb-acts">
           <button type="button" class="ws-btn primary" id="rb-report">Open report</button>
           <button type="button" class="ws-btn" id="rb-csv">CSV</button>
+          <!-- An area is built by hand, so it is the one thing here somebody
+               would be sorry to lose or have to describe over the phone. -->
+          <button type="button" class="ws-btn" id="rb-link"
+                  title="Copy a link that reopens this area, with its name">Copy link</button>
         </div>
         <div class="rb-scroll">
           <div id="rb-summary"></div>
@@ -5951,6 +5959,7 @@ window.deselectWard = function() {
   if (p) p.innerHTML = `<div class="ph"><div class="ph-icon">\u2196</div>Click any ward on the map to explore its health, crime, deprivation and service data</div>`;
   const vsd = document.getElementById('vs-digest');
   if (vsd) vsd.textContent = 'All of London';
+  if (window.PH_URL) window.PH_URL.write();
 };
 window.deselectLSOA = function() {
   selLSOA = null;
@@ -6846,6 +6855,9 @@ function buildWardLayer() {
         // whichever ward is selected, and that is a different ward now.
         if (wardBoundaryLyr) wardBoundaryLyr.setStyle(_wardBoundaryStyle);
         showWard(wn);
+        // The selected ward rides in the link now, and a click is the only
+        // thing that moves it.
+        if (window.PH_URL) window.PH_URL.write();
       });
       lyr.on('mouseover', e => {
         if (typeof wardInFocus === 'function' && !wardInFocus(wn)) return;
@@ -10261,9 +10273,32 @@ _applyColourPalette();
 })();
 
 // ── URL state + Copy-link ────────────────────────────────────────────────────
-// Serialise the current view (overlay, borough focus, LSOA mode, Core20 flag,
-// CB-safe, map centre+zoom) to the URL so the user can bookmark or share it.
-// Kept intentionally short-param so the query string stays legible.
+/* Serialise the current view to the URL so it can be bookmarked or sent.
+
+   It used to carry the overlay, the borough or board, the LSOA layer, Core20,
+   colour-blind-safe mode and the map position. That is the view, and it left
+   out the two links people actually want to send: "look at this ward" and
+   "look at these wards". A shared link opened on a different ward, or on no
+   query at all, and the sender had to write the steps out underneath it.
+
+   It now also carries the selected ward, the data level, the other layers, the
+   tool that is open, the query in it, and a custom area. Still short-param, and
+   still legible where it can be: the query rides as repeated ?qs= and ?qc=
+   rather than one packed blob, so you can read what a link asks for and edit
+   it by hand. */
+
+// The layers that ride in ?L=. tlsoa is deliberately not among them: it has
+// carried its own ?lsoa=1 since before this list existed, and links already in
+// circulation use it.
+const _URL_LAYERS = ['tg', 'th', 'tgr', 'td', 'tph', 'tv', 'tsch', 'tcc',
+                     'tlib', 'tesol', 'ticb', 'tb', 'tnw', 'tmsoa'];
+const _URL_MODES = ['query', 'compare', 'report', 'csv', 'directory'];
+
+function _urlTool() {
+  const b = document.querySelector('.mode-rail .mode-btn[aria-selected="true"]');
+  return (b && b.dataset.mode) || 'explore';
+}
+
 function _writeUrlState() {
   try {
     const p = new URLSearchParams();
@@ -10278,6 +10313,43 @@ function _writeUrlState() {
     if (lsEl && lsEl.checked) p.set('lsoa', '1');
     if (c20El && c20El.checked) p.set('c20', '1');
     if (window.cbSafe) p.set('cb', '1');
+
+    // Ward is the default, so it is the one level that costs nothing to omit.
+    if (typeof currentDataLevel !== 'undefined' && currentDataLevel &&
+        currentDataLevel !== 'ward') p.set('lvl', currentDataLevel);
+
+    const layersOn = _URL_LAYERS.filter(id => {
+      const el = document.getElementById(id);
+      return el && el.checked;
+    });
+    if (layersOn.length) p.set('L', layersOn.join(','));
+
+    // selW is a top-level `let`, so it is not readable before its declaration
+    // is evaluated. Nothing is selected that early anyway.
+    try { if (selW) p.set('w', selW); } catch (e) { /* not initialised yet */ }
+
+    const tool = _urlTool();
+    if (_URL_MODES.indexOf(tool) !== -1) p.set('mode', tool);
+
+    // A query and an area belong to the tool that holds them. Writing them
+    // from any tool would put a stale filter in the link of someone who ran a
+    // query once and moved on.
+    if (tool === 'query' && window.PH_QUERY && window.PH_QUERY.state) {
+      const s = window.PH_QUERY.state();
+      (s.services || []).forEach(id => p.append('qs', id));
+      if (s.scope) p.set('qw', s.scope);
+      (s.conds || []).forEach(c => p.append('qc', c.join('~')));
+    }
+    if (tool === 'report' && window.PH_REPORT && window.PH_REPORT.state) {
+      const a = window.PH_REPORT.state();
+      if (a.codes && a.codes.length) {
+        // Every LSOA code here starts E01, so the prefix is 3 characters times
+        // however many the area holds, for no information at all.
+        p.set('a', a.codes.map(c => c.replace(/^E01/, '')).join('.'));
+        if (a.name) p.set('an', a.name);
+      }
+    }
+
     if (typeof map !== 'undefined' && map) {
       const c = map.getCenter();
       p.set('z', map.getZoom().toString());
@@ -10288,6 +10360,72 @@ function _writeUrlState() {
     history.replaceState(null, '', url);
   } catch (e) { /* ignore */ }
 }
+let _urlWriteTimer = null;
+function _scheduleUrlWrite() {
+  clearTimeout(_urlWriteTimer);
+  _urlWriteTimer = setTimeout(_writeUrlState, 60);
+}
+
+/* Copy the current view as a link.
+
+   Written first rather than trusting whatever is in the address bar: the
+   writer is debounced, so a click landing inside that window would otherwise
+   copy the view as it was a moment ago.
+
+   The button says what happened rather than raising a toast, because the thing
+   it is confirming is the button you just pressed. execCommand is the fallback
+   for a browser that will not give a page the clipboard; it is deprecated and
+   still the only thing that works there. */
+function _copyViewLink(btn) {
+  _writeUrlState();
+  const href = location.href;
+  /* Settled once, whoever gets there first.
+
+     navigator.clipboard.writeText does not always reject when it cannot do the
+     job: without document focus it can simply never settle, and the button
+     then sits there having visibly done nothing, which reads as broken rather
+     than as refused. The timer is the floor under that. */
+  let settled = false;
+  const done = (ok) => {
+    if (settled || !btn) return;
+    settled = true;
+    const was = btn.textContent;
+    // Not "press Ctrl+C": nothing is selected, so that instruction does
+    // nothing. The address bar already holds the link, which is the whole
+    // reason this button can fail harmlessly.
+    btn.textContent = ok ? '✓ Copied' : 'Copy from the address bar';
+    btn.disabled = true;
+    setTimeout(() => { btn.textContent = was; btn.disabled = false; }, ok ? 1600 : 3200);
+  };
+  setTimeout(() => done(false), 1200);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(href).then(() => done(true), () => _copyFallback(href, done));
+  } else {
+    _copyFallback(href, done);
+  }
+}
+function _copyFallback(text, done) {
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    done(ok);
+  } catch (e) { done(false); }
+}
+(function _wireCopyLink() {
+  ['tb-link', 'rb-link'].forEach(id => {
+    const b = document.getElementById(id);
+    if (b) b.addEventListener('click', () => _copyViewLink(b));
+  });
+})();
+// The modes call this. They own state the URL wants and there is no DOM event
+// that means "the query finished" or "the area changed".
+window.PH_URL = { write: _scheduleUrlWrite };
 /* The inbound query string, taken once, before anything can overwrite it.
    _writeUrlState rewrites location.search from the live state via
    replaceState, and it is wired to the map's moveend, which the initial
@@ -10298,6 +10436,21 @@ function _writeUrlState() {
    Reading from this snapshot instead means the link says what it said when
    the page opened, whatever the map has done since. */
 const _INBOUND_URL_STATE = (typeof location !== 'undefined') ? location.search : '';
+
+/* Which inbound fields have landed.
+
+   The scalar controls are re-applied on every pass on purpose, as the note
+   above explains: it is a few values and a change event, and the last caller
+   settles it. The four below are different. Selecting a ward opens a bar,
+   choosing a tool changes the whole sidebar, and running a query redraws the
+   map, so re-applying them at 4,000ms would undo whatever the user had done in
+   the meantime with a link they had already finished reading.
+
+   Not "first wins" either, which is the trap the note describes. Each records
+   itself only once it has actually succeeded: a ward cannot be selected before
+   the ward layer exists, and an area cannot be drawn before the boundaries
+   have loaded. Until then the pass reports failure and the next one retries. */
+const _urlDone = {};
 
 function _readUrlState() {
   try {
@@ -10314,11 +10467,85 @@ function _readUrlState() {
     applyIf('icb-focus', p.get('icb'), 'change');
     applyIf('core20-toggle', p.get('c20'), 'change');
     applyIf('tlsoa', p.get('lsoa'), 'change');
+
+    /* Layers before the overlay. Ticking a boundary layer can move the data
+       level with it, and the overlay is the thing that should have the last
+       word on where the level ends up.
+
+       ?L= is the set of layers that are on, so it is applied in both
+       directions: anything in it goes on, anything else goes off. Ward
+       boundaries are on by default, so a sender who turned them off would
+       otherwise have sent a link that turns them back on. Absent means the
+       defaults stand, which is the rule every other parameter here follows. */
+    if (p.has('L')) {
+      const want = (p.get('L') || '').split(',').filter(Boolean);
+      _URL_LAYERS.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const on = want.indexOf(id) !== -1;
+        if (el.checked !== on) { el.checked = on; el.dispatchEvent(new Event('change')); }
+      });
+    }
+
     applyIf('ov', p.get('ov'), 'change');
-    if (p.get('cb') === '1') {
+
+    // Level after the overlay, and past the compatibility gate: the link chose
+    // an indicator and a level together, and they agreed when it was made.
+    const lvl = p.get('lvl');
+    if (lvl && !_urlDone.lvl && ['borough', 'ward', 'msoa', 'lsoa'].indexOf(lvl) !== -1 &&
+        typeof _setDataLevel === 'function') {
+      _setDataLevel(lvl, { fromOverlay: true });
+      _urlDone.lvl = true;
+    }
+
+    if (p.get('cb') === '1' && !_urlDone.cb) {
       const btn = document.getElementById('tb-cb');
+      if (btn) { btn.click(); _urlDone.cb = true; }
+    }
+
+    /* The tool, re-asserted on every pass rather than recorded as done.
+
+       It is the one field the scalars above can knock over. Re-applying ?ov=
+       dispatches a change on the indicator picker, and that handler pulls the
+       sidebar to the Indicators tab; the observer watching the mode panes sees
+       the Query pane lose its class, reads it as the user leaving Query, and
+       puts the rail back on Explore. So the first pass opened Query and the
+       second closed it, and a shared query link landed on Explore with the
+       right answer showing behind the wrong tab.
+
+       Re-asserting is safe: clicking a rail button is what a chapter of the
+       tour does on every entry, so the whole path is built to be re-entered.
+       It also puts back whatever applyMode draws, which is how a custom area
+       gets its outlines after the boundaries arrive. */
+    const mode = p.get('mode');
+    if (mode && _URL_MODES.indexOf(mode) !== -1 && _urlTool() !== mode) {
+      const btn = document.querySelector('.mode-rail .mode-btn[data-mode="' + mode + '"]');
       if (btn) btn.click();
     }
+
+    if (!_urlDone.q && (p.getAll('qs').length || p.getAll('qc').length || p.get('qw'))) {
+      const st = {
+        services: p.getAll('qs'),
+        scope: p.get('qw') || '',
+        conds: p.getAll('qc').map(s => s.split('~')).filter(t => t.length === 3),
+      };
+      if (window.PH_QUERY && window.PH_QUERY.apply && window.PH_QUERY.apply(st)) _urlDone.q = true;
+    }
+
+    if (!_urlDone.a && p.get('a')) {
+      const codes = p.get('a').split('.').filter(Boolean).map(n => 'E01' + n);
+      if (window.PH_REPORT && window.PH_REPORT.apply &&
+          window.PH_REPORT.apply({ name: p.get('an') || '', codes })) _urlDone.a = true;
+    }
+
+    // The ward last. It opens the bar along the bottom of the map, so it wants
+    // to be the thing on top when everything else has settled.
+    const wantWard = p.get('w');
+    if (wantWard && !_urlDone.w && typeof wLyr !== 'undefined' && wLyr) {
+      const lyr = wLyr.getLayers().find(l => l.feature.properties.WD24NM === wantWard);
+      if (lyr) { lyr.fire('click'); _urlDone.w = true; }
+    }
+
     if (typeof map !== 'undefined' && map) {
       const z = parseInt(p.get('z'), 10);
       const c = (p.get('c') || '').split(',').map(parseFloat);
@@ -10329,9 +10556,15 @@ function _readUrlState() {
   } catch (e) { console.warn('_readUrlState failed', e); }
 }
 (function _wireUrlStateWriters() {
-  ['ov','borough-focus','icb-focus','tlsoa','core20-toggle'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.addEventListener('change', () => setTimeout(_writeUrlState, 50));
+  ['ov', 'borough-focus', 'icb-focus', 'tlsoa', 'core20-toggle']
+    .concat(_URL_LAYERS)
+    .forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('change', _scheduleUrlWrite);
+    });
+  // The level badge is buttons rather than a control with a change event.
+  document.querySelectorAll('#dl-seg button').forEach(b => {
+    b.addEventListener('click', _scheduleUrlWrite);
   });
   if (typeof map !== 'undefined' && map) {
     let t = null;
@@ -14127,6 +14360,8 @@ loadData();
     var at = rbSelected.indexOf(code);
     if (at === -1) rbSelected.push(code); else rbSelected.splice(at, 1);
     renderReportPane();
+    // The area rides in the link, so every LSOA added or dropped moves it.
+    if (window.PH_URL) window.PH_URL.write();
   }
 
   // showLSOA calls this before doing anything else, so in Custom area mode
@@ -14136,11 +14371,43 @@ loadData();
     toggle: rbToggle,
     selected: function () { return rbSelected.slice(); },
     aggregate: rbAggregate,
+    /* For the shared link. An area is the only thing on this page a user
+       builds by hand rather than chooses, so it was also the only thing they
+       could not send anyone and the only thing a refresh threw away. */
+    state: function () {
+      var el = $('rb-name');
+      return { name: (el && el.value.trim()) || '', codes: rbSelected.slice() };
+    },
+    apply: function (st) {
+      if (!st || !st.codes || !st.codes.length) return false;
+      // The boundaries carry the geography this draws from, so there is
+      // nothing to show until they have loaded. Reported as not-yet-applied so
+      // the caller comes back rather than marking the job done.
+      if (typeof LSOA_IMD === 'undefined' || !LSOA_IMD || !LSOA_IMD.features) return false;
+      var known = {};
+      LSOA_IMD.features.forEach(function (f) { known[(f.properties || {}).code] = 1; });
+      var codes = st.codes.filter(function (c) { return known[c]; });
+      if (!codes.length) return false;
+      rbSelected = codes;
+      var el = $('rb-name');
+      if (el && st.name) el.value = st.name;
+      renderReportPane();
+      drawReportSelection();
+      return true;
+    },
   };
 
   if (rbPane) {
-    $('rb-clear').addEventListener('click', function () { rbSelected = []; renderReportPane(); });
-    $('rb-name').addEventListener('input', function () { /* name is read on export */ });
+    $('rb-clear').addEventListener('click', function () {
+      rbSelected = [];
+      renderReportPane();
+      if (window.PH_URL) window.PH_URL.write();
+    });
+    // The name is read on export, and it also rides in the link, so a shared
+    // area arrives called what its author called it rather than "Unnamed area".
+    $('rb-name').addEventListener('input', function () {
+      if (window.PH_URL) window.PH_URL.write();
+    });
     $('rb-list').addEventListener('click', function (e) {
       var drop = e.target.closest('[data-drop]');
       if (drop) { e.stopPropagation(); rbToggle(drop.getAttribute('data-drop')); return; }
@@ -14578,6 +14845,10 @@ loadData();
     // refreshPins is the one call that redoes both.
     refreshPins();
 
+    // Which tool is open rides in the link, and so do the query and the area,
+    // which are only written while their own tool has the sidebar.
+    if (window.PH_URL) window.PH_URL.write();
+
     if (currentMode === 'compare') {
       buildOnce();
       renderComparePane();
@@ -14777,6 +15048,9 @@ loadData();
 
   function renderBuilder() {
     renderServices(); renderScope(); renderConds(); renderCaution(); renderReadback();
+    // Every route that edits the query lands here, so the link follows the
+    // builder without five separate handlers having to remember to say so.
+    if (window.PH_URL) window.PH_URL.write();
   }
 
   /* Step 1 on or off.
@@ -15054,7 +15328,49 @@ loadData();
   // got there yet. seed is for the tour: the worked example is laid down once,
   // at load, and anything that clears the builder after that leaves the panel
   // empty, which is not the same as leaving it at its default.
-  window.PH_QUERY = { build: buildOnce, seed: seedExample };
+  //
+  // state and apply are for the shared link. A query is the one piece of state
+  // on this page that is a structure rather than a value, so it serialises
+  // itself here and the URL layer stays generic: it does not have to know what
+  // a condition is, only how to put three fields in a query string.
+  window.PH_QUERY = {
+    build: buildOnce,
+    seed: seedExample,
+    state: function () {
+      return {
+        services: q.services.slice(),
+        scope: q.scope || '',
+        // Only the conditions that are actually filtering. A half-typed row
+        // with no value is a row the user is still writing, not part of the
+        // question they would send someone.
+        conds: q.conds.filter(function (c) { return c.key && c.value != null; })
+                      .map(function (c) { return [c.key, c.op, c.value]; }),
+      };
+    },
+    /* Everything inbound is treated as hostile: a link can be edited, and an
+       indicator key that no longer exists would otherwise put a dead row in the
+       builder and filter every ward out of the answer. Unknown services,
+       unknown keys and unknown operators are dropped rather than corrected. */
+    apply: function (st) {
+      if (!st) return false;
+      buildOnce();
+      if (!_built) return false;
+      var svcIds = SERVICES.map(function (s) { return s.id; });
+      q.services = (st.services || []).filter(function (id) { return svcIds.indexOf(id) !== -1; });
+      q.scope = typeof st.scope === 'string' ? st.scope : '';
+      q.conds = (st.conds || []).filter(function (t) {
+        return t && t.length === 3 && indicatorKeys().indexOf(t[0]) !== -1 &&
+               ['lte', 'gte', 'eq'].indexOf(t[1]) !== -1 && num(t[2]) !== null;
+      }).map(function (t) { return { key: t[0], op: t[1], value: num(t[2]) }; });
+      if (qUseServices) {
+        qUseServices.checked = q.services.length > 0;
+        applyServicesToggle(q.services.length > 0, false);
+      }
+      renderBuilder();
+      runQuery();
+      return true;
+    },
+  };
 
 })();
 </script>
