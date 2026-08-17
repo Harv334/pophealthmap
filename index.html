@@ -253,7 +253,31 @@
   .sidebar.resizing .sb-grip::before { opacity: 1; background: var(--nhs-blue); }
   /* Nothing to grab on a zero-width panel, and nothing to give it to. */
   .sidebar.collapsed .sb-grip { display: none; }
+  /* The mode bar shares the tab strip's grid row, so exactly one of them is on
+     screen and the row is always the same height whichever it is. */
   .sidebar > .sb-tabs     { grid-area: tabs; }
+  .sidebar > .sb-modebar  { grid-area: tabs; display: none; }
+  .sb-modebar { align-items: center; gap: 7px; min-height: 36px;
+    padding: 0 12px; background: var(--paper-2);
+    border-bottom: 1px solid var(--line-2); overflow: hidden; }
+  .sb-modebar-back { appearance: none; background: none; border: 0; padding: 2px 0;
+    font: inherit; font-size: var(--t-xs); font-weight: 600; color: var(--nhs-blue);
+    cursor: pointer; flex-shrink: 0; }
+  .sb-modebar-back:hover { color: var(--nhs-dark); text-decoration: underline;
+    text-underline-offset: 2px; }
+  .sb-modebar-back:focus-visible { outline: 2px solid var(--nhs-blue); outline-offset: 2px; }
+  .sb-modebar-sep { color: var(--line); flex-shrink: 0; }
+  .sb-modebar-name { font-size: var(--t-xs); font-weight: 600; color: var(--ink);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* One rule for all five modes: the tools own the panel, so the tab strip
+     stands down and the mode bar stands up. The per-mode `display:none` rules
+     that used to do the first half of this are gone. */
+  .sidebar.query-mode > .sb-tabs, .sidebar.compare-mode > .sb-tabs,
+  .sidebar.report-mode > .sb-tabs, .sidebar.csv-mode > .sb-tabs,
+  .sidebar.directory-mode > .sb-tabs { display: none; }
+  .sidebar.query-mode > .sb-modebar, .sidebar.compare-mode > .sb-modebar,
+  .sidebar.report-mode > .sb-modebar, .sidebar.csv-mode > .sb-modebar,
+  .sidebar.directory-mode > .sb-modebar { display: flex; }
   /* Panes scroll. They used to be overflow:hidden, with the only scrollable
      thing in the Layers pane being the empty spacer at the bottom, so on a
      short window or a phone the boundary toggles simply could not be reached:
@@ -1055,7 +1079,7 @@
      which a row of figures is still readable. The assistant's compare_areas
      tool stops at six, but that is a different surface with a different
      constraint, and matching the design here is the better call. */
-  .sidebar.compare-mode > .sb-tabs { display: none; }
+  /* The tab strip standing down for this mode is handled once, with the mode bar that replaces it. See .sb-modebar. */
   .cmp-pane { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
   .cmp-scroll { overflow-y: auto; min-height: 0; flex: 1; }
   .cmp-head { padding: 13px 14px 11px; border-bottom: 1px solid var(--line); }
@@ -1063,20 +1087,13 @@
   .cmp-head h2 { font-family: 'Inter Tight', Inter, sans-serif; font-size: var(--t-xl); font-weight: 600;
     margin: 0; letter-spacing: -.01em; color: var(--nhs-dark); }
   .cmp-head .cmp-sub { font-size: var(--t-sm); color: var(--ink-3); margin-top: 2px; }
-  /* ── Back to Explore ──
-     One rule for all four, keyed off the button rather than the header it
-     happens to sit in. This was written as `.cmp-head .cmp-back`, which is the
-     Compare header, so Compare and Query got the quiet blue link and the other
-     two got whatever the browser draws for a bare <button>: Custom area's
-     lives in .rb-head and Directory's in .dir-head, and neither matched. Four
-     buttons with the same class, the same label and the same job looked like
-     two different kinds of control. */
-  .cmp-back, .q-back { margin-left: auto; appearance: none; background: none; border: 0;
-    padding: 0; font: inherit; font-size: var(--t-xs); color: var(--nhs-blue); cursor: pointer;
-    white-space: nowrap; flex: 0 0 auto; }
-  .cmp-back:hover, .q-back:hover { color: var(--nhs-dark); text-decoration: underline; }
-  .cmp-back:focus-visible, .q-back:focus-visible { outline: 2px solid var(--nhs-blue);
-    outline-offset: 2px; border-radius: 2px; }
+  /* The five "Back to Explore" buttons that used to live in these headers, one
+     per mode, are gone. There is one, in the mode bar, in the same place
+     whichever tool is open. Their styling had already been through one round
+     of this: the rule was written as `.cmp-head .cmp-back`, so two of the five
+     got the quiet blue link and the other three got whatever the browser draws
+     for a bare button. Five buttons with the same label and the same job are
+     better as one button than as one rule. */
   .cmp-group { padding: 12px 14px; border-bottom: 1px solid var(--line); }
   .cmp-group h3 { font-size: var(--t-xs); text-transform: uppercase; letter-spacing: .06em; font-weight: 600;
     color: var(--ink-3); margin: 0 0 9px; display: flex; justify-content: space-between; align-items: baseline; }
@@ -1291,7 +1308,7 @@
      Pick LSOAs off the map and treat them as one area. Neighbourhoods,
      catchments and PCN footprints do not follow ward lines, and until now the
      only areas the map could total up were the ones ONS had already drawn. */
-  .sidebar.report-mode > .sb-tabs { display: none; }
+  /* The tab strip standing down for this mode is handled once, with the mode bar that replaces it. See .sb-modebar. */
   .rb-pane { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
   .rb-scroll { overflow-y: auto; overflow-x: hidden; min-height: 0; flex: 1; }
   .rb-head { padding: 13px 14px 11px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
@@ -1341,7 +1358,7 @@
      The toolbar CSV gives you what the map is drawing. This gives you the
      columns you asked for, at the level you asked for, for the places you
      asked for. */
-  .sidebar.csv-mode > .sb-tabs { display: none; }
+  /* The tab strip standing down for this mode is handled once, with the mode bar that replaces it. See .sb-modebar. */
   .cb-pane { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
   .cb-scroll { overflow-y: auto; overflow-x: hidden; min-height: 0; flex: 1; }
   .cb-head { padding: 13px 14px 11px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
@@ -1395,7 +1412,7 @@
      Every point dataset on the map as one searchable list. The map answers
      "what is near here"; this answers "where is this" and "how many of these
      are there", which the map cannot do without a lot of panning. */
-  .sidebar.directory-mode > .sb-tabs { display: none; }
+  /* The tab strip standing down for this mode is handled once, with the mode bar that replaces it. See .sb-modebar. */
   .dir-pane { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
   .dir-head { padding: 13px 14px 11px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
   .dir-head .cmp-row { display: flex; align-items: baseline; gap: 8px; }
@@ -1432,13 +1449,11 @@
      any number of indicator conditions, read left to right as one sentence. */
   /* In Query mode the sidebar is the query, so the tab strip goes: leaving it
      visible with nothing selected reads as a bug rather than as a mode. */
-  .sidebar.query-mode > .sb-tabs { display: none; }
+  /* The tab strip standing down for this mode is handled once, with the mode bar that replaces it. See .sb-modebar. */
   .q-pane { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
   .q-head { display: flex; align-items: baseline; gap: 8px; padding: 11px 12px 0; }
   .q-head h2 { font-family: 'Inter Tight', Inter, sans-serif; font-size: var(--t-xl); font-weight: 600;
     letter-spacing: -.01em; color: var(--nhs-dark); margin: 0; }
-  /* Styled with .cmp-back above, so the two stay identical by construction
-     rather than by two copies of the same declarations being kept in step. */
   .q-scroll { overflow-y: auto; min-height: 0; flex: 1; }
   .q-block { padding: 12px 12px 13px; border-bottom: 1px solid var(--line); background: var(--paper-2); }
   .q-sub { font-size: var(--t-xs); color: var(--ink-3); line-height: 1.45; margin-bottom: 9px; }
@@ -1867,6 +1882,25 @@
                 aria-selected="false" aria-controls="tab-ward" data-tab="ward">Area profile</button>
       </div>
 
+      <!-- What sits in the tab strip's slot while a tool has the panel.
+           The strip used to be display:none for the five modes that take the
+           sidebar over, so choosing Query made a whole row of the interface
+           vanish and everything below it jump up 36px. A row disappearing
+           reads as a rendering fault the first time, not as a mode change.
+
+           It occupies the same grid area, so the height never changes, and it
+           says which tool is open and how to leave it. That back button is the
+           only one now: there used to be five, one in each mode's own pane
+           header, all labelled "Back to Explore" and all running the same two
+           lines of code from five different places. -->
+      <div class="sb-modebar" id="sb-modebar">
+        <button type="button" class="sb-modebar-back" id="sb-mode-back">
+          <span aria-hidden="true">&#8592;</span> Explore
+        </button>
+        <span class="sb-modebar-sep" aria-hidden="true">/</span>
+        <span class="sb-modebar-name" id="sb-modebar-name"></span>
+      </div>
+
       <!-- Layers tab -->
       <div class="tab-pane" id="tab-layers" role="tabpanel" aria-labelledby="sbtab-layers">
         <div class="sb-sec">
@@ -2266,7 +2300,7 @@
         <div class="rb-head">
           <div class="cmp-row">
             <h2>Custom area</h2>
-            <button type="button" class="cmp-back" id="rb-back">Back to Explore</button>
+            
           </div>
           <input type="text" class="rb-name" id="rb-name" maxlength="60"
                  placeholder="Name this area" aria-label="Name for the area you are building">
@@ -2300,7 +2334,7 @@
         <div class="cb-head">
           <div class="cmp-row">
             <h2>Data export</h2>
-            <button type="button" class="cmp-back" id="cb-back">Back to Explore</button>
+            
           </div>
           <div class="cb-sub">Build a spreadsheet. Choose the areas, then the figures. The file
             downloads to your computer.</div>
@@ -2348,7 +2382,7 @@
         <div class="dir-head">
           <div class="cmp-row">
             <h2>Directory</h2>
-            <button type="button" class="cmp-back" id="dir-back">Back to Explore</button>
+            
           </div>
           <div class="cmp-sub" id="dir-sub">Loading the lists...</div>
         </div>
@@ -2373,7 +2407,7 @@
         <div class="cmp-head">
           <div class="cmp-row">
             <h2>Compare</h2>
-            <button type="button" class="cmp-back" id="cmp-back">Back to Explore</button>
+            
           </div>
           <div class="cmp-sub">Pin up to 4 wards, live on the map</div>
         </div>
@@ -2405,7 +2439,7 @@
       <div class="tab-pane q-pane" id="tab-query">
         <div class="q-head">
           <h2>Query</h2>
-          <button type="button" class="q-back" id="q-back">Back to Explore</button>
+          
         </div>
         <div class="q-scroll">
           <div class="q-block">
@@ -11040,6 +11074,16 @@ loadData();
     });
   }());
   panel.querySelector('.mode-back').addEventListener('click', function () { show('explore'); });
+
+  // The one way out of a mode, replacing the five identical buttons that used
+  // to sit in the five mode pane headers.
+  var modeBack = document.getElementById('sb-mode-back');
+  if (modeBack) {
+    modeBack.addEventListener('click', function () {
+      var explore = rail.querySelector('.mode-btn[data-mode="explore"]');
+      if (explore) explore.click();
+    });
+  }
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && !panel.hidden) show('explore');
   });
@@ -11064,6 +11108,20 @@ loadData();
         sidebar.classList.toggle('report-mode', rp);
         sidebar.classList.toggle('csv-mode', cv);
       }
+      /* Name the tool in the bar that has taken the tab strip's row. Read off
+         the rail's own button rather than a second list of labels here, so
+         renaming a mode in one place renames it everywhere: this is exactly
+         how "Report builder" came to be two different things. */
+      var modeName = document.getElementById('sb-modebar-name');
+      if (modeName) {
+        var active = q ? 'query' : c ? 'compare' : dr ? 'directory'
+                   : rp ? 'report' : cv ? 'csv' : null;
+        if (active) {
+          var railBtn = rail.querySelector('.mode-btn[data-mode="' + active + '"]');
+          modeName.textContent = railBtn ? railBtn.textContent.trim() : active;
+        }
+      }
+
       if (q) markRail('query');
       else if (c) markRail('compare');
       else if (dr) markRail('directory');
@@ -12198,10 +12256,6 @@ loadData();
     $('cmp-csv').addEventListener('click', cmpCsv);
     $('cmp-bar-csv').addEventListener('click', cmpCsv);
     $('cmp-bar-close').addEventListener('click', closeCompareBar);
-    $('cmp-back').addEventListener('click', function () {
-      var explore = document.querySelector('.mode-btn[data-mode="explore"]');
-      if (explore) explore.click();
-    });
   }
 
   function cmpCsv() {
@@ -12530,10 +12584,6 @@ loadData();
         lines.push([r.n, r.label, r.a, r.pc, r.lad, r.lat, r.lng].map(csvCell).join(','));
       });
       download('pophealth-directory.csv', lines.join('\n'), 'text/csv;charset=utf-8');
-    });
-    $('dir-back').addEventListener('click', function () {
-      var explore = document.querySelector('.mode-btn[data-mode="explore"]');
-      if (explore) explore.click();
     });
   })();
 
@@ -13211,10 +13261,6 @@ loadData();
 
   if (rbPane) {
     $('rb-clear').addEventListener('click', function () { rbSelected = []; renderReportPane(); });
-    $('rb-back').addEventListener('click', function () {
-      var b = document.querySelector('.mode-btn[data-mode="explore"]');
-      if (b) b.click();
-    });
     $('rb-name').addEventListener('input', function () { /* name is read on export */ });
     $('rb-list').addEventListener('click', function (e) {
       var drop = e.target.closest('[data-drop]');
@@ -13547,10 +13593,6 @@ loadData();
   }
 
   if (cbPane) {
-    $('cb-back').addEventListener('click', function () {
-      var b = document.querySelector('.mode-btn[data-mode="explore"]');
-      if (b) b.click();
-    });
     $('cb-level').addEventListener('click', function (e) {
       var b = e.target.closest('[data-lvl]');
       if (!b) return;
@@ -14137,13 +14179,6 @@ loadData();
   // got there yet.
   window.PH_QUERY = { build: buildOnce };
 
-  var backBtn = $('q-back');
-  if (backBtn) {
-    backBtn.addEventListener('click', function () {
-      var explore = document.querySelector('.mode-btn[data-mode="explore"]');
-      if (explore) explore.click();
-    });
-  }
 })();
 </script>
 </body></html>
