@@ -82,6 +82,90 @@
     --shadow-sm:0 1px 2px rgba(33,43,50,.05);
     --shadow:0 2px 4px rgba(33,43,50,.05), 0 8px 24px rgba(33,43,50,.06);
     --shadow-lg:0 8px 32px rgba(33,43,50,.10), 0 2px 8px rgba(33,43,50,.05);
+
+    /* Two roles a light-only palette never had to name, and that a dark one
+       cannot work without.
+
+       --on-accent is text sitting on a saturated fill: the blue of an active
+       toolbar button, a numbered step, a popup header. White here. In dark the
+       accent lifts to #4DA3E8 so it reads against a dark ground, and white on
+       that is 2.2:1, so the text has to go dark instead. Anything written as
+       color:#fff over an accent is wrong by construction; it wants this.
+
+       --invert-* is the handful of things deliberately inverted against the
+       page: the development banner, the level-badge hint, the help popover,
+       the marker tooltips. In dark they do not invert again into white cards,
+       which would glare. They become a raised surface instead. */
+    --on-accent:#FFFFFF;
+    --invert-bg:#212B32; --invert-ink:#FFFFFF;
+
+    /* Status washes. These were literal tints scattered through the sheet:
+       the amber of the suppression notice, the red of a Core20 chip, the pink
+       of a VCSE one. A wash is the one thing that cannot survive a theme
+       change untouched, because it is defined by being barely lighter than
+       the page, and in dark it has to be barely lighter than a dark page. */
+    --tint-amber:#FFF8E6; --tint-amber-line:#E0C280; --tint-amber-ink:#5C4115;
+    --tint-red:#FDF2F1;   --tint-red-line:#F2C4BF;
+    --tint-pink:#F6E7F0;  --tint-pink-line:#E6C6D8;
+    --tint-green:#E3F2E8;
+    --tint-blue-line:#B9D3EC;
+    /* The hairline between wards on the loading map. See .ldr-map path. */
+    --ldr-stroke:var(--bg);
+  }
+
+  /* ── Dark ──────────────────────────────────────────────────────────────────
+     Three blocks, because the viewer has three states and not two. The bare
+     :root above carries the whole light palette. This one covers the default,
+     where nobody has told us anything and only the operating system has an
+     opinion; it is guarded so an explicit light choice still beats a dark OS.
+     The third covers an explicit dark choice.
+
+     Only tokens are redefined in here. No component rule appears, which is
+     what prevents the classic failure where one theme's text lands on the
+     other theme's ground: every surface and every colour on it come from the
+     same set, so they move together.
+
+     The values are measured. Against --paper: --ink 13.8:1, --ink-2 8.7:1,
+     --ink-3 5.8:1, the blue 6.1:1, and --on-accent on that blue 6.8:1. */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --nhs-blue:#4DA3E8; --nhs-dark:#8AC4F5; --nhs-bright:#5FB3F0;
+      --nhs-aqua:#5FC5EE; --nhs-light:#22303A; --nhs-yellow:#F5C43C;
+      --nhs-red:#F2857B;  --nhs-green:#5CC98A; --nhs-pink:#E08AB8;
+      --ink:#E3EAEF; --ink-2:#AFBDC6; --ink-3:#8B9AA5; --ink-faint:#66757F;
+      --line:#2C3840; --line-2:#232E35;
+      --bg:#0E1519; --paper:#161F25; --paper-2:#1C262C;
+      --on-accent:#0E1519;
+      --invert-bg:#24313A; --invert-ink:#E3EAEF;
+      --tint-amber:#2E2410; --tint-amber-line:#5E4A1E; --tint-amber-ink:#F0D9A8;
+      --tint-red:#2E1614;   --tint-red-line:#6B302B;
+      --tint-pink:#2C1A26;  --tint-pink-line:#5A3348;
+      --tint-green:#132A1C;
+      --tint-blue-line:#2F4A63;
+    --ldr-stroke:#7E8F9B;
+      --ldr-stroke:#7E8F9B;
+      --shadow-sm:0 1px 2px rgba(0,0,0,.4);
+      --shadow:0 2px 4px rgba(0,0,0,.35), 0 8px 24px rgba(0,0,0,.45);
+      --shadow-lg:0 8px 32px rgba(0,0,0,.55), 0 2px 8px rgba(0,0,0,.4);
+    }
+  }
+  :root[data-theme="dark"] {
+    --nhs-blue:#4DA3E8; --nhs-dark:#8AC4F5; --nhs-bright:#5FB3F0;
+    --nhs-aqua:#5FC5EE; --nhs-light:#22303A; --nhs-yellow:#F5C43C;
+    --nhs-red:#F2857B;  --nhs-green:#5CC98A; --nhs-pink:#E08AB8;
+    --ink:#E3EAEF; --ink-2:#AFBDC6; --ink-3:#8B9AA5; --ink-faint:#66757F;
+    --line:#2C3840; --line-2:#232E35;
+    --bg:#0E1519; --paper:#161F25; --paper-2:#1C262C;
+    --on-accent:#0E1519;
+    --invert-bg:#24313A; --invert-ink:#E3EAEF;
+    --tint-amber:#2E2410; --tint-amber-line:#5E4A1E; --tint-amber-ink:#F0D9A8;
+    --tint-red:#2E1614;   --tint-red-line:#6B302B;
+    --tint-pink:#2C1A26;  --tint-pink-line:#5A3348;
+    --tint-green:#132A1C;
+    --tint-blue-line:#2F4A63;
+    --shadow-sm:0 1px 2px rgba(0,0,0,.4);
+    --shadow:0 2px 4px rgba(0,0,0,.35), 0 8px 24px rgba(0,0,0,.45);
+    --shadow-lg:0 8px 32px rgba(0,0,0,.55), 0 2px 8px rgba(0,0,0,.4);
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -91,7 +175,7 @@
      display:none and not visibility:hidden, either of which would take it out
      of the focus order and defeat the point of having it. */
   .skip-link { position: absolute; left: -9999px; top: 0; z-index: 9999;
-    background: var(--nhs-blue); color: #fff; padding: 10px 16px;
+    background: var(--nhs-blue); color: var(--on-accent); padding: 10px 16px;
     border-radius: 0 0 8px 0; font-size: var(--t-md); font-weight: 600;
     text-decoration: none; }
   .skip-link:focus { left: 0; outline: 3px solid var(--nhs-yellow); outline-offset: -3px; }
@@ -128,23 +212,23 @@
 
   /* ── Header toolbar (Reset / Copy link / PNG / CSV) ── */
   .tb-btn { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 6px 13px; font-size: var(--t-md); color: var(--ink); cursor: pointer; display: inline-flex; align-items: center; gap: 5px; font-weight: 500; transition: background .12s, border-color .12s; }
-  .tb-btn:hover { background: var(--paper-2); border-color: #c9d1d6; color: var(--ink); }
-  .tb-btn.active { background: var(--nhs-blue); border-color: var(--nhs-blue); color: #fff; }
-  .tb-btn.active:hover { background: var(--nhs-dark); border-color: var(--nhs-dark); color: #fff; }
+  .tb-btn:hover { background: var(--paper-2); border-color: var(--ink-faint); color: var(--ink); }
+  .tb-btn.active { background: var(--nhs-blue); border-color: var(--nhs-blue); color: var(--on-accent); }
+  .tb-btn.active:hover { background: var(--nhs-dark); border-color: var(--nhs-dark); color: var(--on-accent); }
   .tb-btn:active { background: var(--line-2); }
-  .tb-btn.primary { background: var(--nhs-blue); color: #fff; border-color: var(--nhs-blue); }
-  .tb-btn.primary:hover { background: var(--nhs-dark); color: #fff; border-color: var(--nhs-dark); }
-  .tb-btn.danger:hover { background: #FDF2F1; border-color: var(--nhs-red); color: var(--nhs-red); }
+  .tb-btn.primary { background: var(--nhs-blue); color: var(--on-accent); border-color: var(--nhs-blue); }
+  .tb-btn.primary:hover { background: var(--nhs-dark); color: var(--on-accent); border-color: var(--nhs-dark); }
+  .tb-btn.danger:hover { background: var(--tint-red); border-color: var(--nhs-red); color: var(--nhs-red); }
   .tb-sep { width: 1px; height: 20px; background: var(--line); }
 
   /* ── Header search ── */
   .hdr-search { position: relative; }
-  .hdr-search input { width: 200px; padding: 5px 10px 5px 28px; border: 1px solid var(--line); border-radius: 6px; font-size: var(--t-sm); color: var(--ink); background: #fff url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'><circle cx='11' cy='11' r='7'/><path d='m21 21-4.35-4.35'/></svg>") no-repeat 8px center; outline: none; transition: border-color .12s, box-shadow .12s; }
+  .hdr-search input { width: 200px; padding: 5px 10px 5px 28px; border: 1px solid var(--line); border-radius: 6px; font-size: var(--t-sm); color: var(--ink); background: var(--paper) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'><circle cx='11' cy='11' r='7'/><path d='m21 21-4.35-4.35'/></svg>") no-repeat 8px center; outline: none; transition: border-color .12s, box-shadow .12s; }
   .hdr-search input:focus { border-color: var(--nhs-blue); box-shadow: 0 0 0 3px rgba(0,94,184,.12); }
-  .hdr-search-results { position: absolute; top: 100%; left: 0; margin-top: 4px; width: 320px; max-height: 360px; overflow-y: auto; background: #fff; border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,.15); display: none; z-index: 3000; }
+  .hdr-search-results { position: absolute; top: 100%; left: 0; margin-top: 4px; width: 320px; max-height: 360px; overflow-y: auto; background: var(--paper); border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,.15); display: none; z-index: 3000; }
   /* Search now lives in the sidebar footer — make it full-width and open the dropdown UPWARD so it doesn't go off-screen. */
   .sb-footer-search { position: relative; margin-bottom: 8px; }
-  .sb-footer-search input { width: 100%; padding: 6px 10px 6px 28px; border: 1px solid var(--line); border-radius: 6px; font-size: var(--t-sm); color: var(--ink); background: #fff url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'><circle cx='11' cy='11' r='7'/><path d='m21 21-4.35-4.35'/></svg>") no-repeat 8px center; outline: none; transition: border-color .12s, box-shadow .12s; }
+  .sb-footer-search input { width: 100%; padding: 6px 10px 6px 28px; border: 1px solid var(--line); border-radius: 6px; font-size: var(--t-sm); color: var(--ink); background: var(--paper) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'><circle cx='11' cy='11' r='7'/><path d='m21 21-4.35-4.35'/></svg>") no-repeat 8px center; outline: none; transition: border-color .12s, box-shadow .12s; }
   .sb-footer-search input:focus { border-color: var(--nhs-blue); box-shadow: 0 0 0 3px rgba(0,94,184,.12); }
   .hdr-search-results.sb-footer-results { position: absolute; top: auto; bottom: 100%; left: 0; right: 0; width: auto; margin: 0 0 4px 0; max-height: 320px; }
   /* 2×2 button grid for the four toolbar actions */
@@ -161,14 +245,14 @@
   .sr-grp { padding: 4px 10px; font-size: var(--t-xs); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); background: var(--paper-2); font-weight: 600; border-bottom: 1px solid var(--line-2); }
   .hsr-group { font-size: var(--t-xs); text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); padding: 6px 10px 3px; background: var(--paper-2); border-bottom: 1px solid var(--line-2); }
   .hsr-item { display: flex; align-items: baseline; gap: 8px; padding: 6px 10px; font-size: var(--t-sm); color: var(--ink); cursor: pointer; border-bottom: 1px solid var(--paper-2); }
-  .hsr-item:hover { background: #E5EFF8; }
+  .hsr-item:hover { background: var(--nhs-light); }
   .hsr-type { font-size: var(--t-xs); color: var(--ink-3); padding: 1px 5px; border-radius: 3px; background: var(--line-2); flex-shrink: 0; text-transform: uppercase; letter-spacing: .04em; }
   .hsr-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .hsr-meta { font-size: var(--t-xs); color: var(--ink-3); flex-shrink: 0; }
   .hsr-empty { padding: 14px 10px; font-size: var(--t-sm); color: var(--ink-3); text-align: center; }
 
   /* ── "Currently viewing" strip + filter chips (above the map) ── */
-  .viewing-strip { background: #fff; border-bottom: 1px solid var(--line-2); padding: 5px 12px 6px; font-size: var(--t-sm); color: var(--ink-2); display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 10px; row-gap: 2px; align-items: center; flex-shrink: 0; }
+  .viewing-strip { background: var(--paper); border-bottom: 1px solid var(--line-2); padding: 5px 12px 6px; font-size: var(--t-sm); color: var(--ink-2); display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 10px; row-gap: 2px; align-items: center; flex-shrink: 0; }
   /* ── Search result pin ──
      A teardrop rather than a circle, because the point layers are already
      circles and the whole job of this one is to be the thing you can pick out
@@ -180,7 +264,7 @@
     transform: rotate(-45deg); background: var(--nhs-blue); border: 2.5px solid #fff;
     box-shadow: 0 2px 6px rgba(0,0,0,.35); }
   .search-pin-dot { position: absolute; left: 10.5px; top: 7.5px;
-    width: 7px; height: 7px; border-radius: 50%; background: #fff; }
+    width: 7px; height: 7px; border-radius: 50%; background: var(--paper); }
 
   /* ── Fingertips suppression notice ──
      Bottom right, which is where it belongs: it is a footnote about the
@@ -194,20 +278,20 @@
      inline style beats an id selector, so the narrow-screen rule below it was
      dead and had never once applied. */
   #fingertips-banner { position: absolute; right: 12px; bottom: 54px; max-width: 300px;
-    background: #fff8e6; border: 1px solid #e0c280; color: #5c4115;
+    background: var(--tint-amber); border: 1px solid var(--tint-amber-line); color: var(--tint-amber-ink);
     padding: 9px 12px; border-radius: 6px; box-shadow: 0 2px 10px rgba(0,0,0,.10);
     font-size: var(--t-sm); line-height: 1.45; z-index: 560; display: none;
     pointer-events: none; }
-  #fingertips-banner .ft-i { display: inline-block; background: #b88030; color: #fff;
+  #fingertips-banner .ft-i { display: inline-block; background: #b88030; color: var(--on-accent);
     border-radius: 50%; width: 18px; height: 18px; text-align: center;
     line-height: 18px; font-weight: 700; margin-right: 6px; font-size: var(--t-xs);
     vertical-align: middle; }
   #fingertips-banner-close { float: right; background: none; border: none;
-    color: #5c4115; font-size: var(--t-xl); cursor: pointer; padding: 0 0 0 8px;
+    color: var(--tint-amber-ink); font-size: var(--t-xl); cursor: pointer; padding: 0 0 0 8px;
     margin: -4px 0 0 0; line-height: 1; pointer-events: auto; }
 
   /* ── Persistent map legend strip ── */
-  .map-legend-strip { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); background: rgba(255,255,255,.94); border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px; box-shadow: 0 2px 8px rgba(0,0,0,.10); font-size: var(--t-xs); color: var(--ink-2); display: flex; align-items: center; gap: 10px; z-index: 540; pointer-events: none; max-width: 90%; }
+  .map-legend-strip { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); background: color-mix(in srgb, var(--paper) 94%, transparent); border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px; box-shadow: 0 2px 8px rgba(0,0,0,.10); font-size: var(--t-xs); color: var(--ink-2); display: flex; align-items: center; gap: 10px; z-index: 540; pointer-events: none; max-width: 90%; }
   .map-legend-strip .mls-label { font-weight: 600; color: var(--ink); max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .map-legend-strip .mls-min, .map-legend-strip .mls-max { font-variant-numeric: tabular-nums; color: var(--ink-2); min-width: 34px; }
   .map-legend-strip .mls-min { text-align: right; }
@@ -219,16 +303,16 @@
   .vs-digest { color: var(--ink); font-weight: 500; }
   .vs-digest b { color: var(--nhs-blue); font-weight: 600; }
   .chips { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; }
-  .chip { display: inline-flex; align-items: center; gap: 5px; background: #E5EFF8; color: var(--nhs-blue); border: 1px solid #B9D3EC; border-radius: 12px; padding: 3px 4px 3px 9px; font-size: var(--t-xs); font-weight: 500; line-height: 1.4; }
-  .chip.core20 { background: #FDF2F1; color: var(--nhs-red); border-color: #F2C4BF; }
-  .chip.overlay { background: #f2ecdf; color: #854F0B; border-color: #e3d3ae; }
-  .chip.vcse { background: #F6E7F0; color: var(--nhs-pink); border-color: #E6C6D8; }
+  .chip { display: inline-flex; align-items: center; gap: 5px; background: var(--nhs-light); color: var(--nhs-blue); border: 1px solid var(--tint-blue-line); border-radius: 12px; padding: 3px 4px 3px 9px; font-size: var(--t-xs); font-weight: 500; line-height: 1.4; }
+  .chip.core20 { background: var(--tint-red); color: var(--nhs-red); border-color: var(--tint-red-line); }
+  .chip.overlay { background: var(--tint-amber); color: var(--tint-amber-ink); border-color: var(--tint-amber-line); }
+  .chip.vcse { background: var(--tint-pink); color: var(--nhs-pink); border-color: var(--tint-pink-line); }
   .chip-x { background: transparent; border: none; color: inherit; opacity: .6; cursor: pointer; font-size: var(--t-md); line-height: 1; padding: 0 4px; border-radius: 8px; }
   .chip-x:hover { opacity: 1; background: rgba(0,0,0,.06); }
   .main { display: grid; grid-template-columns: auto minmax(0, 1fr); overflow: hidden; min-height: 0; min-width: 0; }
 
   /* ── Sidebar ── CSS Grid: native layout guarantees [focus] [tabs] [flexible pane] [footer] stack. No JS measurement needed. */
-  .sidebar { position: relative; width: var(--sb-w, 268px); border-right: 1px solid var(--line-2); flex-shrink: 0; background: #fff; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; grid-template-areas: "focus" "tabs" "pane" "footer"; height: 100%; min-height: 0; overflow: hidden; transition: width .18s ease; }
+  .sidebar { position: relative; width: var(--sb-w, 268px); border-right: 1px solid var(--line-2); flex-shrink: 0; background: var(--paper); display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; grid-template-areas: "focus" "tabs" "pane" "footer"; height: 100%; min-height: 0; overflow: hidden; transition: width .18s ease; }
   /* Collapsed to nothing, so the map gets the whole window. The same button
      that opens the drawer on a phone does this on a desktop: one control, and
      the same idea behind it, which is that the panel is optional. */
@@ -299,9 +383,9 @@
   /* A visible track, so it is obvious there is more below rather than the
      content just appearing to stop. */
   .sidebar > .tab-pane::-webkit-scrollbar { width: 9px; }
-  .sidebar > .tab-pane::-webkit-scrollbar-thumb { background: #CBD5DA; border-radius: 5px; border: 2px solid #fff; }
-  .sidebar > .tab-pane::-webkit-scrollbar-thumb:hover { background: #A8B6BD; }
-  .sidebar > .tab-pane { scrollbar-width: thin; scrollbar-color: #CBD5DA transparent; }
+  .sidebar > .tab-pane::-webkit-scrollbar-thumb { background: var(--line); border-radius: 5px; border: 2px solid var(--paper); }
+  .sidebar > .tab-pane::-webkit-scrollbar-thumb:hover { background: var(--ink-faint); }
+  .sidebar > .tab-pane { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
   .sidebar > .sb-sec      { grid-area: footer; background: var(--paper-2); }
   .sb-tabs { display: flex; border-bottom: 1px solid var(--line-2); background: var(--paper-2); min-height: 36px; }
   /* The button reset here is what lets these be real buttons without looking
@@ -310,8 +394,8 @@
     border-radius: 0; font-family: inherit; margin: 0;
     flex: 1 1 0; min-width: 0; padding: 9px 2px; font-size: var(--t-xs); font-weight: 600; color: var(--ink-2); text-align: center; cursor: pointer; border-bottom: 2px solid transparent; transition: color .15s, background .12s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .sb-tab:focus-visible { outline: 2px solid var(--nhs-blue); outline-offset: -3px; }
-  .sb-tab:hover { color: var(--nhs-blue); background: #fff; }
-  .sb-tab.active { color: var(--ink); border-bottom-color: var(--nhs-blue); background: #fff; }
+  .sb-tab:hover { color: var(--nhs-blue); background: var(--paper); }
+  .sb-tab.active { color: var(--ink); border-bottom-color: var(--nhs-blue); background: var(--paper); }
   .tab-pane { display: none; }
   /* This used to say overflow: hidden, which quietly beat the scrolling rule
      on .sidebar > .tab-pane above: same specificity, declared later, and it
@@ -335,7 +419,7 @@
     cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
   .start-hint-x:hover { color: var(--nhs-dark); }
   .start-hint.gone { display: none; }
-  .deselect-btn { border: 1px solid var(--line); background: #fff; color: var(--ink-2); font-size: var(--t-xs); font-weight: 500; padding: 3px 8px; border-radius: 5px; cursor: pointer; line-height: 1.2; white-space: nowrap; flex-shrink: 0; }
+  .deselect-btn { border: 1px solid var(--line); background: var(--paper); color: var(--ink-2); font-size: var(--t-xs); font-weight: 500; padding: 3px 8px; border-radius: 5px; cursor: pointer; line-height: 1.2; white-space: nowrap; flex-shrink: 0; }
   .deselect-btn:hover { background: var(--paper-2); border-color: var(--ink-3); color: var(--ink); }
   .sb-lbl { font-size: var(--t-xs); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3); margin-bottom: 8px; }
   .sb-lbl.collapsible { cursor: pointer; user-select: none; display: flex; align-items: center; gap: 5px; }
@@ -368,24 +452,24 @@
     background: var(--line-2); color: var(--ink-3); font-size: var(--t-xs);
     font-weight: 700; cursor: pointer; user-select: none; vertical-align: middle;
     flex-shrink: 0; }
-  .lhelp:hover, .lhelp[aria-expanded="true"] { background: var(--nhs-blue); color: #fff; }
+  .lhelp:hover, .lhelp[aria-expanded="true"] { background: var(--nhs-blue); color: var(--on-accent); }
   .lhelp:focus-visible { outline: 2px solid var(--nhs-blue); outline-offset: 2px; }
 
   /* Positioned relative to the sidebar rather than the button, because the
      button sits inside panes that scroll and clip. left/right are pinned to
      the pane so a long explanation wraps instead of running off the edge. */
   .help-pop { position: absolute; z-index: 4300; max-width: 260px;
-    background: var(--ink); color: #fff; border-radius: 8px;
+    background: var(--invert-bg); color: var(--invert-ink); border-radius: 8px;
     padding: 10px 12px; font-size: var(--t-xs); line-height: 1.5;
     box-shadow: 0 6px 24px rgba(33,43,50,.28); }
-  .help-pop-x { appearance: none; background: none; border: 0; color: #fff;
+  .help-pop-x { appearance: none; background: none; border: 0; color: var(--on-accent);
     opacity: .7; cursor: pointer; font-size: var(--t-md); line-height: 1;
     float: right; padding: 0 0 4px 8px; margin: -2px -2px 0 0; }
   .help-pop-x:hover { opacity: 1; }
   input[type=checkbox] { width: 14px; height: 14px; cursor: pointer; accent-color: var(--nhs-blue); }
-  select { width: 100%; padding: 6px 9px; border: 1px solid var(--line); border-radius: 6px; font-size: var(--t-sm); color: var(--ink); background: #fff; cursor: pointer; outline: none; }
+  select { width: 100%; padding: 6px 9px; border: 1px solid var(--line); border-radius: 6px; font-size: var(--t-sm); color: var(--ink); background: var(--paper); cursor: pointer; outline: none; }
   select:focus { border-color: var(--nhs-blue); }
-  input[type=text] { width: 100%; padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px; font-size: var(--t-sm); color: var(--ink); background: #fff; outline: none; }
+  input[type=text] { width: 100%; padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px; font-size: var(--t-sm); color: var(--ink); background: var(--paper); outline: none; }
   input[type=text]:focus { border-color: var(--nhs-blue); box-shadow: 0 0 0 2px rgba(0,94,184,.1); }
 
   /* ── VCSE tag filter ── */
@@ -433,10 +517,10 @@
   .sv.real { color: #00612A; }
   .sv.sample { color: var(--ink-3); font-style: italic; }
   .gpill { display: inline-block; font-size: var(--t-xs); padding: 1px 5px; border-radius: 999px; margin-left: 4px; vertical-align: middle; font-weight: 500; }
-  .gpill-ward { background: #E3F2E8; color: #00612A; }
-  .gpill-lsoa { background: #fdebd0; color: #b8600c; }
-  .gpill-msoa { background: #E5EFF8; color: var(--nhs-dark); }
-  .gpill-la   { background: #F6E7F0; color: #330072; }
+  .gpill-ward { background: var(--tint-green); color: #00612A; }
+  .gpill-lsoa { background: var(--tint-amber); color: var(--tint-amber-ink); }
+  .gpill-msoa { background: var(--nhs-light); color: var(--nhs-dark); }
+  .gpill-la   { background: var(--tint-pink); color: #330072; }
   .data-note { margin-top: 10px; padding: 7px 10px; background: var(--paper-2); border-left: 3px solid var(--line); font-size: var(--t-xs); color: var(--ink-3); line-height: 1.5; border-radius: 0 5px 5px 0; }
   .data-note a { color: var(--nhs-blue); text-decoration: none; }
 
@@ -452,9 +536,9 @@
      panel that failed to draw. */
   .keystat-val.dim { color: var(--ink-3); font-weight: 400; }
   .keystat-sub { font-size: var(--t-xs); color: var(--ink-3); margin-top: 1px; }
-  .wbtn { display: block; width: 100%; padding: 9px 12px; margin: 8px 0 14px; background: #fff; color: var(--nhs-blue); border: 1.5px solid var(--nhs-blue); border-radius: 6px; font-size: var(--t-sm); font-weight: 600; cursor: pointer; transition: background .15s, color .15s, box-shadow .15s; letter-spacing: .01em; }
-  .wbtn:hover { background: var(--nhs-blue); color: #fff; box-shadow: 0 2px 6px rgba(0,94,184,.25); }
-  .wbtn:active { background: var(--nhs-dark); color: #fff; border-color: var(--nhs-dark); }
+  .wbtn { display: block; width: 100%; padding: 9px 12px; margin: 8px 0 14px; background: var(--paper); color: var(--nhs-blue); border: 1.5px solid var(--nhs-blue); border-radius: 6px; font-size: var(--t-sm); font-weight: 600; cursor: pointer; transition: background .15s, color .15s, box-shadow .15s; letter-spacing: .01em; }
+  .wbtn:hover { background: var(--nhs-blue); color: var(--on-accent); box-shadow: 0 2px 6px rgba(0,94,184,.25); }
+  .wbtn:active { background: var(--nhs-dark); color: var(--on-accent); border-color: var(--nhs-dark); }
 
   /* ── Overlay scale ── */
   .scale-bar { display: none; margin-top: 8px; }
@@ -505,7 +589,16 @@
      with an inline style rather than a fill attribute: a presentation
      attribute loses to any CSS rule, so setting fill="..." on the element left
      this declaration winning and the map never coloured in at all. */
-  .ldr-map path { fill: var(--line); stroke: var(--bg); stroke-width: 1.1;
+  /* The hairline is what makes this work in dark. The IMD ramp was chosen for
+     a light page: its deepest blue is 14.7:1 against the light ground and
+     1.16:1 against the dark one, so on dark the most deprived wards, which are
+     the whole point, would sink into the background and read as a hole in
+     London. A pale stroke round every ward restores the shape: 4.7:1 against
+     that deepest blue and 5.5:1 against the ground. The real map solves the
+     same problem the same way, which is why its choropleth survives the dark
+     basemap. In light the stroke stays the ground colour, so the wards read as
+     separated by white as before. */
+  .ldr-map path { fill: var(--line); stroke: var(--ldr-stroke); stroke-width: 1.1;
     stroke-linejoin: round; transition: fill .55s ease; }
   .ldr-txt { font-size: var(--t-lg); font-weight: 600; color: var(--ink);
     margin: 18px 0 0; letter-spacing: -.01em; }
@@ -517,19 +610,19 @@
     border: 1px solid var(--line); }
 
   /* ── Data-level badge (floating overlay, top-right of map) ── */
-  .dl-badge { position: absolute; top: 12px; right: 12px; z-index: 2500; background: rgba(255,255,255,0.96); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); padding: 6px 8px; display: flex; align-items: center; gap: 8px; user-select: none; }
+  .dl-badge { position: absolute; top: 12px; right: 12px; z-index: 2500; background: color-mix(in srgb, var(--paper) 96%, transparent); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); padding: 6px 8px; display: flex; align-items: center; gap: 8px; user-select: none; }
   .dl-badge-label { font-weight: 600; color: var(--ink-2); letter-spacing: 0.04em; text-transform: uppercase; font-size: var(--t-xs); }
   .dl-seg { display: flex; background: var(--paper-2); border-radius: 6px; padding: 2px; gap: 2px; }
   .dl-seg button { background: transparent; border: none; padding: 4px 10px; font-size: var(--t-xs); color: var(--ink-2); border-radius: 4px; cursor: pointer; font-weight: 500; transition: background .12s, color .12s; }
   .dl-seg button:hover { color: var(--nhs-blue); }
-  .dl-seg button.active { background: var(--nhs-blue); color: #fff; box-shadow: 0 1px 3px rgba(0,94,184,.3); }
+  .dl-seg button.active { background: var(--nhs-blue); color: var(--on-accent); box-shadow: 0 1px 3px rgba(0,94,184,.3); }
   .dl-seg button.disabled { color: var(--ink-3); cursor: help; font-style: italic; }
   .dl-seg button.disabled:hover { color: var(--ink-3); background: transparent; }
-  .dl-hint { position: absolute; top: 100%; right: 0; margin-top: 4px; background: var(--ink); color: #fff; font-size: var(--t-xs); padding: 6px 9px; border-radius: 5px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .2s; box-shadow: 0 2px 6px rgba(0,0,0,.2); }
+  .dl-hint { position: absolute; top: 100%; right: 0; margin-top: 4px; background: var(--invert-bg); color: var(--invert-ink); font-size: var(--t-xs); padding: 6px 9px; border-radius: 5px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .2s; box-shadow: 0 2px 6px rgba(0,0,0,.2); }
   .dl-hint.show { opacity: 1; }
 
   /* ── Status bar ── */
-  .sbar { background: #fff; border-top: 1px solid var(--line-2); padding: 4px 14px; font-size: var(--t-xs); color: var(--ink-3); display: flex; justify-content: space-between; flex-shrink: 0; }
+  .sbar { background: var(--paper); border-top: 1px solid var(--line-2); padding: 4px 14px; font-size: var(--t-xs); color: var(--ink-3); display: flex; justify-content: space-between; flex-shrink: 0; }
   .sbar-right { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
   /* Sits with the data date and is deliberately quieter than it: the date is
      the one people need, the version is the one they get asked for. The empty
@@ -549,8 +642,8 @@
   .leaflet-popup-content-wrapper { border-radius: 8px !important; box-shadow: 0 2px 12px rgba(0,0,0,.12) !important; border: none !important; padding: 0 !important; overflow: hidden; }
   .leaflet-popup-tip-container { display: none; }
   .leaflet-popup-content { margin: 0 !important; min-width: 200px; max-width: 260px; }
-  .pop-hdr { padding: 9px 13px; font-size: var(--t-sm); font-weight: 600; color: #fff; }
-  .pop-body { padding: 8px 13px; font-size: var(--t-xs); background: #fff; color: var(--ink); }
+  .pop-hdr { padding: 9px 13px; font-size: var(--t-sm); font-weight: 600; color: var(--on-accent); }
+  .pop-body { padding: 8px 13px; font-size: var(--t-xs); background: var(--paper); color: var(--ink); }
   .pop-addr { color: var(--ink-3); margin-bottom: 5px; line-height: 1.4; }
   .pop-row { display: flex; gap: 8px; margin-bottom: 3px; }
   .pop-key { color: var(--ink-3); width: 54px; flex-shrink: 0; }
@@ -558,7 +651,7 @@
   /* ── VCSE cluster colours ── */
   .marker-cluster-small div,
   .marker-cluster-medium div,
-  .marker-cluster-large div { background: rgba(133,79,11,.75) !important; color: #fff !important; font-weight: 600 !important; font-size: var(--t-sm) !important; }
+  .marker-cluster-large div { background: rgba(133,79,11,.75) !important; color: var(--on-accent) !important; font-weight: 600 !important; font-size: var(--t-sm) !important; }
   .marker-cluster-small,
   .marker-cluster-medium,
   .marker-cluster-large { background: rgba(133,79,11,.2) !important; }
@@ -741,8 +834,8 @@
 
 /* Hover tooltips on map markers */
 .leaflet-tooltip.marker-tip {
-  background: rgba(30, 30, 28, 0.92);
-  color: #fff;
+  background: var(--invert-bg);
+  color: var(--invert-ink);
   border: none;
   border-radius: 3px;
   padding: 3px 7px;
@@ -763,13 +856,13 @@
    it can never stray over the sidebar. Above the map's badges at 2500, below
    the mode panel at 3500, so a mode still covers it. */
 #ai-toggle{position:absolute;right:12px;bottom:34px;z-index:2600;padding:10px 16px;
-  border:1px solid var(--nhs-blue);border-radius:8px;background:var(--nhs-blue);color:#fff;font-size: var(--t-md);
+  border:1px solid var(--nhs-blue);border-radius:8px;background:var(--nhs-blue);color: var(--on-accent);font-size: var(--t-md);
   font-weight:600;cursor:pointer;box-shadow:0 2px 10px rgba(33,43,50,.22);
   font-family:'Inter Tight',Inter,system-ui,sans-serif;display:flex;align-items:center;gap:7px}
 #ai-toggle:hover{background:var(--nhs-dark);border-color:var(--nhs-dark)}
 #ai-toggle:focus-visible{outline:3px solid var(--nhs-yellow);outline-offset:2px}
 #ai-panel{position:absolute;right:12px;top:54px;bottom:12px;z-index:2600;
-  width:min(390px,calc(100% - 24px));display:none;flex-direction:column;background:#fff;
+  width:min(390px,calc(100% - 24px));display:none;flex-direction:column;background: var(--paper);
   border:1px solid var(--line);border-radius:10px;
   box-shadow:0 8px 32px rgba(33,43,50,.16),0 2px 8px rgba(33,43,50,.08);overflow:hidden}
 #ai-panel.open{display:flex}
@@ -781,29 +874,29 @@
 #ai-body{flex:1 1 auto;display:flex;flex-direction:column;min-height:0;overflow:hidden}
 #ai-log{flex:1 1 auto;overflow-y:auto;padding:12px 13px;font-size: var(--t-md);line-height:1.5}
 .ai-msg{margin-bottom:10px;padding:8px 10px;border-radius:8px;white-space:normal;word-wrap:break-word}
-.ai-user{background:var(--nhs-blue);color:#fff;width:fit-content;max-width:85%;margin-left:auto}
+.ai-user{background:var(--nhs-blue);color: var(--on-accent);width:fit-content;max-width:85%;margin-left:auto}
 .ai-bot{background:var(--bg);color:var(--ink)}
 .ai-thinking{color:var(--ink-3);font-style:italic}
-.ai-error{background:#FBE5E3;color:#A81A10}
+.ai-error{background:var(--tint-red);color:var(--nhs-red)}
 .ai-msg em{color:var(--ink-2)}
 #ai-form{display:flex;gap:6px;padding:10px;border-top:1px solid var(--line-2);background:var(--paper-2)}
 #ai-input{flex:1 1 auto;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size: var(--t-md);
   font-family:inherit;min-width:0}
 #ai-input:focus{outline:2px solid var(--nhs-bright);outline-offset:-1px;border-color:var(--nhs-bright)}
-#ai-send{padding:8px 14px;border:1px solid var(--nhs-blue);border-radius:8px;background:var(--nhs-blue);color:#fff;
+#ai-send{padding:8px 14px;border:1px solid var(--nhs-blue);border-radius:8px;background:var(--nhs-blue);color: var(--on-accent);
   font-size: var(--t-md);font-weight:600;cursor:pointer;font-family:inherit}
 #ai-send:hover:not(:disabled){background:var(--nhs-dark);border-color:var(--nhs-dark)}
 #ai-send:disabled{opacity:.55;cursor:default}
 .ai-examples{display:flex;flex-wrap:wrap;gap:5px;margin:10px 0 2px}
 .ai-chip{font:inherit;font-size: var(--t-sm);cursor:pointer;text-align:left;background:var(--paper-2);
   color:var(--nhs-dark);border:1px solid var(--line);border-radius:13px;padding:5px 10px}
-.ai-chip:hover{background:#E5EFF8;border-color:var(--nhs-aqua)}
+.ai-chip:hover{background:var(--nhs-light);border-color:var(--nhs-aqua)}
 /* Panel header: the title, then the remaining questions beside it. */
 .ai-head-l{display:flex;align-items:baseline;gap:8px;min-width:0}
 .ai-limit{font-family:'JetBrains Mono',ui-monospace,monospace;font-size: var(--t-xs);font-weight:500;
-  color:var(--ink-2);background:#fff;border:1px solid var(--line);border-radius:4px;padding:1px 6px;
+  color:var(--ink-2);background: var(--paper);border:1px solid var(--line);border-radius:4px;padding:1px 6px;
   white-space:nowrap;font-variant-numeric:tabular-nums;cursor:default}
-.ai-limit.spent{color:#A81A10;border-color:#F2C4BF;background:#FDF2F1}
+.ai-limit.spent{color:#A81A10;border-color:var(--tint-red-line);background:var(--tint-red)}
 /* The verification caution, docked under the input rather than at the top of
    the log. Quiet, because it is a standing condition of the panel rather than
    an error, but always on screen next to the answers it applies to. */
@@ -848,10 +941,10 @@
          looked like a rendering fault. */
       z-index:3600;max-width:min(620px,calc(100vw - 28px));
       display:flex;align-items:flex-start;gap:10px;
-      background:var(--ink);color:#fff;border-radius:8px;padding:11px 13px;
+      background: var(--invert-bg); color: var(--invert-ink);border-radius:8px;padding:11px 13px;
       font-size: var(--t-md);line-height:1.45;box-shadow:0 4px 16px rgba(0,0,0,.28)}
     #dev-banner b{font-weight:600}
-    #dev-banner .dev-x{flex:0 0 auto;background:none;border:0;color:#fff;opacity:.65;
+    #dev-banner .dev-x{flex:0 0 auto;background:none;border:0;color: var(--on-accent);opacity:.65;
       cursor:pointer;font-size: var(--t-xl);line-height:1;padding:0 2px;margin-left:2px}
     #dev-banner .dev-x:hover{opacity:1}
     @media (max-width:560px){#dev-banner{font-size: var(--t-sm);bottom:8px}}
@@ -881,10 +974,10 @@
   .lrow:hover { background:var(--nhs-light); }
 
   .panel, .legend, .cat-block { border-radius:10px; border-color:var(--line); }
-  .legend { background:rgba(255,255,255,.96); backdrop-filter:blur(8px);
+  .legend { background:color-mix(in srgb, var(--paper) 96%, transparent); backdrop-filter:blur(8px);
             box-shadow:var(--shadow-sm); }
 
-  .gpill.on, .gpill.active { background:var(--nhs-blue); border-color:var(--nhs-blue); color:#fff; }
+  .gpill.on, .gpill.active { background:var(--nhs-blue); border-color:var(--nhs-blue); color: var(--on-accent); }
 
   /* Focus ring in the accent, so keyboard users get the same colour language. */
   input:focus, select:focus, button:focus-visible, .lrow:focus-visible {
@@ -962,7 +1055,7 @@
     margin: 0 0 16px; padding-left: 20px; }
   .mode-card li { margin-bottom: 5px; }
   .mode-back { appearance: none; font: inherit; font-size: var(--t-md); font-weight: 600;
-    cursor: pointer; background: var(--nhs-blue); color: #fff; border: 1px solid var(--nhs-blue);
+    cursor: pointer; background: var(--nhs-blue); color: var(--on-accent); border: 1px solid var(--nhs-blue);
     border-radius: 8px; padding: 8px 15px; }
   .mode-back:hover { background: var(--nhs-dark); border-color: var(--nhs-dark); }
 
@@ -998,8 +1091,8 @@
     border-radius: 8px; padding: 6px 11px; white-space: nowrap;
     transition: background .12s, border-color .12s, color .12s; }
   .ws-btn:hover { background: var(--paper-2); border-color: var(--nhs-blue); color: var(--nhs-blue); }
-  .ws-btn.primary { background: var(--nhs-blue); border-color: var(--nhs-blue); color: #fff; }
-  .ws-btn.primary:hover { background: var(--nhs-dark); border-color: var(--nhs-dark); color: #fff; }
+  .ws-btn.primary { background: var(--nhs-blue); border-color: var(--nhs-blue); color: var(--on-accent); }
+  .ws-btn.primary:hover { background: var(--nhs-dark); border-color: var(--nhs-dark); color: var(--on-accent); }
   .ws-btn.on { background: var(--nhs-light); border-color: var(--nhs-blue); color: var(--nhs-dark); }
   .ws-close { appearance: none; background: none; border: 0; cursor: pointer; color: var(--ink-3);
     font-size: var(--t-xl); line-height: 1; padding: 2px 4px; border-radius: 6px; }
@@ -1034,7 +1127,7 @@
     overflow: hidden; text-overflow: ellipsis; }
   .ws-kpi.emphasis { background: var(--nhs-dark); border-color: var(--nhs-dark); }
   .ws-kpi.emphasis .ws-k-lbl, .ws-kpi.emphasis .ws-k-sub { color: rgba(255,255,255,.72); }
-  .ws-kpi.emphasis .ws-k-num { color: #fff; }
+  .ws-kpi.emphasis .ws-k-num { color: var(--on-accent); }
   /* Pinned comparison. Six is the ceiling the assistant's compare_areas tool
      already enforces, so the two cannot disagree about how many fit. */
   .ws-pins { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 12px; }
@@ -1352,8 +1445,8 @@
   .rb-acts { display: flex; gap: 5px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
   .rb-acts .ws-btn { flex: 1; justify-content: center; }
   .rb-empty { padding: 14px; font-size: var(--t-sm); color: var(--ink-3); line-height: 1.5; }
-  .rb-caution { font-size: var(--t-xs); line-height: 1.45; color: #5c4115; background: #FFF8E6;
-    border: 1px solid #E0C280; border-radius: 6px; padding: 7px 9px; margin: 9px 14px; }
+  .rb-caution { font-size: var(--t-xs); line-height: 1.45; color: var(--tint-amber-ink); background: var(--tint-amber);
+    border: 1px solid var(--tint-amber-line); border-radius: 6px; padding: 7px 9px; margin: 9px 14px; }
 
   /* ── Data export (custom CSV) ─────────────────────────────────────────────
      The toolbar CSV gives you what the map is drawing. This gives you the
@@ -1371,14 +1464,14 @@
   .cb-step > h3 { display: flex; align-items: baseline; gap: 6px; font-size: var(--t-sm);
     font-weight: 600; color: var(--ink); margin: 0 0 4px; }
   .cb-n { flex: 0 0 auto; width: 15px; height: 15px; border-radius: 50%; background: var(--nhs-blue);
-    color: #fff; font-size: var(--t-xs); font-weight: 700; display: inline-flex; align-items: center;
+    color: var(--on-accent); font-size: var(--t-xs); font-weight: 700; display: inline-flex; align-items: center;
     justify-content: center; font-family: 'JetBrains Mono', ui-monospace, monospace; }
   .cb-help { font-size: var(--t-xs); color: var(--ink-3); line-height: 1.45; margin: 0 0 7px 21px; }
   .cb-seg { display: flex; gap: 4px; flex-wrap: wrap; }
   .cb-seg button { appearance: none; font: inherit; font-size: var(--t-sm); padding: 5px 10px;
     border: 1px solid var(--line); border-radius: 999px; background: var(--paper);
     color: var(--ink-2); cursor: pointer; }
-  .cb-seg button.on { background: var(--nhs-blue); border-color: var(--nhs-blue); color: #fff;
+  .cb-seg button.on { background: var(--nhs-blue); border-color: var(--nhs-blue); color: var(--on-accent);
     font-weight: 600; }
   .cb-picked { padding: 9px 14px; font-size: var(--t-sm); font-weight: 600; color: var(--nhs-blue);
     border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 8px; }
@@ -1422,7 +1515,7 @@
   .dir-controls { padding: 10px 14px; border-bottom: 1px solid var(--line);
     background: var(--paper-2); flex-shrink: 0; }
   .dir-search { width: 100%; font: inherit; font-size: var(--t-sm); padding: 7px 9px 7px 28px;
-    border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: #fff
+    border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: var(--paper)
     url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23768692' stroke-width='2'><circle cx='11' cy='11' r='7'/><path d='m21 21-4.35-4.35'/></svg>") no-repeat 8px center; }
   .dir-search:focus { outline: none; border-color: var(--nhs-bright);
     box-shadow: 0 0 0 3px rgba(0,114,206,.15); }
@@ -1478,7 +1571,7 @@
   .q-step { display: flex; align-items: baseline; gap: 6px; font-size: var(--t-sm); font-weight: 600;
     color: var(--ink); margin-bottom: 5px; }
   .q-step-n { flex: 0 0 auto; width: 15px; height: 15px; border-radius: 50%; background: var(--nhs-blue);
-    color: #fff; font-size: var(--t-xs); font-weight: 700; display: inline-flex; align-items: center;
+    color: var(--on-accent); font-size: var(--t-xs); font-weight: 700; display: inline-flex; align-items: center;
     justify-content: center; font-family: 'JetBrains Mono', ui-monospace, monospace; }
   .q-hint { display: block; font-size: var(--t-xs); font-weight: 400; color: var(--ink-3);
     margin: 1px 0 7px 21px; line-height: 1.4; }
@@ -1498,8 +1591,8 @@
     font-size: var(--t-sm); font-weight: 500; cursor: pointer; user-select: none;
     transition: background .12s, border-color .12s, color .12s; }
   .q-chip:hover { border-color: var(--nhs-blue); color: var(--nhs-blue); }
-  .q-chip.on { background: var(--nhs-blue); border-color: var(--nhs-blue); color: #fff; }
-  .q-chip.on:hover { background: var(--nhs-dark); border-color: var(--nhs-dark); color: #fff; }
+  .q-chip.on { background: var(--nhs-blue); border-color: var(--nhs-blue); color: var(--on-accent); }
+  .q-chip.on:hover { background: var(--nhs-dark); border-color: var(--nhs-dark); color: var(--on-accent); }
   .q-chip.outline { color: var(--nhs-blue); border-color: rgba(0,94,184,.3); background: rgba(0,94,184,.04); }
   .q-chip.add { border-style: dashed; color: var(--ink-3); }
   select.q-chip { appearance: none; -webkit-appearance: none; padding-right: 24px; max-width: 100%;
@@ -1523,8 +1616,8 @@
   .q-del { appearance: none; background: none; border: 1px solid var(--line); border-radius: 6px;
     color: var(--ink-3); cursor: pointer; font-size: var(--t-md); line-height: 1; padding: 5px 8px; }
   .q-del:hover { color: var(--nhs-red); border-color: var(--nhs-red); }
-  .q-caution { font-size: var(--t-xs); line-height: 1.45; color: #5c4115; background: #FFF8E6;
-    border: 1px solid #E0C280; border-radius: 6px; padding: 7px 9px; margin-top: 8px; }
+  .q-caution { font-size: var(--t-xs); line-height: 1.45; color: var(--tint-amber-ink); background: var(--tint-amber);
+    border: 1px solid var(--tint-amber-line); border-radius: 6px; padding: 7px 9px; margin-top: 8px; }
   .q-resultbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
     padding: 10px 12px; font-size: var(--t-sm); color: var(--nhs-blue); font-weight: 600;
     border-bottom: 1px solid var(--line); background: var(--paper); }
@@ -1633,6 +1726,29 @@
     #zoom-row { display: none; }
   }
 
+  /* ── Leaflet's own chrome ─────────────────────────────────────────────────
+     The zoom buttons, the attribution strip and the popup shell come styled
+     by leaflet.css with literal white and near-black, which is correct on a
+     light page and a set of glowing white rectangles on a dark one. These are
+     the only rules in this stylesheet that reach into another library's
+     classes, and they exist because the alternative is forking its CSS.
+
+     Written against tokens, so they are right in both themes and there is
+     nothing theme-specific here to keep in step. */
+  .leaflet-bar a, .leaflet-bar a:hover,
+  .leaflet-control-attribution,
+  .leaflet-popup-content-wrapper, .leaflet-popup-tip {
+    background: var(--paper); color: var(--ink-2);
+  }
+  .leaflet-bar a { border-bottom-color: var(--line); }
+  .leaflet-bar a:hover { background: var(--paper-2); }
+  .leaflet-bar a.leaflet-disabled { background: var(--paper-2); color: var(--ink-faint); }
+  .leaflet-control-attribution a { color: var(--nhs-blue); }
+  .leaflet-container { background: var(--bg); }
+  /* The tile layer itself. Carto's dark cut is already dark, so this is only
+     the colour that shows through before a tile has arrived and in the margin
+     beyond the last one. */
+
   /* ── Reduced motion ───────────────────────────────────────────────────────
      Last in the stylesheet so it beats every transition declared above it
      without needing !important on each one.
@@ -1658,6 +1774,30 @@
   }
 
 </style>
+
+<!-- Theme, resolved before anything paints.
+     Inline and blocking on purpose. If this ran with the rest of the
+     application scripts at the end of the body, a reader who has chosen dark
+     would get a full white page first and then a flip, which is worse than
+     not offering the choice. It only reads a preference and stamps two
+     attributes, so it costs a fraction of a millisecond.
+
+     data-theme is what the stylesheet keys off, and it is set only for an
+     explicit choice, so "auto" falls through to prefers-color-scheme. The
+     ph-dark class carries the resolved answer for the JavaScript that cannot
+     read a CSS variable, which is the basemap. -->
+<script>
+(function () {
+  try {
+    var pref = window.localStorage.getItem('ph_theme') || 'auto';
+    var root = document.documentElement;
+    if (pref === 'light' || pref === 'dark') root.setAttribute('data-theme', pref);
+    var dark = pref === 'dark' || (pref === 'auto' && window.matchMedia &&
+      window.matchMedia('(prefers-color-scheme: dark)').matches);
+    root.classList.toggle('ph-dark', dark);
+  } catch (e) { /* private mode: light, which is the safe way to be wrong */ }
+}());
+</script>
 
 <!-- Structured data. Two graphs: the site itself, and the data behind it.
      The Dataset entry is the one that earns its keep: it makes the map
@@ -1797,6 +1937,11 @@
       <div class="tb-sep"></div>
       <button type="button" class="tb-btn" id="tb-reset" title="Clear all filters and return to default view">↺ Reset</button>
       <button type="button" class="tb-btn" id="tb-cb" title="Switch to a colour-blind safe palette (deuteranopia/protanopia friendly)" aria-pressed="false">◐ CB safe</button>
+      <!-- Three states, not two, and it says which one it is in. Auto follows
+           the machine, which is what most people want and what a plain
+           light/dark switch quietly throws away the first time it is
+           pressed. -->
+      <button type="button" class="tb-btn" id="tb-theme" title="Appearance: following your device. Click to switch to light, then dark.">◐ Auto</button>
       <button type="button" class="tb-btn" id="tb-png" title="Clear the screen for a screenshot: whitens everything outside the mapped area and hides the controls, then you capture it with your own screenshot tool.">⤓ Screenshot</button>
       <button type="button" class="tb-btn" id="tb-csv" title="Download the ward/LSOA data behind the current overlay">⤓ CSV</button>
     </div>
@@ -1932,7 +2077,7 @@
           <div class="cov-note">Covers North West London only. Blank elsewhere means not yet collected, not none.</div>
           <label class="lrow"><div class="ldot" style="background:#1E5BB8"></div><span class="lname">Schools <span class="lcount" id="schools-count"></span> <span class="cov-tag" title="North West London boroughs only">NWL</span></span><input type="checkbox" id="tsch"></label>
           <div id="schools-filter-wrap" style="margin:2px 0 4px 16px">
-            <select id="schools-phase-filter" style="width:100%;padding:3px 6px;border:1px solid var(--line);border-radius:5px;font-size:var(--t-xs);color:var(--ink);background:#fff">
+            <select id="schools-phase-filter" style="width:100%;padding:3px 6px;border:1px solid var(--line);border-radius:5px;font-size:var(--t-xs);color:var(--ink);background:var(--paper)">
               <option value="all" selected>All schools</option>
               <option value="Primary">Primary</option>
               <option value="Secondary">Secondary</option>
@@ -1946,7 +2091,7 @@
           <label class="lrow"><div class="ldot" style="background:#00A0A0"></div><span class="lname">Libraries <span class="lcount" id="lib-count"></span> <span class="cov-tag" title="North West London boroughs only">NWL</span></span><input type="checkbox" id="tlib"></label>
           <label class="lrow"><div class="ldot" style="background:#B83C3C"></div><span class="lname">Formal ESOL providers <span class="lcount" id="esol-count"></span> <span class="cov-tag" title="North West London boroughs only">NWL</span></span><input type="checkbox" id="tesol"></label>
           <div id="esol-filter-wrap" style="margin:2px 0 4px 16px">
-            <select id="esol-type-filter" style="width:100%;padding:3px 6px;border:1px solid var(--line);border-radius:5px;font-size:var(--t-xs);color:var(--ink);background:#fff">
+            <select id="esol-type-filter" style="width:100%;padding:3px 6px;border:1px solid var(--line);border-radius:5px;font-size:var(--t-xs);color:var(--ink);background:var(--paper)">
               <option value="all" selected>All provider types</option>
               <option value="Local Authority">Local Authority</option>
               <option value="Further Education College">FE College</option>
@@ -1971,7 +2116,7 @@
           <label class="lrow"><div style="width:9px;height:9px;border:2px solid #1a1a1a;border-radius:2px;flex-shrink:0"></div><span class="lname">London boroughs</span><input type="checkbox" id="tb"></label>
           <div style="margin:4px 0 8px 0">
             <div style="font-size:var(--t-xs);color:var(--ink-2);margin-bottom:3px">Focus by borough</div>
-            <select id="borough-focus" style="width:100%;padding:4px 6px;border:1px solid var(--line);border-radius:5px;font-size:var(--t-xs);color:var(--ink);background:#fff">
+            <select id="borough-focus" style="width:100%;padding:4px 6px;border:1px solid var(--line);border-radius:5px;font-size:var(--t-xs);color:var(--ink);background:var(--paper)">
               <option value="all">All London</option>
             </select>
           </div>
@@ -2023,7 +2168,7 @@
         </div>
         <div class="sb-sec" style="padding-bottom:8px">
           <div class="sb-lbl">Filter by area</div>
-          <select id="vcse-area-filter" style="width:100%;padding:5px 8px;border:1px solid var(--line);border-radius:6px;font-size:var(--t-sm);color:var(--ink);background:#fff;margin-bottom:8px">
+          <select id="vcse-area-filter" style="width:100%;padding:5px 8px;border:1px solid var(--line);border-radius:6px;font-size:var(--t-sm);color:var(--ink);background:var(--paper);margin-bottom:8px">
             <!-- One "All London", not two. There were two options with that
                  label, 'london' and 'all', and every branch that read them
                  treated them identically, so the dropdown offered the same
@@ -4062,12 +4207,38 @@ const map = L.map('map', {
 // exporter, which needed to read tile pixels; it costs nothing now and keeps
 // the option open. Carto's CDN sends Access-Control-Allow-Origin:* so it works
 // without proxying. {r} resolves to '@2x' on retina.
-L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-  maxZoom: 19,
-  subdomains: 'abcd',
-  crossOrigin: 'anonymous',
-  attribution: '© <a href="https://openstreetmap.org/copyright">OpenStreetMap</a> · © <a href="https://carto.com/attributions">CARTO</a>'
-}).addTo(map);
+/* The basemap follows the theme. Carto publish Positron in a light and a dark
+   cut of the same cartography, so the streets, the labels and the river keep
+   their weight and only the ground changes; the choropleth carries on doing
+   the visual work in either.
+
+   Kept as a swappable layer rather than one set at startup, because the theme
+   can change under the map: the reader can hit the toggle, and a machine set
+   to follow the system flips at sunset without reloading anything. */
+var _baseTiles = null;
+function applyBasemap(dark) {
+  const style = dark ? 'dark_all' : 'light_all';
+  if (_baseTiles && _baseTiles._phStyle === style) return;
+  const next = L.tileLayer(
+    `https://{s}.basemaps.cartocdn.com/${style}/{z}/{x}/{y}{r}.png`, {
+      maxZoom: 19,
+      subdomains: 'abcd',
+      crossOrigin: 'anonymous',
+      attribution: '© <a href="https://openstreetmap.org/copyright">OpenStreetMap</a> · © <a href="https://carto.com/attributions">CARTO</a>'
+    });
+  next._phStyle = style;
+  next.addTo(map);
+  // The old one comes off only once the new one is on, so the map never
+  // flashes empty between the two.
+  if (_baseTiles) {
+    const old = _baseTiles;
+    next.once('load', () => { try { map.removeLayer(old); } catch (e) {} });
+    setTimeout(() => { try { map.removeLayer(old); } catch (e) {} }, 2000);
+  }
+  _baseTiles = next;
+  next.bringToBack();
+}
+applyBasemap(document.documentElement.classList.contains('ph-dark'));
 
 // Static layers
 // GP layer: circleMarkers sized by registered-patients list size.
@@ -4304,12 +4475,25 @@ function _activeLevel() {
   try { return currentDataLevel; } catch (e) { return 'ward'; }
 }
 
+/* Boundary ink.
+
+   A black hairline is exactly right over a light basemap and invisible over a
+   dark one, so every boundary stroke asks this instead of naming a colour.
+   The values are not inversions: an outline has to sit between the basemap
+   and the choropleth fill in lightness, and where that sits depends on which
+   ground is underneath. Read from the resolved theme class rather than a CSS
+   variable, because Leaflet paints these into SVG attributes and never
+   consults the cascade. */
+function _ink(light, dark) {
+  return document.documentElement.classList.contains('ph-dark') ? dark : light;
+}
+
 function _boroughStyle(feat) {
   const props = (feat && feat.properties) || {};
   const name = props.name || '';
   const hidden = focusedBorough && focusedBorough !== 'all' && name !== focusedBorough;
   const base = {
-    color: '#1a1a1a',
+    color: _ink('#1a1a1a', '#D6E2EA'),
     weight: 2.5,
     fillOpacity: 0,
     opacity: hidden ? 0 : 0.85,
@@ -4395,7 +4579,7 @@ function _wardBoundaryStyle(feat) {
   const lad = (feat && feat.properties && feat.properties.LAD) || '';
   const hidden = focusedBorough && focusedBorough !== 'all' && lad !== focusedBorough;
   return {
-    color: '#000',
+    color: _ink('#000', '#B9C7D0'),
     weight: hidden ? 0 : 1,
     fill: false,
     opacity: hidden ? 0 : 0.85,
@@ -5320,7 +5504,7 @@ function wstyle(wn, ov, state) {
     // was shaded, which is what the colour meant.
     const baseW = {default:1.0, hover:3.0, selected:4.0}[state] || 1.0;
     return applyCore20Outline({
-      color: '#000',
+      color: _ink('#000', '#8FA0AC'),
       weight: Math.max(0, baseW * borderWeightMult),
       fillColor: '#94a3b8',
       fillOpacity: Math.min(absFill, 0.12),
@@ -5340,7 +5524,7 @@ function wstyle(wn, ov, state) {
   const fo = baseFo;
   const w  = Math.max(0, baseW * borderWeightMult);
   const op = isFocus ? 1.0 : 0.9;
-  return applyCore20Outline({ color:'#000', weight:w, fillColor:fill, fillOpacity:fo, opacity:op }, wn);
+  return applyCore20Outline({ color:_ink('#000', '#8FA0AC'), weight:w, fillColor:fill, fillOpacity:fo, opacity:op }, wn);
 }
 
 function pillClass(g) {
@@ -7518,8 +7702,8 @@ function imdDecileColor(d) {
    them together; hover and selected used to be raw numbers the slider could
    not reach. */
 const LSOA_EDGE = {
-  default:  { color: '#6B6B6B', weight: 1.1, opacity: 0.90 },
-  hover:    { color: '#4F4F4F', weight: 2.0, opacity: 1.0 },
+  default:  { color: _ink('#6B6B6B', '#7E8F9B'), weight: 1.1, opacity: 0.90 },
+  hover:    { color: _ink('#4F4F4F', '#A6B6C1'), weight: 2.0, opacity: 1.0 },
   selected: { color: '#3A3A3A', weight: 2.6, opacity: 1.0 },
 };
 function lsoaEdge(state) { return LSOA_EDGE[state] || LSOA_EDGE.default; }
@@ -8600,7 +8784,7 @@ function msoaStyle(feat) {
     fill: true,
     fillColor: ramp(Math.max(0, Math.min(1, t)), !cfg.wh),
     fillOpacity: 0.45,
-    color: '#555',
+    color: _ink('#555', '#8FA0AC'),
   });
 }
 
@@ -10672,6 +10856,80 @@ document.querySelectorAll('.sb-tab').forEach(t => {
       btn.focus();
     }
   });
+}());
+
+/* ── Appearance ───────────────────────────────────────────────────────────
+   Three states: auto, light, dark. The bootstrap in the head has already
+   resolved and applied whichever was stored, before anything painted. This
+   is the part that needs the DOM: the button, and keeping the map and the
+   Leaflet layers in step when the answer changes.
+
+   The map has to be told, twice over. The basemap is a URL and cannot read a
+   CSS variable, and the vector layers were styled with colours computed at
+   the time they were drawn, so they are restyled rather than left as they
+   were. Without the restyle a theme change repainted the panel and left the
+   map in the old palette, which is worse than not changing at all. */
+(function wireTheme() {
+  const btn = document.getElementById('tb-theme');
+  const root = document.documentElement;
+  const KEY = 'ph_theme';
+  const mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+  const ORDER = ['auto', 'light', 'dark'];
+  const FACE = {
+    auto:  { label: '◐ Auto',  title: 'Appearance: following your device. Click to switch to light, then dark.' },
+    light: { label: '☀ Light', title: 'Appearance: always light. Click to switch to dark.' },
+    dark:  { label: '☾ Dark',  title: 'Appearance: always dark. Click to go back to following your device.' },
+  };
+
+  function stored() {
+    try { return window.localStorage.getItem(KEY) || 'auto'; } catch (e) { return 'auto'; }
+  }
+  function isDark(pref) {
+    return pref === 'dark' || (pref === 'auto' && !!(mq && mq.matches));
+  }
+
+  function apply(pref, announce) {
+    if (pref === 'auto') root.removeAttribute('data-theme');
+    else root.setAttribute('data-theme', pref);
+    const dark = isDark(pref);
+    root.classList.toggle('ph-dark', dark);
+
+    if (btn) {
+      btn.textContent = FACE[pref].label;
+      btn.title = FACE[pref].title;
+      // Not aria-pressed: this is three states, and a pressed/unpressed
+      // toggle would describe two of them and lie about the third.
+      btn.setAttribute('aria-label', FACE[pref].title);
+    }
+
+    // The map's own colours, which live outside the stylesheet.
+    if (typeof applyBasemap === 'function') applyBasemap(dark);
+    if (typeof _restyleAll === 'function') { try { _restyleAll(); } catch (e) {} }
+    if (typeof icbLyr !== 'undefined' && icbLyr) {
+      try { icbLyr.setStyle(icbStyle); } catch (e) {}
+    }
+    if (announce && typeof _announce === 'function') {
+      _announce('Appearance: ' + (pref === 'auto' ? 'following your device' : pref) + '.');
+    }
+  }
+
+  if (btn) {
+    btn.addEventListener('click', () => {
+      const next = ORDER[(ORDER.indexOf(stored()) + 1) % ORDER.length];
+      try { window.localStorage.setItem(KEY, next); } catch (e) {}
+      apply(next, true);
+    });
+  }
+
+  // Following the device means following it as it changes, not only as it was
+  // when the page opened. A machine that flips at sunset flips the map too.
+  if (mq) {
+    const onSystemChange = () => { if (stored() === 'auto') apply('auto', false); };
+    if (mq.addEventListener) mq.addEventListener('change', onSystemChange);
+    else if (mq.addListener) mq.addListener(onSystemChange);
+  }
+
+  apply(stored(), false);
 }());
 
 // The opening hint at the top of the Indicators pane. localStorage rather than
