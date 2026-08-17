@@ -116,23 +116,24 @@
      retracted, so the last few centimetres of the app sat underneath the
      toolbar with overflow:hidden over the top of them: the sidebar footer and
      the foot of the layers list were unreachable rather than merely awkward. */
-  .app { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; height: 100vh; max-height: 100vh; height: 100dvh; max-height: 100dvh; overflow: hidden; }
-  .hdr { background: var(--paper-2); border-bottom: 1px solid var(--line-2); padding: 6px 16px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; gap: 12px; }
+  .app { display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; height: 100vh; max-height: 100vh; height: 100dvh; max-height: 100dvh; overflow: hidden; }
+  .hdr { background: var(--paper); border-bottom: 1px solid var(--line); padding: 7px 18px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; gap: 12px; }
   .hdr-left { display: flex; align-items: center; gap: 12px; }
   /* The page's h1. Margin zeroed because the browser default would push the
      header out of alignment; everything else it inherits is what the div
      had before. */
-  .hdr-logo { font-size: var(--t-lg); font-weight: 600; color: var(--ink); margin: 0; }
+  .hdr-logo { font-size: var(--t-lg); font-weight: 600; color: var(--nhs-dark); margin: 0;
+    letter-spacing: -.01em; }
   .hdr-right { display: flex; align-items: center; gap: 8px; }
 
   /* ── Header toolbar (Reset / Copy link / PNG / CSV) ── */
-  .tb-btn { background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px; font-size: var(--t-sm); color: var(--ink); cursor: pointer; display: inline-flex; align-items: center; gap: 5px; font-weight: 500; transition: background .12s, border-color .12s; }
-  .tb-btn:hover { background: var(--paper-2); border-color: var(--nhs-blue); color: var(--nhs-blue); }
+  .tb-btn { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 6px 13px; font-size: var(--t-md); color: var(--ink); cursor: pointer; display: inline-flex; align-items: center; gap: 5px; font-weight: 500; transition: background .12s, border-color .12s; }
+  .tb-btn:hover { background: var(--paper-2); border-color: #c9d1d6; color: var(--ink); }
   .tb-btn.active { background: var(--nhs-blue); border-color: var(--nhs-blue); color: #fff; }
   .tb-btn.active:hover { background: var(--nhs-dark); border-color: var(--nhs-dark); color: #fff; }
   .tb-btn:active { background: var(--line-2); }
   .tb-btn.primary { background: var(--nhs-blue); color: #fff; border-color: var(--nhs-blue); }
-  .tb-btn.primary:hover { background: var(--nhs-dark); color: #fff; }
+  .tb-btn.primary:hover { background: var(--nhs-dark); color: #fff; border-color: var(--nhs-dark); }
   .tb-btn.danger:hover { background: #FDF2F1; border-color: var(--nhs-red); color: var(--nhs-red); }
   .tb-sep { width: 1px; height: 20px; background: var(--line); }
 
@@ -318,7 +319,7 @@
      or the toggles below the fold cannot be reached on a short window. */
   .tab-pane.active { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; overflow-x: hidden; }
   .ward-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
-  .sb-sec { padding: 11px 13px; border-bottom: 1px solid var(--line-2); flex-shrink: 0; }
+  .sb-sec { padding: 11px 13px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
 
   /* ── Opening hint ──
      The three sentences that used to live in a title attribute on the page
@@ -336,15 +337,16 @@
   .start-hint.gone { display: none; }
   .deselect-btn { border: 1px solid var(--line); background: #fff; color: var(--ink-2); font-size: var(--t-xs); font-weight: 500; padding: 3px 8px; border-radius: 5px; cursor: pointer; line-height: 1.2; white-space: nowrap; flex-shrink: 0; }
   .deselect-btn:hover { background: var(--paper-2); border-color: var(--ink-3); color: var(--ink); }
-  .sb-lbl { font-size: var(--t-xs); font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-3); margin-bottom: 8px; }
+  .sb-lbl { font-size: var(--t-xs); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3); margin-bottom: 8px; }
   .sb-lbl.collapsible { cursor: pointer; user-select: none; display: flex; align-items: center; gap: 5px; }
   .sb-lbl.collapsible::before { content: "▾"; font-size: 9px; color: var(--line); transition: transform .15s; transform-origin: center; display: inline-block; }
   .sb-sec.collapsed .sb-lbl.collapsible::before { transform: rotate(-90deg); }
   .sb-sec.collapsed > *:not(.sb-lbl) { display: none !important; }
-  .lrow { display: flex; align-items: center; gap: 8px; padding: 3px 0; cursor: default; }
+  .lrow { display: flex; align-items: center; gap: 8px; padding: 5px 6px; cursor: default;
+    border-radius: 6px; }
   .ldot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
   .lname { font-size: var(--t-md); color: var(--ink); flex: 1; }
-  .lcount { font-size: var(--t-sm); color: var(--ink-3); }
+  .lcount { font-size: var(--t-xs); color: var(--ink-3); }
   /* ── Help buttons and their popover ──
      These were spans carrying their entire explanation in a title attribute,
      which a touchscreen never shows and a screen reader does not reliably
@@ -430,7 +432,7 @@
   .sv { font-weight: 500; color: var(--ink); text-align: right; flex-shrink: 0; }
   .sv.real { color: #00612A; }
   .sv.sample { color: var(--ink-3); font-style: italic; }
-  .gpill { display: inline-block; font-size: var(--t-xs); padding: 1px 5px; border-radius: 3px; margin-left: 4px; vertical-align: middle; font-weight: 500; }
+  .gpill { display: inline-block; font-size: var(--t-xs); padding: 1px 5px; border-radius: 999px; margin-left: 4px; vertical-align: middle; font-weight: 500; }
   .gpill-ward { background: #E3F2E8; color: #00612A; }
   .gpill-lsoa { background: #fdebd0; color: #b8600c; }
   .gpill-msoa { background: #E5EFF8; color: var(--nhs-dark); }
@@ -468,7 +470,7 @@
   .rank-val { color: var(--ink-2); font-variant-numeric: tabular-nums; flex-shrink: 0; font-size: var(--t-xs); }
 
   /* ── Map ── */
-  .map-wrap { position: relative; min-height: 0; min-width: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); overflow: hidden; }
+  .map-wrap { --sheet-lift: 0px; position: relative; min-height: 0; min-width: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); overflow: hidden; }
   #map { width: 100%; height: 100%; }
   /* ── Loading screen ───────────────────────────────────────────────────────
      A ward map of London that fills with its own IMD colour as the real data
@@ -606,6 +608,33 @@
      decide the bottom-sheet heights and the drawer behaviour. They have to
      agree with this block or the sheet sizes itself for a layout that is not
      on screen. Change all four together. */
+  /* ── Mode rail ────────────────────────────────────────────────────────────
+     These live above the breakpoint on purpose. They used to sit 300 lines
+     below it, in the design layer, which put them after the narrow-screen
+     block at the same specificity, so the phone rules for this rail lost
+     every time.
+
+     One of those losses mattered. The narrow-screen rule paints four
+     background gradients on this element, the scroll-shadow trick that tells
+     a reader the strip continues past the edge of the screen; the comment on
+     it explains at length why it is there, that at 390px the rail holds 455px
+     of buttons and that without the shadows it reads as a rendering fault.
+     The declaration below said `background: var(--paper)` and, coming later,
+     flattened all four of them. The affordance had never once appeared on a
+     phone. The other loss was cosmetic: 18px of side padding instead of 10px
+     on a screen with none to spare. */
+  .mode-rail { display: flex; align-items: stretch; gap: 2px; padding: 0 18px;
+    background: var(--paper); border-bottom: 1px solid var(--line); flex-shrink: 0; }
+  .mode-btn { appearance: none; background: none; border: 0; cursor: pointer;
+    font-family: 'Inter Tight', Inter, system-ui, sans-serif; font-size: var(--t-md);
+    font-weight: 600; color: var(--ink-2); padding: 10px 14px 9px;
+    border-bottom: 3px solid transparent; display: flex; align-items: center;
+    gap: 7px; transition: color .15s, border-color .15s, background .12s; }
+  .mode-btn:hover { color: var(--nhs-blue); background: var(--paper-2); }
+  .mode-btn[aria-selected="true"] { color: var(--nhs-dark);
+    border-bottom-color: var(--nhs-blue); }
+  .mode-btn:focus-visible { outline: 3px solid var(--nhs-yellow); outline-offset: -3px; }
+
   @media (max-width: 900px) {
     .main { grid-template-columns: minmax(0, 1fr); }
 
@@ -837,34 +866,24 @@
   /* Display face for anything that names a thing. */
   .hdr-logo, .sb-tab, .section-h, .cat-hdr-l, .pop-hdr, h1, h2, h3 {
     font-family:'Inter Tight','Inter',sans-serif; letter-spacing:-0.01em; }
-  .hdr-logo { font-weight:600; font-size: var(--t-lg); }
 
   /* Figures get a monospace face so columns of numbers line up and digits
      stop jittering as values change. */
   .lcount, .legend-tick, .gpill-ward, .pop-key + *, .sv, .badge {
     font-family:'JetBrains Mono',ui-monospace,monospace; font-variant-numeric:tabular-nums; }
 
-  .hdr { background:var(--paper); border-bottom:1px solid var(--line); padding:7px 18px; }
 
-  .tb-btn { border-radius:8px; padding:6px 13px; font-size: var(--t-md); font-weight:500;
-            border-color:var(--line); color:var(--ink); }
-  .tb-btn:hover { background:var(--paper-2); border-color:#c9d1d6; color:var(--ink); }
-  .tb-btn.primary, .tb-btn.active { background:var(--nhs-blue); border-color:var(--nhs-blue); color:#fff; }
-  .tb-btn.primary:hover, .tb-btn.active:hover { background:var(--nhs-dark); border-color:var(--nhs-dark); }
 
-  .sb-lbl, .section-h { font-size: var(--t-xs); text-transform:uppercase; letter-spacing:.06em;
-                        font-weight:600; color:var(--ink-3); }
-  .sb-sec { border-bottom:1px solid var(--line); }
-  .lrow { border-radius:6px; padding:5px 6px; }
+  /* .sb-lbl folded into its own rule above. .section-h keeps this because it
+     has no base rule of its own outside the report templates. */
+  .section-h { font-size: var(--t-xs); text-transform: uppercase; letter-spacing: .06em;
+               font-weight: 600; color: var(--ink-3); }
   .lrow:hover { background:var(--nhs-light); }
-  .lname { font-size: var(--t-md); }
-  .lcount { font-size: var(--t-xs); color:var(--ink-3); }
 
   .panel, .legend, .cat-block { border-radius:10px; border-color:var(--line); }
   .legend { background:rgba(255,255,255,.96); backdrop-filter:blur(8px);
             box-shadow:var(--shadow-sm); }
 
-  .gpill { border-radius:999px; border-color:var(--line); }
   .gpill.on, .gpill.active { background:var(--nhs-blue); border-color:var(--nhs-blue); color:#fff; }
 
   /* Focus ring in the accent, so keyboard users get the same colour language. */
@@ -872,7 +891,6 @@
     outline:none; border-color:var(--nhs-bright);
     box-shadow:0 0 0 3px rgba(0,114,206,.15); }
 
-  .dev-badge { color: var(--ink-2); background: var(--paper-2); border-color: var(--line); }
 
   /* Accent placement. The palette alone reads as a grey refresh; the design
      carries its identity in a few structural blue moments, not in tinting
@@ -880,9 +898,7 @@
   /* The 4px blue rule across the top has gone. It was pure decoration and it
      was costing four rows of pixels on every screen, which the map wanted
      more than the identity did. The wordmark still carries the colour. */
-  .hdr-logo { color: var(--nhs-dark); letter-spacing: -.01em; }
   .section-h { color: var(--nhs-dark); }
-  .sb-tabs { background: var(--paper-2); }
   a { color: var(--nhs-blue); }
   a:hover { color: var(--nhs-dark); }
 
@@ -915,7 +931,6 @@
      the panel shares row 3 with .main instead of being positioned over it.
      That keeps the map's own two-column grid untouched: nothing here moves
      the sidebar or the map, it only stacks above them. */
-  .app { grid-template-rows: auto auto minmax(0, 1fr) auto; }
   .app > .hdr        { grid-row: 1; grid-column: 1; }
   .app > .mode-rail  { grid-row: 2; grid-column: 1; }
   .app > .main       { grid-row: 3; grid-column: 1; }
@@ -925,17 +940,8 @@
   .app > .mode-panel { grid-row: 3; grid-column: 1; z-index: 3500; }
   .app > .sbar       { grid-row: 4; grid-column: 1; }
 
-  .mode-rail { display: flex; align-items: stretch; gap: 2px; padding: 0 18px;
-    background: var(--paper); border-bottom: 1px solid var(--line); flex-shrink: 0; }
-  .mode-btn { appearance: none; background: none; border: 0; cursor: pointer;
-    font-family: 'Inter Tight', Inter, system-ui, sans-serif; font-size: var(--t-md);
-    font-weight: 600; color: var(--ink-2); padding: 10px 14px 9px;
-    border-bottom: 3px solid transparent; display: flex; align-items: center;
-    gap: 7px; transition: color .15s, border-color .15s, background .12s; }
-  .mode-btn:hover { color: var(--nhs-blue); background: var(--paper-2); }
-  .mode-btn[aria-selected="true"] { color: var(--nhs-dark);
-    border-bottom-color: var(--nhs-blue); }
-  .mode-btn:focus-visible { outline: 3px solid var(--nhs-yellow); outline-offset: -3px; }
+  /* .mode-rail and .mode-btn moved above the 900px breakpoint. See the note
+     there for what was going wrong while they sat here. */
   /* Same family as .dev-badge and .cov-tag. */
   .mode-soon { font-family: Inter, system-ui, sans-serif; font-size: var(--t-xs);
     font-weight: 500; letter-spacing: .02em; text-transform: none;
@@ -966,7 +972,6 @@
      as in the design file. Everything here is namespaced ws- because .chip,
      .kpi and .rank-row are already used elsewhere in this file and the design
      file's own class names would have collided with all three. */
-  .map-wrap { --sheet-lift: 0px; }
   .ws-sheet { position: absolute; left: 16px; right: 16px; bottom: 16px; z-index: 1200;
     background: var(--paper); border: 1px solid var(--line); border-radius: 14px;
     box-shadow: var(--shadow-lg); overflow: hidden; display: none; flex-direction: column;
