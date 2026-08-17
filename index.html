@@ -11848,8 +11848,14 @@ loadData();
   /**
    * Frame a ward without selecting it.
    *
-   * selectWardByName also opens the ward bar, which belongs to the chapter
-   * after this one. This only moves the map.
+   * selectWardByName also opens the ward bar, so a chapter that only wants to
+   * move the map uses this instead.
+   *
+   * Currently called by nothing. Its only caller was the deprivation chapter,
+   * which framed a ward whose neighbourhoods all sat inside it. That chapter
+   * has gone. Kept because it is self-contained, takes a ward code and touches
+   * nothing else, and any future chapter that wants to move the map without
+   * opening the ward bar needs exactly this.
    */
   function frameWard(code) {
     if (typeof wLyr === 'undefined' || !wLyr || typeof map === 'undefined') return false;
@@ -11946,41 +11952,17 @@ loadData();
     }
   }
 
-  /**
-   * Telegraph Hill, Lewisham.
-   *
-   * The deciles chapter says a ward figure is a mean of the neighbourhoods
-   * inside it, which only reads if the neighbourhoods on screen are inside
-   * the ward on screen. 41% of London's LSOAs cross a ward line, so a chapter
-   * that opens on all of London argues against its own picture.
-   *
-   * Chosen by measuring, over the same data/map blobs the browser draws, three
-   * things for every ward with four to twelve LSOAs: how far any LSOA vertex
-   * strays outside its ward, how far any ward vertex sits from the nearest
-   * LSOA edge, and how closely the LSOA areas sum to the ward's. Nothing fits
-   * perfectly and nothing can: ward and LSOA boundaries are separately
-   * generalised ONS products, so a shared edge is drawn twice, slightly
-   * differently. Of the 129 candidates Telegraph Hill is the closest to exact,
-   * with its LSOA areas summing to within 0.04% of the ward, roughly six times
-   * tighter than the next ward with a comparable decile range, and both
-   * boundary discrepancies inside 14m, which is around a pixel at the zoom
-   * this frames to. Its ten LSOAs run from decile 2 to decile 7, so the range
-   * inside one ward is visible without being freakish.
-   *
-   * Held by code rather than name, because codes survive the renaming that
-   * comes with a boundary review. If the code ever stops matching, frameWard
-   * returns false and the chapter leaves the map where it was.
-   */
-  var NESTED_WARD = 'E05013732';
-
   var TOUR = [
     {
-      t: 'What you are looking at',
-      n: 'Every ward in all 33 London boroughs, built only from published NHS and ' +
-         'government data. There are three levels underneath: <strong>704 wards</strong>, ' +
-         '<strong>4,994 LSOAs</strong> and <strong>1,002 MSOAs</strong>, and they do not ' +
-         'nest inside one another. Everything runs in your browser, so nothing you do ' +
-         'here is uploaded anywhere.',
+      t: 'What this map shows',
+      n: 'This map shows health and living conditions across London. It covers all 33 ' +
+         'boroughs. You can look at three sizes of area. There are ' +
+         '<strong>704 wards</strong>, and two smaller types of area called ' +
+         '<strong>LSOAs</strong> and <strong>MSOAs</strong>. An LSOA is about the size ' +
+         'of a neighbourhood. An MSOA is a group of neighbourhoods. The three sizes do ' +
+         'not fit neatly inside each other, so a ward is not a whole number of ' +
+         'neighbourhoods. Every figure comes from the NHS or from government. The map ' +
+         'runs inside your browser, so nothing you do here is sent anywhere.',
       go: function () {
         railClick('explore');
         // The indicator first: changing #ov pulls the sidebar to the Indicators
@@ -11990,11 +11972,12 @@ loadData();
       },
     },
     {
-      t: 'Colour the map by any figure',
-      n: 'The Indicators tab shades every ward by one of 116 figures, and the strip along ' +
-         'the bottom of the map gives the scale it is using. This one is the ' +
-         '<strong>IMD 2025 score</strong>, a ward aggregate of the deprivation of the ' +
-         'neighbourhoods inside it. Darker is more deprived.',
+      t: 'Colour the map by a figure',
+      n: 'Open the <strong>Indicators</strong> tab. Choose a figure, and the map gives ' +
+         'every ward a colour for it. The bar along the bottom shows what the colours ' +
+         'mean. This example shows deprivation. Darker wards are more deprived. Each ' +
+         'figure in the list tells you who published it, and which sizes of area it ' +
+         'can colour.',
       go: function () {
         railClick('explore');
         sidebarTab('overlay');
@@ -12002,55 +11985,15 @@ loadData();
       },
     },
     {
-      t: 'Deprivation runs in two directions',
-      n: 'The map has not changed: the wards are still shaded by IMD <strong>score</strong>. ' +
-         'What is new is the neighbourhood boundaries drawn inside them, and this ward is ' +
-         'one of the few whose neighbourhoods sit entirely within it. Those are the ' +
-         'neighbourhoods the ward figure is made of. A higher <strong>score</strong> means ' +
-         'more deprived. A higher <strong>decile</strong> means <em>less</em> deprived, ' +
-         'because decile 1 is the most deprived tenth of England, which is the easiest ' +
-         'thing on this map to state backwards. And a ward has no decile of its own: its ' +
-         'figure is a population-weighted mean of the deciles of the neighbourhoods you ' +
-         'can now see inside it, so a ward at 3 is not "in the third decile", the typical ' +
-         'neighbourhood in it is.',
-      go: function () {
-        // The ward shading stays up, and the neighbourhoods go on as outlines
-        // over it rather than as a second choropleth.
-        //
-        // Two things ruled the alternatives out. Choosing the imd_decile
-        // overlay moves the map to LSOA level and takes the ward shading with
-        // it, because wstyle drops ward fill to zero whenever the overlay is
-        // LSOA-only: the chapter would contrast a score with a decile while
-        // only the decile was on screen. Colouring the LSOA layer by decile
-        // instead paints 40% fills over every ward in view, in the same
-        // red-to-green hues as the score ramp, while the only key on screen
-        // is still the score legend. That is not two things being compared,
-        // it is one muddy composite inviting exactly the backwards reading
-        // this chapter exists to prevent.
-        //
-        // Outlines leave the ward's own colour legible and put the
-        // neighbourhoods it is built from around it, which is what the
-        // sentence is actually about.
-        railClick('explore'); sidebarTab('overlay'); setOverlay('imd_score_ward');
-        lsoaLayer(true, false);
-        // Framed on a ward whose neighbourhoods are all inside it, so the
-        // sentence can be read straight off the map.
-        frameWard(NESTED_WARD);
-      },
-    },
-    {
-      t: 'Click a ward for its figures',
-      n: 'Any ward on the map opens the bar along the bottom: a sentence placing it ' +
-         'against London, then its headline numbers. From there you can pin it to ' +
-         'compare, download a printable profile, or open the full panel of every ' +
-         'indicator the ward has.',
+      t: 'Click a ward to see its figures',
+      n: 'Click any ward. A bar opens along the bottom of the map. It gives you one ' +
+         'sentence about the ward, and then the main numbers for it. From that bar you ' +
+         'can pin the ward to compare it with others. You can also download a report, ' +
+         'or open the full list of figures for the ward.',
       go: function () {
         railClick('explore');
-        // The deciles chapter has served its purpose by here. Its
-        // neighbourhood outlines come down so the ward being clicked is the
-        // thing on screen, and the ward shading is set rather than inherited:
-        // arriving here backwards from the Query chapter, which clears the
-        // overlay, otherwise left this chapter looking at a blank grey map.
+        // Arriving here backwards from the Query chapter, which clears the
+        // overlay, otherwise leaves this chapter looking at a blank grey map.
         wardLevelKeepOverlay();
         sidebarTab('layers');
         setOverlay('imd_score_ward');
@@ -12066,20 +12009,16 @@ loadData();
       },
     },
     {
-      t: 'Ask a sharper question',
-      n: '<strong>Query</strong> finds the wards meeting several conditions at once, and ' +
-         'this one is running now: wards in Brent with a GP practice and a pharmacy, ' +
-         'where deprivation and disability are both above a threshold. ' +
-         '<strong>Compare</strong> puts up to four wards side by side, and ' +
-         '<strong>Directory</strong> lists all 23,000 services and organisations on the ' +
-         'map in one searchable place.',
+      t: 'Find the wards that match',
+      n: '<strong>Query</strong> finds the wards that meet several conditions at the ' +
+         'same time. This example is running now. It finds wards in Brent that have a ' +
+         'GP practice and a pharmacy, where deprivation and disability are both high. ' +
+         '<strong>Compare</strong> puts up to four wards next to each other. ' +
+         '<strong>Directory</strong> lists every service on the map in one place, and ' +
+         'you can search it.',
       go: function () {
-        // Query answers in wards. The deciles chapter left the map at
-        // neighbourhood level with the LSOA layer drawn over everything, so
-        // the matches this chapter is about would arrive underneath 4,994
-        // boundaries that have nothing to do with them.
-        //
-        // The previous chapter's ward bar comes down with them: this chapter is
+        // Query answers in wards, so the map goes back to ward level first.
+        // The previous chapter's ward bar comes down with it: this chapter is
         // about the wards a query returns, not the one that was clicked.
         closeWardSheet();
         wardLevel();
@@ -12090,18 +12029,16 @@ loadData();
       },
     },
     {
-      t: 'Asking it a question',
-      n: 'The panel on the right answers questions in plain English, and it is built so ' +
-         'it cannot make a figure up: the model is never given the data. It is given ' +
-         'four tools, your browser runs them against the numbers already loaded on this ' +
-         'page, and it only writes the sentence around what they return. Nothing you ' +
-         'type is used to look anything up anywhere else. It is capped at ' +
-         '<strong>10 questions a day</strong> because it costs money to run, and the ' +
-         'count sits next to the panel’s title. The map, Query, Compare and Directory ' +
-         'are not capped, because they cost nothing to serve.',
+      t: 'Ask a question in plain English',
+      n: 'The panel on the right answers questions in plain English. It cannot invent a ' +
+         'number, because it never sees the data. Your browser looks the numbers up on ' +
+         'this page. The answer is then written around what your browser found. Nothing ' +
+         'you type is sent anywhere else. You get <strong>10 questions a day</strong>, ' +
+         'because this part costs money to run. The map, Query, Compare and Directory ' +
+         'are free to use as much as you want.',
       go: function () {
-        // Idempotent: chapter 5 will normally have closed it, but the tour
-        // drives the real controls, so a ward clicked by hand during that
+        // Idempotent: the chapter before will normally have closed it, but the
+        // tour drives the real controls, so a ward clicked by hand during that
         // chapter would otherwise arrive here under the answer panel.
         closeWardSheet();
         railClick('explore');
@@ -12112,13 +12049,13 @@ loadData();
     },
     {
       t: 'What these figures cannot tell you',
-      n: 'An area figure describes an area, not the people in it: a ward being deprived ' +
-         'on average says nothing about any particular household there. Some health ' +
-         'indicators are published at borough level and repeated across every ward in ' +
-         'that borough, so they cannot separate wards, and the map says so wherever they ' +
-         'appear. A blank ward may be suppressed for privacy rather than zero. And this ' +
-         'tool is still in development, so treat what you find as provisional and check ' +
-         'it before acting on it.',
+      n: 'A figure for an area describes the area. It does not describe the people in ' +
+         'it. If a ward is deprived on average, that tells you nothing about any one ' +
+         'household in it. Some health figures are published for a whole borough, then ' +
+         'repeated for every ward in that borough. Those figures cannot tell one ward ' +
+         'from another, and the map says so next to them. An empty ward can mean the ' +
+         'figure is hidden to protect privacy, not that it is zero. This tool is still ' +
+         'being built. Please check anything important before you act on it.',
       go: function () {
         // Also reachable by pressing Back from the end, so it cannot rely on
         // the chapter before it having run.
