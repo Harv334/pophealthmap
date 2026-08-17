@@ -2579,12 +2579,24 @@
             <h2>Compare</h2>
             
           </div>
-          <div class="cmp-sub">Pin up to 4 wards, live on the map</div>
+          <div class="cmp-sub" id="cmp-sub">Pin up to 4 wards, live on the map</div>
         </div>
         <div class="cmp-scroll">
+          <!-- Boards and boroughs are first-class everywhere else on this page:
+               you can focus one, filter every layer by one, scope a query to
+               one and export one. Compare was the exception, and "how do the
+               four boards compare" is the question the boards invite. -->
           <div class="cmp-group">
-            <h3>Pinned wards <span class="cmp-badge" id="cmp-count">0 of 4</span></h3>
+            <h3>Compare by</h3>
+            <div class="cmp-chiprow" id="cmp-levels" role="group" aria-label="Which size of area to compare"></div>
+          </div>
+          <div class="cmp-group">
+            <h3><span id="cmp-pin-lbl">Pinned wards</span> <span class="cmp-badge" id="cmp-count">0 of 4</span></h3>
             <div class="cmp-pins" id="cmp-pins"></div>
+            <!-- There are 33 boroughs and 4 boards, so at those levels a list
+                 is a better picker than hunting the map for one to click. The
+                 map still works: clicking a ward adds whatever contains it. -->
+            <div id="cmp-picker" hidden style="margin-top:8px"></div>
           </div>
           <div class="cmp-group">
             <h3>Metrics</h3>
@@ -12704,19 +12716,26 @@ loadData();
     }).join('');
     var body = ROWS.map(function (r) {
       var cells = pinned.map(function (n) {
-        var v = num(indsOf(n)[r.k]);
+        // cmpIndsOf, not indsOf: the pins hold whatever Compare is set to
+        // compare, and at board level a ward lookup on a board's name finds
+        // nothing and fills the table with dashes.
+        var v = num(cmpIndsOf(n)[r.k]);
         return '<td>' + (v == null ? '—' :
           v.toLocaleString(undefined, { maximumFractionDigits: r.dp }) + (r.pct ? '%' : '')) + '</td>';
       }).join('');
       return '<tr><td>' + esc(r.l) + '</td>' + cells + '</tr>';
     }).join('');
     return '<div class="ws-pins">' +
-      '<div class="ws-pins-hd"><span class="ws-lbl">Pinned comparison (' + pinned.length + ' of ' + PIN_MAX + ')</span>' +
+      '<div class="ws-pins-hd"><span class="ws-lbl">Pinned comparison (' + pinned.length + ' of ' + PIN_MAX +
+      (cmpLevel === 'ward' ? '' : ', by ' + esc(cmpLvl().many)) + ')</span>' +
       '<button type="button" class="ws-btn" id="ws-unpin-all">Clear pins</button>' +
       '<button type="button" class="ws-btn primary" id="ws-open-compare">Open Compare</button></div>' +
       '<table class="ws-ptable"><thead><tr>' + head + '</tr></thead><tbody>' + body + '</tbody></table>' +
       '<div class="ws-note">Deprivation deciles run 1 (the most deprived tenth nationally) to 10 (the least). ' +
-      'The ward figure is a population-weighted mean of the deciles of the LSOAs inside it, so it is not itself a decile.</div>' +
+      'The ward figure is a population-weighted mean of the deciles of the LSOAs inside it, so it is not itself a decile.' +
+      (cmpLevel === 'ward' ? ''
+        : ' Figures for a ' + esc(cmpLvl().one) + ' are added up from its wards: counts summed, ' +
+          'everything else weighted by population.') + '</div>' +
       '</div>';
   }
 
@@ -12749,7 +12768,12 @@ loadData();
     // map to add another", so a click pins rather than raising the one-ward
     // sheet over the comparison it was asked to add to.
     if (inCompareMode()) {
-      if (pinned.indexOf(wn) === -1 && pinned.length < PIN_MAX) pinned.push(wn);
+      // At ward level the ward clicked is the pin. Above it, the pin is
+      // whatever contains that ward, so the map keeps working as a picker
+      // without the user having to find a borough's outline to click.
+      var rec0 = wardRec(wn);
+      var target = cmpLevel === 'ward' ? wn : cmpAreaOfLad((rec0 && rec0.lad) || '');
+      if (target && pinned.indexOf(target) === -1 && pinned.length < PIN_MAX) pinned.push(target);
       refreshPins();
       if (pinned.length >= 2) openCompareBar();
       return;
@@ -12822,10 +12846,23 @@ loadData();
     sheetSuspended = false;
   }
 
+  // What "Pin to compare" pins from the ward bar depends on what Compare is
+  // set to compare. At board level it is the board this ward is in, and the
+  // button says so rather than silently pinning something else.
+  function pinTargetFor(wn) {
+    if (!wn) return '';
+    if (cmpLevel === 'ward') return wn;
+    var rec = wardRec(wn);
+    return cmpAreaOfLad((rec && rec.lad) || '');
+  }
   function syncPinBtn() {
-    var on = currentWard && pinned.indexOf(currentWard) !== -1;
-    pinBtn.textContent = on ? 'Pinned ✓' : '+ Pin to compare';
+    var target = pinTargetFor(currentWard);
+    var on = target && pinned.indexOf(target) !== -1;
+    pinBtn.textContent = on ? 'Pinned ✓'
+      : (cmpLevel === 'ward' ? '+ Pin to compare' : '+ Pin ' + (target || cmpLvl().one));
     pinBtn.classList.toggle('on', !!on);
+    pinBtn.title = cmpLevel === 'ward' ? ''
+      : 'Compare is set to ' + cmpLvl().many + ', so this pins ' + (target || 'the ' + cmpLvl().one);
   }
 
   /* Which tool the rail is on.
@@ -12858,14 +12895,34 @@ loadData();
     var tool = activeTool();
     if (tool !== 'explore' && tool !== 'compare') return;
     if (!pinned.length || typeof GJ === 'undefined' || !GJ.features || typeof map === 'undefined') return;
-    var feats = GJ.features.filter(function (f) {
-      return pinned.indexOf(f.properties.WD24NM) !== -1;
-    });
+
+    /* Which geometry a pin is drawn with.
+
+       A ward is its own polygon. A borough is the borough outline, and a board
+       is the outlines of the boroughs in it: both come from BOROUGH_GJ, which
+       is on the page at parse time. Drawing a board as its 275 wards would be
+       275 dashed polygons for one pin, and drawing it from the boards file
+       would mean waiting on a fetch to show a pin the user just made. */
+    var feats = [];
+    if (cmpLevel === 'ward') {
+      feats = GJ.features
+        .filter(function (f) { return pinned.indexOf(f.properties.WD24NM) !== -1; })
+        .map(function (f) { return { f: f, i: pinned.indexOf(f.properties.WD24NM) }; });
+    } else if (typeof BOROUGH_GJ !== 'undefined' && BOROUGH_GJ.features) {
+      BOROUGH_GJ.features.forEach(function (f) {
+        var lad = (f.properties || {}).name;
+        var at = pinned.indexOf(cmpAreaOfLad(lad));
+        if (at !== -1) feats.push({ f: f, i: at });
+      });
+    }
     if (!feats.length) return;
-    pinLyr = L.geoJSON({ type: 'FeatureCollection', features: feats }, {
-      // Each pin in its own colour, matching its card and its row.
+    pinLyr = L.geoJSON({ type: 'FeatureCollection', features: feats.map(function (x) { return x.f; }) }, {
+      // Each pin in its own colour, matching its card and its row. The index
+      // travels with the feature so a board's several outlines all take the
+      // one colour of the board they belong to.
       style: function (f) {
-        return { color: pinColour(pinned.indexOf(f.properties.WD24NM)), weight: 3,
+        var hit = feats.filter(function (x) { return x.f === f; })[0];
+        return { color: pinColour(hit ? hit.i : 0), weight: 3,
                  fill: false, opacity: .95, dashArray: '5,4' };
       },
       interactive: false,
@@ -12888,12 +12945,14 @@ loadData();
   pinBtn.addEventListener('click', function (e) {
     e.stopPropagation();
     if (!currentWard) return;
-    var at = pinned.indexOf(currentWard);
+    var target = pinTargetFor(currentWard);
+    if (!target) return;
+    var at = pinned.indexOf(target);
     if (at !== -1) pinned.splice(at, 1);
     else if (pinned.length >= PIN_MAX) {
-      alert('Four wards is the most that fit side by side. Remove one before pinning another.');
+      alert('Four ' + cmpLvl().many + ' is the most that fit side by side. Remove one before pinning another.');
       return;
-    } else pinned.push(currentWard);
+    } else pinned.push(target);
     if (sheetState !== 0) { sheetState = 0; applyState(); }
     refreshPins();
   });
@@ -12999,26 +13058,184 @@ loadData();
   }
   function inCompareMode() { return !!(cmpPane && cmpPane.classList.contains('active')); }
 
+  /* ── Comparing at three sizes ──────────────────────────────────────────────
+
+     A board and a borough have no published figures of their own here beyond
+     eighteen Fingertips series, so they are added up from their wards, by the
+     same rule the Custom area report uses and states: counts are summed,
+     everything else is weighted by population.
+
+     That rule happens to be exactly right for the borough series too, without
+     a special case. Those are published for a whole borough and written onto
+     every ward in it, so a population-weighted mean of the same number
+     repeated is that number back. A board's figure for one of them is then a
+     population-weighted mean of its boroughs, which is what it should be.
+
+     Pins hold names at whichever level is chosen, so switching level empties
+     them: three wards and a borough in one row of cards would be four columns
+     of numbers that are not comparable, under a heading that says they are. */
+  var CMP_LEVELS = [
+    { k: 'ward',    one: 'ward',    many: 'wards' },
+    { k: 'borough', one: 'borough', many: 'boroughs' },
+    { k: 'icb',     one: 'board',   many: 'boards' },
+  ];
+  var cmpLevel = 'ward';
+  function cmpLvl() {
+    return CMP_LEVELS.filter(function (l) { return l.k === cmpLevel; })[0] || CMP_LEVELS[0];
+  }
+
+  // Every area available at the current level. Empty at ward level, where the
+  // map is the picker and a 704-long menu would not be one.
+  function cmpChoices() {
+    if (cmpLevel === 'borough') return boroughList();
+    if (cmpLevel === 'icb') {
+      return (typeof ICB_ORDER !== 'undefined' && ICB_ORDER.length)
+        ? ICB_ORDER.slice() : [];
+    }
+    return [];
+  }
+  function cmpAreaLabel(name) {
+    if (cmpLevel === 'icb' && typeof ICB_LABEL === 'object' && ICB_LABEL[name]) return ICB_LABEL[name];
+    return name;
+  }
+
+  // Which area at the current level contains a ward. Used both to add up an
+  // area's figures and to turn a click on the map into the right pin.
+  function cmpAreaOfLad(lad) {
+    if (!lad) return '';
+    if (cmpLevel === 'borough') return lad;
+    if (cmpLevel === 'icb') {
+      if (typeof ICB_OF_LAD !== 'object') return '';
+      var norm = (lad === 'City of Westminster') ? 'Westminster' : lad;
+      return ICB_OF_LAD[lad] || ICB_OF_LAD[norm] || '';
+    }
+    return '';
+  }
+  function cmpWardsOf(name) {
+    if (cmpLevel === 'ward') return [name];
+    return allWards().filter(function (w) {
+      return cmpLevel === 'borough'
+        ? (typeof _sameLad === 'function' ? _sameLad(w.lad, name) : w.lad === name)
+        : cmpAreaOfLad(w.lad) === name;
+    }).map(function (w) { return w.name; });
+  }
+
+  // Two boards is 400 wards of arithmetic on every keystroke in the metric
+  // picker, and none of it changes until the data does.
+  var _cmpAgg = {};
+  function cmpIndsOf(name) {
+    if (cmpLevel === 'ward') return indsOf(name);
+    var key = cmpLevel + ' ' + name;
+    if (_cmpAgg[key]) return _cmpAgg[key];
+    var sum = {}, wnum = {}, wden = {};
+    cmpWardsOf(name).forEach(function (wn) {
+      var i = indsOf(wn);
+      var p = num(i.census_population) || 0;
+      Object.keys(i).forEach(function (k) {
+        if (RB_SKIP[k]) return;              // a mean of ranks is not a rank
+        var v = num(i[k]);
+        if (v === null) return;
+        if (rbIsAdditive(k)) { sum[k] = (sum[k] || 0) + v; return; }
+        // No population is no weight. Falling back to 1 would let an empty
+        // ward pull as hard as a full one.
+        if (p <= 0) return;
+        wnum[k] = (wnum[k] || 0) + v * p;
+        wden[k] = (wden[k] || 0) + p;
+      });
+    });
+    var out = {};
+    Object.keys(sum).forEach(function (k) { out[k] = sum[k]; });
+    Object.keys(wnum).forEach(function (k) { if (wden[k] > 0) out[k] = wnum[k] / wden[k]; });
+    _cmpAgg[key] = out;
+    return out;
+  }
+
+  // What a pinned area's subtitle says. A ward names its borough; a borough
+  // and a board name what they are made of, which is the thing a reader needs
+  // in order to know the figures were added up rather than published.
+  function cmpSubOf(name) {
+    if (cmpLevel === 'ward') {
+      var rec = wardRec(name);
+      return (rec && rec.lad) || '';
+    }
+    var n = cmpWardsOf(name).length;
+    return n + ' ward' + (n === 1 ? '' : 's');
+  }
+
+  function setCmpLevel(lvl) {
+    if (cmpLevel === lvl) return;
+    cmpLevel = lvl;
+    pinned = [];
+    _cmpAgg = {};
+    renderComparePane();
+    renderCompareBar();
+    drawPins();
+    syncPinBtn();
+    closeCompareBar();
+  }
+
   function renderComparePane() {
     if (!cmpPinsEl) return;
+    var lvl = cmpLvl();
     cmpCountEl.textContent = pinned.length + ' of ' + PIN_MAX;
 
+    var lvlEl = $('cmp-levels');
+    if (lvlEl) {
+      lvlEl.innerHTML = CMP_LEVELS.map(function (l) {
+        return '<span class="q-chip' + (l.k === cmpLevel ? ' on' : '') + '" data-cmplvl="' +
+          l.k + '" role="button" tabindex="0" aria-pressed="' + (l.k === cmpLevel) + '">' +
+          esc(l.many.charAt(0).toUpperCase() + l.many.slice(1)) + '</span>';
+      }).join('');
+    }
+    var subEl = $('cmp-sub');
+    if (subEl) {
+      subEl.textContent = cmpLevel === 'ward'
+        ? 'Pin up to ' + PIN_MAX + ' wards, live on the map'
+        : 'Up to ' + PIN_MAX + ' ' + lvl.many + ', added up from their wards';
+    }
+    var pinLbl = $('cmp-pin-lbl');
+    if (pinLbl) pinLbl.textContent = 'Pinned ' + lvl.many;
+
     if (!pinned.length) {
-      cmpPinsEl.innerHTML = '<div class="cmp-empty">Nothing pinned yet. Click a ward on the map ' +
-        'and it will be added here, or use "Pin to compare" on the ward bar.</div>';
+      cmpPinsEl.innerHTML = '<div class="cmp-empty">' + (cmpLevel === 'ward'
+        ? 'Nothing pinned yet. Click a ward on the map and it will be added here, or use ' +
+          '"Pin to compare" on the ward bar.'
+        : 'Nothing pinned yet. Choose ' + (lvl.one === 'board' ? 'a board' : 'a borough') +
+          ' below, or click anywhere on the map and the one you clicked in is added.') +
+        '</div>';
     } else {
       cmpPinsEl.innerHTML = pinned.map(function (n, i) {
-        var rec = wardRec(n);
         return '<div class="cmp-pin" data-goto="' + esc(n) + '">' +
           '<span class="cmp-spine" style="background:' + pinColour(i) + '"></span>' +
-          '<span class="cmp-txt"><span class="cmp-lad">' + esc((rec && rec.lad) || '') + '</span>' +
-          '<span class="cmp-nm">' + esc(n) + '</span></span>' +
+          '<span class="cmp-txt"><span class="cmp-lad">' + esc(cmpSubOf(n)) + '</span>' +
+          '<span class="cmp-nm">' + esc(cmpAreaLabel(n)) + '</span></span>' +
           '<button type="button" class="cmp-x" data-unpin="' + esc(n) + '" ' +
-          'title="Remove ' + esc(n) + '" aria-label="Remove ' + esc(n) + '">&times;</button>' +
+          'title="Remove ' + esc(cmpAreaLabel(n)) + '" aria-label="Remove ' +
+          esc(cmpAreaLabel(n)) + '">&times;</button>' +
           '</div>';
       }).join('') +
-      (pinned.length < PIN_MAX
+      (pinned.length < PIN_MAX && cmpLevel === 'ward'
         ? '<div class="cmp-addhint">Click a ward on the map to add another</div>' : '');
+    }
+
+    var pick = $('cmp-picker');
+    if (pick) {
+      var left = cmpChoices().filter(function (n) { return pinned.indexOf(n) === -1; });
+      pick.hidden = cmpLevel === 'ward' || pinned.length >= PIN_MAX || !left.length;
+      if (!pick.hidden) {
+        pick.innerHTML = '<select class="q-chip outline" id="cmp-add-area" style="width:100%" ' +
+          'aria-label="Add ' + esc(lvl.one === 'board' ? 'a board' : 'a borough') + '">' +
+          '<option value="">+ add ' + esc(lvl.one === 'board' ? 'a board' : 'a borough') + '</option>' +
+          left.map(function (n) {
+            return '<option value="' + esc(n) + '">' + esc(cmpAreaLabel(n)) + '</option>';
+          }).join('') + '</select>' +
+          // Four boards and four cards: the one case where "all of them" is
+          // the whole comparison rather than a shortcut into it.
+          (cmpLevel === 'icb' && !pinned.length && left.length === PIN_MAX
+            ? '<button type="button" class="ws-btn" id="cmp-all" style="width:100%;' +
+              'justify-content:center;margin-top:6px">Compare all four boards</button>'
+            : '');
+      }
     }
 
     cmpMetricsEl.innerHTML = cmpMetrics.map(function (m, i) {
@@ -13043,11 +13260,12 @@ loadData();
    * of its LSOAs' deciles and is not itself a decile.
    */
   function quickView() {
+    var lvl = cmpLvl();
     if (pinned.length < 2) {
-      return 'Pin at least two wards to compare them. Each one keeps its colour on the map.';
+      return 'Pin at least two ' + lvl.many + ' to compare them. Each one keeps its colour on the map.';
     }
     var bits = [];
-    var decs = pinned.map(function (n) { return num(indsOf(n).imd_decile_mean); })
+    var decs = pinned.map(function (n) { return num(cmpIndsOf(n).imd_decile_mean); })
                      .filter(function (v) { return v !== null; });
     if (decs.length === pinned.length) {
       // Deciles run backwards, so the highest of them is the LEAST deprived.
@@ -13057,53 +13275,58 @@ loadData();
       var leastDep = Math.max.apply(null, decs);
       var mostDep  = Math.min.apply(null, decs);
       if (leastDep <= 5.5) {
-        bits.push('All ' + pinned.length + ' pinned wards sit in the most deprived <strong>' +
+        bits.push('All ' + pinned.length + ' pinned ' + lvl.many + ' sit in the most deprived <strong>' +
           decileBand(leastDep).pct + '%</strong> of England on the mean decile of their neighbourhoods.');
       } else if (mostDep > 5.5) {
-        bits.push('All ' + pinned.length + ' pinned wards sit in the least deprived <strong>' +
+        bits.push('All ' + pinned.length + ' pinned ' + lvl.many + ' sit in the least deprived <strong>' +
           decileBand(mostDep).pct + '%</strong> of England on the mean decile of their neighbourhoods.');
       } else {
         // Straddling the middle, where neither framing says anything: one of
         // these wards is in the more deprived half and another is not, and any
         // single band wide enough to hold both is too wide to be worth stating.
-        bits.push('These ' + pinned.length + ' wards sit either side of the national middle, from decile <strong>' +
+        bits.push('These ' + pinned.length + ' ' + lvl.many + ' sit either side of the national middle, from decile <strong>' +
           mostDep.toFixed(1) + '</strong> to <strong>' + leastDep.toFixed(1) +
           '</strong> on the mean decile of their neighbourhoods.');
       }
     }
     // Name the outlier on each active metric that actually separates them.
     cmpActive().slice(0, 3).forEach(function (m) {
-      var rows = pinned.map(function (n) { return { n: n, v: num(indsOf(n)[m.k]) }; })
+      var rows = pinned.map(function (n) { return { n: n, v: num(cmpIndsOf(n)[m.k]) }; })
                        .filter(function (r) { return r.v !== null; });
       if (rows.length < 2) return;
       rows.sort(function (a, b) { return b.v - a.v; });
       var top = rows[0];
       if (Math.abs(top.v - rows[rows.length - 1].v) < 1e-9) return;   // all identical
-      var med = median(m.k);
       var vs = fmtVal(top.v, m.k);
+      /* The anchor is the London ward median, so it is only an anchor while
+         wards are what is being compared. Setting a borough or a board beside
+         it would read as a like-for-like comparison and is not one: half of
+         London's wards are more deprived than the median ward, and that says
+         nothing about whether a board of 275 of them is. Better to say less. */
+      var med = cmpLevel === 'ward' ? median(m.k) : null;
       var context = med !== null ? ' against a London ward median of ' + fmtVal(med, m.k) : '';
 
       // Deprivation runs backwards and saying "the highest IMD" of a decile
       // means the least deprived, which reads as the opposite. The direction
       // is spelled out for those two rather than left to the word "highest".
       if (m.k === 'imd_decile_mean') {
-        bits.push('<strong>' + esc(top.n) + '</strong> is the least deprived of them on the mean ' +
+        bits.push('<strong>' + esc(cmpAreaLabel(top.n)) + '</strong> is the least deprived of them on the mean ' +
           'decile of its neighbourhoods (' + vs + ')' + context + '.');
         return;
       }
       if (m.k === 'imd_score') {
-        bits.push('<strong>' + esc(top.n) + '</strong> is the most deprived of them by IMD score (' +
+        bits.push('<strong>' + esc(cmpAreaLabel(top.n)) + '</strong> is the most deprived of them by IMD score (' +
           vs + ')' + context + '.');
         return;
       }
       // The short chip label, not the long description: lowercasing that gave
       // "the highest mean imd decile of the lsoas in", truncated mid-phrase.
       var lbl = /[A-Z]{2,}/.test(m.l) ? m.l : m.l.charAt(0).toLowerCase() + m.l.slice(1);
-      bits.push('<strong>' + esc(top.n) + '</strong> has the highest ' + esc(lbl) +
+      bits.push('<strong>' + esc(cmpAreaLabel(top.n)) + '</strong> has the highest ' + esc(lbl) +
         ' at ' + vs + context + '.');
     });
     if (bits.length === 0) {
-      return 'The pinned wards do not differ on the metrics selected, or those figures are missing for them.';
+      return 'The pinned ' + lvl.many + ' do not differ on the metrics selected, or those figures are missing for them.';
     }
     return bits.join(' ');
   }
@@ -13115,17 +13338,40 @@ loadData();
     // Two wards in the same borough, compared on a borough figure, come out
     // identical. That is the geography, not a finding about the wards.
     var lads = {}, shared = false;
-    pinned.forEach(function (n) {
-      var lad = (wardRec(n) || {}).lad || '';
-      if (lad && lads[lad]) shared = true;
-      if (lad) lads[lad] = 1;
-    });
+    if (cmpLevel === 'ward') {
+      pinned.forEach(function (n) {
+        var lad = (wardRec(n) || {}).lad || '';
+        if (lad && lads[lad]) shared = true;
+        if (lad) lads[lad] = 1;
+      });
+    }
     if (bl.length) {
-      notes.push('<strong>' + esc(bl.map(labelOf).join(', ')) + '</strong> ' +
-        (bl.length > 1 ? 'are' : 'is') + ' published at borough level and written onto every ward ' +
-        'in the borough' +
-        (shared ? ', and two or more of your pins share a borough, so they will read as identical there' : '') +
-        '.');
+      // At borough level a borough figure is the borough's own figure, which
+      // is the one place on this page where that series says exactly what it
+      // means, so the warning would be backwards. At board level it is a
+      // population-weighted mean of the boroughs, which is worth saying.
+      if (cmpLevel === 'borough') {
+        notes.push('<strong>' + esc(bl.map(labelOf).join(', ')) + '</strong> ' +
+          (bl.length > 1 ? 'are' : 'is') + ' published at borough level, so here ' +
+          (bl.length > 1 ? 'they are' : 'it is') + ' the published figure rather than anything added up.');
+      } else if (cmpLevel === 'icb') {
+        notes.push('<strong>' + esc(bl.map(labelOf).join(', ')) + '</strong> ' +
+          (bl.length > 1 ? 'are' : 'is') + ' published at borough level, so a board figure is a ' +
+          'population-weighted mean of the boroughs in it, not a published board statistic.');
+      } else {
+        notes.push('<strong>' + esc(bl.map(labelOf).join(', ')) + '</strong> ' +
+          (bl.length > 1 ? 'are' : 'is') + ' published at borough level and written onto every ward ' +
+          'in the borough' +
+          (shared ? ', and two or more of your pins share a borough, so they will read as identical there' : '') +
+          '.');
+      }
+    }
+    // Said once, where the figures are, rather than only in the drawer that
+    // has to be opened to see them.
+    if (cmpLevel !== 'ward' && pinned.length) {
+      notes.push('These figures are added up from the wards in each ' + esc(cmpLvl().one) +
+        ': counts summed, everything else weighted by population. They are not published ' +
+        esc(cmpLvl().one) + ' statistics.');
     }
     cmpCautionEl.innerHTML = notes.map(function (n) {
       return '<div class="q-caution" style="margin-top:9px">' + n + '</div>';
@@ -13138,7 +13384,7 @@ loadData();
     // Highest and lowest per metric, so a card can mark its own outliers.
     var ext = {};
     mets.forEach(function (m) {
-      var vs = pinned.map(function (n) { return num(indsOf(n)[m.k]); })
+      var vs = pinned.map(function (n) { return num(cmpIndsOf(n)[m.k]); })
                      .filter(function (v) { return v !== null; });
       if (vs.length > 1) {
         var hi = Math.max.apply(null, vs), lo = Math.min.apply(null, vs);
@@ -13146,8 +13392,9 @@ loadData();
       }
     });
 
+    var lvl = cmpLvl();
     cmpCardsEl.innerHTML = pinned.map(function (n, i) {
-      var rec = wardRec(n), inds = (rec && rec.indicators) || {};
+      var inds = cmpIndsOf(n);
       var rows = mets.map(function (m) {
         var v = num(inds[m.k]);
         var cls = '';
@@ -13164,20 +13411,27 @@ loadData();
       }).join('');
       return '<div class="cmp-card">' +
         '<div class="cmp-c-hdr"><span class="cmp-swatch" style="background:' + pinColour(i) + '"></span>' +
-        '<span class="cmp-c-lad">' + esc((rec && rec.lad) || '') + '</span></div>' +
+        // The short name on a card. "NHS West and North London ICB" is the
+        // right label for a list and three wrapped lines on a 190px card,
+        // which pushes the figures it exists to show off the bottom.
+        '<span class="cmp-c-lad">' + esc(cmpSubOf(n)) + '</span></div>' +
         '<div class="cmp-c-nm">' + esc(n) + '</div>' + rows + '</div>';
     }).join('') +
       (pinned.length < PIN_MAX
-        ? '<div class="cmp-card add">Click a ward on the map to pin it</div>' : '');
+        ? '<div class="cmp-card add">Click ' + (cmpLevel === 'ward' ? 'a ward' : 'the map') +
+          ' to pin ' + (cmpLevel === 'ward' ? 'it' : 'the ' + lvl.one + ' you click in') + '</div>' : '');
 
     $('cmp-bar-title').textContent = pinned.length
-      ? 'Comparing ' + pinned.length + ' ward' + (pinned.length === 1 ? '' : 's')
+      ? 'Comparing ' + pinned.length + ' ' + (pinned.length === 1 ? lvl.one : lvl.many)
       : 'Comparison';
     var uncoloured = mets.filter(function (m) { return !polarityOf(m.k); });
     cmpLegendEl.innerHTML = mets.length
       ? '<span class="cmp-key"><i style="background:#00703C"></i>better</span>' +
         '<span class="cmp-key"><i style="background:#D4351C"></i>worse</span>' +
         '<span class="cmp-key">&#9650; highest &#9660; lowest</span>' +
+        (cmpLevel === 'ward' ? ''
+          : 'Every figure here is added up from the wards in the ' + esc(lvl.one) +
+            ': counts are summed, everything else is weighted by population. ') +
         'Colour follows the indicator, not the size of the number: the highest IMD decile is the ' +
         'least deprived tenth, the highest bad-health percentage is the worst outcome. ' +
         (uncoloured.length
@@ -13256,6 +13510,40 @@ loadData();
     $('cmp-csv').addEventListener('click', cmpCsv);
     $('cmp-bar-csv').addEventListener('click', cmpCsv);
     $('cmp-bar-close').addEventListener('click', closeCompareBar);
+
+    // The level chips and the area picker are both rebuilt by
+    // renderComparePane, so both are delegated rather than bound to elements
+    // that stop existing the moment they are used.
+    var lvlEl = $('cmp-levels');
+    if (lvlEl) {
+      lvlEl.addEventListener('click', function (e) {
+        var chip = e.target.closest('[data-cmplvl]');
+        if (chip) setCmpLevel(chip.getAttribute('data-cmplvl'));
+      });
+      lvlEl.addEventListener('keydown', function (e) {
+        if ((e.key === 'Enter' || e.key === ' ') && e.target.closest('[data-cmplvl]')) {
+          e.preventDefault(); e.target.click();
+        }
+      });
+    }
+    var pickEl = $('cmp-picker');
+    if (pickEl) {
+      pickEl.addEventListener('change', function (e) {
+        if (e.target.id !== 'cmp-add-area' || !e.target.value) return;
+        if (pinned.indexOf(e.target.value) === -1 && pinned.length < PIN_MAX) {
+          pinned.push(e.target.value);
+          refreshPins();
+          if (pinned.length >= 2) { renderCompareBar(); openCompareBar(); }
+        }
+      });
+      pickEl.addEventListener('click', function (e) {
+        if (e.target.id !== 'cmp-all') return;
+        pinned = cmpChoices().slice(0, PIN_MAX);
+        refreshPins();
+        renderCompareBar();
+        openCompareBar();
+      });
+    }
   }
 
   /* The pin list, for the tour.
@@ -13269,22 +13557,38 @@ loadData();
   window.PH_COMPARE = {
     pinned: function () { return pinned.slice(); },
     clear: function () { if (!pinned.length) return; pinned = []; refreshPins(); },
+    // Read-only, for the same reason PH_DIR and PH_REPORT expose theirs: the
+    // parts that decide what a user sees should be checkable from outside
+    // without reading it back off the DOM and inferring it.
+    level: function () { return cmpLevel; },
+    setLevel: setCmpLevel,
+    figures: function (name) { return cmpIndsOf(name); },
+    wardsOf: cmpWardsOf,
   };
 
   function cmpCsv() {
-    if (!pinned.length) { alert('Pin at least one ward first.'); return; }
+    var lvl = cmpLvl();
+    if (!pinned.length) { alert('Pin at least one ' + lvl.one + ' first.'); return; }
     var mets = cmpActive();
-    var lines = [['indicator', 'unit'].concat(pinned).map(csvCell).join(',')];
+    var lines = [['indicator', 'unit'].concat(pinned.map(cmpAreaLabel)).map(csvCell).join(',')];
     mets.forEach(function (m) {
       lines.push([labelOf(m.k), unitOf(m.k)].concat(pinned.map(function (n) {
-        var v = num(indsOf(n)[m.k]);
+        var v = num(cmpIndsOf(n)[m.k]);
         return v === null ? '' : v;
       })).map(csvCell).join(','));
     });
-    lines.push(['borough', ''].concat(pinned.map(function (n) {
-      return (wardRec(n) || {}).lad || '';
+    // At ward level this names the borough each one is in. Above it, the row
+    // says what the figures were added up from, which is the thing a
+    // spreadsheet away from this page has no other way of recording.
+    lines.push([cmpLevel === 'ward' ? 'borough' : 'wards counted', ''].concat(pinned.map(function (n) {
+      return cmpLevel === 'ward' ? ((wardRec(n) || {}).lad || '') : cmpWardsOf(n).length;
     })).map(csvCell).join(','));
-    download('ward-comparison.csv', lines.join('\n'), 'text/csv;charset=utf-8');
+    if (cmpLevel !== 'ward') {
+      lines.push(['method', ''].concat(pinned.map(function () {
+        return 'summed for counts, population-weighted otherwise';
+      })).map(csvCell).join(','));
+    }
+    download(lvl.one + '-comparison.csv', lines.join('\n'), 'text/csv;charset=utf-8');
   }
 
   /* ─────────────────────────────────────────────────────────────────────────
