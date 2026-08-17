@@ -2115,7 +2115,7 @@
           <label class="lrow"><div style="width:9px;height:9px;border:2px solid #8E5BA6;border-radius:2px;flex-shrink:0"></div><span class="lname">ICB regions <span class="lcount" id="icb-count"></span><span class="lhelp" title="Integrated Care Boards. London has five, and each one covers whole boroughs: North West, North Central, North East, South East and South West. Switch this on and click a region to zoom to it.">?</span></span><input type="checkbox" id="ticb"></label>
           <label class="lrow"><div style="width:9px;height:9px;border:2px solid #1a1a1a;border-radius:2px;flex-shrink:0"></div><span class="lname">London boroughs</span><input type="checkbox" id="tb"></label>
           <div style="margin:4px 0 8px 0">
-            <div style="font-size:var(--t-xs);color:var(--ink-2);margin-bottom:3px">Focus by borough</div>
+            <div style="font-size:var(--t-xs);color:var(--ink-2);margin-bottom:3px">Focus on a board or borough</div>
             <select id="borough-focus" style="width:100%;padding:4px 6px;border:1px solid var(--line);border-radius:5px;font-size:var(--t-xs);color:var(--ink);background:var(--paper)">
               <option value="all">All London</option>
             </select>
@@ -3766,6 +3766,74 @@ function ladOf(wn) {
 // leaving the page stuck on "Loading ward data".
 var focusedBorough = 'all';
 
+/* ── Focus ────────────────────────────────────────────────────────────────
+   Focus used to mean one borough, and roughly twenty places asked about it by
+   comparing a LAD name with === . Adding a second kind of focus by widening
+   that comparison in twenty places would have been twenty chances to get it
+   subtly wrong, and the ones that decide what a CSV contains fail silently.
+
+   So there is one question and one place that answers it. Everything asks
+   ladInFocus(); nothing compares focusedBorough directly any more. A third
+   kind of focus later is a change to this function and nothing else.
+
+   focusedIcb wins when it is set, and the two are kept mutually exclusive by
+   setFocus below rather than by convention. */
+var focusedIcb = null;
+var ICB_OF_LAD = {};      // borough name -> ICB name, from icb_lookup.json
+var ICB_ORDER = [];       // the five, in the order the generator lists them
+var ICB_COLOUR = {};
+
+function focusActive() {
+  return !!focusedIcb || !!(focusedBorough && focusedBorough !== 'all');
+}
+
+/* Westminster appears as both "Westminster" and "City of Westminster"
+   depending on which register a record came from, and that alias was being
+   handled at three of the old comparison sites and forgotten at the rest. */
+function _sameLad(a, b) {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const norm = s => (s === 'City of Westminster' ? 'Westminster' : s);
+  return norm(a) === norm(b);
+}
+
+function ladInFocus(lad) {
+  if (!focusActive()) return true;
+  if (!lad) return false;
+  if (focusedIcb) {
+    const norm = (lad === 'City of Westminster') ? 'Westminster' : lad;
+    return ICB_OF_LAD[lad] === focusedIcb || ICB_OF_LAD[norm] === focusedIcb;
+  }
+  return _sameLad(lad, focusedBorough);
+}
+
+/** The boroughs in focus. One for a borough, five to eight for a board. */
+function focusedLads() {
+  if (focusedIcb) {
+    return Object.keys(ICB_OF_LAD).filter(l => ICB_OF_LAD[l] === focusedIcb);
+  }
+  if (focusedBorough && focusedBorough !== 'all') return [focusedBorough];
+  return [];
+}
+
+/** Their LAD codes, for the records that carry a code rather than a name. */
+function focusedLadCodes() {
+  const out = [];
+  focusedLads().forEach(name => {
+    const code = LAD_NAME_TO_CODE[name] ||
+      LAD_NAME_TO_CODE[name === 'City of Westminster' ? 'Westminster' : name];
+    if (code) out.push(code);
+  });
+  return out;
+}
+
+/** What the focus is called, for the viewing strip and announcements. */
+function focusLabel() {
+  if (focusedIcb) return 'NHS ' + focusedIcb + ' ICB';
+  if (focusedBorough && focusedBorough !== 'all') return focusedBorough;
+  return null;
+}
+
 /* LAD code ↔ borough name mapping. Charity Commission and VCSE records carry
    E09xxxxxxx codes; the ward GeoJSON and BOROUGH_GJ carry the friendly name, so
    anything that filters organisations by the focused borough has to cross
@@ -4491,7 +4559,7 @@ function _ink(light, dark) {
 function _boroughStyle(feat) {
   const props = (feat && feat.properties) || {};
   const name = props.name || '';
-  const hidden = focusedBorough && focusedBorough !== 'all' && name !== focusedBorough;
+  const hidden = focusActive() && !ladInFocus(name);
   const base = {
     color: _ink('#1a1a1a', '#D6E2EA'),
     weight: 2.5,
@@ -4577,7 +4645,7 @@ const nwWardsL = L.geoJSON(NW_WARDS_GJ, {
 // Per-feature style so when a borough is focused, wards outside it disappear.
 function _wardBoundaryStyle(feat) {
   const lad = (feat && feat.properties && feat.properties.LAD) || '';
-  const hidden = focusedBorough && focusedBorough !== 'all' && lad !== focusedBorough;
+  const hidden = focusActive() && !ladInFocus(lad);
   return {
     color: _ink('#000', '#B9C7D0'),
     weight: hidden ? 0 : 1,
@@ -4820,17 +4888,15 @@ function applyCICFilter() {
   const textFilter = (document.getElementById('vcse-search')?.value || '').toLowerCase().trim();
   // Borough-focus override (mirrors applyVCSEFilter): when a borough is
   // focused, hide CICs outside that borough regardless of area-filter.
-  const _focusedLadCode = (typeof focusedBorough !== 'undefined' && focusedBorough && focusedBorough !== 'all')
-    ? (LAD_NAME_TO_CODE[focusedBorough]
-       || LAD_NAME_TO_CODE[focusedBorough === 'City of Westminster' ? 'Westminster' : focusedBorough]
-       || '')
-    : '';
+  // A set, not a single code: a focused board is five to eight boroughs.
+  const _focusCodes = (typeof focusedLadCodes === 'function')
+    ? new Set(focusedLadCodes()) : new Set();
   cicData.forEach(o => {
     let areaMatch = true;
     if (areaFilter.startsWith('lad-')) {
       areaMatch = (o.record.lad || '') === areaFilter.slice(4);
     }
-    const focusMatch = !_focusedLadCode || (o.record.lad || '') === _focusedLadCode;
+    const focusMatch = !_focusCodes.size || _focusCodes.has(o.record.lad || '');
     const textMatch = !textFilter ||
       o.name.toLowerCase().includes(textFilter) ||
       (o.addr||'').toLowerCase().includes(textFilter);
@@ -5299,11 +5365,9 @@ function applyVCSEFilter() {
   // Borough-focus override: when a borough is focused via the Layers tab,
   // we must filter VCSE pins to that borough no matter what the area-filter
   // dropdown says. Compute the LAD code for the focused borough up front.
-  const _focusedLadCode = (typeof focusedBorough !== 'undefined' && focusedBorough && focusedBorough !== 'all')
-    ? (LAD_NAME_TO_CODE[focusedBorough]
-       || LAD_NAME_TO_CODE[focusedBorough === 'City of Westminster' ? 'Westminster' : focusedBorough]
-       || '')
-    : '';
+  // A set, not a single code: a focused board is five to eight boroughs.
+  const _focusCodes = (typeof focusedLadCodes === 'function')
+    ? new Set(focusedLadCodes()) : new Set();
 
   // Determine visibility for each org
   vcseData.forEach(o => {
@@ -5316,7 +5380,7 @@ function applyVCSEFilter() {
     }
     // Hard borough-focus gate. If a borough is focused, any pin whose LAD
     // doesn't match is hidden regardless of area-filter setting.
-    const focusMatch = !_focusedLadCode || (o.record.lad || '') === _focusedLadCode;
+    const focusMatch = !_focusCodes.size || _focusCodes.has(o.record.lad || '');
 
     const textMatch = !textFilter ||
       o.name.toLowerCase().includes(textFilter) ||
@@ -5339,7 +5403,7 @@ function applyVCSEFilter() {
     if (areaFilter.startsWith('lad-')) {
       areaMatch = (o.record.lad || '') === areaFilter.slice(4);
     }
-    const focusMatch = !_focusedLadCode || (o.record.lad || '') === _focusedLadCode;
+    const focusMatch = !_focusCodes.size || _focusCodes.has(o.record.lad || '');
     return areaMatch && focusMatch && _vcseOrgMatchesTags(o.record) && _causeMatches(o.record) && (!textFilter || o.name.toLowerCase().includes(textFilter) || (o.addr||'').toLowerCase().includes(textFilter));
   });
 
@@ -5379,6 +5443,7 @@ function initVCSEFilters() {
       const bname = LAD_CODE_TO_NAME[code] || '';
       if (bname) {
         focusedBorough = bname;
+        focusedIcb = null;
         const bsel = document.getElementById('borough-focus');
         if (bsel) bsel.value = bname;
         _applyBoroughSolo();
@@ -5393,9 +5458,10 @@ function initVCSEFilters() {
         }
       }
     } else {
-      // 'all' — clear any borough focus
-      if (focusedBorough !== 'all') {
+      // 'all' — clear whichever kind of focus is on
+      if (focusActive()) {
         focusedBorough = 'all';
+        focusedIcb = null;
         const bsel = document.getElementById('borough-focus');
         if (bsel) bsel.value = 'all';
         _applyBoroughSolo();
@@ -5487,7 +5553,7 @@ function wstyle(wn, ov, state) {
   // entirely, invisible and not interactive-looking, so only the selected
   // borough is on screen. It used to sit alongside a softer dim-and-spotlight
   // path for neighbourhood focus, which went with the neighbourhoods.
-  if (focusedBorough && focusedBorough !== 'all' && ladOf(wn) !== focusedBorough) {
+  if (focusActive() && !ladInFocus(ladOf(wn))) {
     return { color: '#000', weight: 0, fillColor: '#fff', fillOpacity: 0, opacity: 0 };
   }
 
@@ -6662,7 +6728,7 @@ document.getElementById('tb').addEventListener('change',  e => {
 // wards/boundaries/markers are restored; otherwise only features in the
 // focused borough stay visible.
 function _applyBoroughSolo() {
-  const focused = focusedBorough && focusedBorough !== 'all';
+  const focused = focusActive();
 
   // 1. Main ward layer — wstyle() already branches on `outOfBorough` and
   //    returns a fully-transparent style, so a restyle is enough.
@@ -6670,8 +6736,13 @@ function _applyBoroughSolo() {
   else if (wLyr) wLyr.eachLayer(l =>
     l.setStyle(wstyle(l.feature.properties.WD24NM, curOv, gs(l.feature.properties.WD24NM))));
 
-  // 2. Borough outline layer — hide non-matching outlines (style fn reads focusedBorough).
+  // 2. Borough outline layer — hide non-matching outlines (style fn reads the focus).
   if (boroughL) boroughL.setStyle(_boroughStyle);
+
+  // 2b. ICB regions, so the focused board lifts out of the other four.
+  if (typeof icbLyr !== 'undefined' && icbLyr) {
+    try { icbLyr.setStyle(icbStyle); } catch (e) {}
+  }
 
   // 3. Black ward boundary overlay — same per-feature trick.
   if (wardBoundaryLyr) wardBoundaryLyr.setStyle(_wardBoundaryStyle);
@@ -6686,7 +6757,7 @@ function _applyBoroughSolo() {
       lyr.eachLayer(m => lyr._allMarkers.push(m));
     }
     lyr._allMarkers.forEach(m => {
-      const inFocus = !focused || m._lad === focusedBorough;
+      const inFocus = !focused || ladInFocus(m._lad);
       if (inFocus) {
         if (!lyr.hasLayer(m)) lyr.addLayer(m);
       } else {
@@ -6709,7 +6780,7 @@ function _applyBoroughSolo() {
         try { rec._lad = ladOfLatLng(rec.lat, rec.lng) || ''; }
         catch (e) { rec._lad = ''; }
       }
-      const inFocus = !focused || rec._lad === focusedBorough;
+      const inFocus = !focused || ladInFocus(rec._lad);
       if (inFocus) {
         if (!cluster.hasLayer(rec.marker)) cluster.addLayer(rec.marker);
       } else {
@@ -6730,12 +6801,16 @@ function _applyBoroughSolo() {
   const vcseSel = document.getElementById('vcse-area-filter');
   if (vcseSel) {
     if (focused) {
-      const code = LAD_NAME_TO_CODE[focusedBorough] || LAD_NAME_TO_CODE[
-        focusedBorough === 'City of Westminster' ? 'Westminster' : focusedBorough
-      ];
-      if (code) {
-        vcseSel.value = 'lad-' + code;
-        currentVCSEAreaFilter = 'lad-' + code;
+      // This dropdown can only name one borough. With a board focused there
+      // is no single borough to name, so it stays on All London and the
+      // focus predicate inside applyVCSEFilter does the narrowing instead.
+      const codes = focusedLadCodes();
+      if (!focusedIcb && codes.length === 1) {
+        vcseSel.value = 'lad-' + codes[0];
+        currentVCSEAreaFilter = 'lad-' + codes[0];
+      } else if (vcseSel.value && vcseSel.value.startsWith('lad-')) {
+        vcseSel.value = 'all';
+        currentVCSEAreaFilter = 'all';
       }
     } else if (vcseSel.value && vcseSel.value.startsWith('lad-')) {
       // Restore 'All London' only if the dropdown is currently on a lad-* filter
@@ -6757,7 +6832,7 @@ function _applyBoroughSolo() {
           l._lad = ladOfLatLng(c.lat, c.lng);
         } catch(e) { l._lad = ''; }
       }
-      const inFocus = !focused || l._lad === focusedBorough;
+      const inFocus = !focused || ladInFocus(l._lad);
       // Greenspaces carry a category colour — stash the original style on first hide.
       if (!l._origStyle) {
         const s = l.options && l.options.style;
@@ -6817,31 +6892,82 @@ function _applyBoroughSolo() {
     opt.textContent = lad;
     sel.appendChild(opt);
   });
+  /* One control, two kinds of scope. An option valued icb:<name> focuses a
+     whole board; anything else is a borough as before. They are set through
+     here and nowhere else, so the two can never both be active. */
   sel.addEventListener('change', e => {
-    focusedBorough = e.target.value || 'all';
+    const v = e.target.value || 'all';
+    if (v.indexOf('icb:') === 0) {
+      focusedIcb = v.slice(4);
+      focusedBorough = 'all';
+    } else {
+      focusedIcb = null;
+      focusedBorough = v;
+    }
     _applyBoroughSolo();
-    // A ward selected in the borough you have just left should not stay
-    // selected, with its bar still on screen, behind a view it is not in.
-    if (focusedBorough !== 'all' && selW) {
+
+    // A ward selected in the area you have just left should not stay selected,
+    // with its bar still on screen, behind a view it is not in.
+    if (focusActive() && selW) {
       const rec = (typeof WARD_DATA !== 'undefined' && WARD_DATA) ? WARD_DATA[selW] : null;
-      if (!rec || rec.lad !== focusedBorough) {
+      if (!rec || !ladInFocus(rec.lad)) {
         if (typeof deselectWard === 'function') deselectWard();
       }
     }
-    // Zoom to the focused borough's wards
-    if (focusedBorough !== 'all' && wLyr) {
+
+    // Fit to whatever is in focus: one borough's wards, or a board's.
+    if (focusActive() && wLyr) {
       const matched = wLyr.getLayers().filter(l =>
-        (l.feature.properties || {}).LAD === focusedBorough);
+        ladInFocus((l.feature.properties || {}).LAD));
       if (matched.length) {
         const g = L.featureGroup(matched);
-        map.fitBounds(g.getBounds(), { padding:[30,30], maxZoom:12 });
+        map.fitBounds(g.getBounds(), { padding: [30, 30], maxZoom: 12 });
       }
-    } else if (focusedBorough === 'all' && wLyr) {
-      // Restoring 'all' — re-fit to whole London map.
-      map.fitBounds(wLyr.getBounds(), { padding:[28,28] });
+    } else if (wLyr) {
+      map.fitBounds(wLyr.getBounds(), { padding: [28, 28] });
     }
+
+    // Focusing a board draws it, because the outline is what tells you where
+    // the thing you have just narrowed to actually ends.
+    if (focusedIcb) {
+      const cb = document.getElementById('ticb');
+      if (cb && !cb.checked) { cb.checked = true; cb.dispatchEvent(new Event('change')); }
+    }
+
     applyBoroughLock();
+    if (typeof _announce === 'function') {
+      _announce(focusActive()
+        ? ('Focused on ' + focusLabel() + '.')
+        : 'Showing all of London.');
+    }
   });
+
+  /* The five boards, above the 33 boroughs, in the order the generator lists
+     them rather than alphabetically: north west, north central, north east,
+     south east, south west is how the boards are always named. The lookup is
+     1.9 KB and carries no geometry, so the control works whether or not
+     anybody has asked to see the regions drawn. */
+  fetch(dataUrl('data/map/icb_lookup.json'))
+    .then(r => (r.ok ? r.json() : null))
+    .catch(() => null)
+    .then(d => {
+      if (!d || !d.lad_to_icb) return;
+      ICB_OF_LAD = d.lad_to_icb;
+      ICB_ORDER = d.order || Object.keys(d.colours || {});
+      ICB_COLOUR = d.colours || {};
+      const group = document.createElement('optgroup');
+      group.label = 'Integrated Care Boards';
+      ICB_ORDER.forEach(name => {
+        const n = Object.keys(ICB_OF_LAD).filter(l => ICB_OF_LAD[l] === name).length;
+        const opt = document.createElement('option');
+        opt.value = 'icb:' + name;
+        opt.textContent = name + ' (' + n + ' boroughs)';
+        group.appendChild(opt);
+      });
+      // After "All London" and before the boroughs, so the two kinds of scope
+      // read largest first.
+      sel.insertBefore(group, sel.options[1] || null);
+    });
 })();
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -7515,26 +7641,26 @@ function _applyBoroughSolo() {
    does not remove the context around it.
    ═══════════════════════════════════════════════════════════════════════════ */
 function wardInFocus(wardName) {
-  if (!focusedBorough || focusedBorough === 'all') return true;
+  if (!focusActive()) return true;
   const w = (typeof WARD_DATA !== 'undefined' && WARD_DATA) ? WARD_DATA[wardName] : null;
-  if (w && w.lad) return w.lad === focusedBorough;
+  if (w && w.lad) return ladInFocus(w.lad);
   // Fall back to the boundary file, which is what the solo view filters on.
   if (typeof GJ !== 'undefined' && GJ.features) {
     const f = GJ.features.find(x => (x.properties || {}).WD24NM === wardName);
-    if (f) return (f.properties || {}).LAD === focusedBorough;
+    if (f) return ladInFocus((f.properties || {}).LAD);
   }
   return true;
 }
 
 function applyBoroughLock() {
   if (typeof map === 'undefined' || !map) return;
-  if (!focusedBorough || focusedBorough === 'all' || typeof wLyr === 'undefined' || !wLyr) {
+  if (!focusActive() || typeof wLyr === 'undefined' || !wLyr) {
     map.setMaxBounds(null);
     map.setMinZoom(0);
     return;
   }
   const matched = wLyr.getLayers().filter(l =>
-    (l.feature.properties || {}).LAD === focusedBorough);
+    ladInFocus((l.feature.properties || {}).LAD));
   if (!matched.length) { map.setMaxBounds(null); map.setMinZoom(0); return; }
   // A margin, so the borough is not jammed against the edge of the frame and
   // you can still see which way it faces.
@@ -8724,12 +8850,12 @@ if (typeof _updateLayerCounts === 'function') _updateLayerCounts();
 // wrong control on a map of 33 boroughs and went with them.
 function applyLSOAFilter() {
   if (!lsoaLyr) return;
-  const boroughActive = focusedBorough && focusedBorough !== 'all';
+  const boroughActive = focusActive();
   lsoaLyr.eachLayer(lyr => {
     const ward = lyr.feature.properties.ward;
     let visible = true;
     if (boroughActive) {
-      visible = ladOf(ward) === focusedBorough;
+      visible = ladInFocus(ladOf(ward));
     }
     if (visible) {
       lyr.setStyle(imdStyle(lyr.feature, lyr.feature.properties.code === selLSOA ? 'selected' : 'default'));
@@ -8848,9 +8974,15 @@ let _icbLoading = null;
 
 function icbStyle(feat) {
   const c = (feat.properties || {}).colour || '#8E5BA6';
+  // 6% was too faint to tell one region from the next: at that weight a pale
+  // violet and a pale teal are the same colour, and the two northern boards
+  // read as one. 14% is still a wash the choropleth shows through, and the
+  // focused board is lifted again so it is obvious which one is in scope.
+  const focused = (typeof focusedIcb !== 'undefined') && focusedIcb &&
+                  (feat.properties || {}).name === focusedIcb;
   return {
-    color: c, weight: 2.5, opacity: 0.95,
-    fill: true, fillColor: c, fillOpacity: 0.06,
+    color: c, weight: focused ? 4 : 2.5, opacity: 0.95,
+    fill: true, fillColor: c, fillOpacity: focused ? 0.22 : 0.14,
   };
 }
 
@@ -9715,8 +9847,7 @@ function _refreshUI() {
     const dig = document.getElementById('vs-digest');
     if (dig) {
       const parts = [];
-      parts.push(focusedBorough && focusedBorough !== 'all'
-        ? `<b>${focusedBorough}</b>` : 'All of London');
+      parts.push(focusActive() ? `<b>${focusLabel()}</b>` : 'All of London');
       // The level is not repeated here. The Viewing badge in the corner of the
       // map is the control for it and shows which one is active, so the strip
       // saying "Ward mode" a second time under the word "Viewing" was the same
@@ -9753,9 +9884,10 @@ function _refreshUI() {
         c.appendChild(x);
         box.appendChild(c);
       };
-      if (focusedBorough && focusedBorough !== 'all') {
-        addChip('', 'Borough: ' + focusedBorough, () => {
+      if (focusActive()) {
+        addChip('', (focusedIcb ? '' : 'Borough: ') + focusLabel(), () => {
           focusedBorough = 'all';
+          focusedIcb = null;
           const bsel = document.getElementById('borough-focus');
           if (bsel) bsel.value = 'all';
           _applyBoroughSolo();
@@ -9796,8 +9928,9 @@ function _resetAll() {
     // "put the map back to how it started", and a pin left behind outlives the
     // search that explained it.
     if (typeof _clearSearchPin === 'function') _clearSearchPin();
-    // Borough
+    // Borough or board
     focusedBorough = 'all';
+    focusedIcb = null;
     const bsel = document.getElementById('borough-focus');
     if (bsel) bsel.value = 'all';
     // Overlay
@@ -10567,12 +10700,13 @@ async function _prepareScreenForScreenshot(opts) {
   // Fit to scope if requested.
   if (opts.mode === 'nwl' || opts.mode === 'borough') {
     const savedFocus = (typeof focusedBorough !== 'undefined') ? focusedBorough : 'all';
+    const savedIcb = (typeof focusedIcb !== 'undefined') ? focusedIcb : null;
     let scopeBounds;
     try {
-      if (opts.mode === 'nwl') focusedBorough = 'all';
+      if (opts.mode === 'nwl') { focusedBorough = 'all'; focusedIcb = null; }
       scopeBounds = _pngScopeBounds();
     } finally {
-      if (opts.mode === 'nwl') focusedBorough = savedFocus;
+      if (opts.mode === 'nwl') { focusedBorough = savedFocus; focusedIcb = savedIcb; }
     }
     if (scopeBounds) {
       try {
