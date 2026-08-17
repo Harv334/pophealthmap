@@ -321,8 +321,41 @@
   .ldot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
   .lname { font-size: var(--t-md); color: var(--ink); flex: 1; }
   .lcount { font-size: var(--t-sm); color: var(--ink-3); }
-  .lhelp { display: inline-block; margin-left: 4px; width: 13px; height: 13px; line-height: 13px; text-align: center; border-radius: 50%; background: var(--line-2); color: var(--ink-3); font-size: var(--t-xs); font-weight: 700; cursor: help; user-select: none; }
-  .lhelp:hover { background: var(--nhs-blue); color: #fff; }
+  /* ── Help buttons and their popover ──
+     These were spans carrying their entire explanation in a title attribute,
+     which a touchscreen never shows and a screen reader does not reliably
+     read. On the Civic & education section that title was the only statement
+     of which boroughs the layers actually cover; on Core20 it was the only
+     definition of Core20 anywhere near the toggle.
+
+     They are buttons now, and the popover below reads its text straight off
+     the element's own title, so there is one copy of the words and nothing to
+     keep in step. The title is left in place: on a mouse it is still a
+     perfectly good hover tooltip, and it doubles as the accessible
+     description. See wireHelpPopovers.
+
+     18px rather than 13px: at 13px this was a 13px tap target, and the
+     coarse-pointer block below cannot help an inline circle. */
+  .lhelp { appearance: none; border: 0; padding: 0; font-family: inherit;
+    display: inline-block; margin-left: 4px; width: 18px; height: 18px;
+    line-height: 18px; text-align: center; border-radius: 50%;
+    background: var(--line-2); color: var(--ink-3); font-size: var(--t-xs);
+    font-weight: 700; cursor: pointer; user-select: none; vertical-align: middle;
+    flex-shrink: 0; }
+  .lhelp:hover, .lhelp[aria-expanded="true"] { background: var(--nhs-blue); color: #fff; }
+  .lhelp:focus-visible { outline: 2px solid var(--nhs-blue); outline-offset: 2px; }
+
+  /* Positioned relative to the sidebar rather than the button, because the
+     button sits inside panes that scroll and clip. left/right are pinned to
+     the pane so a long explanation wraps instead of running off the edge. */
+  .help-pop { position: absolute; z-index: 4300; max-width: 260px;
+    background: var(--ink); color: #fff; border-radius: 8px;
+    padding: 10px 12px; font-size: var(--t-xs); line-height: 1.5;
+    box-shadow: 0 6px 24px rgba(33,43,50,.28); }
+  .help-pop-x { appearance: none; background: none; border: 0; color: #fff;
+    opacity: .7; cursor: pointer; font-size: var(--t-md); line-height: 1;
+    float: right; padding: 0 0 4px 8px; margin: -2px -2px 0 0; }
+  .help-pop-x:hover { opacity: 1; }
   input[type=checkbox] { width: 14px; height: 14px; cursor: pointer; accent-color: var(--nhs-blue); }
   select { width: 100%; padding: 6px 9px; border: 1px solid var(--line); border-radius: 6px; font-size: var(--t-sm); color: var(--ink); background: #fff; cursor: pointer; outline: none; }
   select:focus { border-color: var(--nhs-blue); }
@@ -1860,7 +1893,7 @@
           <label class="lrow"><div class="ldot" style="background:#E89B1B"></div><span class="lname">Pharmacies <span class="lcount" id="pharm-count"></span></span><input type="checkbox" id="tph"></label>
         </div>
         <div class="sb-sec" style="flex-shrink:0;border-bottom:1px solid var(--line-2)">
-          <div class="sb-lbl">Civic &amp; education<span class="lhelp" title="Schools, community centres, libraries and formal ESOL providers — sourced from the GLA ESOL Planning Map (English language proficiency planning dataset). These four layers cover the eight North West London boroughs only: Brent, Ealing, Hammersmith and Fulham, Harrow, Hillingdon, Hounslow, Kensington and Chelsea, and Westminster. Elsewhere in London they are empty because the data has not been collected yet, not because there is nothing there.">?</span></div>
+          <div class="sb-lbl">Civic &amp; education<button type="button" class="lhelp" title="Schools, community centres, libraries and formal ESOL providers — sourced from the GLA ESOL Planning Map (English language proficiency planning dataset). These four layers cover the eight North West London boroughs only: Brent, Ealing, Hammersmith and Fulham, Harrow, Hillingdon, Hounslow, Kensington and Chelsea, and Westminster. Elsewhere in London they are empty because the data has not been collected yet, not because there is nothing there." aria-label="Explain this" aria-expanded="false">?</button></div>
           <div class="cov-note">Covers North West London only. Blank elsewhere means not yet collected, not none.</div>
           <label class="lrow"><div class="ldot" style="background:#1E5BB8"></div><span class="lname">Schools <span class="lcount" id="schools-count"></span> <span class="cov-tag" title="North West London boroughs only">NWL</span></span><input type="checkbox" id="tsch"></label>
           <div id="schools-filter-wrap" style="margin:2px 0 4px 16px">
@@ -1976,7 +2009,7 @@
                  does the same work: "charities" says which of the two lists
                  above this is about. The rest is on the ? for anyone who wants
                  it, and one short line stays visible for anyone who does not. -->
-            <div class="sb-lbl" style="margin-bottom:0">Filter charities by tag<span class="lhelp" title="The tags are the Charity Commission's own classification of what a charity does, how it helps and whom it helps. Community Interest Companies are registered with Companies House instead and carry no tags at all, so this filter cannot include or exclude them: whatever you tick here, every CIC currently shown stays shown.">?</span></div>
+            <div class="sb-lbl" style="margin-bottom:0">Filter charities by tag<button type="button" class="lhelp" title="The tags are the Charity Commission's own classification of what a charity does, how it helps and whom it helps. Community Interest Companies are registered with Companies House instead and carry no tags at all, so this filter cannot include or exclude them: whatever you tick here, every CIC currently shown stays shown." aria-label="Explain this" aria-expanded="false">?</button></div>
             <button type="button" id="vcse-tag-clear" style="font-size:var(--t-xs);color:var(--ink-2);background:none;border:none;cursor:pointer;padding:0;text-decoration:underline;display:none">clear</button>
           </div>
           <div class="cov-note" style="margin:0 0 6px">Charity Commission tags. CICs have none, so they are not filtered.</div>
@@ -2014,7 +2047,11 @@
         <div class="sb-sec" style="flex:1;border-bottom:none;overflow-y:auto">
           <div class="sb-lbl" style="display:flex;align-items:center;gap:6px">
             <span>Choropleth overlay</span>
-            <span id="ov-info" class="lhelp" title="About the current indicator" style="display:none">i</span>
+            <!-- Already opened a visible panel on click, so it was the one
+                 help affordance that worked on a touchscreen. It was a span,
+                 so it did not work on a keyboard. -->
+            <button type="button" id="ov-info" class="lhelp" aria-label="About the current indicator"
+                    title="About the current indicator" style="display:none">i</button>
           </div>
           <div id="ov-info-panel" style="display:none;background:var(--paper-2);border:1px solid var(--line-2);border-radius:5px;padding:7px 9px;margin:0 0 8px;font-size:var(--t-xs);color:var(--ink-2);line-height:1.5"></div>
 
@@ -2209,7 +2246,7 @@
           <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line-2)">
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--t-sm);color:var(--ink);font-weight:500">
               <input type="checkbox" id="core20-toggle" style="cursor:pointer">
-              <span>Highlight Core20<span class="lhelp" title="Core20 = the 20% most deprived neighbourhoods nationally (IMD deciles 1–2). NHS England's Core20PLUS5 framework prioritises them for targeted health action.">?</span> LSOAs</span>
+              <span>Highlight Core20<button type="button" class="lhelp" title="Core20 = the 20% most deprived neighbourhoods nationally (IMD deciles 1–2). NHS England's Core20PLUS5 framework prioritises them for targeted health action." aria-label="Explain this" aria-expanded="false">?</button> LSOAs</span>
             </label>
             <div style="font-size:var(--t-xs);color:var(--ink-3);margin-top:4px;line-height:1.45">
               NHS Core20PLUS5: LSOAs in IMD deciles 1-2 (most deprived 20% nationally).
@@ -10382,6 +10419,86 @@ document.querySelectorAll('.sb-tab').forEach(t => {
     e.preventDefault();
     tabs[to].focus();
     tabs[to].click();
+  });
+}());
+
+/* ── Help popovers ────────────────────────────────────────────────────────
+   Makes the "?" buttons work on a touchscreen and on a keyboard, not only
+   under a mouse pointer. The text comes from the button's own title, so this
+   adds a way to read it rather than a second copy of it.
+
+   #ov-info is skipped: it has its own handler and its own panel in the pane
+   below it, which is a better answer for a paragraph of indicator metadata
+   than a floating card. */
+(function wireHelpPopovers() {
+  let open = null;
+
+  function close() {
+    if (!open) return;
+    open.pop.remove();
+    open.btn.setAttribute('aria-expanded', 'false');
+    open = null;
+  }
+
+  function show(btn) {
+    const text = btn.getAttribute('title');
+    if (!text) return;
+    close();
+
+    const pop = document.createElement('div');
+    pop.className = 'help-pop';
+    pop.setAttribute('role', 'dialog');
+    pop.setAttribute('aria-label', 'Explanation');
+    const x = document.createElement('button');
+    x.type = 'button';
+    x.className = 'help-pop-x';
+    x.setAttribute('aria-label', 'Close');
+    x.textContent = '×';
+    x.addEventListener('click', () => { close(); btn.focus(); });
+    pop.appendChild(x);
+    pop.appendChild(document.createTextNode(text));
+
+    // Anchored to the sidebar, so it is not clipped by the scrolling pane the
+    // button lives in, and measured from the button's position on screen.
+    const host = btn.closest('.sidebar') || document.body;
+    if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
+    host.appendChild(pop);
+
+    const hostBox = host.getBoundingClientRect();
+    const btnBox = btn.getBoundingClientRect();
+    pop.style.left = '10px';
+    pop.style.right = '10px';
+    pop.style.maxWidth = 'none';
+    // Below the button normally, above it if there is no room below.
+    const below = btnBox.bottom - hostBox.top + 8;
+    if (below + pop.offsetHeight > hostBox.height - 8) {
+      pop.style.top = Math.max(8, btnBox.top - hostBox.top - pop.offsetHeight - 8) + 'px';
+    } else {
+      pop.style.top = below + 'px';
+    }
+
+    btn.setAttribute('aria-expanded', 'true');
+    open = { btn, pop };
+  }
+
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('.lhelp');
+    if (btn && btn.id !== 'ov-info') {
+      e.preventDefault();
+      e.stopPropagation();
+      if (open && open.btn === btn) close(); else show(btn);
+      return;
+    }
+    // A click anywhere else, including on the map, puts it away.
+    if (open && !open.pop.contains(e.target)) close();
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && open) {
+      const btn = open.btn;
+      close();
+      btn.focus();
+    }
   });
 }());
 
