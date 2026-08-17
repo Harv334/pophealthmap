@@ -5651,8 +5651,89 @@ function initVCSEFilters() {
   });
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE DEFERRED HALF OF THE WARD DATA
+
+   The first paint fetches data/ward_core.json: 264.9 KB gz, every ward's name,
+   borough, Core20 flag, the per-category crime breakdown and the 58 census,
+   IMD, crime, transport, fuel and claimant indicators. The other 51 are the
+   Fingertips series, 125.9 KB gz, and the loading screen no longer waits for
+   them. The whole file was 419.5 KB gz, so the first paint is 154.6 KB lighter.
+
+   Merged into the same records rather than kept beside them, so nothing
+   downstream has to know there were ever two files: after this resolves,
+   WARD_DATA holds exactly what it held before the split.
+
+   Started as soon as the map is up rather than on demand. On demand would be
+   a smaller download for someone who never touches a Fingertips indicator,
+   and a wait in front of the one who does; this way the gap is about a second
+   at the start of a session and nothing waits after it.
+
+   That gap is still a gap, so it is closed at both ends rather than trusted.
+   Anything that can read a Fingertips figure inside it awaits this first: the
+   overlay menu, and Query, Compare, Custom area and Data export. What is
+   already on screen when the merge lands is redrawn below. Neither alone is
+   enough, because the overlay menu can be used without opening a tool and a
+   tool can be opened without touching the menu.
+
+   The keys are checked against a ward that has already merged, not a flag, so
+   a second call while the first is in flight returns the same promise and a
+   call after it returns immediately.
+   ═══════════════════════════════════════════════════════════════════════════ */
+let _wardDetailLoading = null;
+let _wardDetailDone = false;
+function wardDetailReady() { return _wardDetailDone; }
+function ensureWardDetail() {
+  if (_wardDetailDone) return Promise.resolve(true);
+  if (_wardDetailLoading) return _wardDetailLoading;
+  _wardDetailLoading = fetch(dataUrl('data/ward_rest.json'))
+    .then(r => (r.ok ? r.json() : null))
+    .catch(() => null)
+    .then(json => {
+      const extra = (json && json.wards) || null;
+      if (!extra) {
+        // No split on this deployment. The core fetch already fell back to the
+        // whole file, so everything is present and there is nothing to merge.
+        _wardDetailDone = true;
+        _wardDetailLoading = null;
+        return false;
+      }
+      for (const [code, part] of Object.entries(extra)) {
+        const rec = WARD_DATA_BY_CODE[code];
+        if (!rec) continue;
+        rec.indicators = Object.assign(rec.indicators || {}, part.indicators || {});
+      }
+      _wardDetailDone = true;
+      _wardDetailLoading = null;
+
+      /* Everything derived from the indicator set was derived from half of it.
+         The cached key list, the per-indicator ranges and the distribution
+         pools all have to go, or a Fingertips overlay chosen a moment later
+         paints from a range computed over nothing and comes out flat. */
+      for (const k in _ovRange) delete _ovRange[k];
+      if (typeof _lsoaRange === 'object') { for (const k in _lsoaRange) delete _lsoaRange[k]; }
+      if (window.PH_DATA_REFRESH) { try { window.PH_DATA_REFRESH(); } catch (e) {} }
+      /* Whatever is on screen was drawn without these figures. An active
+         Fingertips overlay needs its scale and its legend strip recomputed as
+         well as its colours, so it goes back through the overlay change rather
+         than a restyle; anything else only needs repainting. */
+      if (typeof curOv === 'string' && curOv.startsWith('ft_') &&
+          typeof _applyOverlayChange === 'function') {
+        try { _applyOverlayChange(curOv); } catch (e) {}
+      } else {
+        if (typeof _restyleAll === 'function') _restyleAll();
+        if (typeof renderTopBottom === 'function') { try { renderTopBottom(); } catch (e) {} }
+      }
+      if (typeof selW !== 'undefined' && selW && typeof showWard === 'function') {
+        try { showWard(selW); } catch (e) {}
+      }
+      return true;
+    });
+  return _wardDetailLoading;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
-// WARD LAYER (built after ward_data.json loads)
+// WARD LAYER (built after the ward data loads)
 // ═══════════════════════════════════════════════════════════════════════════
 let wLyr = null, selW = null, curOv = 'none';
 let WARD_DATA = {};
@@ -9681,8 +9762,15 @@ function _syncScaleNumbers() {
   if (mlsMax) mlsMax.textContent = range ? (fmtNum(range.hi, 1) + unitSuffix) : '';
 }
 
-document.getElementById('ov').addEventListener('change', e => {
-  curOv = e.target.value;
+/* The overlay change, as a function rather than only as a listener.
+
+   Two things run it: the dropdown below, and the merge in ensureWardDetail,
+   which re-runs it when the figures a Fingertips overlay needs arrive after
+   that overlay was already chosen. Restyling the layers alone would repaint
+   the map and leave the scale and the legend strip stating the range that was
+   computed while there was nothing to compute it over. */
+function _applyOverlayChange(key) {
+  curOv = key;
   const cfg = OV_CFG[curOv];
   const sc  = document.getElementById('scale');
   sc.style.display = curOv !== 'none' ? 'block' : 'none';
@@ -9798,6 +9886,23 @@ document.getElementById('ov').addEventListener('change', e => {
   // Switch to overlay tab
   document.querySelectorAll('.sb-tab').forEach(t => t.classList.toggle('active', t.dataset.tab==='overlay'));
   document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.id==='tab-overlay'));
+}
+
+/* A Fingertips overlay cannot be drawn from the core half of the ward data, so
+   it waits for the other half instead of painting a flat map from an empty
+   range. The wait only exists between the map appearing and ward_rest.json
+   landing, about a second at the start of a session, and only for the fifty-one
+   ft_* indicators.
+
+   Every route to one of them arrives here, a shared ?ov= link included:
+   _readUrlState sets the dropdown and dispatches this same event. */
+document.getElementById('ov').addEventListener('change', e => {
+  const key = e.target.value;
+  if (typeof key === 'string' && key.startsWith('ft_') && !wardDetailReady()) {
+    ensureWardDetail().then(() => _applyOverlayChange(key));
+    return;
+  }
+  _applyOverlayChange(key);
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -11657,7 +11762,27 @@ async function loadData() {
     // immediately while an unchanged one is served from cache.
     const manifest = await loadManifest();
 
-    const response = await fetch(dataUrl('ward_data.json'));
+    /* The core half, not the whole file.
+
+       ward_data.json is 419.5 KB gz and the map cannot draw a single ward
+       until all of it has arrived, which is what the loading screen is waiting
+       through. 125.9 KB of that is the Fingertips block, fifty-one ft_* series
+       per ward, and the opening view reads none of it.
+       scripts/split_ward_data.py cuts it on that seam, and ensureWardDetail
+       above fetches the far side once the map is up.
+
+       Falls back to the whole file if the split has not been generated, so a
+       checkout that has not run the script still works rather than opening on
+       an empty map. */
+    let response = await fetch(dataUrl('data/ward_core.json'));
+    if (!response.ok) {
+      response = await fetch(dataUrl('ward_data.json'));
+      /* The whole file carries the Fingertips series already, so there is no
+         far side to go and get. Recorded here rather than left for
+         ensureWardDetail to discover, which would spend a 404 on every load of
+         a deployment that has not run the split. */
+      _wardDetailDone = true;
+    }
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
     const json = await response.json();
@@ -11779,6 +11904,14 @@ async function loadData() {
     // 600ms timer hoping the fetch above had finished.
     if (typeof _applyUrlStateOnce === 'function') _applyUrlStateOnce();
     done();
+
+    /* The map is drawn and the loading screen has gone, so the far side of the
+       split can be fetched with nothing waiting behind it. Started here rather
+       than earlier so it never competes for a connection with anything the
+       first paint needs, and deliberately not awaited: the merge redraws what
+       is on screen when it lands, and the few things that could read a
+       Fingertips figure before then wait for it themselves. */
+    ensureWardDetail();
 
   } catch (err) {
     // ward_data.json missing or not yet generated — show map with sample data
@@ -11937,6 +12070,12 @@ loadData();
   var BUILT = { query: 'query', compare: 'compare', directory: 'directory',
                 report: 'report', csv: 'csv' };
 
+  /* The modes that can put a Fingertips figure in front of somebody: Query
+     filters on them, Compare tabulates them, and Custom area and Data export
+     both write them out. Directory is not one of them. It lists places, and
+     holds no ward indicators at all. */
+  var NEEDS_DETAIL = { query: 1, compare: 1, report: 1, csv: 1 };
+
   function markRail(mode) {
     rail.querySelectorAll('.mode-btn').forEach(function (b) {
       b.setAttribute('aria-selected', String(b.dataset.mode === mode));
@@ -11972,6 +12111,18 @@ loadData();
   }
 
   function show(mode) {
+    /* Built from the core half of the ward data, one of these would offer the
+       fifty-one Fingertips indicators and have no figures behind them: a query
+       filtered on one would return no wards, and an export would write a column
+       of blanks. Both look like answers. So the tool waits for the rest of the
+       data instead, which is the tail of the same second the map took to
+       appear, and is usually over before the rail is clicked. */
+    if (NEEDS_DETAIL[mode] && typeof wardDetailReady === 'function' &&
+        !wardDetailReady()) {
+      ensureWardDetail().then(function () { show(mode); });
+      return;
+    }
+
     // Query and Compare are built rather than announced, so they skip the
     // placeholder card. Each takes over the sidebar and leaves the map where
     // it is: a query whose results you cannot see on the map is a table with

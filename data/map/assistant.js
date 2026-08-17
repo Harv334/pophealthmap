@@ -545,6 +545,17 @@ var MODEL_LABEL = "Claude Sonnet 5";
   }
 
   async function ask(question) {
+    /* The map now defers half the ward indicators to a second fetch, so a
+       question asked in the first second of a session could be answered from a
+       set that is missing all fifty-one Fingertips series. The tools below
+       report whatever they find, so the answer would come back confidently
+       short rather than visibly wrong, which is the worse of the two.
+
+       A no-op once the merge has landed, and on a deployment that still serves
+       the whole ward file there is nothing here to wait for. */
+    if (typeof window.ensureWardDetail === "function") {
+      try { await window.ensureWardDetail(); } catch (e) {}
+    }
     history.push({ role: "user", content: question });
     trimHistory();
     for (var round = 0; round < MAX_TOOL_ROUNDS; round++) {

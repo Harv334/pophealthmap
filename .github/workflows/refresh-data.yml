@@ -62,7 +62,7 @@ jobs:
         continue-on-error: true
         run: python fetch_all_data.py
 
-      # Three files are derived from the pipeline's own outputs rather than
+      # Four files are derived from the pipeline's own outputs rather than
       # fetched, so a refresh that did not rebuild them would leave the map
       # stating figures that no longer match the data underneath it. Order
       # matters: the ICB regions are dissolved from the borough outlines, and
@@ -81,6 +81,14 @@ jobs:
       #   rebuilds the map on the loading screen. Stale geometry would draw last
       #   month's deprivation while the map behind it drew this month's.
       #
+      #   split_ward_data.py cuts ward_data.json into the half the first paint
+      #   needs and the half it does not. It reads the file the pipeline has
+      #   just written, so it goes after the refresh rather than beside it.
+      #   Skipping it is the quietest failure of the four: the map would keep
+      #   serving last month's two halves against this month's ward_data.json,
+      #   and every figure would look perfectly reasonable while being a month
+      #   out of step with the date printed beside it.
+      #
       # Not continue-on-error, deliberately. If one of these fails the run goes
       # red and nothing is committed, so the site keeps the old data with its
       # matching derived files. A refresh committed with derived files that no
@@ -90,6 +98,7 @@ jobs:
           python scripts/build_icb_boundaries.py
           python scripts/build_layer_counts.py
           python scripts/build_loader_map.py
+          python scripts/split_ward_data.py
 
       - name: Read manifest for failed sources
         id: manifest
