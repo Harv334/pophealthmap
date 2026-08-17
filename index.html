@@ -4479,6 +4479,23 @@ const GREENSPACE_DEFAULT_COLOR = "#4CAF50";
 
 // Lazy-loaded. The geojson is ~3.7MB — don't fetch it until the user ticks
 // the toggle. Kept on the `grL` name so legacy references don't break.
+/* Which borough a greenspace sits in, from a point on it. Cached on the
+   feature: the spatial test is the expensive part and the answer never
+   changes. Only ever called while a scope is on. */
+function greenspaceLad(feat) {
+  if (feat._lad !== undefined) return feat._lad;
+  feat._lad = '';
+  try {
+    const g = feat.geometry || {};
+    let pt = null;
+    if (g.type === 'Polygon') pt = g.coordinates[0][0];
+    else if (g.type === 'MultiPolygon') pt = g.coordinates[0][0][0];
+    else if (g.type === 'Point') pt = g.coordinates;
+    if (pt && typeof ladOfLatLng === 'function') feat._lad = ladOfLatLng(pt[1], pt[0]) || '';
+  } catch (e) { /* leave it blank: an unknown borough is simply never in scope */ }
+  return feat._lad;
+}
+
 let grL = null;
 let _grLLoading = null;
 function _ensureGreenspaceLayer() {
@@ -4492,6 +4509,11 @@ function _ensureGreenspaceLayer() {
       grL = L.geoJSON(gj, {
         interactive: true,
         style: f => {
+          // Greenspaces carry no borough of their own, so the one they sit in
+          // is worked out from the polygon and cached on the feature. Done
+          // here rather than up front because it is only needed when a scope
+          // is actually on, and never at all for most visits.
+          if (focusActive() && !ladInFocus(greenspaceLad(f))) return HIDDEN_STYLE;
           const c = GREENSPACE_COLORS[f.properties.function] || GREENSPACE_DEFAULT_COLOR;
           return { color: c, weight: 0.6, fillColor: c, fillOpacity: 0.55, opacity: 0.9 };
         },
@@ -6852,6 +6874,13 @@ function _applyBoroughSolo() {
     try { icbLyr.setStyle(icbStyle); } catch (e) {}
   }
 
+  // 2c. Greenspaces. Unlike the boundary layers this one is not touched by
+  //     _restyleAll, so without this a scope change left the parks of the
+  //     whole of London drawn over a focused borough.
+  if (typeof grL !== 'undefined' && grL) {
+    try { grL.setStyle(grL.options.style); } catch (e) {}
+  }
+
   // 3. Black ward boundary overlay — same per-feature trick.
   if (wardBoundaryLyr) wardBoundaryLyr.setStyle(_wardBoundaryStyle);
 
@@ -7938,7 +7967,23 @@ const LSOA_EDGE = {
 };
 function lsoaEdge(state) { return LSOA_EDGE[state] || LSOA_EDGE.default; }
 
+/* The hidden style. Anything out of scope is drawn as nothing rather than
+   removed from the layer, so the layer keeps its shape and a focus change is
+   a restyle instead of a rebuild. */
+const HIDDEN_STYLE = { fillOpacity: 0, opacity: 0, weight: 0 };
+
 function imdStyle(feat, state) {
+  /* Focus is checked here, not in the callers. applyLSOAFilter used to be the
+     only thing that hid out-of-scope LSOAs, and eight other places restyle
+     this layer directly: the IMD colour toggle, the fill and border sliders,
+     the overlay change, the lsoa_data arrival, selection, deselection. Every
+     one of them called imdStyle and quietly painted the whole of London back
+     in over the top of the mask.
+     That is what made "colour by IMD decile" ignore a focus. With the test
+     here, every caller is correct by construction and applyLSOAFilter is
+     belt and braces rather than the only thing holding it. */
+  if (focusActive() && !ladInFocus((feat.properties || {}).borough)) return HIDDEN_STYLE;
+
   const d = feat.properties.imd_decile;
   const edge = lsoaEdge(state);
   const base = {
@@ -8996,7 +9041,24 @@ let _msoaLoading = null;
  * does not falls back to the plain purple outline rather than filling with a
  * colour it has no number for.
  */
+/* An MSOA's borough, from its name. ONS names them "<local authority> NNN",
+   and the boundary file carries only a code and a name, so this is the whole
+   of the geography available on the feature. Checked against the borough list:
+   all 1,002 resolve. Memoised because restyling runs over every feature. */
+const _msoaLadCache = {};
+function msoaLad(feat) {
+  const p = feat.properties || {};
+  if (!p.name) return '';
+  if (_msoaLadCache[p.name] === undefined) {
+    _msoaLadCache[p.name] = String(p.name).replace(/\s+\d+[A-Za-z]?$/, '');
+  }
+  return _msoaLadCache[p.name];
+}
+
 function msoaStyle(feat) {
+  // Same reasoning as imdStyle: restyleMsoa is not the only caller.
+  if (focusActive() && !ladInFocus(msoaLad(feat))) return HIDDEN_STYLE;
+
   const base = { color: '#7A2E8E', weight: scaledWeight(1.1), fill: false, opacity: 0.85 };
   if (!curOv || curOv === 'none' || !ovHasLevel(curOv, 'msoa')) return base;
   const cfg = OV_CFG[curOv];
