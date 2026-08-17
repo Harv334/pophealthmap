@@ -1925,7 +1925,14 @@
     </div>
     <div class="hdr-right">
       <div class="hdr-search">
-        <input type="text" id="hdr-search-input" placeholder="Search ward, LSOA, GP, charity…" autocomplete="off" />
+        <!-- A placeholder is not a label: it is announced by some screen
+             readers and not others, and it is gone the moment anyone types.
+             This is also the keyboard's way on to the map, since the ward
+             polygons are not focusable, so it is the last control here that
+             should be reaching a user unnamed. -->
+        <input type="text" id="hdr-search-input" autocomplete="off"
+               aria-label="Search for a ward, LSOA, GP practice, school or charity"
+               placeholder="Search ward, LSOA, GP, charity…" />
         <div class="hdr-search-results" id="hdr-search-results"></div>
       </div>
       <div class="tb-sep"></div>
@@ -2833,6 +2840,9 @@
   <footer class="sbar">
     <span class="sbar-left">
       <a class="sbar-link" href="methodology.html">Methodology &amp; technical notes</a>
+      <!-- Linked from every page, which is the point of it: a statement nobody
+           can find is not one. -->
+      <a class="sbar-link" href="accessibility.html">Accessibility</a>
       <a class="sbar-link" href="mailto:contact@pophealth.uk">contact@pophealth.uk</a>
       <span id="src-lbl"></span>
     </span>

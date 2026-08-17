@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Accessibility statement · PopHealth Map</title>
+<meta name="description" content="Accessibility statement for PopHealth Map: what works, what does not, and how to ask for something you cannot reach.">
+<!-- Same inline map-pin icon as index.html, so the tab matches. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23005EB8'/%3E%3Cpath d='M16 6c-3.9 0-7 3.1-7 7 0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7z' fill='%23fff'/%3E%3Ccircle cx='16' cy='13' r='2.6' fill='%23005EB8'/%3E%3C/svg%3E">
+<style>
+  /* Light and dark, following the device, same three-block pattern the map
+     uses. A statement about accessibility that only works in one theme would
+     be making its own point. */
+  :root {
+    --nhs-blue:#005EB8; --nhs-dark:#003087; --nhs-yellow:#FFB81C;
+    --ink:#212B32; --ink-2:#4C6272; --ink-3:#768692;
+    --line:#DDE1E4; --bg:#F4F7F9; --paper:#FFFFFF;
+    --warn-bg:#FFF6E0; --warn-line:#F0C660;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --nhs-blue:#4DA3E8; --nhs-dark:#8AC4F5; --nhs-yellow:#F5C43C;
+      --ink:#E3EAEF; --ink-2:#AFBDC6; --ink-3:#8B9AA5;
+      --line:#2B3B45; --bg:#0E1519; --paper:#161F25;
+      --warn-bg:#2A2210; --warn-line:#6B5520;
+    }
+  }
+  :root[data-theme="dark"] {
+    --nhs-blue:#4DA3E8; --nhs-dark:#8AC4F5; --nhs-yellow:#F5C43C;
+    --ink:#E3EAEF; --ink-2:#AFBDC6; --ink-3:#8B9AA5;
+    --line:#2B3B45; --bg:#0E1519; --paper:#161F25;
+    --warn-bg:#2A2210; --warn-line:#6B5520;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+    font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif; font-size:15px; line-height:1.6; }
+  header { background:var(--paper); border-top:4px solid var(--nhs-blue);
+    border-bottom:1px solid var(--line); padding:18px 24px; }
+  header h1 { font-family:'Inter Tight',Inter,system-ui,sans-serif; font-size:21px; color:var(--nhs-dark);
+    margin:0 0 3px; letter-spacing:-.01em; }
+  header p { margin:0; color:var(--ink-2); font-size:13.5px; }
+  header a { color:var(--nhs-blue); }
+  main { max-width:820px; margin:0 auto; padding:28px 24px 64px; }
+  h2 { font-family:'Inter Tight',Inter,system-ui,sans-serif; font-size:19px; color:var(--nhs-dark);
+    margin:34px 0 10px; padding-bottom:6px; border-bottom:1px solid var(--line); }
+  h3 { font-family:'Inter Tight',Inter,system-ui,sans-serif; font-size:15.5px; margin:22px 0 6px; }
+  p, li { color:var(--ink-2); }
+  li { margin-bottom:6px; }
+  strong { color:var(--ink); font-weight:600; }
+  a { color:var(--nhs-blue); text-underline-offset:2px; }
+  a:focus-visible { outline:3px solid var(--nhs-yellow); outline-offset:2px; border-radius:2px; }
+  .lede { font-size:16.5px; color:var(--ink); max-width:62ch; }
+  .box { background:var(--paper); border:1px solid var(--line); border-radius:8px;
+    padding:14px 16px; margin:16px 0; }
+  .box.warn { background:var(--warn-bg); border-color:var(--warn-line); }
+  .box p:first-child { margin-top:0; }
+  .box p:last-child { margin-bottom:0; }
+  dl { margin:0; }
+  dt { font-weight:600; color:var(--ink); margin-top:12px; }
+  dd { margin:2px 0 0; color:var(--ink-2); }
+  /* --ink-2, not --ink-3. The lighter one comes out at 3.49 against this
+     page's background, which is under AA for text this size, and a page about
+     accessibility failing its own check is the one place that cannot stand. */
+  .updated { color:var(--ink-2); font-size:13.5px; margin-top:40px;
+    border-top:1px solid var(--line); padding-top:14px; }
+  .skip { position:absolute; left:-9999px; background:var(--paper); color:var(--ink);
+    padding:10px 14px; z-index:10; }
+  .skip:focus { left:0; top:0; outline:3px solid var(--nhs-yellow); }
+</style>
+</head>
+<body>
+
+<a class="skip" href="#content">Skip to content</a>
+
+<header>
+  <h1>Accessibility statement</h1>
+  <p><a href="/">← Back to the map</a> · PopHealth Map, London</p>
+</header>
+
+<main id="content">
+
+  <p class="lede">
+    This statement applies to <strong>pophealth.uk</strong>, an interactive map of
+    population health across the 33 London boroughs. It covers the map itself, the
+    methodology and technical notes, and this page.
+  </p>
+
+  <h2>How accessible this site is</h2>
+
+  <p>
+    Most of the site can be used with a keyboard and with a screen reader. The
+    parts that cannot are listed below, in plain terms, with what to use instead.
+  </p>
+
+  <p>These things work:</p>
+  <ul>
+    <li>Every page can be zoomed to 200% without losing content or function.</li>
+    <li>The site follows your device's light or dark setting, and you can override it.</li>
+    <li>There is a colour-blind safe palette for the map's colours, on the
+      <strong>CB safe</strong> button in the toolbar.</li>
+    <li>Colour is never the only way a figure is given. Everything shaded on the map
+      is also written as a number in the panel and in the downloads.</li>
+    <li>Every control can be reached with the keyboard, and the one with focus is
+      visibly outlined.</li>
+    <li>The tool strip and the sidebar tabs behave the way a screen reader is told
+      they will: arrow keys move within them, and each is a single stop on the way
+      through the page.</li>
+    <li>Selecting a ward, focusing a borough or a board, and zooming to an area are
+      each announced to a screen reader.</li>
+    <li>There is a skip link to the main content on every page.</li>
+  </ul>
+
+  <h2>What is not accessible</h2>
+
+  <div class="box warn">
+    <p>
+      <strong>The map's areas cannot be reached with a keyboard.</strong> The wards,
+      neighbourhoods and boundaries are drawn as shapes that only respond to a
+      mouse or a touch. There are about 1,400 of them on screen at once, and making
+      each one a keyboard stop would put the rest of the page hundreds of presses
+      away.
+    </p>
+    <p>
+      Everything the map can tell you is reachable another way:
+    </p>
+    <ul>
+      <li>The <strong>search box</strong> in the header finds a ward, a
+        neighbourhood, a GP practice, a school or a charity by name or postcode.
+        Choosing a result does exactly what clicking it on the map does.</li>
+      <li><strong>Query</strong> lists the wards matching any set of conditions, as
+        a list you can move through and select from.</li>
+      <li>The <strong>Directory</strong> holds every service and organisation on the
+        map in one searchable, filterable list.</li>
+      <li><strong>Data export</strong> writes the figures for every area to a
+        spreadsheet, so nothing on the map is only on the map.</li>
+    </ul>
+  </div>
+
+  <p>These are also known to fall short:</p>
+
+  <dl>
+    <dt>Building a custom area needs a mouse</dt>
+    <dd>
+      A custom area is assembled by clicking neighbourhoods on the map, so it
+      currently cannot be built with a keyboard. Once built it can be sent as a
+      link, which does open for anyone. Data export covers the same figures for
+      published areas without needing the map.
+    </dd>
+
+    <dt>The map's own background is not described</dt>
+    <dd>
+      Street names, rivers and parks come from OpenStreetMap and are drawn as
+      images. They carry no text alternative. Nothing this site publishes depends
+      on reading them.
+    </dd>
+
+    <dt>Shading is described in words, not read out area by area</dt>
+    <dd>
+      When the map is coloured by a figure, a screen reader is told what the colours
+      mean and what the range is, but it will not read out all 704 wards. Use Query,
+      the Top and Bottom 20 lists, or Data export to get that as an ordered list.
+    </dd>
+
+    <dt>Some charts are images of their data</dt>
+    <dd>
+      A few small bar and distribution graphics are drawn rather than written out.
+      Every figure in them appears as a number nearby or in the ward's full profile.
+    </dd>
+  </dl>
+
+  <h2>Reporting accessibility problems</h2>
+
+  <p>
+    If you find a problem that is not listed here, or you need something on this
+    site in a different format, email
+    <a href="mailto:contact@pophealth.uk">contact@pophealth.uk</a>. Please say which
+    page it was and what you were trying to do. We aim to reply within five working
+    days.
+  </p>
+
+  <p>
+    If you ask for information in an accessible format and you are not happy with
+    the response, say so in your reply and it will be looked at again.
+  </p>
+
+  <h2>Technical information</h2>
+
+  <p>
+    This site is partially compliant with the
+    <a href="https://www.w3.org/TR/WCAG22/">Web Content Accessibility Guidelines
+    version 2.2</a> AA standard, because of the exceptions listed above.
+  </p>
+
+  <h3>Non-accessible content</h3>
+  <p>The content below is non-accessible for the following reasons.</p>
+  <ul>
+    <li>
+      The interactive map's areas are not operable by keyboard, which fails WCAG 2.2
+      success criterion 2.1.1 (keyboard). The alternatives listed above are provided
+      under 1.1.1 as a text route to the same information. We are looking at whether
+      a keyboard mode over a shortlist of areas can be added without making the rest
+      of the page unusable.
+    </li>
+    <li>
+      Map tiles carry no text alternative, which fails success criterion 1.1.1
+      (non-text content). They are decorative context rather than data, and the data
+      is available in text.
+    </li>
+  </ul>
+
+  <h3>How this was tested</h3>
+  <p>
+    The site is checked with automated tests run in a real browser against the
+    published pages. Those tests measure the contrast of the site's text colours in
+    both light and dark themes against the WCAG formula, check that every control
+    has a name a screen reader can announce, check that every image has a text
+    alternative, and check that the page has one main heading, a main landmark and a
+    language set. Keyboard order and screen-reader behaviour are checked by hand.
+  </p>
+  <p>
+    The site has <strong>not</strong> been through a formal external audit. This
+    statement is written from the checks described above, and it names what those
+    checks found rather than claiming more than they can show.
+  </p>
+
+  <h2>What we are doing to improve accessibility</h2>
+  <ul>
+    <li>Looking at a keyboard route into the map itself, most likely over a
+      shortlist of areas rather than all 1,400 shapes.</li>
+    <li>Making the custom area builder usable without a mouse, by letting areas be
+      added from a list as well as from the map.</li>
+    <li>Adding the automated checks above to the build, so a change that breaks one
+      of them fails before it is published rather than after.</li>
+  </ul>
+
+  <p class="updated">
+    This statement was prepared on 17 August 2026. It was last reviewed on
+    17 August 2026. The site was last tested on 17 August 2026 against WCAG 2.2 AA.
+  </p>
+
+</main>
+
+</body>
+</html>
