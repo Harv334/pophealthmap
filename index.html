@@ -1063,8 +1063,17 @@
      squeeze the name: four levels on a phone would otherwise leave the label
      a few characters wide. The filled pill is where the figures are actually
      published; the outlined ones are levels this map can carry it to. */
-  .ov-opt .ov-lvls { display: flex; flex-wrap: wrap; gap: 3px; justify-content: flex-end;
-    flex-shrink: 0; margin-top: 1px; max-width: 46%; }
+  /* Name on top, provenance underneath, rather than side by side.
+     Side by side worked while the trailing block was two level pills. Adding a
+     publisher name made it wide enough that in a 270px sidebar the name was
+     squeezed into a 120px column and "Year 6 obesity, including severe
+     obesity" wrapped to five lines — a taller row, and a harder one to scan,
+     than simply putting the metadata on its own line. Stacked, the name reads
+     across the full width and the chips sit under it as a caption. */
+  .ov-opt .ov-opt-body { flex: 1; min-width: 0; display: flex; flex-direction: column;
+    gap: 3px; align-items: flex-start; }
+  .ov-opt .ov-lvls { display: flex; flex-wrap: wrap; gap: 3px; justify-content: flex-start;
+    max-width: 100%; }
   .ov-opt .ov-lvl { font-size: 9px; color: var(--ink-3); border: 1px solid var(--line);
     border-radius: 3px; padding: 0 3px; white-space: nowrap; }
   .ov-opt .ov-lvl.native { color: var(--nhs-dark); border-color: var(--nhs-blue);
@@ -1074,9 +1083,17 @@
      about the publication that the reader needs before choosing it. Sits after
      the level pills and stays out of the way when it is absent, which is most
      of the time. */
+  /* Who published it. Filled rather than outlined, so it reads as a different
+     kind of fact from the level pills beside it: those say where the figure
+     can be drawn, this says where it came from. Quiet on purpose — it is the
+     answer to a question the reader has not asked yet. */
+  .ov-opt .ov-src { font-size: 9px; color: var(--ink-2); background: var(--paper-2);
+    border: 1px solid transparent; border-radius: 3px; padding: 0 4px;
+    white-space: nowrap; flex-shrink: 0; font-weight: 600;
+    letter-spacing: .01em; cursor: help; }
   .ov-opt .ov-spread { font-size: 9px; color: #8A5A00; background: #FDF0D5;
     border: 1px solid #E8D3A3; border-radius: 3px; padding: 0 3px;
-    white-space: nowrap; flex-shrink: 0; margin-top: 1px; margin-left: 3px;
+    white-space: nowrap; flex-shrink: 0;
     font-variant-numeric: tabular-nums; cursor: help; }
   @media (prefers-color-scheme: dark) {
     .ov-opt .ov-spread { color: #F0D9A8; background: #3A2F1B; border-color: #6B5730; }
@@ -6232,12 +6249,53 @@ function _applyBoroughSolo() {
   // largest area first, so the same indicator looks the same everywhere.
   const LADDER = ['borough', 'ward', 'msoa', 'lsoa'];
 
+  /**
+   * Who published it, in one or two words.
+   *
+   * The source used to be in the group name — "Health (Fingertips, MSOA →
+   * ward)" — and grouping by subject took it away. It belongs on the row
+   * anyway: two indicators sitting next to each other under Health & care can
+   * come from a census, a model and a clinical register, and that changes how
+   * much weight to put on a difference between two areas.
+   *
+   * Matched by pattern rather than by a key-to-tag table, so a source added
+   * later is tagged without anyone maintaining a list. Order matters where a
+   * string names two organisations: "GLA LSOA Atlas (TfL PTAL)" is published
+   * by the GLA and measured by TfL, and the publisher is the attribution, so
+   * GLA is tested first. The full string stays in the tooltip either way.
+   */
+  const SRC_TAGS = [
+    [/census/i,             'Census'],
+    [/fingertips|ohid/i,    'Fingertips'],
+    [/police/i,             'Police'],
+    [/mhclg|\bimd\b/i,      'MHCLG'],
+    [/defra/i,              'Defra'],
+    [/\bgla\b/i,            'GLA'],
+    [/\btfl\b/i,            'TfL'],
+    [/desnz/i,              'DESNZ'],
+    [/nhs/i,                'NHS'],
+    [/nomis/i,              'NOMIS'],
+    [/\bons\b/i,            'ONS'],
+    [/charity commission/i, 'Charities'],
+  ];
+  function srcTag(o) {
+    const src = (o.meta && o.meta.src) || '';
+    if (!src) return '';
+    let tag = '';
+    for (const [re, t] of SRC_TAGS) { if (re.test(src)) { tag = t; break; } }
+    // Nothing matched: fall back to the first word rather than showing
+    // nothing, so a new source is visibly unlabelled instead of invisibly so.
+    if (!tag) tag = src.split(/[\s(,]/)[0].slice(0, 10);
+    if (!tag) return '';
+    return '<span class="ov-src" title="' + esc(src) + '">' + esc(tag) + '</span>';
+  }
+
   function levelPills(o) {
     const levels = ((o.levels && o.levels.length) ? o.levels.slice()
                  : (o.level ? [o.level.toLowerCase()] : []))
       .sort((a, b) => LADDER.indexOf(a) - LADDER.indexOf(b));
     if (!levels.length) return '';
-    return '<span class="ov-lvls">' + levels.map(lv => {
+    return levels.map(lv => {
       const isNative = lv === o.native;
       const sent = (typeof _levelName === 'function') ? _levelName(lv) : lv;
       const title = isNative
@@ -6247,7 +6305,18 @@ function _applyBoroughSolo() {
             ((typeof _levelName === 'function') ? _levelName(o.native) : o.native) + ' level' : '');
       return '<span class="ov-lvl' + (isNative ? ' native' : '') + '" title="' + esc(title) + '">' +
         esc(_levelTitle(lv)) + '</span>';
-    }).join('') + '</span>';
+    }).join('');
+  }
+
+  /* Source, levels and spread in one wrapping container.
+     They were three separate flex children of the row, each with its own
+     margins, which meant three things competing with the name for width and
+     wrapping independently of each other. As one unit they wrap together and
+     share a single width budget, so a long indicator name shortens the block
+     rather than pushing part of it onto its own line. */
+  function rowMeta(o) {
+    const inner = srcTag(o) + levelPills(o) + spreadNote(o);
+    return inner ? '<span class="ov-lvls">' + inner + '</span>' : '';
   }
 
   /**
@@ -6343,8 +6412,10 @@ function _applyBoroughSolo() {
               '<label class="ov-opt' + (o.value === cur ? ' on' : '') + '">' +
                 '<input type="checkbox" data-ov="' + esc(o.value) + '"' +
                   (o.value === cur ? ' checked' : '') + '>' +
-                '<span class="ov-opt-nm">' + esc(o.name) + '</span>' +
-                levelPills(o) + spreadNote(o) +
+                '<span class="ov-opt-body">' +
+                  '<span class="ov-opt-nm">' + esc(o.name) + '</span>' +
+                  rowMeta(o) +
+                '</span>' +
               '</label>').join('') +
           '</div></div>';
       }
@@ -6392,9 +6463,10 @@ function _applyBoroughSolo() {
             '<label class="ov-opt' + (o.value === cur ? ' on' : '') + '">' +
               '<input type="checkbox" data-ov="' + esc(o.value) + '"' +
                 (o.value === cur ? ' checked' : '') + '>' +
-              '<span class="ov-opt-nm">' + esc(o.name) + '</span>' +
-              levelPills(o) +
-              spreadNote(o) +
+              '<span class="ov-opt-body">' +
+                '<span class="ov-opt-nm">' + esc(o.name) + '</span>' +
+                rowMeta(o) +
+              '</span>' +
             '</label>').join('') +
         '</div></div>';
     });
