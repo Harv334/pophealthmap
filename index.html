@@ -58,16 +58,34 @@
     --nhs-blue:#005EB8; --nhs-dark:#003087; --nhs-bright:#0072CE;
     --nhs-aqua:#41B6E6; --nhs-light:#E8EDEE; --nhs-yellow:#FFB81C;
     --nhs-red:#DA291C;  --nhs-green:#009639; --nhs-pink:#AE2573;
-    --ink:#212B32; --ink-2:#4C6272; --ink-3:#768692;
+    /* --ink-3 was #768692, which is 3.75:1 on white against a 4.5:1
+       requirement. It is the colour of nearly every label, count, caption,
+       unit and source note in this interface, usually set between 9 and 11px,
+       so the single most-read grey on the site had never met the standard.
+       #5E6D78 is 5.34:1 on white and 5.20:1 on --paper-2, and keeps the same
+       blue-grey cast. */
+    --ink:#212B32; --ink-2:#4C6272; --ink-3:#5E6D78;
+    /* Kept for the few places that want a grey quieter than text and are not
+       carrying words: rule-adjacent marks and disabled dots. Never use it for
+       anything anybody has to read. */
+    --ink-faint:#8B99A3;
     --line:#DDE1E4; --line-2:#E8EDEE;
     --bg:#F4F7F9; --paper:#FFFFFF; --paper-2:#FBFCFD;
+
+    /* Type scale. The stylesheet had 21 distinct sizes between 8px and 28px,
+       137 of the 342 declarations below 11px, and steps as fine as 9.5 against
+       10 that do no work at a glance but that every future change has to
+       reproduce. Seven steps, floor at 11px, because sub-10px text here is
+       carrying real content: keystat labels, source pills, the status bar. */
+    --t-xs:11px; --t-sm:12px; --t-md:13px; --t-lg:15px;
+    --t-xl:17px; --t-2xl:22px; --t-3xl:28px;
     --shadow-sm:0 1px 2px rgba(33,43,50,.05);
     --shadow:0 2px 4px rgba(33,43,50,.05), 0 8px 24px rgba(33,43,50,.06);
     --shadow-lg:0 8px 32px rgba(33,43,50,.10), 0 2px 8px rgba(33,43,50,.05);
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #F4F7F9; color: #212B32; }
+  html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--ink); }
 
   /* ── Layout ── */
   /* Root layout uses CSS grid (not flex) — grid rows are mathematically rigid so the header/main/status bar cannot be pushed out of their slots. */
@@ -77,57 +95,57 @@
      toolbar with overflow:hidden over the top of them: the sidebar footer and
      the foot of the layers list were unreachable rather than merely awkward. */
   .app { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; height: 100vh; max-height: 100vh; height: 100dvh; max-height: 100dvh; overflow: hidden; }
-  .hdr { background: #FBFCFD; border-bottom: 1px solid #E8EDEE; padding: 6px 16px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; gap: 12px; }
+  .hdr { background: var(--paper-2); border-bottom: 1px solid var(--line-2); padding: 6px 16px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; gap: 12px; }
   .hdr-left { display: flex; align-items: center; gap: 12px; }
   /* The page's h1. Margin zeroed because the browser default would push the
      header out of alignment; everything else it inherits is what the div
      had before. */
-  .hdr-logo { font-size: 15px; font-weight: 600; color: #212B32; margin: 0; }
+  .hdr-logo { font-size: var(--t-lg); font-weight: 600; color: var(--ink); margin: 0; }
   .hdr-right { display: flex; align-items: center; gap: 8px; }
 
   /* ── Header toolbar (Reset / Copy link / PNG / CSV) ── */
-  .tb-btn { background: #fff; border: 1px solid #DDE1E4; border-radius: 6px; padding: 5px 10px; font-size: 11.5px; color: #212B32; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; font-weight: 500; transition: background .12s, border-color .12s; }
-  .tb-btn:hover { background: #FBFCFD; border-color: #005EB8; color: #005EB8; }
-  .tb-btn.active { background: #005EB8; border-color: #005EB8; color: #fff; }
-  .tb-btn.active:hover { background: #003087; border-color: #003087; color: #fff; }
-  .tb-btn:active { background: #E8EDEE; }
-  .tb-btn.primary { background: #005EB8; color: #fff; border-color: #005EB8; }
-  .tb-btn.primary:hover { background: #003087; color: #fff; }
-  .tb-btn.danger:hover { background: #FDF2F1; border-color: #DA291C; color: #DA291C; }
-  .tb-sep { width: 1px; height: 20px; background: #DDE1E4; }
+  .tb-btn { background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px; font-size: var(--t-sm); color: var(--ink); cursor: pointer; display: inline-flex; align-items: center; gap: 5px; font-weight: 500; transition: background .12s, border-color .12s; }
+  .tb-btn:hover { background: var(--paper-2); border-color: var(--nhs-blue); color: var(--nhs-blue); }
+  .tb-btn.active { background: var(--nhs-blue); border-color: var(--nhs-blue); color: #fff; }
+  .tb-btn.active:hover { background: var(--nhs-dark); border-color: var(--nhs-dark); color: #fff; }
+  .tb-btn:active { background: var(--line-2); }
+  .tb-btn.primary { background: var(--nhs-blue); color: #fff; border-color: var(--nhs-blue); }
+  .tb-btn.primary:hover { background: var(--nhs-dark); color: #fff; }
+  .tb-btn.danger:hover { background: #FDF2F1; border-color: var(--nhs-red); color: var(--nhs-red); }
+  .tb-sep { width: 1px; height: 20px; background: var(--line); }
 
   /* ── Header search ── */
   .hdr-search { position: relative; }
-  .hdr-search input { width: 200px; padding: 5px 10px 5px 28px; border: 1px solid #DDE1E4; border-radius: 6px; font-size: 12px; color: #212B32; background: #fff url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'><circle cx='11' cy='11' r='7'/><path d='m21 21-4.35-4.35'/></svg>") no-repeat 8px center; outline: none; transition: border-color .12s, box-shadow .12s; }
-  .hdr-search input:focus { border-color: #005EB8; box-shadow: 0 0 0 3px rgba(0,94,184,.12); }
-  .hdr-search-results { position: absolute; top: 100%; left: 0; margin-top: 4px; width: 320px; max-height: 360px; overflow-y: auto; background: #fff; border: 1px solid #DDE1E4; border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,.15); display: none; z-index: 3000; }
+  .hdr-search input { width: 200px; padding: 5px 10px 5px 28px; border: 1px solid var(--line); border-radius: 6px; font-size: var(--t-sm); color: var(--ink); background: #fff url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'><circle cx='11' cy='11' r='7'/><path d='m21 21-4.35-4.35'/></svg>") no-repeat 8px center; outline: none; transition: border-color .12s, box-shadow .12s; }
+  .hdr-search input:focus { border-color: var(--nhs-blue); box-shadow: 0 0 0 3px rgba(0,94,184,.12); }
+  .hdr-search-results { position: absolute; top: 100%; left: 0; margin-top: 4px; width: 320px; max-height: 360px; overflow-y: auto; background: #fff; border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,.15); display: none; z-index: 3000; }
   /* Search now lives in the sidebar footer — make it full-width and open the dropdown UPWARD so it doesn't go off-screen. */
   .sb-footer-search { position: relative; margin-bottom: 8px; }
-  .sb-footer-search input { width: 100%; padding: 6px 10px 6px 28px; border: 1px solid #DDE1E4; border-radius: 6px; font-size: 12px; color: #212B32; background: #fff url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'><circle cx='11' cy='11' r='7'/><path d='m21 21-4.35-4.35'/></svg>") no-repeat 8px center; outline: none; transition: border-color .12s, box-shadow .12s; }
-  .sb-footer-search input:focus { border-color: #005EB8; box-shadow: 0 0 0 3px rgba(0,94,184,.12); }
+  .sb-footer-search input { width: 100%; padding: 6px 10px 6px 28px; border: 1px solid var(--line); border-radius: 6px; font-size: var(--t-sm); color: var(--ink); background: #fff url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'><circle cx='11' cy='11' r='7'/><path d='m21 21-4.35-4.35'/></svg>") no-repeat 8px center; outline: none; transition: border-color .12s, box-shadow .12s; }
+  .sb-footer-search input:focus { border-color: var(--nhs-blue); box-shadow: 0 0 0 3px rgba(0,94,184,.12); }
   .hdr-search-results.sb-footer-results { position: absolute; top: auto; bottom: 100%; left: 0; right: 0; width: auto; margin: 0 0 4px 0; max-height: 320px; }
   /* 2×2 button grid for the four toolbar actions */
   .sb-footer-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 4px; }
-  .sb-footer-btns .tb-btn { width: 100%; justify-content: center; padding: 5px 6px; font-size: 11px; }
+  .sb-footer-btns .tb-btn { width: 100%; justify-content: center; padding: 5px 6px; font-size: var(--t-xs); }
   .hdr-search-results.show { display: block; }
-  .sr-row { padding: 7px 10px; font-size: 12px; color: #212B32; cursor: pointer; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #E8EDEE; }
-  .sr-row:hover, .sr-row.active { background: #E8EDEE; }
+  .sr-row { padding: 7px 10px; font-size: var(--t-sm); color: var(--ink); cursor: pointer; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--line-2); }
+  .sr-row:hover, .sr-row.active { background: var(--line-2); }
   .sr-row:last-child { border-bottom: 0; }
-  .sr-row .sr-type { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: #768692; font-weight: 600; min-width: 54px; }
-  .sr-row .sr-name { flex: 1; color: #212B32; }
-  .sr-row .sr-sub { font-size: 10.5px; color: #768692; }
-  .sr-empty { padding: 12px; font-size: 11.5px; color: #768692; text-align: center; }
-  .sr-grp { padding: 4px 10px; font-size: 9.5px; text-transform: uppercase; letter-spacing: .08em; color: #768692; background: #FBFCFD; font-weight: 600; border-bottom: 1px solid #E8EDEE; }
-  .hsr-group { font-size: 9.5px; text-transform: uppercase; letter-spacing: .05em; color: #768692; padding: 6px 10px 3px; background: #FBFCFD; border-bottom: 1px solid #E8EDEE; }
-  .hsr-item { display: flex; align-items: baseline; gap: 8px; padding: 6px 10px; font-size: 12px; color: #212B32; cursor: pointer; border-bottom: 1px solid #FBFCFD; }
+  .sr-row .sr-type { font-size: var(--t-xs); text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); font-weight: 600; min-width: 54px; }
+  .sr-row .sr-name { flex: 1; color: var(--ink); }
+  .sr-row .sr-sub { font-size: var(--t-xs); color: var(--ink-3); }
+  .sr-empty { padding: 12px; font-size: var(--t-sm); color: var(--ink-3); text-align: center; }
+  .sr-grp { padding: 4px 10px; font-size: var(--t-xs); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); background: var(--paper-2); font-weight: 600; border-bottom: 1px solid var(--line-2); }
+  .hsr-group { font-size: var(--t-xs); text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); padding: 6px 10px 3px; background: var(--paper-2); border-bottom: 1px solid var(--line-2); }
+  .hsr-item { display: flex; align-items: baseline; gap: 8px; padding: 6px 10px; font-size: var(--t-sm); color: var(--ink); cursor: pointer; border-bottom: 1px solid var(--paper-2); }
   .hsr-item:hover { background: #E5EFF8; }
-  .hsr-type { font-size: 9.5px; color: #768692; padding: 1px 5px; border-radius: 3px; background: #E8EDEE; flex-shrink: 0; text-transform: uppercase; letter-spacing: .04em; }
+  .hsr-type { font-size: var(--t-xs); color: var(--ink-3); padding: 1px 5px; border-radius: 3px; background: var(--line-2); flex-shrink: 0; text-transform: uppercase; letter-spacing: .04em; }
   .hsr-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .hsr-meta { font-size: 10.5px; color: #768692; flex-shrink: 0; }
-  .hsr-empty { padding: 14px 10px; font-size: 11.5px; color: #768692; text-align: center; }
+  .hsr-meta { font-size: var(--t-xs); color: var(--ink-3); flex-shrink: 0; }
+  .hsr-empty { padding: 14px 10px; font-size: var(--t-sm); color: var(--ink-3); text-align: center; }
 
   /* ── "Currently viewing" strip + filter chips (above the map) ── */
-  .viewing-strip { background: #fff; border-bottom: 1px solid #E8EDEE; padding: 5px 12px 6px; font-size: 11.5px; color: #4C6272; display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 10px; row-gap: 2px; align-items: center; flex-shrink: 0; }
+  .viewing-strip { background: #fff; border-bottom: 1px solid var(--line-2); padding: 5px 12px 6px; font-size: var(--t-sm); color: var(--ink-2); display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 10px; row-gap: 2px; align-items: center; flex-shrink: 0; }
   /* ── Search result pin ──
      A teardrop rather than a circle, because the point layers are already
      circles and the whole job of this one is to be the thing you can pick out
@@ -136,7 +154,7 @@
   .search-pin { width: 26px; height: 34px; position: relative; }
   .search-pin::before { content: ''; position: absolute; left: 3px; top: 0;
     width: 20px; height: 20px; border-radius: 50% 50% 50% 0;
-    transform: rotate(-45deg); background: #005EB8; border: 2.5px solid #fff;
+    transform: rotate(-45deg); background: var(--nhs-blue); border: 2.5px solid #fff;
     box-shadow: 0 2px 6px rgba(0,0,0,.35); }
   .search-pin-dot { position: absolute; left: 10.5px; top: 7.5px;
     width: 7px; height: 7px; border-radius: 50%; background: #fff; }
@@ -155,39 +173,39 @@
   #fingertips-banner { position: absolute; right: 12px; bottom: 54px; max-width: 300px;
     background: #fff8e6; border: 1px solid #e0c280; color: #5c4115;
     padding: 9px 12px; border-radius: 6px; box-shadow: 0 2px 10px rgba(0,0,0,.10);
-    font-size: 11.5px; line-height: 1.45; z-index: 560; display: none;
+    font-size: var(--t-sm); line-height: 1.45; z-index: 560; display: none;
     pointer-events: none; }
   #fingertips-banner .ft-i { display: inline-block; background: #b88030; color: #fff;
     border-radius: 50%; width: 18px; height: 18px; text-align: center;
-    line-height: 18px; font-weight: 700; margin-right: 6px; font-size: 11px;
+    line-height: 18px; font-weight: 700; margin-right: 6px; font-size: var(--t-xs);
     vertical-align: middle; }
   #fingertips-banner-close { float: right; background: none; border: none;
-    color: #5c4115; font-size: 16px; cursor: pointer; padding: 0 0 0 8px;
+    color: #5c4115; font-size: var(--t-xl); cursor: pointer; padding: 0 0 0 8px;
     margin: -4px 0 0 0; line-height: 1; pointer-events: auto; }
 
   /* ── Persistent map legend strip ── */
-  .map-legend-strip { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); background: rgba(255,255,255,.94); border: 1px solid #DDE1E4; border-radius: 6px; padding: 6px 12px; box-shadow: 0 2px 8px rgba(0,0,0,.10); font-size: 11px; color: #4C6272; display: flex; align-items: center; gap: 10px; z-index: 540; pointer-events: none; max-width: 90%; }
-  .map-legend-strip .mls-label { font-weight: 600; color: #212B32; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .map-legend-strip .mls-min, .map-legend-strip .mls-max { font-variant-numeric: tabular-nums; color: #4C6272; min-width: 34px; }
+  .map-legend-strip { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); background: rgba(255,255,255,.94); border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px; box-shadow: 0 2px 8px rgba(0,0,0,.10); font-size: var(--t-xs); color: var(--ink-2); display: flex; align-items: center; gap: 10px; z-index: 540; pointer-events: none; max-width: 90%; }
+  .map-legend-strip .mls-label { font-weight: 600; color: var(--ink); max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .map-legend-strip .mls-min, .map-legend-strip .mls-max { font-variant-numeric: tabular-nums; color: var(--ink-2); min-width: 34px; }
   .map-legend-strip .mls-min { text-align: right; }
-  .map-legend-strip .mls-grad { width: 140px; height: 8px; border-radius: 3px; border: 1px solid #DDE1E4; }
+  .map-legend-strip .mls-grad { width: 140px; height: 8px; border-radius: 3px; border: 1px solid var(--line); }
   .viewing-strip .vs-row1 { display: contents; }
   .viewing-strip .vs-row2 { grid-column: 1 / -1; min-height: 0; }
   .viewing-strip .vs-row2:empty { display: none; }
-  .vs-label { font-weight: 600; color: #768692; letter-spacing: .05em; text-transform: uppercase; font-size: 9.5px; flex-shrink: 0; align-self: center; }
-  .vs-digest { color: #212B32; font-weight: 500; }
-  .vs-digest b { color: #005EB8; font-weight: 600; }
+  .vs-label { font-weight: 600; color: var(--ink-3); letter-spacing: .05em; text-transform: uppercase; font-size: var(--t-xs); flex-shrink: 0; align-self: center; }
+  .vs-digest { color: var(--ink); font-weight: 500; }
+  .vs-digest b { color: var(--nhs-blue); font-weight: 600; }
   .chips { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; }
-  .chip { display: inline-flex; align-items: center; gap: 5px; background: #E5EFF8; color: #005EB8; border: 1px solid #B9D3EC; border-radius: 12px; padding: 3px 4px 3px 9px; font-size: 11px; font-weight: 500; line-height: 1.4; }
-  .chip.core20 { background: #FDF2F1; color: #DA291C; border-color: #F2C4BF; }
+  .chip { display: inline-flex; align-items: center; gap: 5px; background: #E5EFF8; color: var(--nhs-blue); border: 1px solid #B9D3EC; border-radius: 12px; padding: 3px 4px 3px 9px; font-size: var(--t-xs); font-weight: 500; line-height: 1.4; }
+  .chip.core20 { background: #FDF2F1; color: var(--nhs-red); border-color: #F2C4BF; }
   .chip.overlay { background: #f2ecdf; color: #854F0B; border-color: #e3d3ae; }
-  .chip.vcse { background: #F6E7F0; color: #AE2573; border-color: #E6C6D8; }
-  .chip-x { background: transparent; border: none; color: inherit; opacity: .6; cursor: pointer; font-size: 13px; line-height: 1; padding: 0 4px; border-radius: 8px; }
+  .chip.vcse { background: #F6E7F0; color: var(--nhs-pink); border-color: #E6C6D8; }
+  .chip-x { background: transparent; border: none; color: inherit; opacity: .6; cursor: pointer; font-size: var(--t-md); line-height: 1; padding: 0 4px; border-radius: 8px; }
   .chip-x:hover { opacity: 1; background: rgba(0,0,0,.06); }
   .main { display: grid; grid-template-columns: auto minmax(0, 1fr); overflow: hidden; min-height: 0; min-width: 0; }
 
   /* ── Sidebar ── CSS Grid: native layout guarantees [focus] [tabs] [flexible pane] [footer] stack. No JS measurement needed. */
-  .sidebar { position: relative; width: var(--sb-w, 268px); border-right: 1px solid #E8EDEE; flex-shrink: 0; background: #fff; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; grid-template-areas: "focus" "tabs" "pane" "footer"; height: 100%; min-height: 0; overflow: hidden; transition: width .18s ease; }
+  .sidebar { position: relative; width: var(--sb-w, 268px); border-right: 1px solid var(--line-2); flex-shrink: 0; background: #fff; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; grid-template-areas: "focus" "tabs" "pane" "footer"; height: 100%; min-height: 0; overflow: hidden; transition: width .18s ease; }
   /* Collapsed to nothing, so the map gets the whole window. The same button
      that opens the drawer on a phone does this on a desktop: one control, and
      the same idea behind it, which is that the panel is optional. */
@@ -208,9 +226,9 @@
     width: 3px; height: 36px; margin-top: -18px; border-radius: 2px;
     background: #A8B6BD; opacity: 0; transition: opacity .15s; }
   .sb-grip:hover::before, .sb-grip:focus-visible::before { opacity: 1; }
-  .sb-grip:focus-visible { outline: 2px solid #005EB8; outline-offset: -2px; }
+  .sb-grip:focus-visible { outline: 2px solid var(--nhs-blue); outline-offset: -2px; }
   .sidebar.resizing { transition: none; user-select: none; }
-  .sidebar.resizing .sb-grip::before { opacity: 1; background: #005EB8; }
+  .sidebar.resizing .sb-grip::before { opacity: 1; background: var(--nhs-blue); }
   /* Nothing to grab on a zero-width panel, and nothing to give it to. */
   .sidebar.collapsed .sb-grip { display: none; }
   .sidebar > .sb-tabs     { grid-area: tabs; }
@@ -237,11 +255,16 @@
   .sidebar > .tab-pane::-webkit-scrollbar-thumb { background: #CBD5DA; border-radius: 5px; border: 2px solid #fff; }
   .sidebar > .tab-pane::-webkit-scrollbar-thumb:hover { background: #A8B6BD; }
   .sidebar > .tab-pane { scrollbar-width: thin; scrollbar-color: #CBD5DA transparent; }
-  .sidebar > .sb-sec      { grid-area: footer; background: #FBFCFD; }
-  .sb-tabs { display: flex; border-bottom: 1px solid #E8EDEE; background: #FBFCFD; min-height: 36px; }
-  .sb-tab { flex: 1 1 0; min-width: 0; padding: 9px 2px; font-size: 11px; font-weight: 600; color: #4C6272; text-align: center; cursor: pointer; border-bottom: 2px solid transparent; transition: color .15s, background .12s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .sb-tab:hover { color: #005EB8; background: #fff; }
-  .sb-tab.active { color: #212B32; border-bottom-color: #005EB8; background: #fff; }
+  .sidebar > .sb-sec      { grid-area: footer; background: var(--paper-2); }
+  .sb-tabs { display: flex; border-bottom: 1px solid var(--line-2); background: var(--paper-2); min-height: 36px; }
+  /* The button reset here is what lets these be real buttons without looking
+     like them. Everything below the reset is the styling they already had. */
+  .sb-tab { appearance: none; -webkit-appearance: none; background: none; border: 0;
+    border-radius: 0; font-family: inherit; margin: 0;
+    flex: 1 1 0; min-width: 0; padding: 9px 2px; font-size: var(--t-xs); font-weight: 600; color: var(--ink-2); text-align: center; cursor: pointer; border-bottom: 2px solid transparent; transition: color .15s, background .12s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sb-tab:focus-visible { outline: 2px solid var(--nhs-blue); outline-offset: -3px; }
+  .sb-tab:hover { color: var(--nhs-blue); background: #fff; }
+  .sb-tab.active { color: var(--ink); border-bottom-color: var(--nhs-blue); background: #fff; }
   .tab-pane { display: none; }
   /* This used to say overflow: hidden, which quietly beat the scrolling rule
      on .sidebar > .tab-pane above: same specificity, declared later, and it
@@ -249,101 +272,121 @@
      or the toggles below the fold cannot be reached on a short window. */
   .tab-pane.active { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; overflow-x: hidden; }
   .ward-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
-  .sb-sec { padding: 11px 13px; border-bottom: 1px solid #E8EDEE; flex-shrink: 0; }
-  .deselect-btn { border: 1px solid #DDE1E4; background: #fff; color: #4C6272; font-size: 10.5px; font-weight: 500; padding: 3px 8px; border-radius: 5px; cursor: pointer; line-height: 1.2; white-space: nowrap; flex-shrink: 0; }
-  .deselect-btn:hover { background: #FBFCFD; border-color: #768692; color: #212B32; }
-  .sb-lbl { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: #768692; margin-bottom: 8px; }
+  .sb-sec { padding: 11px 13px; border-bottom: 1px solid var(--line-2); flex-shrink: 0; }
+
+  /* ── Opening hint ──
+     The three sentences that used to live in a title attribute on the page
+     heading. See the markup in #tab-overlay. Dismissable and it stays
+     dismissed, because it introduces rather than warns. */
+  .start-hint { margin: 11px 13px 0; padding: 10px 12px 8px; flex-shrink: 0;
+    background: var(--nhs-light); border-radius: 8px;
+    font-size: var(--t-sm); line-height: 1.5; color: var(--ink-2); }
+  .start-hint p { margin: 0 0 5px; }
+  .start-hint b { color: var(--ink); font-weight: 600; }
+  .start-hint-x { appearance: none; background: none; border: 0; padding: 2px 0 0;
+    font: inherit; font-size: var(--t-xs); font-weight: 600; color: var(--nhs-blue);
+    cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+  .start-hint-x:hover { color: var(--nhs-dark); }
+  .start-hint.gone { display: none; }
+  .deselect-btn { border: 1px solid var(--line); background: #fff; color: var(--ink-2); font-size: var(--t-xs); font-weight: 500; padding: 3px 8px; border-radius: 5px; cursor: pointer; line-height: 1.2; white-space: nowrap; flex-shrink: 0; }
+  .deselect-btn:hover { background: var(--paper-2); border-color: var(--ink-3); color: var(--ink); }
+  .sb-lbl { font-size: var(--t-xs); font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-3); margin-bottom: 8px; }
   .sb-lbl.collapsible { cursor: pointer; user-select: none; display: flex; align-items: center; gap: 5px; }
-  .sb-lbl.collapsible::before { content: "▾"; font-size: 9px; color: #DDE1E4; transition: transform .15s; transform-origin: center; display: inline-block; }
+  .sb-lbl.collapsible::before { content: "▾"; font-size: 9px; color: var(--line); transition: transform .15s; transform-origin: center; display: inline-block; }
   .sb-sec.collapsed .sb-lbl.collapsible::before { transform: rotate(-90deg); }
   .sb-sec.collapsed > *:not(.sb-lbl) { display: none !important; }
   .lrow { display: flex; align-items: center; gap: 8px; padding: 3px 0; cursor: default; }
   .ldot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
-  .lname { font-size: 13px; color: #212B32; flex: 1; }
-  .lcount { font-size: 12px; color: #768692; }
-  .lhelp { display: inline-block; margin-left: 4px; width: 13px; height: 13px; line-height: 13px; text-align: center; border-radius: 50%; background: #E8EDEE; color: #768692; font-size: 9.5px; font-weight: 700; cursor: help; user-select: none; }
-  .lhelp:hover { background: #005EB8; color: #fff; }
-  input[type=checkbox] { width: 14px; height: 14px; cursor: pointer; accent-color: #005EB8; }
-  select { width: 100%; padding: 6px 9px; border: 1px solid #DDE1E4; border-radius: 6px; font-size: 12px; color: #212B32; background: #fff; cursor: pointer; outline: none; }
-  select:focus { border-color: #005EB8; }
-  input[type=text] { width: 100%; padding: 7px 10px; border: 1px solid #DDE1E4; border-radius: 6px; font-size: 12px; color: #212B32; background: #fff; outline: none; }
-  input[type=text]:focus { border-color: #005EB8; box-shadow: 0 0 0 2px rgba(0,94,184,.1); }
+  .lname { font-size: var(--t-md); color: var(--ink); flex: 1; }
+  .lcount { font-size: var(--t-sm); color: var(--ink-3); }
+  .lhelp { display: inline-block; margin-left: 4px; width: 13px; height: 13px; line-height: 13px; text-align: center; border-radius: 50%; background: var(--line-2); color: var(--ink-3); font-size: var(--t-xs); font-weight: 700; cursor: help; user-select: none; }
+  .lhelp:hover { background: var(--nhs-blue); color: #fff; }
+  input[type=checkbox] { width: 14px; height: 14px; cursor: pointer; accent-color: var(--nhs-blue); }
+  select { width: 100%; padding: 6px 9px; border: 1px solid var(--line); border-radius: 6px; font-size: var(--t-sm); color: var(--ink); background: #fff; cursor: pointer; outline: none; }
+  select:focus { border-color: var(--nhs-blue); }
+  input[type=text] { width: 100%; padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px; font-size: var(--t-sm); color: var(--ink); background: #fff; outline: none; }
+  input[type=text]:focus { border-color: var(--nhs-blue); box-shadow: 0 0 0 2px rgba(0,94,184,.1); }
 
   /* ── VCSE tag filter ── */
-  .vcse-tag-group { margin: 4px 0; border-top: 1px dotted #E8EDEE; }
+  .vcse-tag-group { margin: 4px 0; border-top: 1px dotted var(--line-2); }
   .vcse-tag-group:first-of-type { border-top: none; }
-  .vcse-tag-group > summary { list-style: none; cursor: pointer; padding: 5px 0; font-size: 11px; color: #4C6272; font-weight: 500; display: flex; align-items: center; gap: 6px; }
+  .vcse-tag-group > summary { list-style: none; cursor: pointer; padding: 5px 0; font-size: var(--t-xs); color: var(--ink-2); font-weight: 500; display: flex; align-items: center; gap: 6px; }
   .vcse-tag-group > summary::-webkit-details-marker { display: none; }
-  .vcse-tag-group > summary::before { content: '▸'; font-size: 9px; color: #768692; transition: transform .1s; display: inline-block; }
+  .vcse-tag-group > summary::before { content: '▸'; font-size: 9px; color: var(--ink-3); transition: transform .1s; display: inline-block; }
   .vcse-tag-group[open] > summary::before { transform: rotate(90deg); }
-  .vcse-tag-count { margin-left: auto; font-size: 10px; color: #768692; font-weight: 400; }
-  .vcse-tag-count.active { color: #005EB8; font-weight: 600; }
+  .vcse-tag-count { margin-left: auto; font-size: var(--t-xs); color: var(--ink-3); font-weight: 400; }
+  .vcse-tag-count.active { color: var(--nhs-blue); font-weight: 600; }
   .vcse-tag-list { display: flex; flex-direction: column; gap: 2px; padding: 2px 0 6px 14px; }
-  .vcse-tag-list label { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #212B32; cursor: pointer; padding: 2px 0; }
-  .vcse-tag-list label:hover { color: #212B32; }
+  .vcse-tag-list label { display: flex; align-items: center; gap: 6px; font-size: var(--t-xs); color: var(--ink); cursor: pointer; padding: 2px 0; }
+  .vcse-tag-list label:hover { color: var(--ink); }
   .vcse-tag-list input { margin: 0; }
-  .vcse-tag-list .vcse-tag-n { margin-left: auto; color: #768692; font-size: 10px; }
+  .vcse-tag-list .vcse-tag-n { margin-left: auto; color: var(--ink-3); font-size: var(--t-xs); }
 
   /* ── VCSE list ── */
-  .vcse-count { font-size: 11px; color: #768692; padding: 6px 13px; border-bottom: 1px solid #E8EDEE; flex-shrink: 0; background: #FBFCFD; }
+  .vcse-count { font-size: var(--t-xs); color: var(--ink-3); padding: 6px 13px; border-bottom: 1px solid var(--line-2); flex-shrink: 0; background: var(--paper-2); }
   .vcse-list { flex: 1; overflow-y: auto; min-height: 0; }
-  .vcse-item { padding: 8px 13px; border-bottom: 1px solid #E8EDEE; cursor: pointer; transition: background .1s; }
-  .vcse-item:hover { background: #FBFCFD; }
-  .vcse-name { font-size: 12px; font-weight: 500; color: #212B32; line-height: 1.3; }
-  .vcse-addr { font-size: 10px; color: #768692; margin-top: 2px; }
-  .vcse-more { padding: 8px 13px; font-size: 11px; color: #768692; text-align: center; font-style: italic; }
+  .vcse-item { padding: 8px 13px; border-bottom: 1px solid var(--line-2); cursor: pointer; transition: background .1s; }
+  .vcse-item:hover { background: var(--paper-2); }
+  .vcse-name { font-size: var(--t-sm); font-weight: 500; color: var(--ink); line-height: 1.3; }
+  .vcse-addr { font-size: var(--t-xs); color: var(--ink-3); margin-top: 2px; }
+  .vcse-more { padding: 8px 13px; font-size: var(--t-xs); color: var(--ink-3); text-align: center; font-style: italic; }
 
   /* ── Ward detail panel ── */
   .ward-scroll { flex: 1 1 0; overflow-y: auto; padding: 11px 13px; min-height: 0; height: 0; }
-  .ph { text-align: center; padding: 28px 12px; color: #768692; font-size: 12px; line-height: 1.8; }
-  .ph-icon { font-size: 22px; margin-bottom: 8px; opacity: .4; }
-  .wname { font-size: 14px; font-weight: 600; color: #212B32; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #E8EDEE; display: flex; justify-content: space-between; align-items: baseline; }
-  .wpop { font-size: 11px; font-weight: 400; color: #768692; }
+  .ph { text-align: center; padding: 28px 12px; color: var(--ink-3); font-size: var(--t-sm); line-height: 1.8; }
+  .ph-icon { font-size: var(--t-2xl); margin-bottom: 8px; opacity: .4; }
+  .wname { font-size: var(--t-lg); font-weight: 600; color: var(--ink); margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--line-2); display: flex; justify-content: space-between; align-items: baseline; }
+  .wpop { font-size: var(--t-xs); font-weight: 400; color: var(--ink-3); }
   .cat-block { margin-bottom: 9px; }
-  .cat-hdr { display: flex; align-items: center; justify-content: space-between; padding: 6px 9px; background: #FBFCFD; border-radius: 6px; cursor: pointer; transition: background .1s; }
-  .cat-hdr:hover { background: #E8EDEE; }
-  .cat-hdr-l { font-size: 11px; font-weight: 600; color: #212B32; display: flex; align-items: center; gap: 7px; }
-  .cat-ico { width: 16px; text-align: center; font-size: 12px; }
-  .cat-arrow { font-size: 9px; color: #768692; transition: transform .15s; }
+  .cat-hdr { display: flex; align-items: center; justify-content: space-between; padding: 6px 9px; background: var(--paper-2); border-radius: 6px; cursor: pointer; transition: background .1s; }
+  .cat-hdr:hover { background: var(--line-2); }
+  .cat-hdr-l { font-size: var(--t-xs); font-weight: 600; color: var(--ink); display: flex; align-items: center; gap: 7px; }
+  .cat-ico { width: 16px; text-align: center; font-size: var(--t-sm); }
+  .cat-arrow { font-size: 9px; color: var(--ink-3); transition: transform .15s; }
   .cat-arrow.open { transform: rotate(90deg); }
   .cat-body { display: none; padding: 3px 0 0; }
   .cat-body.open { display: block; }
-  .sr { display: flex; justify-content: space-between; align-items: baseline; padding: 4px 0; border-bottom: 1px solid #E8EDEE; font-size: 11px; gap: 8px; }
-  .sl { color: #4C6272; flex: 1; line-height: 1.4; }
-  .sv { font-weight: 500; color: #212B32; text-align: right; flex-shrink: 0; }
+  .sr { display: flex; justify-content: space-between; align-items: baseline; padding: 4px 0; border-bottom: 1px solid var(--line-2); font-size: var(--t-xs); gap: 8px; }
+  .sl { color: var(--ink-2); flex: 1; line-height: 1.4; }
+  .sv { font-weight: 500; color: var(--ink); text-align: right; flex-shrink: 0; }
   .sv.real { color: #00612A; }
-  .sv.sample { color: #768692; font-style: italic; }
-  .gpill { display: inline-block; font-size: 9px; padding: 1px 5px; border-radius: 3px; margin-left: 4px; vertical-align: middle; font-weight: 500; }
+  .sv.sample { color: var(--ink-3); font-style: italic; }
+  .gpill { display: inline-block; font-size: var(--t-xs); padding: 1px 5px; border-radius: 3px; margin-left: 4px; vertical-align: middle; font-weight: 500; }
   .gpill-ward { background: #E3F2E8; color: #00612A; }
   .gpill-lsoa { background: #fdebd0; color: #b8600c; }
-  .gpill-msoa { background: #E5EFF8; color: #003087; }
+  .gpill-msoa { background: #E5EFF8; color: var(--nhs-dark); }
   .gpill-la   { background: #F6E7F0; color: #330072; }
-  .data-note { margin-top: 10px; padding: 7px 10px; background: #FBFCFD; border-left: 3px solid #DDE1E4; font-size: 10px; color: #768692; line-height: 1.5; border-radius: 0 5px 5px 0; }
-  .data-note a { color: #005EB8; text-decoration: none; }
+  .data-note { margin-top: 10px; padding: 7px 10px; background: var(--paper-2); border-left: 3px solid var(--line); font-size: var(--t-xs); color: var(--ink-3); line-height: 1.5; border-radius: 0 5px 5px 0; }
+  .data-note a { color: var(--nhs-blue); text-decoration: none; }
 
   /* ── Ward key-stats strip & report button ── */
   .keystats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 6px 0 10px; }
-  .keystat { background: #FBFCFD; border-radius: 6px; padding: 7px 6px; text-align: center; border: 1px solid #E8EDEE; }
-  .keystat-lbl { font-size: 9px; color: #768692; text-transform: uppercase; letter-spacing: .04em; line-height: 1.2; min-height: 22px; display: flex; align-items: center; justify-content: center; }
-  .keystat-val { font-size: 15px; font-weight: 600; color: #212B32; margin-top: 3px; line-height: 1.1; }
-  .keystat-val.dim { color: #DDE1E4; font-weight: 400; }
-  .keystat-sub { font-size: 9px; color: #768692; margin-top: 1px; }
-  .wbtn { display: block; width: 100%; padding: 9px 12px; margin: 8px 0 14px; background: #fff; color: #005EB8; border: 1.5px solid #005EB8; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background .15s, color .15s, box-shadow .15s; letter-spacing: .01em; }
-  .wbtn:hover { background: #005EB8; color: #fff; box-shadow: 0 2px 6px rgba(0,94,184,.25); }
-  .wbtn:active { background: #003087; color: #fff; border-color: #003087; }
+  .keystat { background: var(--paper-2); border-radius: 6px; padding: 7px 6px; text-align: center; border: 1px solid var(--line-2); }
+  .keystat-lbl { font-size: var(--t-xs); color: var(--ink-3); text-transform: uppercase; letter-spacing: .04em; line-height: 1.2; min-height: 22px; display: flex; align-items: center; justify-content: center; }
+  .keystat-val { font-size: var(--t-lg); font-weight: 600; color: var(--ink); margin-top: 3px; line-height: 1.1; }
+  /* This was --line, a border colour used as a text colour: #DDE1E4 on white
+     is 1.32:1, which is not dim, it is invisible. The em dash it renders is
+     the honest statement that a figure is not held for this area, and a reader
+     has to be able to see it to know the difference between "no data" and a
+     panel that failed to draw. */
+  .keystat-val.dim { color: var(--ink-3); font-weight: 400; }
+  .keystat-sub { font-size: var(--t-xs); color: var(--ink-3); margin-top: 1px; }
+  .wbtn { display: block; width: 100%; padding: 9px 12px; margin: 8px 0 14px; background: #fff; color: var(--nhs-blue); border: 1.5px solid var(--nhs-blue); border-radius: 6px; font-size: var(--t-sm); font-weight: 600; cursor: pointer; transition: background .15s, color .15s, box-shadow .15s; letter-spacing: .01em; }
+  .wbtn:hover { background: var(--nhs-blue); color: #fff; box-shadow: 0 2px 6px rgba(0,94,184,.25); }
+  .wbtn:active { background: var(--nhs-dark); color: #fff; border-color: var(--nhs-dark); }
 
   /* ── Overlay scale ── */
   .scale-bar { display: none; margin-top: 8px; }
-  .scale-labels { display: flex; justify-content: space-between; font-size: 10px; color: #768692; margin-bottom: 3px; }
+  .scale-labels { display: flex; justify-content: space-between; font-size: var(--t-xs); color: var(--ink-3); margin-bottom: 3px; }
   .scale-grad { display: block; height: 6px; border-radius: 3px; overflow: hidden; }
 
   /* ── Top / bottom 20 rankings ── */
   .rank-list { display: flex; flex-direction: column; gap: 1px; }
-  .rank-row { display: flex; align-items: baseline; gap: 4px; font-size: 10px; padding: 2px 4px; border-radius: 3px; cursor: pointer; line-height: 1.2; }
-  .rank-row:hover { background: #FBFCFD; }
-  .rank-rank { color: #768692; width: 16px; text-align: right; flex-shrink: 0; font-variant-numeric: tabular-nums; }
-  .rank-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #212B32; }
-  .rank-val { color: #4C6272; font-variant-numeric: tabular-nums; flex-shrink: 0; font-size: 9.5px; }
+  .rank-row { display: flex; align-items: baseline; gap: 4px; font-size: var(--t-xs); padding: 2px 4px; border-radius: 3px; cursor: pointer; line-height: 1.2; }
+  .rank-row:hover { background: var(--paper-2); }
+  .rank-rank { color: var(--ink-3); width: 16px; text-align: right; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+  .rank-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
+  .rank-val { color: var(--ink-2); font-variant-numeric: tabular-nums; flex-shrink: 0; font-size: var(--t-xs); }
 
   /* ── Map ── */
   .map-wrap { position: relative; min-height: 0; min-width: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); overflow: hidden; }
@@ -371,84 +414,94 @@
   .loading-overlay.hidden { display: none; }
   .ldr-card { display: flex; flex-direction: column; align-items: center;
     padding: 0 20px; max-width: 100%; }
-  .ldr-map { width: min(340px, 58vw); height: auto; display: block; overflow: visible; }
+  .ldr-map { width: min(440px, 72vw); height: auto; display: block; overflow: visible; }
   /* Empty wards are drawn, not hidden: the outline of London is recognisable
-     immediately, and only the colour arrives progressively. */
-  .ldr-map path { fill: var(--line-2); stroke: var(--bg); stroke-width: 1.4;
+     immediately, and only the colour arrives progressively. --line rather than
+     --line-2 because at this size the wards are a few pixels across, and
+     against --bg the lighter grey read as a smudge rather than as a city.
+
+     The fill here is what the paint code overrides, and it has to override it
+     with an inline style rather than a fill attribute: a presentation
+     attribute loses to any CSS rule, so setting fill="..." on the element left
+     this declaration winning and the map never coloured in at all. */
+  .ldr-map path { fill: var(--line); stroke: var(--bg); stroke-width: 1.1;
     stroke-linejoin: round; transition: fill .55s ease; }
-  .ldr-txt { font-size: 14px; font-weight: 600; color: var(--ink);
+  .ldr-txt { font-size: var(--t-lg); font-weight: 600; color: var(--ink);
     margin: 18px 0 0; letter-spacing: -.01em; }
-  .ldr-sub { font-size: 12px; color: var(--ink-2); margin: 4px 0 0; }
+  .ldr-sub { font-size: var(--t-sm); color: var(--ink-2); margin: 4px 0 0; }
   .ldr-key { display: flex; align-items: center; gap: 8px; margin-top: 15px;
-    font-size: 9.5px; color: var(--ink-2); text-transform: uppercase;
+    font-size: var(--t-xs); color: var(--ink-2); text-transform: uppercase;
     letter-spacing: .07em; font-weight: 600; }
   .ldr-key-grad { width: 92px; height: 6px; border-radius: 3px;
     border: 1px solid var(--line); }
 
   /* ── Data-level badge (floating overlay, top-right of map) ── */
-  .dl-badge { position: absolute; top: 12px; right: 12px; z-index: 2500; background: rgba(255,255,255,0.96); border: 1px solid #DDE1E4; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); padding: 6px 8px; display: flex; align-items: center; gap: 8px; user-select: none; }
-  .dl-badge-label { font-weight: 600; color: #4C6272; letter-spacing: 0.04em; text-transform: uppercase; font-size: 9px; }
-  .dl-seg { display: flex; background: #FBFCFD; border-radius: 6px; padding: 2px; gap: 2px; }
-  .dl-seg button { background: transparent; border: none; padding: 4px 10px; font-size: 11px; color: #4C6272; border-radius: 4px; cursor: pointer; font-weight: 500; transition: background .12s, color .12s; }
-  .dl-seg button:hover { color: #005EB8; }
-  .dl-seg button.active { background: #005EB8; color: #fff; box-shadow: 0 1px 3px rgba(0,94,184,.3); }
-  .dl-seg button.disabled { color: #768692; cursor: help; font-style: italic; }
-  .dl-seg button.disabled:hover { color: #768692; background: transparent; }
-  .dl-hint { position: absolute; top: 100%; right: 0; margin-top: 4px; background: #212B32; color: #fff; font-size: 10.5px; padding: 6px 9px; border-radius: 5px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .2s; box-shadow: 0 2px 6px rgba(0,0,0,.2); }
+  .dl-badge { position: absolute; top: 12px; right: 12px; z-index: 2500; background: rgba(255,255,255,0.96); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); padding: 6px 8px; display: flex; align-items: center; gap: 8px; user-select: none; }
+  .dl-badge-label { font-weight: 600; color: var(--ink-2); letter-spacing: 0.04em; text-transform: uppercase; font-size: var(--t-xs); }
+  .dl-seg { display: flex; background: var(--paper-2); border-radius: 6px; padding: 2px; gap: 2px; }
+  .dl-seg button { background: transparent; border: none; padding: 4px 10px; font-size: var(--t-xs); color: var(--ink-2); border-radius: 4px; cursor: pointer; font-weight: 500; transition: background .12s, color .12s; }
+  .dl-seg button:hover { color: var(--nhs-blue); }
+  .dl-seg button.active { background: var(--nhs-blue); color: #fff; box-shadow: 0 1px 3px rgba(0,94,184,.3); }
+  .dl-seg button.disabled { color: var(--ink-3); cursor: help; font-style: italic; }
+  .dl-seg button.disabled:hover { color: var(--ink-3); background: transparent; }
+  .dl-hint { position: absolute; top: 100%; right: 0; margin-top: 4px; background: var(--ink); color: #fff; font-size: var(--t-xs); padding: 6px 9px; border-radius: 5px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .2s; box-shadow: 0 2px 6px rgba(0,0,0,.2); }
   .dl-hint.show { opacity: 1; }
 
   /* ── Status bar ── */
-  .sbar { background: #fff; border-top: 1px solid #E8EDEE; padding: 4px 14px; font-size: 10px; color: #768692; display: flex; justify-content: space-between; flex-shrink: 0; }
+  .sbar { background: #fff; border-top: 1px solid var(--line-2); padding: 4px 14px; font-size: var(--t-xs); color: var(--ink-3); display: flex; justify-content: space-between; flex-shrink: 0; }
   .sbar-right { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
   /* Sits with the data date and is deliberately quieter than it: the date is
      the one people need, the version is the one they get asked for. The empty
      rule on #data-date stops a stray gap opening between the tour button and
      the version while the manifest is still in flight. */
-  #site-ver { color: #A3AEB5; font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+  /* Was #A3AEB5, 2.26:1. Quieter than the data date beside it is the right
+     intent, and --ink-3 against the bar's own --ink-2 still reads as quieter
+     while being legible to somebody who has been asked for it. */
+  #site-ver { color: var(--ink-3); font-variant-numeric: tabular-nums; letter-spacing: .02em; }
   #data-date:empty { display: none; }
   .sbar-btn { appearance: none; background: none; border: 0; padding: 0; cursor: pointer;
-    font: inherit; font-size: 10px; color: #005EB8; text-decoration: underline;
+    font: inherit; font-size: var(--t-xs); color: var(--nhs-blue); text-decoration: underline;
     text-underline-offset: 2px; }
-  .sbar-btn:hover { color: #003087; }
+  .sbar-btn:hover { color: var(--nhs-dark); }
 
   /* ── Leaflet overrides ── */
   .leaflet-popup-content-wrapper { border-radius: 8px !important; box-shadow: 0 2px 12px rgba(0,0,0,.12) !important; border: none !important; padding: 0 !important; overflow: hidden; }
   .leaflet-popup-tip-container { display: none; }
   .leaflet-popup-content { margin: 0 !important; min-width: 200px; max-width: 260px; }
-  .pop-hdr { padding: 9px 13px; font-size: 12px; font-weight: 600; color: #fff; }
-  .pop-body { padding: 8px 13px; font-size: 11px; background: #fff; color: #212B32; }
-  .pop-addr { color: #768692; margin-bottom: 5px; line-height: 1.4; }
+  .pop-hdr { padding: 9px 13px; font-size: var(--t-sm); font-weight: 600; color: #fff; }
+  .pop-body { padding: 8px 13px; font-size: var(--t-xs); background: #fff; color: var(--ink); }
+  .pop-addr { color: var(--ink-3); margin-bottom: 5px; line-height: 1.4; }
   .pop-row { display: flex; gap: 8px; margin-bottom: 3px; }
-  .pop-key { color: #768692; width: 54px; flex-shrink: 0; }
+  .pop-key { color: var(--ink-3); width: 54px; flex-shrink: 0; }
 
   /* ── VCSE cluster colours ── */
   .marker-cluster-small div,
   .marker-cluster-medium div,
-  .marker-cluster-large div { background: rgba(133,79,11,.75) !important; color: #fff !important; font-weight: 600 !important; font-size: 12px !important; }
+  .marker-cluster-large div { background: rgba(133,79,11,.75) !important; color: #fff !important; font-weight: 600 !important; font-size: var(--t-sm) !important; }
   .marker-cluster-small,
   .marker-cluster-medium,
   .marker-cluster-large { background: rgba(133,79,11,.2) !important; }
 
   /* ── Transparency slider ── */
   .opacity-row { display:flex; align-items:center; gap:8px; margin-top:8px; }
-  .opacity-row label { font-size:11px; color:#768692; flex-shrink:0; width:68px; }
-  input[type=range] { flex:1; accent-color:#005EB8; height:4px; cursor:pointer; }
-  .opacity-val { font-size:11px; color:#212B32; width:28px; text-align:right; flex-shrink:0; }
+  .opacity-row label { font-size: var(--t-xs); color:var(--ink-3); flex-shrink:0; width:68px; }
+  input[type=range] { flex:1; accent-color:var(--nhs-blue); height:4px; cursor:pointer; }
+  .opacity-val { font-size: var(--t-xs); color:var(--ink); width:28px; text-align:right; flex-shrink:0; }
 
 
 
 
   /* ── GP layer toggle ── */
-  .layer-section { padding:10px 13px; border-bottom:1px solid #E8EDEE; flex-shrink:0; }
+  .layer-section { padding:10px 13px; border-bottom:1px solid var(--line-2); flex-shrink:0; }
 
   /* ── Responsive ── */
   /* Hamburger. Present in the markup at every width, shown only once the
      sidebar becomes a drawer, so there is never a drawer with no way in. */
   /* Shown at every width now: a drawer toggle on a phone, a collapse toggle
      on a desktop. */
-  .hdr-menu { display: inline-flex; appearance: none; background: none; border: 1px solid #DDE1E4;
+  .hdr-menu { display: inline-flex; appearance: none; background: none; border: 1px solid var(--line);
     border-radius: 8px; padding: 6px 9px; cursor: pointer; line-height: 0; flex: 0 0 auto; }
-  .hdr-menu:hover { border-color: #005EB8; }
+  .hdr-menu:hover { border-color: var(--nhs-blue); }
   .hdr-menu svg { display: block; }
   .sb-scrim { position: fixed; inset: 0; background: rgba(33,43,50,.45); z-index: 3900;
     display: none; }
@@ -485,7 +538,7 @@
       width: min(86vw, 330px); z-index: 4000;
       display: flex; flex-direction: column;
       transform: translateX(-100%); transition: transform .22s ease;
-      box-shadow: 8px 0 32px rgba(33,43,50,.22); border-right: 1px solid #E8EDEE;
+      box-shadow: 8px 0 32px rgba(33,43,50,.22); border-right: 1px solid var(--line-2);
     }
     .sidebar.open { transform: none; }
 
@@ -503,7 +556,7 @@
     /* The desktop collapse does not apply here: at this width the drawer's
        own transform is what hides it, and a zero width would leave nothing
        to slide in. */
-    .sidebar.collapsed { width: min(86vw, 330px); border-right: 1px solid #E8EDEE; }
+    .sidebar.collapsed { width: min(86vw, 330px); border-right: 1px solid var(--line-2); }
     /* The drawer is already a fraction of the screen, and there is no second
        pane on screen to trade width with, so there is nothing to drag against.
        Zeroing the width also reclaims the gutter the panes leave for it. */
@@ -520,23 +573,23 @@
        in between. */
     .dl-badge { top: 8px; right: 8px; padding: 5px 6px; gap: 5px; }
     .dl-badge-label { display: none; }
-    .dl-seg button { padding: 4px 7px; font-size: 10.5px; }
+    .dl-seg button { padding: 4px 7px; font-size: var(--t-xs); }
 
     /* The header was 137px, a sixth of the viewport, before any content. The
        instruction line goes: the tour now says all of it, at more length, to
        exactly the people who needed it. */
     .hdr { padding: 5px 10px; gap: 8px; }
-    .hdr-logo { font-size: 14px; }
+    .hdr-logo { font-size: var(--t-lg); }
     .hdr-menu { display: inline-flex; }
     /* Moved into the drawer, not duplicated: one set of controls, relocated. */
-    .sb-tools { display: block; padding: 9px 10px; border-bottom: 1px solid #E8EDEE;
-      background: #FBFCFD; flex: 0 0 auto; }
+    .sb-tools { display: block; padding: 9px 10px; border-bottom: 1px solid var(--line-2);
+      background: var(--paper-2); flex: 0 0 auto; }
     .sb-tools-hd { display: flex; align-items: center; justify-content: space-between;
-      margin-bottom: 8px; font-size: 10px; text-transform: uppercase; letter-spacing: .06em;
-      font-weight: 600; color: #768692; }
+      margin-bottom: 8px; font-size: var(--t-xs); text-transform: uppercase; letter-spacing: .06em;
+      font-weight: 600; color: var(--ink-3); }
     .sb-close { appearance: none; background: none; border: 0; cursor: pointer;
-      color: #4C6272; font-size: 22px; line-height: 1; padding: 0 4px; margin: -4px -4px 0 0; }
-    .sb-close:hover { color: #DA291C; }
+      color: var(--ink-2); font-size: var(--t-2xl); line-height: 1; padding: 0 4px; margin: -4px -4px 0 0; }
+    .sb-close:hover { color: var(--nhs-red); }
     .sb-tools .hdr-right { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
     .sb-tools .hdr-search { grid-column: 1 / -1; }
     .sb-tools .hdr-search input { width: 100%; }
@@ -566,7 +619,7 @@
         linear-gradient(to left,  rgba(33,43,50,.16), rgba(33,43,50,0)) right center / 14px 100% no-repeat scroll,
         var(--paper); }
     .mode-rail::-webkit-scrollbar { display: none; }
-    .mode-btn { flex: 0 0 auto; padding: 10px 11px 9px; font-size: 12.5px; }
+    .mode-btn { flex: 0 0 auto; padding: 10px 11px 9px; font-size: var(--t-md); }
 
     /* Same for the tab strip, which was 267px wide inside a 220px sidebar and
        was cutting the Ward tab off the end. */
@@ -585,7 +638,7 @@
   border: none;
   border-radius: 3px;
   padding: 3px 7px;
-  font-size: 11.5px;
+  font-size: var(--t-sm);
   font-weight: 500;
   white-space: nowrap;
   box-shadow: 0 1px 3px rgba(0,0,0,0.25);
@@ -593,7 +646,7 @@
 .leaflet-tooltip.marker-tip::before { display: none; }
 
 /* ── Assistant panel ─────────────────────────────────────────────────────
-   Matches the existing panel styling: white card, 1px #DDE1E4 border, 5px radius,
+   Matches the existing panel styling: white card, 1px var(--line) border, 5px radius,
    11px labels. Hidden entirely unless the Worker endpoint is configured. */
 /* The assistant sits beside the map rather than in a mode of its own. Asking
    about an area is something you do while looking at it, so sending someone to
@@ -602,56 +655,56 @@
    it can never stray over the sidebar. Above the map's badges at 2500, below
    the mode panel at 3500, so a mode still covers it. */
 #ai-toggle{position:absolute;right:12px;bottom:34px;z-index:2600;padding:10px 16px;
-  border:1px solid #005EB8;border-radius:8px;background:#005EB8;color:#fff;font-size:12.5px;
+  border:1px solid var(--nhs-blue);border-radius:8px;background:var(--nhs-blue);color:#fff;font-size: var(--t-md);
   font-weight:600;cursor:pointer;box-shadow:0 2px 10px rgba(33,43,50,.22);
   font-family:'Inter Tight',Inter,system-ui,sans-serif;display:flex;align-items:center;gap:7px}
-#ai-toggle:hover{background:#003087;border-color:#003087}
-#ai-toggle:focus-visible{outline:3px solid #FFB81C;outline-offset:2px}
+#ai-toggle:hover{background:var(--nhs-dark);border-color:var(--nhs-dark)}
+#ai-toggle:focus-visible{outline:3px solid var(--nhs-yellow);outline-offset:2px}
 #ai-panel{position:absolute;right:12px;top:54px;bottom:12px;z-index:2600;
   width:min(390px,calc(100% - 24px));display:none;flex-direction:column;background:#fff;
-  border:1px solid #DDE1E4;border-radius:10px;
+  border:1px solid var(--line);border-radius:10px;
   box-shadow:0 8px 32px rgba(33,43,50,.16),0 2px 8px rgba(33,43,50,.08);overflow:hidden}
 #ai-panel.open{display:flex}
 #ai-head{display:flex;align-items:center;justify-content:space-between;padding:11px 13px;
-  border-bottom:1px solid #E8EDEE;font-size:13px;font-weight:600;background:#FBFCFD;color:#003087;
+  border-bottom:1px solid var(--line-2);font-size: var(--t-md);font-weight:600;background:var(--paper-2);color:var(--nhs-dark);
   font-family:'Inter Tight',Inter,system-ui,sans-serif}
-#ai-close{border:0;background:none;font-size:20px;line-height:1;cursor:pointer;color:#768692;padding:0 2px}
-#ai-close:hover{color:#212B32}
+#ai-close{border:0;background:none;font-size: var(--t-2xl);line-height:1;cursor:pointer;color:var(--ink-3);padding:0 2px}
+#ai-close:hover{color:var(--ink)}
 #ai-body{flex:1 1 auto;display:flex;flex-direction:column;min-height:0;overflow:hidden}
-#ai-log{flex:1 1 auto;overflow-y:auto;padding:12px 13px;font-size:12.5px;line-height:1.5}
+#ai-log{flex:1 1 auto;overflow-y:auto;padding:12px 13px;font-size: var(--t-md);line-height:1.5}
 .ai-msg{margin-bottom:10px;padding:8px 10px;border-radius:8px;white-space:normal;word-wrap:break-word}
-.ai-user{background:#005EB8;color:#fff;width:fit-content;max-width:85%;margin-left:auto}
-.ai-bot{background:#F4F7F9;color:#212B32}
-.ai-thinking{color:#768692;font-style:italic}
+.ai-user{background:var(--nhs-blue);color:#fff;width:fit-content;max-width:85%;margin-left:auto}
+.ai-bot{background:var(--bg);color:var(--ink)}
+.ai-thinking{color:var(--ink-3);font-style:italic}
 .ai-error{background:#FBE5E3;color:#A81A10}
-.ai-msg em{color:#4C6272}
-#ai-form{display:flex;gap:6px;padding:10px;border-top:1px solid #E8EDEE;background:#FBFCFD}
-#ai-input{flex:1 1 auto;padding:8px 10px;border:1px solid #DDE1E4;border-radius:8px;font-size:12.5px;
+.ai-msg em{color:var(--ink-2)}
+#ai-form{display:flex;gap:6px;padding:10px;border-top:1px solid var(--line-2);background:var(--paper-2)}
+#ai-input{flex:1 1 auto;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size: var(--t-md);
   font-family:inherit;min-width:0}
-#ai-input:focus{outline:2px solid #0072CE;outline-offset:-1px;border-color:#0072CE}
-#ai-send{padding:8px 14px;border:1px solid #005EB8;border-radius:8px;background:#005EB8;color:#fff;
-  font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit}
-#ai-send:hover:not(:disabled){background:#003087;border-color:#003087}
+#ai-input:focus{outline:2px solid var(--nhs-bright);outline-offset:-1px;border-color:var(--nhs-bright)}
+#ai-send{padding:8px 14px;border:1px solid var(--nhs-blue);border-radius:8px;background:var(--nhs-blue);color:#fff;
+  font-size: var(--t-md);font-weight:600;cursor:pointer;font-family:inherit}
+#ai-send:hover:not(:disabled){background:var(--nhs-dark);border-color:var(--nhs-dark)}
 #ai-send:disabled{opacity:.55;cursor:default}
 .ai-examples{display:flex;flex-wrap:wrap;gap:5px;margin:10px 0 2px}
-.ai-chip{font:inherit;font-size:11.5px;cursor:pointer;text-align:left;background:#FBFCFD;
-  color:#003087;border:1px solid #DDE1E4;border-radius:13px;padding:5px 10px}
-.ai-chip:hover{background:#E5EFF8;border-color:#41B6E6}
+.ai-chip{font:inherit;font-size: var(--t-sm);cursor:pointer;text-align:left;background:var(--paper-2);
+  color:var(--nhs-dark);border:1px solid var(--line);border-radius:13px;padding:5px 10px}
+.ai-chip:hover{background:#E5EFF8;border-color:var(--nhs-aqua)}
 /* Panel header: the title, then the remaining questions beside it. */
 .ai-head-l{display:flex;align-items:baseline;gap:8px;min-width:0}
-.ai-limit{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;font-weight:500;
-  color:#4C6272;background:#fff;border:1px solid #DDE1E4;border-radius:4px;padding:1px 6px;
+.ai-limit{font-family:'JetBrains Mono',ui-monospace,monospace;font-size: var(--t-xs);font-weight:500;
+  color:var(--ink-2);background:#fff;border:1px solid var(--line);border-radius:4px;padding:1px 6px;
   white-space:nowrap;font-variant-numeric:tabular-nums;cursor:default}
 .ai-limit.spent{color:#A81A10;border-color:#F2C4BF;background:#FDF2F1}
 /* The verification caution, docked under the input rather than at the top of
    the log. Quiet, because it is a standing condition of the panel rather than
    an error, but always on screen next to the answers it applies to. */
-.ai-caution{flex:0 0 auto;margin:0;padding:8px 12px;border-top:1px solid #E8EDEE;
-  background:#FBFCFD;color:#4C6272;font-size:10.5px;line-height:1.45;border-radius:0}
+.ai-caution{flex:0 0 auto;margin:0;padding:8px 12px;border-top:1px solid var(--line-2);
+  background:var(--paper-2);color:var(--ink-2);font-size: var(--t-xs);line-height:1.45;border-radius:0}
 /* Which model is answering, under the caution it belongs with. Quieter again
    and without a second rule above it, so the two read as one footer rather
    than as two separate warnings. */
-.ai-model{border-top:0;padding-top:0;color:#768692;font-size:10px}
+.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs)}
 @media (max-width:640px){#ai-panel{width:calc(100% - 24px)}}
 
     /* Layers whose coverage is narrower than the map. Flagged rather than
@@ -664,11 +717,11 @@
        readiness. Repeated eight times down the sidebar they were also the
        loudest thing on a page whose subject is the data. Quiet, neutral,
        one size, and the eye goes back to the figures. */
-    .cov-tag{display:inline-block;font-size:9.5px;font-weight:500;letter-spacing:.02em;
-      color:#768692;background:#FBFCFD;border:1px solid #DDE1E4;border-radius:4px;
+    .cov-tag{display:inline-block;font-size: var(--t-xs);font-weight:500;letter-spacing:.02em;
+      color:var(--ink-3);background:var(--paper-2);border:1px solid var(--line);border-radius:4px;
       padding:0 4px;vertical-align:middle;margin-left:4px;text-transform:none}
-    .cov-note{font-size:10px;line-height:1.4;color:#768692;background:transparent;
-      border:0;border-left:2px solid #DDE1E4;border-radius:0;padding:2px 0 2px 7px;
+    .cov-note{font-size: var(--t-xs);line-height:1.4;color:var(--ink-3);background:transparent;
+      border:0;border-left:2px solid var(--line);border-radius:0;padding:2px 0 2px 7px;
       margin:3px 0 6px}
 
     /* Development status. The app is a fixed 100vh grid, so anything in the
@@ -678,8 +731,8 @@
        banner, because a figure read off this map is quotable either way. */
     .dev-badge{display:inline-block;vertical-align:middle;margin-left:9px;
       font-family:'Inter',system-ui,sans-serif;
-      font-size:10px;font-weight:500;letter-spacing:.02em;text-transform:none;
-      color:#4C6272;background:#FBFCFD;border:1px solid #DDE1E4;
+      font-size: var(--t-xs);font-weight:500;letter-spacing:.02em;text-transform:none;
+      color:var(--ink-2);background:var(--paper-2);border:1px solid var(--line);
       border-radius:4px;padding:1px 6px}
     #dev-banner{position:fixed;left:50%;transform:translateX(-50%);bottom:14px;
       /* Above the mode panel (3500). It applies to the whole tool, not just
@@ -687,13 +740,13 @@
          looked like a rendering fault. */
       z-index:3600;max-width:min(620px,calc(100vw - 28px));
       display:flex;align-items:flex-start;gap:10px;
-      background:#212B32;color:#fff;border-radius:8px;padding:11px 13px;
-      font-size:12.5px;line-height:1.45;box-shadow:0 4px 16px rgba(0,0,0,.28)}
+      background:var(--ink);color:#fff;border-radius:8px;padding:11px 13px;
+      font-size: var(--t-md);line-height:1.45;box-shadow:0 4px 16px rgba(0,0,0,.28)}
     #dev-banner b{font-weight:600}
     #dev-banner .dev-x{flex:0 0 auto;background:none;border:0;color:#fff;opacity:.65;
-      cursor:pointer;font-size:16px;line-height:1;padding:0 2px;margin-left:2px}
+      cursor:pointer;font-size: var(--t-xl);line-height:1;padding:0 2px;margin-left:2px}
     #dev-banner .dev-x:hover{opacity:1}
-    @media (max-width:560px){#dev-banner{font-size:12px;bottom:8px}}
+    @media (max-width:560px){#dev-banner{font-size: var(--t-sm);bottom:8px}}
   
   /* ── Design layer ─────────────────────────────────────────────────────────
      Typography and component chrome from the prototype, applied as an
@@ -705,7 +758,7 @@
   /* Display face for anything that names a thing. */
   .hdr-logo, .sb-tab, .section-h, .cat-hdr-l, .pop-hdr, h1, h2, h3 {
     font-family:'Inter Tight','Inter',sans-serif; letter-spacing:-0.01em; }
-  .hdr-logo { font-weight:600; font-size:15px; }
+  .hdr-logo { font-weight:600; font-size: var(--t-lg); }
 
   /* Figures get a monospace face so columns of numbers line up and digits
      stop jittering as values change. */
@@ -714,19 +767,19 @@
 
   .hdr { background:var(--paper); border-bottom:1px solid var(--line); padding:7px 18px; }
 
-  .tb-btn { border-radius:8px; padding:6px 13px; font-size:12.5px; font-weight:500;
+  .tb-btn { border-radius:8px; padding:6px 13px; font-size: var(--t-md); font-weight:500;
             border-color:var(--line); color:var(--ink); }
   .tb-btn:hover { background:var(--paper-2); border-color:#c9d1d6; color:var(--ink); }
   .tb-btn.primary, .tb-btn.active { background:var(--nhs-blue); border-color:var(--nhs-blue); color:#fff; }
   .tb-btn.primary:hover, .tb-btn.active:hover { background:var(--nhs-dark); border-color:var(--nhs-dark); }
 
-  .sb-lbl, .section-h { font-size:11px; text-transform:uppercase; letter-spacing:.06em;
+  .sb-lbl, .section-h { font-size: var(--t-xs); text-transform:uppercase; letter-spacing:.06em;
                         font-weight:600; color:var(--ink-3); }
   .sb-sec { border-bottom:1px solid var(--line); }
   .lrow { border-radius:6px; padding:5px 6px; }
   .lrow:hover { background:var(--nhs-light); }
-  .lname { font-size:12.5px; }
-  .lcount { font-size:11px; color:var(--ink-3); }
+  .lname { font-size: var(--t-md); }
+  .lcount { font-size: var(--t-xs); color:var(--ink-3); }
 
   .panel, .legend, .cat-block { border-radius:10px; border-color:var(--line); }
   .legend { background:rgba(255,255,255,.96); backdrop-filter:blur(8px);
@@ -796,7 +849,7 @@
   .mode-rail { display: flex; align-items: stretch; gap: 2px; padding: 0 18px;
     background: var(--paper); border-bottom: 1px solid var(--line); flex-shrink: 0; }
   .mode-btn { appearance: none; background: none; border: 0; cursor: pointer;
-    font-family: 'Inter Tight', Inter, system-ui, sans-serif; font-size: 13px;
+    font-family: 'Inter Tight', Inter, system-ui, sans-serif; font-size: var(--t-md);
     font-weight: 600; color: var(--ink-2); padding: 10px 14px 9px;
     border-bottom: 3px solid transparent; display: flex; align-items: center;
     gap: 7px; transition: color .15s, border-color .15s, background .12s; }
@@ -805,7 +858,7 @@
     border-bottom-color: var(--nhs-blue); }
   .mode-btn:focus-visible { outline: 3px solid var(--nhs-yellow); outline-offset: -3px; }
   /* Same family as .dev-badge and .cov-tag. */
-  .mode-soon { font-family: Inter, system-ui, sans-serif; font-size: 9.5px;
+  .mode-soon { font-family: Inter, system-ui, sans-serif; font-size: var(--t-xs);
     font-weight: 500; letter-spacing: .02em; text-transform: none;
     padding: 1px 5px; border-radius: 4px; background: var(--paper-2);
     color: var(--ink-3); border: 1px solid var(--line); }
@@ -816,14 +869,14 @@
     border-radius: 10px; box-shadow: var(--shadow); max-width: 560px; width: 100%;
     padding: 28px 30px 26px; }
   .mode-card h2 { font-family: 'Inter Tight', Inter, system-ui, sans-serif;
-    font-size: 20px; font-weight: 700; color: var(--nhs-dark); margin: 0 0 4px; }
-  .mode-card .mode-kicker { font-size: 11px; font-weight: 700; letter-spacing: .06em;
+    font-size: var(--t-2xl); font-weight: 700; color: var(--nhs-dark); margin: 0 0 4px; }
+  .mode-card .mode-kicker { font-size: var(--t-xs); font-weight: 700; letter-spacing: .06em;
     text-transform: uppercase; color: var(--ink-3); margin-bottom: 10px; }
-  .mode-card p { font-size: 13.5px; line-height: 1.55; color: var(--ink-2); margin: 0 0 12px; }
-  .mode-card ul { font-size: 13.5px; line-height: 1.55; color: var(--ink-2);
+  .mode-card p { font-size: var(--t-md); line-height: 1.55; color: var(--ink-2); margin: 0 0 12px; }
+  .mode-card ul { font-size: var(--t-md); line-height: 1.55; color: var(--ink-2);
     margin: 0 0 16px; padding-left: 20px; }
   .mode-card li { margin-bottom: 5px; }
-  .mode-back { appearance: none; font: inherit; font-size: 13px; font-weight: 600;
+  .mode-back { appearance: none; font: inherit; font-size: var(--t-md); font-weight: 600;
     cursor: pointer; background: var(--nhs-blue); color: #fff; border: 1px solid var(--nhs-blue);
     border-radius: 8px; padding: 8px 15px; }
   .mode-back:hover { background: var(--nhs-dark); border-color: var(--nhs-dark); }
@@ -848,15 +901,15 @@
     border-bottom: 1px solid var(--line); cursor: pointer; flex-shrink: 0; }
   .ws-head:hover { background: var(--paper-2); }
   .ws-title { flex: 1; min-width: 0; }
-  .ws-title .ws-lbl { font-size: 10px; text-transform: uppercase; letter-spacing: .06em;
+  .ws-title .ws-lbl { font-size: var(--t-xs); text-transform: uppercase; letter-spacing: .06em;
     color: var(--ink-3); font-weight: 600; }
-  .ws-title h2 { font-family: 'Inter Tight', Inter, sans-serif; font-size: 17px; font-weight: 600;
+  .ws-title h2 { font-family: 'Inter Tight', Inter, sans-serif; font-size: var(--t-xl); font-weight: 600;
     margin: 2px 0 0; letter-spacing: -.01em; color: var(--ink); white-space: nowrap;
     overflow: hidden; text-overflow: ellipsis; }
-  .ws-title .ws-meta { font-size: 11.5px; color: var(--ink-2); margin-top: 1px; white-space: nowrap;
+  .ws-title .ws-meta { font-size: var(--t-sm); color: var(--ink-2); margin-top: 1px; white-space: nowrap;
     overflow: hidden; text-overflow: ellipsis; }
   .ws-acts { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-  .ws-btn { appearance: none; font: inherit; font-size: 11.5px; font-weight: 500; cursor: pointer;
+  .ws-btn { appearance: none; font: inherit; font-size: var(--t-sm); font-weight: 500; cursor: pointer;
     background: var(--paper); color: var(--ink); border: 1px solid var(--line);
     border-radius: 8px; padding: 6px 11px; white-space: nowrap;
     transition: background .12s, border-color .12s, color .12s; }
@@ -865,7 +918,7 @@
   .ws-btn.primary:hover { background: var(--nhs-dark); border-color: var(--nhs-dark); color: #fff; }
   .ws-btn.on { background: var(--nhs-light); border-color: var(--nhs-blue); color: var(--nhs-dark); }
   .ws-close { appearance: none; background: none; border: 0; cursor: pointer; color: var(--ink-3);
-    font-size: 17px; line-height: 1; padding: 2px 4px; border-radius: 6px; }
+    font-size: var(--t-xl); line-height: 1; padding: 2px 4px; border-radius: 6px; }
   .ws-close:hover { color: var(--nhs-red); background: var(--nhs-light); }
   .ws-body { padding: 11px 14px 13px; overflow: auto; flex: 1; min-height: 0; }
   /* On a wide screen the sentence and the figures sit beside each other.
@@ -879,21 +932,21 @@
     .ws-body .ws-pins { flex: 1 1 100%; margin-top: 4px; }
   }
   .ws-insight { border-left: 3px solid var(--nhs-blue); background: var(--nhs-light);
-    border-radius: 6px; padding: 8px 11px; font-size: 12px; line-height: 1.5; color: var(--ink-2); }
+    border-radius: 6px; padding: 8px 11px; font-size: var(--t-sm); line-height: 1.5; color: var(--ink-2); }
   .ws-insight strong { color: var(--ink); font-weight: 600; }
   .ws-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
     gap: 7px; margin-top: 10px; }
   .ws-kpi { background: var(--paper); border: 1px solid var(--line); border-radius: 10px;
     padding: 7px 10px; min-width: 0; }
-  .ws-kpi .ws-k-lbl { font-size: 10px; text-transform: uppercase; letter-spacing: .05em;
+  .ws-kpi .ws-k-lbl { font-size: var(--t-xs); text-transform: uppercase; letter-spacing: .05em;
     color: var(--ink-3); font-weight: 600; white-space: nowrap; overflow: hidden;
     text-overflow: ellipsis; }
-  .ws-kpi .ws-k-num { font-family: 'Inter Tight', Inter, sans-serif; font-size: 19px;
+  .ws-kpi .ws-k-num { font-family: 'Inter Tight', Inter, sans-serif; font-size: var(--t-2xl);
     font-weight: 600; letter-spacing: -.02em; line-height: 1.15; margin-top: 2px;
     font-variant-numeric: tabular-nums; }
-  .ws-kpi .ws-k-num span { font-size: 13px; font-weight: 500; margin-left: 1px; }
+  .ws-kpi .ws-k-num span { font-size: var(--t-md); font-weight: 500; margin-left: 1px; }
   .ws-kpi .ws-k-num.dim { color: var(--ink-3); font-weight: 400; }
-  .ws-kpi .ws-k-sub { font-size: 10px; color: var(--ink-3); margin-top: 1px; white-space: nowrap;
+  .ws-kpi .ws-k-sub { font-size: var(--t-xs); color: var(--ink-3); margin-top: 1px; white-space: nowrap;
     overflow: hidden; text-overflow: ellipsis; }
   .ws-kpi.emphasis { background: var(--nhs-dark); border-color: var(--nhs-dark); }
   .ws-kpi.emphasis .ws-k-lbl, .ws-kpi.emphasis .ws-k-sub { color: rgba(255,255,255,.72); }
@@ -902,20 +955,20 @@
      already enforces, so the two cannot disagree about how many fit. */
   .ws-pins { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 12px; }
   .ws-pins-hd { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-  .ws-pins-hd .ws-lbl { font-size: 10px; text-transform: uppercase; letter-spacing: .06em;
+  .ws-pins-hd .ws-lbl { font-size: var(--t-xs); text-transform: uppercase; letter-spacing: .06em;
     color: var(--ink-3); font-weight: 600; flex: 1; }
-  .ws-ptable { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+  .ws-ptable { width: 100%; border-collapse: collapse; font-size: var(--t-sm); }
   .ws-ptable th, .ws-ptable td { text-align: right; padding: 5px 7px; border-bottom: 1px solid var(--line);
     font-variant-numeric: tabular-nums; color: var(--ink-2); white-space: nowrap; }
   .ws-ptable th:first-child, .ws-ptable td:first-child { text-align: left; color: var(--ink);
     white-space: normal; min-width: 120px; }
-  .ws-ptable thead th { font-size: 10px; text-transform: uppercase; letter-spacing: .05em;
+  .ws-ptable thead th { font-size: var(--t-xs); text-transform: uppercase; letter-spacing: .05em;
     color: var(--ink-3); font-weight: 600; }
   .ws-ptable tbody tr.current td:first-child { font-weight: 600; color: var(--nhs-dark); }
   .ws-pin-x { appearance: none; background: none; border: 0; cursor: pointer; color: var(--ink-3);
-    font-size: 13px; line-height: 1; padding: 0 3px; }
+    font-size: var(--t-md); line-height: 1; padding: 0 3px; }
   .ws-pin-x:hover { color: var(--nhs-red); }
-  .ws-note { font-size: 10.5px; color: var(--ink-3); margin-top: 9px; line-height: 1.45; }
+  .ws-note { font-size: var(--t-xs); color: var(--ink-3); margin-top: 9px; line-height: 1.45; }
   /* Keep the map's own furniture clear of the sheet. --sheet-lift is written
      by the sheet's own state handler, so all three move together. */
   .map-wrap.has-sheet .map-legend-strip { bottom: calc(var(--sheet-lift) + 12px); }
@@ -952,25 +1005,25 @@
   .cmp-scroll { overflow-y: auto; min-height: 0; flex: 1; }
   .cmp-head { padding: 13px 14px 11px; border-bottom: 1px solid var(--line); }
   .cmp-head .cmp-row { display: flex; align-items: baseline; gap: 8px; }
-  .cmp-head h2 { font-family: 'Inter Tight', Inter, sans-serif; font-size: 17px; font-weight: 600;
+  .cmp-head h2 { font-family: 'Inter Tight', Inter, sans-serif; font-size: var(--t-xl); font-weight: 600;
     margin: 0; letter-spacing: -.01em; color: var(--nhs-dark); }
-  .cmp-head .cmp-sub { font-size: 11.5px; color: var(--ink-3); margin-top: 2px; }
+  .cmp-head .cmp-sub { font-size: var(--t-sm); color: var(--ink-3); margin-top: 2px; }
   /* ── Back to Explore ──
      One rule for all four, keyed off the button rather than the header it
      happens to sit in. This was written as `.cmp-head .cmp-back`, which is the
      Compare header, so Compare and Query got the quiet blue link and the other
-     two got whatever the browser draws for a bare <button>: Report builder's
+     two got whatever the browser draws for a bare <button>: Custom area's
      lives in .rb-head and Directory's in .dir-head, and neither matched. Four
      buttons with the same class, the same label and the same job looked like
      two different kinds of control. */
   .cmp-back, .q-back { margin-left: auto; appearance: none; background: none; border: 0;
-    padding: 0; font: inherit; font-size: 11px; color: var(--nhs-blue); cursor: pointer;
+    padding: 0; font: inherit; font-size: var(--t-xs); color: var(--nhs-blue); cursor: pointer;
     white-space: nowrap; flex: 0 0 auto; }
   .cmp-back:hover, .q-back:hover { color: var(--nhs-dark); text-decoration: underline; }
   .cmp-back:focus-visible, .q-back:focus-visible { outline: 2px solid var(--nhs-blue);
     outline-offset: 2px; border-radius: 2px; }
   .cmp-group { padding: 12px 14px; border-bottom: 1px solid var(--line); }
-  .cmp-group h3 { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; font-weight: 600;
+  .cmp-group h3 { font-size: var(--t-xs); text-transform: uppercase; letter-spacing: .06em; font-weight: 600;
     color: var(--ink-3); margin: 0 0 9px; display: flex; justify-content: space-between; align-items: baseline; }
   .cmp-group h3 .cmp-badge { color: var(--nhs-blue); text-transform: none; letter-spacing: 0;
     font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -980,19 +1033,19 @@
   .cmp-pin:hover { border-color: var(--nhs-blue); }
   .cmp-pin .cmp-spine { width: 4px; align-self: stretch; border-radius: 2px; flex-shrink: 0; }
   .cmp-pin .cmp-txt { flex: 1; min-width: 0; }
-  .cmp-pin .cmp-lad { display: block; font-size: 10.5px; color: var(--ink-3); }
-  .cmp-pin .cmp-nm { display: block; font-family: 'Inter Tight', Inter, sans-serif; font-size: 12.5px;
+  .cmp-pin .cmp-lad { display: block; font-size: var(--t-xs); color: var(--ink-3); }
+  .cmp-pin .cmp-nm { display: block; font-family: 'Inter Tight', Inter, sans-serif; font-size: var(--t-md);
     font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .cmp-pin .cmp-x { color: var(--ink-3); cursor: pointer; font-size: 15px; line-height: 1;
+  .cmp-pin .cmp-x { color: var(--ink-3); cursor: pointer; font-size: var(--t-lg); line-height: 1;
     background: none; border: 0; padding: 0 2px; }
   .cmp-pin .cmp-x:hover { color: var(--nhs-red); }
   .cmp-addhint { border: 1px dashed var(--line); border-radius: 10px; height: 38px; display: flex;
-    align-items: center; justify-content: center; color: var(--ink-3); font-size: 11.5px;
+    align-items: center; justify-content: center; color: var(--ink-3); font-size: var(--t-sm);
     background: var(--paper-2); text-align: center; padding: 0 8px; }
   .cmp-chiprow { display: flex; flex-wrap: wrap; gap: 5px; }
-  .cmp-quick { font-size: 11.5px; color: var(--ink-2); line-height: 1.55; }
+  .cmp-quick { font-size: var(--t-sm); color: var(--ink-2); line-height: 1.55; }
   .cmp-quick strong { color: var(--ink); font-weight: 600; }
-  .cmp-empty { font-size: 11.5px; color: var(--ink-3); line-height: 1.5; }
+  .cmp-empty { font-size: var(--t-sm); color: var(--ink-3); line-height: 1.5; }
 
   /* The full comparison, in the same footprint as the ward sheet because the
      two are alternatives: you are either reading one ward or several. */
@@ -1003,20 +1056,20 @@
   .cmp-bar.open { display: block; }
   .cmp-bar .cmp-bar-head { display: flex; align-items: center; justify-content: space-between;
     gap: 10px; margin-bottom: 11px; }
-  .cmp-bar .cmp-bar-head h3 { font-family: 'Inter Tight', Inter, sans-serif; font-size: 15px;
+  .cmp-bar .cmp-bar-head h3 { font-family: 'Inter Tight', Inter, sans-serif; font-size: var(--t-lg);
     font-weight: 600; margin: 0; color: var(--ink); }
   .cmp-bar .cmp-bar-acts { display: flex; gap: 6px; align-items: center; }
   .cmp-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
   .cmp-card { border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; min-width: 0; }
   .cmp-card.add { border-style: dashed; display: flex; align-items: center; justify-content: center;
-    color: var(--ink-3); font-size: 11.5px; text-align: center; min-height: 90px; }
+    color: var(--ink-3); font-size: var(--t-sm); text-align: center; min-height: 90px; }
   .cmp-card .cmp-c-hdr { display: flex; align-items: center; gap: 6px; }
   .cmp-card .cmp-swatch { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
-  .cmp-card .cmp-c-lad { font-size: 10.5px; color: var(--ink-3); overflow: hidden;
+  .cmp-card .cmp-c-lad { font-size: var(--t-xs); color: var(--ink-3); overflow: hidden;
     text-overflow: ellipsis; white-space: nowrap; }
-  .cmp-card .cmp-c-nm { font-family: 'Inter Tight', Inter, sans-serif; font-size: 13px;
+  .cmp-card .cmp-c-nm { font-family: 'Inter Tight', Inter, sans-serif; font-size: var(--t-md);
     font-weight: 600; margin: 2px 0 7px; color: var(--ink); }
-  .cmp-card .cmp-c-row { display: flex; justify-content: space-between; gap: 8px; font-size: 11px;
+  .cmp-card .cmp-c-row { display: flex; justify-content: space-between; gap: 8px; font-size: var(--t-xs);
     padding: 3px 0; border-bottom: 1px solid var(--paper-2); }
   .cmp-card .cmp-c-row .k { color: var(--ink-3); overflow: hidden; text-overflow: ellipsis;
     white-space: nowrap; }
@@ -1042,7 +1095,7 @@
   .cmp-card .cmp-c-row .v.bad::after, .cmp-card .cmp-c-row .v.good::after { color: inherit; }
   .cmp-key { display: inline-flex; align-items: center; gap: 4px; margin-right: 10px; }
   .cmp-key i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; font-style: normal; }
-  .cmp-bar .cmp-legend { font-size: 10.5px; color: var(--ink-3); margin-top: 10px; line-height: 1.45; }
+  .cmp-bar .cmp-legend { font-size: var(--t-xs); color: var(--ink-3); margin-top: 10px; line-height: 1.45; }
 
   /* ── Overlay picker ───────────────────────────────────────────────────────
      103 indicators in one dropdown meant scrolling a list you could only see
@@ -1058,21 +1111,21 @@
   .ov-picker { border: 1px solid var(--line); border-radius: 8px; background: var(--paper);
     margin-bottom: 9px; overflow: hidden; }
   .ov-current { display: flex; align-items: center; gap: 7px; padding: 8px 10px;
-    border-bottom: 1px solid var(--line); background: var(--nhs-light); font-size: 11.5px; }
+    border-bottom: 1px solid var(--line); background: var(--nhs-light); font-size: var(--t-sm); }
   .ov-current .ov-cur-nm { flex: 1; min-width: 0; font-weight: 600; color: var(--nhs-dark);
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .ov-current.empty { background: var(--paper-2); }
   .ov-current.empty .ov-cur-nm { font-weight: 500; color: var(--ink-3); }
   .ov-clear { appearance: none; background: none; border: 0; cursor: pointer; padding: 0 2px;
-    color: var(--ink-3); font-size: 14px; line-height: 1; }
+    color: var(--ink-3); font-size: var(--t-lg); line-height: 1; }
   .ov-clear:hover { color: var(--nhs-red); }
   .ov-search { width: 100%; border: 0; border-bottom: 1px solid var(--line); font: inherit;
-    font-size: 11.5px; padding: 7px 9px 7px 26px; color: var(--ink); background: var(--paper)
+    font-size: var(--t-sm); padding: 7px 9px 7px 26px; color: var(--ink); background: var(--paper)
     url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23768692' stroke-width='2'><circle cx='11' cy='11' r='7'/><path d='m21 21-4.35-4.35'/></svg>") no-repeat 8px center; }
   .ov-search:focus { outline: none; border-bottom-color: var(--nhs-bright); }
   .ov-groups { max-height: 340px; overflow-y: auto; overflow-x: hidden; }
   .ov-grp-hd { display: flex; align-items: center; gap: 6px; padding: 7px 10px; cursor: pointer;
-    background: var(--paper-2); border-bottom: 1px solid var(--line); font-size: 10.5px;
+    background: var(--paper-2); border-bottom: 1px solid var(--line); font-size: var(--t-xs);
     font-weight: 600; color: var(--ink-2); user-select: none; }
   .ov-grp-hd:hover { background: var(--nhs-light); }
   /* Recently used is capped at six and always open, so its header is a label
@@ -1088,12 +1141,12 @@
   .ov-grp-hd .ov-grp-nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
     white-space: nowrap; }
   .ov-grp-hd .ov-grp-n { color: var(--ink-3); font-weight: 500;
-    font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 9.5px; }
+    font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: var(--t-xs); }
   .ov-grp-hd.has-sel .ov-grp-nm { color: var(--nhs-dark); }
   .ov-grp-body { display: none; }
   .ov-grp-body.open { display: block; }
   .ov-opt { display: flex; align-items: flex-start; gap: 7px; padding: 5px 10px 5px 16px;
-    cursor: pointer; font-size: 11.5px; color: var(--ink); border-bottom: 1px solid var(--paper-2); }
+    cursor: pointer; font-size: var(--t-sm); color: var(--ink); border-bottom: 1px solid var(--paper-2); }
   .ov-opt:hover { background: var(--nhs-light); }
   .ov-opt input { margin: 2px 0 0; flex-shrink: 0; accent-color: var(--nhs-blue); cursor: pointer; }
   .ov-opt .ov-opt-nm { flex: 1; min-width: 0; line-height: 1.35; }
@@ -1112,7 +1165,7 @@
     gap: 3px; align-items: flex-start; }
   .ov-opt .ov-lvls { display: flex; flex-wrap: wrap; gap: 3px; justify-content: flex-start;
     max-width: 100%; }
-  .ov-opt .ov-lvl { font-size: 9px; color: var(--ink-3); border: 1px solid var(--line);
+  .ov-opt .ov-lvl { font-size: var(--t-xs); color: var(--ink-3); border: 1px solid var(--line);
     border-radius: 3px; padding: 0 3px; white-space: nowrap; }
   .ov-opt .ov-lvl.native { color: var(--nhs-dark); border-color: var(--nhs-blue);
     background: var(--nhs-light); font-weight: 600; }
@@ -1125,11 +1178,11 @@
      kind of fact from the level pills beside it: those say where the figure
      can be drawn, this says where it came from. Quiet on purpose — it is the
      answer to a question the reader has not asked yet. */
-  .ov-opt .ov-src { font-size: 9px; color: var(--ink-2); background: var(--paper-2);
+  .ov-opt .ov-src { font-size: var(--t-xs); color: var(--ink-2); background: var(--paper-2);
     border: 1px solid transparent; border-radius: 3px; padding: 0 4px;
     white-space: nowrap; flex-shrink: 0; font-weight: 600;
     letter-spacing: .01em; cursor: help; }
-  .ov-opt .ov-spread { font-size: 9px; color: #8A5A00; background: #FDF0D5;
+  .ov-opt .ov-spread { font-size: var(--t-xs); color: #8A5A00; background: #FDF0D5;
     border: 1px solid #E8D3A3; border-radius: 3px; padding: 0 3px;
     white-space: nowrap; flex-shrink: 0;
     font-variant-numeric: tabular-nums; cursor: help; }
@@ -1138,7 +1191,7 @@
   }
   .ov-opt.on { background: var(--nhs-light); }
   .ov-opt.on .ov-opt-nm { font-weight: 600; color: var(--nhs-dark); }
-  .ov-empty { padding: 12px 10px; font-size: 11px; color: var(--ink-3); text-align: center; }
+  .ov-empty { padding: 12px 10px; font-size: var(--t-xs); color: var(--ink-3); text-align: center; }
 
   /* ── Tour ─────────────────────────────────────────────────────────────────
      The design file's story strip: a chapter counter, a progress bar, one
@@ -1151,22 +1204,22 @@
   .tour-strip.open { display: block; }
   .tour-hd { display: flex; align-items: baseline; justify-content: space-between;
     gap: 12px; margin-bottom: 9px; }
-  .tour-hd .tour-title { font-family: 'Inter Tight', Inter, sans-serif; font-size: 16px;
+  .tour-hd .tour-title { font-family: 'Inter Tight', Inter, sans-serif; font-size: var(--t-xl);
     font-weight: 600; color: var(--ink); margin: 0; }
-  .tour-hd .tour-ctr { font-size: 10.5px; color: var(--ink-3); text-transform: uppercase;
+  .tour-hd .tour-ctr { font-size: var(--t-xs); color: var(--ink-3); text-transform: uppercase;
     letter-spacing: .06em; font-weight: 600; white-space: nowrap; }
   .tour-hd .tour-end { background: none; border: 0; padding: 0 0 0 8px; cursor: pointer;
-    color: var(--ink-2); font: inherit; font-size: 10.5px; text-transform: uppercase;
+    color: var(--ink-2); font: inherit; font-size: var(--t-xs); text-transform: uppercase;
     letter-spacing: .06em; font-weight: 600; }
   .tour-hd .tour-end:hover { color: var(--nhs-red); }
   .tour-prog { display: flex; gap: 4px; margin-bottom: 11px; }
   .tour-prog .seg { flex: 1; height: 3px; border-radius: 2px; background: var(--line); }
   .tour-prog .seg.done, .tour-prog .seg.on { background: var(--nhs-blue); }
-  .tour-narr { font-size: 13.5px; line-height: 1.6; color: var(--ink); margin-bottom: 12px;
+  .tour-narr { font-size: var(--t-md); line-height: 1.6; color: var(--ink); margin-bottom: 12px;
     max-width: 760px; }
   .tour-narr strong { font-weight: 600; }
   .tour-ctrls { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-  .tour-next-lbl { font-size: 11px; color: var(--ink-3); overflow: hidden;
+  .tour-next-lbl { font-size: var(--t-xs); color: var(--ink-3); overflow: hidden;
     text-overflow: ellipsis; white-space: nowrap; }
   /* While the tour runs the sheet stacks above the strip instead of under it.
      252px because a full sheet is about 250: at 210 the chapter that opens it
@@ -1175,7 +1228,7 @@
   .map-wrap.touring .ws-sheet { bottom: calc(var(--tour-h, 150px) + 26px); max-height: 252px; }
   .map-wrap.touring .cmp-bar { bottom: calc(var(--tour-h, 150px) + 26px); max-height: 252px; }
 
-  /* ── Report builder ───────────────────────────────────────────────────────
+  /* ── Custom area ──────────────────────────────────────────────────────────
      Pick LSOAs off the map and treat them as one area. Neighbourhoods,
      catchments and PCN footprints do not follow ward lines, and until now the
      only areas the map could total up were the ones ONS had already drawn. */
@@ -1184,48 +1237,48 @@
   .rb-scroll { overflow-y: auto; overflow-x: hidden; min-height: 0; flex: 1; }
   .rb-head { padding: 13px 14px 11px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
   .rb-head .cmp-row { display: flex; align-items: baseline; gap: 8px; }
-  .rb-head h2 { font-family: 'Inter Tight', Inter, sans-serif; font-size: 17px; font-weight: 600;
+  .rb-head h2 { font-family: 'Inter Tight', Inter, sans-serif; font-size: var(--t-xl); font-weight: 600;
     margin: 0; letter-spacing: -.01em; color: var(--nhs-dark); flex: 1; min-width: 0; }
-  .rb-name { width: 100%; font: inherit; font-size: 12.5px; padding: 7px 9px; margin-top: 9px;
+  .rb-name { width: 100%; font: inherit; font-size: var(--t-md); padding: 7px 9px; margin-top: 9px;
     border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: var(--paper); }
   .rb-name:focus { outline: none; border-color: var(--nhs-bright);
     box-shadow: 0 0 0 3px rgba(0,114,206,.15); }
-  .rb-hint { font-size: 11px; color: var(--ink-3); line-height: 1.45; margin-top: 7px; }
-  .rb-count { padding: 9px 14px; font-size: 11.5px; font-weight: 600; color: var(--nhs-blue);
+  .rb-hint { font-size: var(--t-xs); color: var(--ink-3); line-height: 1.45; margin-top: 7px; }
+  .rb-count { padding: 9px 14px; font-size: var(--t-sm); font-weight: 600; color: var(--nhs-blue);
     border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 8px; }
   .rb-count strong { color: var(--nhs-dark); font-variant-numeric: tabular-nums; }
   .rb-count .rb-clear { margin-left: auto; appearance: none; background: none; border: 0;
-    font: inherit; font-size: 11px; color: var(--ink-3); cursor: pointer; text-decoration: underline; }
+    font: inherit; font-size: var(--t-xs); color: var(--ink-3); cursor: pointer; text-decoration: underline; }
   .rb-count .rb-clear:hover { color: var(--nhs-red); }
   .rb-group { padding: 11px 14px; border-bottom: 1px solid var(--line); }
-  .rb-group h3 { font-size: 10px; text-transform: uppercase; letter-spacing: .06em;
+  .rb-group h3 { font-size: var(--t-xs); text-transform: uppercase; letter-spacing: .06em;
     font-weight: 600; color: var(--ink-3); margin: 0 0 8px; }
   .rb-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
   .rb-stat { border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; min-width: 0; }
-  .rb-stat .k { font-size: 9.5px; text-transform: uppercase; letter-spacing: .05em;
+  .rb-stat .k { font-size: var(--t-xs); text-transform: uppercase; letter-spacing: .05em;
     color: var(--ink-3); font-weight: 600; white-space: nowrap; overflow: hidden;
     text-overflow: ellipsis; }
-  .rb-stat .v { font-family: 'Inter Tight', Inter, sans-serif; font-size: 17px; font-weight: 600;
+  .rb-stat .v { font-family: 'Inter Tight', Inter, sans-serif; font-size: var(--t-xl); font-weight: 600;
     letter-spacing: -.02em; color: var(--ink); font-variant-numeric: tabular-nums; margin-top: 1px; }
-  .rb-stat .v span { font-size: 11px; font-weight: 500; }
+  .rb-stat .v span { font-size: var(--t-xs); font-weight: 500; }
   .rb-stat.wide { grid-column: 1 / -1; }
   .rb-list { max-height: 168px; overflow-y: auto; overflow-x: hidden; }
-  .rb-item { display: flex; align-items: center; gap: 8px; padding: 6px 14px; font-size: 11.5px;
+  .rb-item { display: flex; align-items: center; gap: 8px; padding: 6px 14px; font-size: var(--t-sm);
     border-bottom: 1px solid var(--paper-2); cursor: pointer; }
   .rb-item:hover { background: var(--nhs-light); }
   .rb-item .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
     white-space: nowrap; color: var(--ink); }
-  .rb-item .nm small { display: block; font-size: 9.5px; color: var(--ink-3); }
+  .rb-item .nm small { display: block; font-size: var(--t-xs); color: var(--ink-3); }
   .rb-item .x { appearance: none; background: none; border: 0; cursor: pointer;
-    color: var(--ink-3); font-size: 14px; line-height: 1; padding: 0 2px; }
+    color: var(--ink-3); font-size: var(--t-lg); line-height: 1; padding: 0 2px; }
   .rb-item .x:hover { color: var(--nhs-red); }
   .rb-acts { display: flex; gap: 5px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
   .rb-acts .ws-btn { flex: 1; justify-content: center; }
-  .rb-empty { padding: 14px; font-size: 11.5px; color: var(--ink-3); line-height: 1.5; }
-  .rb-caution { font-size: 10.5px; line-height: 1.45; color: #5c4115; background: #FFF8E6;
+  .rb-empty { padding: 14px; font-size: var(--t-sm); color: var(--ink-3); line-height: 1.5; }
+  .rb-caution { font-size: var(--t-xs); line-height: 1.45; color: #5c4115; background: #FFF8E6;
     border: 1px solid #E0C280; border-radius: 6px; padding: 7px 9px; margin: 9px 14px; }
 
-  /* ── Report builder (custom CSV) ──────────────────────────────────────────
+  /* ── Data export (custom CSV) ─────────────────────────────────────────────
      The toolbar CSV gives you what the map is drawing. This gives you the
      columns you asked for, at the level you asked for, for the places you
      asked for. */
@@ -1234,41 +1287,41 @@
   .cb-scroll { overflow-y: auto; overflow-x: hidden; min-height: 0; flex: 1; }
   .cb-head { padding: 13px 14px 11px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
   .cb-head .cmp-row { display: flex; align-items: baseline; gap: 8px; }
-  .cb-head h2 { font-family: 'Inter Tight', Inter, sans-serif; font-size: 17px; font-weight: 600;
+  .cb-head h2 { font-family: 'Inter Tight', Inter, sans-serif; font-size: var(--t-xl); font-weight: 600;
     margin: 0; letter-spacing: -.01em; color: var(--nhs-dark); flex: 1; min-width: 0; }
-  .cb-head .cb-sub { font-size: 11.5px; color: var(--ink-3); margin-top: 3px; line-height: 1.45; }
+  .cb-head .cb-sub { font-size: var(--t-sm); color: var(--ink-3); margin-top: 3px; line-height: 1.45; }
   .cb-step { padding: 11px 14px; border-bottom: 1px solid var(--line); }
-  .cb-step > h3 { display: flex; align-items: baseline; gap: 6px; font-size: 11.5px;
+  .cb-step > h3 { display: flex; align-items: baseline; gap: 6px; font-size: var(--t-sm);
     font-weight: 600; color: var(--ink); margin: 0 0 4px; }
   .cb-n { flex: 0 0 auto; width: 15px; height: 15px; border-radius: 50%; background: var(--nhs-blue);
-    color: #fff; font-size: 9.5px; font-weight: 700; display: inline-flex; align-items: center;
+    color: #fff; font-size: var(--t-xs); font-weight: 700; display: inline-flex; align-items: center;
     justify-content: center; font-family: 'JetBrains Mono', ui-monospace, monospace; }
-  .cb-help { font-size: 10.5px; color: var(--ink-3); line-height: 1.45; margin: 0 0 7px 21px; }
+  .cb-help { font-size: var(--t-xs); color: var(--ink-3); line-height: 1.45; margin: 0 0 7px 21px; }
   .cb-seg { display: flex; gap: 4px; flex-wrap: wrap; }
-  .cb-seg button { appearance: none; font: inherit; font-size: 11.5px; padding: 5px 10px;
+  .cb-seg button { appearance: none; font: inherit; font-size: var(--t-sm); padding: 5px 10px;
     border: 1px solid var(--line); border-radius: 999px; background: var(--paper);
     color: var(--ink-2); cursor: pointer; }
   .cb-seg button.on { background: var(--nhs-blue); border-color: var(--nhs-blue); color: #fff;
     font-weight: 600; }
-  .cb-picked { padding: 9px 14px; font-size: 11.5px; font-weight: 600; color: var(--nhs-blue);
+  .cb-picked { padding: 9px 14px; font-size: var(--t-sm); font-weight: 600; color: var(--nhs-blue);
     border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 8px; }
   .cb-picked strong { color: var(--nhs-dark); font-variant-numeric: tabular-nums; }
   .cb-picked .cb-none { margin-left: auto; appearance: none; background: none; border: 0;
-    font: inherit; font-size: 11px; color: var(--ink-3); cursor: pointer; text-decoration: underline; }
+    font: inherit; font-size: var(--t-xs); color: var(--ink-3); cursor: pointer; text-decoration: underline; }
   .cb-cols { max-height: 300px; overflow-y: auto; overflow-x: hidden; }
   .cb-grp-hd { display: flex; align-items: center; gap: 6px; padding: 7px 14px; cursor: pointer;
-    background: var(--paper-2); border-bottom: 1px solid var(--line); font-size: 10.5px;
+    background: var(--paper-2); border-bottom: 1px solid var(--line); font-size: var(--t-xs);
     font-weight: 600; color: var(--ink-2); user-select: none; }
   .cb-grp-hd .a { color: var(--ink-3); font-size: 8px; transition: transform .12s; }
   .cb-grp-hd.open .a { transform: rotate(90deg); }
   .cb-grp-hd .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
     white-space: nowrap; }
-  .cb-grp-hd .n { color: var(--ink-3); font-weight: 500; font-size: 9.5px;
+  .cb-grp-hd .n { color: var(--ink-3); font-weight: 500; font-size: var(--t-xs);
     font-family: 'JetBrains Mono', ui-monospace, monospace; }
   .cb-grp-body { display: none; }
   .cb-grp-body.open { display: block; }
   .cb-col { display: flex; align-items: flex-start; gap: 7px; padding: 5px 14px 5px 20px;
-    cursor: pointer; font-size: 11.5px; color: var(--ink);
+    cursor: pointer; font-size: var(--t-sm); color: var(--ink);
     border-bottom: 1px solid var(--paper-2); }
   .cb-col:hover { background: var(--nhs-light); }
   .cb-col input { margin: 2px 0 0; flex-shrink: 0; accent-color: var(--nhs-blue); cursor: pointer; }
@@ -1277,7 +1330,7 @@
   .cb-acts { display: flex; gap: 5px; padding: 10px 14px; border-top: 1px solid var(--line);
     flex-shrink: 0; background: var(--paper-2); }
   .cb-acts .ws-btn { flex: 1; justify-content: center; }
-  .cb-note { font-size: 10.5px; line-height: 1.45; color: var(--ink-3); padding: 0 14px 11px; }
+  .cb-note { font-size: var(--t-xs); line-height: 1.45; color: var(--ink-3); padding: 0 14px 11px; }
 
   /* ── Directory ────────────────────────────────────────────────────────────
      Every point dataset on the map as one searchable list. The map answers
@@ -1287,18 +1340,18 @@
   .dir-pane { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
   .dir-head { padding: 13px 14px 11px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
   .dir-head .cmp-row { display: flex; align-items: baseline; gap: 8px; }
-  .dir-head h2 { font-family: 'Inter Tight', Inter, sans-serif; font-size: 17px; font-weight: 600;
+  .dir-head h2 { font-family: 'Inter Tight', Inter, sans-serif; font-size: var(--t-xl); font-weight: 600;
     margin: 0; letter-spacing: -.01em; color: var(--nhs-dark); flex: 1; min-width: 0; }
   .dir-controls { padding: 10px 14px; border-bottom: 1px solid var(--line);
     background: var(--paper-2); flex-shrink: 0; }
-  .dir-search { width: 100%; font: inherit; font-size: 12px; padding: 7px 9px 7px 28px;
+  .dir-search { width: 100%; font: inherit; font-size: var(--t-sm); padding: 7px 9px 7px 28px;
     border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: #fff
     url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23768692' stroke-width='2'><circle cx='11' cy='11' r='7'/><path d='m21 21-4.35-4.35'/></svg>") no-repeat 8px center; }
   .dir-search:focus { outline: none; border-color: var(--nhs-bright);
     box-shadow: 0 0 0 3px rgba(0,114,206,.15); }
   .dir-row2 { display: grid; grid-template-columns: 1fr auto; gap: 6px; margin-top: 7px; }
   .dir-types { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
-  .dir-count { padding: 8px 14px; font-size: 11.5px; color: var(--nhs-blue); font-weight: 600;
+  .dir-count { padding: 8px 14px; font-size: var(--t-sm); color: var(--nhs-blue); font-weight: 600;
     border-bottom: 1px solid var(--line); flex-shrink: 0; }
   .dir-count strong { color: var(--nhs-dark); font-variant-numeric: tabular-nums; }
   .dir-list { overflow-y: auto; overflow-x: hidden; min-height: 0; flex: 1; }
@@ -1309,11 +1362,11 @@
   .dir-txt { flex: 1; min-width: 0; }
   /* Block, not inline: as spans the name and its meta line ran together into
      one string that pushed the list sideways. */
-  .dir-nm { display: block; font-size: 12px; color: var(--ink); overflow: hidden;
+  .dir-nm { display: block; font-size: var(--t-sm); color: var(--ink); overflow: hidden;
     text-overflow: ellipsis; white-space: nowrap; }
-  .dir-sub { display: block; font-size: 10px; color: var(--ink-3); overflow: hidden;
+  .dir-sub { display: block; font-size: var(--t-xs); color: var(--ink-3); overflow: hidden;
     text-overflow: ellipsis; white-space: nowrap; }
-  .dir-more { padding: 10px 14px; font-size: 10.5px; color: var(--ink-3); line-height: 1.45; }
+  .dir-more { padding: 10px 14px; font-size: var(--t-xs); color: var(--ink-3); line-height: 1.45; }
 
   /* ── Query builder ────────────────────────────────────────────────────────
      The filter sentence from the design file: services, then a borough, then
@@ -1323,14 +1376,14 @@
   .sidebar.query-mode > .sb-tabs { display: none; }
   .q-pane { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
   .q-head { display: flex; align-items: baseline; gap: 8px; padding: 11px 12px 0; }
-  .q-head h2 { font-family: 'Inter Tight', Inter, sans-serif; font-size: 16px; font-weight: 600;
+  .q-head h2 { font-family: 'Inter Tight', Inter, sans-serif; font-size: var(--t-xl); font-weight: 600;
     letter-spacing: -.01em; color: var(--nhs-dark); margin: 0; }
   /* Styled with .cmp-back above, so the two stay identical by construction
      rather than by two copies of the same declarations being kept in step. */
   .q-scroll { overflow-y: auto; min-height: 0; flex: 1; }
   .q-block { padding: 12px 12px 13px; border-bottom: 1px solid var(--line); background: var(--paper-2); }
-  .q-sub { font-size: 11px; color: var(--ink-3); line-height: 1.45; margin-bottom: 9px; }
-  .q-lbl { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3);
+  .q-sub { font-size: var(--t-xs); color: var(--ink-3); line-height: 1.45; margin-bottom: 9px; }
+  .q-lbl { font-size: var(--t-xs); text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3);
     font-weight: 600; margin-bottom: 6px; }
   /* Numbered steps. "Show me wards with" left the reader to guess whether the
      chips meant at least one of each, any of them, or only those; and whether
@@ -1347,27 +1400,27 @@
      but they are plainly out of play and cannot be clicked. */
   .q-skip #q-services { opacity: .4; pointer-events: none; filter: grayscale(1); }
   .q-skip #q-services-hint { color: var(--ink-3); }
-  .q-step { display: flex; align-items: baseline; gap: 6px; font-size: 11.5px; font-weight: 600;
+  .q-step { display: flex; align-items: baseline; gap: 6px; font-size: var(--t-sm); font-weight: 600;
     color: var(--ink); margin-bottom: 5px; }
   .q-step-n { flex: 0 0 auto; width: 15px; height: 15px; border-radius: 50%; background: var(--nhs-blue);
-    color: #fff; font-size: 9.5px; font-weight: 700; display: inline-flex; align-items: center;
+    color: #fff; font-size: var(--t-xs); font-weight: 700; display: inline-flex; align-items: center;
     justify-content: center; font-family: 'JetBrains Mono', ui-monospace, monospace; }
-  .q-hint { display: block; font-size: 10.5px; font-weight: 400; color: var(--ink-3);
+  .q-hint { display: block; font-size: var(--t-xs); font-weight: 400; color: var(--ink-3);
     margin: 1px 0 7px 21px; line-height: 1.4; }
   /* The whole filter, read back as one sentence. Six controls in three groups
      is a shape, not a question; this is the question. */
   .q-readback { margin-top: 11px; padding: 9px 11px; border-left: 3px solid var(--nhs-blue);
-    background: var(--nhs-light); border-radius: 0 6px 6px 0; font-size: 11.5px; line-height: 1.5;
+    background: var(--nhs-light); border-radius: 0 6px 6px 0; font-size: var(--t-sm); line-height: 1.5;
     color: var(--ink-2); }
   .q-readback strong { color: var(--ink); font-weight: 600; }
-  .q-readback .q-rb-lbl { display: block; font-size: 9.5px; text-transform: uppercase;
+  .q-readback .q-rb-lbl { display: block; font-size: var(--t-xs); text-transform: uppercase;
     letter-spacing: .06em; color: var(--ink-3); font-weight: 600; margin-bottom: 3px; }
-  .q-sentence { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; font-size: 12px;
+  .q-sentence { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; font-size: var(--t-sm);
     color: var(--ink-2); line-height: 1.6; }
-  .q-sentence .q-join { color: var(--ink-3); font-size: 11.5px; padding: 0 1px; }
+  .q-sentence .q-join { color: var(--ink-3); font-size: var(--t-sm); padding: 0 1px; }
   .q-chip { display: inline-flex; align-items: center; gap: 5px; min-height: 26px; padding: 2px 10px;
     border: 1px solid var(--line); border-radius: 999px; background: var(--paper); color: var(--ink-2);
-    font-size: 11.5px; font-weight: 500; cursor: pointer; user-select: none;
+    font-size: var(--t-sm); font-weight: 500; cursor: pointer; user-select: none;
     transition: background .12s, border-color .12s, color .12s; }
   .q-chip:hover { border-color: var(--nhs-blue); color: var(--nhs-blue); }
   .q-chip.on { background: var(--nhs-blue); border-color: var(--nhs-blue); color: #fff; }
@@ -1377,7 +1430,7 @@
   select.q-chip { appearance: none; -webkit-appearance: none; padding-right: 24px; max-width: 100%;
     background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23005EB8' stroke-width='3'><path d='M5 9l7 7 7-7'/></svg>");
     background-repeat: no-repeat; background-position: right 9px center; }
-  .q-chip .q-x { opacity: .65; font-size: 13px; line-height: 1; margin-left: 1px; }
+  .q-chip .q-x { opacity: .65; font-size: var(--t-md); line-height: 1; margin-left: 1px; }
   .q-chip .q-x:hover { opacity: 1; }
   /* One condition, two rows: the indicator gets the full width because its
      names are long, the comparison and the value share the row below. Packed
@@ -1386,19 +1439,19 @@
   .q-cond { border: 1px solid var(--line); border-radius: 8px; background: var(--paper);
     padding: 7px 8px; margin-bottom: 6px; }
   .q-cond-row2 { display: grid; grid-template-columns: 1fr 76px auto; gap: 5px; align-items: center; }
-  .q-f { font: inherit; font-size: 11.5px; padding: 4px 6px; border: 1px solid var(--line);
+  .q-f { font: inherit; font-size: var(--t-sm); padding: 4px 6px; border: 1px solid var(--line);
     border-radius: 6px; background: var(--paper); color: var(--ink); min-width: 0; width: 100%; }
   select.q-f { appearance: none; -webkit-appearance: none; padding-right: 20px;
     background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%234C6272' stroke-width='3'><path d='M5 9l7 7 7-7'/></svg>");
     background-repeat: no-repeat; background-position: right 6px center; }
   .q-cond .q-f-ind { margin-bottom: 5px; }
   .q-del { appearance: none; background: none; border: 1px solid var(--line); border-radius: 6px;
-    color: var(--ink-3); cursor: pointer; font-size: 13px; line-height: 1; padding: 5px 8px; }
+    color: var(--ink-3); cursor: pointer; font-size: var(--t-md); line-height: 1; padding: 5px 8px; }
   .q-del:hover { color: var(--nhs-red); border-color: var(--nhs-red); }
-  .q-caution { font-size: 10.5px; line-height: 1.45; color: #5c4115; background: #FFF8E6;
+  .q-caution { font-size: var(--t-xs); line-height: 1.45; color: #5c4115; background: #FFF8E6;
     border: 1px solid #E0C280; border-radius: 6px; padding: 7px 9px; margin-top: 8px; }
   .q-resultbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-    padding: 10px 12px; font-size: 11.5px; color: var(--nhs-blue); font-weight: 600;
+    padding: 10px 12px; font-size: var(--t-sm); color: var(--nhs-blue); font-weight: 600;
     border-bottom: 1px solid var(--line); background: var(--paper); }
   .q-resultbar strong { color: var(--nhs-dark); font-variant-numeric: tabular-nums; }
   .q-resultbar .q-empty { color: var(--ink-3); font-weight: 500; }
@@ -1406,18 +1459,18 @@
     border-bottom: 1px solid var(--paper-2); }
   .q-row:hover { background: var(--nhs-light); }
   .q-row.sel { background: var(--nhs-light); }
-  .q-row .q-rank { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10.5px;
+  .q-row .q-rank { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: var(--t-xs);
     color: var(--ink-3); width: 20px; flex-shrink: 0; font-variant-numeric: tabular-nums; }
-  .q-row .q-nm { flex: 1; min-width: 0; font-size: 12px; color: var(--ink); overflow: hidden;
+  .q-row .q-nm { flex: 1; min-width: 0; font-size: var(--t-sm); color: var(--ink); overflow: hidden;
     text-overflow: ellipsis; white-space: nowrap; }
-  .q-row .q-nm small { display: block; font-size: 10px; color: var(--ink-3); }
-  .q-row .q-v { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10.5px;
+  .q-row .q-nm small { display: block; font-size: var(--t-xs); color: var(--ink-3); }
+  .q-row .q-v { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: var(--t-xs);
     color: var(--ink-2); flex-shrink: 0; font-variant-numeric: tabular-nums; }
   .q-acts { display: flex; gap: 5px; padding: 9px 12px; border-bottom: 1px solid var(--line); }
   .q-acts .ws-btn { flex: 1; text-align: center; }
   .q-sortrow { display: flex; align-items: center; gap: 6px; padding: 8px 12px;
-    border-bottom: 1px solid var(--line); font-size: 11px; color: var(--ink-3); }
-  .q-sortrow select { flex: 1; font: inherit; font-size: 11px; padding: 3px 5px;
+    border-bottom: 1px solid var(--line); font-size: var(--t-xs); color: var(--ink-3); }
+  .q-sortrow select { flex: 1; font: inherit; font-size: var(--t-xs); padding: 3px 5px;
     border: 1px solid var(--line); border-radius: 6px; background: var(--paper); color: var(--ink);
     min-width: 0; }
 
@@ -1445,14 +1498,14 @@
     .ws-sheet.peek .ws-body { display: none; }
     .ws-sheet.collapsed { max-height: 58px; }
     .ws-head { padding: 11px 12px 10px; gap: 8px; touch-action: pan-y; }
-    .ws-title h2 { font-size: 16px; }
+    .ws-title h2 { font-size: var(--t-xl); }
     .ws-body { padding: 12px 12px 14px; }
     /* Two columns of figures rather than one long strip of six. */
     .ws-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
     /* Open profile is the one that leads somewhere; the other two are
        secondary and stop competing for a 390px row. */
     .ws-acts { width: 100%; gap: 5px; }
-    .ws-acts .ws-btn { flex: 1 1 auto; padding: 8px 6px; font-size: 11px; }
+    .ws-acts .ws-btn { flex: 1 1 auto; padding: 8px 6px; font-size: var(--t-xs); }
     .ws-sheet.peek .ws-acts #ws-pin,
     .ws-sheet.peek .ws-acts #ws-pdf,
     .ws-sheet.collapsed .ws-acts { display: none; }
@@ -1464,7 +1517,7 @@
     /* Four cards across is a desktop shape. */
     .cmp-cards { grid-template-columns: minmax(0, 1fr); }
     .tour-strip { padding: 11px 13px 12px; }
-    .tour-narr { font-size: 12.5px; margin-bottom: 10px; }
+    .tour-narr { font-size: var(--t-md); margin-bottom: 10px; }
     .tour-ctrls { gap: 6px; }
     .tour-next-lbl { display: none; }
 
@@ -1473,16 +1526,16 @@
        attribution were four things independently claiming the same corner of
        a 390px screen. They lift above the sheet together already; here they
        stop overlapping each other as well. */
-    #ai-toggle { right: 8px; padding: 8px 12px; font-size: 12px; }
+    #ai-toggle { right: 8px; padding: 8px 12px; font-size: var(--t-sm); }
     /* Full width along the bottom instead: at this width there is no room for
        300px of notice beside anything and still a map. */
     #fingertips-banner { left: 8px; right: 8px; bottom: 48px; max-width: none;
-      font-size: 11px; padding: 8px 10px; }
+      font-size: var(--t-xs); padding: 8px 10px; }
     .map-legend-strip { left: 8px; right: 8px; transform: none; max-width: none;
-      font-size: 10.5px; padding: 5px 9px; }
+      font-size: var(--t-xs); padding: 5px 9px; }
     .map-legend-strip .mls-label { max-width: 45%; }
     /* The viewing strip is scope only now; keep it to one line. */
-    .viewing-strip { padding: 4px 10px 5px; font-size: 11px; }
+    .viewing-strip { padding: 4px 10px 5px; font-size: var(--t-xs); }
   }
 
   /* Coarse pointers get bigger targets, whatever the width. A 25px row is a
@@ -1606,11 +1659,21 @@
            moment anyone clicks it, and the tour says properly for anyone who
            wants telling. On a laptop it cost a row of header across the full
            width, and that row comes off the height of both the map and the
-           panel, which are the two things actually being read. The wording
-           survives as the title attribute, so hovering the name still
-           explains. -->
+           panel, which are the two things actually being read.
+
+           The wording used to survive as a title attribute on this heading.
+           That was the whole "how to use this" instruction living somewhere a
+           touchscreen cannot show and a screen reader does not reliably
+           announce, which is to say: nowhere, for a large share of the people
+           who most needed it. It is now a visible line at the top of the
+           Indicators pane, which is the tab this opens on.
+
+           The name is "PopHealth Map" here and everywhere else. The heading
+           used to say "London Population Health Mapping" while the tab, the
+           link preview and the methodology page said PopHealth Map, so a
+           shared link previewed under one name and opened under another. -->
       <div>
-        <h1 class="hdr-logo" title="Click a ward for its headline figures, then Open profile for the full panel · use the Indicators tab to colour the map by a figure · the VCSE tab maps charities and Community Interest Companies">London Population Health Mapping<span class="dev-badge" title="This tool is still in development">In development</span></h1>
+        <h1 class="hdr-logo">PopHealth Map<span class="dev-badge" title="This tool is still in development">In development</span></h1>
       </div>
     </div>
     <div class="hdr-right">
@@ -1632,7 +1695,7 @@
     <button type="button" class="mode-btn" role="tab" data-mode="query" aria-selected="false">Query</button>
     <button type="button" class="mode-btn" role="tab" data-mode="compare" aria-selected="false">Compare</button>
     <button type="button" class="mode-btn" role="tab" data-mode="report" aria-selected="false">Custom area</button>
-    <button type="button" class="mode-btn" role="tab" data-mode="csv" aria-selected="false">Report builder</button>
+    <button type="button" class="mode-btn" role="tab" data-mode="csv" aria-selected="false">Data export</button>
     <button type="button" class="mode-btn" role="tab" data-mode="directory" aria-selected="false">Directory</button>
   </div>
 
@@ -1666,7 +1729,15 @@
           <button type="button" class="sb-close" id="sb-close" aria-label="Close the panel">&times;</button>
         </div>
       </div>
-      <div class="sb-tabs">
+      <!-- These are buttons, and that is not cosmetic. They were divs with a
+           click handler and nothing else: no role, no tabindex, no key
+           handling. Indicators, Layers, VCSE and Area profile are the primary
+           navigation of this tool, and a keyboard could reach the map, the
+           search, the mode rail and every checkbox but could not change which
+           pane the sidebar showed. Every other div-button in this file already
+           carried role="button" tabindex="0"; these four were simply missed.
+           See wireSidebarTabs for the arrow-key behaviour and the aria sync. -->
+      <div class="sb-tabs" role="tablist" aria-label="Sidebar view">
         <!-- Indicators first, and open by default. Colouring the map by a
              figure is what this site is for; Layers held that place and is a
              list of things to draw on top of a map that is not yet showing
@@ -1679,9 +1750,12 @@
              handler that names it keep working, exactly as data-tab stayed
              "ward" when that tab became Area profile. Body copy still says
              overlay, which is still what it is. -->
-        <div class="sb-tab active" data-tab="overlay">Indicators</div>
-        <div class="sb-tab" data-tab="layers">Layers</div>
-        <div class="sb-tab" data-tab="vcse">VCSE</div>
+        <button type="button" class="sb-tab active" id="sbtab-overlay" role="tab"
+                aria-selected="true" aria-controls="tab-overlay" data-tab="overlay">Indicators</button>
+        <button type="button" class="sb-tab" id="sbtab-layers" role="tab"
+                aria-selected="false" aria-controls="tab-layers" data-tab="layers">Layers</button>
+        <button type="button" class="sb-tab" id="sbtab-vcse" role="tab"
+                aria-selected="false" aria-controls="tab-vcse" data-tab="vcse">VCSE</button>
         <!-- Query is not a tab. It is a mode, reached from the rail at the
              top, and while it is on it takes over the whole sidebar: the tab
              strip is hidden rather than left showing nothing selected. -->
@@ -1692,19 +1766,20 @@
              with the Open profile button on the ward bar, which is what opens
              this. data-tab stays "ward" so the pane id and every handler that
              names it keep working. -->
-        <div class="sb-tab" data-tab="ward">Area profile</div>
+        <button type="button" class="sb-tab" id="sbtab-ward" role="tab"
+                aria-selected="false" aria-controls="tab-ward" data-tab="ward">Area profile</button>
       </div>
 
       <!-- Layers tab -->
-      <div class="tab-pane" id="tab-layers">
+      <div class="tab-pane" id="tab-layers" role="tabpanel" aria-labelledby="sbtab-layers">
         <div class="sb-sec">
           <div class="sb-lbl">Point layers</div>
           <label class="lrow"><div class="ldot" style="background:#185FA5"></div><span class="lname">GP practices <span class="lcount" id="gp-count">0</span></span><input type="checkbox" id="tg"></label>
           <label class="lrow"><div class="ldot" style="background:#A32D2D"></div><span class="lname">Hospitals &amp; clinics <span class="lcount" id="hosp-count">0</span></span><input type="checkbox" id="th"></label>
           <label class="lrow"><div class="ldot" style="background:#2E7D32"></div><span class="lname">Parks &amp; greenspaces <span class="lcount" id="greenspace-count"></span></span><input type="checkbox" id="tgr"></label>
-          <div id="greenspace-legend" style="display:none;margin:2px 0 6px 18px;padding:4px 6px;background:#f7f9f7;border-radius:4px">
-            <div style="font-size:10px;color:#666;margin-bottom:3px">OS Open Greenspace categories</div>
-            <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 6px;font-size:10px;line-height:1.2">
+          <div id="greenspace-legend" style="display:none;margin:2px 0 6px 18px;padding:4px 6px;background:var(--paper-2);border-radius:4px">
+            <div style="font-size:var(--t-xs);color:var(--ink-2);margin-bottom:3px">OS Open Greenspace categories</div>
+            <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 6px;font-size:var(--t-xs);line-height:1.2">
               <div style="width:10px;height:10px;background:#2E7D32;border-radius:2px;align-self:center"></div><span>Public park or garden</span>
               <div style="width:10px;height:10px;background:#66BB6A;border-radius:2px;align-self:center"></div><span>Play space</span>
               <div style="width:10px;height:10px;background:#558B2F;border-radius:2px;align-self:center"></div><span>Playing field</span>
@@ -1720,12 +1795,12 @@
           <label class="lrow"><div class="ldot" style="background:#7B2D8E"></div><span class="lname">Dental practices <span class="lcount" id="dental-count">0</span></span><input type="checkbox" id="td"></label>
           <label class="lrow"><div class="ldot" style="background:#E89B1B"></div><span class="lname">Pharmacies <span class="lcount" id="pharm-count">0</span></span><input type="checkbox" id="tph"></label>
         </div>
-        <div class="sb-sec" style="flex-shrink:0;border-bottom:1px solid #e5e5e0">
+        <div class="sb-sec" style="flex-shrink:0;border-bottom:1px solid var(--line-2)">
           <div class="sb-lbl">Civic &amp; education<span class="lhelp" title="Schools, community centres, libraries and formal ESOL providers — sourced from the GLA ESOL Planning Map (English language proficiency planning dataset). These four layers cover the eight North West London boroughs only: Brent, Ealing, Hammersmith and Fulham, Harrow, Hillingdon, Hounslow, Kensington and Chelsea, and Westminster. Elsewhere in London they are empty because the data has not been collected yet, not because there is nothing there.">?</span></div>
           <div class="cov-note">Covers North West London only. Blank elsewhere means not yet collected, not none.</div>
           <label class="lrow"><div class="ldot" style="background:#1E5BB8"></div><span class="lname">Schools <span class="lcount" id="schools-count">0</span> <span class="cov-tag" title="North West London boroughs only">NWL</span></span><input type="checkbox" id="tsch"></label>
           <div id="schools-filter-wrap" style="margin:2px 0 4px 16px">
-            <select id="schools-phase-filter" style="width:100%;padding:3px 6px;border:1px solid #ddd;border-radius:5px;font-size:11px;color:#333;background:#fff">
+            <select id="schools-phase-filter" style="width:100%;padding:3px 6px;border:1px solid var(--line);border-radius:5px;font-size:var(--t-xs);color:var(--ink);background:#fff">
               <option value="all" selected>All schools</option>
               <option value="Primary">Primary</option>
               <option value="Secondary">Secondary</option>
@@ -1739,7 +1814,7 @@
           <label class="lrow"><div class="ldot" style="background:#00A0A0"></div><span class="lname">Libraries <span class="lcount" id="lib-count">0</span> <span class="cov-tag" title="North West London boroughs only">NWL</span></span><input type="checkbox" id="tlib"></label>
           <label class="lrow"><div class="ldot" style="background:#B83C3C"></div><span class="lname">Formal ESOL providers <span class="lcount" id="esol-count">0</span> <span class="cov-tag" title="North West London boroughs only">NWL</span></span><input type="checkbox" id="tesol"></label>
           <div id="esol-filter-wrap" style="margin:2px 0 4px 16px">
-            <select id="esol-type-filter" style="width:100%;padding:3px 6px;border:1px solid #ddd;border-radius:5px;font-size:11px;color:#333;background:#fff">
+            <select id="esol-type-filter" style="width:100%;padding:3px 6px;border:1px solid var(--line);border-radius:5px;font-size:var(--t-xs);color:var(--ink);background:#fff">
               <option value="all" selected>All provider types</option>
               <option value="Local Authority">Local Authority</option>
               <option value="Further Education College">FE College</option>
@@ -1749,23 +1824,23 @@
               <option value="University">University</option>
             </select>
           </div>
-          <div style="font-size:10px;color:#888;margin-top:4px;line-height:1.3">Source: GLA ESOL Planning Map</div>
+          <div style="font-size:var(--t-xs);color:var(--ink-3);margin-top:4px;line-height:1.3">Source: GLA ESOL Planning Map</div>
         </div>
-        <div class="sb-sec" style="flex-shrink:0;border-bottom:1px solid #e5e5e0">
+        <div class="sb-sec" style="flex-shrink:0;border-bottom:1px solid var(--line-2)">
           <div class="sb-lbl">Borough boundaries</div>
           <label class="lrow"><div style="width:9px;height:9px;border:2px solid #1a1a1a;border-radius:2px;flex-shrink:0"></div><span class="lname">London boroughs</span><input type="checkbox" id="tb"></label>
           <div style="margin:4px 0 8px 0">
-            <div style="font-size:10.5px;color:#666;margin-bottom:3px">Focus by borough</div>
-            <select id="borough-focus" style="width:100%;padding:4px 6px;border:1px solid #ddd;border-radius:5px;font-size:11px;color:#333;background:#fff">
+            <div style="font-size:var(--t-xs);color:var(--ink-2);margin-bottom:3px">Focus by borough</div>
+            <select id="borough-focus" style="width:100%;padding:4px 6px;border:1px solid var(--line);border-radius:5px;font-size:var(--t-xs);color:var(--ink);background:#fff">
               <option value="all">All London</option>
             </select>
           </div>
           <label class="lrow"><div style="width:9px;height:9px;border:1.5px solid #000;border-radius:2px;flex-shrink:0"></div><span class="lname">Ward boundaries <span class="lcount" id="ward-count">704</span></span><input type="checkbox" id="tnw" checked></label>
           <label class="lrow"><div style="width:9px;height:9px;border:1.5px solid #7A2E8E;border-radius:2px;flex-shrink:0"></div><span class="lname">MSOA boundaries <span class="lcount" id="msoa-count"></span></span><input type="checkbox" id="tmsoa"></label>
           <label class="lrow"><div style="width:9px;height:9px;border:1.5px solid #1E4B8E;border-radius:2px;flex-shrink:0"></div><span class="lname">LSOA boundaries <span class="lcount" id="lsoa-count"></span></span><input type="checkbox" id="tlsoa"></label>
-          <label id="lsoa-imd-row" class="lrow" style="display:none;margin-left:18px;padding:3px 0 0"><div id="imd-row-swatch" style="width:9px;height:9px;border-radius:2px;flex-shrink:0"></div><span class="lname" style="font-size:11px">Colour by IMD decile</span><input type="checkbox" id="tlsoa-imd"></label>
+          <label id="lsoa-imd-row" class="lrow" style="display:none;margin-left:18px;padding:3px 0 0"><div id="imd-row-swatch" style="width:9px;height:9px;border-radius:2px;flex-shrink:0"></div><span class="lname" style="font-size:var(--t-xs)">Colour by IMD decile</span><input type="checkbox" id="tlsoa-imd"></label>
           <div id="lsoa-filter-row" style="display:none;margin:4px 0 0 18px">
-            <div style="margin-top:6px;display:flex;align-items:center;gap:2px;font-size:10px;color:#666">
+            <div style="margin-top:6px;display:flex;align-items:center;gap:2px;font-size:var(--t-xs);color:var(--ink-2)">
               <span>1 (most deprived)</span>
               <!-- Filled from IMD_DECILE_COLORS at load and repainted by the
                    colour-blind toggle. It used to be ten hardcoded hex values,
@@ -1790,7 +1865,7 @@
       </div>
 
       <!-- VCSE tab -->
-      <div class="tab-pane" id="tab-vcse">
+      <div class="tab-pane" id="tab-vcse" role="tabpanel" aria-labelledby="sbtab-vcse">
         <div class="sb-sec" style="padding-bottom:6px">
           <label class="lrow" style="padding:2px 0;border:none">
             <div class="ldot" style="background:#854F0B"></div>
@@ -1802,13 +1877,13 @@
             <span class="lname">Show Community Interest Companies <span class="lcount" id="cic-tab-count">0</span> <span class="cov-tag" title="North West London boroughs only">NWL</span></span>
             <input type="checkbox" id="cic-tab-toggle">
           </label>
-          <div style="font-size:10.5px;color:#888;margin:4px 0 2px 24px;line-height:1.4">
+          <div style="font-size:var(--t-xs);color:var(--ink-3);margin:4px 0 2px 24px;line-height:1.4">
             VCSE = registered charities · CIC = Community Interest Companies (community-anchored businesses)
           </div>
         </div>
         <div class="sb-sec" style="padding-bottom:8px">
           <div class="sb-lbl">Filter by area</div>
-          <select id="vcse-area-filter" style="width:100%;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;color:#333;background:#fff;margin-bottom:8px">
+          <select id="vcse-area-filter" style="width:100%;padding:5px 8px;border:1px solid var(--line);border-radius:6px;font-size:var(--t-sm);color:var(--ink);background:#fff;margin-bottom:8px">
             <!-- One "All London", not two. There were two options with that
                  label, 'london' and 'all', and every branch that read them
                  treated them identically, so the dropdown offered the same
@@ -1838,7 +1913,7 @@
                  above this is about. The rest is on the ? for anyone who wants
                  it, and one short line stays visible for anyone who does not. -->
             <div class="sb-lbl" style="margin-bottom:0">Filter charities by tag<span class="lhelp" title="The tags are the Charity Commission's own classification of what a charity does, how it helps and whom it helps. Community Interest Companies are registered with Companies House instead and carry no tags at all, so this filter cannot include or exclude them: whatever you tick here, every CIC currently shown stays shown.">?</span></div>
-            <button type="button" id="vcse-tag-clear" style="font-size:11px;color:#666;background:none;border:none;cursor:pointer;padding:0;text-decoration:underline;display:none">clear</button>
+            <button type="button" id="vcse-tag-clear" style="font-size:var(--t-xs);color:var(--ink-2);background:none;border:none;cursor:pointer;padding:0;text-decoration:underline;display:none">clear</button>
           </div>
           <div class="cov-note" style="margin:0 0 6px">Charity Commission tags. CICs have none, so they are not filtered.</div>
           <details class="vcse-tag-group" data-fam="wt">
@@ -1859,13 +1934,25 @@
       </div>
 
       <!-- Overlay tab -->
-      <div class="tab-pane active" id="tab-overlay">
+      <div class="tab-pane active" id="tab-overlay" role="tabpanel" aria-labelledby="sbtab-overlay">
+        <!-- The three things this tool does, said once, where someone landing
+             for the first time is already looking. This is the tab the sidebar
+             opens on. It used to be a title attribute on the page heading,
+             which a touchscreen never shows. Dismissable, and it stays
+             dismissed: it is an introduction, not a warning. -->
+        <div class="start-hint" id="start-hint">
+          <p><b>Click any ward</b> for its headline figures, then Open profile for the
+             full panel.</p>
+          <p>Pick an indicator below to <b>colour the map</b> by a figure.</p>
+          <p>The <b>VCSE</b> tab maps charities and Community Interest Companies.</p>
+          <button type="button" class="start-hint-x" id="start-hint-x">Got it</button>
+        </div>
         <div class="sb-sec" style="flex:1;border-bottom:none;overflow-y:auto">
           <div class="sb-lbl" style="display:flex;align-items:center;gap:6px">
             <span>Choropleth overlay</span>
             <span id="ov-info" class="lhelp" title="About the current indicator" style="display:none">i</span>
           </div>
-          <div id="ov-info-panel" style="display:none;background:#fafafa;border:1px solid #eee;border-radius:5px;padding:7px 9px;margin:0 0 8px;font-size:11px;color:#555;line-height:1.5"></div>
+          <div id="ov-info-panel" style="display:none;background:var(--paper-2);border:1px solid var(--line-2);border-radius:5px;padding:7px 9px;margin:0 0 8px;font-size:var(--t-xs);color:var(--ink-2);line-height:1.5"></div>
 
           <!-- Tick-box picker. Built at run time from the options of the
                select below, which stays in the DOM (hidden) and remains what
@@ -2024,53 +2111,53 @@
           </select>
 
           <div class="scale-bar" id="scale">
-            <div class="scale-labels"><span id="sc-lo">Low</span><span id="sc-mid" style="color:#aaa;font-variant-numeric:tabular-nums"></span><span id="sc-hi">High</span></div>
+            <div class="scale-labels"><span id="sc-lo">Low</span><span id="sc-mid" style="color:var(--ink-3);font-variant-numeric:tabular-nums"></span><span id="sc-hi">High</span></div>
             <!-- Gradient must match ramp() in JS exactly: rgb(15,110,86) → rgb(239,159,39) → rgb(163,45,39) -->
             <!-- Painted by _syncScaleGradient. The inline gradient here was a
                third copy of a palette that has since changed twice. -->
           <div class="scale-grad" id="sc-grad"></div>
-            <div id="sc-meta" style="margin-top:5px;font-size:10.5px;color:#888;line-height:1.4"></div>
+            <div id="sc-meta" style="margin-top:5px;font-size:var(--t-xs);color:var(--ink-3);line-height:1.4"></div>
           </div>
 
           <!-- Top 20 / Bottom 20 rankings — single-indicator mode only -->
-          <div id="rank-panel" style="display:none;margin-top:14px;padding-top:12px;border-top:1px solid #eee">
+          <div id="rank-panel" style="display:none;margin-top:14px;padding-top:12px;border-top:1px solid var(--line-2)">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
               <div class="sb-lbl" style="margin:0">Top & bottom 20</div>
-              <div id="rank-unit" style="font-size:10px;color:#888"></div>
+              <div id="rank-unit" style="font-size:var(--t-xs);color:var(--ink-3)"></div>
             </div>
             <div style="display:flex;gap:8px">
               <div style="flex:1;min-width:0">
-                <div id="rank-best-hdr" style="font-size:10px;color:#0F6E56;font-weight:600;margin-bottom:4px">Best 20</div>
+                <div id="rank-best-hdr" style="font-size:var(--t-xs);color:#0F6E56;font-weight:600;margin-bottom:4px">Best 20</div>
                 <div id="rank-best" class="rank-list"></div>
               </div>
               <div style="flex:1;min-width:0">
-                <div id="rank-worst-hdr" style="font-size:10px;color:#A32D2D;font-weight:600;margin-bottom:4px">Worst 20</div>
+                <div id="rank-worst-hdr" style="font-size:var(--t-xs);color:#A32D2D;font-weight:600;margin-bottom:4px">Worst 20</div>
                 <div id="rank-worst" class="rank-list"></div>
               </div>
             </div>
-            <div style="font-size:10px;color:#888;margin-top:6px;line-height:1.4">
+            <div style="font-size:var(--t-xs);color:var(--ink-3);margin-top:6px;line-height:1.4">
               Hidden in bivariate mode. Click a row to zoom.
             </div>
           </div>
 
-          <div id="data-vintage" style="margin-top:10px;font-size:10px;color:#aaa;line-height:1.5"></div>
+          <div id="data-vintage" style="margin-top:10px;font-size:var(--t-xs);color:var(--ink-3);line-height:1.5"></div>
 
-          <div style="margin-top:14px;padding-top:12px;border-top:1px solid #eee">
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:#333;font-weight:500">
+          <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line-2)">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--t-sm);color:var(--ink);font-weight:500">
               <input type="checkbox" id="core20-toggle" style="cursor:pointer">
               <span>Highlight Core20<span class="lhelp" title="Core20 = the 20% most deprived neighbourhoods nationally (IMD deciles 1–2). NHS England's Core20PLUS5 framework prioritises them for targeted health action.">?</span> LSOAs</span>
             </label>
-            <div style="font-size:10px;color:#888;margin-top:4px;line-height:1.45">
+            <div style="font-size:var(--t-xs);color:var(--ink-3);margin-top:4px;line-height:1.45">
               NHS Core20PLUS5: LSOAs in IMD deciles 1-2 (most deprived 20% nationally).
               Highlighted LSOAs are filled magenta.
             </div>
-            <div id="core20-count" style="font-size:10px;color:#666;margin-top:3px"></div>
+            <div id="core20-count" style="font-size:var(--t-xs);color:var(--ink-2);margin-top:3px"></div>
           </div>
         </div>
       </div>
 
       <!-- Neighbourhoods tab -->
-      <!-- Report builder. Pick LSOAs off the map and total them up as one
+      <!-- Custom area. Pick LSOAs off the map and total them up as one
            area. Neighbourhoods, catchments and PCN footprints do not follow
            ward lines, and every other total on this map is an area someone
            else already drew. -->
@@ -2105,13 +2192,13 @@
         </div>
       </div>
 
-      <!-- Report builder: a CSV with the columns you chose.
+      <!-- Data export: a CSV with the columns you chose.
            The toolbar CSV hands over what the map is drawing. This asks three
            questions instead: which areas, which level, which figures. -->
       <div class="tab-pane cb-pane" id="tab-csv">
         <div class="cb-head">
           <div class="cmp-row">
-            <h2>Report builder</h2>
+            <h2>Data export</h2>
             <button type="button" class="cmp-back" id="cb-back">Back to Explore</button>
           </div>
           <div class="cb-sub">Build a spreadsheet. Choose the areas, then the figures. The file
@@ -2273,7 +2360,7 @@
       </div>
 
       <!-- Ward data tab -->
-      <div class="tab-pane" id="tab-ward">
+      <div class="tab-pane" id="tab-ward" role="tabpanel" aria-labelledby="sbtab-ward">
         <div class="ward-scroll" id="wpanel">
           <div class="ph">
             <div class="ph-icon">↖</div>
@@ -2285,7 +2372,7 @@
       <!-- Folds away. Pinned to the bottom of the panel, these three sliders
            cost the same vertical strip whether or not they are being used, and
            that strip comes off whatever is open above them. -->
-      <div class="sb-sec" id="map-controls-sec" style="flex-shrink:0;border-top:1px solid #e5e5e0;background:#fafaf6">
+      <div class="sb-sec" id="map-controls-sec" style="flex-shrink:0;border-top:1px solid var(--line-2);background:#fafaf6">
         <div class="sb-lbl">Map controls</div>
         <div class="opacity-row">
           <label>Fill</label>
@@ -2559,10 +2646,13 @@ var LOADER_MAP = {w:1000,h:771,n:704,d:'IAAAAAAAAAAAAAJAAIAAFAAAIDFEECDGGCFDCCIC
     var target = Math.round(Math.max(0, Math.min(1, fraction)) * paths.length);
     for (; painted < target; painted++) {
       var idx = order[painted];
-      // 'A' is index 0, which is the "no IMD mean for this ward" grey, so an
-      // unknown ward needs no special case: it lands on IMD[0] and stays the
-      // colour it started.
-      paths[idx].setAttribute('fill', IMD[IDX[LOADER_MAP.d.charCodeAt(idx)]]);
+      // An inline style, not a fill attribute. A presentation attribute sits
+      // below every CSS rule in the cascade, so fill="..." lost to the
+      // stylesheet's own fill and nothing ever changed colour.
+      //
+      // 'A' is index 0, the "no IMD mean for this ward" grey, so an unknown
+      // ward needs no special case: it lands on IMD[0] and stays as it was.
+      paths[idx].style.fill = IMD[IDX[LOADER_MAP.d.charCodeAt(idx)]];
     }
   }
 
@@ -3589,21 +3679,21 @@ function ovTooltipRows(valueForKey, ward) {
     const isMissing = (v == null || v === '' || (typeof v === 'number' && isNaN(v)));
     const isFt = typeof k === 'string' && k.startsWith('ft_');
     if (isMissing && isFt && _suppList.indexOf(k) >= 0) {
-      return `<br><span style="font-size:10.5px"><b>${ovLabel(k)}:</b> <span style="color:#b88030;font-style:italic">Suppressed by Fingertips (small numbers, privacy)</span></span>`;
+      return `<br><span style="font-size:var(--t-xs)"><b>${ovLabel(k)}:</b> <span style="color:#b88030;font-style:italic">Suppressed by Fingertips (small numbers, privacy)</span></span>`;
     }
     if (isMissing && isFt) {
-      return `<br><span style="font-size:10.5px"><b>${ovLabel(k)}:</b> <span style="color:#999">no data</span></span>`;
+      return `<br><span style="font-size:var(--t-xs)"><b>${ovLabel(k)}:</b> <span style="color:var(--ink-3)">no data</span></span>`;
     }
     if (isMissing) {
-      return `<br><span style="font-size:10.5px"><b>${ovLabel(k)}:</b> <span style="color:#999">—</span></span>`;
+      return `<br><span style="font-size:var(--t-xs)"><b>${ovLabel(k)}:</b> <span style="color:var(--ink-3)">—</span></span>`;
     }
-    return `<br><span style="font-size:10.5px"><b>${ovLabel(k)}:</b> ${fmtOv(v, k)}</span>`;
+    return `<br><span style="font-size:var(--t-xs)"><b>${ovLabel(k)}:</b> ${fmtOv(v, k)}</span>`;
   };
   if (_ovK  && _ovK  !== 'none') rows += _renderRow(_ovK);
   return rows;
 }
 function mkicon(color, label) {
-  return L.divIcon({ html: `<div style="background:${color};width:28px;height:28px;border-radius:50%;border:2.5px solid #fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#fff;box-shadow:0 1px 4px rgba(0,0,0,.25)">${label}</div>`, iconSize:[28,28], iconAnchor:[14,14], className:'' });
+  return L.divIcon({ html: `<div style="background:${color};width:28px;height:28px;border-radius:50%;border:2.5px solid #fff;display:flex;align-items:center;justify-content:center;font-size:var(--t-xs);font-weight:600;color:#fff;box-shadow:0 1px 4px rgba(0,0,0,.25)">${label}</div>`, iconSize:[28,28], iconAnchor:[14,14], className:'' });
 }
 // VCSE marker helpers (cause -> colour, income band -> radius)
 const VCSE_BUCKET_COLORS = {
@@ -3839,9 +3929,9 @@ function _ensureGreenspaceLayer() {
           const p = feat.properties || {};
           const name = p.name || ('Unnamed ' + (p.function || 'greenspace'));
           const cat  = p.function || '';
-          const ali  = p.aliases ? `<br><span style="font-size:10px;color:#888">Also: ${p.aliases}</span>` : '';
+          const ali  = p.aliases ? `<br><span style="font-size:var(--t-xs);color:var(--ink-3)">Also: ${p.aliases}</span>` : '';
           lyr.bindTooltip(
-            `<b style="font-size:11px">${name}</b><br><span style="font-size:10px;color:#2E7D32">${cat}</span>${ali}`,
+            `<b style="font-size:var(--t-xs)">${name}</b><br><span style="font-size:var(--t-xs);color:#2E7D32">${cat}</span>${ali}`,
             { sticky: true, opacity: 0.94 }
           );
         },
@@ -4123,11 +4213,11 @@ function cicPopupHtml(r) {
   const sicLine = (r.wd || []).slice(0, 2).join(' · ');
   const incDate = r.reg ? new Date(r.reg).toLocaleDateString('en-GB',
                           {year:'numeric', month:'short'}) : '';
-  return `<div style="font-family:-apple-system,sans-serif;font-size:12px;line-height:1.4;max-width:260px">
-    <div style="font-weight:600;font-size:13px;margin-bottom:4px">${r.n||''}</div>
-    <div style="color:#666;font-size:11px;margin-bottom:6px">CIC · ${r.no||''}${incDate ? ' · incorporated '+incDate : ''}</div>
+  return `<div style="font-family:-apple-system,sans-serif;font-size:var(--t-sm);line-height:1.4;max-width:260px">
+    <div style="font-weight:600;font-size:var(--t-md);margin-bottom:4px">${r.n||''}</div>
+    <div style="color:var(--ink-2);font-size:var(--t-xs);margin-bottom:6px">CIC · ${r.no||''}${incDate ? ' · incorporated '+incDate : ''}</div>
     ${sicLine ? `<div style="margin-bottom:4px">${sicLine}</div>` : ''}
-    <div style="color:#888;font-size:11px">${r.a||''}</div>
+    <div style="color:var(--ink-3);font-size:var(--t-xs)">${r.a||''}</div>
   </div>`;
 }
 function wireCICs(records) {
@@ -4298,7 +4388,7 @@ const dentalCluster = L.markerClusterGroup({
   iconCreateFunction: cluster => {
     const c = cluster.getChildCount();
     const sz = c > 50 ? 36 : c > 20 ? 30 : 26;
-    return L.divIcon({ html:`<div style="background:rgba(123,45,142,.75);width:${sz}px;height:${sz}px;border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#fff;box-shadow:0 1px 4px rgba(0,0,0,.25)">${c}</div>`, iconSize:[sz,sz], iconAnchor:[sz/2,sz/2], className:'' });
+    return L.divIcon({ html:`<div style="background:rgba(123,45,142,.75);width:${sz}px;height:${sz}px;border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:var(--t-xs);font-weight:600;color:#fff;box-shadow:0 1px 4px rgba(0,0,0,.25)">${c}</div>`, iconSize:[sz,sz], iconAnchor:[sz/2,sz/2], className:'' });
   }
 });
 let dentalData = [];
@@ -4347,7 +4437,7 @@ const pharmCluster = L.markerClusterGroup({
   iconCreateFunction: cluster => {
     const c = cluster.getChildCount();
     const sz = c > 50 ? 36 : c > 20 ? 30 : 26;
-    return L.divIcon({ html:`<div style="background:rgba(232,155,27,.8);width:${sz}px;height:${sz}px;border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#fff;box-shadow:0 1px 4px rgba(0,0,0,.25)">${c}</div>`, iconSize:[sz,sz], iconAnchor:[sz/2,sz/2], className:'' });
+    return L.divIcon({ html:`<div style="background:rgba(232,155,27,.8);width:${sz}px;height:${sz}px;border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:var(--t-xs);font-weight:600;color:#fff;box-shadow:0 1px 4px rgba(0,0,0,.25)">${c}</div>`, iconSize:[sz,sz], iconAnchor:[sz/2,sz/2], className:'' });
   }
 });
 let pharmData = [];
@@ -4389,7 +4479,7 @@ function _mkCivicCluster(colour, rgba) {
     iconCreateFunction: cluster => {
       const c = cluster.getChildCount();
       const sz = c > 50 ? 36 : c > 20 ? 30 : 26;
-      return L.divIcon({ html:`<div style="background:${rgba};width:${sz}px;height:${sz}px;border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#fff;box-shadow:0 1px 4px rgba(0,0,0,.25)">${c}</div>`, iconSize:[sz,sz], iconAnchor:[sz/2,sz/2], className:'' });
+      return L.divIcon({ html:`<div style="background:${rgba};width:${sz}px;height:${sz}px;border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:var(--t-xs);font-weight:600;color:#fff;box-shadow:0 1px 4px rgba(0,0,0,.25)">${c}</div>`, iconSize:[sz,sz], iconAnchor:[sz/2,sz/2], className:'' });
     }
   });
 }
@@ -4916,10 +5006,10 @@ function stackedBar(parts) {
   if (!(total > 0)) return '';
   const segs = present.map(p => {
     const pct = (parseFloat(p.v) / total) * 100;
-    return `<div title="${p.l}: ${parseFloat(p.v).toFixed(1)}%" style="background:${p.c};width:${pct}%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:600;overflow:hidden;white-space:nowrap">${pct >= 8 ? p.l.split(' ')[0] : ''}</div>`;
+    return `<div title="${p.l}: ${parseFloat(p.v).toFixed(1)}%" style="background:${p.c};width:${pct}%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:var(--t-xs);font-weight:600;overflow:hidden;white-space:nowrap">${pct >= 8 ? p.l.split(' ')[0] : ''}</div>`;
   }).join('');
   const legend = present.map(p =>
-    `<span style="display:inline-flex;align-items:center;gap:4px;margin-right:8px;font-size:10px"><span style="width:8px;height:8px;background:${p.c};border-radius:2px;display:inline-block"></span>${p.l} ${parseFloat(p.v).toFixed(1)}%</span>`
+    `<span style="display:inline-flex;align-items:center;gap:4px;margin-right:8px;font-size:var(--t-xs)"><span style="width:8px;height:8px;background:${p.c};border-radius:2px;display:inline-block"></span>${p.l} ${parseFloat(p.v).toFixed(1)}%</span>`
   ).join('');
   return `<div style="display:flex;height:18px;border-radius:4px;overflow:hidden;margin:6px 0">${segs}</div><div style="line-height:1.6">${legend}</div>`;
 }
@@ -5945,7 +6035,7 @@ function buildWardLayer() {
         if (wn !== selW) lyr.setStyle(wstyle(wn, curOv, 'hover'));
         const _wardRec = WARD_DATA[wn] || (typeof WARD_DATA === 'object' && Object.values(WARD_DATA).find(w => w && w.name === wn));
         const ovRows = ovTooltipRows(k => wardOvValue(wn, k), _wardRec);
-        lyr.bindTooltip(`<b style="font-size:12px">${wn}</b>${ovRows}`, { sticky:true, opacity:.94 }).openTooltip(e.latlng);
+        lyr.bindTooltip(`<b style="font-size:var(--t-sm)">${wn}</b>${ovRows}`, { sticky:true, opacity:.94 }).openTooltip(e.latlng);
       });
       lyr.on('mouseout', () => { if (wn !== selW) lyr.setStyle(wstyle(wn, curOv, 'default')); });
     }
@@ -7295,7 +7385,7 @@ function showLSOA(feat) {
     <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:6px">
       <div>
         <span class="gpill" style="background:#fdebd0;color:#e67e22;border:1px solid #e67e22">LSOA</span>
-        <span style="font-size:11px;color:#666;margin-left:4px">in ${props.ward}</span>
+        <span style="font-size:var(--t-xs);color:var(--ink-2);margin-left:4px">in ${props.ward}</span>
       </div>
       <button class="deselect-btn" onclick="deselectLSOA()" title="Deselect this LSOA">Deselect &times;</button>
     </div>
@@ -7990,7 +8080,7 @@ function buildEmbeddedLSOALayer() {
     onEachFeature: (feat, lyr) => {
       const p = feat.properties;
       lyr.on('click', () => {
-        // In Report builder the map is how you draw the area, so a click adds
+        // In Custom area the map is how you draw the area, so a click adds
         // this neighbourhood to it or takes it out again, rather than opening
         // one LSOA's profile over the panel doing the building.
         if (window.PH_REPORT && window.PH_REPORT.active()) {
@@ -8011,7 +8101,7 @@ function buildEmbeddedLSOALayer() {
         // style from imdStyle(..., 'selected').
         const decStr = p.imd_decile ? `IMD decile ${p.imd_decile}` : '';
         const ovRows = ovTooltipRows(k => lsoaOvValue(p.code, k));
-        lyr.bindTooltip(`<b style="font-size:11px">${p.name}</b><br><span style="font-size:10px;color:#888">${p.ward}</span>${decStr ? '<br><span style="font-size:10px">'+decStr+'</span>' : ''}${ovRows}`, {sticky:true, opacity:.94}).openTooltip(e.latlng);
+        lyr.bindTooltip(`<b style="font-size:var(--t-xs)">${p.name}</b><br><span style="font-size:var(--t-xs);color:var(--ink-3)">${p.ward}</span>${decStr ? '<br><span style="font-size:var(--t-xs)">'+decStr+'</span>' : ''}${ovRows}`, {sticky:true, opacity:.94}).openTooltip(e.latlng);
       });
       lyr.on('mouseout', () => {
         // No restyling on mouseout — nothing changed on mouseover.
@@ -8119,10 +8209,10 @@ function loadMsoaBoundaries() {
             const v = msoaOvValue(p.code, curOv);
             const shown = (curOv && curOv !== 'none' && ovHasLevel(curOv, 'msoa')
                            && v != null && !isNaN(parseFloat(v)))
-              ? `<br><span style="font-size:10px">${_esc(_ovLabel(curOv))}: <b>${fmtOv(parseFloat(v), curOv)}</b></span>`
+              ? `<br><span style="font-size:var(--t-xs)">${_esc(_ovLabel(curOv))}: <b>${fmtOv(parseFloat(v), curOv)}</b></span>`
               : '';
-            return `<b style="font-size:11px">${_esc(p.name || 'MSOA')}</b>` +
-                   `<br><span style="font-size:10px;color:#888">${_esc(p.code || '')}</span>` + shown;
+            return `<b style="font-size:var(--t-xs)">${_esc(p.name || 'MSOA')}</b>` +
+                   `<br><span style="font-size:var(--t-xs);color:var(--ink-3)">${_esc(p.code || '')}</span>` + shown;
           }, { sticky: true, opacity: 0.94 });
         },
       });
@@ -8546,7 +8636,7 @@ document.getElementById('ov').addEventListener('change', e => {
         info.style.display = 'inline-block';
         info.onclick = () => { panel.style.display = panel.style.display === 'block' ? 'none' : 'block'; };
         const lbl = (document.getElementById('ov').selectedOptions[0] || {}).text || curOv;
-        panel.innerHTML = `<div style="margin-bottom:3px"><b>${lbl}</b></div>${meta.desc}<div style="margin-top:5px;color:#888">${meta.g} · ${meta.src} · ${meta.yr}</div>`;
+        panel.innerHTML = `<div style="margin-bottom:3px"><b>${lbl}</b></div>${meta.desc}<div style="margin-top:5px;color:var(--ink-3)">${meta.g} · ${meta.src} · ${meta.yr}</div>`;
         panel.style.display = 'none';
       } else {
         info.style.display = 'none';
@@ -9293,10 +9383,10 @@ function _dropSearchPin(item) {
   const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   _searchPin.bindPopup(
     '<div style="font-weight:600;margin-bottom:2px">' + esc(label) + '</div>' +
-    (kind ? '<div style="font-size:11px;color:#4C6272">' + esc(kind) +
+    (kind ? '<div style="font-size:var(--t-xs);color:var(--ink-2)">' + esc(kind) +
             (sub ? ' · ' + esc(sub) : '') + '</div>' : '') +
     '<div style="margin-top:5px"><a href="#" class="search-pin-clear" ' +
-    'style="font-size:11px;color:#005EB8">Remove this pin</a></div>'
+    'style="font-size:var(--t-xs);color:var(--nhs-blue)">Remove this pin</a></div>'
   ).openPopup();
   _searchPin.on('popupopen', e => {
     const a = e.popup.getElement() && e.popup.getElement().querySelector('.search-pin-clear');
@@ -9686,18 +9776,18 @@ function _exportDialog(title, options, extras) {
     const modal = document.createElement('div');
     modal.style.cssText = 'background:#fff;border-radius:8px;box-shadow:0 12px 36px rgba(0,0,0,.25);padding:18px 20px;min-width:340px;max-width:480px';
     modal.innerHTML = `
-      <div style="font-size:14px;font-weight:600;color:#1a1a1a;margin-bottom:4px">${title}</div>
-      <div style="font-size:12px;color:#666;margin-bottom:14px">Pick what you want in the file.</div>
+      <div style="font-size:var(--t-lg);font-weight:600;color:#1a1a1a;margin-bottom:4px">${title}</div>
+      <div style="font-size:var(--t-sm);color:var(--ink-2);margin-bottom:14px">Pick what you want in the file.</div>
       <div class="ed-options"></div>
-      ${extras ? `<div style="margin-top:12px;padding-top:10px;border-top:1px solid #eee">${extras}</div>` : ''}
+      ${extras ? `<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--line-2)">${extras}</div>` : ''}
       <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">
-        <button class="ed-cancel" style="padding:7px 14px;border:1px solid #ddd;background:#fff;border-radius:5px;font-size:12px;cursor:pointer;color:#555">Cancel</button>
+        <button class="ed-cancel" style="padding:7px 14px;border:1px solid var(--line);background:#fff;border-radius:5px;font-size:var(--t-sm);cursor:pointer;color:var(--ink-2)">Cancel</button>
       </div>`;
     const optWrap = modal.querySelector('.ed-options');
     options.forEach((o, i) => {
       const b = document.createElement('button');
       b.style.cssText = 'display:block;width:100%;text-align:left;padding:10px 12px;margin-bottom:6px;border:1px solid #e0e0e0;background:#fafaf7;border-radius:6px;font-size:13px;cursor:pointer;color:#1a1a1a';
-      b.innerHTML = `<div style="font-weight:600">${o.label}</div>${o.desc ? `<div style="font-size:11px;color:#666;margin-top:2px">${o.desc}</div>` : ''}`;
+      b.innerHTML = `<div style="font-weight:600">${o.label}</div>${o.desc ? `<div style="font-size:var(--t-xs);color:var(--ink-2);margin-top:2px">${o.desc}</div>` : ''}`;
       b.addEventListener('mouseenter', () => b.style.background = '#f0efea');
       b.addEventListener('mouseleave', () => b.style.background = '#fafaf7');
       b.addEventListener('click', () => {
@@ -9796,8 +9886,8 @@ async function _prepareScreenForScreenshot(opts) {
   const banner = document.createElement('div');
   banner.style.cssText = 'position:fixed;top:14px;left:50%;transform:translateX(-50%);background:#1a2640;color:#fff;padding:10px 18px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.3);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;font-size:13px;z-index:99998;display:flex;align-items:center;gap:14px';
   banner.innerHTML = `
-    <span><strong>Screen ready for screenshot</strong> — use <kbd style="background:#fff;color:#1a2640;padding:2px 6px;border-radius:3px;font-family:monospace;font-size:11px">Win + Shift + S</kbd> (Windows) or <kbd style="background:#fff;color:#1a2640;padding:2px 6px;border-radius:3px;font-family:monospace;font-size:11px">Cmd + Shift + 4</kbd> (Mac), then click Done.</span>
-    <button id="screenshot-done" style="padding:6px 14px;border:1px solid #fff;background:#fff;color:#1a2640;border-radius:5px;font-size:12px;font-weight:600;cursor:pointer">Done</button>`;
+    <span><strong>Screen ready for screenshot</strong> — use <kbd style="background:#fff;color:#1a2640;padding:2px 6px;border-radius:3px;font-family:monospace;font-size:var(--t-xs)">Win + Shift + S</kbd> (Windows) or <kbd style="background:#fff;color:#1a2640;padding:2px 6px;border-radius:3px;font-family:monospace;font-size:var(--t-xs)">Cmd + Shift + 4</kbd> (Mac), then click Done.</span>
+    <button id="screenshot-done" style="padding:6px 14px;border:1px solid #fff;background:#fff;color:#1a2640;border-radius:5px;font-size:var(--t-sm);font-weight:600;cursor:pointer">Done</button>`;
   document.body.appendChild(banner);
 
   _screenshotState = {
@@ -9906,6 +9996,75 @@ document.querySelectorAll('.sb-tab').forEach(t => {
     // map-wrap grid geometry never changes (prevents white-screen bug).
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SIDEBAR TABS — keyboard, and keeping aria in step with the class
+// ═══════════════════════════════════════════════════════════════════════════
+// These are <button> elements now, so Tab and Enter work without any help.
+// This adds the two things the tab role promises beyond that: arrow keys move
+// within the strip, and only the selected tab is a tab stop, so the strip is
+// one stop rather than four.
+//
+// The active class is toggled from six places in this file (showWard, the
+// overlay pane, and four mode switches). Rather than thread a setter through
+// all six and hope nobody adds a seventh, an observer mirrors the class onto
+// aria-selected. The two cannot drift apart whoever does the toggling.
+(function wireSidebarTabs() {
+  const strip = document.querySelector('.sb-tabs');
+  if (!strip) return;
+  const tabs = Array.from(strip.querySelectorAll('.sb-tab'));
+  if (!tabs.length) return;
+
+  let syncing = false;
+  const sync = () => {
+    if (syncing) return;
+    syncing = true;
+    tabs.forEach(t => {
+      const on = t.classList.contains('active');
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+      t.tabIndex = on ? 0 : -1;
+    });
+    syncing = false;
+  };
+  // attributeFilter keeps this to class changes, and the guard above stops the
+  // observer seeing its own aria writes.
+  new MutationObserver(sync).observe(strip, {
+    subtree: true, attributes: true, attributeFilter: ['class'],
+  });
+  sync();
+
+  strip.addEventListener('keydown', e => {
+    const from = tabs.indexOf(document.activeElement);
+    if (from < 0) return;
+    let to = -1;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') to = (from + 1) % tabs.length;
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') to = (from - 1 + tabs.length) % tabs.length;
+    else if (e.key === 'Home') to = 0;
+    else if (e.key === 'End') to = tabs.length - 1;
+    if (to < 0) return;
+    e.preventDefault();
+    tabs[to].focus();
+    tabs[to].click();
+  });
+}());
+
+// The opening hint at the top of the Indicators pane. localStorage rather than
+// session, because it introduces the tool: someone who has read it once has
+// read it, and showing it again on every visit turns an introduction into
+// furniture.
+(function wireStartHint() {
+  const hint = document.getElementById('start-hint');
+  const close = document.getElementById('start-hint-x');
+  if (!hint || !close) return;
+  const KEY = 'ph_start_hint_seen';
+  try {
+    if (window.localStorage.getItem(KEY)) hint.classList.add('gone');
+  } catch (e) { /* private mode: show it, which is the safe way to be wrong */ }
+  close.addEventListener('click', () => {
+    hint.classList.add('gone');
+    try { window.localStorage.setItem(KEY, '1'); } catch (e) {}
+  });
+}());
 
 // ═══════════════════════════════════════════════════════════════════════════
 // FILL / BORDER SLIDERS — live restyle so fills & borders can be stacked
@@ -12145,8 +12304,8 @@ loadData();
       },
     },
     {
-      t: 'Report builder: make a spreadsheet',
-      n: '<strong>Report builder</strong> writes a spreadsheet with the columns you ' +
+      t: 'Data export: make a spreadsheet',
+      n: '<strong>Data export</strong> writes a spreadsheet with the columns you ' +
          'choose. It asks three questions. Which size of area, so each area is a row. ' +
          'Where, all of London or one borough. Which figures, so each figure is a ' +
          'column. Nothing is averaged or combined in this file. ' +
@@ -12551,7 +12710,7 @@ loadData();
     renderReportPane();
   }
 
-  // showLSOA calls this before doing anything else, so in Report builder mode
+  // showLSOA calls this before doing anything else, so in Custom area mode
   // a click on the map adds to the area instead of opening one LSOA's profile.
   window.PH_REPORT = {
     active: function () { return currentMode === 'report'; },
@@ -12674,7 +12833,7 @@ loadData();
       '<th>How it was combined</th></tr>' + rows + '</table>' +
       '<h2>Small areas included</h2><table><tr><th>LSOA</th><th>Name</th><th>Ward</th>' +
       '<th>Borough</th><th>Population</th></tr>' + list + '</table>' +
-      '<h2>Source</h2><p style="color:#4c6272;font-size:12px">Built with PopHealth Map, ' +
+      '<h2>Source</h2><p style="color:var(--ink-2);font-size:var(--t-sm)">Built with PopHealth Map, ' +
       'pophealth.uk. Figures are the same ones the map draws; see the methodology page ' +
       'for where each comes from and what it cannot tell you.</p>' +
       '</div><div class="actions">' +
