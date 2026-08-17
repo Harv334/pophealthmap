@@ -1259,10 +1259,6 @@
     border: 1px solid transparent; border-radius: 3px; padding: 0 4px;
     white-space: nowrap; flex-shrink: 0; font-weight: 600;
     letter-spacing: .01em; cursor: help; }
-  .ov-opt .ov-spread { font-size: var(--t-xs); color: #8A5A00; background: #FDF0D5;
-    border: 1px solid #E8D3A3; border-radius: 3px; padding: 0 3px;
-    white-space: nowrap; flex-shrink: 0;
-    font-variant-numeric: tabular-nums; cursor: help; }
   /* There was a dark-mode override here, for this one badge, on a site that
      has no dark mode. On a machine set to dark it turned a single amber chip
      into a dark chip in the middle of an otherwise light page, which reads as
@@ -2005,12 +2001,12 @@
         <div class="sb-sec" style="padding-bottom:6px">
           <label class="lrow" style="padding:2px 0;border:none">
             <div class="ldot" style="background:#854F0B"></div>
-            <span class="lname">Show VCSE organisations <span class="lcount" id="vcse-tab-count">0</span></span>
+            <span class="lname">Show VCSE organisations <span class="lcount" id="vcse-tab-count"></span></span>
             <input type="checkbox" id="vcse-tab-toggle">
           </label>
           <label class="lrow" style="padding:2px 0;border:none">
             <div class="ldot" style="background:#5C5C8A"></div>
-            <span class="lname">Show Community Interest Companies <span class="lcount" id="cic-tab-count">0</span> <span class="cov-tag" title="North West London boroughs only">NWL</span></span>
+            <span class="lname">Show Community Interest Companies <span class="lcount" id="cic-tab-count"></span> <span class="cov-tag" title="North West London boroughs only">NWL</span></span>
             <input type="checkbox" id="cic-tab-toggle">
           </label>
           <div style="font-size:var(--t-xs);color:var(--ink-3);margin:4px 0 2px 24px;line-height:1.4">
@@ -2065,7 +2061,7 @@
             <div class="vcse-tag-list"></div>
           </details>
         </div>
-        <div class="vcse-count" id="vcse-count">loading...</div>
+        <div class="vcse-count" id="vcse-count"></div>
         <div class="vcse-list" id="vcse-list"></div>
       </div>
 
@@ -3145,17 +3141,6 @@ function indLevelsMeasured(k) {
   var out = Object.keys(st.lv);
   return out.length ? out : null;
 }
-/* How many distinct values an indicator has at a level, against how many areas
-   carry one. 679 wards holding 32 distinct values is a borough series written
-   onto every ward in it, which will draw 32 blocks of colour rather than a
-   choropleth. Worth knowing before choosing it, not after the map looks
-   broken. */
-function indSpread(k, level) {
-  var st = indStats(k);
-  var e = st && st.lv && st.lv[level];
-  if (!e || !e.n) return null;
-  return { n: e.n, d: e.d, ratio: e.d / e.n };
-}
 
 // Transparency state — controlled by sliders
 // fillOpacityMult is an absolute fill opacity in [0,1]; 0 = fully transparent, 1 = opaque.
@@ -4227,6 +4212,68 @@ function _updateLayerCounts() {
   } catch (e) { console.warn('_updateLayerCounts failed', e); }
 }
 
+/* ── Counts for layers that have not loaded yet ────────────────────────────
+   The point layers, VCSE, CICs and the LSOA boundaries are fetched on demand,
+   which left their counts blank until the reader ticked the box. Blank was at
+   least honest, but it withheld the one number that helps somebody decide
+   whether to switch a layer on at all: "1,737" next to Pharmacies is wanted
+   before the click, not after it.
+
+   So the counts are measured from the payloads at build time by
+   scripts/build_layer_counts.py and read from a 459-byte file here. The
+   generator mirrors each loader's own counting rule, because a number that
+   disagreed with what the layer shows once loaded would be worse than none:
+   the six point layers count records with a usable lat and lng, VCSE counts
+   what it can pin and also reports the declared total, CICs report every
+   record.
+
+   The live count still overwrites this the moment a layer loads. That is not
+   redundancy, it is the check: if the two ever disagree, the generator has
+   not been re-run since the data was refreshed. */
+function applyPrefetchedCounts() {
+  // The manifest first, because dataUrl stamps the data version onto the path
+  // and this runs before loadData. Without the wait the URL is unversioned and
+  // a refreshed dataset would be reported with counts out of the browser cache,
+  // which is the one way this file could tell a lie.
+  return loadManifest()
+    .then(() => fetch(dataUrl('data/meta/layer_counts.json')))
+    .then(r => (r.ok ? r.json() : null))
+    .catch(() => null)
+    .then(payload => {
+      const c = payload && payload.counts;
+      if (!c) return;
+      const setIf = (id, n) => {
+        const el = document.getElementById(id);
+        if (el && Number.isFinite(n)) el.textContent = n.toLocaleString();
+      };
+      setIf('dental-count', c.dental);
+      setIf('pharm-count', c.pharmacy);
+      setIf('schools-count', c.schools);
+      setIf('cc-count', c.cc);
+      setIf('lib-count', c.libraries);
+      setIf('esol-count', c.esol);
+      setIf('greenspace-count', c.greenspace);
+      setIf('lsoa-count', c.lsoa);
+      setIf('vcse-tab-count', c.vcse);
+      setIf('cic-tab-count', c.cics);
+      // The same sentence wireVCSE writes, so the panel does not change its
+      // wording when the records actually arrive.
+      const vc = document.getElementById('vcse-count');
+      if (vc && Number.isFinite(c.vcse) && Number.isFinite(c.vcse_total)) {
+        vc.textContent = `${c.vcse.toLocaleString()} mappable ` +
+                         `(of ${c.vcse_total.toLocaleString()} declared)`;
+      }
+      // Likewise the caption under Highlight Core20, which can only be counted
+      // from the IMD deciles and so went blank for anyone who never opened an
+      // LSOA. Same wording as the live updateCount in initCore20Toggle.
+      const c20 = document.getElementById('core20-count');
+      if (c20 && Number.isFinite(c.core20)) {
+        c20.textContent = c.core20.toLocaleString() + ' LSOAs in IMD deciles 1-2';
+      }
+    });
+}
+applyPrefetchedCounts();
+
 // ── Borough boundary layer ───────────────────────────────────────────────────
 // Per-feature style so that when a borough is focused we hide the other 8
 // outlines (opacity:0) and keep just the selected one.
@@ -4395,7 +4442,13 @@ function wireVCSE(records) {
   const n = VCSE_PINNED.length;
   const tot = VCSE_ALL.length;
   document.querySelectorAll('.lcount').forEach(el => {
-    if (el.parentElement && el.parentElement.textContent.includes('VCSE')) el.textContent = n;
+    // toLocaleString, because applyPrefetchedCounts has already written this
+    // number with a thousands separator and every other count on the panel has
+    // one. Without it the count visibly lost its comma the moment the layer
+    // loaded, which reads as the number having changed.
+    if (el.parentElement && el.parentElement.textContent.includes('VCSE')) {
+      el.textContent = n.toLocaleString();
+    }
   });
   const cnt = document.getElementById('vcse-count');
   if (cnt) cnt.textContent = `${n.toLocaleString()} mappable (of ${tot.toLocaleString()} declared)`;
@@ -7039,40 +7092,30 @@ function _applyBoroughSolo() {
      share a single width budget, so a long indicator name shortens the block
      rather than pushing part of it onto its own line. */
   function rowMeta(o) {
-    const inner = srcTag(o) + levelPills(o) + spreadNote(o);
+    const inner = srcTag(o) + levelPills(o);
     return inner ? '<span class="ov-lvls">' + inner + '</span>' : '';
   }
 
-  /**
-   * "704 wards, 33 figures" — said before the click, not discovered after it.
-   *
-   * The borough Fingertips series are written onto every ward in the borough,
-   * so choosing one draws 33 blocks of colour. Nothing on screen said so: the
-   * pill read "Ward", the map shaded, and the only clue that it was not a ward
-   * pattern was noticing that whole boroughs shared a shade. People reasonably
-   * concluded the map was broken.
-   *
-   * The ratio of distinct values to areas is measured by the pipeline, so this
-   * is a fact about the payload rather than a rule about which sources are
-   * coarse — a new source that happens to be coarse gets flagged without
-   * anyone adding it to a list. Only shown when it is low enough to matter;
-   * a genuinely varying indicator gets no note, because a note on everything
-   * is a note on nothing.
-   */
-  function spreadNote(o) {
-    if (typeof indSpread !== 'function') return '';
-    const lv = (o.levels && o.levels.indexOf('ward') !== -1) ? 'ward'
-             : (o.levels && o.levels[0]) || o.native;
-    if (!lv) return '';
-    const sp = indSpread(o.value, lv);
-    if (!sp || sp.ratio > 0.25 || sp.n < 20) return '';
-    const title = sp.d + ' distinct ' + (sp.d === 1 ? 'value' : 'values') +
-      ' across ' + sp.n + ' ' + _levelTitle(lv) + (sp.n === 1 ? '' : 's') +
-      '. This is published at a larger geography and repeated, so it will draw ' +
-      'in blocks rather than vary area by area.';
-    return '<span class="ov-spread" title="' + esc(title) + '">' +
-      sp.d.toLocaleString() + ' of ' + sp.n.toLocaleString() + '</span>';
-  }
+  /* The "32 of 679" badge that used to sit on this row has been removed.
+     It was meant to warn that an indicator is published at a larger geography
+     and repeated onto wards, so it draws in blocks rather than varying area by
+     area. That is a real thing worth warning about, but a ratio of distinct
+     values to areas cannot detect it, and the badge was wrong on a good share
+     of the 45 rows it appeared on.
+
+     It cannot tell a repeated series from an integer with a small range. It
+     flagged gp_practice_count as "7 of 555", because a ward holds nought to
+     six GP practices; total_lsoa_count as "14 of 684"; and, worst of all,
+     imd_decile as "10 of 4,994", with a tooltip saying it would draw in blocks
+     rather than vary area by area. A decile has ten possible values by
+     definition and varies LSOA by LSOA. The badge was telling the reader that
+     the most carefully constructed indicator on the site was broken.
+
+     Warning about genuinely coarse data needs the pipeline to record the
+     geography a figure was published at, which it knows, rather than inferring
+     it from the shape of the numbers, which cannot be done. Until then no
+     badge is better than a wrong one. indSpread went with it; nothing else
+     used it. */
 
   /* ── Recent ───────────────────────────────────────────────────────────────
      With 125 indicators and heading for several times that, the number anyone

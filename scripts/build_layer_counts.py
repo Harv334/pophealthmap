@@ -1,0 +1,153 @@
+"""Count the records in each lazily loaded layer, ahead of loading it.
+
+The point layers and the LSOA boundaries are fetched on demand now, which left
+the counts beside them blank until the reader ticked the box. Blank was honest
+but unhelpful: "1,737" beside Pharmacies is the number somebody wants before
+deciding whether to switch the layer on, not after.
+
+So the counts are measured here, from the committed payloads, and written to a
+small file the map reads at startup. The whole thing is well under a kilobyte
+against the 13.6 MB it saves loading.
+
+The counting rules mirror the loaders in index.html exactly, and they have to.
+A number here that disagrees with the number the layer shows once loaded would
+be worse than no number at all:
+
+  - the six point layers count records with a truthy lat and lng, which is the
+    `if (!p.lat || !p.lng) return;` guard in each load function,
+  - VCSE counts what it can pin, `sc === 'explicit' && hq && lat != null &&
+    lng != null`, and also reports the declared total,
+  - CICs report every record, which is what wireCICs writes,
+  - greenspaces and LSOAs are feature collections, so it is the feature count.
+
+Run after any data refresh, and check the numbers against the console lines
+the loaders print:
+
+    py scripts/build_layer_counts.py
+"""
+
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+OUT = ROOT / "data" / "meta" / "layer_counts.json"
+
+
+def load(name: str):
+    path = ROOT / name
+    if not path.exists():
+        print(f"  {name}: missing, skipped", file=sys.stderr)
+        return None
+    with path.open(encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+def mappable(rows) -> int:
+    """The `if (!p.lat || !p.lng) return;` guard the six point loaders share.
+    Falsy rather than None, so a 0 counts as missing exactly as it does there."""
+    if not isinstance(rows, list):
+        return 0
+    return sum(1 for r in rows if isinstance(r, dict) and r.get("lat") and r.get("lng"))
+
+
+def features(gj) -> int:
+    if isinstance(gj, dict):
+        return len(gj.get("features") or [])
+    if isinstance(gj, list):
+        return len(gj)
+    return 0
+
+
+def read_js_const(name: str, var: str):
+    """Parse one of the data/map/*.js files, which are JS assignments rather
+    than JSON."""
+    path = ROOT / name
+    if not path.exists():
+        print(f"  {name}: missing, skipped", file=sys.stderr)
+        return None
+    text = path.read_text(encoding="utf-8")
+    marker = f"var {var} = "
+    if marker not in text:
+        return None
+    start = text.index(marker) + len(marker)
+    return json.loads(text[start : text.rindex("}") + 1])
+
+
+def main() -> int:
+    counts: dict[str, int] = {}
+
+    print("point layers (records with a usable lat and lng):")
+    for key, filename in (
+        ("dental", "dental_practices.json"),
+        ("pharmacy", "pharmacies.json"),
+        ("schools", "schools.json"),
+        ("cc", "community_centres.json"),
+        ("libraries", "libraries.json"),
+        ("esol", "esol_providers.json"),
+    ):
+        rows = load(filename)
+        if rows is None:
+            continue
+        counts[key] = mappable(rows)
+        print(f"  {key:10s} {counts[key]:>7,}  of {len(rows):>7,} in the file")
+
+    vcse = load("vcse_data.json")
+    if vcse is not None:
+        pinned = sum(
+            1
+            for r in vcse
+            if isinstance(r, dict)
+            and r.get("sc") == "explicit"
+            and r.get("hq")
+            and r.get("lat") is not None
+            and r.get("lng") is not None
+        )
+        counts["vcse"] = pinned
+        counts["vcse_total"] = len(vcse)
+        print(f"\nVCSE:      {pinned:>7,} mappable of {len(vcse):,} declared")
+
+    cics = load("cics.json")
+    if cics is not None:
+        # wireCICs writes CIC_ALL.length, not the mappable subset.
+        counts["cics"] = len(cics)
+        print(f"CICs:      {len(cics):>7,}")
+
+    grn = load("greenspaces.geojson")
+    if grn is not None:
+        counts["greenspace"] = features(grn)
+        print(f"greenspace {counts['greenspace']:>7,}")
+
+    # LSOA total, and the Core20 subset. The Core20 caption under that toggle
+    # can only be counted from the deciles, so without this it stayed blank for
+    # anybody who never opened an LSOA.
+    lsoa = read_js_const("data/map/lsoa_imd.js", "LSOA_IMD")
+    if lsoa:
+        feats = lsoa.get("features") or []
+        counts["lsoa"] = len(feats)
+        counts["core20"] = sum(
+            1
+            for f in feats
+            if (f.get("properties") or {}).get("imd_decile") in (1, 2)
+        )
+        print(f"LSOAs:     {counts['lsoa']:>7,}")
+        print(f"Core20:    {counts['core20']:>7,}  (IMD deciles 1 and 2)")
+
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "_comment": (
+            "Generated by scripts/build_layer_counts.py. Record counts for the "
+            "layers the map loads on demand, so their counts can be shown "
+            "before the payload is fetched. Re-run after a data refresh."
+        ),
+        "counts": counts,
+    }
+    OUT.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    print(f"\nwrote {OUT.relative_to(ROOT)}, {OUT.stat().st_size} bytes")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
