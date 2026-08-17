@@ -7035,12 +7035,11 @@ function _applyBoroughSolo() {
       map.fitBounds(wLyr.getBounds(), { padding: [28, 28] });
     }
 
-    // Focusing a board draws it, because the outline is what tells you where
-    // the thing you have just narrowed to actually ends.
-    if (focusedIcb) {
-      const cb = document.getElementById('ticb');
-      if (cb && !cb.checked) { cb.checked = true; cb.dispatchEvent(new Event('change')); }
-    }
+    // Focusing a board deliberately does NOT switch the ICB regions layer on.
+    // Choosing a scope is not the same as asking to see the regions drawn, and
+    // a focus that quietly ticks a box and paints four coloured washes over
+    // the map is doing something the reader did not ask for. The layer has its
+    // own checkbox directly above this control.
 
     applyBoroughLock();
     if (typeof _announce === 'function') {
@@ -7117,12 +7116,11 @@ function _applyBoroughSolo() {
       map.fitBounds(wLyr.getBounds(), { padding: [28, 28] });
     }
 
-    // Focusing a board draws it, because the outline is what tells you where
-    // the thing you have just narrowed to actually ends.
-    if (focusedIcb) {
-      const cb = document.getElementById('ticb');
-      if (cb && !cb.checked) { cb.checked = true; cb.dispatchEvent(new Event('change')); }
-    }
+    // Focusing a board deliberately does NOT switch the ICB regions layer on.
+    // Choosing a scope is not the same as asking to see the regions drawn, and
+    // a focus that quietly ticks a box and paints four coloured washes over
+    // the map is doing something the reader did not ask for. The layer has its
+    // own checkbox directly above this control.
 
     applyBoroughLock();
     if (typeof _announce === 'function') {
