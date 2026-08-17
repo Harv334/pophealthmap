@@ -200,6 +200,10 @@ def main() -> int:
         ),
         "order": list(ICBS.keys()),
         "colours": COLOURS,
+        # The full board name, so the focus control and the map tooltip say the
+        # same thing and neither has to build it out of a short name.
+        "labels": {name: f"NHS {name} ICB" for name in ICBS},
+        "counts": {name: len(members) for name, members in ICBS.items()},
         "lad_to_icb": {b: name for name, members in ICBS.items() for b in members},
     }
     LOOKUP.write_text(

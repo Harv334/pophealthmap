@@ -2119,8 +2119,9 @@
                different sizes of thing, and one list offering both made the
                reader work out which kind each row was before choosing. -->
           <div style="margin:2px 0 8px 18px">
-            <select id="icb-focus" aria-label="Focus on an Integrated Care Board" style="width:100%;padding:4px 6px;border:1px solid var(--line);border-radius:5px;font-size:var(--t-xs);color:var(--ink);background:var(--paper)">
-              <option value="all">All boards</option>
+            <div style="font-size:var(--t-xs);color:var(--ink-2);margin-bottom:3px">Focus by ICB</div>
+            <select id="icb-focus" aria-label="Focus by Integrated Care Board" style="width:100%;padding:4px 6px;border:1px solid var(--line);border-radius:5px;font-size:var(--t-xs);color:var(--ink);background:var(--paper)">
+              <option value="all">All ICBs</option>
             </select>
           </div>
           <label class="lrow"><div style="width:9px;height:9px;border:2px solid #1a1a1a;border-radius:2px;flex-shrink:0"></div><span class="lname">London boroughs</span><input type="checkbox" id="tb"></label>
@@ -3835,6 +3836,7 @@ var focusedIcb = null;
 var ICB_OF_LAD = {};      // borough name -> ICB name, from icb_lookup.json
 var ICB_ORDER = [];       // the five, in the order the generator lists them
 var ICB_COLOUR = {};
+var ICB_LABEL = {};   // short name -> "NHS <name> ICB", from the same lookup
 
 function focusActive() {
   return !!focusedIcb || !!(focusedBorough && focusedBorough !== 'all');
@@ -3882,7 +3884,7 @@ function focusedLadCodes() {
 
 /** What the focus is called, for the viewing strip and announcements. */
 function focusLabel() {
-  if (focusedIcb) return 'NHS ' + focusedIcb + ' ICB';
+  if (focusedIcb) return ICB_LABEL[focusedIcb] || ('NHS ' + focusedIcb + ' ICB');
   if (focusedBorough && focusedBorough !== 'all') return focusedBorough;
   return null;
 }
@@ -7023,11 +7025,17 @@ function _applyBoroughSolo() {
       ICB_OF_LAD = d.lad_to_icb;
       ICB_ORDER = d.order || Object.keys(d.colours || {});
       ICB_COLOUR = d.colours || {};
+      ICB_LABEL = d.labels || {};
       ICB_ORDER.forEach(name => {
-        const n = Object.keys(ICB_OF_LAD).filter(l => ICB_OF_LAD[l] === name).length;
+        const n = (d.counts && d.counts[name]) ||
+          Object.keys(ICB_OF_LAD).filter(l => ICB_OF_LAD[l] === name).length;
         const opt = document.createElement('option');
         opt.value = name;
-        opt.textContent = name + ' (' + n + ' boroughs)';
+        // The full board name, not the short one. "West and North London" on
+        // its own reads like a description; "NHS West and North London ICB"
+        // reads like the board it is, which matters most for the one that is
+        // a merger of two boards people still know by their old names.
+        opt.textContent = (ICB_LABEL[name] || name) + ' (' + n + ' boroughs)';
         sel.appendChild(opt);
       });
     });
