@@ -1732,16 +1732,22 @@
         </div>
         <div class="sb-sec" id="vcse-tag-filter" style="padding-top:0;padding-bottom:8px">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-            <div class="sb-lbl" style="margin-bottom:0">Filter by tags</div>
+            <!-- The scope is in the heading rather than under it. The tags come
+                 from the Charity Commission's own classification of what a
+                 charity does, who it helps and how; CICs are registered with
+                 Companies House and carry none of it, so a tag filter can
+                 neither include nor exclude them. That used to be explained in
+                 three lines of grey text between the heading and the first tag,
+                 which is a lot of reading to reach a checkbox and easy to skip
+                 — and skipping it was the whole problem, because the CIC count
+                 then looks like it has quietly dropped. One word in the heading
+                 does the same work: "charities" says which of the two lists
+                 above this is about. The rest is on the ? for anyone who wants
+                 it, and one short line stays visible for anyone who does not. -->
+            <div class="sb-lbl" style="margin-bottom:0">Filter charities by tag<span class="lhelp" title="The tags are the Charity Commission's own classification of what a charity does, how it helps and whom it helps. Community Interest Companies are registered with Companies House instead and carry no tags at all, so this filter cannot include or exclude them: whatever you tick here, every CIC currently shown stays shown.">?</span></div>
             <button type="button" id="vcse-tag-clear" style="font-size:11px;color:#666;background:none;border:none;cursor:pointer;padding:0;text-decoration:underline;display:none">clear</button>
           </div>
-          <!-- The tags come from the Charity Commission's own classification of
-               what a charity does, who it helps and how. CICs are registered
-               with Companies House and carry none of it, so a tag filter is
-               not a filter that can include or exclude them. Saying so here
-               stops the count looking like it has lost the CICs. -->
-          <div class="cov-note" style="margin:0 0 6px">These tags are the Charity Commission's own, so they filter
-            registered charities only. Community Interest Companies are not tagged and are unaffected.</div>
+          <div class="cov-note" style="margin:0 0 6px">Charity Commission tags. CICs have none, so they are not filtered.</div>
           <details class="vcse-tag-group" data-fam="wt">
             <summary>What they do <span class="vcse-tag-count"></span></summary>
             <div class="vcse-tag-list"></div>
