@@ -1299,13 +1299,6 @@
     background: var(--paper-2); border-bottom: 1px solid var(--line); font-size: var(--t-xs);
     font-weight: 600; color: var(--ink-2); user-select: none; }
   .ov-grp-hd:hover { background: var(--nhs-light); }
-  /* Recently used is capped at six and always open, so its header is a label
-     rather than a control. Given the pointer and the hover of a collapsible
-     header it would invite a click that does nothing. */
-  .ov-grp-recent > .ov-grp-hd { cursor: default; }
-  .ov-grp-recent > .ov-grp-hd:hover { background: var(--paper-2); }
-  .ov-grp-recent > .ov-grp-hd .ov-arrow { visibility: hidden; }
-  .ov-grp-recent { border-bottom: 2px solid var(--line); }
   .ov-grp-hd .ov-arrow { color: var(--ink-3); font-size: 8px; transition: transform .12s;
     flex-shrink: 0; }
   .ov-grp-hd.open .ov-arrow { transform: rotate(90deg); }
@@ -2518,7 +2511,7 @@
 
         <div class="cb-step">
           <h3><span class="cb-n">2</span>Where?</h3>
-          <div class="cb-help">Choose all of London or one borough.</div>
+          <div class="cb-help">Choose all of London, one ICB, or one borough.</div>
           <select class="q-f" id="cb-scope" aria-label="Which places to include">
             <option value="">All of London</option>
           </select>
@@ -2555,7 +2548,7 @@
           <input type="search" class="dir-search" id="dir-q" autocomplete="off"
                  placeholder="Search by name, address or postcode" aria-label="Search the directory">
           <div class="dir-row2">
-            <select class="q-f" id="dir-borough" aria-label="Borough"><option value="">All of London</option></select>
+            <select class="q-f" id="dir-borough" aria-label="Where: all of London, an ICB, or a borough"><option value="">All of London</option></select>
             <button type="button" class="ws-btn" id="dir-csv">CSV</button>
           </div>
           <div class="dir-types" id="dir-types"></div>
@@ -3880,6 +3873,62 @@ function focusedLadCodes() {
     if (code) out.push(code);
   });
   return out;
+}
+
+/* ── Scope pickers ────────────────────────────────────────────────────────
+   Query, Data export and the Directory each offer a place to narrow to. They
+   were borough-only, and each compared a LAD name its own way. These two
+   functions are what they share now, so a board is an option everywhere a
+   borough is and every picker means the same thing by a value.
+
+   A scope value is one of: '' or 'all' for everywhere, 'icb:<board>' for a
+   board, or a borough name. */
+function scopeMatchesLad(scope, lad) {
+  if (!scope || scope === 'all') return true;
+  if (!lad) return false;
+  if (scope.indexOf('icb:') === 0) {
+    const want = scope.slice(4);
+    const norm = (lad === 'City of Westminster') ? 'Westminster' : lad;
+    return ICB_OF_LAD[lad] === want || ICB_OF_LAD[norm] === want;
+  }
+  return _sameLad(lad, scope);
+}
+
+/** What a scope value should be called on screen. */
+function scopeLabel(scope) {
+  if (!scope || scope === 'all') return '';
+  if (scope.indexOf('icb:') === 0) {
+    const n = scope.slice(4);
+    return ICB_LABEL[n] || ('NHS ' + n + ' ICB');
+  }
+  return scope;
+}
+
+/* The options every picker shares: all of London, then the boards, then the
+   boroughs. Boards first because they are the larger geography, and grouped
+   so the two kinds are never mistaken for one list. */
+function scopeOptionsHtml(selected, esc) {
+  const e = esc || function (s) { return String(s); };
+  let html = '<option value=""' + (!selected ? ' selected' : '') + '>All of London</option>';
+  if (ICB_ORDER && ICB_ORDER.length) {
+    html += '<optgroup label="Integrated Care Boards">';
+    ICB_ORDER.forEach(function (name) {
+      const v = 'icb:' + name;
+      html += '<option value="' + e(v) + '"' + (v === selected ? ' selected' : '') + '>' +
+              e(ICB_LABEL[name] || name) + '</option>';
+    });
+    html += '</optgroup>';
+  }
+  const lads = Object.keys(ICB_OF_LAD).sort();
+  if (lads.length) {
+    html += '<optgroup label="Boroughs">';
+    lads.forEach(function (b) {
+      html += '<option value="' + e(b) + '"' + (b === selected ? ' selected' : '') + '>' +
+              e(b) + '</option>';
+    });
+    html += '</optgroup>';
+  }
+  return html;
 }
 
 /** What the focus is called, for the viewing strip and announcements. */
@@ -7548,33 +7597,10 @@ function _applyBoroughSolo() {
      badge is better than a wrong one. indSpread went with it; nothing else
      used it. */
 
-  /* ── Recent ───────────────────────────────────────────────────────────────
-     With 125 indicators and heading for several times that, the number anyone
-     actually uses in a sitting is about five. Without this the fifth look at
-     the same indicator costs the same as the first: open the group, or type
-     enough of the name. Recency is kept rather than a hand-curated favourites
-     list, because it needs no decision from the reader and is right by the
-     second use.
-
-     localStorage, not session: coming back tomorrow to the work you were doing
-     yesterday is the case this is for. Capped, and the cap is small on purpose
-     — a long recent list is just the full list again, in a worse order. */
-  const RECENT_KEY = 'phOvRecent';
-  const RECENT_MAX = 6;
-  function recentGet() {
-    try {
-      const v = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]');
-      return Array.isArray(v) ? v.filter(x => typeof x === 'string') : [];
-    } catch (e) { return []; }
-  }
-  function recentPush(value) {
-    if (!value || value === 'none') return;
-    try {
-      const next = [value].concat(recentGet().filter(v => v !== value))
-        .slice(0, RECENT_MAX);
-      localStorage.setItem(RECENT_KEY, JSON.stringify(next));
-    } catch (e) { /* private mode: recency is a convenience, not a feature */ }
-  }
+  /* A "Recently used" group used to sit above the list here, filled from
+     localStorage. Removed: with the search box and the subject groups both
+     directly above the indicators, it was a third route to the same rows that
+     pushed the real list down the pane every time it appeared. */
 
   const openGroups = {};   // label -> bool
   let filter = '';
@@ -7590,34 +7616,6 @@ function _applyBoroughSolo() {
     const q = filter.trim().toLowerCase();
     let html = '';
     let shown = 0;
-
-    // Recently used, above everything, and only when not searching — a search
-    // is already a direct route, and a Recent block sitting above its results
-    // would just push them down.
-    if (!q) {
-      const byValue = {};
-      model.forEach(g => g.opts.forEach(o => { byValue[o.value] = o; }));
-      const recent = recentGet().map(v => byValue[v]).filter(Boolean);
-      if (recent.length) {
-        html += '<div class="ov-grp ov-grp-recent">' +
-          '<div class="ov-grp-hd open" data-recent="1" aria-expanded="true">' +
-            '<span class="ov-arrow">&#9654;</span>' +
-            '<span class="ov-grp-nm">Recently used</span>' +
-            '<span class="ov-grp-n">' + recent.length + '</span>' +
-          '</div>' +
-          '<div class="ov-grp-body open">' +
-            recent.map(o =>
-              '<label class="ov-opt' + (o.value === cur ? ' on' : '') + '">' +
-                '<input type="checkbox" data-ov="' + esc(o.value) + '"' +
-                  (o.value === cur ? ' checked' : '') + '>' +
-                '<span class="ov-opt-body">' +
-                  '<span class="ov-opt-nm">' + esc(o.name) + '</span>' +
-                  rowMeta(o) +
-                '</span>' +
-              '</label>').join('') +
-          '</div></div>';
-      }
-    }
 
     model.forEach((g, gi) => {
       // Level is searchable now that it is shown: typing "msoa" is a reasonable
@@ -7689,10 +7687,6 @@ function _applyBoroughSolo() {
   }
 
   function choose(value) {
-    // Recorded before the gate has its say. Reaching for an indicator is what
-    // makes it recent, even on the occasions the gate sends you to another
-    // level to see it — that is still the one you were looking for.
-    recentPush(value);
     // Through the select, so the level gate, the legend, the URL writer and
     // everything else downstream behave exactly as they did for the dropdown.
     sel.value = value;
@@ -10494,22 +10488,20 @@ function _pngNormBorough(s) {
 // being a NW London tool).
 function _pngScopeFeatures() {
   if (typeof BOROUGH_GJ === 'undefined' || !BOROUGH_GJ.features) return [];
-  const scopeRaw = (typeof focusedBorough !== 'undefined' && focusedBorough && focusedBorough !== 'all')
-    ? focusedBorough : null;
-  if (!scopeRaw) return BOROUGH_GJ.features;
-  const target = _pngNormBorough(scopeRaw);
+  // Every borough in scope, which is one for a borough focus and up to
+  // thirteen for a board. The mask whitens whatever is not returned here.
+  if (typeof focusActive !== 'function' || !focusActive()) return BOROUGH_GJ.features;
   return BOROUGH_GJ.features.filter(f => {
     const p = f.properties || {};
     const name = p.LAD24NM || p.lad_name || p.name || p.LAD22NM;
-    return _pngNormBorough(name) === target;
+    return ladInFocus(name);
   });
 }
 
 // Human-readable scope name for the caption + filename.
 function _pngScopeLabel() {
-  const scopeRaw = (typeof focusedBorough !== 'undefined' && focusedBorough && focusedBorough !== 'all')
-    ? focusedBorough : null;
-  return scopeRaw ? scopeRaw.replace(/^City of /, '') : 'London';
+  const label = (typeof focusLabel === 'function') ? focusLabel() : null;
+  return label ? label.replace(/^City of /, '') : 'London';
 }
 
 // L.LatLngBounds for the current scope — used both to fit the map before
@@ -10549,7 +10541,8 @@ function _downloadOverlayCsv() {
     const ov = (typeof curOv !== 'undefined' && curOv !== 'none') ? curOv : null;
     const isLsoa = ov && typeof isLsoaOnlyOv === 'function' && isLsoaOnlyOv(ov);
     const wantLsoa = isLsoa || (typeof currentDataLevel !== 'undefined' && currentDataLevel === 'lsoa');
-    const boroughFilter = (typeof focusedBorough !== 'undefined' && focusedBorough && focusedBorough !== 'all') ? focusedBorough : null;
+    // Whichever scope is on, board or borough. ladInFocus answers for both.
+    const scoped = (typeof focusActive === 'function') && focusActive();
     const core20Only    = (typeof showCore20Overlay !== 'undefined' && showCore20Overlay) === true;
     let nKept = 0, nSkipped = 0;
     if (wantLsoa && typeof LSOA_DATA !== 'undefined') {
@@ -10575,7 +10568,7 @@ function _downloadOverlayCsv() {
         const g = geoByCode[code] || {};
         const ward = g.ward || '';
         const lad  = g.borough || '';
-        if (boroughFilter && lad !== boroughFilter) { nSkipped++; continue; }
+        if (scoped && !ladInFocus(lad)) { nSkipped++; continue; }
         const dec = ind.imd_decile != null ? ind.imd_decile
                   : (g.imd_decile != null ? g.imd_decile : '');
         const isCore20 = (dec === 1 || dec === 2);
@@ -10596,7 +10589,7 @@ function _downloadOverlayCsv() {
         // and the code never, which would quietly break any join made against
         // it downstream. The real code is on the record.
         const wardCode = w.code || '';
-        if (boroughFilter && lad !== boroughFilter) { nSkipped++; continue; }
+        if (scoped && !ladInFocus(lad)) { nSkipped++; continue; }
         const row = [wardCode, w.name || key, lad];
         if (ov) row.push(w.indicators ? w.indicators[resolveOvField(ov)] : '');
         rows.push(row.map(_csvEscape).join(','));
@@ -10640,21 +10633,21 @@ function _downloadCsvBlob(filename, header, rows) {
 
 function _downloadPointLayersCsv() {
   const ts = new Date().toISOString().slice(0,16).replace(/[:T-]/g,'');
-  const boroughFilter = (typeof focusedBorough !== 'undefined' && focusedBorough && focusedBorough !== 'all') ? focusedBorough : null;
-  const scopeSlug = (boroughFilter ? boroughFilter : 'nw-london')
+  const scoped = (typeof focusActive === 'function') && focusActive();
+  const scopeSlug = ((scoped && focusLabel()) || 'london')
     .toLowerCase().replace(/&/g,'and').replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
 
-  // Scope helper: keep only records inside the focused borough (if one is
-  // focused). For records with a borough/lad field, match by name; otherwise
-  // fall back to a spatial test using BOROUGH_GJ.
+  // Scope helper: keep only records inside whatever is focused, board or
+  // borough. For records carrying a borough name, match on it; otherwise fall
+  // back to a spatial test using BOROUGH_GJ.
   const inScope = (rec) => {
-    if (!boroughFilter) return true;
+    if (!scoped) return true;
     const b = rec.borough || rec.lad || rec.LAD || '';
-    if (b && b === boroughFilter) return true;
+    if (b && ladInFocus(b)) return true;
     const lat = rec.lat, lng = rec.lng;
     if (lat == null || lng == null) return false;
     if (typeof ladOfLatLng === 'function') {
-      try { return ladOfLatLng(lat, lng) === boroughFilter; } catch(e) { return false; }
+      try { return ladInFocus(ladOfLatLng(lat, lng)); } catch(e) { return false; }
     }
     return false;
   };
@@ -13085,7 +13078,7 @@ loadData();
     var anyType = Object.keys(dirState.types).some(function (k) { return dirState.types[k]; });
     return (dirRecords || []).filter(function (r) {
       if (anyType && !dirState.types[r.t]) return false;
-      if (dirState.borough && r.lad !== dirState.borough) return false;
+      if (!scopeMatchesLad(dirState.borough, r.lad)) return false;
       if (!q) return true;
       return r.n.toLowerCase().indexOf(q) !== -1 ||
              r.a.toLowerCase().indexOf(q) !== -1 ||
@@ -13136,12 +13129,7 @@ loadData();
 
     var bEl = $('dir-borough');
     if (bEl && bEl.options.length <= 1) {
-      var seen = {};
-      dirRecords.forEach(function (r) { if (r.lad) seen[r.lad] = 1; });
-      bEl.innerHTML = '<option value="">All of London</option>' +
-        Object.keys(seen).sort().map(function (b) {
-          return '<option value="' + esc(b) + '">' + esc(b) + '</option>';
-        }).join('');
+      bEl.innerHTML = scopeOptionsHtml(dirState.borough, esc);
     }
     var sub = $('dir-sub');
     if (sub) {
@@ -14081,11 +14069,11 @@ loadData();
     if (cbScope && cbLevel !== 'borough') {
       codes = codes.filter(function (c) {
         var l = cbLabels(c, src[c]);
-        return l.parent === cbScope;
+        return scopeMatchesLad(cbScope, l.parent);
       });
     } else if (cbScope && cbLevel === 'borough') {
       codes = codes.filter(function (c) {
-        return ((src[c] && src[c].name) || c) === cbScope;
+        return scopeMatchesLad(cbScope, (src[c] && src[c].name) || c);
       });
     }
     return codes.sort(function (a, b) {
@@ -14129,13 +14117,7 @@ loadData();
 
     var scopeEl = $('cb-scope');
     if (scopeEl && scopeEl.options.length <= 1) {
-      var bs = {};
-      var w = (typeof WARD_DATA !== 'undefined' && WARD_DATA) || {};
-      Object.keys(w).forEach(function (k) { if (w[k].lad) bs[w[k].lad] = 1; });
-      scopeEl.innerHTML = '<option value="">All of London</option>' +
-        Object.keys(bs).sort().map(function (b) {
-          return '<option value="' + esc(b) + '">' + esc(b) + '</option>';
-        }).join('');
+      scopeEl.innerHTML = scopeOptionsHtml(cbScope, esc);
     }
 
     var avail = cbAvailable();
@@ -14435,10 +14417,9 @@ loadData();
     }).join('<span class="q-join">+</span>');
   }
   function renderScope() {
-    var opts = ['<option value="">All of London</option>'].concat(boroughList().map(function (b) {
-      return '<option value="' + esc(b) + '"' + (b === q.scope ? ' selected' : '') + '>' + esc(b) + '</option>';
-    })).join('');
-    qScopeEl.innerHTML = '<select class="q-chip outline" id="q-scope-sel" aria-label="Borough">' + opts + '</select>';
+    qScopeEl.innerHTML = '<select class="q-chip outline" id="q-scope-sel" ' +
+      'aria-label="Where: all of London, an ICB, or a borough">' +
+      scopeOptionsHtml(q.scope, esc) + '</select>';
   }
   function renderConds() {
     if (!q.conds.length) {
@@ -14499,7 +14480,7 @@ loadData();
     var el = $('q-readback');
     if (!el) return;
     var parts = ['Wards'];
-    parts.push(q.scope ? 'in <strong>' + esc(q.scope) + '</strong>' : 'anywhere in London');
+    parts.push(q.scope ? 'in <strong>' + esc(scopeLabel(q.scope)) + '</strong>' : 'anywhere in London');
 
     if (q.services.length) {
       parts.push('containing at least one ' + q.services.map(function (id) {
@@ -14609,7 +14590,7 @@ loadData();
       q.services.forEach(function (id) { svcTotals[id] = 0; });
 
       allWards().forEach(function (w) {
-        if (q.scope && w.lad !== q.scope) return;
+        if (!scopeMatchesLad(q.scope, w.lad)) return;
 
         for (var s = 0; s < q.services.length; s++) {
           if (!(maps[s][w.name] > 0)) return;
