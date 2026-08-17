@@ -120,6 +120,11 @@ def main() -> int:
         counts["greenspace"] = features(grn)
         print(f"greenspace {counts['greenspace']:>7,}")
 
+    icb = load("data/map/icbs.json")
+    if icb is not None:
+        counts["icb"] = features(icb)
+        print(f"ICBs:      {counts['icb']:>7,}")
+
     # LSOA total, and the Core20 subset. The Core20 caption under that toggle
     # can only be counted from the deciles, so without this it stayed blank for
     # anybody who never opened an LSOA.

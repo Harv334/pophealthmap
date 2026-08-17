@@ -62,9 +62,15 @@ jobs:
         continue-on-error: true
         run: python fetch_all_data.py
 
-      # Two files are derived from the pipeline's own outputs rather than
+      # Three files are derived from the pipeline's own outputs rather than
       # fetched, so a refresh that did not rebuild them would leave the map
-      # stating figures that no longer match the data underneath it.
+      # stating figures that no longer match the data underneath it. Order
+      # matters: the ICB regions are dissolved from the borough outlines, and
+      # the counts file then counts the regions.
+      #
+      #   build_icb_boundaries.py dissolves the borough outlines into the five
+      #   ICB footprints. Rebuilt here so a borough boundary revision cannot
+      #   leave a region edge running down the middle of a borough.
       #
       #   build_layer_counts.py reads the point-layer payloads and writes the
       #   counts shown beside each layer before it is loaded. Stale counts here
@@ -81,6 +87,7 @@ jobs:
       # longer match it is the one outcome worth failing to avoid.
       - name: Rebuild derived files
         run: |
+          python scripts/build_icb_boundaries.py
           python scripts/build_layer_counts.py
           python scripts/build_loader_map.py
 

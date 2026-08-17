@@ -1959,7 +1959,15 @@
           <div style="font-size:var(--t-xs);color:var(--ink-3);margin-top:4px;line-height:1.3">Source: GLA ESOL Planning Map</div>
         </div>
         <div class="sb-sec" style="flex-shrink:0;border-bottom:1px solid var(--line-2)">
-          <div class="sb-lbl">Borough boundaries</div>
+          <div class="sb-lbl">Boundaries and regions</div>
+          <!-- The five Integrated Care Boards. Their footprints in London are
+               unions of whole boroughs, so the geometry is dissolved from the
+               borough outlines rather than fetched: see
+               scripts/build_icb_boundaries.py. Above the boroughs because it
+               is the larger geography, and because an NHS reader usually
+               knows their ICB before they know which borough they are
+               looking at. -->
+          <label class="lrow"><div style="width:9px;height:9px;border:2px solid #8E5BA6;border-radius:2px;flex-shrink:0"></div><span class="lname">ICB regions <span class="lcount" id="icb-count"></span><span class="lhelp" title="Integrated Care Boards. London has five, and each one covers whole boroughs: North West, North Central, North East, South East and South West. Switch this on and click a region to zoom to it.">?</span></span><input type="checkbox" id="ticb"></label>
           <label class="lrow"><div style="width:9px;height:9px;border:2px solid #1a1a1a;border-radius:2px;flex-shrink:0"></div><span class="lname">London boroughs</span><input type="checkbox" id="tb"></label>
           <div style="margin:4px 0 8px 0">
             <div style="font-size:var(--t-xs);color:var(--ink-2);margin-bottom:3px">Focus by borough</div>
@@ -4253,6 +4261,7 @@ function applyPrefetchedCounts() {
       setIf('lib-count', c.libraries);
       setIf('esol-count', c.esol);
       setIf('greenspace-count', c.greenspace);
+      setIf('icb-count', c.icb);
       setIf('lsoa-count', c.lsoa);
       setIf('vcse-tab-count', c.vcse);
       setIf('cic-tab-count', c.cics);
@@ -8635,6 +8644,87 @@ function loadMsoaBoundaries() {
     .catch(() => { _msoaLoading = null; return null; });
   return _msoaLoading;
 }
+
+/* ── Integrated Care Board regions ─────────────────────────────────────────
+   The five London ICBs. Their footprints are unions of whole boroughs, so the
+   geometry is dissolved from the borough outlines by
+   scripts/build_icb_boundaries.py rather than fetched from anywhere: the two
+   can then never disagree about where a borough edge runs, and the regions
+   stay correct when the borough source is refreshed.
+
+   Drawn as an outline with a very light wash rather than a solid fill. This
+   sits over the choropleth, which is the thing being read, so it has to say
+   where the regions are without becoming the thing you look at. Each board
+   carries its own colour from the generator.
+
+   Lazy, like every other optional boundary layer. 61 KB, about 18 KB over the
+   wire, and off by default. */
+let icbLyr = null;
+let _icbLoading = null;
+
+function icbStyle(feat) {
+  const c = (feat.properties || {}).colour || '#8E5BA6';
+  return {
+    color: c, weight: 2.5, opacity: 0.95,
+    fill: true, fillColor: c, fillOpacity: 0.06,
+  };
+}
+
+function loadIcbRegions() {
+  if (icbLyr) return Promise.resolve(icbLyr);
+  if (_icbLoading) return _icbLoading;
+  _icbLoading = fetch(dataUrl('data/map/icbs.json'))
+    .then(r => (r.ok ? r.json() : null))
+    .then(gj => {
+      if (!gj || !gj.features) { _icbLoading = null; return null; }
+      icbLyr = L.geoJSON(gj, {
+        style: icbStyle,
+        onEachFeature: (feat, lyr) => {
+          const p = feat.properties || {};
+          lyr.bindTooltip(
+            `<b style="font-size:var(--t-xs)">${_esc(p.label || p.name || 'ICB')}</b>` +
+            `<br><span style="font-size:var(--t-xs);color:var(--ink-3)">` +
+            `${p.n_boroughs} boroughs · click to zoom</span>`,
+            { sticky: true, opacity: 0.94 });
+          // Click zooms to the region. Deliberately not a filter: borough
+          // focus filters the whole app by a single LAD name in a dozen
+          // places, and quietly making that mean "a set of boroughs" would
+          // change what the CSV exports without saying so.
+          lyr.on('click', (ev) => {
+            try {
+              map.fitBounds(lyr.getBounds(), { padding: [30, 30], maxZoom: 12 });
+            } catch (e) { /* degenerate geometry: leave the view alone */ }
+            if (ev && ev.originalEvent) L.DomEvent.stop(ev.originalEvent);
+            if (typeof _announce === 'function') {
+              _announce(`Zoomed to ${p.label || p.name}, ${p.n_boroughs} boroughs.`);
+            }
+          });
+        },
+      });
+      const el = document.getElementById('icb-count');
+      if (el) el.textContent = gj.features.length;
+      _icbLoading = null;
+      return icbLyr;
+    })
+    .catch(() => { _icbLoading = null; return null; });
+  return _icbLoading;
+}
+
+document.getElementById('ticb') && document.getElementById('ticb')
+  .addEventListener('change', e => {
+    const cb = e.target;
+    if (!cb.checked) { if (icbLyr) map.removeLayer(icbLyr); return; }
+    loadIcbRegions().then(lyr => {
+      if (!lyr || !cb.checked) return;
+      lyr.addTo(map);
+      // Under the point markers but over the choropleth, so it frames the
+      // data rather than hiding it.
+      lyr.bringToFront();
+      if (typeof boroughL !== 'undefined' && boroughL && boroughL._map) {
+        boroughL.bringToFront();
+      }
+    });
+  });
 
 document.getElementById('tmsoa').addEventListener('change', e => {
   const on = e.target.checked;
