@@ -6100,7 +6100,24 @@ window.generateWardReport = function(wn, opts) {
   // The report's IMD domain radar is computed from the ward's own LSOAs, so
   // the deciles are part of what it is waiting for.
   Promise.all([ensureAllLayerData(), ensureLsoaImd()])
-    .then(() => _generateWardReport(_w, wn, opts));
+    .then(() => _generateWardReport(_w, wn, opts))
+    .catch(err => {
+      /* Nothing else was catching this, and the tab is already open and
+         showing a holding page by the time anything can go wrong. Both loaders
+         above resolve null rather than reject, so a throw arriving here comes
+         out of building the report itself, and the result was a tab that said
+         "Building the report" until the person closed it. Saying it failed is
+         worth more than a page that never stops loading. */
+      console.error('ward report failed', err);
+      try {
+        _w.document.body.innerHTML =
+          '<div style="max-width:32em;text-align:center;padding:0 24px">' +
+          '<p style="margin:0 0 8px"><b>The report for ' +
+          String(wn).replace(/[<>&]/g, '') + ' could not be built.</b></p>' +
+          '<p style="margin:0">Close this tab and try again. If it happens ' +
+          'again, some of the figures the report needs did not load.</p></div>';
+      } catch (e) { /* the tab can be closed before this lands */ }
+    });
 };
 
 function _generateWardReport(_reportWindow, wn, opts) {
@@ -9146,14 +9163,43 @@ function ensureLsoaLayer() {
    the meantime is asked again here, so a feature that was opened early does
    not stay empty for the rest of the session. */
 function _onLsoaImdReady() {
+  /* injectWardIMD again, and first, because everything below reads what it
+     writes.
+
+     It runs once in loadData, where it can no longer do the half of its job
+     that needs this file. WARD_LSOA_IMD is empty at that point and LSOA_IMD is
+     undefined, because both are fetched on demand now, so the ward figures
+     derived from the LSOA geometry were quietly left as they came out of
+     ward_data.json. Those are built by a postcode-to-ward voting step and
+     disagree with the geometry on the 2021 boundary splits, which is the whole
+     reason the correction below exists. A ward profile could state seven
+     Core20 LSOAs while the map drew eight of them.
+
+     It also means imd_worst_decile and imd_best_decile were never written at
+     all, so the Ask panel documented two indicators that were not in the data
+     it was given. */
+  if (typeof injectWardIMD === 'function') {
+    try { injectWardIMD(); } catch (e) { console.warn('injectWardIMD on LSOA ready', e); }
+  }
+  /* Ward values have just changed, so a range cached from the uncorrected ones
+     describes figures that are no longer there. The LSOA ranges go for the
+     older reason: they were computed while there were no LSOAs. */
+  if (typeof _ovRange !== 'undefined') { for (const k in _ovRange) delete _ovRange[k]; }
   if (typeof _lsoaRange !== 'undefined') { for (const k in _lsoaRange) delete _lsoaRange[k]; }
   if (typeof _searchIndex !== 'undefined') _searchIndex = null;
+  // Core20 LSOAs in ward and Total LSOAs in ward are both selectable overlays,
+  // so a corrected count has to reach the shading and not just the panel.
+  if (typeof _restyleAll === 'function') _restyleAll();
   if (typeof renderTopBottom === 'function') renderTopBottom();
   if (typeof _updateLayerCounts === 'function') _updateLayerCounts();
   if (typeof window._core20UpdateCount === 'function') window._core20UpdateCount();
-  // A ward profile open at the time now has LSOA rows it can fill in.
-  if (typeof currentWard !== 'undefined' && currentWard && typeof showWard === 'function') {
-    try { showWard(currentWard); } catch (e) { /* the panel will catch up on the next click */ }
+  /* A ward profile open at the time now has LSOA rows it can fill in.
+
+     selW, not currentWard. currentWard is declared with var inside the ward
+     sheet's IIFE further down this file, so the typeof test that used to guard
+     this read 'undefined' every time and the refresh never once ran. */
+  if (typeof selW !== 'undefined' && selW && typeof showWard === 'function') {
+    try { showWard(selW); } catch (e) { /* the panel will catch up on the next click */ }
   }
 }
 
@@ -9525,9 +9571,13 @@ function injectWardIMD() {
     const wdata = Object.values(WARD_DATA).find(w => w.name === wardName);
     if (wdata) {
       if (!wdata.indicators) wdata.indicators = {};
+      // Both are described in the Ask panel's indicator dictionary. There was
+      // an imd_lsoa_count here as well, which nothing read and which counted
+      // the same LSOAs as total_lsoa_count below. The Ask panel offers the
+      // model every key it finds in the data, so an undocumented duplicate of
+      // a documented figure was a question waiting to be answered twice.
       wdata.indicators.imd_worst_decile = worst;
       wdata.indicators.imd_best_decile = best;
-      wdata.indicators.imd_lsoa_count = deciles.length;
     }
   }
 
@@ -11367,7 +11417,13 @@ async function _prepareScreenForScreenshot(opts) {
      screenshot tool the person is already using, which captures exactly what
      they can see at the resolution of their own display. */
   if (pngBtn) pngBtn.addEventListener('click', async () => {
-    const focused = (typeof focusedBorough !== 'undefined' && focusedBorough && focusedBorough !== 'all') ? focusedBorough : null;
+    /* focusLabel, not focusedBorough. The mask and the caption have followed a
+       board focus since the ICB work landed: _pngScopeFeatures filters with
+       ladInFocus and returns up to thirteen boroughs for one, and
+       _pngScopeLabel already names it. This dialog was the only thing left
+       asking whether a borough in particular was focused, so with a board
+       focused the whole capability worked and simply was not offered. */
+    const focused = (typeof focusLabel === 'function') ? focusLabel() : null;
     const opts = [
       { key: 'prepare-current', label: 'This view',
         desc: 'Keeps your current pan and zoom, whitens everything outside London and clears the controls out of the way.' },
@@ -11376,7 +11432,7 @@ async function _prepareScreenForScreenshot(opts) {
     ];
     if (focused) opts.push({
       key: 'prepare-borough', label: `Just ${focused}, framed`,
-      desc: 'Refits to the focused borough and whitens everything outside it.'
+      desc: 'Refits to the area you have focused and whitens everything outside it.'
     });
     const choice = await _exportDialog('Prepare the map for a screenshot', opts);
     if (!choice) return;
@@ -11391,7 +11447,7 @@ async function _prepareScreenForScreenshot(opts) {
       { key: 'overlay', label: 'Overlay data only',
         desc: 'Ward or LSOA values for the currently-active overlay (e.g. fuel poverty, IMD score). One CSV.' },
       { key: 'layers', label: 'Visible point layers only',
-        desc: 'One CSV per toggled-on point layer (VCSE, GP, schools, dental, etc.) scoped to the current borough focus.' },
+        desc: 'One CSV per toggled-on point layer (VCSE, GP, schools, dental, etc.) scoped to the area you have focused, board or borough.' },
       { key: 'both', label: 'Everything visible',
         desc: 'Overlay CSV plus one CSV per visible point layer.' },
     ]);
