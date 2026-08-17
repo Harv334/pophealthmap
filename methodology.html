@@ -72,6 +72,38 @@ map rather than instead of it.</p>
   figures as provisional.
 </div>
 
+<h2>The words used on this map</h2>
+
+<p>Official statistics use short names for areas and measures. This page uses
+plain words instead. Here is what each one means.</p>
+
+<div class="wrap">
+<table>
+  <tr><th>Plain word</th><th>Official name</th><th>What it is</th></tr>
+  <tr><td>Borough</td><td>Local authority district</td>
+      <td>One of the 33 councils in London.</td></tr>
+  <tr><td>Ward</td><td>Electoral ward</td>
+      <td>The area one or more councillors are elected for.</td></tr>
+  <tr><td>Middle area</td><td>MSOA</td>
+      <td>A statistical area of about 7,500 people.</td></tr>
+  <tr><td>Small area</td><td>LSOA</td>
+      <td>A statistical area of about 1,500 people. It is the smallest area
+          this map holds.</td></tr>
+  <tr><td>Deprivation</td><td>Index of Multiple Deprivation, or IMD</td>
+      <td>The government measure of how deprived an area is. It combines
+          income, employment, health, education, crime, housing and
+          environment.</td></tr>
+  <tr><td>Decile</td><td>Decile</td>
+      <td>A tenth. Decile 1 is the most deprived tenth of England. Decile 10
+          is the least deprived tenth.</td></tr>
+  <tr><td>Charity</td><td>VCSE organisation</td>
+      <td>A charity registered with the Charity Commission.</td></tr>
+  <tr><td>Community business</td><td>CIC</td>
+      <td>A Community Interest Company. It is a business that must serve the
+          community.</td></tr>
+</table>
+</div>
+
 <h2>Every data source</h2>
 
 <p>Everything the map draws comes from one of the sources below. Each row says
@@ -307,6 +339,60 @@ uncoloured, and the key names which rows those are. A high share of residents
 over 65, or in social renting, or of any ethnic group, is a fact about who lives
 there rather than a good or bad result, and the map does not colour it as one.</p>
 
+<h2>Custom area: figures for an area you draw</h2>
+
+<p>Every other total on this map belongs to an area somebody else drew. A
+local patch, a school catchment or a primary care network does not follow those
+lines. Custom area lets you build the area you mean.</p>
+
+<p>Click small areas on the map to add them. Click one again to remove it. The
+tool totals up the figures for whatever you have picked. It uses the same rule
+as the rest of the map. Counts are added together. Everything else is averaged
+and weighted by population.</p>
+
+<p>The report states the method beside every figure. It also states three
+limits. This is not an official area. Nobody else publishes figures for it. A
+larger small area pulls each average further than a smaller one.</p>
+
+<p>An area you draw by hand often crosses a borough boundary. Where it does, the
+report names the boroughs it crosses. It then says the figures are not borough
+figures.</p>
+
+<h2>Report builder: a spreadsheet of your own</h2>
+
+<p>The CSV button in the toolbar exports what the map is drawing. Report builder
+does something different. It asks three questions and writes the answer to a
+file:</p>
+
+<ul>
+  <li>Which size of area do you want? Each area becomes one row.</li>
+  <li>Where? All of London, or one borough.</li>
+  <li>Which figures? Each figure becomes one column.</li>
+</ul>
+
+<p>This tool does not average or combine anything. Every value in the file is a
+figure the pipeline already holds for that area. Use Custom area when you want
+areas joined together instead.</p>
+
+<p>Boroughs hold fewer figures than the other sizes. They hold the 18 health
+figures published at borough level. They hold no census figures and no
+deprivation figures. If you pick a figure and then switch to boroughs, the tool
+removes that figure and tells you it has done so.</p>
+
+<h2>Directory: finding one place</h2>
+
+<p>The map answers what is near here. Directory answers where is this. It holds
+every service and organisation on the map in one list. That is about 23,000
+places across ten sets of data.</p>
+
+<p>Search by name, by address or by postcode. Filter by type or by borough.
+Click a result and the map marks it. You can export whatever you have filtered
+as a CSV file.</p>
+
+<p>Directory covers London only. Every record is placed in one of the 33
+boroughs. The charity register is national, so about 2,400 organisations outside
+London are left out. The panel states that number.</p>
+
 <h2>The question panel</h2>
 
 <p>The model is never given the dataset. It is given four tools, and your
@@ -445,12 +531,12 @@ var SOURCES = [
     manifest: 'claimant' },
 
   { name: 'DWP benefits',
-    pub: 'DWP — withdrawn from this map',
+    pub: 'DWP, withdrawn from this map',
     what: 'Personal Independence Payment, Universal Credit, Employment and ' +
           'Support Allowance, Carer’s Allowance and Pension Credit. Not ' +
           'currently shown anywhere on the map, and not fetched.',
-    geo: '—',
-    period: '—',
+    geo: 'Not applicable',
+    period: 'Not applicable',
     cadence: 'Not fetched.',
     manifest: null,
     note: 'Retired rather than broken. The pipeline had been asking NOMIS for ' +

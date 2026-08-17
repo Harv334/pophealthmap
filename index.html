@@ -1187,6 +1187,60 @@
   .rb-caution { font-size: 10.5px; line-height: 1.45; color: #5c4115; background: #FFF8E6;
     border: 1px solid #E0C280; border-radius: 6px; padding: 7px 9px; margin: 9px 14px; }
 
+  /* ── Report builder (custom CSV) ──────────────────────────────────────────
+     The toolbar CSV gives you what the map is drawing. This gives you the
+     columns you asked for, at the level you asked for, for the places you
+     asked for. */
+  .sidebar.csv-mode > .sb-tabs { display: none; }
+  .cb-pane { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  .cb-scroll { overflow-y: auto; overflow-x: hidden; min-height: 0; flex: 1; }
+  .cb-head { padding: 13px 14px 11px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
+  .cb-head .cmp-row { display: flex; align-items: baseline; gap: 8px; }
+  .cb-head h2 { font-family: 'Inter Tight', Inter, sans-serif; font-size: 17px; font-weight: 600;
+    margin: 0; letter-spacing: -.01em; color: var(--nhs-dark); flex: 1; min-width: 0; }
+  .cb-head .cb-sub { font-size: 11.5px; color: var(--ink-3); margin-top: 3px; line-height: 1.45; }
+  .cb-step { padding: 11px 14px; border-bottom: 1px solid var(--line); }
+  .cb-step > h3 { display: flex; align-items: baseline; gap: 6px; font-size: 11.5px;
+    font-weight: 600; color: var(--ink); margin: 0 0 4px; }
+  .cb-n { flex: 0 0 auto; width: 15px; height: 15px; border-radius: 50%; background: var(--nhs-blue);
+    color: #fff; font-size: 9.5px; font-weight: 700; display: inline-flex; align-items: center;
+    justify-content: center; font-family: 'JetBrains Mono', ui-monospace, monospace; }
+  .cb-help { font-size: 10.5px; color: var(--ink-3); line-height: 1.45; margin: 0 0 7px 21px; }
+  .cb-seg { display: flex; gap: 4px; flex-wrap: wrap; }
+  .cb-seg button { appearance: none; font: inherit; font-size: 11.5px; padding: 5px 10px;
+    border: 1px solid var(--line); border-radius: 999px; background: var(--paper);
+    color: var(--ink-2); cursor: pointer; }
+  .cb-seg button.on { background: var(--nhs-blue); border-color: var(--nhs-blue); color: #fff;
+    font-weight: 600; }
+  .cb-picked { padding: 9px 14px; font-size: 11.5px; font-weight: 600; color: var(--nhs-blue);
+    border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 8px; }
+  .cb-picked strong { color: var(--nhs-dark); font-variant-numeric: tabular-nums; }
+  .cb-picked .cb-none { margin-left: auto; appearance: none; background: none; border: 0;
+    font: inherit; font-size: 11px; color: var(--ink-3); cursor: pointer; text-decoration: underline; }
+  .cb-cols { max-height: 300px; overflow-y: auto; overflow-x: hidden; }
+  .cb-grp-hd { display: flex; align-items: center; gap: 6px; padding: 7px 14px; cursor: pointer;
+    background: var(--paper-2); border-bottom: 1px solid var(--line); font-size: 10.5px;
+    font-weight: 600; color: var(--ink-2); user-select: none; }
+  .cb-grp-hd .a { color: var(--ink-3); font-size: 8px; transition: transform .12s; }
+  .cb-grp-hd.open .a { transform: rotate(90deg); }
+  .cb-grp-hd .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; }
+  .cb-grp-hd .n { color: var(--ink-3); font-weight: 500; font-size: 9.5px;
+    font-family: 'JetBrains Mono', ui-monospace, monospace; }
+  .cb-grp-body { display: none; }
+  .cb-grp-body.open { display: block; }
+  .cb-col { display: flex; align-items: flex-start; gap: 7px; padding: 5px 14px 5px 20px;
+    cursor: pointer; font-size: 11.5px; color: var(--ink);
+    border-bottom: 1px solid var(--paper-2); }
+  .cb-col:hover { background: var(--nhs-light); }
+  .cb-col input { margin: 2px 0 0; flex-shrink: 0; accent-color: var(--nhs-blue); cursor: pointer; }
+  .cb-col .l { flex: 1; min-width: 0; line-height: 1.35; }
+  .cb-col.on .l { font-weight: 600; color: var(--nhs-dark); }
+  .cb-acts { display: flex; gap: 5px; padding: 10px 14px; border-top: 1px solid var(--line);
+    flex-shrink: 0; background: var(--paper-2); }
+  .cb-acts .ws-btn { flex: 1; justify-content: center; }
+  .cb-note { font-size: 10.5px; line-height: 1.45; color: var(--ink-3); padding: 0 14px 11px; }
+
   /* ── Directory ────────────────────────────────────────────────────────────
      Every point dataset on the map as one searchable list. The map answers
      "what is near here"; this answers "where is this" and "how many of these
@@ -1539,7 +1593,8 @@
     <button type="button" class="mode-btn" role="tab" data-mode="explore" aria-selected="true">Explore</button>
     <button type="button" class="mode-btn" role="tab" data-mode="query" aria-selected="false">Query</button>
     <button type="button" class="mode-btn" role="tab" data-mode="compare" aria-selected="false">Compare</button>
-    <button type="button" class="mode-btn" role="tab" data-mode="report" aria-selected="false">Report builder</button>
+    <button type="button" class="mode-btn" role="tab" data-mode="report" aria-selected="false">Custom area</button>
+    <button type="button" class="mode-btn" role="tab" data-mode="csv" aria-selected="false">Report builder</button>
     <button type="button" class="mode-btn" role="tab" data-mode="directory" aria-selected="false">Directory</button>
   </div>
 
@@ -1984,13 +2039,17 @@
       <div class="tab-pane rb-pane" id="tab-report">
         <div class="rb-head">
           <div class="cmp-row">
-            <h2>Report builder</h2>
+            <h2>Custom area</h2>
             <button type="button" class="cmp-back" id="rb-back">Back to Explore</button>
           </div>
           <input type="text" class="rb-name" id="rb-name" maxlength="60"
                  placeholder="Name this area" aria-label="Name for the area you are building">
-          <div class="rb-hint">Click neighbourhoods on the map to add them. Click again to take
-            one out.</div>
+          <!-- "Small area", not "neighbourhood": this map uses neighbourhood for
+               Defra's neighbourhood distance band as well, and one word cannot
+               mean two things in the same interface. -->
+          <div class="rb-hint">Click a small area on the map to add it. Click it again to
+            remove it. A small area holds about 1,500 people. It is the smallest area this
+            map has figures for.</div>
         </div>
         <div class="rb-count" id="rb-count">
           <span>Nothing selected yet</span>
@@ -2003,8 +2062,56 @@
         <div class="rb-scroll">
           <div id="rb-summary"></div>
           <div id="rb-caution"></div>
-          <div class="rb-group" style="padding-bottom:4px"><h3>Neighbourhoods in this area</h3></div>
+          <div class="rb-group" style="padding-bottom:4px"><h3>Small areas in this area</h3></div>
           <div class="rb-list" id="rb-list"></div>
+        </div>
+      </div>
+
+      <!-- Report builder: a CSV with the columns you chose.
+           The toolbar CSV hands over what the map is drawing. This asks three
+           questions instead: which areas, which level, which figures. -->
+      <div class="tab-pane cb-pane" id="tab-csv">
+        <div class="cb-head">
+          <div class="cmp-row">
+            <h2>Report builder</h2>
+            <button type="button" class="cmp-back" id="cb-back">Back to Explore</button>
+          </div>
+          <div class="cb-sub">Build a spreadsheet. Choose the areas, then the figures. The file
+            downloads to your computer.</div>
+        </div>
+
+        <div class="cb-step">
+          <h3><span class="cb-n">1</span>Which areas?</h3>
+          <div class="cb-help">Each row in the file is one area.</div>
+          <div class="cb-seg" id="cb-level">
+            <button type="button" data-lvl="ward" class="on">Wards</button>
+            <button type="button" data-lvl="lsoa">Small areas</button>
+            <button type="button" data-lvl="msoa">MSOAs</button>
+            <button type="button" data-lvl="borough">Boroughs</button>
+          </div>
+        </div>
+
+        <div class="cb-step">
+          <h3><span class="cb-n">2</span>Where?</h3>
+          <div class="cb-help">Choose all of London or one borough.</div>
+          <select class="q-f" id="cb-scope" aria-label="Which places to include">
+            <option value="">All of London</option>
+          </select>
+        </div>
+
+        <div class="cb-step" style="border-bottom:none;padding-bottom:4px">
+          <h3><span class="cb-n">3</span>Which figures?</h3>
+          <div class="cb-help">Each figure you tick becomes one column.</div>
+        </div>
+        <div class="cb-picked" id="cb-picked">
+          <span>No figures chosen</span>
+          <button type="button" class="cb-none" id="cb-clear" hidden>Clear</button>
+        </div>
+        <div class="cb-cols" id="cb-cols"></div>
+        <div class="cb-note" id="cb-note"></div>
+        <div class="cb-acts">
+          <button type="button" class="ws-btn primary" id="cb-download">Download CSV</button>
+          <button type="button" class="ws-btn" id="cb-preview">Preview</button>
         </div>
       </div>
 
@@ -3069,6 +3176,15 @@ const VCSE_RAW = []; // replaced by async fetch of vcse_data.json (see wireVCSE 
 // UTILITY FUNCTIONS
 // ═══════════════════════════════════════════════════════════════════════════
 function norm(n) { return (n||'').toLowerCase().replace(/\u2019/g,"'").trim(); }
+
+// Ward name to borough, built once on first use.
+//
+// This cache was read three times in ladOf and declared nowhere, so the first
+// call threw an uncaught ReferenceError. ladOf is called while the borough
+// filter is being applied, so the throw stopped applyBoroughLock before it set
+// the map bounds: focusing a borough left the map free to pan across the rest
+// of London, which is the behaviour that was fixed earlier.
+const _ladByWard = {};
 
 function ladOf(wn) {
   if (typeof GJ === 'undefined' || !GJ.features) return '';
@@ -5968,7 +6084,7 @@ function _applyBoroughSolo() {
   // chose rather than one to undo for them.
   document.querySelectorAll('.mode-btn').forEach(b => {
     b.addEventListener('click', () => {
-      const wantsPanel = ['query', 'compare', 'directory', 'report']
+      const wantsPanel = ['query', 'compare', 'directory', 'report', 'csv']
         .indexOf(b.dataset.mode) !== -1;
       if (narrow()) setOpen(wantsPanel);
       else if (wantsPanel && isCollapsed()) setCollapsed(false);
@@ -10234,9 +10350,10 @@ loadData();
   var comparePane = document.getElementById('tab-compare');
   var dirPane = document.getElementById('tab-directory');
   var reportPane = document.getElementById('tab-report');
+  var csvPane = document.getElementById('tab-csv');
   // Modes that own the sidebar rather than raising a placeholder card.
   var BUILT = { query: 'query', compare: 'compare', directory: 'directory',
-                report: 'report' };
+                report: 'report', csv: 'csv' };
 
   function markRail(mode) {
     rail.querySelectorAll('.mode-btn').forEach(function (b) {
@@ -10269,7 +10386,7 @@ loadData();
     var pane = document.querySelector('.tab-pane.active');
     if (!pane) return;
     var name = pane.id.replace(/^tab-/, '');
-    if (['query', 'compare', 'directory', 'report'].indexOf(name) === -1) lastTab = name;
+    if (['query', 'compare', 'directory', 'report', 'csv'].indexOf(name) === -1) lastTab = name;
   }
 
   function show(mode) {
@@ -10304,7 +10421,8 @@ loadData();
       if ((queryPane && queryPane.classList.contains('active')) ||
           (comparePane && comparePane.classList.contains('active')) ||
           (dirPane && dirPane.classList.contains('active')) ||
-          (reportPane && reportPane.classList.contains('active'))) activateTab(lastTab);
+          (reportPane && reportPane.classList.contains('active')) ||
+          (csvPane && csvPane.classList.contains('active'))) activateTab(lastTab);
       return;
     }
 
@@ -10334,26 +10452,31 @@ loadData();
      the overlay-info link and the restored URL state) and threading a call
      through each of them would leave the sixth one to be found later. Watching
      the pane's own class is the one place that cannot be missed. */
-  if (queryPane && comparePane && dirPane && reportPane && window.MutationObserver) {
+  if (queryPane && comparePane && dirPane && reportPane && csvPane
+      && window.MutationObserver) {
     var sync = function () {
       var q = queryPane.classList.contains('active');
       var c = comparePane.classList.contains('active');
       var dr = dirPane.classList.contains('active');
       var rp = reportPane.classList.contains('active');
+      var cv = csvPane.classList.contains('active');
       if (sidebar) {
         sidebar.classList.toggle('query-mode', q);
         sidebar.classList.toggle('compare-mode', c);
         sidebar.classList.toggle('directory-mode', dr);
         sidebar.classList.toggle('report-mode', rp);
+        sidebar.classList.toggle('csv-mode', cv);
       }
       if (q) markRail('query');
       else if (c) markRail('compare');
       else if (dr) markRail('directory');
       else if (rp) markRail('report');
+      else if (cv) markRail('csv');
       else if (rail.querySelector('.mode-btn[aria-selected="true"][data-mode="query"], ' +
                                   '.mode-btn[aria-selected="true"][data-mode="compare"], ' +
                                   '.mode-btn[aria-selected="true"][data-mode="directory"], ' +
-                                  '.mode-btn[aria-selected="true"][data-mode="report"]')) {
+                                  '.mode-btn[aria-selected="true"][data-mode="report"], ' +
+                                  '.mode-btn[aria-selected="true"][data-mode="csv"]')) {
         // A pane can be switched away from without going through the rail:
         // clicking an LSOA sends the sidebar to the Ward tab. That is still a
         // mode change, so it tears down like one.
@@ -10366,6 +10489,7 @@ loadData();
     mo.observe(comparePane, { attributes: true, attributeFilter: ['class'] });
     mo.observe(dirPane, { attributes: true, attributeFilter: ['class'] });
     mo.observe(reportPane, { attributes: true, attributeFilter: ['class'] });
+    mo.observe(csvPane, { attributes: true, attributeFilter: ['class'] });
     sync();
   }
 })();
@@ -12010,12 +12134,13 @@ loadData();
     },
     {
       t: 'Find the wards that match',
+      // Compare and Directory used to share this chapter as a closing clause.
+      // They have chapters of their own below, so this one is about Query.
       n: '<strong>Query</strong> finds the wards that meet several conditions at the ' +
          'same time. This example is running now. It finds wards in Brent that have a ' +
          'GP practice and a pharmacy, where deprivation and disability are both high. ' +
-         '<strong>Compare</strong> puts up to four wards next to each other. ' +
-         '<strong>Directory</strong> lists every service on the map in one place, and ' +
-         'you can search it.',
+         'The panel reads your filter back as a sentence. ' +
+         'The wards that match are listed below it and outlined on the map.',
       go: function () {
         // Query answers in wards, so the map goes back to ward level first.
         // The previous chapter's ward bar comes down with it: this chapter is
@@ -12029,13 +12154,90 @@ loadData();
       },
     },
     {
+      t: 'Compare: put wards side by side',
+      n: '<strong>Compare</strong> holds up to four wards. ' +
+         'It lines them up on the figures you choose. ' +
+         'Each ward keeps one colour. That colour marks its card, its row, and its ' +
+         'outline on the map. On every row the highest and the lowest value are marked. ' +
+         'Green marks the better end. Red marks the worse end. ' +
+         'The colour follows the figure, not the size of the number. ' +
+         'A high deprivation decile is the least deprived tenth, so it is green. ' +
+         'Some figures have no better end. The share of residents over 65 is one. ' +
+         'Those rows are marked but left uncoloured.',
+      go: function () {
+        closeWardSheet();
+        wardLevel();
+        railClick('compare');
+        // Two real wards, so the chapter shows a comparison rather than a
+        // panel asking you to pin something first.
+        var picked = [];
+        allWards().forEach(function (w) {
+          if (picked.length >= 2) return;
+          if (num(w.inds.imd_decile_mean) === null) return;
+          if (num(w.inds.census_bad_health_pct) === null) return;
+          picked.push(w.name);
+        });
+        picked.forEach(function (n) { selectWardByName(n); });
+      },
+    },
+    {
+      t: 'Custom area: draw your own',
+      n: 'A local patch, a school catchment or a primary care network does not follow ' +
+         'ward lines. <strong>Custom area</strong> lets you build the area you mean. ' +
+         'Click the small areas on the map to add them. Click one again to take it out. ' +
+         'A small area holds about 1,500 people. ' +
+         'Name the area and the tool totals up its figures. ' +
+         'Counts are added together. Percentages and scores are weighted by population. ' +
+         'So a bigger small area pulls each average further than a smaller one. ' +
+         'The report states the method beside every figure. ' +
+         'It also says this is not an official area.',
+      go: function () {
+        closeWardSheet();
+        railClick('report');
+      },
+    },
+    {
+      t: 'Report builder: make a spreadsheet',
+      n: '<strong>Report builder</strong> writes a spreadsheet with the columns you ' +
+         'choose. It asks three questions. Which size of area, so each area is a row. ' +
+         'Where, all of London or one borough. Which figures, so each figure is a ' +
+         'column. Nothing is averaged or combined in this file. ' +
+         'Each value is the figure held for that area. ' +
+         'Use Custom area instead when you want areas joined together.',
+      go: function () {
+        closeWardSheet();
+        railClick('csv');
+        // Three figures picked, so the row and column counts show something.
+        if (window.PH_CSV) {
+          ['census_population', 'imd_decile_mean', 'census_bad_health_pct']
+            .forEach(function (k) {
+              try { window.PH_CSV.pick(k); } catch (e) { /* not at this level */ }
+            });
+        }
+      },
+    },
+    {
+      t: 'Directory: find one place',
+      n: 'The map answers what is near here. <strong>Directory</strong> answers where ' +
+         'is this. It holds every service and organisation on the map in one list. ' +
+         'That is about 23,000 places across ten sets of data. ' +
+         'Search by name, by address or by postcode. ' +
+         'Filter by type or by borough. Click a result and the map marks it. ' +
+         'You can export whatever you have filtered as a spreadsheet.',
+      go: function () {
+        closeWardSheet();
+        railClick('directory');
+      },
+    },
+    {
       t: 'Ask a question in plain English',
       n: 'The panel on the right answers questions in plain English. It cannot invent a ' +
          'number, because it never sees the data. Your browser looks the numbers up on ' +
          'this page. The answer is then written around what your browser found. Nothing ' +
-         'you type is sent anywhere else. You get <strong>10 questions a day</strong>, ' +
-         'because this part costs money to run. The map, Query, Compare and Directory ' +
-         'are free to use as much as you want.',
+         'you type is sent anywhere else. It never receives the data itself. ' +
+         'You get <strong>10 questions a day</strong>, because this part costs money to ' +
+         'run. Every other tool here is free to use as much as you want. ' +
+         'They all run in your browser and cost nothing to serve.',
       go: function () {
         // Idempotent: the chapter before will normally have closed it, but the
         // tour drives the real controls, so a ward clicked by hand during that
@@ -12330,7 +12532,7 @@ loadData();
     var countEl = $('rb-count');
     var clearBtn = $('rb-clear');
     countEl.firstElementChild.innerHTML = rbSelected.length
-      ? '<strong>' + agg.lsoas + '</strong> neighbourhood' + (agg.lsoas === 1 ? '' : 's') +
+      ? '<strong>' + agg.lsoas + '</strong> small area' + (agg.lsoas === 1 ? '' : 's') +
         ' · <strong>' + Math.round(agg.population).toLocaleString() + '</strong> residents'
       : 'Nothing selected yet';
     clearBtn.hidden = !rbSelected.length;
@@ -12508,7 +12710,7 @@ loadData();
       '@media print{body{background:#fff;padding:0}.r{border:0;border-radius:0}.actions{display:none}}' +
       '</style></head><body><div class="r">' +
       '<h1>' + esc(rbAreaName()) + '</h1>' +
-      '<div class="sub">' + agg.lsoas + ' neighbourhood' + (agg.lsoas === 1 ? '' : 's') +
+      '<div class="sub">' + agg.lsoas + ' small area' + (agg.lsoas === 1 ? '' : 's') +
       ' · ' + Math.round(agg.population).toLocaleString() + ' residents' +
       (boroughLine ? ' · ' + boroughLine : '') + '</div>' +
       '<div class="note">This is a custom area, assembled from ' + agg.lsoas +
@@ -12522,7 +12724,7 @@ loadData();
       '</div>' +
       '<h2>Figures for this area</h2><table><tr><th>Indicator</th><th>Value</th>' +
       '<th>How it was combined</th></tr>' + rows + '</table>' +
-      '<h2>Neighbourhoods included</h2><table><tr><th>LSOA</th><th>Name</th><th>Ward</th>' +
+      '<h2>Small areas included</h2><table><tr><th>LSOA</th><th>Name</th><th>Ward</th>' +
       '<th>Borough</th><th>Population</th></tr>' + list + '</table>' +
       '<h2>Source</h2><p style="color:#4c6272;font-size:12px">Built with PopHealth Map, ' +
       'pophealth.uk. Figures are the same ones the map draws; see the methodology page ' +
@@ -12536,6 +12738,293 @@ loadData();
     w.document.open(); w.document.write(html); w.document.close();
   }
 
+  /* ─────────────────────────────────────────────────────────────────────────
+     REPORT BUILDER (custom CSV)
+
+     The toolbar CSV exports what the map is currently drawing, which is the
+     right default and the wrong tool for anyone who wants three columns for
+     every ward, or every indicator for one borough. This asks which areas,
+     which level and which figures, and writes exactly that.
+
+     No aggregation happens here. Every level it offers is a level the pipeline
+     already publishes, so each row is a stored figure rather than something
+     derived in the browser. Custom area is the tool that combines areas, and it
+     is separate for that reason: the moment a CSV starts averaging things, the
+     file needs to explain how, and this one does not have to.
+     ───────────────────────────────────────────────────────────────────────── */
+  var cbPane = $('tab-csv');
+  var cbLevel = 'ward';
+  var cbScope = '';
+  var cbCols = {};          // indicator key -> true
+  var cbOpenGroups = {};
+
+  var CB_LEVELS = {
+    ward:    { label: 'ward',          plural: 'wards' },
+    lsoa:    { label: 'small area',    plural: 'small areas' },
+    msoa:    { label: 'MSOA',          plural: 'MSOAs' },
+    borough: { label: 'borough',       plural: 'boroughs' },
+  };
+
+  function cbSource() {
+    if (cbLevel === 'lsoa') return (typeof LSOA_DATA !== 'undefined' && LSOA_DATA) || {};
+    if (cbLevel === 'msoa') return (typeof MSOA_DATA !== 'undefined' && MSOA_DATA) || {};
+    if (cbLevel === 'borough') return (typeof BOROUGH_DATA !== 'undefined' && BOROUGH_DATA) || {};
+    return (typeof WARD_DATA !== 'undefined' && WARD_DATA) || {};
+  }
+  function cbInds(rec) { return (rec && (rec.indicators || rec)) || {}; }
+
+  // Names and parents differ by level, and only the ward records carry them
+  // inline. The rest are looked up from the boundary features, the same way
+  // Custom area does it.
+  function cbLabels(code, rec) {
+    if (cbLevel === 'ward') {
+      return { name: (rec && rec.name) || code, parent: (rec && rec.lad) || '' };
+    }
+    if (cbLevel === 'borough') return { name: (rec && rec.name) || code, parent: '' };
+    if (cbLevel === 'lsoa') {
+      var p = rbProps(code);
+      return { name: p.name || code, parent: p.borough || '', ward: p.ward || '' };
+    }
+    var mp = cbMsoaProps(code);
+    return { name: mp.name || code, parent: mp.borough || '' };
+  }
+  var _cbMsoa = null;
+  function cbMsoaProps(code) {
+    if (!_cbMsoa) {
+      _cbMsoa = {};
+      // msoaLyr is loaded on demand, so this may legitimately be empty. The
+      // MSOA name is in the record when the layer has not been fetched.
+      var src = (typeof MSOA_DATA !== 'undefined' && MSOA_DATA) || {};
+      Object.keys(src).forEach(function (k) {
+        _cbMsoa[k] = { name: (src[k] && src[k].name) || k,
+                       borough: (src[k] && (src[k].lad || src[k].borough)) || '' };
+      });
+    }
+    return _cbMsoa[code] || {};
+  }
+
+  function cbRows() {
+    var src = cbSource();
+    var codes = Object.keys(src);
+    if (cbScope && cbLevel !== 'borough') {
+      codes = codes.filter(function (c) {
+        var l = cbLabels(c, src[c]);
+        return l.parent === cbScope;
+      });
+    } else if (cbScope && cbLevel === 'borough') {
+      codes = codes.filter(function (c) {
+        return ((src[c] && src[c].name) || c) === cbScope;
+      });
+    }
+    return codes.sort(function (a, b) {
+      return cbLabels(a, src[a]).name.localeCompare(cbLabels(b, src[b]).name);
+    });
+  }
+
+  // Every key any record at this level actually holds. Built from the data
+  // rather than from a list, so a level never offers a column it cannot fill.
+  function cbAvailable() {
+    var src = cbSource(), seen = {};
+    var codes = Object.keys(src);
+    // 300 records is plenty to discover the key set and avoids walking 4,994
+    // LSOAs on every keystroke.
+    codes.slice(0, 300).forEach(function (c) {
+      Object.keys(cbInds(src[c])).forEach(function (k) {
+        if (typeof cbInds(src[c])[k] !== 'object') seen[k] = 1;
+      });
+    });
+    return Object.keys(seen).filter(function (k) {
+      return k !== 'name' && k !== 'lad' && k !== 'code';
+    }).sort();
+  }
+
+  function cbGroupOf(k) {
+    if (/^imd_|_score$/.test(k)) return 'Deprivation (IMD 2025)';
+    if (/^census_/.test(k)) return 'Census 2021';
+    if (/^ft_\d+$/.test(k)) return 'Health (published at MSOA)';
+    if (/^ft_/.test(k)) return 'Health (published at borough)';
+    if (/^crime/.test(k)) return 'Crime';
+    if (/^claimant/.test(k)) return 'Benefits';
+    if (/^(gb_|green_|blue_|fuel_)/.test(k)) return 'Environment and access';
+    return 'Other';
+  }
+
+  function renderCsvPane() {
+    if (!cbPane) return;
+    $('cb-level').querySelectorAll('button').forEach(function (b) {
+      b.classList.toggle('on', b.dataset.lvl === cbLevel);
+    });
+
+    var scopeEl = $('cb-scope');
+    if (scopeEl && scopeEl.options.length <= 1) {
+      var bs = {};
+      var w = (typeof WARD_DATA !== 'undefined' && WARD_DATA) || {};
+      Object.keys(w).forEach(function (k) { if (w[k].lad) bs[w[k].lad] = 1; });
+      scopeEl.innerHTML = '<option value="">All of London</option>' +
+        Object.keys(bs).sort().map(function (b) {
+          return '<option value="' + esc(b) + '">' + esc(b) + '</option>';
+        }).join('');
+    }
+
+    var avail = cbAvailable();
+    // Drop any column the previous level had and this one does not, so the
+    // count cannot promise a column the file will not contain. Dropping it
+    // quietly would be worse than not offering it: boroughs here hold only the
+    // 18 health figures published at borough level, with no census and no
+    // deprivation, so switching to Boroughs after picking population takes the
+    // population away. Say which ones went.
+    var dropped = [];
+    Object.keys(cbCols).forEach(function (k) {
+      if (avail.indexOf(k) === -1) { dropped.push(k); delete cbCols[k]; }
+    });
+
+    var groups = {};
+    avail.forEach(function (k) {
+      var g = cbGroupOf(k);
+      (groups[g] = groups[g] || []).push(k);
+    });
+
+    var chosen = Object.keys(cbCols).length;
+    $('cb-picked').firstElementChild.innerHTML = chosen
+      ? '<strong>' + chosen + '</strong> figure' + (chosen === 1 ? '' : 's') + ' chosen'
+      : 'No figures chosen';
+    $('cb-clear').hidden = !chosen;
+
+    $('cb-cols').innerHTML = Object.keys(groups).sort().map(function (g, gi) {
+      var open = cbOpenGroups[g] || false;
+      var hit = groups[g].filter(function (k) { return cbCols[k]; }).length;
+      return '<div><div class="cb-grp-hd' + (open ? ' open' : '') + '" data-grp="' + esc(g) +
+        '" role="button" tabindex="0" aria-expanded="' + open + '">' +
+        '<span class="a">&#9654;</span><span class="nm">' + esc(g) + '</span>' +
+        '<span class="n">' + (hit ? hit + '/' : '') + groups[g].length + '</span></div>' +
+        '<div class="cb-grp-body' + (open ? ' open' : '') + '">' +
+        groups[g].map(function (k) {
+          return '<label class="cb-col' + (cbCols[k] ? ' on' : '') + '">' +
+            '<input type="checkbox" data-col="' + esc(k) + '"' + (cbCols[k] ? ' checked' : '') + '>' +
+            '<span class="l">' + esc(labelOf(k)) + '</span></label>';
+        }).join('') + '</div></div>';
+    }).join('');
+
+    var n = cbRows().length;
+    var lv = CB_LEVELS[cbLevel];
+    $('cb-note').innerHTML =
+      (dropped.length
+        ? '<span id="cb-dropped" style="display:block;color:#8a5a00;background:#FFF8E6;' +
+          'border:1px solid #E0C280;border-radius:6px;padding:7px 9px;margin-bottom:7px">' +
+          esc(dropped.map(labelOf).join(', ')) +
+          (dropped.length > 1 ? ' are' : ' is') + ' not published for ' + esc(lv.plural) +
+          ', so ' + (dropped.length > 1 ? 'they have' : 'it has') + ' been removed.</span>'
+        : '') +
+      'The file will have <strong>' + n.toLocaleString() + '</strong> ' +
+      esc(n === 1 ? lv.label : lv.plural) + ' and <strong>' + chosen + '</strong> figure' +
+      (chosen === 1 ? '' : 's') + '. Each figure is a stored value for that area. ' +
+      'Nothing is averaged or combined here. Use Custom area to join areas together.' +
+      (cbLevel === 'borough'
+        ? ' Boroughs hold the health figures published at borough level only.'
+        : '');
+  }
+
+  function cbBuild() {
+    var src = cbSource();
+    var codes = cbRows();
+    var cols = Object.keys(cbCols).sort(function (a, b) {
+      return labelOf(a).localeCompare(labelOf(b));
+    });
+    var head = ['code', 'name'];
+    if (cbLevel === 'lsoa') head.push('ward');
+    if (cbLevel !== 'borough') head.push('borough');
+    head = head.concat(cols.map(labelOf));
+    var lines = [head.map(csvCell).join(',')];
+    codes.forEach(function (c) {
+      var rec = src[c], l = cbLabels(c, rec), i = cbInds(rec);
+      var row = [c, l.name];
+      if (cbLevel === 'lsoa') row.push(l.ward || '');
+      if (cbLevel !== 'borough') row.push(l.parent || '');
+      cols.forEach(function (k) {
+        var v = i[k];
+        row.push(v === null || v === undefined ? '' : v);
+      });
+      lines.push(row.map(csvCell).join(','));
+    });
+    return { text: lines.join('\n'), rows: codes.length, cols: cols.length, header: head };
+  }
+
+  if (cbPane) {
+    $('cb-back').addEventListener('click', function () {
+      var b = document.querySelector('.mode-btn[data-mode="explore"]');
+      if (b) b.click();
+    });
+    $('cb-level').addEventListener('click', function (e) {
+      var b = e.target.closest('[data-lvl]');
+      if (!b) return;
+      cbLevel = b.dataset.lvl;
+      _cbMsoa = null;
+      renderCsvPane();
+    });
+    $('cb-scope').addEventListener('change', function (e) {
+      cbScope = e.target.value; renderCsvPane();
+    });
+    $('cb-clear').addEventListener('click', function () { cbCols = {}; renderCsvPane(); });
+    $('cb-cols').addEventListener('click', function (e) {
+      var hd = e.target.closest('[data-grp]');
+      if (hd) {
+        var g = hd.getAttribute('data-grp');
+        cbOpenGroups[g] = !cbOpenGroups[g];
+        renderCsvPane();
+        return;
+      }
+      var box = e.target.closest('input[data-col]');
+      if (!box) return;
+      var k = box.getAttribute('data-col');
+      if (box.checked) cbCols[k] = true; else delete cbCols[k];
+      renderCsvPane();
+    });
+    $('cb-cols').addEventListener('keydown', function (e) {
+      if ((e.key === 'Enter' || e.key === ' ') && e.target.closest('[data-grp]')) {
+        e.preventDefault(); e.target.click();
+      }
+    });
+    $('cb-download').addEventListener('click', function () {
+      if (!Object.keys(cbCols).length) { alert('Choose at least one figure first.'); return; }
+      var out = cbBuild();
+      var nm = 'pophealth-' + cbLevel + (cbScope ? '-' + cbScope.replace(/[^A-Za-z0-9]+/g, '-') : '');
+      download(nm.toLowerCase() + '.csv', out.text, 'text/csv;charset=utf-8');
+    });
+    $('cb-preview').addEventListener('click', function () {
+      if (!Object.keys(cbCols).length) { alert('Choose at least one figure first.'); return; }
+      var out = cbBuild();
+      var rows = out.text.split('\n').slice(0, 11);
+      var w = window.open('', '_blank');
+      if (!w) { alert('Please allow pop-ups to see the preview.'); return; }
+      var tbl = rows.map(function (r, ri) {
+        var cells = r.split(',').map(function (c) {
+          return '<' + (ri ? 'td' : 'th') + '>' + esc(c.replace(/^"|"$/g, '')) +
+                 '</' + (ri ? 'td' : 'th') + '>';
+        }).join('');
+        return '<tr>' + cells + '</tr>';
+      }).join('');
+      w.document.open();
+      w.document.write('<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">' +
+        '<title>Preview</title><style>body{font-family:system-ui,sans-serif;padding:20px;' +
+        'font-size:12px;color:#212b32}table{border-collapse:collapse}' +
+        'th,td{border:1px solid #dde1e4;padding:4px 7px;text-align:left;white-space:nowrap}' +
+        'th{background:#f4f7f9;font-size:10px;text-transform:uppercase;color:#768692}' +
+        'p{color:#4c6272}</style></head><body>' +
+        '<p>First 10 rows of ' + out.rows.toLocaleString() + '. The file has ' +
+        out.cols + ' figure column' + (out.cols === 1 ? '' : 's') + '.</p>' +
+        '<table>' + tbl + '</table></body></html>');
+      w.document.close();
+    });
+  }
+
+  window.PH_CSV = {
+    level: function () { return cbLevel; },
+    columns: function () { return Object.keys(cbCols); },
+    build: cbBuild,
+    setLevel: function (l) { cbLevel = l; _cbMsoa = null; renderCsvPane(); },
+    pick: function (k) { cbCols[k] = true; renderCsvPane(); },
+  };
+
   function applyMode(mode) {
     currentMode = (mode === 'query' || mode === 'compare' || mode === 'report')
       ? mode : 'explore';
@@ -12543,6 +13032,7 @@ loadData();
     // The area is built out of LSOAs, so the LSOA layer has to be the one on
     // the map. Without this the mode opens onto wards and clicking does
     // nothing at all.
+    if (mode === 'csv') renderCsvPane();
     if (mode === 'report') {
       if (typeof _setDataLevel === 'function' && currentDataLevel !== 'lsoa') {
         _setDataLevel('lsoa');
