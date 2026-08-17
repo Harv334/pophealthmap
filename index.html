@@ -569,9 +569,13 @@
 
      The geometry is inlined as LOADER_MAP, so it costs no request and paints
      before the data scripts have finished. See _paintLoaderMap. */
-  .loading-overlay { position: absolute; inset: 0; background: var(--bg);
-    display: flex; align-items: center; justify-content: center; z-index: 2000;
-    opacity: 1; transition: opacity .24s ease; }
+  /* Fixed and over everything, not just over the map pane. The header, the
+     sidebar and the mode rail used to be on screen and usable while the map
+     behind the loader was still empty, which is a half-built page rather than
+     a loading screen. 6000 clears the drawer at 4000 and the tour at 4200. */
+  .loading-overlay { position: fixed; inset: 0; background: var(--bg);
+    display: flex; align-items: center; justify-content: center; z-index: 6000;
+    opacity: 1; transition: opacity .3s ease; }
   /* Two steps: fade, then leave. The map underneath is already live and
      interactive by the time the fade starts, and pointer-events are dropped
      with it, so the fade never eats a click. */
@@ -600,14 +604,11 @@
      separated by white as before. */
   .ldr-map path { fill: var(--line); stroke: var(--ldr-stroke); stroke-width: 1.1;
     stroke-linejoin: round; transition: fill .55s ease; }
-  .ldr-txt { font-size: var(--t-lg); font-weight: 600; color: var(--ink);
-    margin: 18px 0 0; letter-spacing: -.01em; }
-  .ldr-sub { font-size: var(--t-sm); color: var(--ink-2); margin: 4px 0 0; }
-  .ldr-key { display: flex; align-items: center; gap: 8px; margin-top: 15px;
-    font-size: var(--t-xs); color: var(--ink-2); text-transform: uppercase;
-    letter-spacing: .07em; font-weight: 600; }
-  .ldr-key-grad { width: 92px; height: 6px; border-radius: 3px;
-    border: 1px solid var(--line); }
+  /* One word, above the map, and nothing under it. The map is the thing worth
+     looking at while you wait, and a headline, a running commentary and a key
+     stacked beneath it were three things competing with it. */
+  .ldr-label { font-size: var(--t-xs); font-weight: 600; color: var(--ink-3);
+    text-transform: uppercase; letter-spacing: .16em; margin: 0 0 18px; }
 
   /* ── Data-level badge (floating overlay, top-right of map) ── */
   .dl-badge { position: absolute; top: 12px; right: 12px; z-index: 2500; background: color-mix(in srgb, var(--paper) 96%, transparent); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); padding: 6px 8px; display: flex; align-items: center; gap: 8px; user-select: none; }
@@ -2112,10 +2113,19 @@
                is the larger geography, and because an NHS reader usually
                knows their ICB before they know which borough they are
                looking at. -->
-          <label class="lrow"><div style="width:9px;height:9px;border:2px solid #8E5BA6;border-radius:2px;flex-shrink:0"></div><span class="lname">ICB regions <span class="lcount" id="icb-count"></span><span class="lhelp" title="Integrated Care Boards. London has five, and each one covers whole boroughs: North West, North Central, North East, South East and South West. Switch this on and click a region to zoom to it.">?</span></span><input type="checkbox" id="ticb"></label>
+          <label class="lrow"><div style="width:9px;height:9px;border:2px solid #8E44AD;border-radius:2px;flex-shrink:0"></div><span class="lname">ICB regions <span class="lcount" id="icb-count"></span><span class="lhelp" title="Integrated Care Boards. London has four, and each one covers whole boroughs: West and North, North East, South East and South West. Switch this on and click a region to zoom to it.">?</span></span><input type="checkbox" id="ticb"></label>
+          <!-- Its own control, under the layer it belongs to, rather than a
+               group inside the borough dropdown. A board and a borough are two
+               different sizes of thing, and one list offering both made the
+               reader work out which kind each row was before choosing. -->
+          <div style="margin:2px 0 8px 18px">
+            <select id="icb-focus" aria-label="Focus on an Integrated Care Board" style="width:100%;padding:4px 6px;border:1px solid var(--line);border-radius:5px;font-size:var(--t-xs);color:var(--ink);background:var(--paper)">
+              <option value="all">All boards</option>
+            </select>
+          </div>
           <label class="lrow"><div style="width:9px;height:9px;border:2px solid #1a1a1a;border-radius:2px;flex-shrink:0"></div><span class="lname">London boroughs</span><input type="checkbox" id="tb"></label>
           <div style="margin:4px 0 8px 0">
-            <div style="font-size:var(--t-xs);color:var(--ink-2);margin-bottom:3px">Focus on a board or borough</div>
+            <div style="font-size:var(--t-xs);color:var(--ink-2);margin-bottom:3px">Focus by borough</div>
             <select id="borough-focus" style="width:100%;padding:4px 6px;border:1px solid var(--line);border-radius:5px;font-size:var(--t-xs);color:var(--ink);background:var(--paper)">
               <option value="all">All London</option>
             </select>
@@ -2703,17 +2713,9 @@
            nothing except that they were looking at a filename. -->
       <div class="loading-overlay" id="ldr" role="status" aria-live="polite">
         <div class="ldr-card">
+          <p class="ldr-label">Loading</p>
           <svg class="ldr-map" id="ldr-map" role="img"
-               aria-label="A map of London's wards, filling in with deprivation colour as the data loads"></svg>
-          <p class="ldr-txt" id="ldr-txt">704 wards across 33 boroughs</p>
-          <p class="ldr-sub" id="ldr-sub">Bringing in the deprivation figures</p>
-          <!-- The wait is the one moment a reader will look at a key before
-               they need it, so the map arrives already explained. -->
-          <div class="ldr-key" aria-hidden="true">
-            <span>More deprived</span>
-            <span class="ldr-key-grad" id="ldr-key-grad"></span>
-            <span>Less deprived</span>
-          </div>
+               aria-label="A map of London's wards, filling in with deprivation colour while the page loads"></svg>
         </div>
       </div>
       <!-- tabindex="-1" so the skip link above has somewhere to land. It is
@@ -2922,15 +2924,13 @@ var LOADER_MAP = {w:1000,h:771,n:704,d:'IAAAAAAAAAAAAAJAAIAAFAAAIDFEECDGGCFDCCIC
     metrics.sort(function (m1, m2) { return m1.k - m2.k; });
     order = metrics.map(function (m) { return m.i; });
 
-    var grad = document.getElementById('ldr-key-grad');
-    if (grad) grad.style.background = 'linear-gradient(to right,' + IMD.slice(1).join(',') + ')';
     return true;
   }
 
   var ok = build();
 
-  // Someone who has asked for less motion still gets the map and the key, in
-  // their finished state, without 704 colour transitions running at them.
+  // Someone who has asked for less motion gets the finished map at once,
+  // without 704 colour transitions running at them, and no artificial wait.
   var still = window.matchMedia &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -2949,21 +2949,74 @@ var LOADER_MAP = {w:1000,h:771,n:704,d:'IAAAAAAAAAAAAAJAAIAAFAAAIDFEECDGGCFDCCIC
     }
   }
 
-  // The only thing the rest of the app needs. Called at real load milestones
-  // in loadData, so the fill is a measurement rather than an animation: if a
-  // payload is slow the map genuinely stops filling, which is the truth.
-  window._ldrProgress = function (fraction, note) {
-    if (still) fraction = 1;
-    paintTo(fraction);
-    if (note) {
-      var sub = document.getElementById('ldr-sub');
-      if (sub) sub.textContent = note;
-    }
-  };
+  /* ── When the screen goes ─────────────────────────────────────────────────
+     The sweep used to be driven by real load milestones, which made it an
+     honest progress bar and a poor animation: on a warm cache the data landed
+     while London was about a third filled, and the screen cut away mid-sweep.
+     That reads as an interruption, not as a page arriving.
 
-  // A first band immediately, so the screen is never a blank outline while
-  // the network is still opening connections.
-  window._ldrProgress(still ? 1 : 0.06);
+     So the fill is an animation of its own, and the screen waits for both it
+     and the data. A quick load waits for the sweep to finish; a slow one sees
+     the sweep finish and the map sit whole until the figures arrive. Either
+     way what you see is a complete picture of London, and never a partial one.
+
+     The cost is honest: on a fast connection this holds the page back by up to
+     LDR_MS. That is the trade the completed animation asks for. */
+  var LDR_MS = 1500;
+  var started = 0, dataReady = false, sweepDone = false;
+
+  function reveal() {
+    if (!dataReady || !sweepDone) return;
+    var el = document.getElementById('ldr');
+    if (!el || el.classList.contains('fading')) return;
+    el.style.pointerEvents = 'none';
+    el.classList.add('fading');
+    setTimeout(function () { el.classList.add('hidden'); }, 320);
+    // The map was built behind a full-screen cover, so Leaflet sized it
+    // against a pane it could not measure. Tell it to look again.
+    setTimeout(function () {
+      try { if (window.map && window.map.invalidateSize) window.map.invalidateSize(); } catch (e) {}
+    }, 60);
+  }
+
+  function finish() {
+    if (sweepDone) return;
+    paintTo(1);
+    sweepDone = true;
+    reveal();
+  }
+
+  function frame(now) {
+    if (sweepDone) return;
+    if (!started) started = now;
+    var linear = Math.min(1, (now - started) / LDR_MS);
+    // Ease out, so the sweep leaves the west quickly and settles into the east
+    // rather than stopping dead at the last ward.
+    paintTo(1 - Math.pow(1 - linear, 2));
+    if (linear < 1) { requestAnimationFrame(frame); return; }
+    finish();
+  }
+
+  /* Called once by loadData when the map behind this is ready to be looked
+     at. The screen does not go until the sweep has finished as well. */
+  window._ldrReady = function () { dataReady = true; reveal(); };
+
+  if (still || !ok) {
+    paintTo(1);
+    sweepDone = true;
+  } else {
+    requestAnimationFrame(frame);
+    /* The backstop, and it is not paranoia. requestAnimationFrame only runs
+       while the page is producing frames, and this sweep runs during the
+       heaviest synchronous work the page ever does: parsing the ward geometry
+       and building 704 Leaflet layers. Measured here, the loop stalled at 495
+       wards of 704 and never resumed, which left the screen up forever.
+
+       A timer is not throttled the same way, so it guarantees the sweep ends.
+       rAF still does the smooth part whenever frames are actually being
+       produced; this only ever has to finish the job. */
+    setTimeout(finish, LDR_MS + 400);
+  }
 }());
 </script>
 
@@ -5444,6 +5497,8 @@ function initVCSEFilters() {
       if (bname) {
         focusedBorough = bname;
         focusedIcb = null;
+        const _isel = document.getElementById('icb-focus');
+        if (_isel) _isel.value = 'all';
         const bsel = document.getElementById('borough-focus');
         if (bsel) bsel.value = bname;
         _applyBoroughSolo();
@@ -5464,6 +5519,8 @@ function initVCSEFilters() {
         focusedIcb = null;
         const bsel = document.getElementById('borough-focus');
         if (bsel) bsel.value = 'all';
+        const isel = document.getElementById('icb-focus');
+        if (isel) isel.value = 'all';
         _applyBoroughSolo();
       }
     }
@@ -6896,13 +6953,13 @@ function _applyBoroughSolo() {
      whole board; anything else is a borough as before. They are set through
      here and nowhere else, so the two can never both be active. */
   sel.addEventListener('change', e => {
-    const v = e.target.value || 'all';
-    if (v.indexOf('icb:') === 0) {
-      focusedIcb = v.slice(4);
-      focusedBorough = 'all';
-    } else {
+    focusedBorough = e.target.value || 'all';
+    // Choosing a borough drops any board focus, and puts that control back to
+    // "All boards" so the panel is not showing two scopes at once.
+    if (focusedBorough !== 'all' && focusedIcb) {
       focusedIcb = null;
-      focusedBorough = v;
+      const isel = document.getElementById('icb-focus');
+      if (isel) isel.value = 'all';
     }
     _applyBoroughSolo();
 
@@ -6942,11 +6999,22 @@ function _applyBoroughSolo() {
     }
   });
 
-  /* The five boards, above the 33 boroughs, in the order the generator lists
-     them rather than alphabetically: north west, north central, north east,
-     south east, south west is how the boards are always named. The lookup is
-     1.9 KB and carries no geometry, so the control works whether or not
-     anybody has asked to see the regions drawn. */
+})();
+
+/* ── Focus on a board ──────────────────────────────────────────────────────
+   Its own control, under the ICB layer it belongs to, rather than a group
+   inside the borough dropdown. A board and a borough are two different sizes
+   of thing, and one list offering both made the reader work out which kind
+   each row was before they could choose.
+
+   The two are mutually exclusive and are made so here and in the borough
+   handler, by clearing the other one, rather than by hoping nothing sets both.
+   The membership comes from a 1.9 KB lookup that carries no geometry, so this
+   works whether or not anybody has asked to see the regions drawn. */
+(function initIcbFocus() {
+  const sel = document.getElementById('icb-focus');
+  if (!sel) return;
+
   fetch(dataUrl('data/map/icb_lookup.json'))
     .then(r => (r.ok ? r.json() : null))
     .catch(() => null)
@@ -6955,19 +7023,55 @@ function _applyBoroughSolo() {
       ICB_OF_LAD = d.lad_to_icb;
       ICB_ORDER = d.order || Object.keys(d.colours || {});
       ICB_COLOUR = d.colours || {};
-      const group = document.createElement('optgroup');
-      group.label = 'Integrated Care Boards';
       ICB_ORDER.forEach(name => {
         const n = Object.keys(ICB_OF_LAD).filter(l => ICB_OF_LAD[l] === name).length;
         const opt = document.createElement('option');
-        opt.value = 'icb:' + name;
+        opt.value = name;
         opt.textContent = name + ' (' + n + ' boroughs)';
-        group.appendChild(opt);
+        sel.appendChild(opt);
       });
-      // After "All London" and before the boroughs, so the two kinds of scope
-      // read largest first.
-      sel.insertBefore(group, sel.options[1] || null);
     });
+
+  sel.addEventListener('change', e => {
+    const v = e.target.value || 'all';
+    focusedIcb = (v === 'all') ? null : v;
+    // A board and a borough cannot both be the scope.
+    if (focusedIcb) {
+      focusedBorough = 'all';
+      const bsel = document.getElementById('borough-focus');
+      if (bsel) bsel.value = 'all';
+    }
+    _applyBoroughSolo();
+
+    if (focusActive() && selW) {
+      const rec = (typeof WARD_DATA !== 'undefined' && WARD_DATA) ? WARD_DATA[selW] : null;
+      if (!rec || !ladInFocus(rec.lad)) {
+        if (typeof deselectWard === 'function') deselectWard();
+      }
+    }
+
+    if (focusActive() && wLyr) {
+      const matched = wLyr.getLayers().filter(l =>
+        ladInFocus((l.feature.properties || {}).LAD));
+      if (matched.length) {
+        map.fitBounds(L.featureGroup(matched).getBounds(), { padding: [30, 30], maxZoom: 12 });
+      }
+    } else if (wLyr) {
+      map.fitBounds(wLyr.getBounds(), { padding: [28, 28] });
+    }
+
+    // Focusing a board draws it, because the outline is what tells you where
+    // the thing you have just narrowed to actually ends.
+    if (focusedIcb) {
+      const cb = document.getElementById('ticb');
+      if (cb && !cb.checked) { cb.checked = true; cb.dispatchEvent(new Event('change')); }
+    }
+
+    applyBoroughLock();
+    if (typeof _announce === 'function') {
+      _announce(focusActive() ? ('Focused on ' + focusLabel() + '.') : 'Showing all of London.');
+    }
+  });
 })();
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -9890,6 +9994,8 @@ function _refreshUI() {
           focusedIcb = null;
           const bsel = document.getElementById('borough-focus');
           if (bsel) bsel.value = 'all';
+          const isel = document.getElementById('icb-focus');
+          if (isel) isel.value = 'all';
           _applyBoroughSolo();
           if (typeof BOROUGH_GJ !== 'undefined' && BOROUGH_GJ.features && boroughL) {
             map.fitBounds(boroughL.getBounds(), { padding: [20, 20] });
@@ -9933,6 +10039,8 @@ function _resetAll() {
     focusedIcb = null;
     const bsel = document.getElementById('borough-focus');
     if (bsel) bsel.value = 'all';
+    const isel = document.getElementById('icb-focus');
+    if (isel) isel.value = 'all';
     // Overlay
     const ovSel = document.getElementById('ov');
     if (ovSel && ovSel.value !== 'none') { ovSel.value = 'none'; ovSel.dispatchEvent(new Event('change')); }
@@ -10046,6 +10154,8 @@ function _writeUrlState() {
     const c20El = document.getElementById('core20-toggle');
     if (ovEl && ovEl.value && ovEl.value !== 'none') p.set('ov', ovEl.value);
     if (bfEl && bfEl.value && bfEl.value !== 'all') p.set('b', bfEl.value);
+    const ifEl = document.getElementById('icb-focus');
+    if (ifEl && ifEl.value && ifEl.value !== 'all') p.set('icb', ifEl.value);
     if (lsEl && lsEl.checked) p.set('lsoa', '1');
     if (c20El && c20El.checked) p.set('c20', '1');
     if (window.cbSafe) p.set('cb', '1');
@@ -10082,6 +10192,7 @@ function _readUrlState() {
       if (ev) el.dispatchEvent(new Event(ev));
     };
     applyIf('borough-focus', p.get('b'), 'change');
+    applyIf('icb-focus', p.get('icb'), 'change');
     applyIf('core20-toggle', p.get('c20'), 'change');
     applyIf('tlsoa', p.get('lsoa'), 'change');
     applyIf('ov', p.get('ov'), 'change');
@@ -10099,7 +10210,7 @@ function _readUrlState() {
   } catch (e) { console.warn('_readUrlState failed', e); }
 }
 (function _wireUrlStateWriters() {
-  ['ov','borough-focus','tlsoa','core20-toggle'].forEach(id => {
+  ['ov','borough-focus','icb-focus','tlsoa','core20-toggle'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.addEventListener('change', () => setTimeout(_writeUrlState, 50));
   });
@@ -10818,7 +10929,7 @@ async function _prepareScreenForScreenshot(opts) {
 // back via location.href + navigator.clipboard.writeText.)
 
 // Keep the strip + chips in sync when any of these inputs change.
-['ov', 'borough-focus', 'tlsoa', 'core20-toggle', 'vcse-area-filter'].forEach(id => {
+['ov', 'borough-focus', 'icb-focus', 'tlsoa', 'core20-toggle', 'vcse-area-filter'].forEach(id => {
   const el = document.getElementById(id);
   if (el) el.addEventListener('change', () => setTimeout(_refreshUI, 0));
 });
@@ -11159,37 +11270,25 @@ function _restyleAll() {
 async function loadData() {
   const ldr = document.getElementById('ldr');
 
-  // The loading map fills to these fractions and no further, so what it shows
-  // is how far the load has actually got. If a payload hangs, the map stops
-  // where it stopped. Nothing here advances it on a timer.
-  const step = (fraction, note) => {
-    if (typeof window._ldrProgress === 'function') window._ldrProgress(fraction, note);
-  };
-
-  // Dismiss on a short fade rather than a cut, and only once the map behind it
-  // is real. pointer-events go first so the fade cannot swallow a click.
+  // The loading screen owns its own animation and its own dismissal now. All
+  // this has to say is that the map behind it is worth looking at; the screen
+  // goes when that is true and the sweep has finished, whichever is later.
   const done = () => {
-    step(1);
-    ldr.style.pointerEvents = 'none';
-    ldr.classList.add('fading');
-    setTimeout(() => ldr.classList.add('hidden'), 240);
+    if (typeof window._ldrReady === 'function') window._ldrReady();
   };
 
   try {
-    step(0.12, 'Checking for fresher data');
 
     // The manifest first, uncached and small. It gives the data version every
     // other payload is stamped with, so a refreshed dataset is picked up
     // immediately while an unchanged one is served from cache.
     const manifest = await loadManifest();
 
-    step(0.22, 'Fetching the ward figures');
     const response = await fetch(dataUrl('ward_data.json'));
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
     const json = await response.json();
     const wards = json.wards || {};
-    step(0.5, `${Object.keys(wards).length.toLocaleString()} wards read`);
 
     // Index by ward code first (unambiguous), then by the GJ display name so
     // disambiguated names like "Kilburn (Brent)" resolve to the right ward.
@@ -11261,14 +11360,12 @@ async function loadData() {
     document.getElementById('data-vintage').innerHTML =
       `Crime: Nov 2025 – Jan 2026 (annualised)<br>Claimants: ${meta.claimant_period||'most recent month'}<br>Health: OHID Fingertips (MSOA level)`;
 
-    step(0.72, 'Drawing the ward boundaries');
 
     buildWardLayer();
     enrichGPFromWardData(wards);
     injectWardIMD();
     injectCrimeCategories();
 
-    step(0.92, 'Almost there');
 
     // lsoa_data.json is no longer fetched here. At 7.8 MB it was the largest
     // single thing this page downloaded, and it holds the census and indicator
@@ -11315,21 +11412,15 @@ async function loadData() {
     console.warn('ward_data.json not found or invalid:', err.message);
     document.getElementById('src-lbl').textContent =
       'ward_data.json not found — map running with boundaries only. Run fetch_all_data.py to populate data.';
-    // The reader gets told the boundaries are there and the figures are not,
-    // which is the part that affects them. The filename and the command that
-    // fixes it are in src-lbl above, for whoever is running it.
-    document.getElementById('ldr-txt').textContent = 'Boundaries only';
-    document.getElementById('ldr-sub').textContent =
-      'The figures behind this map could not be loaded. You can still click a ward.';
+    // The loading screen carries one word now, so the explanation goes where
+    // it can stay on screen: src-lbl in the status bar, set just above.
     buildWardLayer();
     injectWardIMD();
     setTimeout(initVCSEFilters, 100);
     // The boundaries-only fallback still honours a link's borough focus and
     // layer toggles, even though there are no figures to shade with.
     if (typeof _applyUrlStateOnce === 'function') _applyUrlStateOnce();
-    // A beat longer than the success path, because this one has a sentence to
-    // read before the screen goes.
-    setTimeout(done, 1400);
+    done();
   }
 }
 

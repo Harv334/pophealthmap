@@ -36,18 +36,24 @@ BOROUGHS = ROOT / "data" / "map" / "boroughs.js"
 OUT = ROOT / "data" / "map" / "icbs.json"
 LOOKUP = ROOT / "data" / "map" / "icb_lookup.json"
 
-# The eight the rest of this project already calls North West London. If this
-# list and CLAUDE.md ever disagree, this file is the one that is wrong.
+# The eight the rest of this project calls North West London. Kept as its own
+# list even though it is no longer a board of its own: it is still the scope
+# the pipeline and CLAUDE.md are written around, and it is the cross-check that
+# the board below is composed of the right boroughs.
 NWL = [
     "Brent", "Ealing", "Hammersmith and Fulham", "Harrow",
     "Hillingdon", "Hounslow", "Kensington and Chelsea", "Westminster",
 ]
 
+# The five boroughs that were North Central London before the merger.
+NCL = ["Barnet", "Camden", "Enfield", "Haringey", "Islington"]
+
+# Four boards, not five. North West London and North Central London are now a
+# single board, NHS West and North London ICB, so they are composed here rather
+# than drawn as two regions that happen to touch: a merged board has one
+# outline, and the boundary that used to run between them is gone.
 ICBS: dict[str, list[str]] = {
-    "North West London": NWL,
-    "North Central London": [
-        "Barnet", "Camden", "Enfield", "Haringey", "Islington",
-    ],
+    "West and North London": NWL + NCL,
     "North East London": [
         "Barking and Dagenham", "City of London", "Hackney", "Havering",
         "Newham", "Redbridge", "Tower Hamlets", "Waltham Forest",
@@ -61,21 +67,19 @@ ICBS: dict[str, list[str]] = {
     ],
 }
 
-# Five hues chosen for the pairs that actually touch. The first attempt put a
-# violet next to a blue along the whole northern boundary, and at the opacity
-# this layer draws at, a pale violet and a pale blue are the same colour: North
-# West and North Central read as one region.
+# Four hues chosen for the pairs that actually touch. The ring of adjacencies
+# is WNL-NE, NE-SE, SE-SW, SW-WNL, so the four are spread around the wheel in
+# that order and every neighbouring pair sits a quarter turn apart. Saturated
+# enough to survive being drawn at low opacity over a basemap, in either theme.
 #
-# The ring of adjacencies is NW-NC, NC-NE, NE-SE, SE-SW, SW-NW, so the five are
-# spread around the wheel in that order and every neighbouring pair sits at
-# least a quarter turn apart. Saturated enough to survive being drawn at low
-# opacity over a basemap, in either theme.
+# The teal that used to be here went with the merger. It existed because a pale
+# violet and a pale blue were indistinguishable along the old North West to
+# North Central boundary, which is a boundary that no longer exists.
 COLOURS = {
-    "North West London":    "#8E44AD",  # violet
-    "North Central London": "#1A9E8F",  # teal, a long way round from the violet
-    "North East London":    "#C2701C",  # amber
-    "South East London":    "#2E7D32",  # green
-    "South West London":    "#C0392B",  # red
+    "West and North London": "#8E44AD",  # violet
+    "North East London":     "#C2701C",  # amber
+    "South East London":     "#2E7D32",  # green
+    "South West London":     "#C0392B",  # red
 }
 
 
@@ -116,6 +120,11 @@ def main() -> int:
         problems.append(f"borough in no board: {unassigned}")
     if len(assigned) != len(by_name):
         problems.append(f"{len(assigned)} assigned against {len(by_name)} boroughs")
+    # The project's own NWL scope has to sit whole inside one board, or the
+    # eight boroughs the pipeline is built around have been split across two.
+    stray = [b for b in NWL if b not in ICBS["West and North London"]]
+    if stray:
+        problems.append(f"NWL boroughs outside West and North London: {stray}")
     if problems:
         for p in problems:
             print(f"  {p}", file=sys.stderr)
