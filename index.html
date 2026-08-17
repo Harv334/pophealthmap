@@ -85,6 +85,28 @@
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  /* ── Skip link ──
+     Off screen until focused, then a real button at the top left. Not
+     display:none and not visibility:hidden, either of which would take it out
+     of the focus order and defeat the point of having it. */
+  .skip-link { position: absolute; left: -9999px; top: 0; z-index: 9999;
+    background: var(--nhs-blue); color: #fff; padding: 10px 16px;
+    border-radius: 0 0 8px 0; font-size: var(--t-md); font-weight: 600;
+    text-decoration: none; }
+  .skip-link:focus { left: 0; outline: 3px solid var(--nhs-yellow); outline-offset: -3px; }
+
+  /* Read by a screen reader, never drawn. clip-path as well as clip because
+     clip is deprecated and clip-path alone still leaves a 1px box in some
+     engines; together they cover everything in use. */
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0;
+    margin: -1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%);
+    white-space: nowrap; border: 0; }
+
+  /* The map is the skip link's destination, so it has to be able to take
+     focus, and it should not draw a ring when clicked. */
+  #map:focus { outline: none; }
+  #map:focus-visible { outline: 3px solid var(--nhs-blue); outline-offset: -3px; }
   html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--ink); }
 
   /* ── Layout ── */
@@ -1186,9 +1208,13 @@
     border: 1px solid #E8D3A3; border-radius: 3px; padding: 0 3px;
     white-space: nowrap; flex-shrink: 0;
     font-variant-numeric: tabular-nums; cursor: help; }
-  @media (prefers-color-scheme: dark) {
-    .ov-opt .ov-spread { color: #F0D9A8; background: #3A2F1B; border-color: #6B5730; }
-  }
+  /* There was a dark-mode override here, for this one badge, on a site that
+     has no dark mode. On a machine set to dark it turned a single amber chip
+     into a dark chip in the middle of an otherwise light page, which reads as
+     a rendering fault rather than as a theme. One component cannot believe in
+     a theme by itself. Removed until the whole palette has a dark half, which
+     is a real piece of work and is what folding the design layer down is the
+     precondition for. */
   .ov-opt.on { background: var(--nhs-light); }
   .ov-opt.on .ov-opt-nm { font-weight: 600; color: var(--nhs-dark); }
   .ov-empty { padding: 12px 10px; font-size: var(--t-xs); color: var(--ink-3); text-align: center; }
@@ -1558,6 +1584,30 @@
     #zoom-row { display: none; }
   }
 
+  /* ── Reduced motion ───────────────────────────────────────────────────────
+     Last in the stylesheet so it beats every transition declared above it
+     without needing !important on each one.
+
+     This page moves a lot: the drawer slides in, the sidebar animates its
+     width as it collapses, the tour crossfades between chapters, the bottom
+     sheet rises, and the loading map fills 704 wards one colour transition at
+     a time. For somebody with a vestibular disorder that is not decoration,
+     it is a symptom. Nothing here changes what is on screen, only how quickly
+     it gets there.
+
+     0.01ms rather than 0: a zero-length transition never fires transitionend,
+     and anything waiting on one would hang. The loading map is handled
+     separately in its own script, where reduced motion paints the finished
+     state at once rather than sweeping to it. */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
 </style>
 
 <!-- Structured data. Two graphs: the site itself, and the data behind it.
@@ -1644,10 +1694,24 @@
 </head>
 <body>
 
+<!-- The header, the toolbar and a six-button mode rail sit between the top of
+     the document and the map, and the map is what somebody came for. Visible
+     on focus only, which is when it is useful and the only time it is not in
+     the way. -->
+<a class="skip-link" href="#map">Skip to the map</a>
+
+<!-- Everything the map says out loud. The interface answers a click by
+     redrawing, which a screen reader has no way to notice, so the four things
+     that change what is being looked at (the selected area, the indicator, the
+     level and the scope) announce themselves here. Kept in step with the
+     "Currently viewing" strip, which is already the plain-language summary of
+     the same state. See _announce. -->
+<p id="sr-live" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></p>
+
 <div class="app">
 
   <!-- Header -->
-  <div class="hdr">
+  <header class="hdr">
     <div class="hdr-left">
       <button type="button" class="hdr-menu" id="hdr-menu" aria-label="Open the panel"
               aria-expanded="false" aria-controls="sidebar" title="Layers, overlays and modes">
@@ -1687,17 +1751,17 @@
       <button type="button" class="tb-btn" id="tb-png" title="Clear the screen for a screenshot: whitens everything outside the mapped area and hides the controls, then you capture it with your own screenshot tool.">⤓ Screenshot</button>
       <button type="button" class="tb-btn" id="tb-csv" title="Download the ward/LSOA data behind the current overlay">⤓ CSV</button>
     </div>
-  </div>
+  </header>
 
   <!-- Mode rail. Explore is the map below; the rest are scaffolding. -->
-  <div class="mode-rail" role="tablist" aria-label="Tool mode">
+  <nav class="mode-rail" role="tablist" aria-label="Tool mode">
     <button type="button" class="mode-btn" role="tab" data-mode="explore" aria-selected="true">Explore</button>
     <button type="button" class="mode-btn" role="tab" data-mode="query" aria-selected="false">Query</button>
     <button type="button" class="mode-btn" role="tab" data-mode="compare" aria-selected="false">Compare</button>
     <button type="button" class="mode-btn" role="tab" data-mode="report" aria-selected="false">Custom area</button>
     <button type="button" class="mode-btn" role="tab" data-mode="csv" aria-selected="false">Data export</button>
     <button type="button" class="mode-btn" role="tab" data-mode="directory" aria-selected="false">Directory</button>
-  </div>
+  </nav>
 
   <div class="mode-panel" id="mode-panel" hidden>
     <div class="mode-card">
@@ -1709,7 +1773,7 @@
     </div>
   </div>
 
-  <div class="main">
+  <main class="main">
 
     <!-- Sidebar -->
     <div class="sb-scrim" id="sb-scrim" hidden></div>
@@ -2427,7 +2491,11 @@
           </div>
         </div>
       </div>
-      <div id="map"></div>
+      <!-- tabindex="-1" so the skip link above has somewhere to land. It is
+           not a tab stop: Leaflet's own zoom buttons and the ward polygons
+           are what a keyboard walks through inside it. -->
+      <div id="map" tabindex="-1" role="application"
+           aria-label="Map of London. Wards are shaded by the selected indicator."></div>
       <!-- Fingertips suppression banner: shown when a Fingertips overlay is selected -->
       <!-- Top left, under the zoom control. It used to sit bottom right, where
            the Ask button covers it and the Ask panel hides it completely: the
@@ -2512,12 +2580,12 @@
       </div>
     </div>
 
-  </div>
+  </main>
 
   <!-- The source list moved out of here; it is going somewhere with room to
        credit each source properly. #src-lbl stays because it is also where a
        failed ward_data.json load reports itself, and it is empty otherwise. -->
-  <div class="sbar">
+  <footer class="sbar">
     <span class="sbar-left">
       <a class="sbar-link" href="methodology.html">Methodology &amp; technical notes</a>
       <a class="sbar-link" href="mailto:contact@pophealth.uk">contact@pophealth.uk</a>
@@ -2540,7 +2608,7 @@
            thing it exists to tell you. -->
       <span id="site-ver" title="Version of the website itself. The date beside it is when the data was last refreshed.">v0.9.0</span>
     </span>
-  </div>
+  </footer>
 
 </div><!-- .app -->
 
@@ -5198,6 +5266,15 @@ function showWard(wn) {
   // was causing the map to repaint as a blank white rectangle).
   const _vsd = document.getElementById('vs-digest');
   if (_vsd) _vsd.textContent = 'Ward: ' + wn;
+  // Selecting a ward redraws the sheet and the panel, neither of which a
+  // screen reader notices. The population is included because it is the first
+  // figure in the sheet and it makes the announcement worth listening to.
+  if (typeof _announce === 'function') {
+    const _pop = wdata && wdata.indicators && wdata.indicators.population;
+    _announce(`${wn} selected.` +
+      (_pop ? ` Population ${Number(_pop).toLocaleString()}.` : '') +
+      ' Details are in the Area profile tab.');
+  }
 
 
   const inds = wdata.indicators || {};
@@ -9219,6 +9296,26 @@ function _ovLabel(k) {
   }
   return k;
 }
+/* Say something into #sr-live.
+
+   The whole interface answers a click by redrawing the map, and a redraw is
+   invisible to a screen reader: choosing an indicator, selecting a ward,
+   changing level or focusing a borough all happened in complete silence. This
+   is the one channel that makes them audible.
+
+   Two rules keep it usable rather than chatty. Repeats are dropped, because
+   several of the paths that call this fire twice for one user action. And the
+   text is cleared first on a short timer, because a live region that is
+   handed the same-length replacement can be skipped over entirely. */
+let _lastAnnouncement = '';
+function _announce(text) {
+  const el = document.getElementById('sr-live');
+  if (!el || !text || text === _lastAnnouncement) return;
+  _lastAnnouncement = text;
+  el.textContent = '';
+  setTimeout(() => { el.textContent = text; }, 60);
+}
+
 function _refreshUI() {
   try {
     // --- Digest line ---
@@ -9239,6 +9336,11 @@ function _refreshUI() {
         parts.push('<b>Core20</b> only');
       }
       dig.innerHTML = parts.join(' · ');
+      // The same sentence, out loud. _refreshUI runs after every change to
+      // scope, indicator or Core20, so this is already the one place that
+      // knows the whole state; the strip and the announcement cannot disagree
+      // because they are built from the same parts.
+      _announce('Now showing: ' + parts.join(', ').replace(/<\/?b>/g, '') + '.');
     }
 
     // --- Chip bar ---
@@ -10777,6 +10879,49 @@ loadData();
     var btn = e.target.closest('.mode-btn');
     if (btn) show(btn.dataset.mode);
   });
+
+  /* The rail has carried role="tablist" from the start, which tells a screen
+     reader that the arrow keys move between the six tools and that the strip
+     is a single tab stop. Neither was true: they were six ordinary buttons,
+     so Tab walked through all of them and the arrows did nothing. Declaring
+     the pattern and not implementing it is worse than not declaring it, since
+     the reader is told how to drive something that does not answer. */
+  (function wireRailKeys() {
+    var btns = Array.prototype.slice.call(rail.querySelectorAll('.mode-btn'));
+    if (!btns.length) return;
+
+    var roving = function () {
+      btns.forEach(function (b) {
+        b.tabIndex = b.getAttribute('aria-selected') === 'true' ? 0 : -1;
+      });
+    };
+    // aria-selected is set by markRail, from several places. Mirroring it here
+    // rather than setting tabIndex alongside each of them keeps the two from
+    // drifting apart.
+    new MutationObserver(roving).observe(rail, {
+      subtree: true, attributes: true, attributeFilter: ['aria-selected'],
+    });
+    roving();
+
+    rail.addEventListener('keydown', function (e) {
+      var from = btns.indexOf(document.activeElement);
+      if (from < 0) return;
+      var to = -1;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') to = (from + 1) % btns.length;
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') to = (from - 1 + btns.length) % btns.length;
+      else if (e.key === 'Home') to = 0;
+      else if (e.key === 'End') to = btns.length - 1;
+      if (to < 0) return;
+      e.preventDefault();
+      btns[to].focus();
+      // The rail scrolls horizontally on a phone, so a button reached by
+      // keyboard has to be brought into view or focus lands off screen.
+      if (btns[to].scrollIntoView) {
+        btns[to].scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      }
+      btns[to].click();
+    });
+  }());
   panel.querySelector('.mode-back').addEventListener('click', function () { show('explore'); });
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && !panel.hidden) show('explore');
