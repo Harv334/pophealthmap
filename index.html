@@ -4777,8 +4777,10 @@ function _wardBoundaryStyle(feat) {
   const lad = (feat && feat.properties && feat.properties.LAD) || '';
   const hidden = focusActive() && !ladInFocus(lad);
   /* This overlay is drawn above the ward layer and is on by default, so its
-     hairline would run down the middle of the selected ward's yellow outline.
-     It stands aside for that one ward and lets the selection read cleanly.
+     hairline would run down the middle of the selected ward's thicker outline
+     in a slightly different ink, which reads as a doubled edge rather than a
+     heavy one. It stands aside for that one ward and lets the selection read
+     as a single line.
 
      Wrapped, because this function runs once at parse time to build the layer
      and selW is a `let` declared further down the file. Reading it that early
@@ -5698,20 +5700,16 @@ function buildCore20LsoaLayer() {
 
 /* The selected ward's outline.
 
-   Selection used to be signalled by line thickness alone, in the same ink as
-   every other ward edge, and the Border slider scaled it like everything else:
-   turn borders down and the ward you had just clicked became the hardest one
-   on the map to find.
+   Weight alone, in the same ink as every other ward edge. It was briefly a
+   yellow, which read against everything but also read as a highlight the map
+   had applied rather than a ward the user had clicked, and put a colour on the
+   map that meant nothing in any legend. Taken back out.
 
-   It is a colour now, and one that is nowhere else on this map. The choropleth
-   ramps are blues and greens, Core20 is magenta, the ICB regions are violet,
-   amber, green and red at a wash. A saturated yellow at full opacity reads
-   against all of them and against both basemaps, and it is already in the
-   palette as --nhs-yellow.
-
-   The weight has a floor as well as a multiplier, so the slider can make the
-   selection heavier but never thin it back into the crowd. */
-const SELECTED_INK = '#FFB81C';
+   What stays from that change is the floor. Selection used to be scaled by the
+   Border slider like every other edge, so turning borders down made the ward
+   you had just clicked the hardest one on the map to find. The weight has a
+   floor as well as a multiplier now: the slider can make the selection heavier
+   but never thin it back into the crowd. */
 const SELECTED_MIN_WEIGHT = 4.5;
 function selectedWeight(mult) {
   return Math.max(SELECTED_MIN_WEIGHT, 4.5 * (mult || 1));
@@ -5739,7 +5737,7 @@ function wstyle(wn, ov, state) {
     // was shaded, which is what the colour meant.
     const baseW = {default:1.0, hover:3.0, selected:4.0}[state] || 1.0;
     return applyCore20Outline({
-      color: state === 'selected' ? SELECTED_INK : _ink('#000', '#8FA0AC'),
+      color: _ink('#000', '#8FA0AC'),
       weight: state === 'selected'
         ? selectedWeight(borderWeightMult)
         : Math.max(0, baseW * borderWeightMult),
@@ -5764,7 +5762,7 @@ function wstyle(wn, ov, state) {
                  : Math.max(0, baseW * borderWeightMult);
   const op = isFocus ? 1.0 : 0.9;
   return applyCore20Outline({
-    color: sel ? SELECTED_INK : _ink('#000', '#8FA0AC'),
+    color: _ink('#000', '#8FA0AC'),
     weight: w, fillColor: fill, fillOpacity: fo, opacity: op,
   }, wn);
 }
@@ -12442,8 +12440,16 @@ loadData();
     return '<div class="ws-insight">' + bits.join(' ') + '</div>';
   }
 
+  /* The pinned comparison, inside the ward sheet.
+
+     Explore only, for the same reason the pin outlines are. The sheet itself
+     is shared: Query, Custom area, Data export and the Directory all leave it
+     up, because the selected ward is still the selected ward. The comparison
+     is not shared. It is half the height of the sheet, it is a table of wards
+     that have nothing to do with the spreadsheet being built or the service
+     being looked up, and it was following the user into all four of them. */
   function pinTable() {
-    if (!pinned.length) return '';
+    if (!pinned.length || activeTool() !== 'explore') return '';
     var ROWS = [
       { k: 'census_population',        l: 'Population',        dp: 0 },
       { k: 'imd_decile_mean',          l: 'IMD decile (mean)', dp: 1 },
@@ -12583,16 +12589,35 @@ loadData();
     pinBtn.classList.toggle('on', !!on);
   }
 
+  /* Which tool the rail is on.
+
+     currentMode is not that: it collapses Data export and Directory into
+     'explore', because what it tracks is which mode owns the map's click, and
+     neither of those takes it. For "is the user still looking at Compare's
+     things" the rail is the honest answer, and markRail keeps it current from
+     every route in, including the observer that catches a pane switched away
+     from without the rail being touched. */
+  function activeTool() {
+    var b = document.querySelector('.mode-rail .mode-btn[aria-selected="true"]');
+    return (b && b.dataset.mode) || 'explore';
+  }
+
   function drawPins() {
     if (pinLyr && typeof map !== 'undefined') { map.removeLayer(pinLyr); pinLyr = null; }
-    // Pins are drawn everywhere except Query.
-    //
-    // They are not really Compare's output: pinning starts on the ward sheet,
-    // in Explore, and a "Pin to compare" that marks nothing on the map is a
-    // button with no visible effect. But Query owns the outline channel while
-    // it is open, and two sets of outlines in two colours, one of them
-    // answering a question and one of them not, is the thing being fixed here.
-    if (currentMode === 'query') return;
+    /* Explore and Compare only.
+
+       Pinning starts on the ward sheet, in Explore, and a "Pin to compare"
+       that marks nothing on the map is a button with no visible effect, so
+       Explore has to draw them. Compare draws them because they are what its
+       cards are about.
+
+       Everywhere else they are somebody else's map. Query, Custom area and the
+       Directory each own the outline channel while they are open, and a second
+       set of outlines in a second set of colours, answering a question nobody
+       asked on this tab, is what a user carries between tabs without meaning
+       to. They come back the moment Compare or Explore does. */
+    var tool = activeTool();
+    if (tool !== 'explore' && tool !== 'compare') return;
     if (!pinned.length || typeof GJ === 'undefined' || !GJ.features || typeof map === 'undefined') return;
     var feats = GJ.features.filter(function (f) {
       return pinned.indexOf(f.properties.WD24NM) !== -1;
@@ -12949,6 +12974,7 @@ loadData();
     mapWrap.style.setProperty('--sheet-lift', px);
     document.documentElement.style.setProperty('--sheet-lift', px);
   }
+
 
   if (cmpPinsEl) {
     cmpPinsEl.addEventListener('click', function (e) {
@@ -14502,7 +14528,10 @@ loadData();
     if (currentMode === 'compare') suspendSheet(); else resumeSheet();
 
     drawMatches(q._rows);          // self-guards: draws only in Query
-    drawPins();                    // self-guards: draws only in Compare
+    // Not drawPins() on its own: which tabs show the pins is decided by the
+    // tab, so the sheet's pinned table has to be rebuilt on a switch too, and
+    // refreshPins is the one call that redoes both.
+    refreshPins();
 
     if (currentMode === 'compare') {
       buildOnce();
