@@ -10172,9 +10172,15 @@ function _resetAll() {
     // Whatever is selected, selected. Reset says it clears everything and
     // returns to the default view, and it was leaving a ward highlighted with
     // its bar across the bottom of the map, plus any Directory pin and its
-    // popup. Back to Explore also takes down the query highlight, the pinned
-    // outlines and the comparison drawer.
+    // popup. Back to Explore also takes down the query highlight and the
+    // comparison drawer.
     if (typeof deselectWard === 'function') deselectWard();
+    // The pins are the exception: going back to Explore does not clear them,
+    // it is where they draw. They are user state like everything else here, so
+    // Reset owes them the same treatment. It matters most at the end of a tour,
+    // which finishes by pressing this: stopping on the Compare chapter used to
+    // leave the tour's own two example wards outlined on the map afterwards.
+    if (window.PH_COMPARE) window.PH_COMPARE.clear();
     if (typeof map !== 'undefined' && map && map.closePopup) map.closePopup();
     const _explore = document.querySelector('.mode-btn[data-mode="explore"]');
     if (_explore) _explore.click();
@@ -13019,6 +13025,19 @@ loadData();
     $('cmp-bar-close').addEventListener('click', closeCompareBar);
   }
 
+  /* The pin list, for the tour.
+
+     Pinning it already does the way a user would, by clicking wards on the map
+     while Compare is open. Unpinning has no control that is always reachable:
+     "Clear pins" lives in the sheet's pinned block, and that block is Explore's
+     and only exists while a ward is selected. So a tour that pinned two wards
+     in chapter 5 had no way to put them away, and they were still outlined on
+     the map in chapter 9. */
+  window.PH_COMPARE = {
+    pinned: function () { return pinned.slice(); },
+    clear: function () { if (!pinned.length) return; pinned = []; refreshPins(); },
+  };
+
   function cmpCsv() {
     if (!pinned.length) { alert('Pin at least one ward first.'); return; }
     var mets = cmpActive();
@@ -13568,7 +13587,19 @@ loadData();
         closeWardSheet();
         wardLevel();
         railClick('query');
-        if (window.PH_QUERY) window.PH_QUERY.build();
+        if (window.PH_QUERY) {
+          window.PH_QUERY.build();
+          /* Lay the worked example down again.
+
+             It is seeded once, when the ward data arrives, and the stage reset
+             clears the builder before every chapter so that a query is not
+             still outlined under the chapter after this one. Those two met
+             here: by the time this chapter ran, the example had been cleared,
+             and an empty filter matches everything. The panel answered "704
+             wards" and read back "Wards anywhere in London", under narration
+             describing a borough, two services and two conditions. */
+          window.PH_QUERY.seed();
+        }
         var run = $('q-run');
         if (run) run.click();
       },
@@ -13780,6 +13811,11 @@ loadData();
       // self-guards when that mode is not on screen.
       var qc = document.getElementById('q-clear'); if (qc) qc.click();
       var rc = document.getElementById('rb-clear'); if (rc) rc.click();
+      // Compare's two example wards. They are pinned, and a pin outlives the
+      // chapter that made it: it is a list, not a mode, so it survived into
+      // Custom area, Data export and the Directory and came back out onto the
+      // map for the last two chapters, which are Explore's.
+      if (window.PH_COMPARE) window.PH_COMPARE.clear();
       if (typeof clearDirMarker === 'function') clearDirMarker();
       // Scope is a chapter's own business, and a board or borough left focused
       // would silently narrow every chapter after it.
@@ -13790,6 +13826,15 @@ loadData();
         var is = document.getElementById('icb-focus');     if (is) is.value = 'all';
         if (typeof _applyBoroughSolo === 'function') _applyBoroughSolo();
       }
+      /* Back to Explore, last, once the clearing is done.
+
+         Every chapter opens by calling railClick for the tool it is about, so
+         this is never what the user ends up looking at; it is the state each
+         chapter starts from. Without it a chapter inherits the last one's tool
+         and only the parts it thought to name get put away, which is the same
+         trap the rest of this function exists to close. Explore is the map on
+         its own, so it is the one tool that leaves nothing of its own behind. */
+      railClick('explore');
     } catch (e) { /* tidying must never strand the tour */ }
   }
 
@@ -15005,9 +15050,11 @@ loadData();
   }, 400);
   setTimeout(function () { clearInterval(_poll); }, 30000);
 
-  // The rail calls this when Query mode is entered, in case the poll has not
-  // got there yet.
-  window.PH_QUERY = { build: buildOnce };
+  // The rail calls build when Query mode is entered, in case the poll has not
+  // got there yet. seed is for the tour: the worked example is laid down once,
+  // at load, and anything that clears the builder after that leaves the panel
+  // empty, which is not the same as leaving it at its default.
+  window.PH_QUERY = { build: buildOnce, seed: seedExample };
 
 })();
 </script>
