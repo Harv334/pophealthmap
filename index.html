@@ -1792,13 +1792,13 @@
           </div>
           <!-- VCSE + CIC toggles moved to the VCSE tab; they're the only place to enable them now. -->
 
-          <label class="lrow"><div class="ldot" style="background:#7B2D8E"></div><span class="lname">Dental practices <span class="lcount" id="dental-count">0</span></span><input type="checkbox" id="td"></label>
-          <label class="lrow"><div class="ldot" style="background:#E89B1B"></div><span class="lname">Pharmacies <span class="lcount" id="pharm-count">0</span></span><input type="checkbox" id="tph"></label>
+          <label class="lrow"><div class="ldot" style="background:#7B2D8E"></div><span class="lname">Dental practices <span class="lcount" id="dental-count"></span></span><input type="checkbox" id="td"></label>
+          <label class="lrow"><div class="ldot" style="background:#E89B1B"></div><span class="lname">Pharmacies <span class="lcount" id="pharm-count"></span></span><input type="checkbox" id="tph"></label>
         </div>
         <div class="sb-sec" style="flex-shrink:0;border-bottom:1px solid var(--line-2)">
           <div class="sb-lbl">Civic &amp; education<span class="lhelp" title="Schools, community centres, libraries and formal ESOL providers — sourced from the GLA ESOL Planning Map (English language proficiency planning dataset). These four layers cover the eight North West London boroughs only: Brent, Ealing, Hammersmith and Fulham, Harrow, Hillingdon, Hounslow, Kensington and Chelsea, and Westminster. Elsewhere in London they are empty because the data has not been collected yet, not because there is nothing there.">?</span></div>
           <div class="cov-note">Covers North West London only. Blank elsewhere means not yet collected, not none.</div>
-          <label class="lrow"><div class="ldot" style="background:#1E5BB8"></div><span class="lname">Schools <span class="lcount" id="schools-count">0</span> <span class="cov-tag" title="North West London boroughs only">NWL</span></span><input type="checkbox" id="tsch"></label>
+          <label class="lrow"><div class="ldot" style="background:#1E5BB8"></div><span class="lname">Schools <span class="lcount" id="schools-count"></span> <span class="cov-tag" title="North West London boroughs only">NWL</span></span><input type="checkbox" id="tsch"></label>
           <div id="schools-filter-wrap" style="margin:2px 0 4px 16px">
             <select id="schools-phase-filter" style="width:100%;padding:3px 6px;border:1px solid var(--line);border-radius:5px;font-size:var(--t-xs);color:var(--ink);background:#fff">
               <option value="all" selected>All schools</option>
@@ -1810,9 +1810,9 @@
               <option value="Not applicable">Special / Other</option>
             </select>
           </div>
-          <label class="lrow"><div class="ldot" style="background:#D87C2D"></div><span class="lname">Community centres <span class="lcount" id="cc-count">0</span> <span class="cov-tag" title="North West London boroughs only">NWL</span></span><input type="checkbox" id="tcc"></label>
-          <label class="lrow"><div class="ldot" style="background:#00A0A0"></div><span class="lname">Libraries <span class="lcount" id="lib-count">0</span> <span class="cov-tag" title="North West London boroughs only">NWL</span></span><input type="checkbox" id="tlib"></label>
-          <label class="lrow"><div class="ldot" style="background:#B83C3C"></div><span class="lname">Formal ESOL providers <span class="lcount" id="esol-count">0</span> <span class="cov-tag" title="North West London boroughs only">NWL</span></span><input type="checkbox" id="tesol"></label>
+          <label class="lrow"><div class="ldot" style="background:#D87C2D"></div><span class="lname">Community centres <span class="lcount" id="cc-count"></span> <span class="cov-tag" title="North West London boroughs only">NWL</span></span><input type="checkbox" id="tcc"></label>
+          <label class="lrow"><div class="ldot" style="background:#00A0A0"></div><span class="lname">Libraries <span class="lcount" id="lib-count"></span> <span class="cov-tag" title="North West London boroughs only">NWL</span></span><input type="checkbox" id="tlib"></label>
+          <label class="lrow"><div class="ldot" style="background:#B83C3C"></div><span class="lname">Formal ESOL providers <span class="lcount" id="esol-count"></span> <span class="cov-tag" title="North West London boroughs only">NWL</span></span><input type="checkbox" id="tesol"></label>
           <div id="esol-filter-wrap" style="margin:2px 0 4px 16px">
             <select id="esol-type-filter" style="width:100%;padding:3px 6px;border:1px solid var(--line);border-radius:5px;font-size:var(--t-xs);color:var(--ink);background:#fff">
               <option value="all" selected>All provider types</option>
@@ -4172,10 +4172,90 @@ function wireVCSE(records) {
   try { buildVCSETagFilters(); } catch(e) { console.error('buildVCSETagFilters failed:', e); }
 }
 
-fetch('vcse_data.json')
-  .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP '+r.status)))
-  .then(wireVCSE)
-  .catch(err => console.error('VCSE load failed:', err));
+// ═══════════════════════════════════════════════════════════════════════════
+// LAZY POINT LAYERS
+// ═══════════════════════════════════════════════════════════════════════════
+/* These eight payloads used to be fetched from the top level of this script,
+   so the browser started every one of them while the map was still being
+   built, and finished none of them before the reader could have wanted any.
+   Every single one of their toggles is off by default.
+
+   A cold load pulled about 15.4 MB of JSON, roughly 2.1 MB over the wire, to
+   put nothing on the screen: 11,134 VCSE organisations, 1,737 pharmacies,
+   1,663 dental practices, 750 schools, 190 community centres, 81 libraries
+   and 58 ESOL providers, none of them drawn.
+
+   They are fetched when something actually needs them now, following
+   loadMsoaBoundaries, which has worked this way for a while. Three things
+   need them, and all three call ensureLayerData:
+
+     - a layer toggle being switched on,
+     - the VCSE tab being opened, which lists and filters the records,
+     - the ward report, which counts what sits inside a ward.
+
+   The Directory has always loaded its own copies through loadJson and is
+   untouched; the browser cache means it does not pay twice.
+
+   Repeat calls are free: the promise is kept. A failed one is not, so a
+   second attempt at the toggle retries rather than being stuck with the
+   first failure for the rest of the session. */
+const LAYER_SOURCES = {
+  vcse:      { url: 'vcse_data.json',        apply: d => wireVCSE(d) },
+  cics:      { url: 'cics.json',             apply: d => wireCICs(d),
+               fail: () => {
+                 // cics.json is optional. An honest zero beats a stuck blank.
+                 const cnt = document.getElementById('cic-count');
+                 if (cnt) cnt.textContent = '0';
+               } },
+  dental:    { url: 'dental_practices.json', apply: d => loadDentalLayer(d) },
+  pharmacy:  { url: 'pharmacies.json',       apply: d => loadPharmacyLayer(d) },
+  schools:   { url: 'schools.json',          apply: d => loadSchoolsLayer(d) },
+  cc:        { url: 'community_centres.json',apply: d => loadCCLayer(d) },
+  libraries: { url: 'libraries.json',        apply: d => loadLibLayer(d) },
+  esol:      { url: 'esol_providers.json',   apply: d => loadESOLLayer(d) },
+};
+const _layerLoads = {};
+
+function ensureLayerData(key) {
+  if (_layerLoads[key]) return _layerLoads[key];
+  const src = LAYER_SOURCES[key];
+  if (!src) return Promise.resolve(null);
+
+  _layerLoads[key] = fetch(src.url)
+    .then(r => (r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))))
+    .then(data => {
+      if (!data || !data.length) throw new Error('empty');
+      src.apply(data);
+      return data;
+    })
+    .catch(err => {
+      _layerLoads[key] = null;
+      if (src.fail) src.fail();
+      console.info(`${src.url} not loaded: ${err.message}`);
+      return null;
+    });
+  return _layerLoads[key];
+}
+
+// Everything at once, for the ward report, which counts across all of them.
+function ensureAllLayerData() {
+  return Promise.all(Object.keys(LAYER_SOURCES).map(ensureLayerData));
+}
+
+/* Wire a checkbox so ticking it fetches what it draws before showing it.
+   The layer is only added if the box is still ticked when the payload lands,
+   so a quick tick-untick does not leave markers on a map whose toggle is
+   off. */
+function _wireLazyToggle(id, key, cluster) {
+  const cb = document.getElementById(id);
+  if (!cb) return;
+  cb.addEventListener('change', e => {
+    if (!e.target.checked) { map.removeLayer(cluster); return; }
+    ensureLayerData(key).then(() => {
+      if (cb.checked) cluster.addTo(map);
+    });
+  });
+}
 
 // vcseCluster not added by default - toggle on via sidebar
 
@@ -4235,15 +4315,7 @@ function wireCICs(records) {
   const cnt = document.getElementById('cic-count');
   if (cnt) cnt.textContent = CIC_ALL.length.toLocaleString();
 }
-fetch('cics.json')
-  .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP '+r.status)))
-  .then(wireCICs)
-  .catch(err => {
-    // Soft fail — cics.json is optional. Hide the count if missing.
-    console.info('cics.json not loaded (run scripts/fetch_cics.py to generate):', err.message);
-    const cnt = document.getElementById('cic-count');
-    if (cnt) cnt.textContent = '0';
-  });
+// cics.json is fetched by ensureLayerData('cics'). See LAYER_SOURCES.
 // Paired-toggle helper for CICs (mirrors _setVcseLayerVisible).
 function _setCicLayerVisible(on) {
   const a = document.getElementById('tcic');
@@ -4251,7 +4323,10 @@ function _setCicLayerVisible(on) {
   if (a && a.checked !== !!on) a.checked = !!on;
   if (b && b.checked !== !!on) b.checked = !!on;
   if (on) {
-    if (!cicCluster._map) cicCluster.addTo(map);
+    ensureLayerData('cics').then(() => {
+      const stillOn = (a && a.checked) || (b && b.checked);
+      if (stillOn && !cicCluster._map) cicCluster.addTo(map);
+    });
   } else {
     if (cicCluster._map) map.removeLayer(cicCluster);
   }
@@ -4421,10 +4496,7 @@ function _applyDentalFilter() {
   if (countEl) countEl.textContent = n;
 }
 // Try loading dental_practices.json
-fetch('dental_practices.json').then(r => r.ok ? r.json() : []).then(data => {
-  if (data && data.length) loadDentalLayer(data);
-  else console.log('dental_practices.json not found or empty — run fetch_all_data.py --only dental');
-}).catch(() => console.log('dental_practices.json not available'));
+// Fetched by ensureLayerData('dental') when the toggle asks for it.
 
 // ── Pharmacy layer ─────────────────────────────────────────────────────────────────────
 function mkPharmacyIcon() {
@@ -4462,10 +4534,7 @@ function loadPharmacyLayer(practices) {
   console.log(`Loaded ${pharmData.length} pharmacies`);
 }
 // Try loading pharmacies.json — generated by scripts/refresh_pharmacies.py
-fetch('pharmacies.json').then(r => r.ok ? r.json() : []).then(data => {
-  if (data && data.length) loadPharmacyLayer(data);
-  else console.log('pharmacies.json empty — run scripts/refresh_pharmacies.py to populate');
-}).catch(() => console.log('pharmacies.json not available'));
+// Fetched by ensureLayerData('pharmacy') when the toggle asks for it.
 
 
 // ── ESOL Planning Map: schools + community centres + libraries + ESOL providers ───
@@ -4525,10 +4594,7 @@ function _applySchoolsFilter() {
   const el = document.getElementById('schools-count');
   if (el) el.textContent = n;
 }
-fetch('schools.json').then(r => r.ok ? r.json() : []).then(data => {
-  if (data && data.length) loadSchoolsLayer(data);
-  else console.log('schools.json not found or empty');
-}).catch(() => console.log('schools.json not available'));
+// Fetched by ensureLayerData('schools') when the toggle asks for it.
 
 // ── Community centres (GLA ESOL Planning Map) ─────────────────────────────
 const ccCluster  = _mkCivicCluster('#D87C2D', 'rgba(216,124,45,.78)');
@@ -4550,10 +4616,7 @@ function loadCCLayer(rows) {
   if (el) el.textContent = ccData.length;
   console.log(`Loaded ${ccData.length} community centres`);
 }
-fetch('community_centres.json').then(r => r.ok ? r.json() : []).then(data => {
-  if (data && data.length) loadCCLayer(data);
-  else console.log('community_centres.json not found or empty');
-}).catch(() => console.log('community_centres.json not available'));
+// Fetched by ensureLayerData('cc') when the toggle asks for it.
 
 // ── Libraries (GLA ESOL Planning Map) ─────────────────────────────────────
 const libCluster  = _mkCivicCluster('#00A0A0', 'rgba(0,160,160,.78)');
@@ -4576,10 +4639,7 @@ function loadLibLayer(rows) {
   if (el) el.textContent = libData.length;
   console.log(`Loaded ${libData.length} libraries`);
 }
-fetch('libraries.json').then(r => r.ok ? r.json() : []).then(data => {
-  if (data && data.length) loadLibLayer(data);
-  else console.log('libraries.json not found or empty');
-}).catch(() => console.log('libraries.json not available'));
+// Fetched by ensureLayerData('libraries') when the toggle asks for it.
 
 // ── Formal ESOL providers (GLA ESOL Planning Map) ─────────────────────────
 const esolCluster  = _mkCivicCluster('#B83C3C', 'rgba(184,60,60,.78)');
@@ -4611,10 +4671,7 @@ function _applyESOLFilter() {
   const el = document.getElementById('esol-count');
   if (el) el.textContent = n;
 }
-fetch('esol_providers.json').then(r => r.ok ? r.json() : []).then(data => {
-  if (data && data.length) loadESOLLayer(data);
-  else console.log('esol_providers.json not found or empty');
-}).catch(() => console.log('esol_providers.json not available'));
+// Fetched by ensureLayerData('esol') when the toggle asks for it.
 
 
 // ── VCSE filtering ────────────────────────────────────────────────────────
@@ -5179,7 +5236,26 @@ window.deselectLSOA = function() {
 // All charts inline SVG (no external libraries) so the popup remains
 // fully self-contained.
 // ─────────────────────────────────────────────────────────────────────────
+/* The report counts what sits inside a ward, across every point layer, so it
+   needs all of them whether or not the reader ever switched one on. Since
+   those payloads are lazy now, the tab has to be opened first and filled
+   second: window.open only survives a pop-up blocker while the click that
+   caused it is still on the stack, and an await would put it past that. So
+   the tab opens immediately with a holding page, the data is fetched, and
+   then the real report is written over the top. */
 window.generateWardReport = function(wn, opts) {
+  const _w = window.open('', '_blank');
+  if (!_w) { alert('Please allow pop-ups to generate the ward report.'); return; }
+  _w.document.write(
+    '<!DOCTYPE html><html lang="en-GB"><head><meta charset="UTF-8">' +
+    '<title>' + String(wn).replace(/[<>&]/g, '') + ' | PopHealth Map</title></head>' +
+    '<body style="margin:0;display:flex;align-items:center;justify-content:center;' +
+    'height:100vh;font:15px/1.5 system-ui,sans-serif;color:#4C6272;background:#F4F7F9">' +
+    'Building the report for ' + String(wn).replace(/[<>&]/g, '') + '…</body></html>');
+  ensureAllLayerData().then(() => _generateWardReport(_w, wn, opts));
+};
+
+function _generateWardReport(_reportWindow, wn, opts) {
   // opts.autoPrint opens the browser's print dialogue as soon as the report
   // has rendered, which is how "Download PDF" on the ward sheet produces a
   // PDF: the report is a real page, and every browser can print one to PDF.
@@ -6000,8 +6076,10 @@ window.generateWardReport = function(wn, opts) {
 <\/script>
 </body></html>`;
 
-  const w = window.open('', '_blank');
-  if (!w) { alert('Please allow pop-ups to generate the ward report.'); return; }
+  // Already open, holding a "building the report" page. Opening it here would
+  // be too late: the click that authorised it has long since finished.
+  const w = _reportWindow;
+  if (!w || w.closed) return;
   w.document.open();
   w.document.write(html);
   w.document.close();
@@ -6010,7 +6088,7 @@ window.generateWardReport = function(wn, opts) {
     // print snapshot is taken.
     w.addEventListener('load', () => { try { w.focus(); w.print(); } catch (e) { /* user can still use the button */ } });
   }
-};
+}
 
 function buildWardLayer() {
   wLyr = L.geoJSON(GJ, {
@@ -7039,7 +7117,15 @@ document.getElementById('tgr').addEventListener('change', e => {
 // Whichever one changes, we apply the state to the map AND mirror it to the other.
 function _setVcseLayerVisible(on) {
   if (on) {
-    if (!vcseCluster._map) vcseCluster.addTo(map);
+    // The records have to be in hand before there is anything to cluster.
+    // Re-checking the toggle after the fetch means a quick on-off does not
+    // leave 11,000 markers on a map whose box is unticked.
+    ensureLayerData('vcse').then(() => {
+      const a = document.getElementById('tv');
+      const b = document.getElementById('vcse-tab-toggle');
+      const stillOn = (a && a.checked) || (b && b.checked);
+      if (stillOn && !vcseCluster._map) vcseCluster.addTo(map);
+    });
   } else {
     if (vcseCluster._map) map.removeLayer(vcseCluster);
   }
@@ -7053,14 +7139,16 @@ function _setVcseLayerVisible(on) {
   const vt = document.getElementById('vcse-tab-toggle');
   if (vt) vt.addEventListener('change', e => _setVcseLayerVisible(e.target.checked));
 }
-document.getElementById('td').addEventListener('change',  e => e.target.checked ? dentalCluster.addTo(map) : map.removeLayer(dentalCluster));
-document.getElementById('tph').addEventListener('change', e => e.target.checked ? pharmCluster.addTo(map) : map.removeLayer(pharmCluster));
+// Each of these fetches what it draws the first time it is switched on. See
+// LAYER_SOURCES for why they are no longer downloaded up front.
+_wireLazyToggle('td',  'dental',   dentalCluster);
+_wireLazyToggle('tph', 'pharmacy', pharmCluster);
 
 // ── Civic & education layer toggles (GLA ESOL Planning Map) ──
-document.getElementById('tsch')  && document.getElementById('tsch').addEventListener('change',  e => e.target.checked ? schoolsCluster.addTo(map) : map.removeLayer(schoolsCluster));
-document.getElementById('tcc')   && document.getElementById('tcc').addEventListener('change',   e => e.target.checked ? ccCluster.addTo(map)      : map.removeLayer(ccCluster));
-document.getElementById('tlib')  && document.getElementById('tlib').addEventListener('change',  e => e.target.checked ? libCluster.addTo(map)     : map.removeLayer(libCluster));
-document.getElementById('tesol') && document.getElementById('tesol').addEventListener('change', e => e.target.checked ? esolCluster.addTo(map)    : map.removeLayer(esolCluster));
+_wireLazyToggle('tsch',  'schools',   schoolsCluster);
+_wireLazyToggle('tcc',   'cc',        ccCluster);
+_wireLazyToggle('tlib',  'libraries', libCluster);
+_wireLazyToggle('tesol', 'esol',      esolCluster);
 // Schools phase filter
 (function(){
   const sel = document.getElementById('schools-phase-filter');
@@ -9991,6 +10079,13 @@ document.querySelectorAll('.sb-tab').forEach(t => {
   t.addEventListener('click', () => {
     document.querySelectorAll('.sb-tab').forEach(x => x.classList.toggle('active', x===t));
     document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.id==='tab-'+t.dataset.tab));
+    // The VCSE pane is a list and a set of tag filters over the records
+    // themselves, so opening the tab is a request for the data whether or not
+    // the layer is ever drawn on the map. Nothing else here needs a payload.
+    if (t.dataset.tab === 'vcse') {
+      ensureLayerData('vcse');
+      ensureLayerData('cics');
+    }
     // Viewing-strip stays visible at all times now; the digest text is
     // kept in sync by showWard/showLSOA/deselectWard/deselectLSOA so the
     // map-wrap grid geometry never changes (prevents white-screen bug).
