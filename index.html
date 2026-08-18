@@ -2794,6 +2794,15 @@
           <button type="button" data-dl="msoa" title="MSOA level. MSOAs sit between wards and LSOAs and do not nest into wards. The Local Health indicators are published at this level, so they shade here; anything published elsewhere draws the boundaries only.">MSOA</button>
           <button type="button" data-dl="lsoa" title="LSOA-level data (~1,200 areas, more granular)">LSOA</button>
         </div>
+        <!-- The four names are the whole vocabulary of this control and three
+             of them are initials. Each button already carries a title of its
+             own, but those explain when to pick that level, not what it is,
+             and a reader who does not know what an MSOA is cannot use any of
+             them. The same .lhelp button as everywhere else, so it opens on a
+             touchscreen and on a keyboard rather than only under a pointer. -->
+        <button type="button" class="lhelp" aria-label="What these area levels mean"
+                aria-expanded="false"
+                title="The four sizes of area this map can colour. Borough is one of the 33 London local authorities. Ward is the electoral area a borough divides into, and London has 704. MSOA means Middle Layer Super Output Area, a statistical area of about 7,500 people, and London has 1,002. LSOA means Lower Layer Super Output Area, the smallest here, about 1,500 people, and London has 4,994. Wards sit inside boroughs, but MSOAs and LSOAs do not, so a ward is not a whole number of either. An indicator is only offered at the level it is published for.">?</button>
         <div class="dl-hint" id="dl-hint"></div>
       </div>
 
