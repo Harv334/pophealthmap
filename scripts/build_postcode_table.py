@@ -61,12 +61,14 @@ it is not. --columns all includes the excluded 14, suffixed _modelled.
 
 import argparse
 import csv
+import subprocess
 import io
 import json
 import pathlib
 import re
 import sys
 import zipfile
+from datetime import datetime
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
 ONSPD_ZIP = REPO / ".cache" / "onspd" / "ONSPD_FEB_2026_UK.zip"
@@ -176,14 +178,68 @@ BLANK_REASON = {
     "ward_imd_decile_mean":
         "As the ward IMD score above.",
     "ptal_score":
-        "The GLA LSOA Atlas does not carry a PTAL score for every LSOA.",
+        "The GLA LSOA Atlas supplied 4,835 rows, which is the number of LSOAs "
+        "London had on 2011 boundaries; PTAL itself is 2014 data. 4,659 of "
+        "today's 4,994 LSOAs match one of those rows and 335 do not, so the "
+        "gap is where the 2011 and 2021 boundaries differ rather than "
+        "anything about those places.",
 }
+
+PROVENANCE = """Built {built} by scripts/build_postcode_table.py, in
+https://github.com/Harv334/pophealthmap at commit {commit}. That script is the
+method statement: every choice below is argued in its docstring, and the file
+can be rebuilt from it.
+
+Sources
+    ONSPD               {onspd}
+                        the postcode, its LSOA, its ward and its coordinates
+    IMD 2025            MHCLG File 7, score, rank, decile and seven domains
+    Census 2021         ONS via Nomis, the table named against each column in
+                        the dictionary
+    PTAL                GLA LSOA Atlas, 2014
+    Fuel poverty        DESNZ sub-regional LILEE, 2022
+    Claimant count      NOMIS NM_162
+    LSOA to ward        ONS best-fit lookup LSOA21_WD25_LAD25_EW_LU_v2
+
+The figures are as the pipeline last refreshed them, {last_run}. Rebuilding
+against a later refresh will change them, so quote that date alongside any
+figure taken from here.
+
+Method
+    One row per postcode that ONSPD places in one of London's 4,994 LSOAs.
+    There is no separate region or local-authority filter, so this file cannot
+    disagree with the map about what London is.
+
+    LSOA figures are joined on lsoa21cd and never lsoa11cd. London had 4,835
+    LSOAs on 2011 boundaries and has 4,994 now, so the wrong key would
+    mismatch silently.
+
+    The ward is the one ONSPD gives the postcode, not the ward its LSOA is
+    best-fitted to. Best fit is correct for an LSOA and wrong for a postcode
+    inside an LSOA that straddles a ward boundary: deriving it that way put
+    13,869 postcodes, 7.66 per cent of London, in a ward they are not in, and
+    left 20 City of London wards with no postcodes at all.
+
+    Only figures published at LSOA by their source are included. Fourteen that
+    this pipeline computes onto the LSOA, from a 1 km pollution grid, an Output
+    Area rollup or a distance from the LSOA centroid, are left out unless the
+    build is run with --columns all, where they are marked [modelled].
+
+    A column with no value in any LSOA is dropped before the header is written.
+    A heading is a promise, and one census field was reaching this file as
+    180,983 empty cells under a confident name."""
+
 
 READ_ME = """LONDON POSTCODES WITH AREA DEPRIVATION AND CENSUS FIGURES
 =========================================================
 
 {rows:,} live London postcodes. Built {stamp} by
 scripts/build_postcode_table.py in the pophealthmap project.
+
+HOW THIS WAS MADE
+-----------------
+{provenance}
+
 
 Files
 -----
@@ -451,9 +507,27 @@ def main():
     else:
         coverage = "Every column is complete for all %s rows." % f"{kept:,}"
 
+    try:
+        manifest = json.loads((REPO / "data" / "meta" / "manifest.json")
+                              .read_text(encoding="utf-8"))
+        last_run = str(manifest.get("last_run", ""))[:10] or "unknown"
+    except (OSError, ValueError):
+        last_run = "unknown"
+    try:
+        commit = subprocess.run(["git", "-C", str(REPO), "rev-parse", "--short", "HEAD"],
+                                capture_output=True, text=True, timeout=20).stdout.strip()
+    except Exception:
+        commit = ""
+    provenance = PROVENANCE.format(
+        built=datetime.now().strftime("%d %B %Y"),
+        commit=commit or "see the repository history",
+        last_run=last_run,
+        onspd=ONSPD_ZIP.name)
+
     readme = base.with_name(base.name + "_READ_ME.txt")
     readme.write_text(READ_ME.format(rows=kept, name=base.name,
                                      stamp="from ONSPD FEB 2026",
+                                     provenance=provenance,
                                      coverage=coverage), encoding="utf-8")
 
     mb = out_csv.stat().st_size / 1e6
