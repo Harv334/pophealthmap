@@ -198,14 +198,12 @@ function json(body, status, headers) {
 }
 
 /**
- * Is this request a fresh question, or the continuation of one?
+ * A continuation posted by the client loop, rather than something typed.
  *
- * Answering a question takes several round trips: the model asks for a tool,
- * the browser runs it and posts the result back. Those are separate requests
- * here, so counting requests rather than questions would make a cap of 10 mean
- * two or three questions, and the panel promises ten.
- * A continuation is a user message carrying only tool_result blocks, which is
- * something only the client loop sends, never a person typing.
+ * Answering one question takes several round trips: the model asks for a tool,
+ * the browser runs it and posts the result back. A user message carrying only
+ * tool_result blocks is one of those. Only the client loop sends them, never a
+ * person, and they are never counted.
  */
 function isToolResultOnly(msg) {
   if (!msg || msg.role !== "user") return false;
