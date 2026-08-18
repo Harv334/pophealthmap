@@ -222,6 +222,27 @@ THE THREE KINDS OF FIGURE HERE
    describe a point rather than the area around it.
 
 
+A NOTE ON RETIRED POSTCODES
+---------------------------
+Only present when the file was built with --terminated, and marked in the
+"Postcode status" column.
+
+ONS assigns retired postcodes to current geography, so one withdrawn in 1996
+still carries a 2021 LSOA and joins like any other. That is what makes matching
+historical addresses possible at all.
+
+What it cannot do is take the figures back with it. Every figure here describes
+its area as measured recently: IMD 2025, Census 2021. A record from a 1998
+address therefore gets that area's deprivation today, not its deprivation when
+the person lived there. Areas change, sometimes a great deal and sometimes
+because of the very things being studied. For a cohort spanning decades this is
+usually the largest source of error in the file, and it is invisible in the
+data: nothing in the row says the figure and the address are thirty years
+apart.
+
+The retirement date is given so it can be filtered on.
+
+
 A NOTE ON WARDS
 ---------------
 The ward is the one ONSPD places the postcode in, which is right per postcode.
@@ -325,6 +346,10 @@ def main():
             "Ward code", "Ward name",
             "Ward IMD score (mean of its LSOAs)", "Ward IMD decile (mean of its LSOAs)",
             "Local authority", "Local authority code", "Latitude", "Longitude"]
+    # Without these, a postcode retired in 1996 is indistinguishable from one
+    # in use today, and every row looks equally current.
+    if args.terminated:
+        head += ["Postcode status", "Retired"]
     body_keys = [k for k, _, _, _ in metrics if k not in ("imd_score", "imd_decile", "imd_rank")]
     head += [lab for k, lab, _, _ in metrics if k in body_keys]
 
@@ -374,6 +399,10 @@ def main():
                        tidy(wi.get("imd_decile_mean"), "ward_imd"),
                        wr.get("lad", g.get("borough", "")), wr.get("lad_code", ""),
                        row[i_la], row[i_lo]]
+                if args.terminated:
+                    term = (row[i_dt] or "").strip()
+                    rec += ["Retired" if term else "Live",
+                            f"{term[:4]}-{term[4:6]}" if len(term) >= 6 else term]
                 rec += [tidy(li.get(k), k) for k in body_keys]
                 w.writerow(rec)
                 for h, val in zip(head, rec):
