@@ -59,23 +59,24 @@ Rules that matter:
   the data is not available rather than guessing.
 - Call the tools you need before answering. Prefer one comparison call over
   several single lookups.
-- Answer the question. Do not offer to answer it. Tool calls are free, but
-  every message the reader types spends one of their ${DAILY_CAP} questions for
-  the day, so a reply that asks which Brent they meant, or offers to run the
-  comparison they just asked for, costs them a question and tells them nothing.
-  Take the most reasonable reading, call the tools, and give the figures. If
-  the reading was a real choice, name it in a short clause inside the answer
-  rather than asking first: "Taking Church End in Brent, ...".
-- Ask a question back only where no reasonable default exists and answering
-  would mislead. That is rare. Several places named, a place named with no
-  indicator, an indicator named with no place, or a vague word like "deprived"
-  or "unhealthy" are all answerable: compare them, give the headline figures,
-  rank London by it, or pick the closest indicator and say which you picked.
+- Prefer answering to asking. Where a reasonable reading exists, take it, call
+  the tools, and give the figures, naming the reading in a short clause inside
+  the answer: "Taking Church End in Brent, ...". Most questions have one.
+  Several places named, a place named with no indicator, an indicator named
+  with no place, and loose words like "deprived" or "unhealthy" are all
+  answerable: compare them, give the headline figures, rank London by it, or
+  pick the closest indicator and say which you picked.
+- You may ask one clarifying question per query. The reader's answer to it is
+  free: a reply to a question you asked is not counted against their
+  ${DAILY_CAP} a day, so asking costs them nothing but the time.
+  Use it where guessing would waste their time or mislead them, and where the
+  choice is genuinely theirs. Ask one short question, name the options you are
+  choosing between, and do not ask twice: a second question in the same
+  exchange is charged to them, so answer with your best reading instead.
 - Do not close with an offer of more work. No "would you like me to", no "I can
-  also show you", no list of suggested next questions. The reader can see the
-  map and knows how to ask. Every offer taken up costs them another question,
-  so a helpful-sounding ending is a charge for something they did not ask for.
-  End on the last figure or the caveat that qualifies it.
+  also show you", no list of suggested next questions. That is not a
+  clarification, it is a charge for something they did not ask for. End on the
+  last figure, or on the caveat that qualifies it.
 - Deprivation runs in opposite directions depending on the measure, and this is
   the single easiest thing here to get wrong. Get it right every time:
     - imd_score and the domain scores (income, employment, health, education,
@@ -206,14 +207,82 @@ function json(body, status, headers) {
  * A continuation is a user message carrying only tool_result blocks, which is
  * something only the client loop sends, never a person typing.
  */
+function isToolResultOnly(msg) {
+  if (!msg || msg.role !== "user") return false;
+  if (!Array.isArray(msg.content)) return false; // plain string: a typed question
+  // Note the length check. An empty array satisfies every() vacuously, which
+  // would let a caller post {content: []} all day without ever being counted.
+  if (msg.content.length === 0) return false;
+  return msg.content.every((b) => b && b.type === "tool_result");
+}
+
+/**
+ * Did the assistant's turn end by asking the reader something?
+ *
+ * Text only and ending in a question mark. A turn carrying tool_use did work
+ * rather than asked, and is the middle of an answer, not the end of one.
+ */
+function endsWithClarification(msg) {
+  if (!msg || msg.role !== "assistant") return false;
+  const blocks = Array.isArray(msg.content) ? msg.content : [];
+  if (!blocks.length) return false;
+  if (blocks.some((b) => b && b.type === "tool_use")) return false;
+  const text = blocks
+    .filter((b) => b && b.type === "text")
+    .map((b) => String(b.text || ""))
+    .join(" ")
+    .trim();
+  return text.endsWith("?");
+}
+
+/**
+ * Is this request a fresh question, or something already paid for?
+ *
+ * Three kinds of user message arrive here.
+ *
+ * A tool_result continuation is the client loop posting back what a tool
+ * returned. Answering one question takes several of these, so counting them
+ * would make a cap of 10 mean two or three questions while the panel promises
+ * ten. Never counted.
+ *
+ * A reply to a question the assistant asked. The assistant is allowed to ask
+ * for a clarification, and charging for the answer was the reason it was told
+ * not to: a reader who asked about Church End, was asked which one, and said
+ * "Brent" had spent two of their ten to ask one question. One such reply per
+ * question is free, so clarifying costs the reader nothing and the assistant
+ * can ask when asking genuinely helps.
+ *
+ * Anything else typed is a new question and is counted.
+ *
+ * The whole array is replayed rather than only the last exchange, because the
+ * free reply has to be once per question and not once per message. Replaying
+ * also means the decision cannot be moved by anything the client says about
+ * itself: it falls out of the shape of the conversation.
+ *
+ * A forger can fabricate an assistant turn ending in a question mark and make
+ * every second message free. That halves questions per pound, not the money:
+ * REQUEST_CAP counts round trips, not questions, so the ceiling on what any
+ * one caller can spend in a day is exactly where it was.
+ */
 function isNewQuestion(messages) {
   const last = messages[messages.length - 1];
   if (!last || last.role !== "user") return true;
-  if (!Array.isArray(last.content)) return true; // plain string: a typed question
-  // Note the length check. An empty array satisfies every() vacuously, which
-  // would let a caller post {content: []} all day without ever being counted.
-  if (last.content.length === 0) return true;
-  return !last.content.every((b) => b && b.type === "tool_result");
+  if (isToolResultOnly(last)) return false;
+
+  let charge = true;
+  let freeUsed = false; // has this question already had its one free reply?
+  for (let i = 0; i < messages.length; i++) {
+    const m = messages[i];
+    if (!m || m.role !== "user" || isToolResultOnly(m)) continue;
+    if (!freeUsed && endsWithClarification(messages[i - 1])) {
+      charge = false;
+      freeUsed = true;
+    } else {
+      charge = true;
+      freeUsed = false; // a new question brings its own free reply with it
+    }
+  }
+  return charge;
 }
 
 /**

@@ -498,6 +498,47 @@ var MODEL_LABEL = "Claude Sonnet 5";
 
   function capNow() { return (lastLimit && lastLimit.cap) || DAILY_CAP; }
 
+  /* ── Is the message about to be sent free? ───────────────────────────────
+     The same rule the Worker applies, kept here so the counter does not tick
+     down and then climb back a second later when the reply lands and says the
+     message was not chargeable. The Worker is still the authority: whatever it
+     reports in _limit overwrites this.
+
+     The assistant may ask one clarifying question per query, and the reply to
+     it is free. Answering "Brent" to "which Church End?" should not cost the
+     same as a question of its own, which is what made asking expensive enough
+     to be worth avoiding. */
+  function isToolResultOnly(msg) {
+    if (!msg || msg.role !== "user" || !Array.isArray(msg.content)) return false;
+    if (!msg.content.length) return false;
+    return msg.content.every(function (b) { return b && b.type === "tool_result"; });
+  }
+
+  function endsWithClarification(msg) {
+    if (!msg || msg.role !== "assistant") return false;
+    var blocks = Array.isArray(msg.content) ? msg.content : [];
+    if (!blocks.length) return false;
+    if (blocks.some(function (b) { return b && b.type === "tool_use"; })) return false;
+    var text = blocks
+      .filter(function (b) { return b && b.type === "text"; })
+      .map(function (b) { return String(b.text || ""); })
+      .join(" ")
+      .trim();
+    return text.slice(-1) === "?";
+  }
+
+  function nextMessageIsFree() {
+    // Replayed rather than read off the last turn, because the free reply is
+    // once per question and not once per message.
+    var freeUsed = false;
+    for (var i = 0; i < history.length; i++) {
+      var m = history[i];
+      if (!m || m.role !== "user" || isToolResultOnly(m)) continue;
+      freeUsed = (!freeUsed && endsWithClarification(history[i - 1]));
+    }
+    return !freeUsed && endsWithClarification(history[history.length - 1]);
+  }
+
   function renderLimit() {
     if (!limitEl) return;
     var cap = capNow();
@@ -650,7 +691,8 @@ var MODEL_LABEL = "Claude Sonnet 5";
       "in an answer is read from the data already loaded in your browser, so " +
       "nothing is uploaded and no number is written from memory. This is a free " +
       "service with running costs, so questions are limited to " + DAILY_CAP +
-      " a day per person. The map itself is unlimited.";
+      " a day per person. If it asks you to narrow something down, your answer " +
+      "to that is free. The map itself is unlimited.";
     log.appendChild(intro);
 
     var chips = document.createElement("div");
@@ -723,8 +765,12 @@ var MODEL_LABEL = "Claude Sonnet 5";
       add("ai-user", q);
       // Count it down as it is spent, not once the answer arrives. The Worker
       // counts the question when it receives it, so this is when it is gone.
-      writeUsed(readUsed() + 1);
-      renderLimit();
+      // Unless it is the free reply to a clarification the assistant asked, in
+      // which case nothing is spent and the counter should not flinch.
+      if (!nextMessageIsFree()) {
+        writeUsed(readUsed() + 1);
+        renderLimit();
+      }
       var thinking = add("ai-bot ai-thinking", "Reading the data...");
       try {
         var answer = await ask(q);
