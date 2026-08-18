@@ -6170,7 +6170,14 @@ window.generateWardReport = function(wn, opts) {
     'Building the report for ' + String(wn).replace(/[<>&]/g, '') + '…</body></html>');
   // The report's IMD domain radar is computed from the ward's own LSOAs, so
   // the deciles are part of what it is waiting for.
-  Promise.all([ensureAllLayerData(), ensureLsoaImd()])
+  /* ensureLsoaData as well, and not because ensureLsoaImd forgets it.
+     ensureLsoaImd starts it deliberately without awaiting, so the
+     boundaries are not held up behind 7.8 MB of figures. That is right for
+     the map, which redraws when they land, and wrong for a report, which
+     is written once and then printed. LSOA_IMD is 4.2 MB and arrives
+     first, so the report was routinely built in the window where the
+     deprivation radar had boundaries to place but no figures to plot. */
+  Promise.all([ensureAllLayerData(), ensureLsoaImd(), ensureLsoaData()])
     .then(() => _generateWardReport(_w, wn, opts))
     .catch(err => {
       /* Nothing else was catching this, and the tab is already open and
@@ -6355,8 +6362,21 @@ function _generateWardReport(_reportWindow, wn, opts) {
       svg += `<polygon points="${refPts}" fill="none" stroke="#1a1a1a" stroke-width="1.2" stroke-dasharray="3,2"/>`;
     }
     // Data polygon
-    const dataPts = data.map((a, i) => pt(i, (a.v || 0) / a.max).join(',')).join(' ');
-    svg += `<polygon points="${dataPts}" fill="rgba(184,60,60,.30)" stroke="#b83c3c" stroke-width="1.5"/>`;
+    /* Nothing to plot is not the same as zero on every axis.
+
+       (a.v || 0) turned a missing figure into the centre of the chart, so a
+       ward whose LSOA figures had not arrived yet was drawn as a single point
+       at the origin: no deprivation on any of the seven domains, stated with
+       a legend naming the ward and the London mean beside it. The dots below
+       were already skipped for a null, which is exactly why it collapsed
+       quietly instead of looking broken. */
+    const hasVal = data.some(a => a.v != null);
+    if (hasVal) {
+      const dataPts = data.map((a, i) => pt(i, (a.v || 0) / a.max).join(',')).join(' ');
+      svg += `<polygon points="${dataPts}" fill="rgba(184,60,60,.30)" stroke="#b83c3c" stroke-width="1.5"/>`;
+    } else {
+      svg += `<text x="${cx}" y="${cy}" text-anchor="middle" font-size="${Math.round(size * 0.06)}" fill="#8a6d3b">Figures not available</text>`;
+    }
     // Data dots
     data.forEach((a, i) => {
       if (a.v == null) return;
@@ -8645,8 +8665,21 @@ window.generateLSOAReport = function(code) {
       const refPts = data.map((a, i) => pt(i, (a.ref || 0) / a.max).join(',')).join(' ');
       svg += `<polygon points="${refPts}" fill="none" stroke="#1a1a1a" stroke-width="1.2" stroke-dasharray="3,2"/>`;
     }
-    const dataPts = data.map((a, i) => pt(i, (a.v || 0) / a.max).join(',')).join(' ');
-    svg += `<polygon points="${dataPts}" fill="rgba(184,60,60,.30)" stroke="#b83c3c" stroke-width="1.5"/>`;
+    /* Nothing to plot is not the same as zero on every axis.
+
+       (a.v || 0) turned a missing figure into the centre of the chart, so a
+       ward whose LSOA figures had not arrived yet was drawn as a single point
+       at the origin: no deprivation on any of the seven domains, stated with
+       a legend naming the ward and the London mean beside it. The dots below
+       were already skipped for a null, which is exactly why it collapsed
+       quietly instead of looking broken. */
+    const hasVal = data.some(a => a.v != null);
+    if (hasVal) {
+      const dataPts = data.map((a, i) => pt(i, (a.v || 0) / a.max).join(',')).join(' ');
+      svg += `<polygon points="${dataPts}" fill="rgba(184,60,60,.30)" stroke="#b83c3c" stroke-width="1.5"/>`;
+    } else {
+      svg += `<text x="${cx}" y="${cy}" text-anchor="middle" font-size="${Math.round(size * 0.06)}" fill="#8a6d3b">Figures not available</text>`;
+    }
     data.forEach((a, i) => {
       if (a.v == null) return;
       const [x, y] = pt(i, a.v / a.max);
@@ -9697,8 +9730,9 @@ function renderTopBottom() {
 
   // Restrict the LSOA pool to codes actually rendered on the map.
   // lsoa_data.json carries all 33k+ English LSOAs, but LSOA_IMD only has the
-  // ~1,313 London polygons. Without this filter the rankings are dominated
-  // by LSOAs the user can never see or click on.
+  // 4,994 London polygons. Without this filter the rankings are dominated
+  // by LSOAs the user can never see or click on. The figure read 1,313 until
+  // now, which was the count when this covered North West London only.
   let mapCodes = null;
   let mapNames = null;
   if (useLsoa && typeof LSOA_IMD !== 'undefined' && LSOA_IMD && LSOA_IMD.features) {
@@ -11133,12 +11167,24 @@ function _csvEscape(v) {
   const s = String(v);
   return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
 }
-function _downloadOverlayCsv() {
+async function _downloadOverlayCsv() {
   try {
     const rows = [];
     const ov = (typeof curOv !== 'undefined' && curOv !== 'none') ? curOv : null;
     const isLsoa = ov && typeof isLsoaOnlyOv === 'function' && isLsoaOnlyOv(ov);
     const wantLsoa = isLsoa || (typeof currentDataLevel !== 'undefined' && currentDataLevel === 'lsoa');
+    /* Fetch the figures before deciding there are none.
+
+       The LSOA figures are 7.8 MB and are loaded on demand, so an export asked
+       for before anything else had needed them read an empty LSOA_DATA, wrote
+       no rows, and told the reader "No data matches the current view. Clear
+       filters and try again." Their filters were fine, and clearing them
+       changed nothing, which is the worst kind of instruction: it blames the
+       one thing they can act on for something they cannot see. */
+    if (wantLsoa && typeof ensureLsoaData === 'function'
+        && !(typeof LSOA_DATA === 'object' && LSOA_DATA && Object.keys(LSOA_DATA).length)) {
+      await ensureLsoaData();
+    }
     // Whichever scope is on, board or borough. ladInFocus answers for both.
     const scoped = (typeof focusActive === 'function') && focusActive();
     const core20Only    = (typeof showCore20Overlay !== 'undefined' && showCore20Overlay) === true;
@@ -11523,7 +11569,7 @@ async function _prepareScreenForScreenshot(opts) {
         desc: 'Overlay CSV plus one CSV per visible point layer.' },
     ]);
     if (!choice) return;
-    if (choice.key === 'overlay' || choice.key === 'both') _downloadOverlayCsv();
+    if (choice.key === 'overlay' || choice.key === 'both') await _downloadOverlayCsv();
     if (choice.key === 'layers'  || choice.key === 'both') {
       try { _downloadPointLayersCsv(); } catch(e) { console.warn('point-layer CSV export failed', e); }
     }
