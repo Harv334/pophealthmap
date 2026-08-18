@@ -165,6 +165,20 @@ GEOGRAPHY = [
     ("longitude",            "Longitude",                    "ONSPD FEB 2026", "2026"),
 ]
 
+# Why a column has blanks, where the reason is known and worth stating rather
+# than leaving someone to guess whether it is an error.
+BLANK_REASON = {
+    "ward_imd_score_mean":
+        "No LSOA is best-fitted to these wards, so no ward figure exists. All 20 "
+        "are City of London wards: the City has 25 wards sharing a handful of "
+        "LSOAs, and the ONS best-fit lookup names only 684 of London's 704 wards. "
+        "The LSOA figures on these rows are complete.",
+    "ward_imd_decile_mean":
+        "As the ward IMD score above.",
+    "ptal_score":
+        "The GLA LSOA Atlas does not carry a PTAL score for every LSOA.",
+}
+
 READ_ME = """LONDON POSTCODES WITH AREA DEPRIVATION AND CENSUS FIGURES
 =========================================================
 
@@ -216,6 +230,10 @@ LSOAs cross ward boundaries, so for some postcodes the ward figure was computed
 from a slightly different set of LSOAs than the one the postcode sits in.
 
 
+WHAT IS BLANK, AND WHY
+----------------------
+{coverage}
+
 LICENCE
 -------
 Contains OS data (c) Crown copyright and database right.
@@ -226,6 +244,19 @@ Licence v3.0.
 Census 2021 and IMD 2025 are Crown copyright, Open Government Licence v3.0.
 This acknowledgement must travel with the data if it is passed on.
 """
+
+
+def _wrap(text, width):
+    out, line = [], ""
+    for word in text.split():
+        if len(line) + len(word) + 1 > width:
+            out.append(line)
+            line = word
+        else:
+            line = (line + " " + word).strip()
+    if line:
+        out.append(line)
+    return out
 
 
 def load_geography():
@@ -272,6 +303,22 @@ def main():
     if args.columns == "all":
         metrics += [(k, lab + " [modelled]", s, y) for k, lab, s, y in MODELLED]
 
+    # A column that is empty for every LSOA would still get a heading, and a
+    # heading is a promise. census_housing_deprived_pct was exactly that: the
+    # pipeline codes TS044 behind a guard that silently skips when a column
+    # match fails, so the key never reaches lsoa_data.json, and the extract
+    # carried 180,983 empty cells under "Deprived in at least one dimension".
+    # Checked rather than hardcoded, so the next one cannot repeat it.
+    has_value = set()
+    for v in lsoa.values():
+        for k, x in (v.get("indicators") or v).items():
+            if x is not None and x != "":
+                has_value.add(k)
+    dropped = [lab for k, lab, _, _ in metrics if k not in has_value]
+    metrics = [m for m in metrics if m[0] in has_value]
+    for lab in dropped:
+        print(f"  dropped, no value in any LSOA: {lab}")
+
     head = ["Postcode", "LSOA code", "LSOA name",
             "IMD score", "IMD decile (1 = most deprived)",
             "IMD rank (1 = most deprived in England)",
@@ -284,6 +331,7 @@ def main():
     base = pathlib.Path(args.out)
     out_csv = base.with_name(base.name + ".csv")
     kept = skipped_geo = skipped_term = 0
+    blanks = {h: 0 for h in head}
 
     # utf-8-sig: Excel reads a plain utf-8 CSV as the system codepage and turns
     # every accent into mojibake. The BOM is what tells it otherwise.
@@ -328,6 +376,9 @@ def main():
                        row[i_la], row[i_lo]]
                 rec += [tidy(li.get(k), k) for k in body_keys]
                 w.writerow(rec)
+                for h, val in zip(head, rec):
+                    if val == "" or val is None:
+                        blanks[h] += 1
                 kept += 1
                 if kept % 50000 == 0:
                     print(f"  {kept:,} postcodes")
@@ -335,22 +386,46 @@ def main():
     dict_csv = base.with_name(base.name + "_dictionary.csv")
     with dict_csv.open("w", encoding="utf-8-sig", newline="") as fh:
         w = csv.writer(fh)
-        w.writerow(["Column", "Describes", "Field name", "Source", "Year", "Kind"])
-        for k, lab, s, y in GEOGRAPHY:
+        w.writerow(["Column", "Describes", "Field name", "Source", "Year", "Kind",
+                    "Blank rows", "Blank %", "Why blank"])
+
+        def cover(lab, key):
+            n = blanks.get(lab, 0)
+            return [n, ("%.2f" % (100 * n / kept)) if kept else "0",
+                    BLANK_REASON.get(key, "") if n else ""]
+
+        for k, lab, src, y in GEOGRAPHY:
             level = ("Ward" if k.startswith("ward_imd") else
                      "Postcode" if k in ("postcode", "latitude", "longitude") else "Geography")
-            kind = "Computed here, population-weighted mean of the ward's LSOAs" \
-                if k.startswith("ward_imd") else "Geography"
-            w.writerow([lab, level, k, s, y, kind])
-        for k, lab, s, y in metrics:
+            kind = ("Computed here, population-weighted mean of the ward's LSOAs"
+                    if k.startswith("ward_imd") else "Geography")
+            w.writerow([lab, level, k, src, y, kind] + cover(lab, k))
+        for k, lab, src, y in metrics:
             modelled = lab.endswith("[modelled]")
-            w.writerow([lab, "LSOA", k, s, y,
+            w.writerow([lab, "LSOA", k, src, y,
                         "Computed onto the LSOA by this pipeline, an estimate for the area"
-                        if modelled else "Published at LSOA by the source"])
+                        if modelled else "Published at LSOA by the source"] + cover(lab, k))
+
+    gaps = [(h, n) for h, n in blanks.items() if n]
+    if gaps:
+        out_lines = ["Every other column is complete for all %s rows. These are not:" % f"{kept:,}", ""]
+        for h, n in sorted(gaps, key=lambda x: -x[1]):
+            key = next((k for k, lab, _, _ in GEOGRAPHY + metrics if lab == h), "")
+            out_lines.append(h)
+            out_lines.append("    blank on %s rows (%.2f%%)" % (f"{n:,}", 100 * n / kept))
+            why = BLANK_REASON.get(key)
+            if why:
+                for chunk in _wrap(why, 72):
+                    out_lines.append("    " + chunk)
+            out_lines.append("")
+        coverage = "\n".join(out_lines)
+    else:
+        coverage = "Every column is complete for all %s rows." % f"{kept:,}"
 
     readme = base.with_name(base.name + "_READ_ME.txt")
     readme.write_text(READ_ME.format(rows=kept, name=base.name,
-                                     stamp="from ONSPD FEB 2026"), encoding="utf-8")
+                                     stamp="from ONSPD FEB 2026",
+                                     coverage=coverage), encoding="utf-8")
 
     mb = out_csv.stat().st_size / 1e6
     print()
