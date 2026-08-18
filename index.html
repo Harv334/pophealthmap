@@ -632,7 +632,22 @@
 
   /* ── Data-level badge (floating overlay, top-right of map) ── */
   .dl-badge { position: absolute; top: 12px; right: 12px; z-index: 2500; background: color-mix(in srgb, var(--paper) 96%, transparent); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); padding: 6px 8px; display: flex; align-items: center; gap: 8px; user-select: none; }
-  .dl-badge-label { font-weight: 600; color: var(--ink-2); letter-spacing: 0.04em; text-transform: uppercase; font-size: var(--t-xs); }
+  /* The caption is the way in to the explanation, rather than a "?" sitting
+     beside it. It is the only word on this badge that is not one of the four
+     answers, so it is where a question about them belongs, and it gives the
+     explanation a target the size of two words instead of eighteen pixels.
+
+     A dotted underline, not a link underline. It opens a definition, it does
+     not navigate, and the two should not look the same. It keeps .lhelp as
+     well, so the same handler opens it and Escape still closes it. */
+  .dl-help { display: inline-flex; align-items: center; justify-content: center;
+    width: auto; height: auto; margin: 0; border-radius: 0; background: none;
+    line-height: 1.2; font-weight: 600; color: var(--ink-2);
+    letter-spacing: 0.04em; text-transform: uppercase; font-size: var(--t-xs);
+    cursor: help; text-decoration: underline dotted;
+    text-underline-offset: 3px; text-decoration-thickness: 1px; }
+  .dl-help:hover, .dl-help[aria-expanded="true"] { background: none; color: var(--nhs-blue); }
+  .dl-help-mark { display: none; }
   .dl-seg { display: flex; background: var(--paper-2); border-radius: 6px; padding: 2px; gap: 2px; }
   .dl-seg button { background: transparent; border: none; padding: 4px 10px; font-size: var(--t-xs); color: var(--ink-2); border-radius: 4px; cursor: pointer; font-weight: 500; transition: background .12s, color .12s; }
   .dl-seg button:hover { color: var(--nhs-blue); }
@@ -794,7 +809,18 @@
        and the badge should be too rather than staying full size for the 60px
        in between. */
     .dl-badge { top: 8px; right: 8px; padding: 5px 6px; gap: 5px; }
-    .dl-badge-label { display: none; }
+    /* No room for the words here, and this is where they are needed most: the
+       badge is the only thing on a phone that names the four levels at all.
+       So the caption becomes the round "?" used everywhere else rather than
+       going away. The button keeps its aria-label either way, so what a
+       screen reader announces does not change with the width. */
+    .dl-help-word { display: none; }
+    .dl-help-mark { display: inline; }
+    .dl-help { width: 18px; height: 18px; line-height: 18px; border-radius: 50%;
+      background: var(--line-2); color: var(--ink-3); font-weight: 700;
+      text-decoration: none; }
+    .dl-help:hover, .dl-help[aria-expanded="true"] {
+      background: var(--nhs-blue); color: var(--on-accent); }
     .dl-seg button { padding: 4px 7px; font-size: var(--t-xs); }
 
     /* The header was 137px, a sixth of the viewport, before any content. The
@@ -2787,22 +2813,24 @@
            hundred pixels apart carrying the same word made the second one
            look like a restatement of the first rather than a separate axis. -->
       <div class="dl-badge" id="dl-badge" role="group" aria-label="Area level">
-        <span class="dl-badge-label">Area level</span>
+        <!-- The caption is the button. The four names are the whole vocabulary
+             of this control and three of them are initials, and each level's own
+             title says when to pick it rather than what it is, so a reader who
+             does not know what an MSOA is cannot use any of them.
+
+             Underlined rather than given a "?" of its own: the word is already
+             there, it is the only one on the badge that is not an answer, and it
+             is a target the size of two words rather than of a dot. Below 760px
+             there is no room for it and it becomes that dot instead. -->
+        <button type="button" class="lhelp dl-help" id="dl-help"
+                aria-label="What these area levels mean" aria-expanded="false"
+                title="The four sizes of area this map can colour. Borough is one of the 33 London local authorities. Ward is the electoral area a borough divides into, and London has 704. MSOA means Middle Layer Super Output Area, a statistical area of about 7,500 people, and London has 1,002. LSOA means Lower Layer Super Output Area, the smallest here, about 1,500 people, and London has 4,994. Wards sit inside boroughs, but MSOAs and LSOAs do not, so a ward is not a whole number of either. An indicator is only offered at the level it is published for."><span class="dl-help-word">Area level</span><span class="dl-help-mark" aria-hidden="true">?</span></button>
         <div class="dl-seg" id="dl-seg">
           <button type="button" data-dl="borough" title="Borough level. The main Fingertips series is published per local authority, so this is the level those figures are actually measured at rather than repeated across every ward.">Borough</button>
           <button type="button" data-dl="ward" class="active" title="Ward-level data (704 wards)">Ward</button>
           <button type="button" data-dl="msoa" title="MSOA level. MSOAs sit between wards and LSOAs and do not nest into wards. The Local Health indicators are published at this level, so they shade here; anything published elsewhere draws the boundaries only.">MSOA</button>
           <button type="button" data-dl="lsoa" title="LSOA-level data (4,994 LSOAs, the most detailed level here)">LSOA</button>
         </div>
-        <!-- The four names are the whole vocabulary of this control and three
-             of them are initials. Each button already carries a title of its
-             own, but those explain when to pick that level, not what it is,
-             and a reader who does not know what an MSOA is cannot use any of
-             them. The same .lhelp button as everywhere else, so it opens on a
-             touchscreen and on a keyboard rather than only under a pointer. -->
-        <button type="button" class="lhelp" aria-label="What these area levels mean"
-                aria-expanded="false"
-                title="The four sizes of area this map can colour. Borough is one of the 33 London local authorities. Ward is the electoral area a borough divides into, and London has 704. MSOA means Middle Layer Super Output Area, a statistical area of about 7,500 people, and London has 1,002. LSOA means Lower Layer Super Output Area, the smallest here, about 1,500 people, and London has 4,994. Wards sit inside boroughs, but MSOAs and LSOAs do not, so a ward is not a whole number of either. An indicator is only offered at the level it is published for.">?</button>
         <div class="dl-hint" id="dl-hint"></div>
       </div>
 
