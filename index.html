@@ -15098,6 +15098,11 @@ loadData();
      ───────────────────────────────────────────────────────────────────────── */
   var cbPane = $('tab-csv');
   var cbLevel = 'ward';
+  /* True while lsoa_data.json is on its way. Ward, borough and MSOA figures
+     are all in memory by the time this pane can be opened; the LSOA ones are
+     7.8 MB and are fetched only when something asks. Nothing here asked, so
+     picking LSOA offered a file of nought rows for the rest of the session. */
+  var _cbLsoaPending = false;
   var cbScope = '';
   var cbCols = {};          // indicator key -> true
   var cbOpenGroups = {};
@@ -15253,13 +15258,20 @@ loadData();
           (dropped.length > 1 ? ' are' : ' is') + ' not published for ' + esc(lv.plural) +
           ', so ' + (dropped.length > 1 ? 'they have' : 'it has') + ' been removed.</span>'
         : '') +
-      'The file will have <strong>' + n.toLocaleString() + '</strong> ' +
-      esc(n === 1 ? lv.label : lv.plural) + ' and <strong>' + chosen + '</strong> figure' +
-      (chosen === 1 ? '' : 's') + '. Each figure is a stored value for that area. ' +
-      'Nothing is averaged or combined here. Use Custom area to join areas together.' +
-      (cbLevel === 'borough'
-        ? ' Boroughs hold the health figures published at borough level only.'
-        : '');
+      (_cbLsoaPending && cbLevel === 'lsoa'
+        /* There is no honest count to give yet. cbRows would say nought, of
+           4,994, and it said exactly that: "The file will have 0 LSOAs and 0
+           figures". Say what is happening instead of stating a figure that is
+           only true for as long as the fetch takes. */
+        ? 'Fetching the LSOA figures. They are 7.8 MB and are not loaded until ' +
+          'something asks for them, so this fills in when they land.'
+        : 'The file will have <strong>' + n.toLocaleString() + '</strong> ' +
+          esc(n === 1 ? lv.label : lv.plural) + ' and <strong>' + chosen + '</strong> figure' +
+          (chosen === 1 ? '' : 's') + '. Each figure is a stored value for that area. ' +
+          'Nothing is averaged or combined here. Use Custom area to join areas together.' +
+          (cbLevel === 'borough'
+            ? ' Boroughs hold the health figures published at borough level only.'
+            : ''));
   }
 
   function cbBuild() {
@@ -15287,13 +15299,37 @@ loadData();
     return { text: lines.join('\n'), rows: codes.length, cols: cols.length, header: head };
   }
 
+  /* Every route to a new export level goes through here, so the one level that
+     needs a fetch cannot be reached without it.
+
+     Only LSOA does. Ward, borough and MSOA figures all arrive during loadData,
+     but lsoa_data.json is 7.8 MB and was taken off the critical path, and
+     cbSource returns an empty object while it is missing. Choosing LSOA
+     therefore offered a file of nought rows, said so in the panel, and stayed
+     that way: nothing in this pane ever asked for the file. */
+  function setCsvLevel(l) {
+    cbLevel = l;
+    _cbMsoa = null;
+    var need = (l === 'lsoa') &&
+      !(typeof LSOA_DATA === 'object' && LSOA_DATA && Object.keys(LSOA_DATA).length);
+    _cbLsoaPending = need;
+    renderCsvPane();
+    if (need && typeof ensureLsoaData === 'function') {
+      ensureLsoaData().then(function () {
+        _cbLsoaPending = false;
+        // Only if the reader is still on this level. They can pick another
+        // while 7.8 MB is in flight, and repainting the pane under them would
+        // undo the choice they just made.
+        if (cbLevel === 'lsoa') renderCsvPane();
+      });
+    }
+  }
+
   if (cbPane) {
     $('cb-level').addEventListener('click', function (e) {
       var b = e.target.closest('[data-lvl]');
       if (!b) return;
-      cbLevel = b.dataset.lvl;
-      _cbMsoa = null;
-      renderCsvPane();
+      setCsvLevel(b.dataset.lvl);
     });
     $('cb-scope').addEventListener('change', function (e) {
       cbScope = e.target.value; renderCsvPane();
@@ -15355,7 +15391,7 @@ loadData();
     level: function () { return cbLevel; },
     columns: function () { return Object.keys(cbCols); },
     build: cbBuild,
-    setLevel: function (l) { cbLevel = l; _cbMsoa = null; renderCsvPane(); },
+    setLevel: function (l) { setCsvLevel(l); },
     pick: function (k) { cbCols[k] = true; renderCsvPane(); },
   };
 
