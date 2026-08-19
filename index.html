@@ -113,60 +113,6 @@
     --ldr-stroke:var(--bg);
   }
 
-  /* ── Dark ──────────────────────────────────────────────────────────────────
-     Three blocks, because the viewer has three states and not two. The bare
-     :root above carries the whole light palette. This one covers the default,
-     where nobody has told us anything and only the operating system has an
-     opinion; it is guarded so an explicit light choice still beats a dark OS.
-     The third covers an explicit dark choice.
-
-     Only tokens are redefined in here. No component rule appears, which is
-     what prevents the classic failure where one theme's text lands on the
-     other theme's ground: every surface and every colour on it come from the
-     same set, so they move together.
-
-     The values are measured. Against --paper: --ink 13.8:1, --ink-2 8.7:1,
-     --ink-3 5.8:1, the blue 6.1:1, and --on-accent on that blue 6.8:1. */
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --nhs-blue:#4DA3E8; --nhs-dark:#8AC4F5; --nhs-bright:#5FB3F0;
-      --nhs-aqua:#5FC5EE; --nhs-light:#22303A; --nhs-yellow:#F5C43C;
-      --nhs-red:#F2857B;  --nhs-green:#5CC98A; --nhs-pink:#E08AB8;
-      --ink:#E3EAEF; --ink-2:#AFBDC6; --ink-3:#8B9AA5; --ink-faint:#66757F;
-      --line:#2C3840; --line-2:#232E35;
-      --bg:#0E1519; --paper:#161F25; --paper-2:#1C262C;
-      --on-accent:#0E1519;
-      --invert-bg:#24313A; --invert-ink:#E3EAEF;
-      --tint-amber:#2E2410; --tint-amber-line:#5E4A1E; --tint-amber-ink:#F0D9A8;
-      --tint-red:#2E1614;   --tint-red-line:#6B302B;
-      --tint-pink:#2C1A26;  --tint-pink-line:#5A3348;
-      --tint-green:#132A1C;
-      --tint-blue-line:#2F4A63;
-    --ldr-stroke:#7E8F9B;
-      --ldr-stroke:#7E8F9B;
-      --shadow-sm:0 1px 2px rgba(0,0,0,.4);
-      --shadow:0 2px 4px rgba(0,0,0,.35), 0 8px 24px rgba(0,0,0,.45);
-      --shadow-lg:0 8px 32px rgba(0,0,0,.55), 0 2px 8px rgba(0,0,0,.4);
-    }
-  }
-  :root[data-theme="dark"] {
-    --nhs-blue:#4DA3E8; --nhs-dark:#8AC4F5; --nhs-bright:#5FB3F0;
-    --nhs-aqua:#5FC5EE; --nhs-light:#22303A; --nhs-yellow:#F5C43C;
-    --nhs-red:#F2857B;  --nhs-green:#5CC98A; --nhs-pink:#E08AB8;
-    --ink:#E3EAEF; --ink-2:#AFBDC6; --ink-3:#8B9AA5; --ink-faint:#66757F;
-    --line:#2C3840; --line-2:#232E35;
-    --bg:#0E1519; --paper:#161F25; --paper-2:#1C262C;
-    --on-accent:#0E1519;
-    --invert-bg:#24313A; --invert-ink:#E3EAEF;
-    --tint-amber:#2E2410; --tint-amber-line:#5E4A1E; --tint-amber-ink:#F0D9A8;
-    --tint-red:#2E1614;   --tint-red-line:#6B302B;
-    --tint-pink:#2C1A26;  --tint-pink-line:#5A3348;
-    --tint-green:#132A1C;
-    --tint-blue-line:#2F4A63;
-    --shadow-sm:0 1px 2px rgba(0,0,0,.4);
-    --shadow:0 2px 4px rgba(0,0,0,.35), 0 8px 24px rgba(0,0,0,.45);
-    --shadow-lg:0 8px 32px rgba(0,0,0,.55), 0 2px 8px rgba(0,0,0,.4);
-  }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1815,29 +1761,7 @@
 
 </style>
 
-<!-- Theme, resolved before anything paints.
-     Inline and blocking on purpose. If this ran with the rest of the
-     application scripts at the end of the body, a reader who has chosen dark
-     would get a full white page first and then a flip, which is worse than
-     not offering the choice. It only reads a preference and stamps two
-     attributes, so it costs a fraction of a millisecond.
 
-     data-theme is what the stylesheet keys off, and it is set only for an
-     explicit choice, so "auto" falls through to prefers-color-scheme. The
-     ph-dark class carries the resolved answer for the JavaScript that cannot
-     read a CSS variable, which is the basemap. -->
-<script>
-(function () {
-  try {
-    var pref = window.localStorage.getItem('ph_theme') || 'auto';
-    var root = document.documentElement;
-    if (pref === 'light' || pref === 'dark') root.setAttribute('data-theme', pref);
-    var dark = pref === 'dark' || (pref === 'auto' && window.matchMedia &&
-      window.matchMedia('(prefers-color-scheme: dark)').matches);
-    root.classList.toggle('ph-dark', dark);
-  } catch (e) { /* private mode: light, which is the safe way to be wrong */ }
-}());
-</script>
 
 <!-- Structured data. Two graphs: the site itself, and the data behind it.
      The Dataset entry is the one that earns its keep: it makes the map
@@ -1988,11 +1912,7 @@
            with no affordance is not one. -->
       <button type="button" class="tb-btn" id="tb-link" title="Copy a link to exactly this view: the indicator, the area, the layers, the selected ward, and any query or custom area open">⧉ Copy link</button>
       <button type="button" class="tb-btn" id="tb-cb" title="Switch to a colour-blind safe palette (deuteranopia/protanopia friendly)" aria-pressed="false">◐ CB safe</button>
-      <!-- Three states, not two, and it says which one it is in. Auto follows
-           the machine, which is what most people want and what a plain
-           light/dark switch quietly throws away the first time it is
-           pressed. -->
-      <button type="button" class="tb-btn" id="tb-theme" title="Appearance: following your device. Click to switch to light, then dark.">◐ Auto</button>
+      
       <button type="button" class="tb-btn" id="tb-png" title="Clear the screen for a screenshot: whitens everything outside the mapped area and hides the controls, then you capture it with your own screenshot tool.">⤓ Screenshot</button>
       <button type="button" class="tb-btn" id="tb-csv" title="Download the ward/LSOA data behind the current overlay">⤓ CSV</button>
     </div>
@@ -4129,10 +4049,10 @@ function ladOfLatLng(lat, lng) {
 
    Seven classes, because past about eight people stop being able to tell
    adjacent bands apart, and a sequential light-to-dark scale, which reads as
-   "more of this" rather than "worse than that". Direction still follows the
-   indicator's own polarity through `inv`, so the dark end is consistently the
-   end that matters for health; what has gone is the claim that the light end
-   is good.
+   "more of this" rather than "worse than that". Direction is fixed: dark is the
+   higher figure, on every indicator. What has gone is the claim that the light
+   end is good, and with it the flip that made dark mean "worse" on one map and
+   "more" on the next.
 
    Both palettes are safe for deuteranopia and protanopia and both are
    monotonic in luminance, so they survive greyscale printing. The toggle now
@@ -4154,18 +4074,27 @@ function rampClasses() { return window.cbSafe ? RAMP_CB : RAMP_DEFAULT; }
 /**
  * Which class a 0..1 position falls in, and its colour.
  *
- * `inv` flips the direction for "higher is better" indicators, so the dark end
- * is the concerning end whichever way the underlying figure runs.
+ * Dark is always the higher figure. The reversing parameter is gone rather
+ * than passed false everywhere, so it cannot come back one call site at a
+ * time; JavaScript ignores a surplus argument, so anything missed degrades to
+ * the right answer instead of throwing.
+ *
+ * It used to take !cfg.wh, so the dark end followed the indicator's
+ * polarity and meant "the concerning end" rather than "more of this". That put
+ * two indicators side by side with opposite scales and nothing on screen saying
+ * so: a dark ward was high crime on one map and high life expectancy on the
+ * next. The palette is sequential and light-to-dark with no hue that means
+ * stop, so it already reads as "more of this", and the flip was the only thing
+ * making it read as anything else.
  */
-function rampIndex(t, inv) {
-  if (inv) t = 1 - t;
+function rampIndex(t) {
   t = Math.min(Math.max(t, 0), 1);
   // The top value belongs in the last class rather than in a class of its own.
   return Math.min(RAMP_CLASSES - 1, Math.floor(t * RAMP_CLASSES));
 }
 
-function ramp(t, inv) {
-  return rampClasses()[rampIndex(t, inv)];
+function ramp(t) {
+  return rampClasses()[rampIndex(t)];
 }
 function fmtNum(v, decimals=0) {
   if (v === null || v === undefined || v === '') return '—';
@@ -4484,38 +4413,16 @@ const map = L.map('map', {
 // exporter, which needed to read tile pixels; it costs nothing now and keeps
 // the option open. Carto's CDN sends Access-Control-Allow-Origin:* so it works
 // without proxying. {r} resolves to '@2x' on retina.
-/* The basemap follows the theme. Carto publish Positron in a light and a dark
-   cut of the same cartography, so the streets, the labels and the river keep
-   their weight and only the ground changes; the choropleth carries on doing
-   the visual work in either.
-
-   Kept as a swappable layer rather than one set at startup, because the theme
-   can change under the map: the reader can hit the toggle, and a machine set
-   to follow the system flips at sunset without reloading anything. */
-var _baseTiles = null;
-function applyBasemap(dark) {
-  const style = dark ? 'dark_all' : 'light_all';
-  if (_baseTiles && _baseTiles._phStyle === style) return;
-  const next = L.tileLayer(
-    `https://{s}.basemaps.cartocdn.com/${style}/{z}/{x}/{y}{r}.png`, {
-      maxZoom: 19,
-      subdomains: 'abcd',
-      crossOrigin: 'anonymous',
-      attribution: '© <a href="https://openstreetmap.org/copyright">OpenStreetMap</a> · © <a href="https://carto.com/attributions">CARTO</a>'
-    });
-  next._phStyle = style;
-  next.addTo(map);
-  // The old one comes off only once the new one is on, so the map never
-  // flashes empty between the two.
-  if (_baseTiles) {
-    const old = _baseTiles;
-    next.once('load', () => { try { map.removeLayer(old); } catch (e) {} });
-    setTimeout(() => { try { map.removeLayer(old); } catch (e) {} }, 2000);
-  }
-  _baseTiles = next;
-  next.bringToBack();
-}
-applyBasemap(document.documentElement.classList.contains('ph-dark'));
+/* Carto Positron, added once. It used to be swapped between a light and a
+   dark cut as the theme changed, which is why it was a named layer with a
+   cross-fade and a fallback timer behind it. With one ground there is nothing
+   to swap to, so it is added and left alone. */
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+  maxZoom: 19,
+  subdomains: 'abcd',
+  crossOrigin: 'anonymous',
+  attribution: '\u00a9 <a href="https://openstreetmap.org/copyright">OpenStreetMap</a> \u00b7 \u00a9 <a href="https://carto.com/attributions">CARTO</a>',
+}).addTo(map);
 
 // Static layers
 // GP layer: circleMarkers sized by registered-patients list size.
@@ -4774,25 +4681,13 @@ function _activeLevel() {
   try { return currentDataLevel; } catch (e) { return 'ward'; }
 }
 
-/* Boundary ink.
-
-   A black hairline is exactly right over a light basemap and invisible over a
-   dark one, so every boundary stroke asks this instead of naming a colour.
-   The values are not inversions: an outline has to sit between the basemap
-   and the choropleth fill in lightness, and where that sits depends on which
-   ground is underneath. Read from the resolved theme class rather than a CSS
-   variable, because Leaflet paints these into SVG attributes and never
-   consults the cascade. */
-function _ink(light, dark) {
-  return document.documentElement.classList.contains('ph-dark') ? dark : light;
-}
 
 function _boroughStyle(feat) {
   const props = (feat && feat.properties) || {};
   const name = props.name || '';
   const hidden = focusActive() && !ladInFocus(name);
   const base = {
-    color: _ink('#1a1a1a', '#D6E2EA'),
+    color: '#1a1a1a',
     weight: 2.5,
     fillOpacity: 0,
     opacity: hidden ? 0 : 0.85,
@@ -4818,7 +4713,7 @@ function _boroughStyle(feat) {
   if (!range || range.hi === range.lo) return base;
   const t = (v - range.lo) / (range.hi - range.lo);
   return Object.assign(base, {
-    fillColor: ramp(Math.max(0, Math.min(1, t)), !cfg.wh),
+    fillColor: ramp(Math.max(0, Math.min(1, t))),
     fillOpacity: 0.5,
   });
 }
@@ -4894,7 +4789,7 @@ function _wardBoundaryStyle(feat) {
   } catch (e) { /* selW not initialised yet: nothing can be selected */ }
   if (isSelected) return { weight: 0, fill: false, opacity: 0 };
   return {
-    color: _ink('#000', '#B9C7D0'),
+    color: '#000',
     weight: hidden ? 0 : 1,
     fill: false,
     opacity: hidden ? 0 : 0.85,
@@ -5845,7 +5740,7 @@ function ovColor(wn, ovKey) {
   const range = getOvRange(ovKey);
   if (!range) return '#ccc';
   const t = range.hi === range.lo ? 0.5 : (parseFloat(val) - range.lo) / (range.hi - range.lo);
-  return ramp(t, !cfg.wh);
+  return ramp(t);
 }
 
 // Track which neighbourhoods are shaded (filled with their colour) via filter checkboxes.
@@ -5919,7 +5814,7 @@ function wstyle(wn, ov, state) {
     // was shaded, which is what the colour meant.
     const baseW = {default:1.0, hover:3.0, selected:4.0}[state] || 1.0;
     return applyCore20Outline({
-      color: _ink('#000', '#8FA0AC'),
+      color: '#000',
       weight: state === 'selected'
         ? selectedWeight(borderWeightMult)
         : Math.max(0, baseW * borderWeightMult),
@@ -5944,7 +5839,7 @@ function wstyle(wn, ov, state) {
                  : Math.max(0, baseW * borderWeightMult);
   const op = isFocus ? 1.0 : 0.9;
   return applyCore20Outline({
-    color: _ink('#000', '#8FA0AC'),
+    color: '#000',
     weight: w, fillColor: fill, fillOpacity: fo, opacity: op,
   }, wn);
 }
@@ -8235,8 +8130,8 @@ function imdDecileColor(d) {
    them together; hover and selected used to be raw numbers the slider could
    not reach. */
 const LSOA_EDGE = {
-  default:  { color: _ink('#6B6B6B', '#7E8F9B'), weight: 1.1, opacity: 0.90 },
-  hover:    { color: _ink('#4F4F4F', '#A6B6C1'), weight: 2.0, opacity: 1.0 },
+  default:  { color: '#6B6B6B', weight: 1.1, opacity: 0.90 },
+  hover:    { color: '#4F4F4F', weight: 2.0, opacity: 1.0 },
   selected: { color: '#3A3A3A', weight: 2.6, opacity: 1.0 },
 };
 function lsoaEdge(state) { return LSOA_EDGE[state] || LSOA_EDGE.default; }
@@ -8283,7 +8178,7 @@ function imdStyle(feat, state) {
         const range = getLsoaRange(curOv);
         if (range && range.hi !== range.lo) {
           const t = (parseFloat(val) - range.lo) / (range.hi - range.lo);
-          base.fillColor = ramp(Math.max(0, Math.min(1, t)), !cfg.wh);
+          base.fillColor = ramp(Math.max(0, Math.min(1, t)));
           shaded = true;
         }
       }
@@ -9390,9 +9285,9 @@ function msoaStyle(feat) {
   const t = (v - range.lo) / (range.hi - range.lo);
   return Object.assign(base, {
     fill: true,
-    fillColor: ramp(Math.max(0, Math.min(1, t)), !cfg.wh),
+    fillColor: ramp(Math.max(0, Math.min(1, t))),
     fillOpacity: 0.45,
-    color: _ink('#555', '#8FA0AC'),
+    color: '#555',
   });
 }
 
@@ -9875,10 +9770,10 @@ function ovRangeForDisplay(k) {
 function _syncScaleGradient() {
   if (typeof ramp !== 'function') return;
   const cfg = (typeof OV_CFG !== 'undefined' && curOv) ? OV_CFG[curOv] : null;
-  // ramp()'s `inv` argument flips the direction for "higher is better", so the
-  // dark end of the legend is the concerning end whichever way the indicator
-  // runs.
-  const inv = cfg ? !cfg.wh : false;
+  // No flip. The map paints dark for the higher figure whatever the indicator
+  // is, so the key has to run the same way or it describes a map that is not
+  // on screen.
+  const inv = false;
   // Hard stops, so the key shows the seven bands the map is actually painted
   // in. A smooth blend here was a picture of a scale the map does not use: it
   // implied every intermediate colour existed and gave no way to match a ward
@@ -10026,6 +9921,33 @@ function _applyOverlayChange(key) {
     if (_m && _m.checked && !ovHasLevel(curOv, 'msoa')) {
       _m.checked = false;
       _m.dispatchEvent(new Event('change'));
+    }
+
+    /* And the area level itself, which is the part the two toggles above do
+       not reach.
+
+       The badge and the layer checkboxes are different things. _setDataLevel
+       drives them together, so moving to LSOA level unticks tnw and takes the
+       ward layer off the map; but the toggles above only untick tlsoa, and
+       nothing ticks tnw back or moves currentDataLevel off 'lsoa'.
+
+       So: sit at LSOA level on an LSOA indicator, then pick a ward-only one
+       such as crime. The LSOA layer is removed because the indicator has no
+       LSOA figures, the ward layer is still off from the earlier switch, and
+       the badge still reads LSOA. Nothing is shaded and nothing says why. That
+       is the "no figures" the report described.
+
+       fromOverlay skips the compatibility gate in _setDataLevel, which exists
+       for a person clicking the badge against the active indicator. This is
+       the opposite case and the gate would refuse the very move that fixes it.
+       Ward is preferred where the indicator has it, because it is where the
+       map opens and where most indicators live; otherwise the first level the
+       indicator does have. */
+    if (typeof currentDataLevel !== 'undefined' && typeof _setDataLevel === 'function'
+        && !ovHasLevel(curOv, currentDataLevel)) {
+      const _lv = ovLevels(curOv) || [];
+      const _target = _lv.indexOf('ward') !== -1 ? 'ward' : _lv[0];
+      if (_target) _setDataLevel(_target, { fromOverlay: true });
     }
   }
   if (wLyr) wLyr.eachLayer(l => l.setStyle(wstyle(l.feature.properties.WD24NM, curOv, gs(l.feature.properties.WD24NM))));
@@ -11754,79 +11676,7 @@ document.querySelectorAll('.sb-tab').forEach(t => {
   });
 }());
 
-/* ── Appearance ───────────────────────────────────────────────────────────
-   Three states: auto, light, dark. The bootstrap in the head has already
-   resolved and applied whichever was stored, before anything painted. This
-   is the part that needs the DOM: the button, and keeping the map and the
-   Leaflet layers in step when the answer changes.
 
-   The map has to be told, twice over. The basemap is a URL and cannot read a
-   CSS variable, and the vector layers were styled with colours computed at
-   the time they were drawn, so they are restyled rather than left as they
-   were. Without the restyle a theme change repainted the panel and left the
-   map in the old palette, which is worse than not changing at all. */
-(function wireTheme() {
-  const btn = document.getElementById('tb-theme');
-  const root = document.documentElement;
-  const KEY = 'ph_theme';
-  const mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
-  const ORDER = ['auto', 'light', 'dark'];
-  const FACE = {
-    auto:  { label: '◐ Auto',  title: 'Appearance: following your device. Click to switch to light, then dark.' },
-    light: { label: '☀ Light', title: 'Appearance: always light. Click to switch to dark.' },
-    dark:  { label: '☾ Dark',  title: 'Appearance: always dark. Click to go back to following your device.' },
-  };
-
-  function stored() {
-    try { return window.localStorage.getItem(KEY) || 'auto'; } catch (e) { return 'auto'; }
-  }
-  function isDark(pref) {
-    return pref === 'dark' || (pref === 'auto' && !!(mq && mq.matches));
-  }
-
-  function apply(pref, announce) {
-    if (pref === 'auto') root.removeAttribute('data-theme');
-    else root.setAttribute('data-theme', pref);
-    const dark = isDark(pref);
-    root.classList.toggle('ph-dark', dark);
-
-    if (btn) {
-      btn.textContent = FACE[pref].label;
-      btn.title = FACE[pref].title;
-      // Not aria-pressed: this is three states, and a pressed/unpressed
-      // toggle would describe two of them and lie about the third.
-      btn.setAttribute('aria-label', FACE[pref].title);
-    }
-
-    // The map's own colours, which live outside the stylesheet.
-    if (typeof applyBasemap === 'function') applyBasemap(dark);
-    if (typeof _restyleAll === 'function') { try { _restyleAll(); } catch (e) {} }
-    if (typeof icbLyr !== 'undefined' && icbLyr) {
-      try { icbLyr.setStyle(icbStyle); } catch (e) {}
-    }
-    if (announce && typeof _announce === 'function') {
-      _announce('Appearance: ' + (pref === 'auto' ? 'following your device' : pref) + '.');
-    }
-  }
-
-  if (btn) {
-    btn.addEventListener('click', () => {
-      const next = ORDER[(ORDER.indexOf(stored()) + 1) % ORDER.length];
-      try { window.localStorage.setItem(KEY, next); } catch (e) {}
-      apply(next, true);
-    });
-  }
-
-  // Following the device means following it as it changes, not only as it was
-  // when the page opened. A machine that flips at sunset flips the map too.
-  if (mq) {
-    const onSystemChange = () => { if (stored() === 'auto') apply('auto', false); };
-    if (mq.addEventListener) mq.addEventListener('change', onSystemChange);
-    else if (mq.addListener) mq.addListener(onSystemChange);
-  }
-
-  apply(stored(), false);
-}());
 
 // The opening hint at the top of the Indicators pane. localStorage rather than
 // session, because it introduces the tool: someone who has read it once has
