@@ -2666,8 +2666,8 @@
         <div class="sb-lbl">Map controls</div>
         <div class="opacity-row">
           <label>Fill</label>
-          <input type="range" id="fill-opacity" min="0" max="100" value="40">
-          <span class="opacity-val" id="fill-opacity-val">40%</span>
+          <input type="range" id="fill-opacity" min="0" max="100" value="60">
+          <span class="opacity-val" id="fill-opacity-val">60%</span>
         </div>
         <div class="opacity-row" style="margin-top:6px">
           <label>Border</label>
@@ -3387,7 +3387,7 @@ function borderStep() { return Math.max(0, borderWeightMult / 0.5); }   // 1..10
 function scaledWeight(base) { return Math.max(0.3, base + (borderStep() - 1) * 0.5); }
 
 // borderWeightMult is an absolute black-border weight in px (0 = no border).
-let fillOpacityMult = 0.40;  // matches the #fill-opacity slider default of 40
+let fillOpacityMult = 0.60;  // matches the #fill-opacity slider default of 60
 let borderWeightMult = 0.5;  // matches the #border-weight slider default of 1 on the 1–10 scale (0.5 px)
 
 const CATS = [
@@ -9190,6 +9190,15 @@ function _onLsoaImdReady() {
   // so a corrected count has to reach the shading and not just the panel.
   if (typeof _restyleAll === 'function') _restyleAll();
   if (typeof renderTopBottom === 'function') renderTopBottom();
+  /* And the key, which was the one thing left describing the old figures.
+
+     The ranges above were cleared and the polygons repainted from the real
+     LSOA spread, but the numbers beside the gradient were written before the
+     file arrived and nothing rewrote them. On imd_score that left the key
+     reading 7.3 to 37.8 over a map painted across 4.886 to 43.653: a legend
+     that disagrees with the colours it is labelling, and no way to tell from
+     the screen which of the two is right. */
+  if (typeof _syncScaleNumbers === 'function') _syncScaleNumbers();
   if (typeof _updateLayerCounts === 'function') _updateLayerCounts();
   if (typeof window._core20UpdateCount === 'function') window._core20UpdateCount();
   /* A ward profile open at the time now has LSOA rows it can fill in.
@@ -9923,32 +9932,12 @@ function _applyOverlayChange(key) {
       _m.dispatchEvent(new Event('change'));
     }
 
-    /* And the area level itself, which is the part the two toggles above do
-       not reach.
-
-       The badge and the layer checkboxes are different things. _setDataLevel
-       drives them together, so moving to LSOA level unticks tnw and takes the
-       ward layer off the map; but the toggles above only untick tlsoa, and
-       nothing ticks tnw back or moves currentDataLevel off 'lsoa'.
-
-       So: sit at LSOA level on an LSOA indicator, then pick a ward-only one
-       such as crime. The LSOA layer is removed because the indicator has no
-       LSOA figures, the ward layer is still off from the earlier switch, and
-       the badge still reads LSOA. Nothing is shaded and nothing says why. That
-       is the "no figures" the report described.
-
-       fromOverlay skips the compatibility gate in _setDataLevel, which exists
-       for a person clicking the badge against the active indicator. This is
-       the opposite case and the gate would refuse the very move that fixes it.
-       Ward is preferred where the indicator has it, because it is where the
-       map opens and where most indicators live; otherwise the first level the
-       indicator does have. */
-    if (typeof currentDataLevel !== 'undefined' && typeof _setDataLevel === 'function'
-        && !ovHasLevel(curOv, currentDataLevel)) {
-      const _lv = ovLevels(curOv) || [];
-      const _target = _lv.indexOf('ward') !== -1 ? 'ward' : _lv[0];
-      if (_target) _setDataLevel(_target, { fromOverlay: true });
-    }
+    /* The area level is not set here. _wireDlBadgeFromOverlay, further down,
+       is a second change listener on this same dropdown and already works out
+       which level the new indicator belongs at, including the case this one
+       does not: keeping the level you are on when the indicator still has
+       figures there. Setting it in both places would be two mechanisms for one
+       decision, and the one nobody was looking at would be the one that drifted. */
   }
   if (wLyr) wLyr.eachLayer(l => l.setStyle(wstyle(l.feature.properties.WD24NM, curOv, gs(l.feature.properties.WD24NM))));
   if (lsoaLyr) { lsoaLyr.eachLayer(l => l.setStyle(imdStyle(l.feature, l.feature.properties.code === selLSOA ? 'selected' : 'default'))); applyLSOAFilter(); }
@@ -10078,7 +10067,15 @@ function _setDataLevel(level, opts) {
       3600);
   }
 
-  if (opts.fromOverlay || opts.fromLsoaToggle || opts.fromMsoaToggle) return;  // avoid feedback loops
+  /* The two toggle-driven calls stop here, because the sync below would set the
+     very checkbox whose change handler is still on the stack.
+
+     fromOverlay does not: it comes from the indicator dropdown, and none of the
+     three toggle handlers calls back into this function, so there is no loop to
+     avoid. Returning for it was why picking an LSOA indicator left the ward
+     boundaries drawn on top of the LSOA choropleth. The level moved and the
+     badge moved; the layer the badge describes did not. */
+  if (opts.fromLsoaToggle || opts.fromMsoaToggle) return;
 
   // Drive the two boundary layers to match the level. Guarded, because each
   // checkbox has its own listener that syncs the badge back the other way.
