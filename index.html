@@ -1382,6 +1382,13 @@
      sliced the row of figures in half, which looks like a rendering fault
      rather than a panel you can scroll. */
   .map-wrap.touring .ws-sheet { bottom: calc(var(--tour-h, 150px) + 26px); max-height: 252px; }
+  /* The rule above is more specific than .ws-sheet.peek and .ws-sheet.collapsed,
+     so during the tour the bar sat at 252px whatever state it was put in. The
+     ward chapter asks for a shorter bar on a short screen precisely so the map
+     it is pointing at is visible, and this was quietly refusing. The cap stays
+     for the full state, which is what it was for. */
+  .map-wrap.touring .ws-sheet.peek { max-height: 174px; }
+  .map-wrap.touring .ws-sheet.collapsed { max-height: 66px; }
   .map-wrap.touring .cmp-bar { bottom: calc(var(--tour-h, 150px) + 26px); max-height: 252px; }
 
   /* ── Custom area ──────────────────────────────────────────────────────────
@@ -14186,6 +14193,72 @@ loadData();
    * __skipLevelGate flag the overlay handler already uses for its own
    * automatic switches.
    */
+  /* Frame something into the part of the map that is actually visible.
+
+     fitBounds measures the map pane, and the map pane is not what a reader can
+     see during the tour: the strip sits over the bottom of it, and on the ward
+     chapter the ward bar sits over the bottom of that. Measured on a 1366x768
+     laptop, the two together covered 428px of a 456px map and the ward this
+     chapter is about was framed dead centre of the 428.
+
+     So the obstruction is measured live and passed as bottom padding, and the
+     zoom is capped well short of a single ward filling the screen. Someone on
+     a small laptop needs the surrounding wards in shot to see which one is
+     highlighted; filling their screen with it tells them nothing.
+
+     Measured rather than assumed, because the ward bar has three heights, the
+     strip wraps to two lines at narrow widths, and compare suspends the bar
+     altogether. */
+  function tourFit(bounds, maxZoom) {
+    if (typeof map === 'undefined' || !map || !bounds) return;
+    if (bounds.isValid && !bounds.isValid()) return;
+    var mapEl = $('map');
+    var mb = mapEl ? mapEl.getBoundingClientRect() : null;
+    var hidden = 0;
+    ['tour-strip', 'ward-sheet'].forEach(function (id) {
+      var el = $(id);
+      if (!el || !mb) return;
+      var cs = window.getComputedStyle(el);
+      if (cs.display === 'none' || cs.visibility === 'hidden' || cs.opacity === '0') return;
+      var r = el.getBoundingClientRect();
+      if (r.height > 0 && r.bottom > mb.top && r.top < mb.bottom) {
+        hidden += Math.min(r.height, mb.bottom - r.top);
+      }
+    });
+    // Never pad away so much that nothing is left to fit into.
+    var room = mb ? Math.max(120, mb.height * 0.35) : 120;
+    var pad = mb ? Math.min(hidden, Math.max(0, mb.height - room)) : 0;
+    /* Cancel whatever is still flying first.
+
+       selectWardByName fits the map to the ward it selected, animated, and an
+       animated fit finishes on a later frame. Reframing on the line after it
+       therefore set the zoom and then lost it: this one landed on 12 and the
+       older animation arrived a moment later and put it back to 13. Measured,
+       not theorised. map.stop() ends the in-flight move so the last fit
+       written is the one that survives. */
+    try { map.stop(); } catch (e) { /* not animating */ }
+    try {
+      map.fitBounds(bounds, {
+        paddingTopLeft: [28, 28],
+        paddingBottomRight: [28, 28 + pad],
+        maxZoom: maxZoom || 12,
+        animate: false,
+      });
+    } catch (e) { /* degenerate bounds */ }
+  }
+
+  function wardBoundsByName(names) {
+    if (typeof wLyr === 'undefined' || !wLyr) return null;
+    var out = null;
+    wLyr.eachLayer(function (l) {
+      var p = l.feature && l.feature.properties;
+      if (!p || names.indexOf(p.WD24NM) === -1) return;
+      out = out ? out.extend(l.getBounds()) : L.latLngBounds(l.getBounds().getSouthWest(),
+                                                             l.getBounds().getNorthEast());
+    });
+    return out;
+  }
+
   function lsoaLayer(on, byDecile) {
     var box = $('tlsoa');
     if (!box) return;
@@ -14286,7 +14359,30 @@ loadData();
           var v = num(w.inds.imd_decile_mean);
           if (!best || v < best.v) best = { n: w.name, v: v };
         });
-        if (best) selectWardByName(best.n);
+        if (best) {
+          selectWardByName(best.n, { noFit: true });
+          /* How tall the bar is left depends on how much map there is.
+
+             This chapter is about the bar, so the bar has to be on screen; but
+             it opens at full height, and full plus the narration strip covered
+             428px of a 456px map on a 1366x768 laptop, leaving 28px. Peek is
+             252px and still leaves 28. Collapsed is about 66px and leaves the
+             ward visible with room around it.
+
+             So: peek where the map can spare it, collapsed where it cannot.
+
+             Judged on the map's own height and not on the strip's. The strip
+             is laid out by tourLift, which runs after this, so measuring it
+             here reads zero and every screen looks roomy. The map element is
+             already sized. 600px is peek (250) plus a wrapped strip (about
+             180) plus enough left to see a ward in. */
+          if (window.PH_SHEET && window.PH_SHEET.setState) {
+            var mEl = $('map');
+            var mapH = mEl ? mEl.getBoundingClientRect().height : 0;
+            window.PH_SHEET.setState(mapH >= 600 ? 1 : 2);
+          }
+          tourFit(wardBoundsByName([best.n]), 12);
+        }
       },
     },
     {
@@ -14346,7 +14442,12 @@ loadData();
           if (num(w.inds.census_bad_health_pct) === null) return;
           picked.push(w.name);
         });
-        picked.forEach(function (n) { selectWardByName(n); });
+        picked.forEach(function (n) { selectWardByName(n, { noFit: true }); });
+        /* Both of them, not the last one. selectWardByName fits the map to the
+           ward it just selected, so pinning two left the map framed on the
+           second with the first somewhere off screen, under a chapter about
+           putting wards side by side. */
+        tourFit(wardBoundsByName(picked), 11);
       },
     },
     {
@@ -14363,6 +14464,46 @@ loadData();
       go: function () {
         closeWardSheet();
         railClick('report');
+        /* An example area, built rather than described.
+
+           The chapter said "click the LSOAs on the map to add them" over an
+           empty panel and an unshaded map, so the one tool here whose output
+           depends entirely on a selection was the one chapter that showed
+           none. Five LSOAs from a single ward: they are contiguous, because an
+           LSOA is best-fitted to one ward, and five is enough for the totals
+           and the population weighting to be worth reading.
+
+           The boundaries carry the geography this draws from, so it waits for
+           them. apply() reports false rather than half-applying when they are
+           not there yet, which is what makes the retry safe. */
+        var seedArea = function () {
+          if (!window.PH_REPORT || !window.PH_REPORT.apply) return false;
+          if (typeof LSOA_IMD === 'undefined' || !LSOA_IMD || !LSOA_IMD.features) return false;
+          var byWard = {};
+          LSOA_IMD.features.forEach(function (f) {
+            var pr = f.properties || {};
+            if (!pr.ward_code || !pr.code) return;
+            (byWard[pr.ward_code] = byWard[pr.ward_code] || []).push(pr.code);
+          });
+          var pick = null, name = '';
+          for (var wc in byWard) {
+            if (byWard[wc].length >= 5) {
+              pick = byWard[wc].slice(0, 5);
+              var f0 = LSOA_IMD.features.filter(function (f) {
+                return (f.properties || {}).ward_code === wc; })[0];
+              name = 'Example: part of ' + (((f0 || {}).properties || {}).ward || 'a ward');
+              break;
+            }
+          }
+          if (!pick) return false;
+          var ok = window.PH_REPORT.apply({ name: name, codes: pick });
+          if (ok) tourFit(wardBoundsByName([(((LSOA_IMD.features.filter(function (f) {
+            return (f.properties || {}).code === pick[0]; })[0] || {}).properties || {}).ward)]), 12);
+          return ok;
+        };
+        if (!seedArea() && typeof ensureLsoaImd === 'function') {
+          ensureLsoaImd().then(function () { seedArea(); });
+        }
       },
     },
     {
@@ -15759,7 +15900,18 @@ loadData();
   // Selecting from a result row has to leave the map in exactly the state a
   // click on the polygon would have left it in, or the sheet and the map
   // disagree about what is selected.
-  function selectWardByName(wn) {
+  /* opts.noFit leaves the map where it is.
+
+     The fit below is animated, and an animated fit finishes on a later frame.
+     A caller that wanted its own framing therefore could not simply reframe on
+     the next line: it set the zoom, and then this one arrived late and undid
+     it. The tour hit exactly that, landing on 12 and being put back to 13.
+     map.stop() does not help, because the move has not started yet.
+
+     So the caller says up front that it will do the framing, and there is only
+     ever one fit. Clicking a query result still passes nothing and still gets
+     the old behaviour. */
+  function selectWardByName(wn, opts) {
     if (typeof wLyr === 'undefined' || !wLyr) return;
     var target = null;
     wLyr.eachLayer(function (l) {
@@ -15772,7 +15924,10 @@ loadData();
     });
     target.setStyle(wstyle(wn, curOv, 'selected'));
     target.bringToFront();
-    try { map.fitBounds(target.getBounds(), { padding: [40, 40], maxZoom: 13 }); } catch (err) { /* degenerate bounds */ }
+    if (!(opts && opts.noFit)) {
+      try { map.fitBounds(target.getBounds(), { padding: [40, 40], maxZoom: 13 }); }
+      catch (err) { /* degenerate bounds */ }
+    }
     if (typeof showWard === 'function') showWard(wn);
   }
 
