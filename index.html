@@ -14433,21 +14433,56 @@ loadData();
         closeWardSheet();
         wardLevel();
         railClick('compare');
-        // Two real wards, so the chapter shows a comparison rather than a
-        // panel asking you to pin something first.
-        var picked = [];
-        allWards().forEach(function (w) {
-          if (picked.length >= 2) return;
-          if (num(w.inds.imd_decile_mean) === null) return;
-          if (num(w.inds.census_bad_health_pct) === null) return;
-          picked.push(w.name);
+        /* Roundwood and Stonebridge, by name.
+
+           This took the first two wards carrying both figures, which is
+           Aldersgate and Cripplegate: two City of London wards, among the
+           smallest in London, and at this chapter's zoom they came out about
+           12 pixels across. A comparison whose subjects cannot be picked out
+           on the map teaches nothing about comparing them.
+
+           These two are neighbours in Brent with about 17,000 and 20,000
+           residents, big enough to read at a glance and adjacent enough to
+           frame together without zooming out to the whole borough.
+
+           Named rather than derived, which is the opposite of what the ward
+           chapter does a few chapters up. That one needs any reasonable ward
+           and derives it so a rename cannot strand it; this one needs a
+           particular pair that looks right side by side. The fallback below
+           covers the rename case: the two largest wards in whichever borough
+           has the biggest pair, which is the property that matters here. */
+        var byName = {};
+        allWards().forEach(function (w) { byName[w.name] = w; });
+        var usable = function (w) {
+          return w && num(w.inds.imd_decile_mean) !== null
+                   && num(w.inds.census_bad_health_pct) !== null;
+        };
+        var picked = ['Roundwood', 'Stonebridge'].filter(function (n) {
+          return usable(byName[n]);
         });
+        if (picked.length < 2) {
+          var byLad = {};
+          allWards().forEach(function (w) {
+            if (!usable(w) || num(w.inds.census_population) === null) return;
+            (byLad[w.lad] = byLad[w.lad] || []).push(w);
+          });
+          var best = null;
+          Object.keys(byLad).forEach(function (lad) {
+            var top = byLad[lad].sort(function (a, b) {
+              return num(b.inds.census_population) - num(a.inds.census_population);
+            }).slice(0, 2);
+            if (top.length < 2) return;
+            var sum = num(top[0].inds.census_population) + num(top[1].inds.census_population);
+            if (!best || sum > best.sum) best = { sum: sum, names: [top[0].name, top[1].name] };
+          });
+          if (best) picked = best.names;
+        }
         picked.forEach(function (n) { selectWardByName(n, { noFit: true }); });
         /* Both of them, not the last one. selectWardByName fits the map to the
            ward it just selected, so pinning two left the map framed on the
            second with the first somewhere off screen, under a chapter about
            putting wards side by side. */
-        tourFit(wardBoundsByName(picked), 11);
+        tourFit(wardBoundsByName(picked), 12);
       },
     },
     {
