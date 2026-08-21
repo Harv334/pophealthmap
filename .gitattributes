@@ -1,0 +1,20 @@
+# Line endings are LF in this repository, on every platform.
+#
+# Without this, editing a file from a Windows script rewrites every line in it.
+# Python's write_text opens in text mode, and text mode on Windows translates
+# \n to \r\n, so a change of two hundred lines was committed as sixteen
+# thousand insertions and sixteen thousand deletions. The content was right and
+# the diff was unreadable, which is worse than it sounds: nobody can review a
+# whole-file rewrite, so nobody does.
+#
+# eol=lf is what the checked-out working copy gets, not only what is stored.
+# Both editors used here handle LF, and the pipeline writes LF already.
+* text=auto eol=lf
+
+# Never touched by the newline logic, because a byte in them is a byte.
+*.png   binary
+*.woff2 binary
+*.parquet binary
+*.zip   binary
+*.ods   binary
+*.xlsx  binary
