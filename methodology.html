@@ -90,13 +90,10 @@ that instead and this gives the official name for it.</p>
           London has 1,002.</td></tr>
   <tr><td>LSOA</td><td>Lower Layer Super Output Area</td>
       <td>A statistical area of about 1,500 people, and the smallest area this
-          map holds figures for. London has 4,994. They are drawn by the Office
-          for National Statistics to hold roughly equal populations, which is
-          why they are small where London is dense and large where it is not,
-          and why they do not follow anything you would recognise on the
-          ground. Where this map offers a choice of area size, this is the
-          smallest one, and it is the level the deprivation deciles are
-          published at.</td></tr>
+          map holds figures for. London has 4,994. They hold roughly equal
+          populations rather than following anything on the ground, so they are
+          small where London is dense and large where it is not. Deprivation
+          deciles are published at this level.</td></tr>
   <tr><td>Deprivation</td><td>Index of Multiple Deprivation, or IMD</td>
       <td>The government measure of how deprived an area is. It combines
           income, employment, health, education, crime, housing and
@@ -202,226 +199,85 @@ borders no longer coincided: LSOA edges visibly cut across ward lines.</p>
 places, which moves no point by more than 0.32 metres and roughly halves the
 file size.</p>
 
-<h3>LSOAs do not sit inside wards</h3>
+<h2>What can go wrong when you read a figure</h2>
+
+<p>Six things on this map are easy to read the wrong way. Each one is a
+property of how the figures are published, not a fault, and each changes what a
+number means.</p>
+
+<h3>1. LSOAs do not sit inside wards</h3>
 
 <p>LSOA boundaries are from 2021 and wards were redrawn in 2025, so the two
-genuinely cross. Measured across the whole of London, the typical LSOA falls
-0.7% outside the ward it is assigned to, and 59% sit entirely within one, but
-41% cross a ward line somewhere and a small number straddle almost completely.</p>
+genuinely cross. 59% of LSOAs sit entirely within one ward. 41% cross a ward
+line. Every LSOA is assigned to exactly one ward, using the ONS best-fit lookup
+<code>LSOA21_WD25_LAD25_EW_LU_v2</code>, so a ward figure counts each LSOA once
+in the ward it best fits, and not in proportion to the area it shares. LSOA
+outlines crossing ward outlines at high zoom is the geography being honest, not
+a drawing error.</p>
 
-<p>Every LSOA is assigned to exactly one ward using the ONS best-fit lookup
-(<code>LSOA21_WD25_LAD25_EW_LU_v2</code>). So a ward figure built from LSOAs
-counts each LSOA once, in the ward it best fits, not in proportion to the area
-it shares. At high zoom you will see LSOA outlines crossing ward outlines. That
-is the geography being honest, not a drawing error.</p>
+<h3>2. Only counts are added up</h3>
 
-<h2>How figures move between levels</h2>
+<p>Everything else is averaged and weighted by population. LSOA figures reach
+wards that way, and wards reach boroughs the same way, except for genuinely
+additive measures such as population, crime totals and service counts, which
+are summed. MSOA figures reach wards through the LSOAs the two share, so a ward
+straddling two MSOAs gets a blend in proportion to where its people are.</p>
 
-<table>
-  <tr><th>Direction</th><th>Method</th></tr>
-  <tr><td>LSOA → ward</td>
-      <td>Population-weighted mean for rates, scores and percentages. Sum for
-          counts.</td></tr>
-  <tr><td>MSOA → ward</td>
-      <td>Through the LSOAs the two share. Each LSOA carries its MSOA's value
-          and contributes its population as weight, so a ward straddling two
-          MSOAs gets a blend in proportion to where its people are.</td></tr>
-  <tr><td>Ward → borough</td>
-      <td>Population-weighted mean, except for genuinely additive measures
-          (population, crime totals, service counts), which are summed.</td></tr>
-</table>
+<h3>3. Some health figures are a borough figure repeated</h3>
 
-<p>Only counts are added up. Everything else is averaged, on the principle that
-a wrongly averaged count looks implausible and gets noticed, while a wrongly
-summed rate just looks like a number.</p>
+<p>The health data comes from OHID Fingertips in two pulls. The Local Health
+set is published per MSOA and varies ward by ward. The borough set is published
+per local authority and is written unchanged onto every ward in that borough,
+so 18 of the health indicators are identical for every ward in a borough.
+Ranking wards on one of those produces a real-looking order that is an artefact
+of the geography rather than a finding. The map flags them, and the indicator
+list shows how many distinct values an indicator actually has.</p>
 
-<h3>Deprivation deciles are not a decile once averaged</h3>
+<h3>4. Missing is not zero</h3>
 
-<p>IMD deciles run 1 (the most deprived tenth nationally) to 10 (the least). A
-ward contains several LSOAs, each with its own decile, so the ward figure is a
-population-weighted <em>mean</em> of deciles and is published as
-<code>imd_decile_mean</code> rather than pretending to be a decile. A value of
-3 means the typical LSOA there sits in the third decile, among roughly the 30%
-most deprived. It does not mean the area is in the most deprived tenth.</p>
+<p>A blank ward can mean the figure was withheld, not that it is zero.
+Fingertips suppresses MSOA figures where small counts could identify
+individuals. In Query, a ward with no figure for one of your conditions can
+neither pass nor fail it, so it is left out of the results and the number left
+out is reported underneath them.</p>
 
-<p>The scores run the other way: a higher <code>imd_score</code> means more
-deprived. Deprivation is the easiest thing on this map to state backwards.</p>
+<h3>5. Colour follows the indicator, not the size of the number</h3>
 
-<h2>Health indicators: two sets at two levels</h2>
+<p>The highest IMD decile is the <em>least</em> deprived tenth, and the highest
+life expectancy is the best outcome, so colouring the largest value red would
+state the opposite of the truth. For the Local Health set the direction is
+OHID’s own published polarity, carried through from the source. Where an
+indicator has no better or worse end, it is left uncoloured. The share of
+residents over 65, or in social renting, or of any ethnic group, is a fact
+about who lives there rather than a good or bad result.</p>
 
-<p>The health data comes from OHID Fingertips in two separate pulls, and they
-are not interchangeable.</p>
+<h3>6. Service counts are attributed by where the service stands</h3>
 
-<div class="wrap">
-<table>
-  <tr><th></th><th>Local Health set</th><th>Borough set</th></tr>
-  <tr><td>Keys</td><td><code>ft_93283</code> and similar, keyed by indicator id</td>
-      <td><code>ft_life_expectancy_male</code> and similar</td></tr>
-  <tr><td>Published at</td><td>MSOA</td><td>Upper-tier local authority</td></tr>
-  <tr><td>On the map</td><td>Aggregated to wards; varies ward by ward</td>
-      <td>Repeated identically for every ward in a borough</td></tr>
-  <tr><td>Count</td><td>33 indicators, 684 wards</td><td>18 indicators, 33 boroughs</td></tr>
-</table>
-</div>
-
-<p>The borough set is the one to be careful with. Ranking wards by it produces a
-real-looking ordering that is an artefact of the geography rather than a finding
-about the wards, because every ward in a borough carries the same number. The
-map and the question panel both flag these.</p>
-
-<p>Fingertips still publishes the Local Health set against 2011 MSOA codes, and
-39 London MSOAs were renumbered in 2021. Where a code no longer matches, the
-value is left missing rather than filled from a neighbour.</p>
+<p>Pharmacies use the pipeline’s own ward count. Schools, libraries and
+community centres use the ward code their source file already carries.
+Everything else is placed by testing its point against the ward polygon. A
+service used by a neighbouring ward is still counted in the ward it stands in,
+so these will not always agree with a count made a different way.</p>
 
 <h2>Known gaps</h2>
 
 <ul>
-  <li><strong>City of London.</strong> Its 20 wards have no deprivation score and
-      no Local Health indicators. They are tiny and share very few LSOAs between
-      them, so there is nothing to aggregate. This is a property of the
-      geography, not a fetch failure.</li>
-  <li><strong>Five layers cover North West London only</strong>: schools,
+  <li><strong>City of London.</strong> Its 20 wards have no deprivation score
+      and no Local Health indicators. They are tiny and share very few LSOAs,
+      so there is nothing to aggregate. This is a property of the geography,
+      not a fetch failure.</li>
+  <li><strong>Five layers cover North West London only:</strong> schools,
       community centres, libraries, ESOL providers and CICs. They are badged
       NWL on the map. Blank elsewhere means not yet collected, not none.</li>
-  <li><strong>Suppressed values.</strong> Fingertips withholds MSOA figures
-      where small counts could identify individuals. A ward with no fill may be
-      suppressed rather than zero.</li>
+  <li><strong>39 renumbered MSOAs.</strong> Fingertips still publishes the
+      Local Health set against 2011 MSOA codes. Where a code no longer matches
+      a 2021 one, the value is left missing rather than filled from a
+      neighbour.</li>
+  <li><strong>DWP benefits are not included.</strong> The figures are on DWP
+      Stat-Xplore, which needs a registered API key. NOMIS holds nothing newer
+      than November 2018 for them.</li>
 </ul>
 
-<h2>Query: how a filter is evaluated</h2>
-
-<p>Query mode asks for wards meeting several conditions at once. Everything runs
-in your browser against the data already on the page, so nothing is uploaded and
-no request is made while you build a filter.</p>
-
-<p>A ward matches when it satisfies <em>every</em> part: it contains at least one
-of each service ticked, it sits in the borough chosen, and it meets all of the
-indicator conditions. Ticking no services places no service condition at all,
-rather than requiring a ward to have none.</p>
-
-<h3>Where the service counts come from</h3>
-
-<table>
-  <tr><th>Service</th><th>Counted by</th></tr>
-  <tr><td>Pharmacies</td>
-      <td>The pipeline's own <code>pharmacy_count</code> ward indicator</td></tr>
-  <tr><td>Schools, libraries, community centres</td>
-      <td>The ward code the source file already carries</td></tr>
-  <tr><td>GP practices, hospitals, dental practices, ESOL providers, CICs</td>
-      <td>A spatial test of the point against the ward polygon</td></tr>
-</table>
-
-<p>These will not always agree with a count made a different way. A point sitting
-just inside a boundary is attributed by where it falls, and a service used by a
-neighbouring ward is still counted in the ward it stands in. Where the pipeline
-already publishes a count, that figure is used rather than a second one being
-derived, so the query and the ward profile cannot disagree about the same ward.</p>
-
-<h3>Missing is not zero</h3>
-
-<p>A ward with no figure for one of your conditions cannot pass it and cannot
-fail it, so it is left out of the results and the number left out is reported
-underneath them. A filter that silently discarded the areas it could not judge
-would hand back a shorter list as though it were the whole answer.</p>
-
-<p>Conditions on the borough-level Fingertips set are flagged as you build them.
-Filtering wards on a figure that is identical for every ward in a borough selects
-whole boroughs, and the panel says so rather than letting the result imply a
-distinction that is not in the data.</p>
-
-<h2>Compare: what the colours claim</h2>
-
-<p>Compare pins up to four wards and lines them up on the metrics you choose.
-On each row the highest and lowest of the pinned values are marked with a
-triangle, and coloured green for the better end and red for the worse.</p>
-
-<p>The colour follows the indicator, not the size of the number. The highest IMD
-decile is the <em>least</em> deprived tenth and the highest life expectancy is
-the best outcome, so colouring the largest value red would state the opposite of
-the truth on those rows. For the Local Health set the direction is OHID's own
-published RAG polarity, carried through from the source. For the deprivation
-family it follows the scale: scores rise with deprivation, deciles fall with it.</p>
-
-<p>Where an indicator has no better or worse end, the row is marked but left
-uncoloured, and the key names which rows those are. A high share of residents
-over 65, or in social renting, or of any ethnic group, is a fact about who lives
-there rather than a good or bad result, and the map does not colour it as one.</p>
-
-<h2>Custom area: figures for an area you draw</h2>
-
-<p>Every other total on this map belongs to an area somebody else drew. A
-local patch, a school catchment or a primary care network does not follow those
-lines. Custom area lets you build the area you mean.</p>
-
-<p>Click small areas on the map to add them. Click one again to remove it. The
-tool totals up the figures for whatever you have picked. It uses the same rule
-as the rest of the map. Counts are added together. Everything else is averaged
-and weighted by population.</p>
-
-<p>The report states the method beside every figure. It also states three
-limits. This is not an official area. Nobody else publishes figures for it. A
-larger small area pulls each average further than a smaller one.</p>
-
-<p>An area you draw by hand often crosses a borough boundary. Where it does, the
-report names the boroughs it crosses. It then says the figures are not borough
-figures.</p>
-
-<h2>Data export: a spreadsheet of your own</h2>
-
-<p>The CSV button in the toolbar exports what the map is drawing. Data export
-does something different. It asks three questions and writes the answer to a
-file:</p>
-
-<ul>
-  <li>Which size of area do you want? Each area becomes one row. The four
-      sizes are boroughs, wards, MSOAs and LSOAs, largest to smallest. An LSOA
-      is the smallest area this map holds figures for, about 1,500 people; the
-      table at the top of this page says what each name means. This choice used
-      to call LSOAs "small areas", which sat oddly next to a button reading
-      "MSOAs" and next to a map that says LSOA everywhere else, so it says LSOA
-      now.</li>
-  <li>Where? All of London, one Integrated Care Board, or one borough.</li>
-  <li>Which figures? Each figure becomes one column.</li>
-</ul>
-
-<p>This tool does not average or combine anything. Every value in the file is a
-figure the pipeline already holds for that area. Use Custom area when you want
-areas joined together instead.</p>
-
-<p>Boroughs hold fewer figures than the other sizes. They hold the 18 health
-figures published at borough level. They hold no census figures and no
-deprivation figures. If you pick a figure and then switch to boroughs, the tool
-removes that figure and tells you it has done so.</p>
-
-<h2>Directory: finding one place</h2>
-
-<p>The map answers what is near here. Directory answers where is this. It holds
-every service and organisation on the map in one list. That is about 23,000
-places across ten sets of data.</p>
-
-<p>Search by name, by address or by postcode. Filter by type or by borough.
-Click a result and the map marks it. You can export whatever you have filtered
-as a CSV file.</p>
-
-<p>Directory covers London only. Every record is placed in one of the 33
-boroughs. The charity register is national, so about 2,400 organisations outside
-London are left out. The panel states that number.</p>
-
-<h2>The question panel</h2>
-
-<p>The model is never given the dataset. It is given four tools, and your
-browser runs them against the JSON already loaded on the page, so every figure
-in an answer is the same number the map is drawing, nothing is uploaded, and
-the model cannot invent a statistic because it has none in its context.</p>
-
-<p>It can still describe a correct figure incorrectly, which is why the panel
-carries a standing note asking you to verify anything you intend to act on.</p>
-
-<p>Questions are capped at <strong>10 a day per person</strong> because the
-service has running costs. The count is enforced by the server against your IP
-address and resets at midnight UTC; the panel shows what you have left beside
-its title. The map itself, including Query and Compare, is unlimited: those run
-entirely in your browser and cost nothing to serve.</p>
 
 <h2>Rebuilding this</h2>
 

@@ -22,18 +22,27 @@ try:
     check("a glossary defines the abbreviations",
           d.execute_script("return document.body.innerHTML.includes('Plain word')")
           and "LSOA" in txt)
-    check("Query section present", any("Query" in h for h in heads), str(heads))
-    for tool in ["Custom area", "Data export", "Directory"]:
-        check(f"{tool} is documented", any(tool in h for h in heads), str(heads))
-    check("Compare section present", any("Compare" in h for h in heads), str(heads))
-    check("service counting method documented", "pharmacy_count" in txt)
+    # This page documents the DATA, not the tools. The walkthroughs of Query,
+    # Compare, Custom area, Data export, Directory and the question panel were
+    # removed deliberately: they described what the buttons do, which the
+    # buttons already do, and they buried the two things a reader comes here
+    # for. What survived from them is the part that changes how a number should
+    # be read, and that is what is checked below.
+    check("the sources table is the centre of the page",
+          any("Every data source" in h for h in heads), str(heads))
+    check("and every geography has a stated year",
+          any("which year" in h for h in heads), str(heads))
+    check("service counting method documented",
+          "ward polygon" in txt and "stands in" in txt)
     check("missing-is-not-zero documented", "Missing is not zero" in txt)
     check("polarity of the colours explained",
           "colour follows the" in txt.lower() and "least" in txt)
     check("uncoloured rows explained", "no better or worse end" in txt)
-    check("the cap is stated as 10 a day", "10 a day" in txt or "10 questions a day" in txt)
-    check("and says the other tools are not capped",
-          "free to use as much as you like" in txt or "unlimited" in txt)
+    check("borough-level repetition is flagged",
+          "repeated" in txt and "every ward in that borough" in txt)
+    check("known gaps still listed",
+          any("Known gaps" in h for h in heads)
+          and "City of London" in txt and "North West London" in txt)
 
     # house style
     check("no em dashes", "—" not in txt, txt[max(0,txt.find("—")-60):txt.find("—")+60] if "—" in txt else "")
