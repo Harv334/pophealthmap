@@ -223,6 +223,22 @@ def main() -> int:
         shutil.copy2(path, target)
         copied += 1
 
+    # The Word version, generated fresh so it cannot describe a build it was
+    # not made from. Optional: python-docx is not in requirements.txt, because
+    # it is needed to write this document and never to run the map.
+    try:
+        import subprocess
+        doc = dst / "PopHealth Map - Handover.docx"
+        r = subprocess.run([sys.executable, str(SRC / "scripts" / "build_handover_doc.py"),
+                            str(doc)], capture_output=True, text=True)
+        if r.returncode == 0:
+            print(f"  wrote {doc.name}")
+        else:
+            print("  no Word document: " + (r.stderr.strip().splitlines() or ["failed"])[-1])
+            print("    (pip install python-docx to include it)")
+    except Exception as e:
+        print(f"  no Word document ({e})")
+
     readme = dst / "README.md"
     if readme.exists():
         rtext, rnotes = strip_readme(readme.read_text(encoding="utf-8", newline=""))
