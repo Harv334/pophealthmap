@@ -146,7 +146,18 @@
      retracted, so the last few centimetres of the app sat underneath the
      toolbar with overflow:hidden over the top of them: the sidebar footer and
      the foot of the layers list were unreachable rather than merely awkward. */
-  .app { display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; height: 100vh; max-height: 100vh; height: 100dvh; max-height: 100dvh; overflow: hidden; }
+  /* grid-template-columns: minmax(0, 1fr) is doing real work here.
+     Without it the single implicit column sizes to the widest child, and
+     because .app clips with overflow:hidden, one child that will not shrink
+     silently crops the whole application. That is what happened on a phone:
+     the footer's two halves needed 439px side by side, so the header, the map
+     and the footer were all laid out 439px wide inside a 390px screen and the
+     right-hand 49px of every one of them was cut off. End tour, Next chapter
+     and Ask about this data all lost their right edge, and nothing looked
+     broken enough to explain why. minmax(0, 1fr) lets the column be narrower
+     than its content, so a child that overflows is the only thing that
+     overflows. */
+  .app { display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; grid-template-columns: minmax(0, 1fr); height: 100vh; max-height: 100vh; height: 100dvh; max-height: 100dvh; overflow: hidden; }
   .hdr { background: var(--paper); border-bottom: 1px solid var(--line); padding: 7px 18px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; gap: 12px; }
   .hdr-left { display: flex; align-items: center; gap: 12px; }
   /* The page's h1. Margin zeroed because the browser default would push the
@@ -712,6 +723,14 @@
 
   @media (max-width: 900px) {
     .main { grid-template-columns: minmax(0, 1fr); }
+
+    /* The footer wraps instead of demanding a width the screen does not have.
+       Its two halves are five links and a date, which will not fit on one line
+       on a phone and were never going to. Left unwrapped they asked for 439px,
+       and since .app clips, that request was granted by cropping everything
+       above them. Wrapping is what a footer should do at this width anyway. */
+    .sbar { flex-wrap: wrap; gap: 2px 12px; padding: 4px 10px; }
+    .sbar-left, .sbar-right { flex-wrap: wrap; min-width: 0; }
 
     /* Flex rather than grid: the named grid areas assume a fixed set of
        children, and the toolbar moves in here at this width. DOM order is
@@ -1677,10 +1696,51 @@
     .cmp-bar { max-height: 76vh; max-height: 76dvh; }
     /* Four cards across is a desktop shape. */
     .cmp-cards { grid-template-columns: minmax(0, 1fr); }
-    .tour-strip { padding: 11px 13px 12px; }
-    .tour-narr { font-size: var(--t-md); margin-bottom: 10px; }
-    .tour-ctrls { gap: 6px; }
+    /* ── The tour, on a phone ──
+       The same treatment the ward sheet got above, and for the same reason.
+       A chapter is four or five sentences, which on a 390px screen is eleven
+       lines, and with the heading, the progress bar and the buttons the panel
+       stood 330px tall over a 780px screen. The tour spent its whole time
+       covering the map it was describing, and the chapter that says "click
+       any ward" left barely enough map to click.
+
+       The narrative scrolls inside a capped panel instead. The heading, the
+       progress bar and the Next button stay put, so the shape of the thing
+       never changes and the control you want is always in the same place;
+       only the words move. */
+    /* flex-direction and the cap go on the base rule, but NOT display: the
+       base rule hides this panel and only .open shows it. Setting display
+       here would put the tour on screen before it had been started. */
+    .tour-strip { padding: 11px 13px 12px; flex-direction: column;
+      max-height: 46vh; max-height: 46dvh; }
+    .tour-strip.open { display: flex; }
+    /* The fade says there is more to read. On a 360px screen four of the ten
+       chapters are taller than the cap, so the last line was cut through the
+       middle with nothing to say it could be scrolled — it read as a rendering
+       fault rather than as a longer chapter. Same self-hiding technique as the
+       mode rail: the `local` layers scroll with the text and cover the `scroll`
+       shadows exactly at the top and bottom, so the cue appears only when
+       there is something to scroll to, with no listener to fall out of step. */
+    .tour-narr { font-size: var(--t-md); margin-bottom: 10px;
+      overflow-y: auto; -webkit-overflow-scrolling: touch; min-height: 0;
+      background:
+        linear-gradient(var(--paper) 30%, rgba(255,255,255,0)) top / 100% 22px no-repeat local,
+        linear-gradient(rgba(255,255,255,0), var(--paper) 70%) bottom / 100% 22px no-repeat local,
+        linear-gradient(rgba(33,43,50,.13), rgba(33,43,50,0)) top / 100% 10px no-repeat scroll,
+        linear-gradient(rgba(33,43,50,0), rgba(33,43,50,.13)) bottom / 100% 10px no-repeat scroll,
+        var(--paper); }
+    .tour-ctrls { gap: 6px; flex-shrink: 0; }
     .tour-next-lbl { display: none; }
+    .tour-prog { flex-shrink: 0; margin-bottom: 8px; }
+
+    /* The heading and the chapter counter stop fighting for one line.
+       "What this map shows" and "CHAPTER 1 OF 10  END TOUR" together need
+       more width than a phone has, so the title took two lines and the
+       counter wrapped under it in a ragged block. Stacked deliberately, the
+       title gets the full width and the counter sits under it on one line. */
+    .tour-hd { flex-direction: column; align-items: flex-start; gap: 2px;
+      margin-bottom: 7px; flex-shrink: 0; }
+    .tour-hd > div { display: flex; align-items: baseline; gap: 10px; }
 
     /* ── The bottom-right corner ──
        The Ask button, the Fingertips notice, the legend and the OSM

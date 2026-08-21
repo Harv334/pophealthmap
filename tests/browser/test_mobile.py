@@ -226,11 +226,17 @@ try:
     time.sleep(1)
 
     # ── phase 3: no more saying the same thing twice ─────────────────────────
+    # getComputedStyle throws on null, so a renamed selector used to take the
+    # whole run down here rather than failing one check: everything after this
+    # point stopped being tested and the output ended in a chromedriver stack
+    # trace. That is what happened when .dl-badge-label became #dl-help. Look
+    # the element up first and report a miss as a miss.
     dup = d.execute_script("""
+      function shown(sel){ var e=document.querySelector(sel);
+        return e ? getComputedStyle(e).display !== 'none' : null; }
       return { digest: document.getElementById('vs-digest').textContent.trim(),
                badgeActive: (document.querySelector('#dl-seg button.active')||{}).textContent,
-               badgeLabelShown: getComputedStyle(
-                 document.querySelector('.dl-badge-label')).display !== 'none' };
+               badgeLabelShown: shown('#dl-help') };
     """)
     check("the strip no longer repeats the level the badge is showing",
           "mode" not in dup["digest"], f"digest: {dup['digest']!r}, badge: {dup['badgeActive']!r}")
