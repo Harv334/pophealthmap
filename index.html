@@ -14187,14 +14187,11 @@ loadData();
   var TOUR = [
     {
       t: 'What this map shows',
-      n: 'This map shows health and living conditions across London. It covers all 33 ' +
-         'boroughs. You can look at three sizes of area. There are ' +
-         '<strong>704 wards</strong>, and two smaller types of area called ' +
-         '<strong>LSOAs</strong> and <strong>MSOAs</strong>. An LSOA is about the size ' +
-         'of a neighbourhood. An MSOA is a group of neighbourhoods. The three sizes do ' +
-         'not fit neatly inside each other, so a ward is not a whole number of ' +
-         'neighbourhoods. Every figure comes from the NHS or from government. The map ' +
-         'runs inside your browser, so nothing you do here is sent anywhere.',
+      n: 'This map shows health and living conditions in London. It covers all 33 ' +
+         'boroughs. The buttons down the left open the tools. The tabs in the panel ' +
+         'change what the map draws. You can work at three sizes of area. These are ' +
+         '<strong>704 wards</strong>, and two smaller ones called <strong>LSOAs</strong> ' +
+         'and <strong>MSOAs</strong>. An LSOA holds about 1,500 people.',
       go: function () {
         railClick('explore');
         // The indicator first: changing #ov pulls the sidebar to the Indicators
@@ -14205,11 +14202,10 @@ loadData();
     },
     {
       t: 'Colour the map by a figure',
-      n: 'Open the <strong>Indicators</strong> tab. Choose a figure, and the map gives ' +
-         'every ward a colour for it. The bar along the bottom shows what the colours ' +
-         'mean. This example shows deprivation. Darker wards are more deprived. Each ' +
-         'figure in the list tells you who published it, and which sizes of area it ' +
-         'can colour.',
+      n: 'Open the <strong>Indicators</strong> tab. Choose a figure from the list. The ' +
+         'map then gives every ward a colour for that figure. The bar along the bottom ' +
+         'shows what the colours mean. This example uses deprivation. Darker wards are ' +
+         'more deprived. Each figure in the list shows who published it.',
       go: function () {
         railClick('explore');
         sidebarTab('overlay');
@@ -14218,10 +14214,9 @@ loadData();
     },
     {
       t: 'Click a ward to see its figures',
-      n: 'Click any ward. A bar opens along the bottom of the map. It gives you one ' +
-         'sentence about the ward, and then the main numbers for it. From that bar you ' +
-         'can pin the ward to compare it with others. You can also download a report, ' +
-         'or open the full list of figures for the ward.',
+      n: 'Click any ward on the map. A bar opens along the bottom. It shows the main ' +
+         'figures for that ward. The buttons in the bar let you pin the ward, download ' +
+         'a report, or open its full list of figures.',
       go: function () {
         railClick('explore');
         // Arriving here backwards from the Query chapter, which clears the
@@ -14284,11 +14279,11 @@ loadData();
       t: 'Find the wards that match',
       // Compare and Directory used to share this chapter as a closing clause.
       // They have chapters of their own below, so this one is about Query.
-      n: '<strong>Query</strong> finds the wards that meet several conditions at the ' +
-         'same time. This example is running now. It finds wards in Brent that have a ' +
-         'GP practice and a pharmacy, where deprivation and disability are both high. ' +
-         'The panel reads your filter back as a sentence. ' +
-         'The wards that match are listed below it and outlined on the map.',
+      n: '<strong>Query</strong> finds the wards that meet several conditions at once. ' +
+         'Add each condition in the panel. The panel reads them back as a sentence. ' +
+         'The wards that match are listed below it and outlined on the map. This ' +
+         'example finds wards in Brent with a GP practice and a pharmacy, where ' +
+         'deprivation and disability are both high.',
       go: function () {
         // Query answers in wards, so the map goes back to ward level first.
         // The previous chapter's ward bar comes down with it: this chapter is
@@ -14315,15 +14310,13 @@ loadData();
     },
     {
       t: 'Compare: put wards side by side',
-      n: '<strong>Compare</strong> holds up to four wards. ' +
-         'It lines them up on the figures you choose. ' +
-         'Each ward keeps one colour. That colour marks its card, its row, and its ' +
-         'outline on the map. On every row the highest and the lowest value are marked. ' +
-         'Green marks the better end. Red marks the worse end. ' +
-         'The colour follows the figure, not the size of the number. ' +
-         'A high deprivation decile is the least deprived tenth, so it is green. ' +
-         'Some figures have no better end. The share of residents over 65 is one. ' +
-         'Those rows are marked but left uncoloured.',
+      n: '<strong>Compare</strong> holds up to four wards side by side. Choose the ' +
+         'wards, then choose the figures. Each ward keeps one colour on its card, its ' +
+         'row and its outline. On every row the highest and lowest values are marked. ' +
+         'Green marks the better end and red marks the worse end. The colour follows ' +
+         'the figure, not the size of the number. A high deprivation decile is the ' +
+         'least deprived tenth, so it is green. Some figures have no better end, and ' +
+         'those rows stay uncoloured.',
       go: function () {
         closeWardSheet();
         wardLevel();
@@ -14382,15 +14375,11 @@ loadData();
     },
     {
       t: 'Custom area: draw your own',
-      n: 'A local patch, a school catchment or a primary care network does not follow ' +
-         'ward lines. <strong>Custom area</strong> lets you build the area you mean. ' +
+      n: '<strong>Custom area</strong> builds an area that does not follow ward lines. ' +
          'Click the LSOAs on the map to add them. Click one again to take it out. ' +
-         'An LSOA holds about 1,500 people. ' +
-         'Name the area and the tool totals up its figures. ' +
-         'Counts are added together. Percentages and scores are weighted by population. ' +
-         'So a bigger LSOA pulls each average further than a smaller one. ' +
-         'The report states the method beside every figure. ' +
-         'It also says this is not an official area.',
+         'Name the area, and the tool totals its figures. Counts are added together. ' +
+         'Percentages and scores are weighted by population. The report states the ' +
+         'method beside every figure.',
       go: function () {
         closeWardSheet();
         railClick('report');
@@ -14438,12 +14427,10 @@ loadData();
     },
     {
       t: 'Data export: make a spreadsheet',
-      n: '<strong>Data export</strong> writes a spreadsheet with the columns you ' +
-         'choose. It asks three questions. Which size of area, so each area is a row. ' +
-         'Where, all of London or one borough. Which figures, so each figure is a ' +
-         'column. Nothing is averaged or combined in this file. ' +
-         'Each value is the figure held for that area. ' +
-         'Use Custom area instead when you want areas joined together.',
+      n: '<strong>Data export</strong> writes a spreadsheet. It asks three things. ' +
+         'First the size of area, so each area becomes a row. Then the place, either ' +
+         'all of London or one borough. Then the figures, so each figure becomes a ' +
+         'column. Nothing is averaged or combined in this file.',
       go: function () {
         closeWardSheet();
         railClick('csv');
@@ -14458,12 +14445,10 @@ loadData();
     },
     {
       t: 'Directory: find one place',
-      n: 'The map answers what is near here. <strong>Directory</strong> answers where ' +
-         'is this. It holds every service and organisation on the map in one list. ' +
-         'That is about 23,000 places across ten sets of data. ' +
-         'Search by name, by address or by postcode. ' +
-         'Filter by type or by borough. Click a result and the map marks it. ' +
-         'You can export whatever you have filtered as a spreadsheet.',
+      n: '<strong>Directory</strong> lists every service and organisation on the map. ' +
+         'That is about 23,000 places across ten sets of data. Search by name, by ' +
+         'address or by postcode. Filter by type or by borough. Click a result and the ' +
+         'map marks it. The export button saves what you have filtered.',
       go: function () {
         closeWardSheet();
         railClick('directory');
@@ -14471,13 +14456,11 @@ loadData();
     },
     {
       t: 'Ask a question in plain English',
-      n: 'The panel on the right answers questions in plain English. It cannot invent a ' +
-         'number, because it never sees the data. Your browser looks the numbers up on ' +
-         'this page. The answer is then written around what your browser found. Nothing ' +
-         'you type is sent anywhere else. It never receives the data itself. ' +
-         'You get <strong>10 questions a day</strong>, because this part costs money to ' +
-         'run. Every other tool here is free to use as much as you want. ' +
-         'They all run in your browser and cost nothing to serve.',
+      n: 'The panel on the right answers questions in plain English. Type your ' +
+         'question and press enter. Your browser looks the numbers up on this page. ' +
+         'The answer is then written around what your browser found. It never receives ' +
+         'the data itself. You get <strong>10 questions a day</strong>, because this ' +
+         'part costs money to run.',
       go: function () {
         // Idempotent: the chapter before will normally have closed it, but the
         // tour drives the real controls, so a ward clicked by hand during that
@@ -14491,13 +14474,12 @@ loadData();
     },
     {
       t: 'What these figures cannot tell you',
-      n: 'A figure for an area describes the area. It does not describe the people in ' +
-         'it. If a ward is deprived on average, that tells you nothing about any one ' +
-         'household in it. Some health figures are published for a whole borough, then ' +
-         'repeated for every ward in that borough. Those figures cannot tell one ward ' +
-         'from another, and the map says so next to them. An empty ward can mean the ' +
-         'figure is hidden to protect privacy, not that it is zero. This tool is still ' +
-         'being built. Please check anything important before you act on it.',
+      n: 'A figure describes an area, not the people who live in it. Some health ' +
+         'figures are published for a whole borough. The map then repeats them for ' +
+         'every ward in that borough, and marks them where it does. Those figures ' +
+         'cannot tell one ward from another. An empty ward can mean the figure is ' +
+         'hidden to protect privacy, not that it is zero. Please check anything ' +
+         'important before you act on it.',
       go: function () {
         // Also reachable by pressing Back from the end, so it cannot rely on
         // the chapter before it having run.

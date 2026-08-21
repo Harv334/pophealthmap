@@ -141,11 +141,19 @@ try:
         check(f"the {name} chapter opens {name}",
               c and c["pane"] == pane, str(c and c["pane"]))
 
-    ai = next((x for x in seen if x["ai"]), None)
-    check("the Ask chapter opens the panel it describes", ai and ai["ai"])
-    check("and states the cap and that the model gets no data",
-          ai and "10 questions a day" in ai["narr"]
-          and ("never receives" in ai["narr"] or "never given" in ai["narr"]))
+    # The handover build strips this chapter along with the panel it drives, so
+    # its absence is a valid tour rather than a fault. Assert on it only where
+    # it exists; a suite that is red the moment it is handed over is one its new
+    # owner learns to ignore.
+    ask = next((x for x in seen if x["title"].startswith("Ask a question")), None)
+    if ask is None:
+        check("no Ask chapter, and no assistant panel to drive (handover build)",
+              not any(x["ai"] for x in seen))
+    else:
+        check("the Ask chapter opens the panel it describes", ask["ai"])
+        check("and states the cap and that the model gets no data",
+              "10 questions a day" in ask["narr"]
+              and ("never receives" in ask["narr"] or "never given" in ask["narr"]))
 
     last = seen[-1]
     check("the last chapter is about what the figures cannot support",
