@@ -67,18 +67,16 @@ uk-air.defra.gov.uk; the site asks for the domain as well as the department.
 | PTAL | Greater London Authority, London Datastore | OGL v3 | TfL's accessibility banding, republished by the GLA in the LSOA Atlas |
 | Street crime | data.police.uk (Home Office) | OGL v3 | |
 | Charity register | Charity Commission for England and Wales | OGL v3 | |
+| NHS trust sites (hospitals) | NHS Organisation Data Service | OGL v3 | |
+| Cultural Infrastructure Map | Greater London Authority | OGL v3 | "Contains public sector information licensed under the Open Government Licence v3.0" |
 | Basemap tiles | OpenStreetMap contributors | ODbL 1.0 | Attribution rendered by the map itself |
 
 ## Hand-compiled layers
 
-Some layers are not derived from any published register. They were compiled by
-hand for this project and have no upstream licence:
-
-  community centres, ESOL providers, libraries, hospitals
-
-They are released under the same MIT licence as the code, but treat them as
-best-effort local knowledge rather than an authoritative register, and check
-them before relying on them.
+None. Every layer on the map now comes from a published register with a licence
+of its own, listed above. Five hand-compiled ones (schools, community centres,
+libraries, ESOL providers and CICs) and a hand-typed hospital list were removed
+in favour of sources that refresh themselves.
 
 ## Personal data
 

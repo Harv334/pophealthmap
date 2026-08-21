@@ -57,8 +57,9 @@ That is the whole setup. **No manual downloads are required** - every source is
 either fetched from an open API or committed to the repo. No accounts, no API
 keys.
 
-One file is optional: drop an NHS hospital CSV at `.cache/hospitals/Hospital.csv`
-to add hospital markers ([source](https://www.nhs.uk/about-us/nhs-website-datasets/)).
+Nothing has to be downloaded by hand. Hospitals used to want an NHS.uk CSV
+dropped into `.cache/`. That page no longer publishes the file, and the layer
+is derived from the ODS NHS trust sites register instead.
 
 ### Where the data comes from
 

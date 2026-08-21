@@ -103,9 +103,6 @@ that instead and this gives the official name for it.</p>
           is the least deprived tenth.</td></tr>
   <tr><td>Charity</td><td>VCSE organisation</td>
       <td>A charity registered with the Charity Commission.</td></tr>
-  <tr><td>Community business</td><td>CIC</td>
-      <td>A Community Interest Company. It is a business that must serve the
-          community.</td></tr>
 </table>
 </div>
 
@@ -253,9 +250,8 @@ about who lives there rather than a good or bad result.</p>
 
 <h3>6. Service counts are attributed by where the service stands</h3>
 
-<p>Pharmacies use the pipeline’s own ward count. Schools, libraries and
-community centres use the ward code their source file already carries.
-Everything else is placed by testing its point against the ward polygon. A
+<p>Pharmacies use the pipeline’s own ward count. Everything else is placed
+by testing its point against the ward polygon. A
 service used by a neighbouring ward is still counted in the ward it stands in,
 so these will not always agree with a count made a different way.</p>
 
@@ -266,9 +262,10 @@ so these will not always agree with a count made a different way.</p>
       and no Local Health indicators. They are tiny and share very few LSOAs,
       so there is nothing to aggregate. This is a property of the geography,
       not a fetch failure.</li>
-  <li><strong>Five layers cover North West London only:</strong> schools,
-      community centres, libraries, ESOL providers and CICs. They are badged
-      NWL on the map. Blank elsewhere means not yet collected, not none.</li>
+  <li><strong>Culture means where culture is made.</strong> The GLA set holds
+      rehearsal rooms, workshops and studios. It holds no cinemas, libraries or
+      schools, so it is not a measure of what a neighbourhood can go and
+      watch.</li>
   <li><strong>39 renumbered MSOAs.</strong> Fingertips still publishes the
       Local Health set against 2011 MSOA codes. Where a code no longer matches
       a 2021 one, the value is left missing rather than filled from a
@@ -492,22 +489,13 @@ var SOURCES = [
     period: 'Current register',
     cadence: 'Monthly.',
     manifest: 'hospitals',
-    fix: {
-      auto: 'This one genuinely needs a person. The NHS dataset index page has no ' +
-            'machine-readable link to the file: it is a page you click through, ' +
-            'and there is nothing stable for the pipeline to request.',
-      manual: [
-        { file: 'Hospital.csv',
-          from: 'https://www.nhs.uk/about-us/nhs-website-datasets/',
-          to: '.cache/hospitals/Hospital.csv' },
-      ],
-      steps: ['Then run <code>python fetch_all_data.py --only hospitals</code>.'],
-    } },
+    note: 'Derived from the ODS NHS trust sites register. ODS has no hospital ' +
+          'category, so a site is recovered from the records filed at its ' +
+          'postcode. 131 sites across all 33 boroughs.' },
 
-  { name: 'Charities and CICs',
+  { name: 'Charities',
     pub: 'Charity Commission for England and Wales',
-    what: 'Registered charities with their areas of operation and classification, ' +
-          'plus Community Interest Companies.',
+    what: 'Registered charities with their areas of operation and classification.',
     geo: 'Point, from the registered address, with stated areas of operation',
     period: 'Current register',
     cadence: 'The full register extract is republished monthly.',
@@ -611,14 +599,17 @@ var SOURCES = [
     manifest: null,
     note: 'Derived here from the IMD rather than fetched.' },
 
-  { name: 'Schools, libraries, community centres, ESOL providers',
-    pub: 'Local authority open data and published directories',
-    what: 'Point layers for civic and education services.',
+  { name: 'Culture and creative spaces',
+    pub: 'Greater London Authority',
+    what: 'Theatres, rehearsal rooms, artist and maker workspaces, recording ' +
+          'studios and design workshops. Where culture is made, so a rehearsal ' +
+          'room is included and a cinema is not.',
     geo: 'Point',
-    period: 'As collected',
-    cadence: 'Not automated. These were compiled by hand.',
-    manifest: null,
-    note: 'North West London only. The map says so wherever they appear.' },
+    period: '2026 edition',
+    cadence: 'Republished by the GLA, usually once a year.',
+    manifest: 'culture',
+    note: 'Replaced five hand-compiled layers that covered North West London ' +
+          'only: schools, community centres, libraries, ESOL providers and CICs.' },
 ];
 
 (function renderSources() {

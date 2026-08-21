@@ -168,7 +168,9 @@ def main() -> int:
            ("QOF, and the three Fingertips sets", "Fetched from OHID each run."),
            ("Fuel poverty, PTAL", "Fetched each run; both find the current file "
             "from the publisher's own index rather than a saved link."),
-           ("Charities and CICs", "Fetched from the Charity Commission each run.")],
+           ("Charities", "Fetched from the Charity Commission each run."),
+           ("Hospitals", "Derived from the NHS ODS trust sites register, "
+            "revalidated like the other ODS extracts.")],
           widths=[2.3, 4.0])
 
     h("Refreshes only when the publisher releases something new", 2)
@@ -181,7 +183,10 @@ def main() -> int:
             "year it downloads, and the run warns you that the year printed on the "
             "map now needs updating."),
            ("Census 2021", "Cached. Fixed until the next census in 2031."),
-           ("Boundaries", "Cached. Changes only when ONS revise them.")],
+           ("Boundaries", "Cached. Changes only when ONS revise them."),
+           ("Culture and creative spaces", "Cached per edition. The pipeline "
+            "reads the GLA dataset listing and takes the newest workbook, so a "
+            "new edition arrives by itself.")],
           widths=[2.3, 4.0])
 
     h("Never refreshes on its own", 2)
@@ -193,9 +198,6 @@ def main() -> int:
            ("Green and blue space",
             "Built once from a very large published extract rather than fetched "
             "every month."),
-           ("Hospitals",
-            "Needs a CSV downloaded by hand. There is no machine-readable source. "
-            "Without it the layer is simply empty."),
            ("Your own figures (data/custom)",
             "Only changes when you change the CSV. See section 5.")],
           widths=[2.3, 4.0])
@@ -221,8 +223,8 @@ def main() -> int:
            ("Deprivation", "About every 6 years",
             "A new release changes the file name and the columns."),
            ("Census", "2031", "Fixed until then."),
-           ("Hospitals", "Any time",
-            "Needs a manual CSV, as above.")],
+           ("Culture and creative spaces", "Yearly",
+            "The GLA republish it. The pipeline finds the newest edition itself.")],
           widths=[1.5, 1.4, 3.4])
 
     # ── 5 ────────────────────────────────────────────────────────────────────
@@ -288,9 +290,10 @@ def main() -> int:
     bullet("The City of London's 20 wards have no deprivation or health figures. "
            "The wards are tiny and share almost no neighbourhoods, so there is "
            "nothing to average. That is the geography, not a fault.")
-    bullet("Five layers cover North West London only: schools, community centres, "
-           "libraries, ESOL providers and community interest companies. They are "
-           "badged on the map. Blank elsewhere means not collected, not none.")
+    bullet("Culture means where culture is made. The GLA set holds rehearsal "
+           "rooms, workshops and studios, and no cinemas or libraries. It "
+           "replaced five hand-compiled layers that covered North West London "
+           "only, so every layer on the map now covers all 33 boroughs.")
     bullet("DWP benefit figures are not included. The publicly available ones "
            "stop in 2018. Current figures need a DWP Stat-Xplore account.")
     bullet("Some health figures are published for a whole borough and repeated "

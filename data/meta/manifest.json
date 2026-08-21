@@ -1,337 +1,42 @@
 {
-  "last_run": "2026-08-21T13:35:20.846986+00:00",
+  "last_run": "2026-08-21T14:18:04.442344+00:00",
   "sources": {
-    "air_quality": {
-      "duration_s": 8.9,
-      "error": "",
-      "fetched_at": "2026-08-15T03:32:55.269624+00:00",
-      "notes": "",
-      "output_path": "data/environment/air_quality_lsoa.parquet",
-      "rows_written": 4994,
-      "schema": {
-        "LSOA21CD": "str",
-        "no2_ugm3": "float64",
-        "pm10_ugm3": "float64",
-        "pm25_ugm3": "float64"
-      },
-      "status": "ok"
-    },
-    "boundaries": {
-      "duration_s": 25.0,
-      "error": "",
-      "fetched_at": "2026-08-15T03:32:19.639512+00:00",
-      "notes": "",
-      "output_path": "",
-      "rows_written": 4,
-      "schema": {
-        "features": "int64",
-        "kind": "str"
-      },
-      "status": "ok"
-    },
-    "census": {
-      "duration_s": 1.2,
-      "error": "",
-      "fetched_at": "2026-08-15T03:36:06.729022+00:00",
-      "notes": "",
-      "output_path": "data/demographics/census2021.parquet",
-      "rows_written": 35672,
-      "schema": {
-        "LSOA21CD": "str",
-        "census_active_travel_pct": "float64",
-        "census_asian_pct": "float64",
-        "census_bad_health_pct": "float64",
-        "census_black_pct": "float64",
-        "census_born_outside_uk_pct": "float64",
-        "census_car_to_work_pct": "float64",
-        "census_disability_any_pct": "float64",
-        "census_disability_lot_pct": "float64",
-        "census_english_hh_all_pct": "float64",
-        "census_english_hh_none_pct": "float64",
-        "census_good_health_pct": "float64",
-        "census_higher_managerial_pct": "float64",
-        "census_level4_qual_pct": "float64",
-        "census_mixed_pct": "float64",
-        "census_no_car_pct": "float64",
-        "census_no_qual_pct": "float64",
-        "census_non_white_pct": "float64",
-        "census_other_ethnic_pct": "float64",
-        "census_over65_pct": "float64",
-        "census_over85_pct": "float64",
-        "census_owned_pct": "float64",
-        "census_population": "Int64",
-        "census_private_rented_pct": "float64",
-        "census_provides_unpaid_care_pct": "float64",
-        "census_public_transport_pct": "float64",
-        "census_routine_semi_routine_pct": "float64",
-        "census_social_rented_pct": "float64",
-        "census_under16_pct": "float64",
-        "census_under5_pct": "float64",
-        "census_unemployed_pct": "float64",
-        "census_white_pct": "float64",
-        "census_working_age_pct": "float64"
-      },
-      "status": "ok"
-    },
-    "charities": {
-      "duration_s": 54.6,
-      "error": "",
-      "fetched_at": "2026-08-15T04:11:51.637808+00:00",
-      "notes": "",
-      "output_path": "data/vcse/charities.parquet",
-      "rows_written": 18533,
-      "schema": {
-        "LAD25CD": "str",
-        "LSOA21CD": "str",
-        "WD25CD": "str",
-        "activities": "str",
-        "addr": "str",
-        "areas": "str",
-        "covers": "str",
-        "how_codes": "str",
-        "how_desc": "str",
-        "how_tags": "str",
-        "hq_in_nwl": "bool",
-        "income": "float64",
-        "income_band": "str",
-        "lat": "float64",
-        "lng": "float64",
-        "name": "str",
-        "num": "int64",
-        "postcode": "str",
-        "registered": "str",
-        "scope": "str",
-        "website": "str",
-        "what_codes": "str",
-        "what_desc": "str",
-        "what_tags": "str",
-        "who_codes": "str",
-        "who_desc": "str",
-        "who_tags": "str"
-      },
-      "status": "ok"
-    },
-    "claimant": {
-      "duration_s": 27.1,
-      "error": "",
-      "fetched_at": "2026-08-15T03:36:07.892148+00:00",
-      "notes": "",
-      "output_path": "data/economy/claimant_count.parquet",
-      "rows_written": 4994,
-      "schema": {
-        "LSOA21CD": "str",
-        "claimant_count": "float64",
-        "claimant_month": "str",
-        "claimant_rate_pct": "Float64",
-        "claimant_yoy_change": "float64",
-        "claimant_yoy_pct": "float64"
-      },
-      "status": "ok"
-    },
     "crime": {
-      "duration_s": 1108.7,
-      "error": "",
-      "fetched_at": "2026-08-15T03:53:22.938639+00:00",
-      "notes": "",
-      "output_path": "data/crime/police_uk_crime.parquet",
-      "rows_written": 1131969,
-      "schema": {
-        "LAD25CD": "str",
-        "LSOA21CD": "str",
-        "WD25CD": "str",
-        "borough_name": "str",
-        "category": "str",
-        "lat": "float64",
-        "lng": "float64",
-        "month": "str",
-        "street_name": "str"
-      },
-      "status": "ok"
-    },
-    "culture": {
-      "duration_s": 1.1,
-      "error": "",
-      "fetched_at": "2026-08-21T13:35:19.690699+00:00",
-      "notes": "",
-      "output_path": "data/culture/cultural_infrastructure.parquet",
-      "rows_written": 1557,
-      "schema": {
-        "address": "str",
-        "borough": "str",
-        "lad_code": "str",
-        "lat": "float64",
-        "lng": "float64",
-        "name": "str",
-        "postcode": "str",
-        "type": "str",
-        "ward_name": "str"
-      },
-      "status": "ok"
-    },
-    "custom": {
-      "duration_s": 0.4,
-      "error": "",
-      "fetched_at": "2026-08-21T11:49:43.818130+00:00",
+      "duration_s": 0.0,
+      "error": "RuntimeError: upstream 500",
+      "fetched_at": "2026-08-21T14:17:11.657007+00:00",
       "notes": "",
       "output_path": "",
-      "rows_written": 1,
-      "schema": {
-        "indicators": "int64",
-        "rows": "int64"
-      },
-      "status": "ok"
-    },
-    "dentists": {
-      "duration_s": 24.0,
-      "error": "",
-      "fetched_at": "2026-08-15T04:12:46.212436+00:00",
-      "notes": "",
-      "output_path": "data/healthcare/dental_practices.parquet",
-      "rows_written": 1663,
-      "schema": {
-        "LSOA21CD": "str",
-        "WD25CD": "str",
-        "lad_code": "str",
-        "lat": "float64",
-        "lng": "float64",
-        "name": "str",
-        "nhs_contracted": "bool",
-        "postcode": "str",
-        "source": "str"
-      },
-      "status": "ok"
-    },
-    "fingertips": {
-      "duration_s": 21.1,
-      "error": "",
-      "fetched_at": "2026-08-15T03:36:59.703970+00:00",
-      "notes": "",
-      "output_path": "data/outcomes/fingertips.parquet",
-      "rows_written": 594,
-      "schema": {
-        "LAD25CD": "str",
-        "age": "str",
-        "indicator_id": "int64",
-        "indicator_name": "str",
-        "indicator_short": "str",
-        "lad_name": "str",
-        "lower_ci": "float64",
-        "period": "str",
-        "sex": "str",
-        "upper_ci": "float64",
-        "value": "float64"
-      },
-      "status": "ok"
-    },
-    "fingertips_msoa": {
-      "duration_s": 278.0,
-      "error": "",
-      "fetched_at": "2026-08-15T03:37:20.796900+00:00",
-      "notes": "",
-      "output_path": "data/outcomes/fingertips_msoa.parquet",
-      "rows_written": 32559,
-      "schema": {
-        "MSOA21CD": "str",
-        "indicator_id": "int64",
-        "indicator_name": "str",
-        "period": "str",
-        "value": "float64"
-      },
-      "status": "ok"
-    },
-    "fingertips_profiles": {
-      "duration_s": 665.4,
-      "error": "",
-      "fetched_at": "2026-08-15T03:41:58.789741+00:00",
-      "notes": "",
-      "output_path": "data/outcomes/fingertips_profiles.parquet",
-      "rows_written": 19702,
-      "schema": {
-        "LAD25CD": "str",
-        "indicator_id": "int64",
-        "indicator_name": "str",
-        "indicator_short": "str",
-        "lad_name": "str",
-        "period": "str",
-        "profile": "str",
-        "profile_id": "int64",
-        "unit": "str",
-        "value": "float64"
-      },
-      "status": "ok"
-    },
-    "fuel_poverty": {
-      "duration_s": 17.9,
-      "error": "",
-      "fetched_at": "2026-08-15T03:53:04.214112+00:00",
-      "notes": "",
-      "output_path": "data/demographics/fuel_poverty.parquet",
-      "rows_written": 33756,
-      "schema": {
-        "LSOA21CD": "str",
-        "fuel_poverty_pct": "float64"
-      },
-      "status": "ok"
+      "rows_written": 0,
+      "schema": {},
+      "status": "failed"
     },
     "gp": {
-      "duration_s": 18.3,
+      "duration_s": 0.0,
       "error": "",
-      "fetched_at": "2026-08-15T03:35:22.632615+00:00",
-      "notes": "",
-      "output_path": "data/healthcare/gp_practices.parquet",
-      "rows_written": 1146,
-      "schema": {
-        "LAD25CD": "str",
-        "LSOA21CD": "str",
-        "WD25CD": "str",
-        "addr": "str",
-        "code": "str",
-        "lad": "str",
-        "lat": "float64",
-        "lng": "float64",
-        "name": "str",
-        "postcode": "str",
-        "tel": "str"
-      },
-      "status": "ok"
-    },
-    "greenblue": {
-      "duration_s": 10.7,
-      "error": "",
-      "fetched_at": "2026-08-15T03:32:44.616978+00:00",
+      "fetched_at": "2026-08-21T14:17:11.651828+00:00",
       "notes": "",
       "output_path": "",
       "rows_written": 1,
       "schema": {
-        "columns": "int64",
-        "lsoas": "int64"
+        "a": "int64"
       },
       "status": "ok"
     },
     "hospitals": {
-      "duration_s": 4.5,
-      "error": "",
-      "fetched_at": "2026-08-21T13:32:25.174760+00:00",
-      "notes": "",
-      "output_path": "data/healthcare/hospitals.parquet",
-      "rows_written": 131,
-      "schema": {
-        "LAD25CD": "str",
-        "LSOA21CD": "str",
-        "WD25CD": "str",
-        "addr": "str",
-        "lat": "float64",
-        "lng": "float64",
-        "name": "str",
-        "postcode": "str",
-        "type": "str"
-      },
-      "status": "ok"
-    },
-    "imd": {
       "duration_s": 0.0,
       "error": "",
-      "fetched_at": "2026-08-15T03:36:06.715429+00:00",
+      "fetched_at": "2026-08-21T14:17:11.651814+00:00",
+      "notes": "source returned no frame",
+      "output_path": "",
+      "rows_written": 0,
+      "schema": {},
+      "status": "skipped"
+    },
+    "imd": {
+      "duration_s": 0.1,
+      "error": "",
+      "fetched_at": "2026-08-21T14:18:04.365920+00:00",
       "notes": "",
       "output_path": "",
       "rows_written": 33755,
@@ -350,75 +55,15 @@
       },
       "status": "ok"
     },
-    "pharmacies": {
-      "duration_s": 25.7,
-      "error": "",
-      "fetched_at": "2026-08-15T03:35:40.967473+00:00",
-      "notes": "",
-      "output_path": "data/healthcare/pharmacies.parquet",
-      "rows_written": 1737,
-      "schema": {
-        "LAD25CD": "str",
-        "LSOA21CD": "str",
-        "WD25CD": "str",
-        "addr": "str",
-        "code": "str",
-        "lat": "float64",
-        "lng": "float64",
-        "name": "str",
-        "postcode": "str",
-        "tel": "str"
-      },
-      "status": "ok"
-    },
     "ptal": {
-      "duration_s": 0.5,
-      "error": "",
-      "fetched_at": "2026-08-15T12:57:30.757486+00:00",
+      "duration_s": 0.0,
+      "error": "RuntimeError: simulated upstream outage",
+      "fetched_at": "2026-08-21T14:18:04.441287+00:00",
       "notes": "",
-      "output_path": "data/demographics/ptal.parquet",
-      "rows_written": 4835,
-      "schema": {
-        "LSOA21CD": "str",
-        "ptal_score": "float64"
-      },
-      "status": "ok"
-    },
-    "qof": {
-      "duration_s": 13.1,
-      "error": "",
-      "fetched_at": "2026-08-15T03:36:46.617028+00:00",
-      "notes": "",
-      "output_path": "data/healthcare/qof_prevalence.parquet",
-      "rows_written": 1119,
-      "schema": {
-        "code": "str",
-        "qof_asthma_pct": "float64",
-        "qof_cancer_pct": "float64",
-        "qof_copd_pct": "float64",
-        "qof_depression_pct": "float64",
-        "qof_diabetes_pct": "float64",
-        "qof_heart_failure_pct": "float64",
-        "qof_hypertension_pct": "float64",
-        "qof_smoking_pct": "float64"
-      },
-      "status": "ok"
-    },
-    "tfl": {
-      "duration_s": 138.5,
-      "error": "",
-      "fetched_at": "2026-08-15T03:33:04.175166+00:00",
-      "notes": "",
-      "output_path": "data/environment/tfl_transport_lsoa.parquet",
-      "rows_written": 4994,
-      "schema": {
-        "LSOA21CD": "str",
-        "bus_stop_dist_m": "float64",
-        "bus_stops_800m": "int64",
-        "rail_station_dist_m": "float64",
-        "rail_stations_1km": "int64"
-      },
-      "status": "ok"
+      "output_path": "",
+      "rows_written": 0,
+      "schema": {},
+      "status": "failed"
     }
   }
 }
