@@ -353,6 +353,10 @@
   .sb-tab:focus-visible { outline: 2px solid var(--nhs-blue); outline-offset: -3px; }
   .sb-tab:hover { color: var(--nhs-blue); background: var(--paper); }
   .sb-tab.active { color: var(--ink); border-bottom-color: var(--nhs-blue); background: var(--paper); }
+  /* Compare disables Area profile while it owns the map. Dimmed rather than
+     removed, so the tab strip keeps its shape and the tooltip can say why. */
+  .sb-tab:disabled { color: var(--ink-3); opacity: .5; cursor: not-allowed; }
+  .sb-tab:disabled:hover { color: var(--ink-3); background: none; }
   .tab-pane { display: none; }
   /* This used to say overflow: hidden, which quietly beat the scrolling rule
      on .sidebar > .tab-pane above: same specificity, declared later, and it
@@ -1258,23 +1262,18 @@
   .cmp-card .cmp-c-row .v { font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 500;
     color: var(--ink); font-variant-numeric: tabular-nums; flex-shrink: 0; }
   /* The point of a comparison is which one is the outlier, so say so rather
-     than leaving four columns of digits to be read against each other. */
-  /* Red is worse and green is better, not red is bigger.
-     Colouring the largest number red is the wrong claim half the time: the
-     highest IMD decile is the least deprived tenth and the highest life
-     expectancy is the best outcome on the row. So the colour follows the
-     indicator's own polarity, which for the Local Health series is OHID's
-     published RAG direction, and rows with no better or worse end stay
-     uncoloured rather than being given one.
-     The triangles stay regardless, so which value is highest is never carried
-     by colour alone. */
+     than leaving four columns of digits to be read against each other.
+
+     Marked, and not coloured. These rows once ran green at the indicator's
+     good end and red at its bad one. Across four pinned areas that is a claim
+     the numbers cannot carry: all four can be poor, or all four fine, and the
+     arithmetic still paints one of them green. A colour reads as a verdict,
+     while an arrow reads as a rank within what is on screen, which is all a
+     comparison of four areas establishes. */
   .cmp-card .cmp-c-row .v.hi::after { content: ' \25B2'; font-size: 8px; color: var(--ink-3);
     vertical-align: 1px; }
   .cmp-card .cmp-c-row .v.lo::after { content: ' \25BC'; font-size: 8px; color: var(--ink-3);
     vertical-align: 1px; }
-  .cmp-card .cmp-c-row .v.bad  { color: #D4351C; font-weight: 600; }
-  .cmp-card .cmp-c-row .v.good { color: #00703C; font-weight: 600; }
-  .cmp-card .cmp-c-row .v.bad::after, .cmp-card .cmp-c-row .v.good::after { color: inherit; }
   .cmp-key { display: inline-flex; align-items: center; gap: 4px; margin-right: 10px; }
   .cmp-key i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; font-style: normal; }
   .cmp-bar .cmp-legend { font-size: var(--t-xs); color: var(--ink-3); margin-top: 10px; line-height: 1.45; }
@@ -8868,6 +8867,11 @@ function buildEmbeddedLSOALayer() {
           window.PH_REPORT.toggle(p.code);
           return;
         }
+        // Compare owns the map the same way, at whichever level is chosen.
+        if (window.PH_COMPARE && window.PH_COMPARE.active()
+            && window.PH_COMPARE.pinFromLsoa(p)) {
+          return;
+        }
         if (lsoaLyr) lsoaLyr.eachLayer(l => l.setStyle(imdStyle(l.feature, 'default')));
         selLSOA = p.code;
         lyr.setStyle(imdStyle(feat, 'selected'));
@@ -11334,8 +11338,7 @@ async function loadData() {
     // disambiguated names like "Kilburn (Brent)" resolve to the right ward.
     // Stamp the WD24CD onto each ward record itself (`ward.code`) so callers
     // can look up the ward's code without doing an inverse search through
-    // WARD_DATA_BY_CODE — ward report uses this for ward_code matching against
-    // schools.json / community_centres.json / libraries.json.
+    // WARD_DATA_BY_CODE.
     WARD_DATA = {};
     WARD_DATA_BY_CODE = {};
     for (const [code, ward] of Object.entries(wards)) {
@@ -12093,11 +12096,7 @@ loadData();
     { id: 'pharmacy', label: 'Pharmacies',        one: 'pharmacy',         mode: 'indicator', key: 'pharmacy_count' },
     { id: 'hospital', label: 'Hospitals',         one: 'hospital',         mode: 'pip',       glob: 'HOSP' },
     { id: 'dentist',  label: 'Dental practices',  one: 'dental practice',  mode: 'pip',       src: 'dental_practices.json' },
-    { id: 'school',   label: 'Schools',           one: 'school',           mode: 'code',      src: 'schools.json',           nwlOnly: true },
-    { id: 'library',  label: 'Libraries',         one: 'library',          mode: 'code',      src: 'libraries.json',         nwlOnly: true },
-    { id: 'cc',       label: 'Community centres', one: 'community centre', mode: 'code',      src: 'community_centres.json', nwlOnly: true },
-    { id: 'esol',     label: 'ESOL providers',    one: 'ESOL provider',    mode: 'pip',       src: 'esol_providers.json',    nwlOnly: true },
-    { id: 'cic',      label: 'CICs',              one: 'CIC',              mode: 'pip',       src: 'cics.json' },
+    { id: 'culture',  label: 'Culture spaces',    one: 'cultural space',   mode: 'pip',       src: 'culture.json' },
   ];
   function serviceById(id) {
     for (var i = 0; i < SERVICES.length; i++) if (SERVICES[i].id === id) return SERVICES[i];
@@ -12607,7 +12606,13 @@ loadData();
        275 dashed polygons for one pin, and drawing it from the boards file
        would mean waiting on a fetch to show a pin the user just made. */
     var feats = [];
-    if (cmpLevel === 'ward') {
+    if (cmpLevel === 'lsoa') {
+      if (typeof LSOA_IMD === 'undefined' || !LSOA_IMD || !LSOA_IMD.features) return;
+      LSOA_IMD.features.forEach(function (f) {
+        var at = pinned.indexOf((f.properties || {}).code);
+        if (at !== -1) feats.push({ f: f, i: at });
+      });
+    } else if (cmpLevel === 'ward') {
       feats = GJ.features
         .filter(function (f) { return pinned.indexOf(f.properties.WD24NM) !== -1; })
         .map(function (f) { return { f: f, i: pinned.indexOf(f.properties.WD24NM) }; });
@@ -12778,6 +12783,9 @@ loadData();
      them: three wards and a borough in one row of cards would be four columns
      of numbers that are not comparable, under a heading that says they are. */
   var CMP_LEVELS = [
+    // Below a ward, and so the one level that is not aggregated from wards: an
+    // LSOA has its own published figures and is compared on those directly.
+    { k: 'lsoa',    one: 'neighbourhood', many: 'neighbourhoods' },
     { k: 'ward',    one: 'ward',    many: 'wards' },
     { k: 'borough', one: 'borough', many: 'boroughs' },
     { k: 'icb',     one: 'board',   many: 'boards' },
@@ -12798,6 +12806,10 @@ loadData();
     return [];
   }
   function cmpAreaLabel(name) {
+    if (cmpLevel === 'lsoa') {
+      var f = lsoaFeat(name);
+      return (f && f.properties && f.properties.name) || name;
+    }
     if (cmpLevel === 'icb' && typeof ICB_LABEL === 'object' && ICB_LABEL[name]) return ICB_LABEL[name];
     return name;
   }
@@ -12815,6 +12827,7 @@ loadData();
     return '';
   }
   function cmpWardsOf(name) {
+    if (cmpLevel === 'lsoa') return [];      // an LSOA sits inside a ward
     if (cmpLevel === 'ward') return [name];
     return allWards().filter(function (w) {
       return cmpLevel === 'borough'
@@ -12826,7 +12839,20 @@ loadData();
   // Two boards is 400 wards of arithmetic on every keystroke in the metric
   // picker, and none of it changes until the data does.
   var _cmpAgg = {};
+  // The one feature lookup an LSOA pin needs: its name, its ward and its shape.
+  function lsoaFeat(code) {
+    if (typeof LSOA_IMD === 'undefined' || !LSOA_IMD || !LSOA_IMD.features) return null;
+    return LSOA_IMD.features.filter(function (f) {
+      return f.properties && f.properties.code === code;
+    })[0] || null;
+  }
   function cmpIndsOf(name) {
+    // An LSOA's figures are published for the LSOA, so nothing is added up and
+    // nothing is weighted. It is the only level below a ward.
+    if (cmpLevel === 'lsoa') {
+      var d = (typeof LSOA_DATA !== 'undefined') ? LSOA_DATA[name] : null;
+      return d ? (d.indicators || d) : {};
+    }
     if (cmpLevel === 'ward') return indsOf(name);
     var key = cmpLevel + ' ' + name;
     if (_cmpAgg[key]) return _cmpAgg[key];
@@ -12857,6 +12883,10 @@ loadData();
   // and a board name what they are made of, which is the thing a reader needs
   // in order to know the figures were added up rather than published.
   function cmpSubOf(name) {
+    if (cmpLevel === 'lsoa') {
+      var f = lsoaFeat(name);
+      return (f && f.properties && f.properties.ward) || '';
+    }
     if (cmpLevel === 'ward') {
       var rec = wardRec(name);
       return (rec && rec.lad) || '';
@@ -12870,6 +12900,24 @@ loadData();
     cmpLevel = lvl;
     pinned = [];
     _cmpAgg = {};
+    /* The map is the picker at this level, so the neighbourhoods have to be on
+       it. Driving the real boundary toggle rather than adding the layer
+       directly keeps its checkbox, its filter rows and its counts in step, the
+       same way the overlay code switches levels a few hundred lines down.
+       __skipLevelGate because that gate exists to stop an indicator being left
+       unshaded, and this is not an indicator change. */
+    if (lvl === 'lsoa') {
+      var box = document.getElementById('tlsoa');
+      if (box && !box.checked) {
+        box.checked = true;
+        box.__skipLevelGate = true;
+        box.dispatchEvent(new Event('change'));
+      }
+      if (typeof ensureLsoaData === 'function') {
+        try { ensureLsoaData().then(function () { renderComparePane(); renderCompareBar(); }); }
+        catch (e) { /* offline: the pane shows dashes rather than nothing */ }
+      }
+    }
     renderComparePane();
     renderCompareBar();
     drawPins();
@@ -12892,8 +12940,8 @@ loadData();
     }
     var subEl = $('cmp-sub');
     if (subEl) {
-      subEl.textContent = cmpLevel === 'ward'
-        ? 'Pin up to ' + PIN_MAX + ' wards, live on the map'
+      subEl.textContent = (cmpLevel === 'ward' || cmpLevel === 'lsoa')
+        ? 'Pin up to ' + PIN_MAX + ' ' + lvl.many + ', live on the map'
         : 'Up to ' + PIN_MAX + ' ' + lvl.many + ', added up from their wards';
     }
     var pinLbl = $('cmp-pin-lbl');
@@ -13100,14 +13148,19 @@ loadData();
       var inds = cmpIndsOf(n);
       var rows = mets.map(function (m) {
         var v = num(inds[m.k]);
+        /* Highest and lowest are marked, and neither is called better.
+
+           These rows used to run green at the good end and red at the bad one,
+           by the indicator's own direction. Among four areas that is a claim
+           the numbers do not support: all four can be poor, or all four fine,
+           and the arithmetic still paints one green and one red. The reader
+           takes it as a verdict rather than as a rank within the four. The
+           arrows say which is highest and which is lowest, which is the only
+           thing a comparison of four areas actually establishes. */
         var cls = '';
         if (v !== null && ext[m.k]) {
-          var pol = polarityOf(m.k);
-          if (v === ext[m.k].hi) {
-            cls = ' hi' + (pol === 'high-bad' ? ' bad' : pol === 'high-good' ? ' good' : '');
-          } else if (v === ext[m.k].lo) {
-            cls = ' lo' + (pol === 'high-bad' ? ' good' : pol === 'high-good' ? ' bad' : '');
-          }
+          if (v === ext[m.k].hi) cls = ' hi';
+          else if (v === ext[m.k].lo) cls = ' lo';
         }
         return '<div class="cmp-c-row"><span class="k">' + esc(m.l) + '</span>' +
           '<span class="v' + cls + '">' + (v === null ? '—' : fmtVal(v, m.k)) + '</span></div>';
@@ -13127,22 +13180,14 @@ loadData();
     $('cmp-bar-title').textContent = pinned.length
       ? 'Comparing ' + pinned.length + ' ' + (pinned.length === 1 ? lvl.one : lvl.many)
       : 'Comparison';
-    var uncoloured = mets.filter(function (m) { return !polarityOf(m.k); });
     cmpLegendEl.innerHTML = mets.length
-      ? '<span class="cmp-key"><i style="background:#00703C"></i>better</span>' +
-        '<span class="cmp-key"><i style="background:#D4351C"></i>worse</span>' +
-        '<span class="cmp-key">&#9650; highest &#9660; lowest</span>' +
-        (cmpLevel === 'ward' ? ''
+      ? '<span class="cmp-key">&#9650; highest &#9660; lowest</span>' +
+        ((cmpLevel === 'ward' || cmpLevel === 'lsoa') ? ''
           : 'Every figure here is added up from the wards in the ' + esc(lvl.one) +
             ': counts are summed, everything else is weighted by population. ') +
-        'Colour follows the indicator, not the size of the number: the highest IMD decile is the ' +
-        'least deprived tenth, the highest bad-health percentage is the worst outcome. ' +
-        (uncoloured.length
-          ? esc(uncoloured.map(function (m) { return m.l; }).join(', ')) +
-            (uncoloured.length > 1 ? ' have' : ' has') +
-            ' no better or worse end, so ' + (uncoloured.length > 1 ? 'those rows are' : 'that row is') +
-            ' marked but not coloured.'
-          : '')
+        'The arrows mark the highest and lowest of the ' +
+        (pinned.length === 1 ? 'pinned area' : pinned.length + ' pinned areas') +
+        ', not the best and worst: all of them can be high, or all of them low.'
       : 'No metrics selected.';
   }
 
@@ -13257,7 +13302,29 @@ loadData();
      and only exists while a ward is selected. So a tour that pinned two wards
      in chapter 5 had no way to put them away, and they were still outlined on
      the map in chapter 9. */
+  /* Pinning from a click on an LSOA.
+
+     Compare makes the map a picker, and it has to stay one whatever level is
+     chosen: clicking a neighbourhood while Compare is open used to fall
+     through to the single-area profile, which closes over the comparison the
+     click was meant to add to. So the click pins whatever the current level
+     is, and the LSOA carries the names needed to find it. */
+  function pinFromLsoa(props) {
+    if (!props) return false;
+    var target = '';
+    if (cmpLevel === 'lsoa') target = props.code || '';
+    else if (cmpLevel === 'ward') target = props.ward || '';
+    else target = cmpAreaOfLad(props.borough || '');
+    if (!target) return false;
+    if (pinned.indexOf(target) === -1 && pinned.length < PIN_MAX) pinned.push(target);
+    refreshPins();
+    if (pinned.length >= 2) openCompareBar();
+    return true;
+  }
+
   window.PH_COMPARE = {
+    active: inCompareMode,
+    pinFromLsoa: pinFromLsoa,
     pinned: function () { return pinned.slice(); },
     clear: function () { if (!pinned.length) return; pinned = []; refreshPins(); },
     // Read-only, for the same reason PH_DIR and PH_REPORT expose theirs: the
@@ -13329,11 +13396,7 @@ loadData();
     { id: 'pharmacy', label: 'Pharmacies',        colour: '#E89B1B', src: 'pharmacies.json' },
     { id: 'hospital', label: 'Hospitals',         colour: '#A32D2D', glob: 'HOSP' },
     { id: 'dentist',  label: 'Dental practices',  colour: '#7B2D8E', src: 'dental_practices.json' },
-    { id: 'school',   label: 'Schools',           colour: '#1E5BB8', src: 'schools.json' },
-    { id: 'cc',       label: 'Community centres', colour: '#D87C2D', src: 'community_centres.json' },
-    { id: 'library',  label: 'Libraries',         colour: '#00A0A0', src: 'libraries.json' },
-    { id: 'esol',     label: 'ESOL providers',    colour: '#B83C3C', src: 'esol_providers.json' },
-    { id: 'cic',      label: 'CICs',              colour: '#7A7A75', src: 'cics.json' },
+    { id: 'culture',  label: 'Culture & creative spaces', colour: '#C2185B', src: 'culture.json' },
     { id: 'vcse',     label: 'Charities (VCSE)',  colour: '#AE2573', src: 'vcse_data.json' },
   ];
   var DIR_CAP = 250;               // rows rendered; the count and the CSV are complete
@@ -13825,7 +13888,8 @@ loadData();
       n: 'Open the <strong>Indicators</strong> tab. Choose a figure from the list. The ' +
          'map then gives every ward a colour for that figure. The bar along the bottom ' +
          'shows what the colours mean. This example uses deprivation. Darker wards are ' +
-         'more deprived. Each figure in the list shows who published it.',
+         'more deprived. Colour follows the figure, not the size of the number. A high ' +
+         'deprivation decile is the least deprived tenth.',
       go: function () {
         railClick('explore');
         sidebarTab('overlay');
@@ -13930,13 +13994,13 @@ loadData();
     },
     {
       t: 'Compare: put wards side by side',
-      n: '<strong>Compare</strong> holds up to four wards side by side. Choose the ' +
-         'wards, then choose the figures. Each ward keeps one colour on its card, its ' +
-         'row and its outline. On every row the highest and lowest values are marked. ' +
-         'Green marks the better end and red marks the worse end. The colour follows ' +
-         'the figure, not the size of the number. A high deprivation decile is the ' +
-         'least deprived tenth, so it is green. Some figures have no better end, and ' +
-         'those rows stay uncoloured.',
+      n: '<strong>Compare</strong> holds up to four areas side by side. First choose ' +
+         'the size of area. You can compare neighbourhoods, wards, boroughs or health ' +
+         'board areas. Then click them on the map, and choose the figures. Each area ' +
+         'keeps one colour on its card, its row and its outline. On every row an arrow ' +
+         'marks the highest and the lowest value. The arrows rank the areas you pinned. ' +
+         'They do not say which is good, because all of them can be high or all of ' +
+         'them low.',
       go: function () {
         closeWardSheet();
         wardLevel();
@@ -15002,6 +15066,27 @@ loadData();
     currentMode = (mode === 'query' || mode === 'compare' || mode === 'report')
       ? mode : 'explore';
 
+    /* Area profile is off while Compare has the map.
+
+       Compare turns the map into a picker: a click pins. Area profile is the
+       opposite, one area filling the panel, and reaching it mid-comparison
+       closes over the thing being built. The tab used to stay live and take
+       the panel the moment a neighbourhood was clicked, which is how a click
+       meant to add a fourth pin ended the comparison instead. Disabled rather
+       than hidden, so the row does not reflow and the reason can be read off
+       the tooltip. It comes back on leaving Compare. */
+    var profTab = document.getElementById('sbtab-ward');
+    if (profTab) {
+      var lock = (currentMode === 'compare');
+      profTab.disabled = lock;
+      profTab.setAttribute('aria-disabled', lock ? 'true' : 'false');
+      profTab.title = lock
+        ? 'Not while Compare is open: clicking the map pins an area instead. '
+          + 'Leave Compare to read one area on its own.'
+        : '';
+      if (lock && profTab.classList.contains('active')) sidebarTab('overlay');
+    }
+
     // The area is built out of LSOAs, so the LSOA layer has to be the one on
     // the map. Without this the mode opens onto wards and clicking does
     // nothing at all.
@@ -15183,12 +15268,9 @@ loadData();
         'in the borough. Filtering on ' + (boroughKeys.length > 1 ? 'them' : 'it') +
         ' selects whole boroughs, not wards within them.');
     }
-    var nwl = q.services.map(serviceById).filter(function (s) { return s && s.nwlOnly; });
-    if (nwl.length) {
-      notes.push('<strong>' + esc(nwl.map(function (s) { return s.label; }).join(', ')) + '</strong> ' +
-        (nwl.length > 1 ? 'cover' : 'covers') + ' the eight North West London boroughs only. ' +
-        'Wards elsewhere will show a count of zero because the data is missing, not because the service is.');
-    }
+    // There was a second caution here, naming the services that covered North
+    // West London only. Every layer on the map covers all 33 boroughs now, so
+    // the warning had nothing left to warn about.
     qCautionEl.innerHTML = notes.map(function (n) {
       return '<div class="q-caution">' + n + '</div>';
     }).join('');

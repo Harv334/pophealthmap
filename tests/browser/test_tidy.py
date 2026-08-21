@@ -102,8 +102,10 @@ try:
     check("the CIC coverage sentence is gone",
           "CICs cover North West London only" not in v
           and "Charities cover all of London" not in v)
+    # The note used to add that CICs carry no tags. That layer is gone, so
+    # naming the register the tags come from is the whole of the claim.
     check("and the tag filter says whose tags they are",
-          "Charity Commission" in v and "not tagged" in v,
+          "Charity Commission" in v,
           [ln for ln in v.split("\n") if "Charity Commission" in ln][:1])
 
     # ── 4. no blue rule across the top ───────────────────────────────────────
