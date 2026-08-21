@@ -83,10 +83,7 @@ def main() -> int:
     for key, filename in (
         ("dental", "dental_practices.json"),
         ("pharmacy", "pharmacies.json"),
-        ("schools", "schools.json"),
-        ("cc", "community_centres.json"),
-        ("libraries", "libraries.json"),
-        ("esol", "esol_providers.json"),
+        ("culture", "culture.json"),
     ):
         rows = load(filename)
         if rows is None:
@@ -108,12 +105,6 @@ def main() -> int:
         counts["vcse"] = pinned
         counts["vcse_total"] = len(vcse)
         print(f"\nVCSE:      {pinned:>7,} mappable of {len(vcse):,} declared")
-
-    cics = load("cics.json")
-    if cics is not None:
-        # wireCICs writes CIC_ALL.length, not the mappable subset.
-        counts["cics"] = len(cics)
-        print(f"CICs:      {len(cics):>7,}")
 
     grn = load("greenspaces.geojson")
     if grn is not None:

@@ -2104,41 +2104,15 @@
               <div style="width:10px;height:10px;background:#00897B;border-radius:2px;align-self:center"></div><span>Other sports facility</span>
             </div>
           </div>
-          <!-- VCSE + CIC toggles moved to the VCSE tab; they're the only place to enable them now. -->
+          <!-- VCSE toggle lives in the VCSE tab; that is the only place to enable it. -->
 
           <label class="lrow"><div class="ldot" style="background:#7B2D8E"></div><span class="lname">Dental practices <span class="lcount" id="dental-count"></span></span><input type="checkbox" id="td"></label>
           <label class="lrow"><div class="ldot" style="background:#E89B1B"></div><span class="lname">Pharmacies <span class="lcount" id="pharm-count"></span></span><input type="checkbox" id="tph"></label>
         </div>
         <div class="sb-sec" style="flex-shrink:0;border-bottom:1px solid var(--line-2)">
-          <div class="sb-lbl">Civic &amp; education<button type="button" class="lhelp" title="Schools, community centres, libraries and formal ESOL providers — sourced from the GLA ESOL Planning Map (English language proficiency planning dataset). These four layers cover the eight North West London boroughs only: Brent, Ealing, Hammersmith and Fulham, Harrow, Hillingdon, Hounslow, Kensington and Chelsea, and Westminster. Elsewhere in London they are empty because the data has not been collected yet, not because there is nothing there." aria-label="Explain this" aria-expanded="false">?</button></div>
-          <div class="cov-note">Covers North West London only. Blank elsewhere means not yet collected, not none.</div>
-          <label class="lrow"><div class="ldot" style="background:#1E5BB8"></div><span class="lname">Schools <span class="lcount" id="schools-count"></span> <span class="cov-tag" title="North West London boroughs only">NWL</span></span><input type="checkbox" id="tsch"></label>
-          <div id="schools-filter-wrap" style="margin:2px 0 4px 16px">
-            <select id="schools-phase-filter" style="width:100%;padding:3px 6px;border:1px solid var(--line);border-radius:5px;font-size:var(--t-xs);color:var(--ink);background:var(--paper)">
-              <option value="all" selected>All schools</option>
-              <option value="Primary">Primary</option>
-              <option value="Secondary">Secondary</option>
-              <option value="Nursery">Nursery</option>
-              <option value="All-through">All-through</option>
-              <option value="16 plus">16+ / Sixth form</option>
-              <option value="Not applicable">Special / Other</option>
-            </select>
-          </div>
-          <label class="lrow"><div class="ldot" style="background:#D87C2D"></div><span class="lname">Community centres <span class="lcount" id="cc-count"></span> <span class="cov-tag" title="North West London boroughs only">NWL</span></span><input type="checkbox" id="tcc"></label>
-          <label class="lrow"><div class="ldot" style="background:#00A0A0"></div><span class="lname">Libraries <span class="lcount" id="lib-count"></span> <span class="cov-tag" title="North West London boroughs only">NWL</span></span><input type="checkbox" id="tlib"></label>
-          <label class="lrow"><div class="ldot" style="background:#B83C3C"></div><span class="lname">Formal ESOL providers <span class="lcount" id="esol-count"></span> <span class="cov-tag" title="North West London boroughs only">NWL</span></span><input type="checkbox" id="tesol"></label>
-          <div id="esol-filter-wrap" style="margin:2px 0 4px 16px">
-            <select id="esol-type-filter" style="width:100%;padding:3px 6px;border:1px solid var(--line);border-radius:5px;font-size:var(--t-xs);color:var(--ink);background:var(--paper)">
-              <option value="all" selected>All provider types</option>
-              <option value="Local Authority">Local Authority</option>
-              <option value="Further Education College">FE College</option>
-              <option value="Independent Training Provider">Independent Training Provider</option>
-              <option value="Institute of Adult Learning">Institute of Adult Learning</option>
-              <option value="Charity">Charity</option>
-              <option value="University">University</option>
-            </select>
-          </div>
-          <div style="font-size:var(--t-xs);color:var(--ink-3);margin-top:4px;line-height:1.3">Source: GLA ESOL Planning Map</div>
+          <div class="sb-lbl">Culture &amp; creative space<button type="button" class="lhelp" title="Theatres, rehearsal rooms, artist and maker workspaces, recording studios and design workshops, from the GLA Cultural Infrastructure Map. This is where culture is made rather than where it is watched, so a rehearsal room counts and a cinema does not. It covers all 33 boroughs." aria-label="Explain this" aria-expanded="false">?</button></div>
+          <label class="lrow"><div class="ldot" style="background:#C2185B"></div><span class="lname">Culture &amp; creative spaces <span class="lcount" id="cult-count"></span></span><input type="checkbox" id="tcult"></label>
+          <div style="font-size:var(--t-xs);color:var(--ink-3);margin-top:4px;line-height:1.3">Source: GLA Cultural Infrastructure Map</div>
         </div>
         <div class="sb-sec" style="flex-shrink:0;border-bottom:1px solid var(--line-2)">
           <div class="sb-lbl">Boundaries and regions</div>
@@ -2204,13 +2178,8 @@
             <span class="lname">Show VCSE organisations <span class="lcount" id="vcse-tab-count"></span></span>
             <input type="checkbox" id="vcse-tab-toggle">
           </label>
-          <label class="lrow" style="padding:2px 0;border:none">
-            <div class="ldot" style="background:#5C5C8A"></div>
-            <span class="lname">Show Community Interest Companies <span class="lcount" id="cic-tab-count"></span> <span class="cov-tag" title="North West London boroughs only">NWL</span></span>
-            <input type="checkbox" id="cic-tab-toggle">
-          </label>
           <div style="font-size:var(--t-xs);color:var(--ink-3);margin:4px 0 2px 24px;line-height:1.4">
-            VCSE = registered charities · CIC = Community Interest Companies (community-anchored businesses)
+            VCSE = registered charities, from the Charity Commission register
           </div>
         </div>
         <div class="sb-sec" style="padding-bottom:8px">
@@ -2232,22 +2201,13 @@
         </div>
         <div class="sb-sec" id="vcse-tag-filter" style="padding-top:0;padding-bottom:8px">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-            <!-- The scope is in the heading rather than under it. The tags come
-                 from the Charity Commission's own classification of what a
-                 charity does, who it helps and how; CICs are registered with
-                 Companies House and carry none of it, so a tag filter can
-                 neither include nor exclude them. That used to be explained in
-                 three lines of grey text between the heading and the first tag,
-                 which is a lot of reading to reach a checkbox and easy to skip
-                 — and skipping it was the whole problem, because the CIC count
-                 then looks like it has quietly dropped. One word in the heading
-                 does the same work: "charities" says which of the two lists
-                 above this is about. The rest is on the ? for anyone who wants
-                 it, and one short line stays visible for anyone who does not. -->
-            <div class="sb-lbl" style="margin-bottom:0">Filter charities by tag<button type="button" class="lhelp" title="The tags are the Charity Commission's own classification of what a charity does, how it helps and whom it helps. Community Interest Companies are registered with Companies House instead and carry no tags at all, so this filter cannot include or exclude them: whatever you tick here, every CIC currently shown stays shown." aria-label="Explain this" aria-expanded="false">?</button></div>
+            <!-- "charities" stays in the heading. It once separated this filter
+                 from the CIC layer beside it, which carried no tags; that layer
+                 is gone, but the word still says what the tags describe, which
+                 is the organisation rather than anything the map draws. -->
+            <div class="sb-lbl" style="margin-bottom:0">Filter charities by tag<button type="button" class="lhelp" title="The tags are the Charity Commission's own classification of what a charity does, how it helps and whom it helps. They come from the register, not from this map." aria-label="Explain this" aria-expanded="false">?</button></div>
             <button type="button" id="vcse-tag-clear" style="font-size:var(--t-xs);color:var(--ink-2);background:none;border:none;cursor:pointer;padding:0;text-decoration:underline;display:none">clear</button>
           </div>
-          <div class="cov-note" style="margin:0 0 6px">Charity Commission tags. CICs have none, so they are not filtered.</div>
           <details class="vcse-tag-group" data-fam="wt">
             <summary>What they do <span class="vcse-tag-count"></span></summary>
             <div class="vcse-tag-list"></div>
@@ -2276,7 +2236,7 @@
           <p><b>Click any ward</b> for its headline figures, then Open profile for the
              full panel.</p>
           <p>Pick an indicator below to <b>colour the map</b> by a figure.</p>
-          <p>The <b>VCSE</b> tab maps charities and Community Interest Companies.</p>
+          <p>The <b>VCSE</b> tab maps registered charities.</p>
           <button type="button" class="start-hint-x" id="start-hint-x">Got it</button>
         </div>
         <div class="sb-sec" style="flex:1;border-bottom:none;overflow-y:auto">
@@ -4735,7 +4695,7 @@ function _updateLayerCounts() {
 }
 
 /* ── Counts for layers that have not loaded yet ────────────────────────────
-   The point layers, VCSE, CICs and the LSOA boundaries are fetched on demand,
+   The point layers, VCSE and the LSOA boundaries are fetched on demand,
    which left their counts blank until the reader ticked the box. Blank was at
    least honest, but it withheld the one number that helps somebody decide
    whether to switch a layer on at all: "1,737" next to Pharmacies is wanted
@@ -4770,15 +4730,11 @@ function applyPrefetchedCounts() {
       };
       setIf('dental-count', c.dental);
       setIf('pharm-count', c.pharmacy);
-      setIf('schools-count', c.schools);
-      setIf('cc-count', c.cc);
-      setIf('lib-count', c.libraries);
-      setIf('esol-count', c.esol);
+      setIf('cult-count', c.culture);
       setIf('greenspace-count', c.greenspace);
       setIf('icb-count', c.icb);
       setIf('lsoa-count', c.lsoa);
       setIf('vcse-tab-count', c.vcse);
-      setIf('cic-tab-count', c.cics);
       // The same sentence wireVCSE writes, so the panel does not change its
       // wording when the records actually arrive.
       const vc = document.getElementById('vcse-count');
@@ -5009,8 +4965,7 @@ function wireVCSE(records) {
 
    A cold load pulled about 15.4 MB of JSON, roughly 2.1 MB over the wire, to
    put nothing on the screen: 11,134 VCSE organisations, 1,737 pharmacies,
-   1,663 dental practices, 750 schools, 190 community centres, 81 libraries
-   and 58 ESOL providers, none of them drawn.
+   1,663 dental practices and 1,557 cultural spaces, none of them drawn.
 
    They are fetched when something actually needs them now, following
    loadMsoaBoundaries, which has worked this way for a while. Three things
@@ -5028,18 +4983,9 @@ function wireVCSE(records) {
    first failure for the rest of the session. */
 const LAYER_SOURCES = {
   vcse:      { url: 'vcse_data.json',        apply: d => wireVCSE(d) },
-  cics:      { url: 'cics.json',             apply: d => wireCICs(d),
-               fail: () => {
-                 // cics.json is optional. An honest zero beats a stuck blank.
-                 const cnt = document.getElementById('cic-count');
-                 if (cnt) cnt.textContent = '0';
-               } },
   dental:    { url: 'dental_practices.json', apply: d => loadDentalLayer(d) },
   pharmacy:  { url: 'pharmacies.json',       apply: d => loadPharmacyLayer(d) },
-  schools:   { url: 'schools.json',          apply: d => loadSchoolsLayer(d) },
-  cc:        { url: 'community_centres.json',apply: d => loadCCLayer(d) },
-  libraries: { url: 'libraries.json',        apply: d => loadLibLayer(d) },
-  esol:      { url: 'esol_providers.json',   apply: d => loadESOLLayer(d) },
+  culture:   { url: 'culture.json',          apply: d => loadCultureLayer(d) },
 };
 const _layerLoads = {};
 
@@ -5085,197 +5031,6 @@ function _wireLazyToggle(id, key, cluster) {
 }
 
 // vcseCluster not added by default - toggle on via sidebar
-
-// ── Community Interest Companies (CIC) layer ───────────────────────────────
-// Sourced from Companies House monthly bulk product (BasicCompanyDataAsOneFile).
-// Filtered to CompanyCategory='Community Interest Company', live-status only,
-// geocoded via ONSPD, scoped to the 8 NWL boroughs. SIC text is mapped to the
-// same cause buckets as the VCSE layer so colours stay consistent.
-const cicCluster = L.markerClusterGroup({
-  maxClusterRadius: 40,
-  showCoverageOnHover: false,
-  zoomToBoundsOnClick: true,
-  iconCreateFunction: cluster => {
-    const c = cluster.getChildCount();
-    const sz = c > 50 ? 36 : c > 20 ? 30 : 26;
-    return L.divIcon({
-      html:`<div style="background:rgba(92,92,138,.78);width:${sz}px;height:${sz}px;border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:600;font-size:${sz>32?13:12}px;box-shadow:0 2px 6px rgba(0,0,0,.2)">${c}</div>`,
-      className: 'cic-cluster', iconSize: [sz, sz]
-    });
-  }
-});
-let CIC_ALL = [];
-let cicData = [];
-function mkCICIcon(r) {
-  // Square marker so CICs are visually distinct from VCSE circles even when
-  // they share the same cause-bucket colour.
-  const color = (typeof VCSE_BUCKET_COLORS === 'object' && r && r.wt && r.wt[0])
-                ? (VCSE_BUCKET_COLORS[r.wt[0]] || '#5C5C8A') : '#5C5C8A';
-  return L.divIcon({
-    html: `<div style="background:${color};width:9px;height:9px;border:1.5px solid #fff;box-shadow:0 1px 2px rgba(0,0,0,.3)"></div>`,
-    iconSize: [9, 9], iconAnchor: [4, 4], className: ''
-  });
-}
-function cicPopupHtml(r) {
-  const sicLine = (r.wd || []).slice(0, 2).join(' · ');
-  const incDate = r.reg ? new Date(r.reg).toLocaleDateString('en-GB',
-                          {year:'numeric', month:'short'}) : '';
-  return `<div style="font-family:-apple-system,sans-serif;font-size:var(--t-sm);line-height:1.4;max-width:260px">
-    <div style="font-weight:600;font-size:var(--t-md);margin-bottom:4px">${r.n||''}</div>
-    <div style="color:var(--ink-2);font-size:var(--t-xs);margin-bottom:6px">CIC · ${r.no||''}${incDate ? ' · incorporated '+incDate : ''}</div>
-    ${sicLine ? `<div style="margin-bottom:4px">${sicLine}</div>` : ''}
-    <div style="color:var(--ink-3);font-size:var(--t-xs)">${r.a||''}</div>
-  </div>`;
-}
-function wireCICs(records) {
-  CIC_ALL = records || [];
-  cicCluster.clearLayers();
-  cicData = [];
-  CIC_ALL.forEach(r => {
-    if (r.lat == null || r.lng == null) return;
-    const m = L.marker([r.lat, r.lng], { icon: mkCICIcon(r) });
-    m.bindPopup(cicPopupHtml(r), { maxWidth: 280 });
-    m.bindTooltip(r.n, { direction: 'top', className: 'marker-tip' });
-    cicCluster.addLayer(m);
-    cicData.push({ name: r.n, addr: r.a, lat: r.lat, lng: r.lng, marker: m, record: r });
-  });
-  const cnt = document.getElementById('cic-count');
-  if (cnt) cnt.textContent = CIC_ALL.length.toLocaleString();
-}
-// cics.json is fetched by ensureLayerData('cics'). See LAYER_SOURCES.
-// Paired-toggle helper for CICs (mirrors _setVcseLayerVisible).
-function _setCicLayerVisible(on) {
-  const a = document.getElementById('tcic');
-  const b = document.getElementById('cic-tab-toggle');
-  if (a && a.checked !== !!on) a.checked = !!on;
-  if (b && b.checked !== !!on) b.checked = !!on;
-  if (on) {
-    ensureLayerData('cics').then(() => {
-      const stillOn = (a && a.checked) || (b && b.checked);
-      if (stillOn && !cicCluster._map) cicCluster.addTo(map);
-    });
-  } else {
-    if (cicCluster._map) map.removeLayer(cicCluster);
-  }
-}
-const _tcic = document.getElementById('tcic');
-if (_tcic) _tcic.addEventListener('change', e => _setCicLayerVisible(e.target.checked));
-
-// ── Apply cause + area + text filtering to the CIC cluster ───────────────
-function applyCICFilter() {
-  const areaFilter = (typeof currentVCSEAreaFilter !== 'undefined') ? currentVCSEAreaFilter : 'all';
-  const textFilter = (document.getElementById('vcse-search')?.value || '').toLowerCase().trim();
-  // Borough-focus override (mirrors applyVCSEFilter): when a borough is
-  // focused, hide CICs outside that borough regardless of area-filter.
-  // A set, not a single code: a focused board is five to eight boroughs.
-  const _focusCodes = (typeof focusedLadCodes === 'function')
-    ? new Set(focusedLadCodes()) : new Set();
-  cicData.forEach(o => {
-    let areaMatch = true;
-    if (areaFilter.startsWith('lad-')) {
-      areaMatch = (o.record.lad || '') === areaFilter.slice(4);
-    }
-    const focusMatch = !_focusCodes.size || _focusCodes.has(o.record.lad || '');
-    const textMatch = !textFilter ||
-      o.name.toLowerCase().includes(textFilter) ||
-      (o.addr||'').toLowerCase().includes(textFilter);
-    const causeMatch = _causeMatches(o.record);
-    const visible = areaMatch && focusMatch && textMatch && causeMatch;
-    if (visible) {
-      if (!cicCluster.hasLayer(o.marker)) cicCluster.addLayer(o.marker);
-    } else {
-      if (cicCluster.hasLayer(o.marker)) cicCluster.removeLayer(o.marker);
-    }
-  });
-  const cnt = document.getElementById('cic-count');
-  const cnt2 = document.getElementById('cic-tab-count');
-  const visN = cicData.filter(o => cicCluster.hasLayer(o.marker)).length;
-  if (cnt)  cnt.textContent  = visN.toLocaleString();
-  if (cnt2) cnt2.textContent = visN.toLocaleString();
-}
-
-// ── Cause-filter chips (shared by VCSE + CIC) ────────────────────────────
-function buildCauseChips() {
-  // Cause chips were removed from the UI; this is a no-op now. Kept as a stub
-  // so other code paths that call it (e.g. the data-loaded hook) don't error.
-  return;
-  // unreachable below
-  const host = document.getElementById('cause-chips');
-  if (!host || typeof VCSE_BUCKET_LABELS !== 'object') return;
-  // Only show buckets that actually have at least one record across both layers.
-  const present = new Set();
-  if (typeof VCSE_PINNED !== 'undefined') VCSE_PINNED.forEach(r => present.add(vcseCauseBucket(r)));
-  if (typeof CIC_ALL    !== 'undefined') CIC_ALL.forEach(r => present.add(vcseCauseBucket(r)));
-  _activeBuckets = new Set(present);   // start with all on
-  host.innerHTML = '';
-  Object.entries(VCSE_BUCKET_LABELS).forEach(([key, label]) => {
-    if (!present.has(key)) return;
-    const c = VCSE_BUCKET_COLORS[key] || '#888';
-    const chip = document.createElement('button');
-    chip.type = 'button';
-    chip.dataset.bucket = key;
-    chip.dataset.active = '1';
-    chip.style.cssText = `background:${c};color:#fff;border:none;border-radius:12px;padding:3px 9px;font-size:11px;cursor:pointer;transition:opacity .15s,filter .15s`;
-    chip.textContent = label;
-    chip.addEventListener('click', () => {
-      const on = chip.dataset.active === '1';
-      if (on) {
-        chip.dataset.active = '0';
-        chip.style.opacity = '0.35';
-        chip.style.filter  = 'grayscale(0.6)';
-        _activeBuckets.delete(key);
-      } else {
-        chip.dataset.active = '1';
-        chip.style.opacity = '1';
-        chip.style.filter  = 'none';
-        _activeBuckets.add(key);
-      }
-      applyVCSEFilter();
-      applyCICFilter();
-    });
-    host.appendChild(chip);
-  });
-}
-
-// Wire the VCSE-tab CIC toggle to the same paired helper as `tcic`.
-const _cicTabToggle = document.getElementById('cic-tab-toggle');
-if (_cicTabToggle) {
-  _cicTabToggle.addEventListener('change', e => _setCicLayerVisible(e.target.checked));
-}
-
-// Build chips once both data layers have loaded. The VCSE + CIC fetchers
-// are fire-and-forget async, so we mark each as ready and only build chips
-// once both have arrived.
-let _vcseReady = false, _cicReady = false;
-function _maybeBuildChips() {
-  if (!_vcseReady || !_cicReady) return;
-  buildCauseChips();
-  applyCICFilter();
-}
-// Hook into the fetch promise chains we set up earlier — both .then()
-// callbacks have already captured the original wireVCSE/wireCICs references,
-// so we instead listen for their work being done by polling the populated
-// arrays. Since both globals start as [] and are reassigned (or filled) by
-// their wirers, we watch for a non-zero length OR the fetch finishing
-// (whichever comes first).
-(function _waitForData() {
-  const ivl = setInterval(() => {
-    if (Array.isArray(VCSE_PINNED) && VCSE_PINNED.length > 0) _vcseReady = true;
-    if (Array.isArray(CIC_ALL))                                _cicReady  = true;
-    // CIC_ALL may legitimately be empty if cics.json missing — give it 5s
-    // then declare ready anyway so chips can build from VCSE alone.
-    if (_vcseReady && _cicReady) {
-      clearInterval(ivl);
-      _maybeBuildChips();
-    }
-  }, 250);
-  // Hard timeout fallback so chips always render
-  setTimeout(() => {
-    _vcseReady = _cicReady = true;
-    clearInterval(ivl);
-    _maybeBuildChips();
-  }, 8000);
-})();
 
 // ── Dental practices layer ───────────────────────────────────────────────
 function mkDentalIcon() {
@@ -5362,8 +5117,6 @@ function loadPharmacyLayer(practices) {
 // Fetched by ensureLayerData('pharmacy') when the toggle asks for it.
 
 
-// ── ESOL Planning Map: schools + community centres + libraries + ESOL providers ───
-// Source: GLA ESOL Planning Map (Greater London Authority)
 // Generic helper to build a clustered point layer with consistent styling
 function _mkCivicCluster(colour, rgba) {
   return L.markerClusterGroup({
@@ -5385,118 +5138,33 @@ function _esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// ── Schools (DfE GIAS, NWL boroughs only) ────────────────────────────────
-const schoolsCluster  = _mkCivicCluster('#1E5BB8', 'rgba(30,91,184,.78)');
-let schoolsData = [];
-let schoolsPhaseFilter = 'all';
-function loadSchoolsLayer(rows) {
-  schoolsCluster.clearLayers();
-  schoolsData = [];
+// ── Culture and creative spaces (GLA Cultural Infrastructure Map) ─────────
+// One layer in place of the four that used to sit here: schools, community
+// centres, libraries and ESOL providers. Each was a one-off scrape covering
+// only North West London, and a blank map in 24 boroughs reads as "none here"
+// rather than "never collected". This one is published, refreshed and covers
+// all 33. It is where culture is made rather than consumed, so it holds
+// rehearsal rooms and workshops, and no cinemas or libraries.
+const cultCluster  = _mkCivicCluster('#C2185B', 'rgba(194,24,91,.78)');
+let cultData = [];
+function loadCultureLayer(rows) {
+  cultCluster.clearLayers();
+  cultData = [];
   rows.forEach(p => {
     if (!p.lat || !p.lng) return;
-    const marker = L.marker([p.lat, p.lng], {icon: _mkCivicIcon('#1E5BB8')});
-    const ageRow = (p.low_age != null && p.high_age != null) ? `<div class="pop-row"><span class="pop-key">Ages</span><span>${p.low_age}–${p.high_age}</span></div>` : '';
-    const pupRow = (p.pupils != null) ? `<div class="pop-row"><span class="pop-key">Pupils</span><span>${p.pupils}${p.capacity?` / ${p.capacity}`:''}</span></div>` : '';
-    const fsmRow = (p.fsm_pct != null) ? `<div class="pop-row"><span class="pop-key">FSM</span><span>${p.fsm_pct}%</span></div>` : '';
-    const phRow = p.phase ? `<div class="pop-row"><span class="pop-key">Phase</span><span>${_esc(p.phase)}</span></div>` : '';
+    const marker = L.marker([p.lat, p.lng], {icon: _mkCivicIcon('#C2185B')});
     const tyRow = p.type ? `<div class="pop-row"><span class="pop-key">Type</span><span>${_esc(p.type)}</span></div>` : '';
-    const wsRow = p.website ? `<div class="pop-row"><span class="pop-key">Web</span><span><a href="${_esc(p.website)}" target="_blank" rel="noopener">link</a></span></div>` : '';
-    marker.bindPopup(`<div class="pop-hdr" style="background:#1E5BB8">${_esc(p.name)}</div><div class="pop-body"><div class="pop-addr">${_esc([p.street,p.town,p.postcode].filter(Boolean).join(', '))}</div>${phRow}${tyRow}${ageRow}${pupRow}${fsmRow}<div class="pop-row"><span class="pop-key">Borough</span><span>${_esc(p.borough)}</span></div>${wsRow}</div>`);
-    marker.bindTooltip(`${_esc(p.name)} · ${_esc(p.phase||'School')}`, { direction:'top', className:'marker-tip' });
-    schoolsData.push({ ...p, marker });
-  });
-  _applySchoolsFilter();
-  console.log(`Loaded ${schoolsData.length} schools`);
-}
-function _applySchoolsFilter() {
-  if (!Array.isArray(schoolsData)) return;
-  schoolsCluster.clearLayers();
-  let n = 0;
-  schoolsData.forEach(d => {
-    const keep = schoolsPhaseFilter === 'all' ? true : d.phase === schoolsPhaseFilter;
-    if (keep) { schoolsCluster.addLayer(d.marker); n++; }
-  });
-  const el = document.getElementById('schools-count');
-  if (el) el.textContent = n;
-}
-// Fetched by ensureLayerData('schools') when the toggle asks for it.
-
-// ── Community centres (GLA ESOL Planning Map) ─────────────────────────────
-const ccCluster  = _mkCivicCluster('#D87C2D', 'rgba(216,124,45,.78)');
-let ccData = [];
-function loadCCLayer(rows) {
-  ccCluster.clearLayers();
-  ccData = [];
-  rows.forEach(p => {
-    if (!p.lat || !p.lng) return;
-    const marker = L.marker([p.lat, p.lng], {icon: _mkCivicIcon('#D87C2D')});
-    const wsRow = p.website ? `<div class="pop-row"><span class="pop-key">Web</span><span><a href="${_esc(p.website)}" target="_blank" rel="noopener">link</a></span></div>` : '';
     const wdRow = p.ward_name ? `<div class="pop-row"><span class="pop-key">Ward</span><span>${_esc(p.ward_name)}</span></div>` : '';
-    marker.bindPopup(`<div class="pop-hdr" style="background:#D87C2D">${_esc(p.name)}</div><div class="pop-body"><div class="pop-addr">${_esc([p.address,p.postcode].filter(Boolean).join(', '))}</div><div class="pop-row"><span class="pop-key">Borough</span><span>${_esc(p.borough)}</span></div>${wdRow}${wsRow}</div>`);
-    marker.bindTooltip(`${_esc(p.name)} · Community centre`, { direction:'top', className:'marker-tip' });
-    ccCluster.addLayer(marker);
-    ccData.push({ ...p, marker });
+    marker.bindPopup(`<div class="pop-hdr" style="background:#C2185B">${_esc(p.name)}</div><div class="pop-body"><div class="pop-addr">${_esc([p.address,p.postcode].filter(Boolean).join(', '))}</div>${tyRow}<div class="pop-row"><span class="pop-key">Borough</span><span>${_esc(p.borough)}</span></div>${wdRow}</div>`);
+    marker.bindTooltip(`${_esc(p.name)} · ${_esc(p.type||'Cultural space')}`, { direction:'top', className:'marker-tip' });
+    cultCluster.addLayer(marker);
+    cultData.push({ ...p, marker });
   });
-  const el = document.getElementById('cc-count');
-  if (el) el.textContent = ccData.length;
-  console.log(`Loaded ${ccData.length} community centres`);
+  const el = document.getElementById('cult-count');
+  if (el) el.textContent = cultData.length.toLocaleString();
+  console.log(`Loaded ${cultData.length} cultural spaces`);
 }
-// Fetched by ensureLayerData('cc') when the toggle asks for it.
-
-// ── Libraries (GLA ESOL Planning Map) ─────────────────────────────────────
-const libCluster  = _mkCivicCluster('#00A0A0', 'rgba(0,160,160,.78)');
-let libData = [];
-function loadLibLayer(rows) {
-  libCluster.clearLayers();
-  libData = [];
-  rows.forEach(p => {
-    if (!p.lat || !p.lng) return;
-    const marker = L.marker([p.lat, p.lng], {icon: _mkCivicIcon('#00A0A0')});
-    const wsRow = p.website ? `<div class="pop-row"><span class="pop-key">Web</span><span><a href="${_esc(p.website)}" target="_blank" rel="noopener">link</a></span></div>` : '';
-    const wdRow = p.ward_name ? `<div class="pop-row"><span class="pop-key">Ward</span><span>${_esc(p.ward_name)}</span></div>` : '';
-    const stRow = p.status ? `<div class="pop-row"><span class="pop-key">Status</span><span>${_esc(p.status)}</span></div>` : '';
-    marker.bindPopup(`<div class="pop-hdr" style="background:#00A0A0">${_esc(p.name)}</div><div class="pop-body"><div class="pop-addr">${_esc([p.address,p.postcode].filter(Boolean).join(', '))}</div><div class="pop-row"><span class="pop-key">Borough</span><span>${_esc(p.borough)}</span></div>${wdRow}${stRow}${wsRow}</div>`);
-    marker.bindTooltip(`${_esc(p.name)} · Library`, { direction:'top', className:'marker-tip' });
-    libCluster.addLayer(marker);
-    libData.push({ ...p, marker });
-  });
-  const el = document.getElementById('lib-count');
-  if (el) el.textContent = libData.length;
-  console.log(`Loaded ${libData.length} libraries`);
-}
-// Fetched by ensureLayerData('libraries') when the toggle asks for it.
-
-// ── Formal ESOL providers (GLA ESOL Planning Map) ─────────────────────────
-const esolCluster  = _mkCivicCluster('#B83C3C', 'rgba(184,60,60,.78)');
-let esolData = [];
-let esolTypeFilter = 'all';
-function loadESOLLayer(rows) {
-  esolCluster.clearLayers();
-  esolData = [];
-  rows.forEach(p => {
-    if (!p.lat || !p.lng) return;
-    const marker = L.marker([p.lat, p.lng], {icon: _mkCivicIcon('#B83C3C')});
-    const wsRow = p.website ? `<div class="pop-row"><span class="pop-key">Web</span><span><a href="${_esc(p.website)}" target="_blank" rel="noopener">link</a></span></div>` : '';
-    const tyRow = p.type ? `<div class="pop-row"><span class="pop-key">Type</span><span>${_esc(p.type)}</span></div>` : '';
-    marker.bindPopup(`<div class="pop-hdr" style="background:#B83C3C">${_esc(p.name)}</div><div class="pop-body"><div class="pop-addr">${_esc([p.address,p.postcode].filter(Boolean).join(', '))}</div>${tyRow}<div class="pop-row"><span class="pop-key">Borough</span><span>${_esc(p.borough)}</span></div>${wsRow}</div>`);
-    marker.bindTooltip(`${_esc(p.name)} · ${_esc(p.type||'ESOL provider')}`, { direction:'top', className:'marker-tip' });
-    esolData.push({ ...p, marker });
-  });
-  _applyESOLFilter();
-  console.log(`Loaded ${esolData.length} ESOL providers`);
-}
-function _applyESOLFilter() {
-  if (!Array.isArray(esolData)) return;
-  esolCluster.clearLayers();
-  let n = 0;
-  esolData.forEach(d => {
-    const keep = esolTypeFilter === 'all' ? true : d.type === esolTypeFilter;
-    if (keep) { esolCluster.addLayer(d.marker); n++; }
-  });
-  const el = document.getElementById('esol-count');
-  if (el) el.textContent = n;
-}
-// Fetched by ensureLayerData('esol') when the toggle asks for it.
+// Fetched by ensureLayerData('culture') when the toggle asks for it.
 
 
 // ── VCSE filtering ────────────────────────────────────────────────────────
@@ -5629,8 +5297,9 @@ function updateVCSETagGroupCounts() {
   if (clearBtn) clearBtn.style.display = anyActive ? '' : 'none';
 }
 
-// Active cause buckets (union across VCSE + CIC). null/empty set → "no chips
-// active" → show everything. Populated by buildCauseChips().
+// Active cause buckets. null/empty set → "no chips
+// active" → show everything. Nothing populates it now that the cause
+// chips are gone, so _causeMatches below is a pass-through.
 let _activeBuckets = null;
 function _causeMatches(rec) {
   if (!_activeBuckets || _activeBuckets.size === 0) return true;
@@ -6509,13 +6178,10 @@ function _generateWardReport(_reportWindow, wn, opts) {
   let dentN  = _matchSpatial(typeof dentalData !== 'undefined' ? dentalData : []);
   let vcseN  = _matchSpatial(typeof vcseData !== 'undefined' ? vcseData : []);
   let grnN   = _matchSpatial(typeof GRN !== 'undefined' ? GRN : []);
-  let schN   = _matchByWardCode(typeof schoolsData !== 'undefined' ? schoolsData : []);
-  if (schN == null) schN = _matchSpatial(typeof schoolsData !== 'undefined' ? schoolsData : []);
-  let ccN    = _matchByWardCode(typeof ccData !== 'undefined' ? ccData : []);
-  if (ccN == null) ccN = _matchSpatial(typeof ccData !== 'undefined' ? ccData : []);
-  let libN   = _matchByWardCode(typeof libData !== 'undefined' ? libData : []);
-  if (libN == null) libN = _matchSpatial(typeof libData !== 'undefined' ? libData : []);
-  let esolN  = _matchSpatial(typeof esolData !== 'undefined' ? esolData : []);
+  // Spatially, not by ward_code: the GLA file names the ward but does not code
+  // it, and _matchByWardCode returns 0 rather than null for a list with no
+  // codes, which would pin this count at zero for every ward on the map.
+  let cultN  = _matchSpatial(typeof cultData !== 'undefined' ? cultData : []);
 
   // Lists for the comprehensive "Physical locations in this ward" section.
   const _byWardCode = (arr) => Array.isArray(arr) && wcode
@@ -6528,10 +6194,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
       return _inWard(lat, lng);
     });
   };
-  const _schools  = _byWardCode(typeof schoolsData !== 'undefined' ? schoolsData : []);
-  const _cc       = _byWardCode(typeof ccData !== 'undefined' ? ccData : []);
-  const _libs     = _byWardCode(typeof libData !== 'undefined' ? libData : []);
-  const _esol     = _bySpatial(typeof esolData !== 'undefined' ? esolData : []);
+  const _cult     = _bySpatial(typeof cultData !== 'undefined' ? cultData : []);
   const _dental   = _bySpatial(typeof dentalData !== 'undefined' ? dentalData : []);
   const _hosp     = _bySpatial(typeof HOSP !== 'undefined' ? HOSP : []);
   const _vcse     = _bySpatial(typeof vcseData !== 'undefined' ? vcseData : []);
@@ -6942,10 +6605,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
       <div class="svc"><div class="svc-val ${pharmN ? '' : 'dim'}">${pharmN ?? 0}</div><div class="svc-lbl">Pharmacy</div></div>
       <div class="svc"><div class="svc-val ${dentN ? '' : 'dim'}">${dentN  ?? 0}</div><div class="svc-lbl">Dental</div></div>
       <div class="svc"><div class="svc-val ${hospN ? '' : 'dim'}">${hospN  ?? 0}</div><div class="svc-lbl">Hospital</div></div>
-      <div class="svc"><div class="svc-val ${schN ? '' : 'dim'}">${schN   ?? 0}</div><div class="svc-lbl">Schools</div></div>
-      <div class="svc"><div class="svc-val ${ccN ? '' : 'dim'}">${ccN    ?? 0}</div><div class="svc-lbl">Comm ctr</div></div>
-      <div class="svc"><div class="svc-val ${libN ? '' : 'dim'}">${libN   ?? 0}</div><div class="svc-lbl">Library</div></div>
-      <div class="svc"><div class="svc-val ${esolN ? '' : 'dim'}">${esolN  ?? 0}</div><div class="svc-lbl">ESOL</div></div>
+      <div class="svc"><div class="svc-val ${cultN ? '' : 'dim'}">${cultN  ?? 0}</div><div class="svc-lbl">Culture</div></div>
       <div class="svc"><div class="svc-val ${vcseN ? '' : 'dim'}">${vcseN  ?? 0}</div><div class="svc-lbl">VCSE</div></div>
     </div>
   </div>
@@ -7004,10 +6664,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
       ${_locBlock('Pharmacies',           phs,      p => `<strong>${_esc(p.name||'')}</strong> <span class="meta">${_esc(p.addr||'')}${p.postcode?' · '+_esc(p.postcode):''}</span>`)}
       ${_locBlock('Dental practices',     _dental,  d => `<strong>${_esc(d.name||'')}</strong> <span class="meta">${d.postcode?_esc(d.postcode):''}</span>`)}
       ${_locBlock('Hospitals & clinics',  _hosp,    h => `<strong>${_esc(h.n||'')}</strong> <span class="meta">${_esc(h.a||'')}${h.t?' · '+_esc(h.t):''}${h.trust?' · '+_esc(h.trust):''}</span>`, 'span-2')}
-      ${_locBlock('Schools',              _schools, s => `<strong>${_esc(s.name||'')}</strong> <span class="meta">${s.phase?_esc(s.phase):''}${s.type?' · '+_esc(s.type):''}${s.postcode?' · '+_esc(s.postcode):''}${s.pupils?' · '+s.pupils+' pupils':''}${s.fsm_pct?' · FSM '+s.fsm_pct+'%':''}</span>`, 'span-2')}
-      ${_locBlock('Community centres',    _cc,      c => `<strong>${_esc(c.name||'')}</strong> <span class="meta">${_esc(c.address||'')}${c.postcode?' · '+_esc(c.postcode):''}</span>`)}
-      ${_locBlock('Libraries',            _libs,    l => `<strong>${_esc(l.name||'')}</strong> <span class="meta">${_esc(l.address||'')}${l.postcode?' · '+_esc(l.postcode):''}${l.status?' · '+_esc(l.status):''}</span>`)}
-      ${_locBlock('Formal ESOL providers',_esol,    e => `<strong>${_esc(e.name||'')}</strong> <span class="meta">${e.type?_esc(e.type):''}${e.postcode?' · '+_esc(e.postcode):''}</span>`)}
+      ${_locBlock('Culture & creative spaces', _cult, c => `<strong>${_esc(c.name||'')}</strong> <span class="meta">${c.type?_esc(c.type):''}${c.address?' · '+_esc(c.address):''}${c.postcode?' · '+_esc(c.postcode):''}</span>`, 'span-2')}
       ${_locBlock('VCSE organisations',   _vcse,    v => `<strong>${_esc(v.name||'')}</strong> <span class="meta">${_esc(v.addr||'')}</span>`, 'span-2')}
       ${_locBlock('Parks & greenspaces',  _green,   g => `<strong>${_esc(g.n||'')}</strong> <span class="meta">${_esc(g.a||'')}${g.sz?' · '+_esc(g.sz):''}</span>`)}
     </div>
@@ -7015,7 +6672,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
 
   <div class="footer">
     <strong>Data sources:</strong> ONS Census 2021 (demographics, health, household language, travel-to-work) · MHCLG Indices of Deprivation 2025, mid-2022 population-weighted · data.police.uk street-level crime (crime, Apr 2025 – Mar 2026) · DESNZ LILEE (fuel poverty) · NOMIS / DWP (claimant count, working-age) · NHS Digital ODS (GP, pharmacy, dental practice registers) · DfE GIAS (schools) · GLA ESOL Planning Map (community centres, libraries, formal ESOL providers).
-    <div style="margin-top:6px">Service counts use ward_code attribution where present (schools, community centres, libraries) and spatial test against the ward polygon otherwise (hospitals, dental, ESOL, VCSE). GP and pharmacy counts come from the ward indicator. &quot;vs London median&quot; bars use the median across every London ward that has a figure for that indicator — ${_ALL_WARDS.length.toLocaleString()} wards are on the map, and an indicator published at a coarser geography, or missing for the City, is compared against fewer. &quot;London percentile&quot; = % of those wards below this one.</div>
+    <div style="margin-top:6px">Service counts use a spatial test against the ward polygon (hospitals, dental, pharmacies, culture, VCSE). GP and pharmacy counts come from the ward indicator. &quot;vs London median&quot; bars use the median across every London ward that has a figure for that indicator — ${_ALL_WARDS.length.toLocaleString()} wards are on the map, and an indicator published at a coarser geography, or missing for the City, is compared against fewer. &quot;London percentile&quot; = % of those wards below this one.</div>
   </div>
 </div>
 <div class="actions">
@@ -7212,8 +6869,7 @@ function _applyBoroughSolo() {
   _toggleLayerGroup(gpL, 'gp');
   _toggleLayerGroup(hL, 'hosp');
 
-  // 5. Marker-cluster point layers — pharmacy, dental, CIC, schools,
-  // community centres, libraries, ESOL providers. They all share the same
+  // 5. Marker-cluster point layers — pharmacy, dental, culture. They share the same
   // shape (cluster + a data array of {marker, lat, lng}) so a single helper
   // filters them. _lad is computed lazily via the geocoder.
   const _filterClusterByBorough = (cluster, dataArr) => {
@@ -7233,11 +6889,7 @@ function _applyBoroughSolo() {
   };
   _filterClusterByBorough(pharmCluster,  typeof pharmData   !== 'undefined' ? pharmData   : []);
   _filterClusterByBorough(dentalCluster, typeof dentalData  !== 'undefined' ? dentalData  : []);
-  _filterClusterByBorough(cicCluster,    typeof cicData     !== 'undefined' ? cicData     : []);
-  _filterClusterByBorough(schoolsCluster,typeof schoolsData !== 'undefined' ? schoolsData : []);
-  _filterClusterByBorough(ccCluster,     typeof ccData      !== 'undefined' ? ccData      : []);
-  _filterClusterByBorough(libCluster,    typeof libData     !== 'undefined' ? libData     : []);
-  _filterClusterByBorough(esolCluster,   typeof esolData    !== 'undefined' ? esolData    : []);
+  _filterClusterByBorough(cultCluster,   typeof cultData    !== 'undefined' ? cultData    : []);
 
   // 6. VCSE layer — re-use applyVCSEFilter() which already supports 'lad-<code>'.
   //    Also sync the VCSE-tab dropdown so the UI reflects the current focus.
@@ -7262,9 +6914,7 @@ function _applyBoroughSolo() {
     }
     if (typeof applyVCSEFilter === 'function') applyVCSEFilter();
   }
-  // CIC cluster — applyCICFilter now respects focusedBorough internally,
   // so a refresh is enough to honour the new focus state.
-  if (typeof applyCICFilter === 'function') applyCICFilter();
 
   // 7. Greenspace polygons — centroid-in-borough test, cached on each layer.
   if (typeof grL !== 'undefined' && grL) {
@@ -8191,29 +7841,8 @@ function _setVcseLayerVisible(on) {
 _wireLazyToggle('td',  'dental',   dentalCluster);
 _wireLazyToggle('tph', 'pharmacy', pharmCluster);
 
-// ── Civic & education layer toggles (GLA ESOL Planning Map) ──
-_wireLazyToggle('tsch',  'schools',   schoolsCluster);
-_wireLazyToggle('tcc',   'cc',        ccCluster);
-_wireLazyToggle('tlib',  'libraries', libCluster);
-_wireLazyToggle('tesol', 'esol',      esolCluster);
-// Schools phase filter
-(function(){
-  const sel = document.getElementById('schools-phase-filter');
-  if (!sel) return;
-  sel.addEventListener('change', e => {
-    schoolsPhaseFilter = (e.target.value || 'all');
-    if (typeof _applySchoolsFilter === 'function') _applySchoolsFilter();
-  });
-})();
-// ESOL provider type filter
-(function(){
-  const sel = document.getElementById('esol-type-filter');
-  if (!sel) return;
-  sel.addEventListener('change', e => {
-    esolTypeFilter = (e.target.value || 'all');
-    if (typeof _applyESOLFilter === 'function') _applyESOLFilter();
-  });
-})();
+// ── Culture and creative space toggle (GLA Cultural Infrastructure Map) ──
+_wireLazyToggle('tcult', 'culture', cultCluster);
 
 // ═══════════════════════════════════════════════════════════════════════════
 // LSOA IMD LAYER (embedded — no external files needed)
@@ -8811,19 +8440,13 @@ window.generateLSOAReport = function(code) {
   const pharmN  = _matchSpatial(typeof pharmData !== 'undefined' ? pharmData : []);
   const dentN   = _matchSpatial(typeof dentalData !== 'undefined' ? dentalData : []);
   const hospN   = _matchSpatial(typeof HOSP !== 'undefined' ? HOSP : []);
-  const schN    = _matchSpatial(typeof schoolsData !== 'undefined' ? schoolsData : []);
-  const ccN     = _matchSpatial(typeof ccData !== 'undefined' ? ccData : []);
-  const libN    = _matchSpatial(typeof libData !== 'undefined' ? libData : []);
-  const esolN   = _matchSpatial(typeof esolData !== 'undefined' ? esolData : []);
+  const cultN   = _matchSpatial(typeof cultData !== 'undefined' ? cultData : []);
   const vcseN   = _matchSpatial(typeof vcseData !== 'undefined' ? vcseData : []);
   const _gp     = _bySpatial(typeof GPS !== 'undefined' ? GPS : []);
   const _pharm  = _bySpatial(typeof pharmData !== 'undefined' ? pharmData : []);
   const _dental = _bySpatial(typeof dentalData !== 'undefined' ? dentalData : []);
   const _hosp   = _bySpatial(typeof HOSP !== 'undefined' ? HOSP : []);
-  const _schools= _bySpatial(typeof schoolsData !== 'undefined' ? schoolsData : []);
-  const _cc     = _bySpatial(typeof ccData !== 'undefined' ? ccData : []);
-  const _libs   = _bySpatial(typeof libData !== 'undefined' ? libData : []);
-  const _esol   = _bySpatial(typeof esolData !== 'undefined' ? esolData : []);
+  const _cult   = _bySpatial(typeof cultData !== 'undefined' ? cultData : []);
   const _vcse   = _bySpatial(typeof vcseData !== 'undefined' ? vcseData : []);
   const _green  = _bySpatial(typeof GRN !== 'undefined' ? GRN : []);
 
@@ -9110,10 +8733,7 @@ window.generateLSOAReport = function(code) {
       <div class="svc"><div class="svc-val ${pharmN ? '' : 'dim'}">${pharmN ?? 0}</div><div class="svc-lbl">Pharmacy</div></div>
       <div class="svc"><div class="svc-val ${dentN ? '' : 'dim'}">${dentN  ?? 0}</div><div class="svc-lbl">Dental</div></div>
       <div class="svc"><div class="svc-val ${hospN ? '' : 'dim'}">${hospN  ?? 0}</div><div class="svc-lbl">Hospital</div></div>
-      <div class="svc"><div class="svc-val ${schN ? '' : 'dim'}">${schN   ?? 0}</div><div class="svc-lbl">Schools</div></div>
-      <div class="svc"><div class="svc-val ${ccN ? '' : 'dim'}">${ccN    ?? 0}</div><div class="svc-lbl">Comm ctr</div></div>
-      <div class="svc"><div class="svc-val ${libN ? '' : 'dim'}">${libN   ?? 0}</div><div class="svc-lbl">Library</div></div>
-      <div class="svc"><div class="svc-val ${esolN ? '' : 'dim'}">${esolN  ?? 0}</div><div class="svc-lbl">ESOL</div></div>
+      <div class="svc"><div class="svc-val ${cultN ? '' : 'dim'}">${cultN  ?? 0}</div><div class="svc-lbl">Culture</div></div>
       <div class="svc"><div class="svc-val ${vcseN ? '' : 'dim'}">${vcseN  ?? 0}</div><div class="svc-lbl">VCSE</div></div>
     </div>
   </div>
@@ -9171,10 +8791,7 @@ window.generateLSOAReport = function(code) {
       ${_locBlock('Pharmacies',           _pharm,   p => `<strong>${_esc(p.name||p.n||'')}</strong> <span class="meta">${_esc(p.addr||p.a||'')}${p.postcode||p.pc?' · '+_esc(p.postcode||p.pc):''}</span>`)}
       ${_locBlock('Dental practices',     _dental,  d => `<strong>${_esc(d.name||'')}</strong> <span class="meta">${d.postcode?_esc(d.postcode):''}</span>`)}
       ${_locBlock('Hospitals & clinics',  _hosp,    h => `<strong>${_esc(h.n||'')}</strong> <span class="meta">${_esc(h.a||'')}${h.t?' · '+_esc(h.t):''}</span>`, 'span-2')}
-      ${_locBlock('Schools',              _schools, s => `<strong>${_esc(s.name||'')}</strong> <span class="meta">${s.phase?_esc(s.phase):''}${s.type?' · '+_esc(s.type):''}${s.postcode?' · '+_esc(s.postcode):''}${s.pupils?' · '+s.pupils+' pupils':''}${s.fsm_pct?' · FSM '+s.fsm_pct+'%':''}</span>`, 'span-2')}
-      ${_locBlock('Community centres',    _cc,      c => `<strong>${_esc(c.name||'')}</strong> <span class="meta">${_esc(c.address||'')}${c.postcode?' · '+_esc(c.postcode):''}</span>`)}
-      ${_locBlock('Libraries',            _libs,    l => `<strong>${_esc(l.name||'')}</strong> <span class="meta">${_esc(l.address||'')}${l.postcode?' · '+_esc(l.postcode):''}${l.status?' · '+_esc(l.status):''}</span>`)}
-      ${_locBlock('Formal ESOL providers',_esol,    e => `<strong>${_esc(e.name||'')}</strong> <span class="meta">${e.type?_esc(e.type):''}${e.postcode?' · '+_esc(e.postcode):''}</span>`)}
+      ${_locBlock('Culture & creative spaces', _cult, c => `<strong>${_esc(c.name||'')}</strong> <span class="meta">${c.type?_esc(c.type):''}${c.address?' · '+_esc(c.address):''}${c.postcode?' · '+_esc(c.postcode):''}</span>`, 'span-2')}
       ${_locBlock('VCSE organisations',   _vcse,    v => `<strong>${_esc(v.name||'')}</strong> <span class="meta">${_esc(v.addr||'')}</span>`, 'span-2')}
       ${_locBlock('Parks & greenspaces',  _green,   g => `<strong>${_esc(g.n||'')}</strong> <span class="meta">${_esc(g.a||'')}${g.sz?' · '+_esc(g.sz):''}</span>`)}
     </div>
@@ -10628,8 +10245,8 @@ _applyColourPalette();
 // The layers that ride in ?L=. tlsoa is deliberately not among them: it has
 // carried its own ?lsoa=1 since before this list existed, and links already in
 // circulation use it.
-const _URL_LAYERS = ['tg', 'th', 'tgr', 'td', 'tph', 'tv', 'tsch', 'tcc',
-                     'tlib', 'tesol', 'ticb', 'tb', 'tnw', 'tmsoa'];
+const _URL_LAYERS = ['tg', 'th', 'tgr', 'td', 'tph', 'tv', 'tcult',
+                     'ticb', 'tb', 'tnw', 'tmsoa'];
 const _URL_MODES = ['query', 'compare', 'report', 'csv', 'directory'];
 
 function _urlTool() {
@@ -10975,6 +10592,10 @@ function _buildSearchIndex() {
     if (typeof pharmData !== 'undefined' && Array.isArray(pharmData)) {
       pharmData.forEach(d => idx.push({ type:'pharmacy', label:d.name, sub:d.postcode || '', _lc:(d.name+' '+(d.postcode||'')).toLowerCase(), _lat:d.lat, _lng:d.lng }));
     }
+    // Culture and creative spaces
+    if (typeof cultData !== 'undefined' && Array.isArray(cultData)) {
+      cultData.forEach(d => idx.push({ type:'culture', label:d.name, sub:d.type || d.borough || '', _lc:(d.name+' '+(d.type||'')+' '+(d.postcode||'')).toLowerCase(), _lat:d.lat, _lng:d.lng }));
+    }
     // Charities (VCSE)
     if (typeof vcseData !== 'undefined' && Array.isArray(vcseData)) {
       vcseData.forEach(d => idx.push({ type:'charity', label:d.name, sub:d.addr || '', _lc:(d.name+' '+(d.addr||'')).toLowerCase(), _lat:d.lat, _lng:d.lng }));
@@ -11094,7 +10715,7 @@ function _runSearch(q) {
   // Group by type
   const groups = {};
   top.forEach(m => { (groups[m.type] = groups[m.type] || []).push(m); });
-  const order = ['ward','lsoa','GP','hospital','dental','pharmacy','charity'];
+  const order = ['ward','lsoa','GP','hospital','dental','pharmacy','culture','charity'];
   let html = '';
   order.forEach(t => {
     if (!groups[t]) return;
@@ -11436,7 +11057,6 @@ document.querySelectorAll('.sb-tab').forEach(t => {
     // the layer is ever drawn on the map. Nothing else here needs a payload.
     if (t.dataset.tab === 'vcse') {
       ensureLayerData('vcse');
-      ensureLayerData('cics');
     }
     // Viewing-strip stays visible at all times now; the digest text is
     // kept in sync by showWard/showLSOA/deselectWard/deselectLSOA so the

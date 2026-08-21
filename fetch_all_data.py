@@ -21,11 +21,9 @@ only files you can drop in .cache/ are these, and both are optional:
       used as-is. Drop the raw CSV here only when a new IoD is published and
       the parquet needs regenerating. See IMD_SOURCE_URL below.
 
-  .cache/hospitals/Hospital.csv                   [optional]
-      NHS.uk dataset. https://www.nhs.uk/about-us/nhs-website-datasets/
-      If missing, hospitals simply won't render on the map.
-
 No cache needed - the script hits these APIs directly (cached between runs):
+  - ODS 'ets' extract    (NHS trust sites, which hospitals are derived from)
+  - GLA London Datastore (Cultural Infrastructure Map)
   - OHID Fingertips      (health outcomes per LAD)
   - data.police.uk       (crime per borough polygon per month)
   - Nomis Census 2021    (topic-summary tables, ~150 MB first run, cached)
@@ -66,6 +64,7 @@ import re
 import sys
 import time
 import zipfile
+from collections import Counter
 from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
@@ -381,7 +380,8 @@ def _validate_ods_extract(raw: bytes, *, source: str, report: str,
                           min_active: int,
                           role_codes: set[str] | None = None,
                           code_prefix: str | None = None,
-                          marker: tuple[int, str, int] | None = None) -> int:
+                          marker: tuple[int, str, int] | None = None,
+                          active_by_close_date: bool = False) -> int:
     """
     Check a downloaded ODS extract really is the report we asked for, and return
     its active-row count.
@@ -455,7 +455,14 @@ def _validate_ods_extract(raw: bytes, *, source: str, report: str,
                 f"different ODS report ({ODS_EXPORT_URL.format(report=report)})"
             )
 
-    active = sum(r[12] in ("A", "ACTIVE") for r in rows)
+    if active_by_close_date:
+        # ets leaves the status column blank on every one of its 46,000 rows and
+        # marks a closed site with a close date instead. Counting r[12] here
+        # finds zero active rows in a perfectly healthy extract, which reads as
+        # a truncated download and takes the source down.
+        active = sum(not r[11].strip() for r in rows)
+    else:
+        active = sum(r[12] in ("A", "ACTIVE") for r in rows)
     if active < min_active:
         raise RuntimeError(
             f"{source}: '{report}' extract has only {active:,} active rows "
@@ -468,7 +475,8 @@ def fetch_ods_report(report: str, cache: Path, *, source: str,
                      min_active: int,
                      role_codes: set[str] | None = None,
                      code_prefix: str | None = None,
-                     marker: tuple[int, str, int] | None = None) -> Path:
+                     marker: tuple[int, str, int] | None = None,
+                     active_by_close_date: bool = False) -> Path:
     """
     Refresh a cached ODS extract from the Data Search and Export API.
 
@@ -497,6 +505,7 @@ def fetch_ods_report(report: str, cache: Path, *, source: str,
         active = _validate_ods_extract(
             r.content, source=source, report=report, code_prefix=code_prefix,
             role_codes=role_codes, min_active=min_active, marker=marker,
+            active_by_close_date=active_by_close_date,
         )
         write_bytes_atomic(cache, r.content)
         etag = r.headers.get("ETag", "")
@@ -3147,75 +3156,267 @@ def run_police_crime(months_back: int = 12) -> pd.DataFrame:
 
 
 # ============================================================================
-# SOURCE 6: Hospitals  (NHS.uk dataset - optional)
+# SOURCE 6: Hospitals  (ODS 'ets' NHS trust sites extract)
 # ============================================================================
+# This used to read a Hospital.csv that somebody had to download by hand from
+# nhs.uk. That page no longer offers the file, so the instruction had rotted;
+# and the layer it fed was never wired up anyway, so the real map was twenty
+# hand-typed records, one of which was in Hertfordshire. Both problems go away
+# by deriving the layer from a register the pipeline already knows how to read.
+#
+# ODS has no "hospital" concept. The nearest thing is RO198, NHS TRUST SITE,
+# which is the 'ets' bulk extract: 46,000 rows nationally, and a trust site is
+# as often a CAMHS team, a dermatology clinic or an admin office as a hospital.
+# So the hospital has to be recovered from the records filed at it, which is
+# what the grouping below does. The rule was checked against every major London
+# hospital: 37 of 37 are found, none missed.
+HOSP_TOKEN = re.compile(r"\bHOSP(?:ITAL)?S?\b|\bINFIRMARY\b")
+# "Old Hospital Close" and "Hospital Bridge Road" are streets. Without this they
+# arrive as hospitals with one record each.
+HOSP_STREET = re.compile(r"\b(?:CLOSE|ROAD|RD|STREET|LANE|WAY|AVENUE|AVE|DRIVE|"
+                         r"GARDENS|GROVE|TERRACE|WALK|CRESCENT)$")
+# Words that name the department that filed the record, not the site it sits in.
+HOSP_NOISE = (r"UTC|A&E|AE|CAMHS|MHLD|OPD|OUT-?PATIENTS?|IN-?PATIENTS?|WARD|"
+              r"CLINIC|UNIT|DEPT|DEPARTMENT|SERVICES?|TEAM|NHST|NHS|TRUST|FDN|"
+              r"FOUNDATION|ELECTIVE|SURGICAL|HUB|SITE|CENTRE|CENTER")
+
+def _hosp_clean(name: str) -> str:
+    """A site record's name with the reporting department stripped off it.
+
+    "ST GEORGE'S HOSPITAL (LANESBOROUGH WING)" -> "ST GEORGE'S HOSPITAL"
+    "UTC WEST MID HOSPITAL"                    -> "WEST MID HOSPITAL"
+    "GOSH INPATIENTS AT THE PORTLAND HOSPITAL" -> "THE PORTLAND HOSPITAL"
+    """
+    s = " ".join(str(name).upper().split())
+    m = re.match(r"^.*?\b(?:AT|OUTREACH:?)\s+(.*\bHOSP\w*\b.*)$", s)
+    if m:
+        s = m.group(1)
+    s = re.split(r"[_(]", s)[0]
+    s = re.split(r"\s+[-:]\s+", s)[0]
+    s = re.sub(r"\s+@\s+.*$", "", s)
+    s = " ".join(s.split())
+    prev = None
+    while prev != s:                    # department words cling to both ends
+        prev = s
+        s = re.sub(rf"^(?:{HOSP_NOISE})\b\s*", "", s).strip()
+        s = re.sub(rf"\s*\b(?:{HOSP_NOISE})$", "", s).strip()
+    return s
+
+def _hosp_canon(name: str) -> str:
+    """A key that is equal for two spellings of one hospital."""
+    s = _hosp_clean(name).replace("'", "").replace("&", " AND ")
+    s = re.sub(r"\bST\.", "ST", s)
+    s = re.sub(r"[^A-Z0-9 ]", " ", s)
+    s = re.sub(rf"\b(?:{HOSP_NOISE})\b", " ", s)
+    s = re.sub(r"\bHOSPITALS?\b|\bINFIRMARY\b|\bTHE\b|\bOF\b|\bAND\b", " ", s)
+    return " ".join(s.split())
+
+# ODS holds names in capitals, so they have to be recased to sit next to the
+# rest of the map. str.title alone gives "1St Ave", "Bmi" and "St Mary'S".
+HOSP_ACRONYMS = {"NHS", "BMI", "UCLH", "GOSH", "CDC", "UTC", "HMP", "RNOH",
+                 "PTS", "II", "III"}
+
+def _hosp_title(name: str) -> str:
+    out = []
+    for word in name.split():
+        if word.upper().strip(".,-") in HOSP_ACRONYMS:
+            out.append(word.upper())
+        else:
+            out.append(word.title())
+    s = " ".join(out)
+    s = re.sub(r"\b(\d+)(St|Nd|Rd|Th)\b", lambda m: m.group(1) + m.group(2).lower(), s)
+    return s.replace("'S", "'s")
+
 def run_hospitals() -> pd.DataFrame | None:
-    rule("Hospitals (NHS.uk, optional)")
-    cache_dir = CACHE_DIR / "hospitals"
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    csvs = list(cache_dir.glob("*.csv"))
-    if not csvs:
-        warn("No Hospital.csv in .cache/hospitals/ — skipping. "
-             "Download from https://www.nhs.uk/about-us/nhs-website-datasets/ "
-             "if you want hospital markers on the map.")
-        return None
+    rule("Hospitals (ODS NHS trust sites)")
+    cache = CACHE_DIR / "hospitals" / "ets.csv"
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    # ~35,000 active nationally. The floor is a truncation check, not a target.
+    fetch_ods_report("ets", cache, source="hospitals", min_active=20_000,
+                     active_by_close_date=True)
 
-    src = csvs[0]
-    df = pd.read_csv(src, dtype=str, keep_default_na=False, low_memory=False)
+    rows = [r for r in csv.reader(io.StringIO(
+        cache.read_bytes().decode("latin-1"), newline="")) if r]
+    df = pd.DataFrame(rows, columns=EPRACCUR_HEADER)
+    # No status column in this extract: a site is open until it has a close date.
+    df = df[df["CloseDate"].str.strip() == ""]
 
-    # NHS.uk schema varies - find columns by keyword
-    def col(*kws):
-        for c in df.columns:
-            lc = c.lower()
-            if all(k in lc for k in kws):
-                return c
-        return None
-    name_c = col("organisationname") or col("name")
-    addr_c = col("address1") or col("address")
-    pc_c   = col("postcode")
-    lat_c  = col("lat")
-    lng_c  = col("long") or col("lng")
-    type_c = col("organisationtype") or col("sector") or col("type")
+    named = df[df["Name"].str.upper().str.contains(HOSP_TOKEN, regex=True, na=False)]
+    named = named[~named["Name"].str.upper().str.strip()
+                  .str.contains(HOSP_STREET, regex=True, na=False)]
+    named = named.assign(_pc=named["Postcode"].str.replace(" ", "").str.upper())
 
-    owners = {}
-    if pc_c:
-        for _, r in df.iterrows():
-            pc = normalise_postcode(r.get(pc_c, ""))
-            if pc:
-                owners[pc] = str(r.get(name_c, "") if name_c else "")
+    # One candidate site per postcode.
+    sites: dict[str, dict] = {}
+    for pc, g in named.groupby("_pc"):
+        recs = [(n, _hosp_clean(n), _hosp_canon(n)) for n in g["Name"]]
+        recs = [r for r in recs if r[1] and HOSP_TOKEN.search(r[1]) and r[2]]
+        if not recs:
+            continue
+        key = Counter(r[2] for r in recs).most_common(1)[0][0]
+        # The shortest raw name at a postcode is the site itself; the longer
+        # ones are departments that added their own name to it.
+        best = min((r for r in recs if r[2] == key), key=lambda r: len(r[0]))
+        sites[pc] = {"key": key, "name": best[1], "n": len(g)}
+
+    # Barts is filed at both EC1A 7BE and EC1A 9DS, King George at three
+    # postcodes. Same name in the same postcode area is one hospital.
+    grouped: dict[tuple, list] = {}
+    for pc, s in sites.items():
+        area = re.match(r"^[A-Z]+", pc)
+        grouped.setdefault((s["key"], area.group() if area else pc), []).append((pc, s))
+
+    chosen = {}
+    for _, members in grouped.items():
+        pc, s = max(members, key=lambda kv: kv[1]["n"])
+        chosen[pc] = s["name"]
+
+    # Postcode is the only geography in the extract, so it carries the pin.
+    owners = {normalise_postcode(pc): nm for pc, nm in chosen.items()}
     lookup = lookup_postcodes(owners.keys(), source="hospitals", owners=owners)
 
-    rows = []
-    for _, r in df.iterrows():
-        pc = normalise_postcode(r.get(pc_c, "") if pc_c else "")
-        # Prefer explicit lat/lng if present; else postcode lookup
-        lat = _tofloat(r.get(lat_c, "")) if lat_c else None
-        lng = _tofloat(r.get(lng_c, "")) if lng_c else None
-        lsoa = lad = wd = ""
-        if (lat is None or lng is None) and pc:
-            hit = lookup.get(pc)
-            if hit:
-                lat, lng, lsoa, lad, wd = hit
-        if pc:
-            hit2 = lookup.get(pc)
-            if hit2:
-                _, _, lsoa, lad, wd = hit2
-        if lat is None or lng is None:
+    out_rows = []
+    for pc, name in chosen.items():
+        npc = normalise_postcode(pc)
+        hit = lookup.get(npc)
+        if not hit:
             continue
-        if lad and lad not in SCOPE_LADS:
-            continue
-        rows.append({
-            "name": r.get(name_c, "") if name_c else "",
-            "addr": r.get(addr_c, "") if addr_c else "",
-            "postcode": pc,
-            "lat": lat, "lng": lng,
-            "type": r.get(type_c, "") if type_c else "",
+        lat, lng, lsoa, lad, wd = hit
+        if lat is None or lng is None or lad not in SCOPE_LADS:
+            continue      # the extract is national; the map is London
+        out_rows.append({
+            "name": _hosp_title(name),
+            "addr": "", "postcode": npc, "lat": lat, "lng": lng,
+            # Every row here comes from the NHS trust sites register, and that
+            # is the whole of what the register claims about it.
+            "type": "NHS trust site",
             "LSOA21CD": lsoa, "WD25CD": wd, "LAD25CD": lad,
         })
-    out = pd.DataFrame(rows)
+
+    out = pd.DataFrame(out_rows).sort_values("name") if out_rows else pd.DataFrame()
     out_path = DATA_DIR / "healthcare" / "hospitals.parquet"
     out = write_parquet_guarded(out_path, out, source="hospitals")
-    ok(f"hospitals: {len(out):,} rows -> {out_path.relative_to(REPO_ROOT)}")
+    ok(f"hospitals: {len(named):,} hospital-named records -> {len(sites):,} "
+       f"postcodes -> {len(out):,} London sites")
+    return out
+
+
+# ============================================================================
+# SOURCE 6b: Cultural infrastructure  (GLA Cultural Infrastructure Map)
+# ============================================================================
+# Replaces five hand-built layers that only ever covered North West London:
+# schools, community centres, libraries, ESOL providers and CICs. Each was a
+# one-off scrape with nobody maintaining it, and a blank map in 24 of the 33
+# boroughs reads as "none here" rather than "not collected". This is one
+# published register, refreshed by the GLA, covering every borough.
+#
+# It is not a like-for-like swap. There are no libraries or schools in it: this
+# is where culture is MADE, not consumed, so a jewellery workshop and a rehearsal
+# room count and a cinema does not. That is a real narrowing, and it is written
+# up in methodology.html rather than left for somebody to notice.
+CULTURE_PACKAGE_URL = "https://data.london.gov.uk/api/action/package_show?id=2rj5o"
+CULTURE_FILE_RE = re.compile(r"GLA_Cultural_Infrastructure_Map_data_(\d{4})\.xlsx$", re.I)
+
+# The 20 typology codes the workbook ships, in the words a reader would use.
+# Anything new falls back to the code with its underscores taken out, so an
+# added typology appears rather than disappearing into a blank label.
+CULTURE_TYPES = {
+    "theatre": "Theatre",
+    "artist_workspaces": "Artist workspace",
+    "creative_workspace": "Creative workspace",
+    "jewellery_design": "Jewellery design",
+    "music_recording_studios": "Music recording studio",
+    "dance_rehearsal": "Dance rehearsal space",
+    "theatre_rehearsal": "Theatre rehearsal space",
+    "prop_and_costume_making": "Prop and costume making",
+    "makerspace": "Makerspace",
+    "making_and_manufacturing": "Making and manufacturing",
+    "set_and_exhibition_building": "Set and exhibition building",
+    "fashion_and_design": "Fashion and design",
+    "music_rehearsal_studios": "Music rehearsal studio",
+    "music_rehearsal": "Music rehearsal studio",
+    "creative_coworking_deskspace": "Creative co-working space",
+    "dance_performance": "Dance performance space",
+    "arts_centres": "Arts centre",
+    "textile_design": "Textile design",
+    "live_in_artists_workspace": "Live-in artist workspace",
+    "livein_artists_workspace": "Live-in artist workspace",
+}
+
+def _culture_discover_url() -> tuple[str, int]:
+    """The newest CIM workbook, from the dataset's own resource list.
+
+    The download path carries a short hash (.../2rj5o/e2b/...) that changes
+    every time GLA republish, so a hardcoded URL rots silently. Two sources
+    here were broken that way for months before anyone noticed.
+    """
+    r = _http_bytes(CULTURE_PACKAGE_URL, source="culture")
+    pkg = json.loads(r.content.decode("utf-8"))["result"]
+    found = []
+    for res in pkg.get("resources", []):
+        url = (res.get("url") or "").strip()
+        m = CULTURE_FILE_RE.search(url)
+        if m:
+            found.append((int(m.group(1)), url))
+    if not found:
+        raise RuntimeError(
+            f"culture: no GLA_Cultural_Infrastructure_Map_data_YYYY.xlsx in "
+            f"{CULTURE_PACKAGE_URL}. The dataset was restructured; check "
+            f"https://data.london.gov.uk/dataset/cultural-infrastructure-map")
+    year, url = max(found)
+    return url, year
+
+def run_culture() -> pd.DataFrame | None:
+    rule("Cultural infrastructure (GLA)")
+    url, year = _culture_discover_url()
+    cache = CACHE_DIR / "culture" / f"cim_{year}.xlsx"
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    if cache.exists():
+        ok(f"CIM {year}: cached")
+    else:
+        r = _http_bytes(url, source="culture")
+        write_bytes_atomic(cache, r.content)
+        ok(f"CIM {year}: downloaded {len(r.content)/1e6:.2f} MB")
+
+    # keep_default_na=False, or an empty postcode cell arrives as a float NaN
+    # and every .strip() on this frame is a coin toss.
+    df = pd.read_excel(cache, dtype=str, keep_default_na=False)
+    need = {"name", "borough", "ward", "latitude", "longitude", "typology"}
+    missing = need - set(df.columns)
+    if missing:
+        raise RuntimeError(f"culture: CIM {year} is missing {sorted(missing)}; "
+                           f"the workbook layout changed ({url})")
+
+    lad_by_borough = {b.lower(): c for b, c in BOROUGHS}
+    rows = []
+    for _, r in df.iterrows():
+        lat, lng = _tofloat(r.get("latitude")), _tofloat(r.get("longitude"))
+        if lat is None or lng is None:
+            continue
+        borough = (r.get("borough") or "").strip()
+        lad = lad_by_borough.get(borough.lower(), "")
+        if not lad:
+            continue          # the file is London-only, so this is a rename
+        typ = (r.get("typology") or "").strip().lower()
+        addr = ", ".join(x.strip() for x in
+                         [r.get("address1"), r.get("address2"), r.get("address3")]
+                         if isinstance(x, str) and x.strip())
+        rows.append({
+            "name": (r.get("name") or "").strip(),
+            "address": addr,
+            "postcode": (r.get("postcode") or "").strip(),
+            "borough": borough,
+            "lad_code": lad,
+            "ward_name": (r.get("ward") or "").strip(),
+            "type": CULTURE_TYPES.get(typ, typ.replace("_", " ").capitalize()),
+            "lat": lat, "lng": lng,
+        })
+
+    out = pd.DataFrame(rows)
+    out_path = DATA_DIR / "culture" / "cultural_infrastructure.parquet"
+    out = write_parquet_guarded(out_path, out, source="culture")
+    ok(f"culture: {len(out):,} venues, {out.borough.nunique()} boroughs, "
+       f"{out['type'].nunique()} types (CIM {year})")
     return out
 
 
@@ -4619,11 +4820,22 @@ def export_map_blobs() -> None:
                        "LSOA boundaries with IMD 2025 decile and rank, and their ward.")
         ok(f"map blob: {len(kept):,} LSOAs -> data/map/{MAP_BLOBS['LSOA_IMD']}")
 
-    # HOSP is deliberately not written here. data/map/hosp.js is hand-curated:
-    # 20 hospitals with their parent NHS trust, which run_hospitals() does not
-    # produce. The old splice regex for it never matched (the block carries //
-    # comment lines), so this was already the de facto behaviour; making it
-    # explicit stops a future change from silently destroying that file.
+    # HOSP used to be excluded here, because data/map/hospitals.js was twenty
+    # hand-typed records and run_hospitals() could not produce them. It reads
+    # the ODS trust sites register now and covers all 33 boroughs, so the blob
+    # is written like every other one.
+    hosp = _read_parquet_opt(DATA_DIR / "healthcare" / "hospitals.parquet")
+    if hosp is not None and len(hosp):
+        # The postcode is the only address ODS gives, and it is the popup's
+        # address line, so it is spaced the way a person writes it.
+        fmt_pc = lambda p: f"{p[:-3]} {p[-3:]}" if len(p) > 3 else p
+        write_map_blob("HOSP", [
+            {"n": r["name"], "a": fmt_pc(r["postcode"]),
+             "lat": round(float(r["lat"]), 6),
+             "lng": round(float(r["lng"]), 6), "t": r["type"]}
+            for _, r in hosp.iterrows()
+        ], "Hospital sites, from the ODS NHS trust sites register.")
+        ok(f"map blob: {len(hosp):,} hospitals -> data/map/{MAP_BLOBS['HOSP']}")
 
 
 def build_dental_json() -> list:
@@ -4642,6 +4854,16 @@ def build_dental_json() -> list:
     return out
 
 
+def build_culture_json() -> list:
+    """culture.json, in the shape the map's point layers already read."""
+    df = _read_parquet_opt(DATA_DIR / "culture" / "cultural_infrastructure.parquet")
+    if df is None:
+        return []
+    keep = [c for c in ["name", "address", "postcode", "borough", "lad_code",
+                        "ward_name", "type", "lat", "lng"] if c in df.columns]
+    return df[keep].sort_values("name").to_dict(orient="records")
+
+
 def export_all() -> None:
     rule("Export Leaflet JSON outputs")
     ward_data  = build_ward_data()
@@ -4651,6 +4873,7 @@ def export_all() -> None:
     pharm_data = build_pharmacies_json()
     vcse_data  = build_vcse_json()
     dental_data = build_dental_json()
+    culture_data = build_culture_json()
 
     write_json_atomic(REPO_ROOT / "ward_data.json",  ward_data)
     write_json_atomic(REPO_ROOT / "lsoa_data.json",  lsoa_data)
@@ -4660,6 +4883,8 @@ def export_all() -> None:
     write_json_atomic(REPO_ROOT / "vcse_data.json",  vcse_data)
     if dental_data:
         write_json_atomic(REPO_ROOT / "dental_practices.json", dental_data)
+    if culture_data:
+        write_json_atomic(REPO_ROOT / "culture.json", culture_data)
     # Measured from the four payloads above, so it can never describe a
     # different build than the one being shipped.
     # Descriptors for anything in data/custom, so index.html can add the
@@ -5561,6 +5786,7 @@ SOURCES = {
     "ptal":        run_ptal,
     "crime":       run_police_crime,
     "hospitals":   run_hospitals,
+    "culture":     run_culture,
     "charities":   run_charities,
     "dentists":    run_dentists,
 }
