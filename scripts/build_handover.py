@@ -88,6 +88,19 @@ EXCLUDE_FILES = {
     "scripts/tokenise_styles.py",       # one-time CSS migration, already done
     # About the original site's domain, and true of nothing here.
     "DOMAIN.md",
+    # Dead weight, each checked for callers before being listed. Nothing in the
+    # pipeline, the workflow, the site or the docs reads any of them.
+    #   build_ward_pptx.py builds a PowerPoint per ward. It is a one-off that
+    #   needs python-pptx, which is not in requirements.txt, so its first run in
+    #   a fresh clone is an ImportError.
+    #   lsoa_boundaries.geojson is read by that script and by nothing else. The
+    #   boundaries the map draws are data/boundaries/lsoa.geojson, which stays.
+    #   ward_imd.csv and ward_geometries.json are read by nothing at all: both
+    #   are superseded by ward_data.json and data/boundaries/.
+    "scripts/build_ward_pptx.py",
+    "lsoa_boundaries.geojson",
+    "ward_imd.csv",
+    "ward_geometries.json",
 }
 # Deliberately kept even though the monthly refresh does not call them:
 #   scripts/fetch_fingertips.py, wire_fingertips_ui.py, build_postcode_table.py,
@@ -169,6 +182,17 @@ def strip_index(text: str) -> tuple[str, list[str]]:
     text = "\n".join(out_lines)
     if css_removed:
         notes.append(f"removed {css_removed} single-line #ai-/.ai- CSS rules")
+
+    # The development banner. It says this tool is still being built and that
+    # there will be an announcement when it is ready, which is a promise about
+    # the original site's release schedule and not about this copy. Left in, it
+    # is a permanent strip across the bottom of somebody else's map telling
+    # them to treat their own figures as provisional.
+    if "devBanner:   true," in text:
+        text = text.replace("devBanner:   true,", "devBanner:   false,", 1)
+        notes.append("turned the development banner off (PH_SHOW.devBanner)")
+    else:
+        notes.append("WARNING: PH_SHOW.devBanner not found; check the banner by hand")
 
     # The tour chapter about the panel. Matched on its own title so a reordered
     # tour does not defeat it, and bounded by the object literal around it.

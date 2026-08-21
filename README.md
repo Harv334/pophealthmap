@@ -154,6 +154,20 @@ Point the domain at Pages with four `A` records for the apex
 to `<user>.github.io`. If the DNS is on Cloudflare, set those records to
 **DNS only** rather than proxied, or Pages cannot issue its certificate.
 
+### pophealth.uk
+
+This repository is the one that keeps https://pophealth.uk updated, and it will
+go on being maintained here.
+
+**Leave the domain pointed at this repository's own GitHub Pages site.** The
+`CNAME` file in this repo is what claims it. A custom domain can only be claimed
+by one repository at a time, and GitHub awards it to whichever published most
+recently, so a second repository carrying the same `CNAME` does not fail
+loudly: it silently takes the domain, and pophealth.uk starts serving that
+repository instead. Any copy or fork must therefore keep no `CNAME` and serve
+from its own `<account>.github.io/<repo>/` address. The handover build drops
+the file for exactly this reason.
+
 ## Handing this over
 
 For someone who just wants to refresh the map:

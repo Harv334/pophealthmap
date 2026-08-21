@@ -332,7 +332,8 @@ would silently be mostly guesswork.
 | `epraccur` extract (GP practices, no download) | NHS ODS Data Search and Export | https://www.odsdatasearchandexport.nhs.uk/api/getReport?report=epraccur | GP practice names, postcodes, status. Join to postcode → ward lookup. Fetched by the pipeline and revalidated by ETag. The former bulk-zip URL `https://files.digital.nhs.uk/assets/ods/current/epraccur.zip` now returns 403; that whole route has been retired. |
 | GP list-size / registered patients CSV | NHS Digital — "Patients Registered at a GP Practice" | https://digital.nhs.uk/data-and-information/publications/statistical/patients-registered-at-a-gp-practice | Sizes the GP marker on the map. Download the monthly "gp-reg-pat-prac-all.csv". |
 | `edispensary` extract (pharmacies, no download) | NHS ODS Data Search and Export | https://www.odsdatasearchandexport.nhs.uk/api/getReport?report=edispensary | Pharmacy name + postcode. Headerless 27-column ODS CSV, same layout as epraccur. Fetched by the pipeline and revalidated by ETag. |
-| NHS.uk GP / Dentist JSON datasets | NHS.uk | https://www.nhs.uk/about-us/nhs-website-datasets/ | Dentist and pharmacy pins; also has opening hours + services. Requires free sign-up. |
+| `ets` extract (NHS trust sites, no download) | NHS ODS Data Search and Export | https://www.odsdatasearchandexport.nhs.uk/api/getReport?report=ets | Hospital sites. ODS has no hospital category, so a site is recovered from the records filed at its postcode. Headerless, and the status column is blank: a site is open until it has a close date. |
+| Cultural Infrastructure Map (no download) | Greater London Authority | https://data.london.gov.uk/api/action/package_show?id=2rj5o | Theatres, rehearsal rooms, artist and maker workspaces. The download path carries a hash that changes on republish, so the pipeline reads the dataset listing and takes the newest workbook. |
 
 ---
 

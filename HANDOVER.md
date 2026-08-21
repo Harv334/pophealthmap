@@ -41,7 +41,8 @@ pip install -r requirements.txt
 python fetch_all_data.py
 ```
 
-Then commit and push. Twenty minutes from cold, faster after that: downloads
+Then commit and push. Nothing has to be downloaded by hand first: every source
+is either an API the script calls or a file already in the repository. Twenty minutes from cold, faster after that: downloads
 are kept in `.cache/`, which is not committed.
 
 Two flags worth knowing:
@@ -170,6 +171,24 @@ number of areas look right, does the colour run the right way, and does
 
 ---
 
+## Two switches you may want
+
+Near the bottom of `index.html`:
+
+```js
+var PH_SHOW = {
+  devBanner:   false,   // the "this tool is in development" strip
+  methodology: false,   // the Methodology link in the footer
+};
+```
+
+The development banner is off in this copy: it was a caveat about the original
+site's release schedule. The methodology link is off too, though
+`methodology.html` is still published and still reachable at its own URL, so
+turning it back on is a one-word change.
+
+---
+
 ## Publishing
 
 Every push to `main` publishes the site. There is nothing to build or upload.
@@ -177,6 +196,12 @@ Every push to `main` publishes the site. There is nothing to build or upload.
 This copy has no `CNAME`, so it serves from
 `https://<account>.github.io/<repo>/`. Add a `CNAME` file containing one domain
 name to use your own address.
+
+**Do not put `pophealth.uk` in it.** That domain belongs to the original site,
+which is still maintained and still updated. A domain can be claimed by only
+one repository at a time and GitHub gives it to whichever published last, so a
+second `CNAME` naming it does not fail: it takes the domain, and pophealth.uk
+starts serving this copy instead.
 
 **Three things still name the original site** and are yours to change: a
 `canonical` link, an `og:url`, and a JSON-LD block in `index.html`. The
@@ -209,6 +234,6 @@ not rank. `sitemap.xml` and `robots.txt` were left out and would need writing.
 | `fetch_all_data.py` | The pipeline. Long, and written to be read |
 | `index.html` | The whole site |
 | `methodology.html` | Public page: every source, its geography, its year |
-| `RAW_DATA_SOURCES.md` | Every raw file and how to fetch it by hand |
+| `RAW_DATA_SOURCES.md` | Every source, with the exact URL the pipeline uses |
 | `DATA_LICENCES.md` | **Read before republishing.** Licence and required wording per source |
 | `tests/README.md` | How to run the tests |

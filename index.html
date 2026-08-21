@@ -2841,7 +2841,7 @@
        failed ward_data.json load reports itself, and it is empty otherwise. -->
   <footer class="sbar">
     <span class="sbar-left">
-      <a class="sbar-link" href="methodology.html">Methodology &amp; technical notes</a>
+      <a class="sbar-link" id="meth-link" href="methodology.html">Methodology &amp; technical notes</a>
       <!-- The Accessibility link was taken out of this bar on request.
            accessibility.html is still published and still reachable at its own
            URL, and the methodology page header still links to it, so the
@@ -11533,6 +11533,32 @@ loadData();
 })();
 </script>
 
+<script>
+/* What this build shows.
+
+   Two pieces of furniture that suit the site they are published on rather than
+   the code, so they are one object at the top rather than a hunt through the
+   page. Both fail safe: an unrecognised value hides the thing.
+
+   devBanner    the "This tool is in development" strip along the bottom. True
+                here, because this build is the one still being worked on. The
+                handover build sets it false: a caveat about somebody else's
+                release schedule is noise in a repository that has just changed
+                hands.
+   methodology  the "Methodology & technical notes" link in the footer. Off by
+                default. methodology.html is still published and still reachable
+                at its own URL, and the page itself is unchanged; it is the
+                footer link that is hidden until somebody turns it on. */
+var PH_SHOW = {
+  devBanner:   true,
+  methodology: false,
+};
+(function () {
+  var link = document.getElementById('meth-link');
+  if (link && PH_SHOW.methodology !== true) link.hidden = true;
+})();
+</script>
+
 <div id="dev-banner" role="status" hidden>
   <div><b>This tool is in development.</b> The data is real and comes from published
   sources, but the map is still being built and checked, so treat figures as
@@ -11543,6 +11569,7 @@ loadData();
 (function () {
   var el = document.getElementById('dev-banner');
   if (!el) return;
+  if (typeof PH_SHOW !== 'object' || PH_SHOW.devBanner !== true) { el.remove(); return; }
   // sessionStorage, not localStorage: dismissing it should quieten this visit,
   // not hide the caveat from someone returning weeks later.
   try { if (sessionStorage.getItem('devBannerDismissed')) return; } catch (e) {}
