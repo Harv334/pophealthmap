@@ -1981,7 +1981,6 @@
       <button type="button" class="tb-btn" id="tb-cb" title="Switch to a colour-blind safe palette (deuteranopia/protanopia friendly)" aria-pressed="false">◐ CB safe</button>
       
       <button type="button" class="tb-btn" id="tb-png" title="Clear the screen for a screenshot: whitens everything outside the mapped area and hides the controls, then you capture it with your own screenshot tool.">⤓ Screenshot</button>
-      <button type="button" class="tb-btn" id="tb-csv" title="Download the ward/LSOA data behind the current overlay">⤓ CSV</button>
     </div>
   </header>
 
@@ -11147,225 +11146,6 @@ function _pngScopeBounds() {
    _pngScopeFeatures, _pngScopeLabel and _pngScopeBounds are kept above:
    the live screenshot path still uses them. */
 
-// CSV: dump the ward/LSOA table behind the currently-active overlay, FILTERED
-// to the currently-visible view. Honours focusedBorough, the LSOA scope and
-// the Core20 toggle so the CSV reflects what the user sees.
-function _csvEscape(v) {
-  if (v == null) return '';
-  const s = String(v);
-  return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
-}
-async function _downloadOverlayCsv() {
-  try {
-    const rows = [];
-    const ov = (typeof curOv !== 'undefined' && curOv !== 'none') ? curOv : null;
-    const isLsoa = ov && typeof isLsoaOnlyOv === 'function' && isLsoaOnlyOv(ov);
-    const wantLsoa = isLsoa || (typeof currentDataLevel !== 'undefined' && currentDataLevel === 'lsoa');
-    /* Fetch the figures before deciding there are none.
-
-       The LSOA figures are 7.8 MB and are loaded on demand, so an export asked
-       for before anything else had needed them read an empty LSOA_DATA, wrote
-       no rows, and told the reader "No data matches the current view. Clear
-       filters and try again." Their filters were fine, and clearing them
-       changed nothing, which is the worst kind of instruction: it blames the
-       one thing they can act on for something they cannot see. */
-    if (wantLsoa && typeof ensureLsoaData === 'function'
-        && !(typeof LSOA_DATA === 'object' && LSOA_DATA && Object.keys(LSOA_DATA).length)) {
-      await ensureLsoaData();
-    }
-    // Whichever scope is on, board or borough. ladInFocus answers for both.
-    const scoped = (typeof focusActive === 'function') && focusActive();
-    const core20Only    = (typeof showCore20Overlay !== 'undefined' && showCore20Overlay) === true;
-    let nKept = 0, nSkipped = 0;
-    if (wantLsoa && typeof LSOA_DATA !== 'undefined') {
-      // LSOA_DATA holds indicators and nothing else: it is keyed by LSOA code
-      // and every value is a number. It has no name, ward or borough on it, so
-      // the geography has to be joined from LSOA_IMD, which is where the map's
-      // own filtering reads it. Reading it off LSOA_DATA gave blank columns on
-      // every row, and worse, made every filter match nothing at all: an
-      // export with a borough or ward selected produced no file, only the "no
-      // data matches" alert.
-      const geoByCode = {};
-      if (typeof LSOA_IMD !== 'undefined' && LSOA_IMD) {
-        for (const f of (LSOA_IMD.features || LSOA_IMD)) {
-          const p = (f && f.properties) || f;
-          if (p && p.code) geoByCode[p.code] = p;
-        }
-      }
-      const header = ['lsoa_code','lsoa_name','ward','borough','imd_decile','core20'];
-      if (ov) header.push(ov);
-      rows.push(header.map(_csvEscape).join(','));
-      for (const [code, l] of Object.entries(LSOA_DATA)) {
-        const ind = l.indicators || l;
-        const g = geoByCode[code] || {};
-        const ward = g.ward || '';
-        const lad  = g.borough || '';
-        if (scoped && !ladInFocus(lad)) { nSkipped++; continue; }
-        const dec = ind.imd_decile != null ? ind.imd_decile
-                  : (g.imd_decile != null ? g.imd_decile : '');
-        const isCore20 = (dec === 1 || dec === 2);
-        if (core20Only && !isCore20) { nSkipped++; continue; }
-        const row = [code, g.name||'', ward, lad, dec, isCore20 ? 'Y' : ''];
-        if (ov) row.push(ind[resolveOvField(ov)]);
-        rows.push(row.map(_csvEscape).join(','));
-        nKept++;
-      }
-    } else if (typeof WARD_DATA !== 'undefined') {
-      const header = ['ward_code','ward_name','borough'];
-      if (ov) header.push(ov);
-      rows.push(header.map(_csvEscape).join(','));
-      for (const [key, w] of Object.entries(WARD_DATA)) {
-        const lad = w.lad || w.LAD || '';
-        // WARD_DATA is keyed by ward name, not code, so the loop key is a name.
-        // Writing it into a column headed ward_code published the name twice
-        // and the code never, which would quietly break any join made against
-        // it downstream. The real code is on the record.
-        const wardCode = w.code || '';
-        if (scoped && !ladInFocus(lad)) { nSkipped++; continue; }
-        const row = [wardCode, w.name || key, lad];
-        if (ov) row.push(w.indicators ? w.indicators[resolveOvField(ov)] : '');
-        rows.push(row.map(_csvEscape).join(','));
-        nKept++;
-      }
-    }
-    if (rows.length < 2) { alert('No data matches the current view. Clear filters and try again.'); return; }
-    const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    const ts = new Date().toISOString().slice(0,16).replace(/[:T-]/g,'');
-    const tag = wantLsoa ? 'lsoa' : 'ward';
-    const suffix = ov ? `${tag}-${ov}` : tag;
-    a.href = url; a.download = `nwl-${suffix}-${ts}.csv`;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 2000);
-    console.log(`CSV export: ${nKept} rows kept, ${nSkipped} filtered out`);
-  } catch (e) {
-    console.error('CSV export error', e);
-    alert('CSV export failed: ' + e.message);
-  }
-}
-
-// ── Point-layer CSV export ─────────────────────────────────────────────
-// When the user has any point layers (VCSE / GP / dental / schools / etc.)
-// toggled on, the CSV button also emits one CSV per visible layer alongside
-// the ward/LSOA choropleth CSV. Each file is scoped to the current borough
-// focus so it matches what the user is currently looking at.
-function _downloadCsvBlob(filename, header, rows) {
-  if (!rows || !rows.length) return false;
-  const lines = [header.map(_csvEscape).join(',')]
-    .concat(rows.map(r => r.map(_csvEscape).join(',')));
-  const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = filename;
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 2000);
-  return true;
-}
-
-function _downloadPointLayersCsv() {
-  const ts = new Date().toISOString().slice(0,16).replace(/[:T-]/g,'');
-  const scoped = (typeof focusActive === 'function') && focusActive();
-  const scopeSlug = ((scoped && focusLabel()) || 'london')
-    .toLowerCase().replace(/&/g,'and').replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
-
-  // Scope helper: keep only records inside whatever is focused, board or
-  // borough. For records carrying a borough name, match on it; otherwise fall
-  // back to a spatial test using BOROUGH_GJ.
-  const inScope = (rec) => {
-    if (!scoped) return true;
-    const b = rec.borough || rec.lad || rec.LAD || '';
-    if (b && ladInFocus(b)) return true;
-    const lat = rec.lat, lng = rec.lng;
-    if (lat == null || lng == null) return false;
-    if (typeof ladOfLatLng === 'function') {
-      try { return ladInFocus(ladOfLatLng(lat, lng)); } catch(e) { return false; }
-    }
-    return false;
-  };
-
-  let total = 0;
-  const layers = [
-    {
-      id: 'tg', name: 'gp-practices',
-      data: typeof GPS !== 'undefined' ? GPS : null,
-      header: ['name','address','postcode','tel','website','patients','lat','lng'],
-      row: r => [r.n||r.name, r.a||r.addr, r.pc||r.postcode, r.tel||'', r.web||'', r.patients||'', r.lat, r.lng],
-    },
-    {
-      id: 'th', name: 'hospitals',
-      data: typeof HOSP !== 'undefined' ? HOSP : null,
-      header: ['name','address','type','trust','lat','lng'],
-      row: r => [r.n||r.name, r.a||r.addr, r.t||'', r.trust||'', r.lat, r.lng],
-    },
-    {
-      id: 'tph', name: 'pharmacies',
-      data: typeof pharmData !== 'undefined' ? pharmData : null,
-      header: ['name','address','postcode','lat','lng'],
-      row: r => [r.name||r.n, r.addr||r.a||'', r.postcode||r.pc||'', r.lat, r.lng],
-    },
-    {
-      id: 'td', name: 'dental-practices',
-      data: typeof dentalData !== 'undefined' ? dentalData : null,
-      header: ['name','postcode','lat','lng'],
-      row: r => [r.name, r.postcode||'', r.lat, r.lng],
-    },
-    {
-      id: 'tv', name: 'vcse-organisations',
-      data: typeof vcseData !== 'undefined' ? vcseData : null,
-      header: ['name','address','lat','lng'],
-      row: r => [r.name, r.addr||'', r.lat, r.lng],
-    },
-    {
-      id: 'tsch', name: 'schools',
-      data: typeof schoolsData !== 'undefined' ? schoolsData : null,
-      header: ['name','urn','phase','type','gender','low_age','high_age','capacity','pupils','fsm_pct','street','town','postcode','website','borough','ward_code','lat','lng'],
-      row: r => [r.name, r.urn||'', r.phase||'', r.type||'', r.gender||'', r.low_age||'', r.high_age||'', r.capacity||'', r.pupils||'', r.fsm_pct||'', r.street||'', r.town||'', r.postcode||'', r.website||'', r.borough||'', r.ward_code||'', r.lat, r.lng],
-    },
-    {
-      id: 'tcc', name: 'community-centres',
-      data: typeof ccData !== 'undefined' ? ccData : null,
-      header: ['name','address','postcode','website','borough','ward_name','ward_code','lat','lng'],
-      row: r => [r.name, r.address||'', r.postcode||'', r.website||'', r.borough||'', r.ward_name||'', r.ward_code||'', r.lat, r.lng],
-    },
-    {
-      id: 'tlib', name: 'libraries',
-      data: typeof libData !== 'undefined' ? libData : null,
-      header: ['name','address','postcode','website','status','borough','ward_name','ward_code','lat','lng'],
-      row: r => [r.name, r.address||'', r.postcode||'', r.website||'', r.status||'', r.borough||'', r.ward_name||'', r.ward_code||'', r.lat, r.lng],
-    },
-    {
-      id: 'tesol', name: 'esol-providers',
-      data: typeof esolData !== 'undefined' ? esolData : null,
-      header: ['name','type','website','address','postcode','borough','lat','lng'],
-      row: r => [r.name, r.type||'', r.website||'', r.address||'', r.postcode||'', r.borough||'', r.lat, r.lng],
-    },
-    {
-      id: 'tgr', name: 'parks-greenspaces',
-      data: typeof GRN !== 'undefined' ? GRN : null,
-      header: ['name','address','size','lat','lng'],
-      row: r => [r.n||r.name, r.a||r.addr||'', r.sz||'', r.lat, r.lng],
-    },
-  ];
-
-  // Stagger the downloads slightly — some browsers block synchronous bursts.
-  let delay = 0;
-  layers.forEach(L => {
-    const cb = document.getElementById(L.id);
-    if (!cb || !cb.checked) return;
-    if (!Array.isArray(L.data) || !L.data.length) return;
-    const filtered = L.data.filter(inScope);
-    if (!filtered.length) return;
-    const rows = filtered.map(L.row);
-    setTimeout(() => {
-      _downloadCsvBlob(`nwl-${L.name}-${scopeSlug}-${ts}.csv`, L.header, rows);
-    }, delay);
-    delay += 350;
-    total++;
-  });
-  return total;
-}
-
 // ── Export dialog modal ─────────────────────────────────────────────────
 // Tiny modal helper: takes a title + array of options + fires the chosen
 // option's onClick. Used for both PNG and CSV export pickers.
@@ -11508,7 +11288,6 @@ async function _prepareScreenForScreenshot(opts) {
 
 (function _wireExportButtons() {
   const pngBtn = document.getElementById('tb-png');
-  const csvBtn = document.getElementById('tb-csv');
 
   /* Prepare the screen, and let the operating system take the picture.
      This was wired to an html2canvas exporter, on the reasoning that a button
@@ -11547,21 +11326,6 @@ async function _prepareScreenForScreenshot(opts) {
     _prepareScreenForScreenshot({ mode, whiteOutside: true });
   });
 
-  if (csvBtn) csvBtn.addEventListener('click', async () => {
-    const choice = await _exportDialog('Download data as CSV', [
-      { key: 'overlay', label: 'Overlay data only',
-        desc: 'Ward or LSOA values for the currently-active overlay (e.g. fuel poverty, IMD score). One CSV.' },
-      { key: 'layers', label: 'Visible point layers only',
-        desc: 'One CSV per toggled-on point layer (VCSE, GP, schools, dental, etc.) scoped to the area you have focused, board or borough.' },
-      { key: 'both', label: 'Everything visible',
-        desc: 'Overlay CSV plus one CSV per visible point layer.' },
-    ]);
-    if (!choice) return;
-    if (choice.key === 'overlay' || choice.key === 'both') await _downloadOverlayCsv();
-    if (choice.key === 'layers'  || choice.key === 'both') {
-      try { _downloadPointLayersCsv(); } catch(e) { console.warn('point-layer CSV export failed', e); }
-    }
-  });
 })();
 
 // (Copy-link button removed — if we want shareable URLs later, wire it
