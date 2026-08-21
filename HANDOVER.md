@@ -79,8 +79,54 @@ Not faults. Dates and identifiers that were true when written.
 
 ## Adding new data
 
-A source touches five places. Copy `run_air_quality` in `fetch_all_data.py`;
-it was added exactly this way and is commented throughout.
+There are two cases, and they are very different amounts of work. Start by
+working out which one you have.
+
+### You have a spreadsheet of your own figures
+
+Drop two files in `data/custom/` and run the pipeline. No Python to edit.
+
+`my_figures.csv` — first column is the area code, `LSOA21CD` or `WD25CD`:
+
+    LSOA21CD,wellbeing_score
+    E01000001,7.2
+    E01000002,6.8
+
+`my_figures.json` beside it:
+
+    {
+      "source": "My team's survey, 2026",
+      "indicators": [{
+        "column": "wellbeing_score",
+        "label": "Wellbeing score (1-10)",
+        "higher_is_worse": false
+      }]
+    }
+
+Then:
+
+```bash
+python fetch_all_data.py --only custom
+python fetch_all_data.py --export-only
+```
+
+Commit and push. It appears in the indicator list under "Your data", colours
+the map, and rolls up from neighbourhoods to wards on the same population
+weighting every other source uses.
+
+`data/custom/README.md` has the full field list, and there is a worked example
+in that folder you can copy or delete.
+
+`higher_is_worse` is the one field with no default. It decides which end of the
+scale is red, and a wrong guess does not look like an error, it looks like a
+finding.
+
+### You are adding a national source that refreshes itself
+
+This is the harder case: a feed somebody else publishes, that you want pulled
+fresh every month. It touches five places. Copy `run_air_quality` in
+`fetch_all_data.py`; it was added exactly this way and is commented
+throughout.
 
 1. **Fetch it** — write a `run_yoursource()` that returns a table keyed by
    `LSOA21CD` and writes a parquet under `data/`. Find the download URL from

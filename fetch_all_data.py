@@ -3872,6 +3872,26 @@ def build_ward_data() -> dict:
             if col in aq.columns:
                 _agg_to_wards(aq, col, col)
 
+    # Your own figures. LSOA rows roll up to wards on the same population
+    # weighting as everything else; ward rows are already ward-level and are
+    # written straight on. Columns ending _count are summed, because a count
+    # that gets averaged looks plausible and is wrong.
+    for level in ("lsoa", "ward"):
+        cf = _read_parquet_opt(CUSTOM_DIR / f"custom_{level}.parquet")
+        if cf is None or cf.empty:
+            continue
+        sources["custom"] = "Your own figures (data/custom)"
+        code_col = "LSOA21CD" if level == "lsoa" else "WD25CD"
+        for col in [c for c in cf.columns if c != code_col]:
+            if level == "lsoa":
+                _agg_to_wards(cf, col, col)
+            else:
+                for _, row in cf.iterrows():
+                    wd = str(row[code_col])
+                    v = row.get(col)
+                    if wd in wards and pd.notna(v):
+                        wards[wd]["indicators"][col] = round(float(v), 4)
+
     tfl = _read_parquet_opt(DATA_DIR / "environment" / "tfl_transport_lsoa.parquet")
     if tfl is not None and not tfl.empty:
         sources["tfl"] = "TfL Unified API (StopPoint register)"
@@ -4111,6 +4131,20 @@ def build_lsoa_data() -> dict:
                     out[code][col] = (int(v) if col.endswith(("_1km", "_800m"))
                                       else round(float(v), 2))
 
+    # Your own figures, LSOA level. Ward-level custom columns are not written
+    # here: they belong to a ward and spreading one ward's number across its
+    # neighbourhoods would invent detail the file does not have.
+    cf = _read_parquet_opt(CUSTOM_DIR / "custom_lsoa.parquet")
+    if cf is not None and not cf.empty:
+        for _, row in cf.iterrows():
+            code = str(row["LSOA21CD"])
+            if code not in out:
+                continue
+            for col in [c for c in cf.columns if c != "LSOA21CD"]:
+                v = row.get(col)
+                if pd.notna(v):
+                    out[code][col] = round(float(v), 4)
+
     # Green and blue space access (Defra, via run_greenblue)
     #
     # Only the fields the map actually offers are carried, matching how
@@ -4240,6 +4274,7 @@ MAP_BLOBS = {
     "LSOA_IMD":   "lsoa_imd.js",
     "BOROUGH_GJ": "boroughs.js",
     "PH_IND_STATS": "indicators.js",
+    "PH_CUSTOM":     "custom.js",
 }
 
 def _read_geojson_opt(path: Path):
@@ -4627,6 +4662,20 @@ def export_all() -> None:
         write_json_atomic(REPO_ROOT / "dental_practices.json", dental_data)
     # Measured from the four payloads above, so it can never describe a
     # different build than the one being shipped.
+    # Descriptors for anything in data/custom, so index.html can add the
+    # options, the colour config and the descriptions itself. Written even when
+    # empty: a stale custom.js naming an indicator whose CSV has been deleted
+    # would leave a permanently blank overlay in the picker.
+    _custom_reg = []
+    _reg_path = CUSTOM_DIR / "custom_registry.json"
+    if _reg_path.exists():
+        try:
+            _custom_reg = json.loads(_reg_path.read_text(encoding="utf-8"))
+        except ValueError as e:
+            warn(f"custom: registry unreadable ({e}); the map will not show it")
+    write_map_blob("PH_CUSTOM", _custom_reg,
+                   "Indicators from data/custom. Generated - do not edit.")
+
     write_map_blob(
         "PH_IND_STATS",
         build_indicator_stats(ward_data, lsoa_data, msoa_data, boro_data),
@@ -5362,7 +5411,139 @@ def run_tfl_transport() -> "pd.DataFrame | None":
     return out
 
 
+# ============================================================================
+# SOURCE: your own figures, from data/custom/
+# ============================================================================
+# Everything else in this file fetches from a national publisher. This one
+# reads CSVs somebody has put in data/custom/ and treats them the same way.
+#
+# It exists because the five-step route for adding a source assumes you are
+# adding a national feed that refreshes monthly. Most of the time that is not
+# what somebody has. They have a spreadsheet of their own numbers for wards or
+# neighbourhoods and want it on the map, and asking them to write a fetcher,
+# edit two builders and hand-write four registry entries for that is asking
+# them to learn the whole pipeline to draw one column.
+#
+# A CSV and a JSON beside it is the whole interface. data/custom/README.md is
+# written for the person doing it. Everything else here reads the same as any
+# other source downstream: the parquet lands beside the rest, the ward roll-up
+# uses the same population weighting, and the UI registry is generated rather
+# than typed.
+CUSTOM_DIR = DATA_DIR / "custom"
+
+
+def run_custom() -> "pd.DataFrame | None":
+    rule("Your own figures (data/custom)")
+    if not CUSTOM_DIR.exists():
+        info("custom: no data/custom directory, nothing to read")
+        return None
+
+    specs = sorted(CUSTOM_DIR.glob("*.json"))
+    if not specs:
+        info("custom: no CSV described in data/custom, nothing to read")
+        return None
+
+    frames: dict[str, list] = {"LSOA21CD": [], "WD25CD": []}
+    registry: list[dict] = []
+    for spec_path in specs:
+        try:
+            spec = json.loads(spec_path.read_text(encoding="utf-8"))
+        except ValueError as e:
+            warn(f"custom: {spec_path.name} is not valid JSON ({e}); skipped")
+            continue
+        csv_path = spec_path.with_suffix(".csv")
+        if not csv_path.exists():
+            warn(f"custom: {spec_path.name} has no {csv_path.name} beside it; skipped")
+            continue
+        try:
+            df = pd.read_csv(csv_path, dtype=str)
+        except Exception as e:
+            warn(f"custom: {csv_path.name} unreadable ({e}); skipped")
+            continue
+        if df.empty:
+            warn(f"custom: {csv_path.name} is empty; skipped")
+            continue
+
+        # The area column is whichever of the two code columns is present,
+        # rather than a setting, because there are only two answers and the
+        # file already knows which one it used.
+        code_col = next((c for c in ("LSOA21CD", "WD25CD") if c in df.columns), None)
+        if not code_col:
+            warn(f"custom: {csv_path.name} has neither an LSOA21CD nor a "
+                 f"WD25CD column; skipped. Its columns are {list(df.columns)[:6]}")
+            continue
+
+        inds = spec.get("indicators") or []
+        if not inds:
+            warn(f"custom: {spec_path.name} lists no indicators; skipped")
+            continue
+
+        keep, bad = [], []
+        for ind in inds:
+            col = ind.get("column")
+            if col not in df.columns:
+                bad.append(f"{col!r} is not a column in {csv_path.name}")
+                continue
+            if not isinstance(ind.get("higher_is_worse"), bool):
+                # Refused rather than defaulted. A guessed direction paints the
+                # best areas red and reads as a finding rather than a guess.
+                bad.append(f"{col!r} has no higher_is_worse, so which end is "
+                           f"bad is unknown and it cannot be coloured")
+                continue
+            if not ind.get("label"):
+                bad.append(f"{col!r} has no label")
+                continue
+            keep.append(ind)
+        for b in bad:
+            warn(f"custom: {b}")
+        if not keep:
+            continue
+
+        sub = pd.DataFrame({code_col: df[code_col].astype(str).str.strip()})
+        for ind in keep:
+            sub[ind["column"]] = pd.to_numeric(df[ind["column"]], errors="coerce")
+        sub = sub.dropna(subset=[code_col])
+        frames[code_col].append(sub)
+
+        for ind in keep:
+            registry.append({
+                "k": ind["column"],
+                "l": ind["label"],
+                "grp": ind.get("group") or "Your data",
+                "wh": bool(ind["higher_is_worse"]),
+                "u": ind.get("unit") or "",
+                "src": spec.get("source") or spec_path.stem,
+                "desc": ind.get("description") or "",
+                "lv": "lsoa" if code_col == "LSOA21CD" else "ward",
+            })
+        ok(f"custom: {csv_path.name} -> {len(keep)} indicator(s) over "
+           f"{len(sub):,} {code_col} rows")
+
+    if not registry:
+        warn("custom: nothing usable was found in data/custom")
+        return None
+
+    CUSTOM_DIR.mkdir(parents=True, exist_ok=True)
+    written = 0
+    for code_col, parts in frames.items():
+        if not parts:
+            continue
+        merged = parts[0]
+        for extra in parts[1:]:
+            merged = merged.merge(extra, on=code_col, how="outer")
+        level = "lsoa" if code_col == "LSOA21CD" else "ward"
+        out_path = CUSTOM_DIR / f"custom_{level}.parquet"
+        write_parquet_atomic(out_path, merged)
+        written += len(merged)
+        ok(f"custom: {len(merged):,} rows -> {out_path.relative_to(REPO_ROOT)}")
+
+    write_json_atomic(CUSTOM_DIR / "custom_registry.json", registry, pretty=True)
+    ok(f"custom: {len(registry)} indicator(s) registered")
+    return pd.DataFrame([{"indicators": len(registry), "rows": written}])
+
+
 SOURCES = {
+    "custom":      run_custom,
     "boundaries":  run_boundaries,
     "greenblue":   run_greenblue,
     "air_quality": run_air_quality,
