@@ -76,7 +76,26 @@ EXCLUDE_FILES = {
     # handover should not start with two files whose purpose has to be guessed.
     ".mount_test",
     ".refresh_marker",
+    # One-off scripts, kept here for their history and dead weight there. Each
+    # was checked for callers first: nothing in the workflow, the pipeline or
+    # the docs references any of them. Left in, they are five more files
+    # somebody has to open to find out they did not need to.
+    "fix_imd.py",                       # one-time IMD repair, already applied
+    "cleanup_and_commit.sh",            # a shell helper for this repository
+    "scripts/heal_index.py",
+    "scripts/check_ward_record.py",     # diagnostics for a fixed bug
+    "scripts/check_fingertips_data.py",
+    "scripts/tokenise_styles.py",       # one-time CSS migration, already done
+    # About the original site's domain, and true of nothing here.
+    "DOMAIN.md",
 }
+# Deliberately kept even though the monthly refresh does not call them:
+#   scripts/fetch_fingertips.py, wire_fingertips_ui.py, build_postcode_table.py,
+#   build_fonts.py, build_greenspaces.py, reclip_greenspaces.py, fetch_cics.py,
+#   build_esol_layers.py and build_esol_v2.py all rebuild a layer or add
+#   indicators. They are how you add data, which is the thing this handover is
+#   most likely to be asked to do.
+#   scripts/reconfigure_to_ons_wd24_lookup.py is imported by fetch_all_data.py.
 
 
 def strip_index(text: str) -> tuple[str, list[str]]:

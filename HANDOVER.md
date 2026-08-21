@@ -1,220 +1,168 @@
 # Handover
 
-You have inherited a map of London population health. It is a static website
-and one Python script that rebuilds it. There is no server, no database and no
-login. GitHub hosts the site, GitHub Actions refreshes the data, and everything
-a visitor sees is a file in this repository.
-
-This page is the one to read first. It covers the three things you need: how to
-run it, how the data refreshes and what will go stale, and how to add data of
-your own.
+A map of London population health. A static website, plus one Python script
+that rebuilds it from published data. No server, no database, no login.
 
 ---
 
-## 1. Running it
+## Do you need to do anything?
 
-### Look at it locally
+**No.** The data refreshes itself and the site publishes itself.
 
-The site is static, but it fetches JSON, so opening `index.html` from the file
-system will not work. Serve it:
+On the 15th of each month GitHub Actions downloads every source, rebuilds the
+files the map reads, and commits them. That commit publishes the site. Nobody
+has to be there.
 
-```bash
-python -m http.server 8000
-```
+Three things are worth doing anyway:
 
-Then open `http://127.0.0.1:8000/index.html`.
+| When | What |
+|------|------|
+| Monthly, one minute | Open **Actions** and check the last "Refresh data" run is green |
+| If a run fails | It opens an issue naming the source that broke. `data/meta/manifest.json` says what happened |
+| Once a year | Read "What will go stale" below |
 
-### Publish it
+---
 
-Every push to `main` publishes. `.github/workflows/jekyll-gh-pages.yml` builds
-the repository and deploys it to GitHub Pages, and the live site is whatever is
-on `main`. There is no build step of your own to run and no artefact to upload.
+## Refreshing the data
 
-This copy carries no `CNAME`, so it serves from
-`https://<your-account>.github.io/<repo>/`. Add a `CNAME` file holding one
-domain name to serve it from your own address. It was left out rather than
-copied because the original site uses `pophealth.uk`, and two repositories
-claiming one domain is a conflict that GitHub resolves in favour of whichever
-published most recently.
+### It happens on its own
 
-**Three things still name the original site**, and they are yours to decide on
-rather than something to change on your behalf:
+`.github/workflows/refresh-data.yml`, 03:00 UTC on the 15th. If nothing
+changed upstream, nothing is committed.
 
-- a `<link rel="canonical">` in `index.html`, which tells search engines this
-  page is a copy of `pophealth.uk` and that the original should rank instead
-- an `og:url`, which sets what a link preview shows when the page is shared
-- a JSON-LD block naming the dataset, its licence and its download URLs
+### Forcing a refresh
 
-While this is a copy of that site they are accurate. Once it becomes its own
-thing they are wrong, and the canonical tag in particular will keep this
-version out of search results. `sitemap.xml` and `robots.txt` were left out
-for the same reason and would need writing fresh.
+**Actions → Refresh data → Run workflow.** Takes about 20 minutes.
 
-### Rebuild the data
+### Doing it on your own machine
 
 ```bash
 pip install -r requirements.txt
 python fetch_all_data.py
 ```
 
-That takes about twenty minutes from cold and downloads roughly 400 MB. It
-writes into `.cache/`, which is gitignored, so a second run is much faster.
+Then commit and push. Twenty minutes from cold, faster after that: downloads
+are kept in `.cache/`, which is not committed.
 
-Useful flags:
-
-```bash
-python fetch_all_data.py --only air_quality      # one source
-python fetch_all_data.py --skip crime            # everything but one
-python fetch_all_data.py --export-only           # rebuild the JSON the site
-                                                 # reads, fetch nothing
-```
-
-`--export-only` is the one you will use most. It rebuilds `ward_data.json`,
-`lsoa_data.json` and the rest from data already downloaded, in about a minute.
-
-### Run the tests
+Two flags worth knowing:
 
 ```bash
-pip install selenium
-python -m http.server 8902            # leave this running
-python tests/browser/test_landing.py
-python tests/pipeline/test_split.py
+python fetch_all_data.py --only air_quality   # one source
+python fetch_all_data.py --export-only        # rebuild the map's files from
+                                              # data already downloaded (~1 min)
 ```
 
-There is no test runner. Each file is a script that prints `PASS` or `FAIL` per
-check and exits non-zero if anything failed. **The browser tests do not all
-pass today** — see "What is already broken" at the end.
+### When something breaks
+
+Look at `data/meta/manifest.json`. It records, per source, whether the last run
+worked, how many rows it wrote, and the error if it failed. The public
+methodology page shows the same thing, so a broken source is visible rather
+than quietly serving old figures.
+
+One source failing does not stop the others.
 
 ---
 
-## 2. How the data refreshes, and what will go stale
+## What will go stale
 
-### The monthly run
+Not faults. Dates and identifiers that were true when written.
 
-`.github/workflows/refresh-data.yml` runs at 03:00 UTC on the 15th of each
-month. It fetches every source, rebuilds four derived files, and commits the
-result only if something actually changed. Pushing that commit publishes the
-site, so a successful refresh updates the live map with no further action.
-
-To run it yourself: **Actions → Refresh data → Run workflow**.
-
-If a source fails, the run still finishes and opens an issue naming it. The
-pipeline isolates each source, so one broken download cannot stop the other
-twenty.
-
-### Where to look when something breaks
-
-`data/meta/manifest.json` records what every source did on its last run: status,
-row count, output path and error. The methodology page reads it, so the public
-site shows a source that has started failing rather than quietly serving older
-figures. Check it first.
-
-### What will need updating, and roughly when
-
-These are not faults. They are dates and identifiers that were true when they
-were written and will stop being true.
-
-| What | When it bites | What to do |
-|------|---------------|------------|
-| **Ward boundaries** | Next boundary review | `ONS_LOOKUP_LAYER` in `fetch_all_data.py` names `LSOA21_WD25_LAD25_EW_LU_v2`. When wards are redrawn, ONS publish a new lookup and this must point at it. Everything ward-level flows through it. |
-| **Census 2021** | 2031 | Fixed until the next census. The table IDs in `RAW_DATA_SOURCES.md` §3 will all change. |
-| **IMD 2025** | ~2031 | Released about every six years. A new release changes the file name and the column set. |
-| **Air quality year** | Each autumn | The pipeline takes the newest year Defra publish, but the map labels it with `PCM_LABELLED_YEAR`. When Defra publish a new year the run prints a warning telling you which labels to update. |
-| **PTAL** | Whenever the GLA republish | The Atlas download URL carries a resource id that changes on republication, so the pipeline asks the Datastore API which file is current rather than remembering one. |
-| **Fingertips MSOA codes** | Ongoing | Fingertips still publish against 2011 MSOA codes. 39 London MSOAs were renumbered in 2021 and are left missing rather than guessed. |
-| **Hospitals** | Any time | Needs a manual `Hospital.csv`; no machine-readable link exists. The methodology page says so. |
-| **DWP benefits** | Already stale | Not included. NOMIS has nothing newer than November 2018. The live figures are on DWP Stat-Xplore, which needs a registered API key and its own client. |
+| What | When | What to do |
+|------|------|------------|
+| **Ward boundaries** | Next boundary review | `ONS_LOOKUP_LAYER` in `fetch_all_data.py` names the 2025 lookup. Point it at the new one. Everything ward-level flows through it |
+| **Air quality year** | Each autumn | The run prints a warning telling you which labels to update |
+| **IMD** | About every 6 years | New release changes the file name and columns |
+| **Census** | 2031 | Fixed until then |
+| **Hospitals** | Any time | Needs a manual `Hospital.csv`. No machine-readable source exists |
 
 ---
 
-## 3. Adding data of your own
+## Adding new data
 
-A source touches five places. The comments in `fetch_all_data.py` are written
-to be read, and the two most recent sources, `run_air_quality` and
-`run_tfl_transport`, are the ones to copy: both were added the way this
-describes.
+A source touches five places. Copy `run_air_quality` in `fetch_all_data.py`;
+it was added exactly this way and is commented throughout.
 
-1. **Write a fetcher** in `fetch_all_data.py`. It returns a DataFrame keyed by
-   `LSOA21CD` and writes a parquet under `data/`. Discover the download URL
-   from the publisher's own index rather than pinning one; pinned URLs rot, and
-   two sources here have already been silently broken by that.
+1. **Fetch it** — write a `run_yoursource()` that returns a table keyed by
+   `LSOA21CD` and writes a parquet under `data/`. Find the download URL from
+   the publisher's index rather than hardcoding one. Hardcoded URLs rot, and
+   two sources here were silently broken by that for months.
+2. **Register it** — add it to the `SOURCES` dict at the bottom of the file.
+3. **Roll it up to wards** — in `build_ward_data`, beside the other LSOA
+   sources. Counts are summed, everything else is population-weighted.
+4. **Add it to the LSOA file** — in `build_lsoa_data`.
+5. **Show it** — in `index.html`: an `<option>` in the indicator list, plus an
+   `OV_CFG` entry (colour range and direction), an `OV_META` entry
+   (description) and a `CATS` entry (which group it sits in).
 
-2. **Register it** in the `SOURCES` dict near the bottom of the same file. The
-   key is what `--only` takes.
+Then:
 
-3. **Aggregate it to wards** in `build_ward_data`, next to the other
-   LSOA-level sources. `_agg_to_wards` does population weighting. Counts are
-   summed; everything else is averaged.
+```bash
+python fetch_all_data.py --only yoursource
+python fetch_all_data.py --export-only
+```
 
-4. **Carry it into the LSOA payload** in `build_lsoa_data`.
+### What you do not have to work out
 
-5. **Show it** in `index.html`: an `<option>` in the indicator `<select>`, an
-   `OV_CFG` entry for the colour range and direction, an `OV_META` entry for
-   the description, and a `CATS` entry for which group it appears in.
+`data/map/indicators.js` is generated by the pipeline. It works out, for every
+indicator, which area sizes have figures, a sensible colour range, and how many
+distinct values exist. So step 5 needs a name, a group and a direction.
 
-Then run `python fetch_all_data.py --only your_source` and
-`python fetch_all_data.py --export-only`.
+**The direction is the one thing nothing can guess.** An indicator with no
+stated direction is left off the map rather than given one, because guessing
+paints the best areas red. If your new indicator does not appear, that is the
+first thing to check.
 
-### What you do not have to write
+### Using an AI assistant
 
-`data/map/indicators.js` is generated by the pipeline from the payloads it has
-just written. It carries, per indicator, which levels hold figures, a 5th-95th
-percentile colour range, and how many distinct values exist at each level. So
-step 5 needs a label, a group and a direction, and the numbers look after
-themselves.
+This repository is written to be worked on with one. The comments explain *why*
+decisions were made, which is what makes that work. "Add a source for X,
+following how `run_air_quality` does it" is a reasonable instruction.
 
-**Direction cannot be guessed.** An indicator with no stated polarity is left
-out of the registry rather than given a default, because guessing paints the
-best areas red. If your indicator does not appear on the map, that is the first
-thing to check; the browser console logs how many indicators were configured
-from measured data.
-
-### Asking Claude to do it
-
-This repository is written to be worked on with an AI assistant. The comments
-explain why decisions were made, not just what the code does, which is what
-makes that work. "Add a source for X, following how `run_air_quality` does it"
-is a reasonable instruction, and the five steps above are the checklist to hold
-the result against.
-
-Whatever writes it, check the same things: does the map draw, does the number
-of areas match, does the colour run the right way, and does the manifest say
-the source succeeded.
+Check the same four things however it was written: does the map draw, does the
+number of areas look right, does the colour run the right way, and does
+`manifest.json` say the source succeeded.
 
 ---
 
-## What is already broken
+## Publishing
 
-Told plainly, because a handover that hides this is worse than none.
+Every push to `main` publishes the site. There is nothing to build or upload.
 
-- **The browser tests do not all pass.** Seven of the eleven have at least one
-  failing check, mostly selectors that rotted as the interface changed. They
-  are worth fixing before you trust them, and worth fixing *first*, because a
-  suite that always fails teaches you to ignore it.
-- **Four tests were left out of this copy**, because they test the question
-  panel and the Worker behind it, neither of which is here:
-  `tests/pipeline/test_assistant_tools.py`, `test_worker_cap.py`,
-  `test_worker_followup.py` and `tests/browser/test_sheet_query.py`. Only the
-  last costs anything: about a third of it drives the panel, and the rest
-  tests the ward sheet and Query. If you want that coverage back, take the
-  file from the original repository and delete the block after the comment
-  `# the assistant's own test of the same thing`.
-- **Hospitals** needs a manual file, as above.
-- **DWP benefits** are absent, as above.
-- **The City of London's 20 wards** have no deprivation score and no Local
-  Health indicators. That is the geography, not a fault: the wards are tiny and
-  share very few LSOAs, so there is nothing to aggregate.
+This copy has no `CNAME`, so it serves from
+`https://<account>.github.io/<repo>/`. Add a `CNAME` file containing one domain
+name to use your own address.
+
+**Three things still name the original site** and are yours to change: a
+`canonical` link, an `og:url`, and a JSON-LD block in `index.html`. The
+canonical tag in particular tells search engines this page is a copy and should
+not rank. `sitemap.xml` and `robots.txt` were left out and would need writing.
+
+---
+
+## Known limitations
+
+- **The browser tests do not all pass.** Seven have a failing check, mostly
+  selectors that rotted as the interface changed. Worth fixing first: a suite
+  that always fails is one you learn to ignore.
+- **The City of London's 20 wards** have no deprivation or health figures. The
+  wards are tiny and share almost no LSOAs, so there is nothing to average.
 - **Five layers cover North West London only** — schools, community centres,
-  libraries, ESOL providers and CICs. They are badged NWL on the map. Blank
-  elsewhere means not yet collected.
+  libraries, ESOL providers, CICs. Badged NWL on the map. Blank elsewhere means
+  not collected.
+- **DWP benefits are absent.** The public figures stop in 2018. Current ones
+  need a DWP Stat-Xplore API key.
+- **The question panel** from the original site is not here. It needed a paid
+  API key. Four tests that exercised it were removed with it.
 
-## Where everything else is written down
+---
 
-| File | What it holds |
-|------|---------------|
-| `README.md` | What the project is |
-| `RAW_DATA_SOURCES.md` | Every raw file, its URL, and how to fetch it by hand |
-| `DATA_LICENCES.md` | Licence and required attribution per source. **Read this before republishing anything** |
-| `methodology.html` | The public page: every source, its geography and its year |
+## Where things are
+
+| File | What it is |
+|------|-----------|
+| `fetch_all_data.py` | The pipeline. Long, and written to be read |
+| `index.html` | The whole site |
+| `methodology.html` | Public page: every source, its geography, its year |
+| `RAW_DATA_SOURCES.md` | Every raw file and how to fetch it by hand |
+| `DATA_LICENCES.md` | **Read before republishing.** Licence and required wording per source |
 | `tests/README.md` | How to run the tests |
-| `fetch_all_data.py` | The pipeline. Long, and commented to be read |
