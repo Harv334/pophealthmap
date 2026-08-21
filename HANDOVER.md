@@ -191,6 +191,14 @@ Told plainly, because a handover that hides this is worse than none.
   failing check, mostly selectors that rotted as the interface changed. They
   are worth fixing before you trust them, and worth fixing *first*, because a
   suite that always fails teaches you to ignore it.
+- **Four tests were left out of this copy**, because they test the question
+  panel and the Worker behind it, neither of which is here:
+  `tests/pipeline/test_assistant_tools.py`, `test_worker_cap.py`,
+  `test_worker_followup.py` and `tests/browser/test_sheet_query.py`. Only the
+  last costs anything: about a third of it drives the panel, and the rest
+  tests the ward sheet and Query. If you want that coverage back, take the
+  file from the original repository and delete the block after the comment
+  `# the assistant's own test of the same thing`.
 - **Hospitals** needs a manual file, as above.
 - **DWP benefits** are absent, as above.
 - **The City of London's 20 wards** have no deprivation score and no Local

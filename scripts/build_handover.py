@@ -60,6 +60,22 @@ EXCLUDE_FILES = {
     "sitemap.xml",                # names pophealth.uk throughout
     "robots.txt",                 # ditto, and points at that sitemap
     "scripts/build_handover.py",  # builds a handover copy; nothing to build here
+    # Tests for the half that is not being handed over. Left in, they would
+    # fail on the first run against a repository that has no assistant and no
+    # Worker, which is the worst possible first impression: a suite that is
+    # red before anything has been changed teaches its new owner to ignore it.
+    "tests/pipeline/test_assistant_tools.py",
+    "tests/pipeline/test_worker_cap.py",
+    "tests/pipeline/test_worker_followup.py",
+    # Roughly a third of this one drives the assistant panel, so it cannot pass
+    # here either. It is the only exclusion that costs real coverage: the rest
+    # of it tests the ward sheet and Query. HANDOVER.md says where to get it
+    # back and what to delete from it.
+    "tests/browser/test_sheet_query.py",
+    # Markers left behind by earlier work. Nothing reads either of them, and a
+    # handover should not start with two files whose purpose has to be guessed.
+    ".mount_test",
+    ".refresh_marker",
 }
 
 
