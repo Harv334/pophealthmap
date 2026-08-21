@@ -39,7 +39,7 @@ shows a figure that was not published for that exact area:
 ## Coverage
 
 All 33 London boroughs plus the City of London: 704 wards, 4,994 LSOAs, 1,146
-GP practices, 1,737 pharmacies and 1,877 dental practices.
+GP practices, 1,737 pharmacies and 1,663 NHS dental practices.
 
 Deprivation covers 684 of the 704 wards. The 20 without a score are all City of
 London wards, which are tiny and share very few LSOAs between them, so there is
@@ -69,11 +69,13 @@ that ETag as `If-None-Match`, so an unchanged file costs a single `304` and no
 download. Each download is validated before it replaces the cache; if validation
 fails the cached copy is kept and the run continues.
 
-Dental practices are ODS plus a curated overlay
-(`data/curated/dental_practices_curated.json`) that adds NHS availability, which
-ODS does not record. The two are joined on postcode rather than name, because
-ODS names practices generically ("Dental Surgery") often enough that name
-matching double-plots them.
+Dental practices are the NHS register from ODS, and nothing else. There used
+to be a curated overlay adding private practices, and a flag to tell the two
+apart, which is what the map's old NHS/private filter ran on. Both were
+retired: the layer is now a claim the source can support on its own, with
+nobody maintaining a list by hand. It costs the 215 private practices the
+overlay contributed. `data/curated/dental_practices_curated.json` is still in
+the repository if that trade is ever worth reversing.
 
 Postcode geography is API-backed. Postcodes resolve to LSOA, ward and borough
 through the [postcodes.io](https://postcodes.io) bulk API, cached per postcode,

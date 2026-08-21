@@ -98,6 +98,53 @@ EXCLUDE_FILES = {
 #   scripts/reconfigure_to_ons_wd24_lookup.py is imported by fetch_all_data.py.
 
 
+def strip_readme(text: str) -> tuple[str, list[str]]:
+    """Take out the parts of README.md that are not true of the handover copy.
+
+    The README describes the site at pophealth.uk. Most of it is true of any
+    copy, but four things are not, and a README that describes features the
+    reader cannot find is worse than a short one: it sends them looking for a
+    panel that is not there, or a Worker they have no account for.
+    """
+    notes: list[str] = []
+
+    # The AI panel section, from its heading to the next one.
+    start = text.find("\n## The AI panel")
+    if start != -1:
+        nxt = text.find("\n## ", start + 5)
+        text = text[:start] + (text[nxt:] if nxt != -1 else "\n")
+        notes.append("removed the AI panel section")
+
+    # The two rows of the contents table that point at files it does not have.
+    kept, dropped = [], 0
+    for line in text.split("\n"):
+        if line.startswith("| `data/map/assistant.js`") or line.startswith("| `worker/`"):
+            dropped += 1
+            continue
+        kept.append(line)
+    text = "\n".join(kept)
+    if dropped:
+        notes.append(f"removed {dropped} contents row(s) for the assistant and the Worker")
+
+    # DOMAIN.md is not carried, and the DNS records it would have explained are
+    # written out in the paragraph immediately below this sentence anyway.
+    if "See `DOMAIN.md`." in text:
+        text = text.replace(" See `DOMAIN.md`.", "")
+        notes.append("removed the pointer to DOMAIN.md, which is not carried")
+
+    # Point at HANDOVER.md, which is the page written for this reader.
+    marker = "## Handing this over"
+    if marker in text:
+        text = text.replace(
+            marker + "\n\nFor someone who just wants to refresh the map:",
+            marker + "\n\n**Read `HANDOVER.md` first.** It covers whether anything is\n"
+            "required of you, how the monthly refresh works, and how to add data of\n"
+            "your own with a CSV.\n\nThe short version, for refreshing the map:")
+        notes.append("pointed the handover section at HANDOVER.md")
+
+    return text, notes
+
+
 def strip_index(text: str) -> tuple[str, list[str]]:
     """Take the assistant out of index.html. Returns (text, what changed)."""
     notes: list[str] = []
@@ -175,6 +222,14 @@ def main() -> int:
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(path, target)
         copied += 1
+
+    readme = dst / "README.md"
+    if readme.exists():
+        rtext, rnotes = strip_readme(readme.read_text(encoding="utf-8", newline=""))
+        with open(readme, "w", encoding="utf-8", newline="") as f:
+            f.write(rtext)
+        for n in rnotes:
+            print(f"  README.md: {n}")
 
     index = dst / "index.html"
     text = index.read_text(encoding="utf-8", newline="")
