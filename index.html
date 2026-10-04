@@ -4513,12 +4513,28 @@ const map = L.map('map', {
    dark cut as the theme changed, which is why it was a named layer with a
    cross-fade and a fallback timer behind it. With one ground there is nothing
    to swap to, so it is added and left alone. */
-L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-  maxZoom: 19,
-  subdomains: 'abcd',
-  crossOrigin: 'anonymous',
-  attribution: '\u00a9 <a href="https://openstreetmap.org/copyright">OpenStreetMap</a> \u00b7 \u00a9 <a href="https://carto.com/attributions">CARTO</a>',
-}).addTo(map);
+/* Since September 2026 Carto stamps "API KEY REQUIRED" across every tile
+   requested without a key. Keys are free (carto.com/basemaps/apikey) and are
+   meant to sit in the page: restrict yours to pophealth.uk and
+   harv334.github.io in the Carto dashboard. Until one is set here the map uses
+   Esri's World Light Gray canvas, the nearest keyless match to Positron, so
+   the ground is never a wall of watermarks. */
+const CARTO_KEY = 'cb1_49ss_1_92682daff33cd89850a57b3d';
+if (CARTO_KEY) {
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png?key=' + encodeURIComponent(CARTO_KEY), {
+    maxZoom: 19,
+    subdomains: 'abcd',
+    crossOrigin: 'anonymous',
+    attribution: '\u00a9 <a href="https://openstreetmap.org/copyright">OpenStreetMap</a> \u00b7 \u00a9 <a href="https://carto.com/attributions">CARTO</a>',
+  }).addTo(map);
+} else {
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 19,
+    maxNativeZoom: 16,
+    crossOrigin: 'anonymous',
+    attribution: 'Tiles \u00a9 <a href="https://www.esri.com">Esri</a>, HERE, Garmin \u00b7 \u00a9 <a href="https://openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  }).addTo(map);
+}
 
 // Static layers
 // GP layer: circleMarkers sized by registered-patients list size.
