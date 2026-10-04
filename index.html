@@ -369,20 +369,6 @@
   .ward-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
   .sb-sec { padding: 11px 13px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
 
-  /* ── Opening hint ──
-     The three sentences that used to live in a title attribute on the page
-     heading. See the markup in #tab-overlay. Dismissable and it stays
-     dismissed, because it introduces rather than warns. */
-  .start-hint { margin: 11px 13px 0; padding: 10px 12px 8px; flex-shrink: 0;
-    background: var(--nhs-light); border-radius: 8px;
-    font-size: var(--t-sm); line-height: 1.5; color: var(--ink-2); }
-  .start-hint p { margin: 0 0 5px; }
-  .start-hint b { color: var(--ink); font-weight: 600; }
-  .start-hint-x { appearance: none; background: none; border: 0; padding: 2px 0 0;
-    font: inherit; font-size: var(--t-xs); font-weight: 600; color: var(--nhs-blue);
-    cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
-  .start-hint-x:hover { color: var(--nhs-dark); }
-  .start-hint.gone { display: none; }
   .deselect-btn { border: 1px solid var(--line); background: var(--paper); color: var(--ink-2); font-size: var(--t-xs); font-weight: 500; padding: 3px 8px; border-radius: 5px; cursor: pointer; line-height: 1.2; white-space: nowrap; flex-shrink: 0; }
   .deselect-btn:hover { background: var(--paper-2); border-color: var(--ink-3); color: var(--ink); }
   .sb-lbl { font-size: var(--t-xs); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3); margin-bottom: 8px; }
@@ -2070,10 +2056,10 @@
              handler that names it keep working, exactly as data-tab stayed
              "ward" when that tab became Area profile. Body copy still says
              overlay, which is still what it is. -->
-        <button type="button" class="sb-tab active" id="sbtab-overlay" role="tab"
-                aria-selected="true" aria-controls="tab-overlay" data-tab="overlay">Indicators</button>
-        <button type="button" class="sb-tab" id="sbtab-layers" role="tab"
-                aria-selected="false" aria-controls="tab-layers" data-tab="layers">Layers</button>
+        <button type="button" class="sb-tab" id="sbtab-overlay" role="tab"
+                aria-selected="false" aria-controls="tab-overlay" data-tab="overlay">Indicators</button>
+        <button type="button" class="sb-tab active" id="sbtab-layers" role="tab"
+                aria-selected="true" aria-controls="tab-layers" data-tab="layers">Layers</button>
         <button type="button" class="sb-tab" id="sbtab-vcse" role="tab"
                 aria-selected="false" aria-controls="tab-vcse" data-tab="vcse">VCSE</button>
         <!-- Query is not a tab. It is a mode, reached from the rail at the
@@ -2110,7 +2096,7 @@
       </div>
 
       <!-- Layers tab -->
-      <div class="tab-pane" id="tab-layers" role="tabpanel" aria-labelledby="sbtab-layers">
+      <div class="tab-pane active" id="tab-layers" role="tabpanel" aria-labelledby="sbtab-layers">
         <div class="sb-sec">
           <div class="sb-lbl">Point layers</div>
           <label class="lrow"><div class="ldot" style="background:#185FA5"></div><span class="lname">GP practices <span class="lcount" id="gp-count">0</span></span><input type="checkbox" id="tg"></label>
@@ -2251,19 +2237,7 @@
       </div>
 
       <!-- Overlay tab -->
-      <div class="tab-pane active" id="tab-overlay" role="tabpanel" aria-labelledby="sbtab-overlay">
-        <!-- The three things this tool does, said once, where someone landing
-             for the first time is already looking. This is the tab the sidebar
-             opens on. It used to be a title attribute on the page heading,
-             which a touchscreen never shows. Dismissable, and it stays
-             dismissed: it is an introduction, not a warning. -->
-        <div class="start-hint" id="start-hint">
-          <p><b>Click any ward</b> for its headline figures, then Open profile for the
-             full panel.</p>
-          <p>Pick an indicator below to <b>colour the map</b> by a figure.</p>
-          <p>The <b>VCSE</b> tab maps registered charities.</p>
-          <button type="button" class="start-hint-x" id="start-hint-x">Got it</button>
-        </div>
+      <div class="tab-pane" id="tab-overlay" role="tabpanel" aria-labelledby="sbtab-overlay">
         <div class="sb-sec" style="flex:1;border-bottom:none;overflow-y:auto">
           <div class="sb-lbl" style="display:flex;align-items:center;gap:6px">
             <span>Choropleth overlay</span>
@@ -4782,6 +4756,7 @@ function applyPrefetchedCounts() {
       setIf('greenspace-count', c.greenspace);
       setIf('icb-count', c.icb);
       setIf('lsoa-count', c.lsoa);
+      setIf('msoa-count', c.msoa);
       setIf('vcse-tab-count', c.vcse);
       // The same sentence wireVCSE writes, so the panel does not change its
       // wording when the records actually arrive.
@@ -9831,7 +9806,10 @@ function _applyOverlayChange(key) {
   if (boroughL._map) boroughL.bringToFront();
   // Refresh the Top/Bottom 20 rankings for the new indicator.
   renderTopBottom();
-  // Switch to overlay tab
+  // Switch to overlay tab, unless this is the default being put back (on
+  // load or by Reset): that is the map being shown, not a choice made in the
+  // Indicators list, so the panel stays where it is.
+  if (window._ovDefaulting) return;
   document.querySelectorAll('.sb-tab').forEach(t => t.classList.toggle('active', t.dataset.tab==='overlay'));
   document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.id==='tab-overlay'));
 }
@@ -10253,7 +10231,11 @@ function _resetAll() {
     const ovSel = document.getElementById('ov');
     const defOv = (ovSel && Array.prototype.some.call(ovSel.options, o => o.value === DEFAULT_OV))
       ? DEFAULT_OV : 'none';
-    if (ovSel && ovSel.value !== defOv) { ovSel.value = defOv; ovSel.dispatchEvent(new Event('change')); }
+    if (ovSel && ovSel.value !== defOv) {
+      ovSel.value = defOv;
+      window._ovDefaulting = true;
+      try { ovSel.dispatchEvent(new Event('change')); } finally { window._ovDefaulting = false; }
+    }
     // Core20
     const tc = document.getElementById('core20-toggle');
     if (tc && tc.checked) { tc.checked = false; tc.dispatchEvent(new Event('change')); }
@@ -10581,7 +10563,8 @@ function _readUrlState() {
       if (ovEl && ovEl.value === 'none' && !touring &&
           Array.prototype.some.call(ovEl.options, o => o.value === DEFAULT_OV)) {
         ovEl.value = DEFAULT_OV;
-        ovEl.dispatchEvent(new Event('change'));
+        window._ovDefaulting = true;
+        try { ovEl.dispatchEvent(new Event('change')); } finally { window._ovDefaulting = false; }
       }
       _urlDone.defOv = true;
     }
@@ -11437,23 +11420,6 @@ document.querySelectorAll('.sb-tab').forEach(t => {
 
 
 
-// The opening hint at the top of the Indicators pane. localStorage rather than
-// session, because it introduces the tool: someone who has read it once has
-// read it, and showing it again on every visit turns an introduction into
-// furniture.
-(function wireStartHint() {
-  const hint = document.getElementById('start-hint');
-  const close = document.getElementById('start-hint-x');
-  if (!hint || !close) return;
-  const KEY = 'ph_start_hint_seen';
-  try {
-    if (window.localStorage.getItem(KEY)) hint.classList.add('gone');
-  } catch (e) { /* private mode: show it, which is the safe way to be wrong */ }
-  close.addEventListener('click', () => {
-    hint.classList.add('gone');
-    try { window.localStorage.setItem(KEY, '1'); } catch (e) {}
-  });
-}());
 
 // ═══════════════════════════════════════════════════════════════════════════
 // FILL / BORDER SLIDERS — live restyle so fills & borders can be stacked
@@ -14482,7 +14448,12 @@ var PH_SHOW = {
    * throw away the thing they were sent.
    */
   var TOUR_SEEN = 'phTourSeen';
+  var TOUR_AUTOSTART = false;
   function maybeAutoStart() {
+    // Off: the map opens straight onto London coloured by deprivation, which
+    // explains itself, and the tour is one click away ("Take a tour") for
+    // anyone who wants it. Kept as a switch rather than deleted.
+    if (!TOUR_AUTOSTART) return;
     if (tourAt >= 0) return;
     // The address as it arrived, not as it is now: the page writes its own
     // state into the URL as soon as the default overlay is drawn, which would

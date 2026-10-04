@@ -111,6 +111,13 @@ def main() -> int:
         counts["greenspace"] = features(grn)
         print(f"greenspace {counts['greenspace']:>7,}")
 
+    # MSOA boundaries, so the layer row has a count before the lazy MSOA
+    # payload is fetched (it is only fetched once MSOAs are used).
+    msoa = load("data/map/msoa_boundaries.json")
+    if msoa is not None:
+        counts["msoa"] = features(msoa)
+        print(f"MSOAs:     {counts['msoa']:>7,}")
+
     icb = load("data/map/icbs.json")
     if icb is not None:
         counts["icb"] = features(icb)
