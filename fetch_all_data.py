@@ -3893,6 +3893,15 @@ def build_ward_data() -> dict:
                 w = _get(wd)
                 w.setdefault("crime_by_category", {})[str(cat)] = int(n)
         sources["crime"] = "police.uk"
+        # The window the counts cover, read off the data rather than restated
+        # in the page, so the label moves with every refresh.
+        if "month" in crime.columns:
+            mo = crime["month"].dropna().astype(str)
+            mo = mo[mo != ""]
+            if not mo.empty:
+                sources["_crime_first_month"] = mo.min()
+                sources["_crime_last_month"] = mo.max()
+                sources["_crime_months"] = str(mo.nunique())
 
     ft = _read_parquet_opt(DATA_DIR / "outcomes" / "fingertips.parquet")
     if ft is not None:
@@ -4162,7 +4171,9 @@ def build_ward_data() -> dict:
         "metadata": {
             "generated": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
             "sources": sources,
-            "claimant_period": "",
+            "claimant_period": _month_label(sources.get("_claimant_month", "")),
+            "crime_period": _month_range_label(sources.get("_crime_first_month", ""),
+                                               sources.get("_crime_last_month", "")),
             # Provenance for the LSOA -> ward attribution behind every
             # LSOA-derived ward indicator above.
             "lsoa_to_ward_lookup":
@@ -4170,6 +4181,24 @@ def build_ward_data() -> dict:
             "lsoa_to_ward_lookup_year": "2025",
         },
     }
+
+def _month_label(ym: str) -> str:
+    """'2026-08' -> 'August 2026'. Anything else comes back unchanged."""
+    try:
+        return datetime.strptime(ym, "%Y-%m").strftime("%B %Y")
+    except (TypeError, ValueError):
+        return ym or ""
+
+
+def _month_range_label(first: str, last: str) -> str:
+    """'2025-08', '2026-07' -> 'Aug 2025 to Jul 2026'."""
+    try:
+        f = datetime.strptime(first, "%Y-%m").strftime("%b %Y")
+        l = datetime.strptime(last, "%Y-%m").strftime("%b %Y")
+    except (TypeError, ValueError):
+        return ""
+    return f if f == l else f"{f} to {l}"
+
 
 def build_borough_data() -> dict:
     """Indicators at borough level, which is the level they are published at.

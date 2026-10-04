@@ -34,8 +34,11 @@
 
 <!-- Inline so it costs no request and cannot 404. A map pin in the map's own ink. -->
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1a1a'/%3E%3Cpath d='M16 6c-3.9 0-7 3.1-7 7 0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7z' fill='%23fff'/%3E%3Ccircle cx='16' cy='13' r='2.6' fill='%231a1a1a'/%3E%3C/svg%3E">
-<!-- Everything the page needs is served from this origin. There is no CDN and
-     no third-party request anywhere in the document.
+<!-- Everything the page needs to run is served from this origin. There is no
+     CDN. The only requests elsewhere are optional extras that the map works
+     without: basemap tiles (CARTO, or Esri without a key), the Ask panel's
+     Worker, and a postcode lookup on postcodes.io, made only when a postcode
+     is typed into search.
 
      This is not only a privacy preference. The audience for this map is NHS
      and local authority staff, and those networks block cdnjs and Google more
@@ -157,7 +160,7 @@
      broken enough to explain why. minmax(0, 1fr) lets the column be narrower
      than its content, so a child that overflows is the only thing that
      overflows. */
-  .app { display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; grid-template-columns: minmax(0, 1fr); height: 100vh; max-height: 100vh; height: 100dvh; max-height: 100dvh; overflow: hidden; }
+  .app { display: grid; grid-template-rows: auto auto auto minmax(0, 1fr) auto; grid-template-columns: minmax(0, 1fr); height: 100vh; max-height: 100vh; height: 100dvh; max-height: 100dvh; overflow: hidden; }
   .hdr { background: var(--paper); border-bottom: 1px solid var(--line); padding: 7px 18px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; gap: 12px; }
   .hdr-left { display: flex; align-items: center; gap: 12px; }
   /* The page's h1. Margin zeroed because the browser default would push the
@@ -592,7 +595,10 @@
     text-transform: uppercase; letter-spacing: .16em; margin: 0 0 18px; }
 
   /* ── Data-level badge (floating overlay, top-right of map) ── */
-  .dl-badge { position: absolute; top: 12px; right: 12px; z-index: 2500; background: color-mix(in srgb, var(--paper) 96%, transparent); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); padding: 6px 8px; display: flex; align-items: center; gap: 8px; user-select: none; }
+  /* grid-row 2 makes the map's own cell the containing block, so the badge
+     sits on the map below the Viewing strip rather than over it (on a phone
+     it covered the name of the area being viewed). */
+  .dl-badge { grid-row: 2; grid-column: 1; position: absolute; top: 12px; right: 12px; z-index: 2500; background: color-mix(in srgb, var(--paper) 96%, transparent); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); padding: 6px 8px; display: flex; align-items: center; gap: 8px; user-select: none; }
   /* The caption is the way in to the explanation, rather than a "?" sitting
      beside it. It is the only word on this badge that is not one of the four
      answers, so it is where a question about them belongs, and it gives the
@@ -678,6 +684,10 @@
     display: none; }
   .sb-scrim.on { display: block; }
   .sb-tools { display: none; }
+  .hdr-search-btn { display: none; appearance: none; background: none; border: 1px solid var(--line);
+    border-radius: 8px; padding: 6px 9px; cursor: pointer; line-height: 0; color: var(--ink);
+    margin-left: auto; flex: 0 0 auto; }
+  .hdr-search-btn:hover { border-color: var(--nhs-blue); }
 
   /* Below this width the sidebar stops being a column beside the map and
      becomes a drawer over it.
@@ -798,6 +808,8 @@
     .hdr { padding: 5px 10px; gap: 8px; }
     .hdr-logo { font-size: var(--t-lg); }
     .hdr-menu { display: inline-flex; }
+    .hdr-search-btn { display: inline-flex; }
+    .hdr-left { flex: 1 1 auto; min-width: 0; }
     /* Moved into the drawer, not duplicated: one set of controls, relocated. */
     .sb-tools { display: block; padding: 9px 10px; border-bottom: 1px solid var(--line-2);
       background: var(--paper-2); flex: 0 0 auto; }
@@ -832,11 +844,13 @@
       background:
         linear-gradient(to right, var(--paper) 40%, rgba(255,255,255,0)) left center / 26px 100% no-repeat local,
         linear-gradient(to left,  var(--paper) 40%, rgba(255,255,255,0)) right center / 26px 100% no-repeat local,
-        linear-gradient(to right, rgba(33,43,50,.16), rgba(33,43,50,0)) left center / 14px 100% no-repeat scroll,
-        linear-gradient(to left,  rgba(33,43,50,.16), rgba(33,43,50,0)) right center / 14px 100% no-repeat scroll,
+        linear-gradient(to right, rgba(33,43,50,.32), rgba(33,43,50,0)) left center / 22px 100% no-repeat scroll,
+        linear-gradient(to left,  rgba(33,43,50,.32), rgba(33,43,50,0)) right center / 22px 100% no-repeat scroll,
         var(--paper); }
     .mode-rail::-webkit-scrollbar { display: none; }
-    .mode-btn { flex: 0 0 auto; padding: 10px 11px 9px; font-size: var(--t-md); }
+    /* Tighter than desktop so most of the rail fits at 390px, with the
+       stronger edge shadow above saying there is more. */
+    .mode-btn { flex: 0 0 auto; padding: 10px 8px 9px; font-size: var(--t-sm); }
 
     /* Same for the tab strip, which was 267px wide inside a 220px sidebar and
        was cutting the Ward tab off the end. */
@@ -951,19 +965,21 @@
       font-size: var(--t-xs);font-weight:500;letter-spacing:.02em;text-transform:none;
       color:var(--ink-2);background:var(--paper-2);border:1px solid var(--line);
       border-radius:4px;padding:1px 6px}
-    #dev-banner{position:fixed;left:50%;transform:translateX(-50%);bottom:14px;
-      /* Above the mode panel (3500). It applies to the whole tool, not just
-         the map, and at 1200 it was half covered rather than hidden, which
-         looked like a rendering fault. */
-      z-index:3600;max-width:min(620px,calc(100vw - 28px));
-      display:flex;align-items:flex-start;gap:10px;
-      background: var(--invert-bg); color: var(--invert-ink);border-radius:8px;padding:11px 13px;
-      font-size: var(--t-md);line-height:1.45;box-shadow:0 4px 16px rgba(0,0,0,.28)}
-    #dev-banner b{font-weight:600}
-    #dev-banner .dev-x{flex:0 0 auto;background:none;border:0;color: var(--on-accent);opacity:.65;
-      cursor:pointer;font-size: var(--t-xl);line-height:1;padding:0 2px;margin-left:2px}
-    #dev-banner .dev-x:hover{opacity:1}
-    @media (max-width:560px){#dev-banner{font-size: var(--t-sm);bottom:8px}}
+    /* A strip in the page flow under the header, not a card floating over the
+       map. As a card it sat on the legend and the Ask button on a laptop and
+       covered most of the map on a phone, so the caveat cost more than the
+       thing it was a caveat about. In flow it takes one line and covers
+       nothing. */
+    #dev-banner{display:flex;align-items:center;gap:10px;flex:0 0 auto;
+      background: var(--paper-2); color: var(--ink-2);border-bottom:1px solid var(--line);
+      padding:4px 18px;font-size: var(--t-sm);line-height:1.4}
+    #dev-banner[hidden]{display:none}
+    #dev-banner > div{flex:1 1 auto;min-width:0}
+    #dev-banner b{font-weight:600;color: var(--ink)}
+    #dev-banner .dev-x{flex:0 0 auto;background:none;border:0;color: var(--ink-2);opacity:.75;
+      cursor:pointer;font-size: var(--t-lg);line-height:1;padding:0 2px;margin-left:2px}
+    #dev-banner .dev-x:hover{opacity:1;color: var(--ink)}
+    @media (max-width:560px){#dev-banner{font-size: var(--t-xs);padding:3px 10px}}
   
   /* ── Design layer ─────────────────────────────────────────────────────────
      Typography and component chrome from the prototype, applied as an
@@ -1042,12 +1058,14 @@
      the sidebar or the map, it only stacks above them. */
   .app > .hdr        { grid-row: 1; grid-column: 1; }
   .app > .mode-rail  { grid-row: 2; grid-column: 1; }
-  .app > .main       { grid-row: 3; grid-column: 1; }
+  /* Row 3 is the development strip. Empty (zero height) when it is hidden. */
+  .app > #dev-banner { grid-row: 3; grid-column: 1; }
+  .app > .main       { grid-row: 4; grid-column: 1; }
   /* Above everything the map puts in this cell. The stack already runs to
      3000 (map badges sit at 2500), so the panel has to clear that or the
      map's floating controls show through a mode that is not the map. */
-  .app > .mode-panel { grid-row: 3; grid-column: 1; z-index: 3500; }
-  .app > .sbar       { grid-row: 4; grid-column: 1; }
+  .app > .mode-panel { grid-row: 4; grid-column: 1; z-index: 3500; }
+  .app > .sbar       { grid-row: 5; grid-column: 1; }
 
   /* .mode-rail and .mode-btn moved above the 900px breakpoint. See the note
      there for what was going wrong while they sat here. */
@@ -1177,7 +1195,7 @@
   /* The development banner is position:fixed, so it is not inside .map-wrap
      and cannot inherit the lift from there. The same value is written to the
      root element for it. Without this it sat squarely over the figures. */
-  #dev-banner { bottom: calc(14px + var(--sheet-lift, 0px)); }
+
   @media (max-width: 900px) {
     .ws-head { flex-wrap: wrap; }
     .ws-acts { width: 100%; justify-content: flex-end; }
@@ -1958,6 +1976,14 @@
       <div>
         <h1 class="hdr-logo">PopHealth Map<span class="dev-badge" title="This tool is still in development">In development</span></h1>
       </div>
+      <!-- Phones only. The search box lives in the drawer below 900px, which
+           left the most-used control two taps away and invisible. This opens
+           the drawer and puts the cursor straight in the box. -->
+      <button type="button" class="hdr-search-btn" id="hdr-search-btn"
+              aria-label="Search for a postcode, ward or place" title="Search">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg>
+      </button>
     </div>
     <div class="hdr-right">
       <div class="hdr-search">
@@ -1967,8 +1993,8 @@
              polygons are not focusable, so it is the last control here that
              should be reaching a user unnamed. -->
         <input type="text" id="hdr-search-input" autocomplete="off"
-               aria-label="Search for a ward, LSOA, GP practice, school or charity"
-               placeholder="Search ward, LSOA, GP, charity…" />
+               aria-label="Search for a postcode, ward, LSOA, GP practice or charity"
+               placeholder="Search postcode, ward, GP, charity…" />
         <div class="hdr-search-results" id="hdr-search-results"></div>
       </div>
       <div class="tb-sep"></div>
@@ -1977,7 +2003,7 @@
            Nobody knew, because nothing on the page said so, and a share feature
            with no affordance is not one. -->
       <button type="button" class="tb-btn" id="tb-link" title="Copy a link to exactly this view: the indicator, the area, the layers, the selected ward, and any query or custom area open">⧉ Copy link</button>
-      <button type="button" class="tb-btn" id="tb-cb" title="Switch to a colour-blind safe palette (deuteranopia/protanopia friendly)" aria-pressed="false">◐ CB safe</button>
+      <button type="button" class="tb-btn" id="tb-cb" title="Switch to a colour-blind safe palette (deuteranopia/protanopia friendly)" aria-pressed="false">◐ Colour-blind palette</button>
       
       <button type="button" class="tb-btn" id="tb-png" title="Clear the screen for a screenshot: whitens everything outside the mapped area and hides the controls, then you capture it with your own screenshot tool.">⤓ Screenshot</button>
     </div>
@@ -2390,6 +2416,7 @@
               <option value="blue_commitment_pct">Blue space within 15 min walk % (Defra) · LSOA</option>
             </optgroup>
             <optgroup label="Crime &amp; safety">
+              <option value="crime_rate_per_1000">Crime rate per 1,000 residents · Ward</option>
               <option value="crime_total">Total crimes (12 months) · Ward</option>
               <option value="crime_violence_12mo">Violence against the person · Ward</option>
               <option value="crime_asb_12mo">Anti-social behaviour · Ward</option>
@@ -3148,6 +3175,10 @@ const OV_CFG = {
   census_provides_unpaid_care_pct: { lo:"Lower", hi:"Higher", wh:true,  min:2,    max:10   },
   // Crime (ward total, 12 months)
   crime_total:                     { lo:"Fewer", hi:"More",   wh:true,  min:200,  max:5000 },
+  // Per 1,000 residents. Capped near the 95th percentile: a handful of
+  // central wards with few residents and many visitors run into the
+  // thousands and would otherwise wash every other ward out.
+  crime_rate_per_1000:             { lo:"Lower", hi:"Higher", wh:true,  min:40,   max:300  },
   // MPS 12-month crime breakdowns by Home Office major category. Higher = worse
   // (more reported crimes), so wh:true. Ranges chosen at roughly the p95 of the
   // observed London ward distribution to avoid extreme outliers (e.g. West End)
@@ -3438,6 +3469,7 @@ const CATS = [
     { k: "gp_practice_count",                l: "GP practices",                  g: "ward" },
     { k: "pharmacy_count",                   l: "Pharmacies",                    g: "ward" },
     { k: "dental_practice_count",            l: "Dental practices (NHS)",        g: "ward" },
+    { k: "crime_rate_per_1000",              l: "Crime rate per 1,000 residents", g: "ward" },
     { k: "crime_total",                      l: "Total crimes (12 months)",      g: "ward" },
     { k: "core20_lsoa_count",                l: "Core20 LSOAs in ward",          g: "ward" },
     { k: "total_lsoa_count",                 l: "Total LSOAs in ward",           g: "ward" },
@@ -3690,6 +3722,7 @@ const OV_META = {
   census_car_to_work_pct:         { src: "Census 2021 (TS061)",  yr: "2021", g: "Ward", u: "%",       desc: "Residents commuting by car or van." },
 
   // Crime + deprivation flags
+  crime_rate_per_1000:            { src: "data.police.uk street-level crime; ONS population", yr: "12 months to the latest release", g: "Ward, counted from point data", u: "per 1,000", desc: "Reported crimes in the latest 12 months per 1,000 usual residents. Crimes are counted where they happen, not where victims live, so wards with town centres, stations or nightlife (the West End, the City) show high rates driven by visitors rather than residents." },
   crime_total:                    { src: "data.police.uk street-level crime", yr: "12 months to the latest release", g: "Ward, counted from point data", u: "crimes", desc: "Total reported crimes in the latest 12 months. Sum across all Home Office major categories from MPS ward / LSOA monthly data." },
   crime_arson_12mo:               { src: "data.police.uk street-level crime", yr: "12 months to the latest release", g: "Ward, counted from point data", u: "crimes", desc: "Reported Arson & Criminal Damage offences (12 months)." },
   crime_burglary_12mo:            { src: "data.police.uk street-level crime", yr: "12 months to the latest release", g: "Ward, counted from point data", u: "crimes", desc: "Reported Burglary offences (residential + business & community) over 12 months." },
@@ -5523,6 +5556,13 @@ function ensureWardDetail() {
 // WARD LAYER (built after the ward data loads)
 // ═══════════════════════════════════════════════════════════════════════════
 let wLyr = null, selW = null, curOv = 'none';
+/* What the map is coloured by when nobody has chosen. It used to open on no
+   indicator at all: grey outlines, nothing to read, and a first-time visitor
+   given no sign of what the tool does until they found the picker. Deprivation
+   is the figure most people come for and the one the rest are read against.
+   Reset returns here, and a shared link only names the overlay when it is
+   something else (or "none", said explicitly). */
+var DEFAULT_OV = 'imd_score_ward';
 let WARD_DATA = {};
 let WARD_DATA_BY_CODE = {};
 // focusedBorough is hoisted near the top of the script (see `var focusedBorough`)
@@ -5613,6 +5653,12 @@ function selectedWeight(mult) {
   return Math.max(SELECTED_MIN_WEIGHT, 4.5 * (mult || 1));
 }
 
+// Resting ward outlines. Solid black at full strength drew a heavier map than
+// the colours it was meant to frame, and in central London, where wards are
+// small, the lines were most of what could be seen. Hover and selection stay
+// black so the ward being pointed at is still unmistakable.
+var WARD_LINE = '#334155';
+var WARD_LINE_OPACITY = 0.6;
 function wstyle(wn, ov, state) {
   // Borough focus is a SOLO VIEW: wards outside the focused borough disappear
   // entirely, invisible and not interactive-looking, so only the selected
@@ -5633,21 +5679,21 @@ function wstyle(wn, ov, state) {
     // No overlay: a faint neutral, so the boundaries read and nothing claims to
     // mean anything. This used to fill with a neighbourhood's colour when one
     // was shaded, which is what the colour meant.
-    const baseW = {default:1.0, hover:3.0, selected:4.0}[state] || 1.0;
+    const baseW = {default:0.8, hover:3.0, selected:4.0}[state] || 0.8;
     return applyCore20Outline({
-      color: '#000',
+      color: isFocus ? '#000' : WARD_LINE,
       weight: state === 'selected'
         ? selectedWeight(borderWeightMult)
         : Math.max(0, baseW * borderWeightMult),
       fillColor: '#94a3b8',
       fillOpacity: Math.min(absFill, 0.12),
-      opacity: 0.95,
+      opacity: isFocus ? 0.95 : WARD_LINE_OPACITY,
     }, wn);
   }
 
   // Overlay: fill comes from the chosen indicator colour.
   const fill = ovColor(wn, ov);
-  const baseW  = {default:1.0, hover:3.0, selected:4.0}[state] || 1.0;
+  const baseW  = {default:0.8, hover:3.0, selected:4.0}[state] || 0.8;
   // When the overlay is LSOA-only, the ward layer has nothing meaningful to
   // colour with — making it fully opaque just hides the LSOA choropleth
   // underneath. Drop to a near-transparent fill + thin outline so the LSOA
@@ -5658,9 +5704,9 @@ function wstyle(wn, ov, state) {
   const sel = state === 'selected';
   const w  = sel ? selectedWeight(borderWeightMult)
                  : Math.max(0, baseW * borderWeightMult);
-  const op = isFocus ? 1.0 : 0.9;
+  const op = isFocus ? 1.0 : WARD_LINE_OPACITY;
   return applyCore20Outline({
-    color: '#000',
+    color: isFocus ? '#000' : WARD_LINE,
     weight: w, fillColor: fill, fillOpacity: fo, opacity: op,
   }, wn);
 }
@@ -7233,6 +7279,13 @@ function _applyBoroughSolo() {
   else if (mq.addListener) mq.addListener(relocate);
   relocate();
 
+  const searchBtn = document.getElementById('hdr-search-btn');
+  if (searchBtn) searchBtn.addEventListener('click', () => {
+    setOpen(true);
+    const input = document.getElementById('hdr-search-input');
+    if (input) setTimeout(() => input.focus(), 60);
+  });
+
   window.PH_DRAWER = { open: () => setOpen(true), close: () => setOpen(false),
                        isOpen: isOpen, narrow: narrow };
 })();
@@ -7492,6 +7545,21 @@ function _applyBoroughSolo() {
     });
   })();
 
+  /* "Start here": a handful of the most-asked-about figures above the eight
+     subject groups, so a first-time visitor faced with 126 indicators has an
+     obvious place to begin. The rows are the same indicators as in their own
+     groups, so it is hidden while filtering rather than listing hits twice. */
+  const START_HERE = 'Start here';
+  (function addStartHere() {
+    const keys = ['imd_score_ward', 'census_bad_health_pct', 'census_disability_any_pct',
+                  'claimant_rate_pct', 'fuel_poverty_pct', 'crime_rate_per_1000',
+                  'no2_ugm3', 'census_over65_pct'];
+    const byVal = {};
+    model.forEach(g => g.opts.forEach(o => { byVal[o.value] = o; }));
+    const opts = keys.map(k => byVal[k]).filter(Boolean);
+    if (opts.length) model.unshift({ label: START_HERE, opts: opts });
+  })();
+
   // One pill per level the indicator can be drawn at, with the level the
   // publisher measured it at marked. Anything with no levels declared falls
   // back to whatever its label said, so nothing goes blank.
@@ -7601,6 +7669,7 @@ function _applyBoroughSolo() {
      pushed the real list down the pane every time it appeared. */
 
   const openGroups = {};   // label -> bool
+  openGroups[START_HERE] = true;
   let filter = '';
 
   function esc(s) {
@@ -7624,6 +7693,7 @@ function _applyBoroughSolo() {
       // puts a description match above a name match purely because its group
       // is listed first. Score, then order within the group.
       let hits;
+      if (q && g.label === START_HERE) return;
       if (q) {
         hits = g.opts.map(o => {
           const nm = o.name.toLowerCase();
@@ -8003,6 +8073,29 @@ function imdStyle(feat, state) {
 // in loadData lands, so every reader has to tolerate that window, exactly as
 // LSOA_DATA does.
 let MSOA_DATA = {};
+/* Fetched the first time anything shows MSOAs: the boundary layer (map level
+   or the boundary tick) or Data export at MSOA level. Same tolerance as
+   before: until it lands, or if it never does, MSOA_DATA is an empty object
+   and every reader copes. One request however many callers ask. */
+let _msoaDataLoading = null;
+function ensureMsoaData() {
+  if (Object.keys(MSOA_DATA).length) return Promise.resolve(MSOA_DATA);
+  if (_msoaDataLoading) return _msoaDataLoading;
+  _msoaDataLoading = fetch(dataUrl('msoa_data.json'))
+    .then(r => r.ok ? r.json() : null).catch(() => null)
+    .then(md => {
+      _msoaDataLoading = null;
+      if (!md) return MSOA_DATA;
+      MSOA_DATA = md;
+      for (const k in _msoaRange) delete _msoaRange[k];
+      if (typeof msoaLyr !== 'undefined' && msoaLyr) restyleMsoa();
+      if (typeof _updateLayerCounts === 'function') _updateLayerCounts();
+      // The legend may be showing an MSOA range computed from nothing.
+      if (typeof _syncScaleNumbers === 'function') { try { _syncScaleNumbers(); } catch (e) {} }
+      return MSOA_DATA;
+    });
+  return _msoaDataLoading;
+}
 function msoaOvValue(code, k) {
   const d = MSOA_DATA[code];
   if (!d) return null;
@@ -9080,6 +9173,7 @@ function restyleMsoa() {
 }
 
 function loadMsoaBoundaries() {
+  ensureMsoaData();
   if (msoaLyr) return Promise.resolve(msoaLyr);
   if (_msoaLoading) return _msoaLoading;
   _msoaLoading = fetch('data/map/msoa_boundaries.json')
@@ -9338,6 +9432,10 @@ function injectCrimeCategories() {
       if (!isNaN(v)) { theft += v; sawTheft = true; }
     });
     if (sawTheft) ind.crime_theft_12mo = theft;
+    // A count alone mostly measures how many people a ward holds. The rate
+    // is what can be compared between wards.
+    const pop = Number(ind.census_population), tot = Number(ind.crime_total);
+    if (pop > 0 && !isNaN(tot)) ind.crime_rate_per_1000 = Math.round(tot / pop * 10000) / 10;
     filled++;
   });
   console.log('Crime categories flattened onto ' + filled + ' wards');
@@ -9622,7 +9720,17 @@ function _applyOverlayChange(key) {
     const midEl = document.getElementById('sc-mid');
     if (midEl) midEl.textContent = fmtMid;
     const metaEl = document.getElementById('sc-meta');
-    if (metaEl) metaEl.textContent = meta ? `${meta.g} · ${meta.src} (${meta.yr})` : '';
+    // Published for smaller areas but drawn on wards: say so where the colour
+    // is being read, not only in the methodology. A ward's air quality or fuel
+    // poverty is an average of its LSOAs (or MSOAs), not a ward statistic.
+    const nativeG = meta && meta.g ? String(meta.g).toLowerCase() : '';
+    // currentDataLevel is a later `let`; read it guarded in case this runs first.
+    let drawnLvl = 'ward';
+    try { drawnLvl = currentDataLevel || 'ward'; } catch (e) { /* not declared yet */ }
+    const avgNote = (drawnLvl === 'ward' && (nativeG === 'lsoa' || nativeG === 'msoa'))
+      ? ` · Ward values are population-weighted averages of ${nativeG === 'lsoa' ? 'LSOAs' : 'MSOAs'}`
+      : '';
+    if (metaEl) metaEl.textContent = meta ? `${meta.g} · ${meta.src} (${meta.yr})${avgNote}` : '';
     const info = document.getElementById('ov-info');
     const panel = document.getElementById('ov-info-panel');
     if (info && panel) {
@@ -10143,7 +10251,9 @@ function _resetAll() {
     if (isel) isel.value = 'all';
     // Overlay
     const ovSel = document.getElementById('ov');
-    if (ovSel && ovSel.value !== 'none') { ovSel.value = 'none'; ovSel.dispatchEvent(new Event('change')); }
+    const defOv = (ovSel && Array.prototype.some.call(ovSel.options, o => o.value === DEFAULT_OV))
+      ? DEFAULT_OV : 'none';
+    if (ovSel && ovSel.value !== defOv) { ovSel.value = defOv; ovSel.dispatchEvent(new Event('change')); }
     // Core20
     const tc = document.getElementById('core20-toggle');
     if (tc && tc.checked) { tc.checked = false; tc.dispatchEvent(new Event('change')); }
@@ -10281,7 +10391,7 @@ function _writeUrlState() {
     const bfEl = document.getElementById('borough-focus');
     const lsEl = document.getElementById('tlsoa');
     const c20El = document.getElementById('core20-toggle');
-    if (ovEl && ovEl.value && ovEl.value !== 'none') p.set('ov', ovEl.value);
+    if (ovEl && ovEl.value && ovEl.value !== DEFAULT_OV) p.set('ov', ovEl.value);
     if (bfEl && bfEl.value && bfEl.value !== 'all') p.set('b', bfEl.value);
     const ifEl = document.getElementById('icb-focus');
     if (ifEl && ifEl.value && ifEl.value !== 'all') p.set('icb', ifEl.value);
@@ -10463,6 +10573,18 @@ function _readUrlState() {
     }
 
     applyIf('ov', p.get('ov'), 'change');
+    // No overlay in the link: the default, once, and only if nothing has
+    // been picked yet and the tour (which sets its own) is not running.
+    if (!p.has('ov') && !_urlDone.defOv && typeof wLyr !== 'undefined' && wLyr) {
+      const ovEl = document.getElementById('ov');
+      const touring = document.querySelector('.tour-strip.open');
+      if (ovEl && ovEl.value === 'none' && !touring &&
+          Array.prototype.some.call(ovEl.options, o => o.value === DEFAULT_OV)) {
+        ovEl.value = DEFAULT_OV;
+        ovEl.dispatchEvent(new Event('change'));
+      }
+      _urlDone.defOv = true;
+    }
 
     // Level after the overlay, and past the compatibility gate: the link chose
     // an indicator and a level together, and they agreed when it was made.
@@ -10688,6 +10810,8 @@ function _searchPickResult(item) {
   const results = document.getElementById('hdr-search-results');
   if (input) input.value = item.label;
   if (results) results.classList.remove('show');
+  // On a phone the box is in the drawer, which would sit over the result.
+  if (window.PH_DRAWER && PH_DRAWER.narrow()) PH_DRAWER.close();
   if (item.type === 'ward') {
     // Trigger the ward's click handler via wLyr
     if (typeof wLyr !== 'undefined' && wLyr) {
@@ -10712,9 +10836,103 @@ function _searchPickResult(item) {
     _dropSearchPin(item);
   }
 }
+/**
+ * Postcodes.
+ *
+ * A postcode is the first thing most people type, and nothing in the page
+ * holds one: shipping every London postcode would cost megabytes. So a
+ * postcode-shaped query is looked up on postcodes.io (free, no key, open CORS)
+ * only when it is typed, and only the postcode itself is sent. The answer
+ * gives a point and a ward code, which is all that is needed to move the map
+ * and open the ward as if it had been clicked.
+ */
+const _PC_FULL = /^([A-Z]{1,2}\d[A-Z\d]?)\s*(\d[A-Z]{2})$/;
+const _PC_OUT  = /^[A-Z]{1,2}\d[A-Z\d]?$/;
+const _pcCache = {};
+function _postcodeQuery(raw) {
+  const q = (raw || '').trim().toUpperCase();
+  const m = q.match(_PC_FULL);
+  if (m) return { kind: 'postcode', text: m[1] + ' ' + m[2] };
+  if (_PC_OUT.test(q)) return { kind: 'outcode', text: q };
+  return null;
+}
+function _lookupPostcode(pq) {
+  const key = pq.kind + ':' + pq.text;
+  if (_pcCache[key]) return _pcCache[key];
+  const url = pq.kind === 'postcode'
+    ? 'https://api.postcodes.io/postcodes/' + encodeURIComponent(pq.text)
+    : 'https://api.postcodes.io/outcodes/' + encodeURIComponent(pq.text);
+  _pcCache[key] = fetch(url)
+    .then(r => r.ok ? r.json() : null)
+    .then(j => (j && j.result) ? j.result : null)
+    .catch(() => null);
+  return _pcCache[key];
+}
+function _wardLayerFor(code, name) {
+  if (typeof wLyr === 'undefined' || !wLyr) return null;
+  const ls = wLyr.getLayers();
+  return ls.find(l => l.feature.properties.WD24CD === code)
+      || (name ? ls.find(l => l.feature.properties.WD24NM === name) : null)
+      || null;
+}
+function _pickPostcode(pq, res) {
+  const results = document.getElementById('hdr-search-results');
+  if (results) results.classList.remove('show');
+  if (window.PH_DRAWER && PH_DRAWER.narrow()) PH_DRAWER.close();
+  if (!res || !Number.isFinite(res.latitude)) return;
+  if (pq.kind === 'outcode') { _searchFlyTo(res.latitude, res.longitude, 14); return; }
+  const codes = res.codes || {};
+  const lyr = _wardLayerFor(codes.admin_ward, res.admin_ward);
+  if (lyr) {
+    lyr.fire('click');
+    if (typeof map !== 'undefined') map.fitBounds(lyr.getBounds(), { padding: [30, 30] });
+  } else {
+    _searchFlyTo(res.latitude, res.longitude, 15);
+  }
+  _dropSearchPin({ type: 'postcode', label: res.postcode, sub: res.admin_ward || '',
+                   _lat: res.latitude, _lng: res.longitude });
+}
+function _renderPostcodeRow(results, pq, q) {
+  const id = 'sr-pc-row';
+  let row = document.getElementById(id);
+  if (!row) {
+    results.insertAdjacentHTML('afterbegin',
+      '<div class="sr-grp">postcode</div><div class="sr-row" id="' + id + '">' +
+      '<span class="sr-type">postcode</span><span class="sr-name"></span>' +
+      '<span class="sr-sub">Looking up…</span></div>');
+    row = document.getElementById(id);
+    // Replace any "No matches" note now there is something to offer.
+    const empty = results.querySelector('.sr-empty');
+    if (empty) empty.remove();
+  }
+  row.querySelector('.sr-name').textContent = pq.text;
+  // Clickable (and reachable with Enter) before the answer is back.
+  row.onclick = () => _lookupPostcode(pq).then(res => _pickPostcode(pq, res));
+  results.classList.add('show');
+  _lookupPostcode(pq).then(res => {
+    // The box may have moved on while the request was out.
+    const input = document.getElementById('hdr-search-input');
+    if (!input || input.value.trim().toLowerCase() !== q) return;
+    const sub = row.querySelector('.sr-sub');
+    if (!res) {
+      sub.textContent = pq.kind === 'postcode' ? 'Postcode not found' : 'Postcode area not found';
+      row.style.cursor = 'default';
+      row.onclick = null;
+      return;
+    }
+    const inLondon = pq.kind === 'outcode'
+      || (res.region === 'London');
+    sub.textContent = pq.kind === 'postcode'
+      ? (res.admin_ward || '') + (res.admin_district ? ' · ' + res.admin_district : '')
+        + (inLondon ? '' : ' (outside London)')
+      : 'Postcode area';
+    row.onclick = () => _pickPostcode(pq, res);
+  });
+}
 function _runSearch(q) {
   const results = document.getElementById('hdr-search-results');
   if (!results) return;
+  const pq = _postcodeQuery(q);
   q = (q || '').trim().toLowerCase();
   if (q.length < 2) { results.classList.remove('show'); results.innerHTML = ''; return; }
   if (!_searchIndex) _searchIndex = _buildSearchIndex();
@@ -10728,8 +10946,9 @@ function _runSearch(q) {
   });
   const top = matches.slice(0, 40);
   if (top.length === 0) {
-    results.innerHTML = '<div class="sr-empty">No matches. Try a ward, LSOA code, GP name, or charity.</div>';
+    results.innerHTML = '<div class="sr-empty">No matches. Try a postcode, ward, LSOA code, GP name, or charity.</div>';
     results.classList.add('show');
+    if (pq) _renderPostcodeRow(results, pq, q);
     return;
   }
   // Group by type
@@ -10753,6 +10972,7 @@ function _runSearch(q) {
       if (Number.isFinite(i) && top[i]) _searchPickResult(top[i]);
     });
   });
+  if (pq) _renderPostcodeRow(results, pq, q);
 }
 (function _wireSearch() {
   const input = document.getElementById('hdr-search-input');
@@ -11417,7 +11637,7 @@ async function loadData() {
 
     // Update overlay vintage note
     document.getElementById('data-vintage').innerHTML =
-      `Crime: Nov 2025 – Jan 2026 (annualised)<br>Claimants: ${meta.claimant_period||'most recent month'}<br>Health: OHID Fingertips (MSOA level)`;
+      `Crime: ${meta.crime_period||'latest 12 months'}<br>Claimants: ${meta.claimant_period||'most recent month'}<br>Health: OHID Fingertips (MSOA level)`;
 
 
     buildWardLayer();
@@ -11433,21 +11653,9 @@ async function loadData() {
     // ensureLsoaImd calls that, so both halves of the LSOA picture arrive
     // together the first time an LSOA is asked for.
 
-    // MSOA indicators, published at that level rather than derived onto it.
-    // Fetched the same fire-and-forget way as the LSOA payload: a slow or
-    // missing file delays nothing and leaves MSOA_DATA an empty object, which
-    // every reader already tolerates. The boundary layer is lazy and usually
-    // is not up yet, so the restyle is guarded rather than assumed.
-    fetch(dataUrl('msoa_data.json')).then(r => r.ok ? r.json() : null).catch(() => null)
-      .then(md => {
-        if (!md) return;
-        MSOA_DATA = md;
-        for (const k in _msoaRange) delete _msoaRange[k];
-        if (msoaLyr) restyleMsoa();
-        // The MSOA boundary layer is lazy, so until this payload lands there is
-        // no honest count to show beside it. Now there is.
-        if (typeof _updateLayerCounts === 'function') _updateLayerCounts();
-      });
+    // MSOA indicators are no longer fetched here: see ensureMsoaData. They
+    // are 600 KB (160 KB compressed) that a reader who stays at ward level,
+    // which is where the map opens, never looks at.
 
     // Borough indicators, published per local authority. The borough layer is
     // always built, so unlike the MSOA one there is nothing to guard against.
@@ -11576,9 +11784,8 @@ var PH_SHOW = {
 </script>
 
 <div id="dev-banner" role="status" hidden>
-  <div><b>This tool is in development.</b> The data is real and comes from published
-  sources, but the map is still being built and checked, so treat figures as
-  provisional. There will be an announcement when it is ready for general release.</div>
+  <div><b>In development.</b> The data is real and from published sources, but the
+  map is still being checked, so treat figures as provisional.</div>
   <button class="dev-x" type="button" aria-label="Dismiss">&times;</button>
 </div>
 <script>
@@ -11586,12 +11793,18 @@ var PH_SHOW = {
   var el = document.getElementById('dev-banner');
   if (!el) return;
   if (typeof PH_SHOW !== 'object' || PH_SHOW.devBanner !== true) { el.remove(); return; }
+  // Into the flow, directly under the header.
+  var hdr = document.querySelector('.hdr');
+  if (hdr && hdr.parentNode) hdr.parentNode.appendChild(el);
+  function resize() {
+    if (typeof map !== 'undefined' && map) setTimeout(function () { map.invalidateSize(); }, 30);
+  }
   // sessionStorage, not localStorage: dismissing it should quieten this visit,
   // not hide the caveat from someone returning weeks later.
   try { if (sessionStorage.getItem('devBannerDismissed')) return; } catch (e) {}
 
   var dismissed = false;
-  function show() { if (!dismissed) el.hidden = false; }
+  function show() { if (!dismissed) { el.hidden = false; resize(); } }
 
   // Take turns with the tour rather than sitting on top of it. The tour is the
   // landing experience on a first visit and covers about 30% of the map on its
@@ -11601,7 +11814,7 @@ var PH_SHOW = {
   // the length of it. Both are opt-out and neither is load-bearing, so if the
   // tour never starts the banner simply shows immediately as before.
   var deferred = false;
-  window.addEventListener('ph:tour-start', function () { deferred = true; el.hidden = true; });
+  window.addEventListener('ph:tour-start', function () { deferred = true; el.hidden = true; resize(); });
   window.addEventListener('ph:tour-end', function () { deferred = false; show(); });
   // The tour auto-starts from its own load handler, which may run either side
   // of this one, so settle it on the next frame rather than racing it.
@@ -11610,6 +11823,7 @@ var PH_SHOW = {
   el.querySelector('.dev-x').addEventListener('click', function () {
     dismissed = true;
     el.hidden = true;
+    resize();
     try { sessionStorage.setItem('devBannerDismissed', '1'); } catch (e) {}
   });
 })();
@@ -12000,6 +12214,7 @@ var PH_SHOW = {
     total_lsoa_count: 'LSOAs in the ward',
     pharmacy_count: 'pharmacies',
     crime_total: 'total recorded crime',
+    crime_rate_per_1000: 'crimes per 1,000 residents',
   };
   function phraseFor(k) {
     if (SHORT_LABEL[k]) return SHORT_LABEL[k];
@@ -12111,6 +12326,21 @@ var PH_SHOW = {
   function median(k) {
     var s = values(k);
     if (!s.length) return null;
+    var m = Math.floor(s.length / 2);
+    return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+  }
+  // The same median within one borough. Uncached: it is 704 wards at most,
+  // and only runs when a ward is opened.
+  function boroughMedian(k, lad) {
+    if (!lad) return null;
+    var s = [];
+    allWards().forEach(function (w) {
+      if (w.lad !== lad) return;
+      var v = num(w.inds[k]);
+      if (v !== null) s.push(v);
+    });
+    if (s.length < 2) return null;
+    s.sort(function (a, b) { return a - b; });
     var m = Math.floor(s.length / 2);
     return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
   }
@@ -12414,9 +12644,19 @@ var PH_SHOW = {
     var dec = num(i.imd_decile_mean);
     if (dec !== null) {
       var band = decileBand(dec);
-      bits.push('The typical neighbourhood here sits in national deprivation decile <strong>' +
-        dec.toFixed(1) + '</strong>, among roughly the ' + band.dir + ' deprived <strong>' +
+      // An average of deciles is not itself a decile, so it is named as an
+      // average. The share of the ward's LSOAs in deciles 1-2 is the figure
+      // that is actually a count.
+      bits.push('Its neighbourhoods average national deprivation decile <strong>' +
+        dec.toFixed(1) + '</strong>, roughly among the ' + band.dir + ' deprived <strong>' +
         band.pct + '%</strong> of England.');
+      var c20 = num(i.core20_lsoa_count), nl = num(i.total_lsoa_count);
+      if (c20 !== null && nl) {
+        bits.push(c20 === 0
+          ? 'None of its ' + nl + ' LSOAs is in the most deprived 20% nationally.'
+          : '<strong>' + c20 + ' of its ' + nl + '</strong> LSOAs ' + (c20 === 1 ? 'is' : 'are') +
+            ' in the most deprived 20% nationally (deciles 1 and 2).');
+      }
     }
     var score = num(i.imd_score);
     if (score !== null) {
@@ -12429,8 +12669,12 @@ var PH_SHOW = {
     var bad = num(i.census_bad_health_pct), badMed = median('census_bad_health_pct');
     if (bad !== null && badMed !== null) {
       var dir = bad > badMed ? 'above' : (bad < badMed ? 'below' : 'level with');
+      // The borough as well as London: someone looking at a ward in Barking
+      // usually wants to know how it sits among its neighbours too.
+      var badBor = boroughMedian('census_bad_health_pct', w.lad);
       bits.push('Bad or very bad self-reported health is <strong>' + bad.toFixed(1) +
-        '%</strong>, ' + dir + ' the London ward median of ' + badMed.toFixed(1) + '%.');
+        '%</strong>, ' + dir + ' the London ward median of ' + badMed.toFixed(1) + '%' +
+        (badBor !== null ? ' (' + esc(w.lad) + ' ward median ' + badBor.toFixed(1) + '%)' : '') + '.');
     }
     if (!bits.length) return '<div class="ws-insight">No indicator data has loaded for this ward yet.</div>';
     return '<div class="ws-insight">' + bits.join(' ') + '</div>';
@@ -12493,7 +12737,7 @@ var PH_SHOW = {
     var ph  = num(i.pharmacy_count);
 
     var strip = '<div class="ws-strip">' +
-      kpi('IMD decile', dec == null ? null : dec.toFixed(1),
+      kpi('Avg decile', dec == null ? null : dec.toFixed(1),
           '1 = most deprived', { emphasis: true }) +
       kpi('Population', pop == null ? null : (pop >= 10000
             ? (pop / 1000).toFixed(1) + '<span>k</span>'
@@ -12533,7 +12777,7 @@ var PH_SHOW = {
     var meta = [];
     if (w.lad) meta.push(w.lad);
     if (pop !== null) meta.push(Math.round(pop).toLocaleString() + ' residents');
-    if (dec !== null) meta.push('IMD decile ' + dec.toFixed(1));
+    if (dec !== null) meta.push('average IMD decile ' + dec.toFixed(1));
     metaEl.textContent = meta.join(' · ');
 
     syncPinBtn();
@@ -13914,10 +14158,11 @@ var PH_SHOW = {
     {
       t: 'What this map shows',
       n: 'This map shows health and living conditions in London. It covers all 33 ' +
-         'boroughs. The buttons down the left open the tools. The tabs in the panel ' +
-         'change what the map draws. You can work at three sizes of area. These are ' +
-         '<strong>704 wards</strong>, and two smaller ones called <strong>LSOAs</strong> ' +
-         'and <strong>MSOAs</strong>. An LSOA holds about 1,500 people.',
+         'boroughs. The tabs along the top open the tools, and the panel (the ' +
+         '&#9776; button) chooses what the map draws. You can work at four sizes of ' +
+         'area: the <strong>33 boroughs</strong>, <strong>704 wards</strong>, and two ' +
+         'smaller ones called <strong>MSOAs</strong> (about 8,000 people) and ' +
+         '<strong>LSOAs</strong> (about 1,500 people).',
       go: function () {
         railClick('explore');
         // The indicator first: changing #ov pulls the sidebar to the Indicators
@@ -14239,7 +14484,11 @@ var PH_SHOW = {
   var TOUR_SEEN = 'phTourSeen';
   function maybeAutoStart() {
     if (tourAt >= 0) return;
-    if (window.location.search && window.location.search.length > 1) return;
+    // The address as it arrived, not as it is now: the page writes its own
+    // state into the URL as soon as the default overlay is drawn, which would
+    // otherwise look like a shared link and stop the tour on every first visit.
+    var inbound = (typeof _INBOUND_URL_STATE === 'string') ? _INBOUND_URL_STATE : window.location.search;
+    if (inbound && inbound.length > 1) return;
     var seen = null;
     try { seen = window.localStorage.getItem(TOUR_SEEN); } catch (e) { return; }
     if (seen) return;
@@ -14541,7 +14790,7 @@ var PH_SHOW = {
 
   var RB_HEADLINE = [
     { k: 'census_population',         l: 'Population',      dp: 0, wide: false },
-    { k: 'imd_decile',                l: 'IMD decile',      dp: 1 },
+    { k: 'imd_decile',                l: 'Avg IMD decile',  dp: 1 },
     { k: 'imd_score',                 l: 'IMD score',       dp: 1 },
     { k: 'census_bad_health_pct',     l: 'Bad health',      dp: 1, pct: true },
     { k: 'census_disability_any_pct', l: 'Disability',      dp: 1, pct: true },
@@ -15020,6 +15269,13 @@ var PH_SHOW = {
   function setCsvLevel(l) {
     cbLevel = l;
     _cbMsoa = null;
+    if (l === 'msoa' && typeof ensureMsoaData === 'function' &&
+        !Object.keys(MSOA_DATA).length) {
+      ensureMsoaData().then(function () {
+        _cbMsoa = null;
+        if (cbLevel === 'msoa') renderCsvPane();
+      });
+    }
     var need = (l === 'lsoa') &&
       !(typeof LSOA_DATA === 'object' && LSOA_DATA && Object.keys(LSOA_DATA).length);
     _cbLsoaPending = need;
