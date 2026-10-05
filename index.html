@@ -670,6 +670,16 @@
     display: none; }
   .sb-scrim.on { display: block; }
   .sb-tools { display: none; }
+  /* The tour's last chapter points at the control to use. */
+  .tour-pulse { position: relative; box-shadow: 0 0 0 3px var(--nhs-yellow);
+    border-radius: 6px; animation: tour-pulse 1.4s ease-in-out infinite; }
+  @keyframes tour-pulse { 0%, 100% { box-shadow: 0 0 0 3px var(--nhs-yellow); }
+                          50% { box-shadow: 0 0 0 6px rgba(255,184,28,.35); } }
+  @media (prefers-reduced-motion: reduce) { .tour-pulse { animation: none; } }
+  .tour-task-done { display: none; }
+  .tour-strip.task-done .tour-task-ask { display: none; }
+  .tour-strip.task-done .tour-task-done { display: inline; }
+  .tour-phone-only { display: none; }
   .hdr-search-btn { display: none; appearance: none; background: none; border: 1px solid var(--line);
     border-radius: 8px; padding: 6px 9px; cursor: pointer; line-height: 0; color: var(--ink);
     margin-left: auto; flex: 0 0 auto; }
@@ -795,6 +805,7 @@
     .hdr-logo { font-size: var(--t-lg); }
     .hdr-menu { display: inline-flex; }
     .hdr-search-btn { display: inline-flex; }
+    .tour-phone-only { display: inline; }
     .hdr-left { flex: 1 1 auto; min-width: 0; }
     /* Moved into the drawer, not duplicated: one set of controls, relocated. */
     .sb-tools { display: block; padding: 9px 10px; border-bottom: 1px solid var(--line-2);
@@ -1750,7 +1761,11 @@
        attribution were four things independently claiming the same corner of
        a 390px screen. They lift above the sheet together already; here they
        stop overlapping each other as well. */
-    #ai-toggle { right: 8px; padding: 8px 12px; font-size: var(--t-sm); }
+    /* Above the legend strip, which runs the full width along the bottom here
+       and was hidden behind this button. 56px clears the strip (12px up and
+       about 36px tall) with a small gap. */
+    #ai-toggle { right: 8px; padding: 8px 12px; font-size: var(--t-sm); bottom: 56px; }
+    .map-wrap.has-sheet #ai-toggle { bottom: calc(var(--sheet-lift) + 56px); }
     /* Full width along the bottom instead: at this width there is no room for
        300px of notice beside anything and still a map. */
     #fingertips-banner { left: 8px; right: 8px; bottom: 48px; max-width: none;
@@ -5531,13 +5546,6 @@ function ensureWardDetail() {
 // WARD LAYER (built after the ward data loads)
 // ═══════════════════════════════════════════════════════════════════════════
 let wLyr = null, selW = null, curOv = 'none';
-/* What the map is coloured by when nobody has chosen. It used to open on no
-   indicator at all: grey outlines, nothing to read, and a first-time visitor
-   given no sign of what the tool does until they found the picker. Deprivation
-   is the figure most people come for and the one the rest are read against.
-   Reset returns here, and a shared link only names the overlay when it is
-   something else (or "none", said explicitly). */
-var DEFAULT_OV = 'imd_score_ward';
 let WARD_DATA = {};
 let WARD_DATA_BY_CODE = {};
 // focusedBorough is hoisted near the top of the script (see `var focusedBorough`)
@@ -9806,9 +9814,9 @@ function _applyOverlayChange(key) {
   if (boroughL._map) boroughL.bringToFront();
   // Refresh the Top/Bottom 20 rankings for the new indicator.
   renderTopBottom();
-  // Switch to overlay tab, unless this is the default being put back (on
-  // load or by Reset): that is the map being shown, not a choice made in the
-  // Indicators list, so the panel stays where it is.
+  // Switch to overlay tab, unless Reset is clearing it: that is the map being
+  // put back, not a choice made in the Indicators list, so the panel stays
+  // where it is.
   if (window._ovDefaulting) return;
   document.querySelectorAll('.sb-tab').forEach(t => t.classList.toggle('active', t.dataset.tab==='overlay'));
   document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.id==='tab-overlay'));
@@ -10229,10 +10237,8 @@ function _resetAll() {
     if (isel) isel.value = 'all';
     // Overlay
     const ovSel = document.getElementById('ov');
-    const defOv = (ovSel && Array.prototype.some.call(ovSel.options, o => o.value === DEFAULT_OV))
-      ? DEFAULT_OV : 'none';
-    if (ovSel && ovSel.value !== defOv) {
-      ovSel.value = defOv;
+    if (ovSel && ovSel.value !== 'none') {
+      ovSel.value = 'none';
       window._ovDefaulting = true;
       try { ovSel.dispatchEvent(new Event('change')); } finally { window._ovDefaulting = false; }
     }
@@ -10373,7 +10379,7 @@ function _writeUrlState() {
     const bfEl = document.getElementById('borough-focus');
     const lsEl = document.getElementById('tlsoa');
     const c20El = document.getElementById('core20-toggle');
-    if (ovEl && ovEl.value && ovEl.value !== DEFAULT_OV) p.set('ov', ovEl.value);
+    if (ovEl && ovEl.value && ovEl.value !== 'none') p.set('ov', ovEl.value);
     if (bfEl && bfEl.value && bfEl.value !== 'all') p.set('b', bfEl.value);
     const ifEl = document.getElementById('icb-focus');
     if (ifEl && ifEl.value && ifEl.value !== 'all') p.set('icb', ifEl.value);
@@ -10555,19 +10561,6 @@ function _readUrlState() {
     }
 
     applyIf('ov', p.get('ov'), 'change');
-    // No overlay in the link: the default, once, and only if nothing has
-    // been picked yet and the tour (which sets its own) is not running.
-    if (!p.has('ov') && !_urlDone.defOv && typeof wLyr !== 'undefined' && wLyr) {
-      const ovEl = document.getElementById('ov');
-      const touring = document.querySelector('.tour-strip.open');
-      if (ovEl && ovEl.value === 'none' && !touring &&
-          Array.prototype.some.call(ovEl.options, o => o.value === DEFAULT_OV)) {
-        ovEl.value = DEFAULT_OV;
-        window._ovDefaulting = true;
-        try { ovEl.dispatchEvent(new Event('change')); } finally { window._ovDefaulting = false; }
-      }
-      _urlDone.defOv = true;
-    }
 
     // Level after the overlay, and past the compatibility gate: the link chose
     // an indicator and a level together, and they agreed when it was made.
@@ -14430,7 +14423,86 @@ var PH_SHOW = {
         if (c && p && p.classList.contains('open')) c.click();
       },
     },
+    {
+      /* The one chapter the reader does rather than watches. Every chapter
+         before this drives the controls itself; this one points at them and
+         waits, so the first thing someone does on their own is the thing the
+         map is for. Next reads "Skip" until it is done, and the choice they
+         make is kept when the tour closes rather than reset away. */
+      t: 'Your turn: colour the map',
+      task: true,
+      n: '<span class="tour-task-ask">Now try it yourself. Open the <strong>Indicators</strong> ' +
+         'tab' + '<span class="tour-phone-only"> (tap the &#9776; button first)</span>' +
+         ', then tick <strong>IMD composite score</strong> under <em>Start here</em>. ' +
+         'The map will colour every ward by how deprived it is.</span>' +
+         '<span class="tour-task-done">That is it: every ward is now coloured by ' +
+         'deprivation, and darker means more deprived. Click any ward to see its ' +
+         'figures, or pick another indicator from the list. Press <strong>Finish</strong> ' +
+         'to start exploring.</span>',
+      go: function () {
+        closeWardSheet();
+        railClick('explore');
+        setOverlay('none');
+        // Back to plain wards, so ticking a ward indicator is all it takes.
+        lsoaLayer(false, false);
+        wardLevel();
+        sidebarTab('layers');
+        var c = document.getElementById('ai-close');
+        var p = document.getElementById('ai-panel');
+        if (c && p && p.classList.contains('open')) c.click();
+        tourTaskArm();
+      },
+    },
   ];
+
+  /* The task chapter's bookkeeping. TOUR_TASK_OV is what counts as done. */
+  var TOUR_TASK_OV = 'imd_score_ward';
+  var tourTaskDone = false;
+  function tourTaskPulse(on) {
+    // The menu button only matters where the panel is a drawer.
+    var narrow = !!(window.PH_DRAWER && PH_DRAWER.narrow());
+    ['sbtab-overlay', 'hdr-menu'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.classList.toggle('tour-pulse', !!on && (id !== 'hdr-menu' || narrow));
+    });
+  }
+  function tourTaskShow(done) {
+    if (tourStrip) tourStrip.classList.toggle('task-done', !!done);
+    var nx = $('tour-next');
+    if (nx) nx.textContent = done ? 'Finish' : 'Skip and finish';
+    tourTaskPulse(!done);
+  }
+  function tourTaskArm() {
+    tourTaskDone = false;
+    tourTaskShow(false);
+  }
+  function tourTaskClear() {
+    tourTaskDone = false;
+    tourTaskPulse(false);
+    if (tourStrip) tourStrip.classList.remove('task-done');
+  }
+  (function () {
+    var ov = document.getElementById('ov');
+    if (!ov) return;
+    ov.addEventListener('change', function () {
+      if (tourAt < 0 || !TOUR[tourAt] || !TOUR[tourAt].task) return;
+      if (ov.value !== TOUR_TASK_OV) return;
+      tourTaskDone = true;
+      tourTaskShow(true);
+      tourLift();
+    });
+    // Opening the Indicators tab moves the highlight on to the list itself.
+    var tab = document.getElementById('sbtab-overlay');
+    if (tab) tab.addEventListener('click', function () {
+      if (tourAt >= 0 && TOUR[tourAt] && TOUR[tourAt].task && !tourTaskDone) tourTaskPulse(false);
+    });
+    var menu = document.getElementById('hdr-menu');
+    if (menu) menu.addEventListener('click', function () {
+      if (tourAt >= 0 && TOUR[tourAt] && TOUR[tourAt].task && !tourTaskDone) {
+        menu.classList.remove('tour-pulse');
+      }
+    });
+  })();
 
   var tourAt = -1;
   var tourStrip = $('tour-strip');
@@ -14448,16 +14520,14 @@ var PH_SHOW = {
    * throw away the thing they were sent.
    */
   var TOUR_SEEN = 'phTourSeen';
-  var TOUR_AUTOSTART = false;
+  var TOUR_AUTOSTART = true;
   function maybeAutoStart() {
-    // Off: the map opens straight onto London coloured by deprivation, which
-    // explains itself, and the tour is one click away ("Take a tour") for
-    // anyone who wants it. Kept as a switch rather than deleted.
+    // A switch, so the landing tour can be turned off without unpicking it.
     if (!TOUR_AUTOSTART) return;
     if (tourAt >= 0) return;
     // The address as it arrived, not as it is now: the page writes its own
-    // state into the URL as soon as the default overlay is drawn, which would
-    // otherwise look like a shared link and stop the tour on every first visit.
+    // state into the URL as the map moves, which would otherwise look like a
+    // shared link and stop the tour on a first visit.
     var inbound = (typeof _INBOUND_URL_STATE === 'string') ? _INBOUND_URL_STATE : window.location.search;
     if (inbound && inbound.length > 1) return;
     var seen = null;
@@ -14570,6 +14640,7 @@ var PH_SHOW = {
     var last = tourAt === TOUR.length - 1;
     $('tour-next').textContent = last ? 'Finish' : 'Next chapter →';
     $('tour-next-lbl').textContent = last ? '' : 'Up next: ' + TOUR[tourAt + 1].t;
+    tourTaskClear();
     tourResetStage();
     try { c.go(); } catch (e) { /* a chapter must never strand the tour */ }
     tourLift();
@@ -14589,6 +14660,8 @@ var PH_SHOW = {
   }
   function tourEnd() {
     if (!tourStrip) return;
+    var keepOv = tourTaskDone ? TOUR_TASK_OV : null;
+    tourTaskClear();
     tourAt = -1;
     tourStrip.classList.remove('open');
     try { window.dispatchEvent(new CustomEvent('ph:tour-end')); } catch (e) {}
@@ -14617,6 +14690,12 @@ var PH_SHOW = {
     // turns off.
     lsoaLayer(false, false);
     if (typeof _resetAll === 'function') _resetAll(); else railClick('explore');
+    // Except what the reader chose themselves in the last chapter: Reset is
+    // there to clear the tour's examples, not the first thing they did.
+    if (keepOv) {
+      setOverlay(keepOv);
+      if (window.PH_DRAWER && PH_DRAWER.narrow()) PH_DRAWER.close();
+    }
     lift();
   }
   function tourStep(d) {
