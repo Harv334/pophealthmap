@@ -6,14 +6,14 @@
 <title>Accessibility statement · PopHealth Map</title>
 <meta name="description" content="Accessibility statement for PopHealth Map: what works, what does not, and how to ask for something you cannot reach.">
 <!-- Same inline map-pin icon as index.html, so the tab matches. -->
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23005EB8'/%3E%3Cpath d='M16 6c-3.9 0-7 3.1-7 7 0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7z' fill='%23fff'/%3E%3Ccircle cx='16' cy='13' r='2.6' fill='%23005EB8'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1a1a'/%3E%3Cpath d='M16 6c-3.9 0-7 3.1-7 7 0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7z' fill='%23fff'/%3E%3Ccircle cx='16' cy='13' r='2.6' fill='%231a1a1a'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="vendor/fonts.css">
 <style>
-  /* Light and dark, following the device, same three-block pattern the map
-     uses. A statement about accessibility that only works in one theme would
-     be making its own point. */
+  /* Light and dark, following the device. A statement about accessibility
+     that only works in one theme would be making its own point. */
   :root {
     --nhs-blue:#005EB8; --nhs-dark:#003087; --nhs-yellow:#FFB81C;
-    --ink:#212B32; --ink-2:#4C6272; --ink-3:#768692;
+    --ink:#212B32; --ink-2:#4C6272; --ink-3:#5E6D78;
     --line:#DDE1E4; --bg:#F4F7F9; --paper:#FFFFFF;
     --warn-bg:#FFF6E0; --warn-line:#F0C660;
   }
@@ -95,9 +95,8 @@
   <p>These things work:</p>
   <ul>
     <li>Every page can be zoomed to 200% without losing content or function.</li>
-    <li>The site follows your device's light or dark setting, and you can override it.</li>
     <li>There is a colour-blind safe palette for the map's colours, on the
-      <strong>CB safe</strong> button in the toolbar.</li>
+      <strong>Colour-blind palette</strong> button in the toolbar.</li>
     <li>Colour is never the only way a figure is given. Everything shaded on the map
       is also written as a number in the panel and in the downloads.</li>
     <li>Every control can be reached with the keyboard, and the one with focus is
@@ -125,7 +124,8 @@
     </p>
     <ul>
       <li>The <strong>search box</strong> in the header finds a ward, a
-        neighbourhood, a GP practice, a school or a charity by name or postcode.
+        neighbourhood, a GP practice, a pharmacy, a hospital or a charity by name
+        or postcode.
         Choosing a result does exactly what clicking it on the map does.</li>
       <li><strong>Query</strong> lists the wards matching any set of conditions, as
         a list you can move through and select from.</li>
@@ -145,6 +145,12 @@
       currently cannot be built with a keyboard. Once built it can be sent as a
       link, which does open for anyone. Data export covers the same figures for
       published areas without needing the map.
+    </dd>
+
+    <dt>The map has no dark mode</dt>
+    <dd>
+      The map is drawn in one light colour scheme and does not follow a dark
+      setting on your device. This statement and the methodology page do.
     </dd>
 
     <dt>The map's own background is not described</dt>
@@ -211,8 +217,8 @@
   <h3>How this was tested</h3>
   <p>
     The site is checked with automated tests run in a real browser against the
-    published pages. Those tests measure the contrast of the site's text colours in
-    both light and dark themes against the WCAG formula, check that every control
+    published pages. Those tests measure the contrast of the site's text colours
+    against the WCAG formula, check that every control
     has a name a screen reader can announce, check that every image has a text
     alternative, and check that the page has one main heading, a main landmark and a
     language set. Keyboard order and screen-reader behaviour are checked by hand.
@@ -235,7 +241,7 @@
 
   <p class="updated">
     This statement was prepared on 17 August 2026. It was last reviewed on
-    17 August 2026. The site was last tested on 17 August 2026 against WCAG 2.2 AA.
+    5 October 2026. The site was last tested on 17 August 2026 against WCAG 2.2 AA.
   </p>
 
 </main>

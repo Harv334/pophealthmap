@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>About and privacy · PopHealth Map</title>
+<meta name="description" content="Who runs PopHealth Map, what it stores in your browser, and what leaves your browser when you use the Ask panel, postcode search or the background map.">
+<link rel="canonical" href="https://pophealth.uk/privacy.html">
+<!-- Same inline map-pin icon as index.html, so the tab matches. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1a1a'/%3E%3Cpath d='M16 6c-3.9 0-7 3.1-7 7 0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7z' fill='%23fff'/%3E%3Ccircle cx='16' cy='13' r='2.6' fill='%231a1a1a'/%3E%3C/svg%3E">
+<!-- Fonts from this origin, never Google: a page that says the site makes no
+     third-party requests should not make one itself. -->
+<link rel="stylesheet" href="vendor/fonts.css">
+<style>
+  /* The map's own tokens, light only, because the map has no dark theme and
+     this page describes the map. */
+  :root {
+    --nhs-blue:#005EB8; --nhs-dark:#003087; --nhs-yellow:#FFB81C;
+    --ink:#212B32; --ink-2:#4C6272; --ink-3:#5E6D78;
+    --line:#DDE1E4; --line-2:#E8EDEE;
+    --bg:#F4F7F9; --paper:#FFFFFF; --paper-2:#FBFCFD;
+    --tint-amber:#FFF8E6; --tint-amber-line:#E0C280; --tint-amber-ink:#5C4115;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+    font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif; font-size:15px; line-height:1.6; }
+  header { background:var(--paper); border-top:4px solid var(--nhs-blue);
+    border-bottom:1px solid var(--line); padding:18px 24px; }
+  header h1 { font-family:'Inter Tight',Inter,system-ui,sans-serif; font-size:21px; color:var(--nhs-dark);
+    margin:0 0 3px; letter-spacing:-.01em; }
+  header p { margin:0; color:var(--ink-2); font-size:13.5px; }
+  header a { color:var(--nhs-blue); }
+  main { max-width:820px; margin:0 auto; padding:28px 24px 64px; }
+  h2 { font-family:'Inter Tight',Inter,system-ui,sans-serif; font-size:19px; color:var(--nhs-dark);
+    margin:34px 0 10px; padding-bottom:6px; border-bottom:1px solid var(--line); }
+  h3 { font-family:'Inter Tight',Inter,system-ui,sans-serif; font-size:15.5px; margin:22px 0 6px; }
+  p, li { color:var(--ink-2); }
+  li { margin-bottom:6px; }
+  strong { color:var(--ink); font-weight:600; }
+  a { color:var(--nhs-blue); text-underline-offset:2px; overflow-wrap:anywhere; }
+  a:focus-visible { outline:3px solid var(--nhs-yellow); outline-offset:2px; border-radius:2px; }
+  .lede { font-size:16.5px; color:var(--ink); max-width:62ch; }
+  .box { background:var(--paper); border:1px solid var(--line); border-radius:8px;
+    padding:14px 16px; margin:16px 0; }
+  .box.warn { background:var(--tint-amber); border-color:var(--tint-amber-line); }
+  .box.warn p, .box.warn strong { color:var(--tint-amber-ink); }
+  .box p:first-child, .box ul:first-child { margin-top:0; }
+  .box p:last-child, .box ul:last-child { margin-bottom:0; }
+  table { width:100%; border-collapse:collapse; margin:12px 0 18px; font-size:13.5px;
+    background:var(--paper); border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+  th, td { text-align:left; padding:8px 11px; border-bottom:1px solid var(--line);
+    vertical-align:top; color:var(--ink-2); }
+  th { background:var(--paper-2); font-weight:600; color:var(--ink); font-size:12.5px;
+    text-transform:uppercase; letter-spacing:.04em; }
+  tr:last-child td { border-bottom:0; }
+  /* Storage names are read as whole words; a narrow screen scrolls the table
+     instead of breaking them. */
+  td code { white-space:nowrap; overflow-wrap:normal; }
+  code { font-family:'JetBrains Mono',ui-monospace,Menlo,monospace; font-size:12.5px;
+    background:var(--paper-2); border:1px solid var(--line); border-radius:4px; padding:1px 5px;
+    color:var(--ink); overflow-wrap:anywhere; }
+  .wrap { overflow-x:auto; }
+  /* --ink-2 rather than --ink-3 for the date, which someone may need to quote. */
+  footer { border-top:1px solid var(--line); margin-top:40px; padding-top:14px;
+    font-size:13.5px; color:var(--ink-2); }
+  .skip { position:absolute; left:-9999px; background:var(--paper); color:var(--ink);
+    padding:10px 14px; z-index:10; }
+  .skip:focus { left:0; top:0; outline:3px solid var(--nhs-yellow); }
+  @media (max-width:600px) {
+    header { padding:16px; }
+    main { padding:22px 16px 48px; }
+    th, td { padding:7px 8px; }
+  }
+</style>
+</head>
+<body>
+
+<a class="skip" href="#content">Skip to content</a>
+
+<header>
+  <h1>About and privacy</h1>
+  <p><a href="index.html">← Back to the map</a> · <a href="methodology.html">Methodology</a> · <a href="accessibility.html">Accessibility</a> · PopHealth Map, London</p>
+</header>
+
+<main id="content">
+
+<p class="lede">PopHealth Map is an independent project run by Harvey Seville. It is
+not an NHS or government service, and it is not endorsed by the NHS, any local
+authority or any of the organisations whose data it shows.</p>
+
+<p>The figures come from published official sources, listed with their dates in the
+<a href="methodology.html">methodology and technical notes</a>. How they are put
+together and presented is this project's own work. For anything on this page, a
+correction, or a request to remove something, email
+<a href="mailto:contact@pophealth.uk">contact@pophealth.uk</a>.</p>
+
+<h2>In short</h2>
+
+<ul>
+  <li>The site sets <strong>no cookies</strong> and has <strong>no analytics, no
+    trackers and no adverts</strong>. Its fonts and map code are served from this
+    site, not from Google or a code library service.</li>
+  <li>The map runs in your browser, on data files downloaded from this site. Clicking
+    areas, filtering, comparing and exporting all happen on your own device.</li>
+  <li>Three optional parts of the page do send something elsewhere: the
+    <a href="#ask">Ask panel</a>, <a href="#postcodes">postcode search</a> and the
+    <a href="#tiles">background map</a>. Each is described below.</li>
+</ul>
+
+<h2 id="ask">The Ask panel</h2>
+
+<div class="box warn">
+  <p><strong>Please do not enter patient or personal information.</strong> Ask about
+  places, not people: no names, NHS numbers, addresses or details of anyone's
+  health or circumstances.</p>
+</div>
+
+<p>The <strong>Ask about this data</strong> panel answers questions in plain English.
+When you send a question:</p>
+
+<ul>
+  <li>Your question is sent to a small server run for this site on Cloudflare (a
+    Cloudflare Worker), which passes it on to <strong>Anthropic</strong>. Anthropic's
+    Claude model writes the answer.</li>
+  <li>To write it, the model asks your browser to look up figures in the data the map
+    has already loaded. Those figures are sent back the same way. The rest of the
+    conversation in the panel is sent along with each new question, so the model can
+    follow it. Closing or reloading the page clears that conversation.</li>
+  <li>To apply the limit of 10 questions a day, the Worker records your IP address
+    with a count of today's questions. That record is deleted automatically after
+    48 hours.</li>
+  <li>If you never send a question, nothing is sent to the Worker or to Anthropic.
+    Opening the panel on its own sends nothing.</li>
+</ul>
+
+<p>Anthropic and Cloudflare handle what they receive under their own policies:
+<a href="https://www.anthropic.com/legal/privacy">Anthropic's privacy policy</a> and
+<a href="https://www.cloudflare.com/privacypolicy/">Cloudflare's privacy policy</a>.</p>
+
+<p>Answers are written by an AI model. The figures in them come from the map's own
+data, but the wording does not, so check anything that matters before acting on it.</p>
+
+<h2 id="postcodes">Postcode search</h2>
+
+<p>When you type a postcode into the search box, that postcode, and nothing else, is
+sent to <a href="https://postcodes.io/">postcodes.io</a>, a free postcode lookup
+service, to find where it is. Like any website, postcodes.io also sees your IP
+address. Other searches, such as a ward, a GP practice or a charity, are matched in
+your browser and are not sent anywhere.</p>
+
+<p>A full postcode can cover a small number of homes. If you are working from
+someone's address, search by ward or neighbourhood name instead.</p>
+
+<h2 id="tiles">The background map</h2>
+
+<p>The street map behind the data is made of image tiles requested from
+<a href="https://carto.com/privacy">CARTO</a>, or from
+<a href="https://www.esri.com/en-us/privacy/overview">Esri</a> if CARTO's tiles cannot
+be loaded. As with any web request, the tile provider sees your IP address and which
+part of the map you are looking at. Nothing from the map's own data layers is sent
+with those requests.</p>
+
+<h2>Hosting</h2>
+
+<p>The pages and data files are served by GitHub Pages. Like any web host, GitHub
+receives your IP address and the addresses of the pages and files your browser asks
+for. See <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">GitHub's
+privacy statement</a>.</p>
+
+<h2>What is stored in your browser</h2>
+
+<p>A few display preferences are kept in your browser's own storage so the map opens
+the way you left it. They stay on your device and are not sent anywhere. Clearing
+this site's data in your browser removes them.</p>
+
+<div class="wrap">
+  <table>
+    <thead>
+      <tr><th scope="col">Name</th><th scope="col">Kept in</th><th scope="col">What it is for</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>phTourSeen</code></td><td>Local storage</td>
+        <td>Notes that the tour has been shown, so it does not start by itself on every visit.</td></tr>
+      <tr><td><code>phPanelCollapsed</code></td><td>Local storage</td>
+        <td>Whether you hid the side panel on a wide screen.</td></tr>
+      <tr><td><code>phPanelWidth</code></td><td>Local storage</td>
+        <td>The width you dragged the side panel to.</td></tr>
+      <tr><td><code>phMapControlsFolded</code></td><td>Local storage</td>
+        <td>Whether the map controls in the side panel are folded or open.</td></tr>
+      <tr><td><code>phAskUsed</code></td><td>Local storage</td>
+        <td>Today's date and how many Ask questions this browser has used, so the panel
+          can show how many are left. Your questions themselves are not stored.</td></tr>
+      <tr><td><code>devBannerDismissed</code></td><td>Session storage</td>
+        <td>That you closed the "In development" strip. Cleared when you close the tab.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<h2>Charity locations</h2>
+
+<p>The charities on the map and in the Directory come from the
+<a href="https://register-of-charities.charitycommission.gov.uk/">Charity Commission's
+register of charities</a>, which publishes each charity's contact details. Many small
+charities give a trustee's home as their contact address, so for smaller charities the
+site shows only an approximate location and no street address.</p>
+
+<p>Anyone can ask for a charity's record to be removed from this site by emailing
+<a href="mailto:contact@pophealth.uk">contact@pophealth.uk</a> with the charity's name
+or registered number. Changing the details on the register itself is done with the
+Charity Commission.</p>
+
+<h2>The data on the map</h2>
+
+<p>The statistics on the map are published figures for areas, such as wards and
+neighbourhoods, with the publishers' own rules for small numbers already applied.
+They are not records about individuals. GP practices, pharmacies, dentists and
+hospitals come from published NHS registers. The
+<a href="methodology.html">methodology and technical notes</a> list every source.</p>
+
+<h2>Questions and requests</h2>
+
+<p>For a question about this page, a correction, or a removal request, email
+<a href="mailto:contact@pophealth.uk">contact@pophealth.uk</a>. If you are not happy
+with the reply, you can also contact the
+<a href="https://ico.org.uk/">Information Commissioner's Office</a>.</p>
+
+<footer>
+  This page was last updated on 5 October 2026. The
+  <a href="accessibility.html">accessibility statement</a> covers how the site works
+  with assistive technology.
+</footer>
+
+</main>
+
+</body>
+</html>

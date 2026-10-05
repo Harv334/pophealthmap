@@ -36,9 +36,10 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1a1a'/%3E%3Cpath d='M16 6c-3.9 0-7 3.1-7 7 0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7z' fill='%23fff'/%3E%3Ccircle cx='16' cy='13' r='2.6' fill='%231a1a1a'/%3E%3C/svg%3E">
 <!-- Everything the page needs to run is served from this origin. There is no
      CDN. The only requests elsewhere are optional extras that the map works
-     without: basemap tiles (CARTO, or Esri without a key), the Ask panel's
-     Worker, and a postcode lookup on postcodes.io, made only when a postcode
-     is typed into search.
+     without: basemap tiles (CARTO, or Esri without a key or when CARTO's
+     tiles fail), the Ask panel's Worker, and a postcode lookup on
+     postcodes.io, made only when a postcode is typed into search. privacy.html
+     tells visitors the same, so a new request elsewhere belongs there too.
 
      This is not only a privacy preference. The audience for this map is NHS
      and local authority staff, and those networks block cdnjs and Google more
@@ -929,6 +930,8 @@
    an error, but always on screen next to the answers it applies to. */
 .ai-caution{flex:0 0 auto;margin:0;padding:8px 12px;border-top:1px solid var(--line-2);
   background:var(--paper-2);color:var(--ink-2);font-size: var(--t-xs);line-height:1.45;border-radius:0}
+.ai-caution strong{color:var(--ink);font-weight:600}
+.ai-caution a{color:var(--nhs-blue);text-underline-offset:2px}
 /* Which model is answering, under the caution it belongs with. Quieter again
    and without a second rule above it, so the two read as one footer rather
    than as two separate warnings. */
@@ -2863,6 +2866,10 @@
            URL, and the methodology page header still links to it, so the
            statement is not orphaned. It is the link in the footer that has
            gone, not the statement. -->
+      <!-- The palette is NHS blue and the audience is NHS staff, so who runs
+           this has to be said on the page, not left to be inferred. -->
+      <span class="sbar-note">Independent project, not an NHS service</span>
+      <a class="sbar-link" href="privacy.html">About and privacy</a>
       <a class="sbar-link" href="mailto:contact@pophealth.uk">contact@pophealth.uk</a>
       <span id="src-lbl"></span>
     </span>
@@ -4542,20 +4549,37 @@ const map = L.map('map', {
    Esri's World Light Gray canvas, the nearest keyless match to Positron, so
    the ground is never a wall of watermarks. */
 const CARTO_KEY = 'cb1_49ss_1_92682daff33cd89850a57b3d';
+function esriBasemap() {
+  return L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 19,
+    maxNativeZoom: 16,
+    crossOrigin: 'anonymous',
+    attribution: 'Tiles \u00a9 <a href="https://www.esri.com">Esri</a>, HERE, Garmin \u00b7 \u00a9 <a href="https://openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  });
+}
 if (CARTO_KEY) {
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png?key=' + encodeURIComponent(CARTO_KEY), {
+  const carto = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png?key=' + encodeURIComponent(CARTO_KEY), {
     maxZoom: 19,
     subdomains: 'abcd',
     crossOrigin: 'anonymous',
     attribution: '\u00a9 <a href="https://openstreetmap.org/copyright">OpenStreetMap</a> \u00b7 \u00a9 <a href="https://carto.com/attributions">CARTO</a>',
   }).addTo(map);
+  /* A revoked or over-quota key, or a network that blocks cartocdn.com, fails
+     every tile, and the map goes grey with nothing to say why. So if CARTO
+     fails four tiles before a single one has loaded, Esri takes over for the
+     rest of the visit. Once any tile has loaded, a later failure is a dropped
+     tile rather than a dead provider, and is left alone. */
+  let cartoFails = 0;
+  const cartoFailed = () => {
+    if (++cartoFails < 4) return;
+    carto.off('tileerror', cartoFailed);
+    map.removeLayer(carto);
+    esriBasemap().addTo(map);
+  };
+  carto.on('tileerror', cartoFailed);
+  carto.once('tileload', () => carto.off('tileerror', cartoFailed));
 } else {
-  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
-    maxZoom: 19,
-    maxNativeZoom: 16,
-    crossOrigin: 'anonymous',
-    attribution: 'Tiles \u00a9 <a href="https://www.esri.com">Esri</a>, HERE, Garmin \u00b7 \u00a9 <a href="https://openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-  }).addTo(map);
+  esriBasemap().addTo(map);
 }
 
 // Static layers
@@ -10832,17 +10856,26 @@ function _postcodeQuery(raw) {
   if (_PC_OUT.test(q)) return { kind: 'outcode', text: q };
   return null;
 }
+// Resolves to the result, or to null when postcodes.io answers that the
+// postcode does not exist. Rejects when there was no answer at all: no
+// connection, a proxy refusing the host, or the service down. Those say nothing
+// about the postcode, so they are reported as such and never cached, and the
+// next attempt asks again rather than repeating a stale "not found".
 function _lookupPostcode(pq) {
   const key = pq.kind + ':' + pq.text;
   if (_pcCache[key]) return _pcCache[key];
   const url = pq.kind === 'postcode'
     ? 'https://api.postcodes.io/postcodes/' + encodeURIComponent(pq.text)
     : 'https://api.postcodes.io/outcodes/' + encodeURIComponent(pq.text);
-  _pcCache[key] = fetch(url)
-    .then(r => r.ok ? r.json() : null)
-    .then(j => (j && j.result) ? j.result : null)
-    .catch(() => null);
-  return _pcCache[key];
+  const p = fetch(url)
+    .then(r => {
+      if (r.status === 404) return null;
+      if (!r.ok) throw new Error('postcodes.io ' + r.status);
+      return r.json().then(j => (j && j.result) ? j.result : null);
+    });
+  _pcCache[key] = p;
+  p.catch(() => { if (_pcCache[key] === p) delete _pcCache[key]; });
+  return p;
 }
 function _wardLayerFor(code, name) {
   if (typeof wLyr === 'undefined' || !wLyr) return null;
@@ -10881,14 +10914,20 @@ function _renderPostcodeRow(results, pq, q) {
     const empty = results.querySelector('.sr-empty');
     if (empty) empty.remove();
   }
-  row.querySelector('.sr-name').textContent = pq.text;
-  // Clickable (and reachable with Enter) before the answer is back.
-  row.onclick = () => _lookupPostcode(pq).then(res => _pickPostcode(pq, res));
+  // A non-breaking space, so a long status beside it squeezes the status and
+  // not the postcode, which otherwise breaks into "E2" over "6AA".
+  row.querySelector('.sr-name').textContent = pq.text.replace(' ', '\u00a0');
+  // Clickable (and reachable with Enter) before the answer is back. A failure
+  // is reported on the row below, so there is nothing to do with it here.
+  row.onclick = () => _lookupPostcode(pq).then(res => _pickPostcode(pq, res), () => {});
   results.classList.add('show');
-  _lookupPostcode(pq).then(res => {
-    // The box may have moved on while the request was out.
+  // The box may have moved on while the request was out.
+  const current = () => {
     const input = document.getElementById('hdr-search-input');
-    if (!input || input.value.trim().toLowerCase() !== q) return;
+    return !!input && input.value.trim().toLowerCase() === q;
+  };
+  _lookupPostcode(pq).then(res => {
+    if (!current()) return;
     const sub = row.querySelector('.sr-sub');
     if (!res) {
       sub.textContent = pq.kind === 'postcode' ? 'Postcode not found' : 'Postcode area not found';
@@ -10903,6 +10942,15 @@ function _renderPostcodeRow(results, pq, q) {
         + (inLondon ? '' : ' (outside London)')
       : 'Postcode area';
     row.onclick = () => _pickPostcode(pq, res);
+  }, () => {
+    if (!current()) return;
+    const sub = row.querySelector('.sr-sub');
+    sub.textContent = 'Could not reach the postcode lookup. Select to try again.';
+    row.style.cursor = '';
+    row.onclick = () => {
+      sub.textContent = 'Looking up…';
+      _renderPostcodeRow(results, pq, q);
+    };
   });
 }
 function _runSearch(q) {
