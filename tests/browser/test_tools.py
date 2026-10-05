@@ -69,14 +69,31 @@ try:
     check("the header names the area and then the figures",
           got["header"][:2] == ["code", "name"] and len(got["header"]) == 5,
           str(got["header"]))
+    # The code column is what a file is joined on elsewhere, so it has to be
+    # the GSS code and not the ward's name standing in for one.
+    first = d.execute_script("return PH_CSV.build().text.split('\\n')[1].split(',');")
+    check("a ward row starts with its E05 code and then its name",
+          re.match(r"^E05\d{6}$", first[0]) is not None and not first[1].startswith("E0"),
+          str(first[:3]))
 
     lv = d.execute_script("""
       PH_CSV.setLevel('borough');
       var a = PH_CSV.build();
-      return { boroughs: a.rows,
-               warned: document.getElementById('cb-note').textContent,
+      // Read before the scope changes, which repaints the note without it.
+      var warned = document.getElementById('cb-note').textContent;
+      var row = a.text.split('\\n')[1].split(',');
+      var s = document.getElementById('cb-scope');
+      s.value = 'Brent'; s.dispatchEvent(new Event('change', {bubbles:true}));
+      var one = PH_CSV.build().rows;
+      s.value = ''; s.dispatchEvent(new Event('change', {bubbles:true}));
+      return { boroughs: a.rows, row: row, scoped: one, warned: warned,
                colsAfterBorough: PH_CSV.columns().length };
     """)
+    check("a borough row carries its E09 code and its name",
+          lv["row"][0].startswith("E09") and lv["row"][1] and not lv["row"][1].startswith("E09"),
+          str(lv["row"][:2]))
+    check("and scoping boroughs to one borough gives that one",
+          lv["scoped"] == 1, str(lv["scoped"]))
 
     # LSOA is the one level whose figures are not in memory already: ward,
     # borough and MSOA all arrive during loadData, and lsoa_data.json is 7.8 MB
@@ -95,6 +112,13 @@ try:
             break
         time.sleep(1)
     lv["lsoas"] = d.execute_script("return PH_CSV.build().rows")
+    # Names, wards and boroughs come from the boundary file, which the level
+    # waits for, so no row may fall back to its code or a blank borough.
+    nameless = d.execute_script("""
+      return PH_CSV.build().text.split('\\n').slice(1).filter(function (l) {
+        var c = l.split(','); return !c[1] || c[1] === c[0] || !c[3];
+      }).length;""")
+    check("every LSOA row has a name, a ward and a borough", nameless == 0, str(nameless))
 
     check("switching level changes what a row is",
           lv["boroughs"] == 33 and lv["lsoas"] == 4994,
