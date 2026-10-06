@@ -253,6 +253,9 @@
   /* ── Persistent map legend strip ── */
   .map-legend-strip { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); background: color-mix(in srgb, var(--paper) 94%, transparent); border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px; box-shadow: 0 2px 8px rgba(0,0,0,.10); font-size: var(--t-xs); color: var(--ink-2); display: flex; align-items: center; gap: 10px; z-index: 540; pointer-events: none; max-width: 90%; }
   .map-legend-strip .mls-label { font-weight: 600; color: var(--ink); max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* The unit, on its own line under the name, when it is too long to go on
+     each end value. Set by _syncScaleNumbers. */
+  .map-legend-strip .mls-unit { display: block; font-weight: 400; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; }
   .map-legend-strip .mls-min, .map-legend-strip .mls-max { font-variant-numeric: tabular-nums; color: var(--ink-2); min-width: 34px; }
   .map-legend-strip .mls-min { text-align: right; }
   .map-legend-strip .mls-grad { width: 140px; height: 8px; border-radius: 3px; border: 1px solid var(--line); }
@@ -494,6 +497,9 @@
   .scale-bar { display: none; margin-top: 8px; }
   .scale-labels { display: flex; justify-content: space-between; font-size: var(--t-xs); color: var(--ink-3); margin-bottom: 3px; }
   .scale-grad { display: block; height: 6px; border-radius: 3px; overflow: hidden; }
+  /* A unit too long to sit on each number, said once above the scale. */
+  .sc-unit { font-size: var(--t-xs); color: var(--ink-2); margin-bottom: 2px; }
+  .sc-unit:empty { display: none; }
 
   /* ── Top / bottom 20 rankings ── */
   .rank-list { display: flex; flex-direction: column; gap: 1px; }
@@ -2318,7 +2324,6 @@
               <option value="ft_93239">Intentional self-harm: emergency hospital admissions · Ward</option>
               <option value="ft_93283">Life expectancy at birth · Ward</option>
               <option value="ft_93098">Long-term unemployment: people claiming out of work benefit for over 12 months (aged 16 to 64) · Ward</option>
-              <option value="ft_93092">Low birth weight of live babies · Ward</option>
               <option value="ft_93250">Mortality from all causes · Ward</option>
               <option value="ft_93252">Mortality from all causes (aged under 75) · Ward</option>
               <option value="ft_93253">Mortality from cancer · Ward</option>
@@ -2422,6 +2427,7 @@
           </select>
 
           <div class="scale-bar" id="scale">
+            <div class="sc-unit" id="sc-unit"></div>
             <div class="scale-labels"><span id="sc-lo">Low</span><span id="sc-mid" style="color:var(--ink-3);font-variant-numeric:tabular-nums"></span><span id="sc-hi">High</span></div>
             <!-- Gradient must match ramp() in JS exactly: rgb(15,110,86) → rgb(239,159,39) → rgb(163,45,39) -->
             <!-- Painted by _syncScaleGradient. The inline gradient here was a
@@ -3308,7 +3314,6 @@ const OV_CFG = {
   ft_93107                      : { lo:"Lower", hi:"Higher", wh:true, min:9.3062, max:33.1308 },
   ft_93108                      : { lo:"Lower", hi:"Higher", wh:true, min:15.1293, max:48.9512 },
   ft_93089                      : { lo:"Lower", hi:"Higher", wh:false, min:26.6285, max:75.9128 },
-  ft_93092                      : { lo:"Lower", hi:"Higher", wh:true, min:2.9117, max:14.0331 },
   ft_93115                      : { lo:"Lower", hi:"Higher", wh:true, min:23.7886, max:130.1168 },
   ft_93114                      : { lo:"Lower", hi:"Higher", wh:true, min:33.0975, max:142.8947 },
   ft_93219                      : { lo:"Lower", hi:"Higher", wh:true, min:28.1776, max:102.0726 },
@@ -3477,7 +3482,6 @@ const CATS = [
     { k: "ft_93107", l: "Year 6 prevalence of obesity (including severe obesity), 3 years data combined", g: "msoa", lv: ["ward","msoa"] },
     { k: "ft_93108", l: "Year 6 prevalence of overweight (including obesity), 3 years data combined", g: "msoa", lv: ["ward","msoa"] },
     { k: "ft_93089", l: "General fertility rate (women aged 15 to 44)", g: "msoa", lv: ["ward","msoa"] },
-    { k: "ft_93092", l: "Low birth weight of live babies", g: "msoa", lv: ["ward","msoa"] },
     { k: "ft_93115", l: "Emergency hospital admissions: all causes (aged under 5)", g: "msoa", lv: ["ward","msoa"] },
     { k: "ft_93114", l: "Unintentional and deliberate injuries: emergency hospital admissions in children (aged under 5)", g: "msoa", lv: ["ward","msoa"] },
     { k: "ft_93219", l: "Unintentional and deliberate injuries: hospital admissions in children (aged under 15)", g: "msoa", lv: ["ward","msoa"] },
@@ -3676,8 +3680,8 @@ function _levelToast(msg) {
 // src = data source · yr = reference year · g = geography · u = unit
 const OV_META = {
   // Census (TS tables) — all ward-level via NOMIS
-  census_population:              { src: "ONS mid-2024",  yr: "2024", g: "Ward", u: "people",  desc: "Usual resident population." },
-  dental_practice_count:          { src: "NHS ODS (egdpprac)", yr: "current register", g: "Ward, counted from point data", u: "practices", desc: "NHS contracted dental practices with a postcode in the ward. Private-only practices are not in the register, so a ward can read as empty when it is not, and people register across boundaries freely: this counts buildings, not access." },
+  census_population:              { src: "Census 2021 (TS001)", yr: "2021", g: "Ward", u: "people",  desc: "Usual resident population on Census day, 21 March 2021." },
+  dental_practice_count:          { src: "NHS ODS (egdpprac)", yr: "as at Sep 2026", g: "Ward, counted from point data", u: "practices", desc: "NHS contracted dental practices with a postcode in the ward. Private-only practices are not in the register, so a ward can read as empty when it is not, and people register across boundaries freely: this counts buildings, not access." },
   census_good_health_pct:         { src: "Census 2021 (TS037)",  yr: "2021", g: "Ward", u: "%",       desc: "Self-reported 'Good' or 'Very good' general health." },
   census_bad_health_pct:          { src: "Census 2021 (TS037)",  yr: "2021", g: "Ward", u: "%",       desc: "Self-reported 'Bad' or 'Very bad' general health." },
   census_disability_any_pct:      { src: "Census 2021 (TS038)",  yr: "2021", g: "Ward", u: "%",       desc: "Activities limited a little or a lot under the Equality Act." },
@@ -3711,39 +3715,39 @@ const OV_META = {
   census_car_to_work_pct:         { src: "Census 2021 (TS061)",  yr: "2021", g: "Ward", u: "%",       desc: "Residents commuting by car or van." },
 
   // Crime + deprivation flags
-  crime_rate_per_1000:            { src: "data.police.uk street-level crime; ONS population", yr: "12 months to the latest release", g: "Ward, counted from point data", u: "per 1,000", desc: "Reported crimes in the latest 12 months per 1,000 usual residents. Crimes are counted where they happen, not where victims live, so wards with town centres, stations or nightlife (the West End, the City) show high rates driven by visitors rather than residents." },
-  crime_total:                    { src: "data.police.uk street-level crime", yr: "12 months to the latest release", g: "Ward, counted from point data", u: "crimes", desc: "Total reported crimes in the latest 12 months. Sum across all Home Office major categories from MPS ward / LSOA monthly data." },
-  crime_arson_12mo:               { src: "data.police.uk street-level crime", yr: "12 months to the latest release", g: "Ward, counted from point data", u: "crimes", desc: "Reported Arson & Criminal Damage offences (12 months)." },
-  crime_burglary_12mo:            { src: "data.police.uk street-level crime", yr: "12 months to the latest release", g: "Ward, counted from point data", u: "crimes", desc: "Reported Burglary offences (residential + business & community) over 12 months." },
-  crime_drug_offences_12mo:       { src: "data.police.uk street-level crime", yr: "12 months to the latest release", g: "Ward, counted from point data", u: "crimes", desc: "Reported Drug Offences (trafficking + possession) over 12 months." },
-  crime_misc_society_12mo:        { src: "data.police.uk street-level crime", yr: "12 months to the latest release", g: "Ward, counted from point data", u: "crimes", desc: "Miscellaneous Crimes Against Society (handling stolen goods, perverting course of justice, etc.) over 12 months." },
-  crime_weapons_12mo:             { src: "data.police.uk street-level crime", yr: "12 months to the latest release", g: "Ward, counted from point data", u: "crimes", desc: "Possession of Weapons offences (firearms, blades & other weapons) over 12 months." },
-  crime_public_order_12mo:        { src: "data.police.uk street-level crime", yr: "12 months to the latest release", g: "Ward, counted from point data", u: "crimes", desc: "Public Order Offences (fear / alarm / distress, racial / religious aggravation, violent disorder) over 12 months." },
-  crime_robbery_12mo:             { src: "data.police.uk street-level crime", yr: "12 months to the latest release", g: "Ward, counted from point data", u: "crimes", desc: "Robbery offences (personal + business property) over 12 months." },
-  crime_theft_12mo:               { src: "data.police.uk street-level crime", yr: "12 months to the latest release", g: "Ward, counted from point data", u: "crimes", desc: "Theft (bicycle, shoplifting, theft from person, other theft) over 12 months." },
-  crime_vehicle_12mo:             { src: "data.police.uk street-level crime", yr: "12 months to the latest release", g: "Ward, counted from point data", u: "crimes", desc: "Vehicle Offences (theft of/from vehicle, aggravated taking, interference) over 12 months." },
-  crime_violence_12mo:            { src: "data.police.uk street-level crime", yr: "12 months to the latest release", g: "Ward, counted from point data", u: "crimes", desc: "Violence Against the Person (homicide, violence with/without injury) over 12 months." },
-  crime_asb_12mo:                 { src: "data.police.uk street-level crime", yr: "12 months to the latest release", g: "Ward, counted from point data", u: "crimes", desc: "Reported anti-social behaviour, the largest single category in the street-level data." },
-  ft_a_e_attendance_under_5: { src: "OHID Fingertips", yr: "latest published", g: "Borough, upper-tier local authority", u: "per 1,000", desc: "A&E attendances, ages 0 to 4. Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
-  ft_cervical_screening_25_49: { src: "OHID Fingertips", yr: "latest published", g: "Borough, upper-tier local authority", u: "%", desc: "Cancer screening coverage: cervical (25 to 49). Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
-  ft_child_poverty_low_income: { src: "OHID Fingertips", yr: "latest published", g: "Borough, upper-tier local authority", u: "%", desc: "Children in relative low income families (under 16). Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
-  ft_depression_qof: { src: "OHID Fingertips", yr: "latest published", g: "Borough, upper-tier local authority", u: "%", desc: "Depression: QOF prevalence. Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
-  ft_flu_vaccination_65plus: { src: "OHID Fingertips", yr: "latest published", g: "Borough, upper-tier local authority", u: "%", desc: "Vaccination coverage: flu (65 and over). Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
-  ft_healthy_life_expectancy_female: { src: "OHID Fingertips", yr: "latest published", g: "Borough, upper-tier local authority", u: "years", desc: "Healthy life expectancy at birth (female). Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
-  ft_healthy_life_expectancy_male: { src: "OHID Fingertips", yr: "latest published", g: "Borough, upper-tier local authority", u: "years", desc: "Healthy life expectancy at birth (male). Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
-  ft_hypertension_qof: { src: "OHID Fingertips", yr: "latest published", g: "Borough, upper-tier local authority", u: "%", desc: "Hypertension: QOF prevalence. Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
-  ft_life_expectancy_female: { src: "OHID Fingertips", yr: "latest published", g: "Borough, upper-tier local authority", u: "years", desc: "Life expectancy at birth (female). Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
-  ft_life_expectancy_male: { src: "OHID Fingertips", yr: "latest published", g: "Borough, upper-tier local authority", u: "years", desc: "Life expectancy at birth (male). Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
-  ft_mental_health_qof: { src: "OHID Fingertips", yr: "latest published", g: "Borough, upper-tier local authority", u: "%", desc: "Mental health: QOF prevalence. Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
-  ft_mmr_2_doses_age5: { src: "OHID Fingertips", yr: "latest published", g: "Borough, upper-tier local authority", u: "%", desc: "Vaccination coverage: MMR two doses at 5 years. Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
-  ft_obesity_adults: { src: "OHID Fingertips", yr: "latest published", g: "Borough, upper-tier local authority", u: "%", desc: "Overweight including obesity prevalence in adults. Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
-  ft_obesity_year6: { src: "OHID Fingertips", yr: "latest published", g: "Borough, upper-tier local authority", u: "%", desc: "Year 6 obesity, including severe obesity. Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
-  ft_physical_activity_adults: { src: "OHID Fingertips", yr: "latest published", g: "Borough, upper-tier local authority", u: "%", desc: "Physically active adults. Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
-  ft_self_harm_admissions_10_24: { src: "OHID Fingertips", yr: "latest published", g: "Borough, upper-tier local authority", u: "per 100,000", desc: "Hospital admissions for self-harm (10 to 24). Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
-  ft_smoking_prevalence_adults: { src: "OHID Fingertips", yr: "latest published", g: "Borough, upper-tier local authority", u: "%", desc: "Smoking prevalence in adults (18+), current smokers. Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
-  ft_suicide_rate: { src: "OHID Fingertips", yr: "latest published", g: "Borough, upper-tier local authority", u: "per 100,000", desc: "Suicide rate. Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
-  core20_lsoa_count:              { src: "NHSE Core20PLUS5",     yr: "2024", g: "Ward", u: "LSOAs",  desc: "Count of LSOAs in the ward falling in the national IMD-decile 1–2 (Core20)." },
-  claimant_rate_pct:              { src: "NOMIS CLA01",          yr: "Latest", g: "Ward/LSOA", u: "%", desc: "Claimant count rate (UC + JSA) as % of working-age population." },
+  crime_rate_per_1000:            { src: "data.police.uk street-level crime; ONS population", yr: "Aug 2025 to Jul 2026", g: "Ward, counted from point data", u: "per 1,000", desc: "Reported crimes in the latest 12 months per 1,000 usual residents. Crimes are counted where they happen, not where victims live, so wards with town centres, stations or nightlife (the West End, the City) show high rates driven by visitors rather than residents." },
+  crime_total:                    { src: "data.police.uk street-level crime", yr: "Aug 2025 to Jul 2026", g: "Ward, counted from point data", u: "crimes", desc: "Total reported crimes in the latest 12 months. Sum across all Home Office major categories from MPS ward / LSOA monthly data." },
+  crime_arson_12mo:               { src: "data.police.uk street-level crime", yr: "Aug 2025 to Jul 2026", g: "Ward, counted from point data", u: "crimes", desc: "Reported Arson & Criminal Damage offences (12 months)." },
+  crime_burglary_12mo:            { src: "data.police.uk street-level crime", yr: "Aug 2025 to Jul 2026", g: "Ward, counted from point data", u: "crimes", desc: "Reported Burglary offences (residential + business & community) over 12 months." },
+  crime_drug_offences_12mo:       { src: "data.police.uk street-level crime", yr: "Aug 2025 to Jul 2026", g: "Ward, counted from point data", u: "crimes", desc: "Reported Drug Offences (trafficking + possession) over 12 months." },
+  crime_misc_society_12mo:        { src: "data.police.uk street-level crime", yr: "Aug 2025 to Jul 2026", g: "Ward, counted from point data", u: "crimes", desc: "Miscellaneous Crimes Against Society (handling stolen goods, perverting course of justice, etc.) over 12 months." },
+  crime_weapons_12mo:             { src: "data.police.uk street-level crime", yr: "Aug 2025 to Jul 2026", g: "Ward, counted from point data", u: "crimes", desc: "Possession of Weapons offences (firearms, blades & other weapons) over 12 months." },
+  crime_public_order_12mo:        { src: "data.police.uk street-level crime", yr: "Aug 2025 to Jul 2026", g: "Ward, counted from point data", u: "crimes", desc: "Public Order Offences (fear / alarm / distress, racial / religious aggravation, violent disorder) over 12 months." },
+  crime_robbery_12mo:             { src: "data.police.uk street-level crime", yr: "Aug 2025 to Jul 2026", g: "Ward, counted from point data", u: "crimes", desc: "Robbery offences (personal + business property) over 12 months." },
+  crime_theft_12mo:               { src: "data.police.uk street-level crime", yr: "Aug 2025 to Jul 2026", g: "Ward, counted from point data", u: "crimes", desc: "Theft (bicycle, shoplifting, theft from person, other theft) over 12 months." },
+  crime_vehicle_12mo:             { src: "data.police.uk street-level crime", yr: "Aug 2025 to Jul 2026", g: "Ward, counted from point data", u: "crimes", desc: "Vehicle Offences (theft of/from vehicle, aggravated taking, interference) over 12 months." },
+  crime_violence_12mo:            { src: "data.police.uk street-level crime", yr: "Aug 2025 to Jul 2026", g: "Ward, counted from point data", u: "crimes", desc: "Violence Against the Person (homicide, violence with/without injury) over 12 months." },
+  crime_asb_12mo:                 { src: "data.police.uk street-level crime", yr: "Aug 2025 to Jul 2026", g: "Ward, counted from point data", u: "crimes", desc: "Reported anti-social behaviour, the largest single category in the street-level data." },
+  ft_a_e_attendance_under_5: { src: "OHID Fingertips", yr: "2024/25", g: "Borough, upper-tier local authority", u: "per 1,000", desc: "A&E attendances, ages 0 to 4. Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
+  ft_cervical_screening_25_49: { src: "OHID Fingertips", yr: "2024", g: "Borough, upper-tier local authority", u: "%", desc: "Cancer screening coverage: cervical (25 to 49). Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
+  ft_child_poverty_low_income: { src: "OHID Fingertips", yr: "2024/25", g: "Borough, upper-tier local authority", u: "%", desc: "Children in relative low income families (under 16). Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
+  ft_depression_qof: { src: "OHID Fingertips", yr: "2024/25", g: "Borough, upper-tier local authority", u: "%", desc: "Depression: QOF prevalence. Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
+  ft_flu_vaccination_65plus: { src: "OHID Fingertips", yr: "2024/25", g: "Borough, upper-tier local authority", u: "%", desc: "Vaccination coverage: flu (65 and over). Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
+  ft_healthy_life_expectancy_female: { src: "OHID Fingertips", yr: "2022 - 24", g: "Borough, upper-tier local authority", u: "years", desc: "Healthy life expectancy at birth (female). Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
+  ft_healthy_life_expectancy_male: { src: "OHID Fingertips", yr: "2022 - 24", g: "Borough, upper-tier local authority", u: "years", desc: "Healthy life expectancy at birth (male). Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
+  ft_hypertension_qof: { src: "OHID Fingertips", yr: "2024/25", g: "Borough, upper-tier local authority", u: "%", desc: "Hypertension: QOF prevalence. Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
+  ft_life_expectancy_female: { src: "OHID Fingertips", yr: "2025", g: "Borough, upper-tier local authority", u: "years", desc: "Life expectancy at birth (female). Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
+  ft_life_expectancy_male: { src: "OHID Fingertips", yr: "2025", g: "Borough, upper-tier local authority", u: "years", desc: "Life expectancy at birth (male). Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
+  ft_mental_health_qof: { src: "OHID Fingertips", yr: "2024/25", g: "Borough, upper-tier local authority", u: "%", desc: "Mental health: QOF prevalence. Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
+  ft_mmr_2_doses_age5: { src: "OHID Fingertips", yr: "2024/25", g: "Borough, upper-tier local authority", u: "%", desc: "Vaccination coverage: MMR two doses at 5 years. Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
+  ft_obesity_adults: { src: "OHID Fingertips", yr: "2024/25", g: "Borough, upper-tier local authority", u: "%", desc: "Overweight including obesity prevalence in adults. Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
+  ft_obesity_year6: { src: "OHID Fingertips", yr: "2024/25", g: "Borough, upper-tier local authority", u: "%", desc: "Year 6 obesity, including severe obesity. Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
+  ft_physical_activity_adults: { src: "OHID Fingertips", yr: "2024/25", g: "Borough, upper-tier local authority", u: "%", desc: "Physically active adults. Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
+  ft_self_harm_admissions_10_24: { src: "OHID Fingertips", yr: "2023/24", g: "Borough, upper-tier local authority", u: "per 100,000", desc: "Hospital admissions for self-harm (10 to 24). Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
+  ft_smoking_prevalence_adults: { src: "OHID Fingertips", yr: "2024", g: "Borough, upper-tier local authority", u: "%", desc: "Smoking prevalence in adults (18+), current smokers. Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
+  ft_suicide_rate: { src: "OHID Fingertips", yr: "2022 - 24", g: "Borough, upper-tier local authority", u: "per 100,000", desc: "Suicide rate. Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
+  core20_lsoa_count:              { src: "NHSE Core20PLUS5",     yr: "2025", g: "Ward", u: "LSOAs",  desc: "Count of LSOAs in the ward falling in the national IMD-decile 1–2 (Core20)." },
+  claimant_rate_pct:              { src: "NOMIS CLA01",          yr: "August 2026", g: "Ward/LSOA", u: "%", desc: "Claimant count rate (UC + JSA) as % of working-age population." },
 
   // Environment + access
   fuel_poverty_pct:               { src: "DESNZ LILEE",          yr: "2022", g: "LSOA", u: "%",       desc: "Households in fuel poverty under the Low Income Low Energy Efficiency (LILEE) metric." },
@@ -3765,10 +3769,10 @@ const OV_META = {
   // unit: "Better (6.8 0–8)". The scale belongs in the label and the
   // description, where it already is.
   ptal_score:                     { src: "GLA LSOA Atlas (TfL PTAL)", yr: "2014", g: "LSOA", u: "", desc: "Public Transport Accessibility Level, averaged over the LSOA. The nine bands 0, 1a, 1b, 2–5, 6a, 6b map onto 0–8, where 8 (6b) is the best connected. Higher is better. TfL's most recent published LSOA banding." },
-  rail_station_dist_m:            { src: "TfL Unified API",      yr: "Live", g: "LSOA", u: "m", desc: "Straight-line distance from the LSOA centroid to the nearest Tube, DLR, Overground, Elizabeth line, tram or National Rail station. Straight line, not walking route, so a real walk is longer wherever a river, railway or park is in the way. Stations just outside London are counted, because for an outer-borough LSOA the nearest one often is." },
-  rail_stations_1km:              { src: "TfL Unified API",      yr: "Live", g: "LSOA", u: "stations", desc: "Stations of any rail mode within 1 km of the LSOA centroid. At ward level this is the population-weighted mean of its LSOAs, not a sum: one station is within 1 km of several LSOAs and summing would count it repeatedly." },
-  bus_stop_dist_m:                { src: "TfL Unified API",      yr: "Live", g: "LSOA", u: "m", desc: "Straight-line distance from the LSOA centroid to the nearest bus stop. Both sides of a road count as separate stops, which is how TfL registers them." },
-  bus_stops_800m:                 { src: "TfL Unified API",      yr: "Live", g: "LSOA", u: "stops", desc: "Bus stops within 800 m of the LSOA centroid, roughly a ten-minute walk. Population-weighted mean at ward level, for the same reason as the station count." },
+  rail_station_dist_m:            { src: "TfL Unified API",      yr: "as at Sep 2026", g: "LSOA", u: "m", desc: "Straight-line distance from the LSOA centroid to the nearest Tube, DLR, Overground, Elizabeth line, tram or National Rail station. Straight line, not walking route, so a real walk is longer wherever a river, railway or park is in the way. Stations just outside London are counted, because for an outer-borough LSOA the nearest one often is." },
+  rail_stations_1km:              { src: "TfL Unified API",      yr: "as at Sep 2026", g: "LSOA", u: "stations", desc: "Stations of any rail mode within 1 km of the LSOA centroid. At ward level this is the population-weighted mean of its LSOAs, not a sum: one station is within 1 km of several LSOAs and summing would count it repeatedly." },
+  bus_stop_dist_m:                { src: "TfL Unified API",      yr: "as at Sep 2026", g: "LSOA", u: "m", desc: "Straight-line distance from the LSOA centroid to the nearest bus stop. Both sides of a road count as separate stops, which is how TfL registers them." },
+  bus_stops_800m:                 { src: "TfL Unified API",      yr: "as at Sep 2026", g: "LSOA", u: "stops", desc: "Bus stops within 800 m of the LSOA centroid, roughly a ten-minute walk. Population-weighted mean at ward level, for the same reason as the station count." },
 
   // IMD 2025
   imd_score:                      { src: "MHCLG IMD 2025",       yr: "2025", g: "LSOA", u: "score",  desc: "Composite Index of Multiple Deprivation. Higher = more deprived." },
@@ -3790,41 +3794,58 @@ const OV_META = {
 
 
 
-  ft_93280                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "latest", g: "MSOA", u: "%", desc: "Fuel poverty (low income, low energy efficiency methodology). Polarity: RAG - Low is good" },
-  ft_93097                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "latest", g: "MSOA", u: "%", desc: "Unemployment: people claiming out of work benefit (aged 16 to 64). Polarity: RAG - Low is good" },
-  ft_93098                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "latest", g: "MSOA", u: "per 1,000", desc: "Long-term unemployment: people claiming out of work benefit for over 12 months (aged 16 to 64). Polarity: RAG - Low is good" },
-  ft_93105                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "latest", g: "MSOA", u: "%", desc: "Reception prevalence of obesity (including severe obesity), 3 years data combined. Polarity: RAG - Low is good" },
-  ft_93106                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "latest", g: "MSOA", u: "%", desc: "Reception prevalence of overweight (including obesity), 3 years data combined. Polarity: RAG - Low is good" },
-  ft_93107                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "latest", g: "MSOA", u: "%", desc: "Year 6 prevalence of obesity (including severe obesity), 3 years data combined. Polarity: RAG - Low is good" },
-  ft_93108                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "latest", g: "MSOA", u: "%", desc: "Year 6 prevalence of overweight (including obesity), 3 years data combined. Polarity: RAG - Low is good" },
-  ft_93089                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "latest", g: "MSOA", u: "per 1,000", desc: "General fertility rate (women aged 15 to 44). Polarity: Not applicable" },
-  ft_93092                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "latest", g: "MSOA", u: "%", desc: "Low birth weight of live babies. Polarity: RAG - Low is good" },
-  ft_93115                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "latest", g: "MSOA", u: "per 1,000", desc: "Emergency hospital admissions: all causes (aged under 5). Polarity: RAG - Low is good" },
-  ft_93114                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "latest", g: "MSOA", u: "per 10,000", desc: "Unintentional and deliberate injuries: emergency hospital admissions in children (aged under 5). Polarity: RAG - Low is good" },
-  ft_93219                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "latest", g: "MSOA", u: "per 10,000", desc: "Unintentional and deliberate injuries: hospital admissions in children (aged under 15). Polarity: RAG - Low is good" },
-  ft_93224                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "latest", g: "MSOA", u: "per 10,000", desc: "Unintentional and deliberate injuries: hospital admissions in young people (aged 15 to 24). Polarity: RAG - Low is good" },
-  ft_93227                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "latest", g: "MSOA", u: "per 100", desc: "Emergency hospital admissions: all causes. Polarity: RAG - Low is good" },
-  ft_93229                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "latest", g: "MSOA", u: "per 100", desc: "Coronary heart disease: emergency hospital admissions. Polarity: RAG - Low is good" },
-  ft_93231                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "latest", g: "MSOA", u: "per 100", desc: "Stroke: emergency hospital admissions. Polarity: RAG - Low is good" },
-  ft_93232                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "latest", g: "MSOA", u: "per 100", desc: "Heart attack (myocardial infarction): emergency hospital admissions. Polarity: RAG - Low is good" },
-  ft_93233                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "latest", g: "MSOA", u: "per 100", desc: "Chronic obstructive pulmonary disease (COPD): emergency hospital admissions. Polarity: RAG - Low is good" },
-  ft_93239                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "latest", g: "MSOA", u: "per 100", desc: "Intentional self-harm: emergency hospital admissions. Polarity: RAG - Low is good" },
-  ft_93241                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "latest", g: "MSOA", u: "per 100", desc: "Hip fracture: emergency hospital admissions (aged 65 and over). Polarity: RAG - Low is good" },
-  ft_93465                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "latest", g: "MSOA", u: "per 100", desc: "Alcohol-related conditions: admission episodes (all primary and secondary diagnoses). Polarity: RAG - Low is good" },
-  ft_93240                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "latest", g: "MSOA", u: "per 100", desc: "Hospital admissions for alcohol attributable conditions, narrow definition. Polarity: RAG - Low is good" },
-  ft_93283                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "latest", g: "MSOA", u: "Years", desc: "Life expectancy at birth. Polarity: RAG - High is good" },
-  ft_93250                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "latest", g: "MSOA", u: "per 100", desc: "Mortality from all causes. Polarity: RAG - Low is good" },
-  ft_93252                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "latest", g: "MSOA", u: "per 100", desc: "Mortality from all causes (aged under 75). Polarity: RAG - Low is good" },
-  ft_93253                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "latest", g: "MSOA", u: "per 100", desc: "Mortality from cancer. Polarity: RAG - Low is good" },
-  ft_93254                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "latest", g: "MSOA", u: "per 100", desc: "Mortality from cancer (aged under 75). Polarity: RAG - Low is good" },
-  ft_93255                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "latest", g: "MSOA", u: "per 100", desc: "Mortality from cardiovascular disease. Polarity: RAG - Low is good" },
-  ft_93256                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "latest", g: "MSOA", u: "per 100", desc: "Mortality from cardiovascular disease (aged under 75). Polarity: RAG - Low is good" },
-  ft_93257                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "latest", g: "MSOA", u: "per 100", desc: "Mortality from coronary heart disease. Polarity: RAG - Low is good" },
-  ft_93259                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "latest", g: "MSOA", u: "per 100", desc: "Mortality from stroke. Polarity: RAG - Low is good" },
-  ft_93260                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "latest", g: "MSOA", u: "per 100", desc: "Mortality from respiratory diseases. Polarity: RAG - Low is good" },
-  ft_93480                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "latest", g: "MSOA", u: "per 100", desc: "Mortality from causes considered preventable (aged under 75). Polarity: RAG - Low is good" },
+  ft_93280                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2023", g: "MSOA", u: "%", desc: "Fuel poverty (low income, low energy efficiency methodology). Lower is better." },
+  ft_93097                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2024/25", g: "MSOA", u: "%", desc: "Unemployment: people claiming out of work benefit (aged 16 to 64). Lower is better." },
+  ft_93098                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2024/25", g: "MSOA", u: "per 1,000", desc: "Long-term unemployment: people claiming out of work benefit for over 12 months (aged 16 to 64). Lower is better." },
+  ft_93105                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2022/23 - 24/25", g: "MSOA", u: "%", desc: "Reception prevalence of obesity (including severe obesity), 3 years data combined. Lower is better." },
+  ft_93106                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2022/23 - 24/25", g: "MSOA", u: "%", desc: "Reception prevalence of overweight (including obesity), 3 years data combined. Lower is better." },
+  ft_93107                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2022/23 - 24/25", g: "MSOA", u: "%", desc: "Year 6 prevalence of obesity (including severe obesity), 3 years data combined. Lower is better." },
+  ft_93108                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2022/23 - 24/25", g: "MSOA", u: "%", desc: "Year 6 prevalence of overweight (including obesity), 3 years data combined. Lower is better." },
+  ft_93089                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2018 - 22", g: "MSOA", u: "per 1,000", desc: "General fertility rate (women aged 15 to 44). Neither a higher nor a lower figure is better in itself." },
+  ft_93115                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2016/17 - 20/21", g: "MSOA", u: "per 1,000", desc: "Emergency hospital admissions: all causes (aged under 5). Lower is better." },
+  ft_93114                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2016/17 - 20/21", g: "MSOA", u: "per 10,000", desc: "Unintentional and deliberate injuries: emergency hospital admissions in children (aged under 5). Lower is better." },
+  ft_93219                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2016/17 - 20/21", g: "MSOA", u: "per 10,000", desc: "Unintentional and deliberate injuries: hospital admissions in children (aged under 15). Lower is better." },
+  ft_93224                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2016/17 - 20/21", g: "MSOA", u: "per 10,000", desc: "Unintentional and deliberate injuries: hospital admissions in young people (aged 15 to 24). Lower is better." },
+  ft_93227                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2016/17 - 20/21", g: "MSOA", u: "ratio (England = 100)", desc: "Emergency hospital admissions: all causes. An indirectly standardised ratio, not a rate: 100 is the number of admissions expected if England's rates applied to this area's age and sex mix, so 120 means 20% more admissions than expected and 80 means 20% fewer. Lower is better." },
+  ft_93229                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2016/17 - 20/21", g: "MSOA", u: "ratio (England = 100)", desc: "Coronary heart disease: emergency hospital admissions. An indirectly standardised ratio, not a rate: 100 is the number of admissions expected if England's rates applied to this area's age and sex mix, so 120 means 20% more admissions than expected and 80 means 20% fewer. Lower is better." },
+  ft_93231                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2016/17 - 20/21", g: "MSOA", u: "ratio (England = 100)", desc: "Stroke: emergency hospital admissions. An indirectly standardised ratio, not a rate: 100 is the number of admissions expected if England's rates applied to this area's age and sex mix, so 120 means 20% more admissions than expected and 80 means 20% fewer. Lower is better." },
+  ft_93232                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2016/17 - 20/21", g: "MSOA", u: "ratio (England = 100)", desc: "Heart attack (myocardial infarction): emergency hospital admissions. An indirectly standardised ratio, not a rate: 100 is the number of admissions expected if England's rates applied to this area's age and sex mix, so 120 means 20% more admissions than expected and 80 means 20% fewer. Lower is better." },
+  ft_93233                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2016/17 - 20/21", g: "MSOA", u: "ratio (England = 100)", desc: "Chronic obstructive pulmonary disease (COPD): emergency hospital admissions. An indirectly standardised ratio, not a rate: 100 is the number of admissions expected if England's rates applied to this area's age and sex mix, so 120 means 20% more admissions than expected and 80 means 20% fewer. Lower is better." },
+  ft_93239                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2016/17 - 20/21", g: "MSOA", u: "ratio (England = 100)", desc: "Intentional self-harm: emergency hospital admissions. An indirectly standardised ratio, not a rate: 100 is the number of admissions expected if England's rates applied to this area's age and sex mix, so 120 means 20% more admissions than expected and 80 means 20% fewer. Lower is better." },
+  ft_93241                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2016/17 - 20/21", g: "MSOA", u: "ratio (England = 100)", desc: "Hip fracture: emergency hospital admissions (aged 65 and over). An indirectly standardised ratio, not a rate: 100 is the number of admissions expected if England's rates applied to this area's age and sex mix, so 120 means 20% more admissions than expected and 80 means 20% fewer. Lower is better." },
+  ft_93465                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2016/17 - 20/21", g: "MSOA", u: "ratio (England = 100)", desc: "Alcohol-related conditions: admission episodes (all primary and secondary diagnoses). An indirectly standardised ratio, not a rate: 100 is the number of admissions expected if England's rates applied to this area's age and sex mix, so 120 means 20% more admissions than expected and 80 means 20% fewer. Lower is better." },
+  ft_93240                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2016/17 - 20/21", g: "MSOA", u: "ratio (England = 100)", desc: "Hospital admissions for alcohol attributable conditions, narrow definition. An indirectly standardised ratio, not a rate: 100 is the number of admissions expected if England's rates applied to this area's age and sex mix, so 120 means 20% more admissions than expected and 80 means 20% fewer. Lower is better." },
+  ft_93283                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2019 - 23", g: "MSOA", u: "Years", desc: "Life expectancy at birth. Higher is better." },
+  ft_93250                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2019 - 23", g: "MSOA", u: "ratio (England = 100)", desc: "Mortality from all causes. An indirectly standardised ratio, not a rate: 100 is the number of deaths expected if England's rates applied to this area's age and sex mix, so 120 means 20% more deaths than expected and 80 means 20% fewer. Lower is better." },
+  ft_93252                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2019 - 23", g: "MSOA", u: "ratio (England = 100)", desc: "Mortality from all causes (aged under 75). An indirectly standardised ratio, not a rate: 100 is the number of deaths expected if England's rates applied to this area's age and sex mix, so 120 means 20% more deaths than expected and 80 means 20% fewer. Lower is better." },
+  ft_93253                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2019 - 23", g: "MSOA", u: "ratio (England = 100)", desc: "Mortality from cancer. An indirectly standardised ratio, not a rate: 100 is the number of deaths expected if England's rates applied to this area's age and sex mix, so 120 means 20% more deaths than expected and 80 means 20% fewer. Lower is better." },
+  ft_93254                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2019 - 23", g: "MSOA", u: "ratio (England = 100)", desc: "Mortality from cancer (aged under 75). An indirectly standardised ratio, not a rate: 100 is the number of deaths expected if England's rates applied to this area's age and sex mix, so 120 means 20% more deaths than expected and 80 means 20% fewer. Lower is better." },
+  ft_93255                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2019 - 23", g: "MSOA", u: "ratio (England = 100)", desc: "Mortality from cardiovascular disease. An indirectly standardised ratio, not a rate: 100 is the number of deaths expected if England's rates applied to this area's age and sex mix, so 120 means 20% more deaths than expected and 80 means 20% fewer. Lower is better." },
+  ft_93256                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2019 - 23", g: "MSOA", u: "ratio (England = 100)", desc: "Mortality from cardiovascular disease (aged under 75). An indirectly standardised ratio, not a rate: 100 is the number of deaths expected if England's rates applied to this area's age and sex mix, so 120 means 20% more deaths than expected and 80 means 20% fewer. Lower is better." },
+  ft_93257                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2019 - 23", g: "MSOA", u: "ratio (England = 100)", desc: "Mortality from coronary heart disease. An indirectly standardised ratio, not a rate: 100 is the number of deaths expected if England's rates applied to this area's age and sex mix, so 120 means 20% more deaths than expected and 80 means 20% fewer. Lower is better." },
+  ft_93259                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2019 - 23", g: "MSOA", u: "ratio (England = 100)", desc: "Mortality from stroke. An indirectly standardised ratio, not a rate: 100 is the number of deaths expected if England's rates applied to this area's age and sex mix, so 120 means 20% more deaths than expected and 80 means 20% fewer. Lower is better." },
+  ft_93260                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2019 - 23", g: "MSOA", u: "ratio (England = 100)", desc: "Mortality from respiratory diseases. An indirectly standardised ratio, not a rate: 100 is the number of deaths expected if England's rates applied to this area's age and sex mix, so 120 means 20% more deaths than expected and 80 means 20% fewer. Lower is better." },
+  ft_93480                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2019 - 23", g: "MSOA", u: "ratio (England = 100)", desc: "Mortality from causes considered preventable (aged under 75). An indirectly standardised ratio, not a rate: 100 is the number of deaths expected if England's rates applied to this area's age and sex mix, so 120 means 20% more deaths than expected and 80 means 20% fewer. Lower is better." },
 
 };
+
+/* Periods from the data win over the ones typed above.
+
+   A typed period is right on the day it is typed and wrong from the first
+   refresh that moves the source on, and it is printed beside every legend,
+   where a stale one reads as current. The pipeline writes the period each
+   source states into indicators.js (yr), and where it has one it replaces the
+   entry above. Ranges go the other way, hand-written first, because a range is
+   a choice and a period is a fact about the figures. Crime and claimant
+   periods arrive with the ward data instead: see loadData. */
+(function _periodsFromData() {
+  var G = (typeof PH_IND_STATS === 'object' && PH_IND_STATS && PH_IND_STATS.stats)
+    ? PH_IND_STATS.stats : null;
+  if (!G) return;
+  Object.keys(OV_META).forEach(function (k) {
+    if (G[k] && G[k].yr) OV_META[k].yr = G[k].yr;
+  });
+})();
 
 /* ═══════════════════════════════════════════════════════════════════════════
    YOUR OWN FIGURES, FROM data/custom
@@ -4874,7 +4895,8 @@ function getBoroughRange(ovKey) {
   const sorted = vals.slice().sort((a, b) => a - b);
   // 33 areas, so no percentile trimming: with this few, clipping the ends
   // throws away real boroughs rather than outliers.
-  _boroughRange[ovKey] = { lo: sorted[0], hi: sorted[sorted.length - 1] };
+  _boroughRange[ovKey] = { lo: sorted[0], hi: sorted[sorted.length - 1],
+                           min: sorted[0], max: sorted[sorted.length - 1] };
   return _boroughRange[ovKey];
 }
 function restyleBorough() {
@@ -5573,7 +5595,8 @@ function getOvRange(ovKey) {
   // Use 5th/95th percentile to avoid extreme outliers dominating the scale
   const lo = sorted[Math.floor(sorted.length * 0.05)];
   const hi = sorted[Math.ceil(sorted.length * 0.95 - 1)];
-  _ovRange[ovKey] = { lo, hi };
+  // min and max as well, so the legend can say when its ends are clamped.
+  _ovRange[ovKey] = { lo, hi, min: sorted[0], max: sorted[sorted.length - 1] };
   return _ovRange[ovKey];
 }
 
@@ -8073,8 +8096,10 @@ function ensureMsoaData() {
       for (const k in _msoaRange) delete _msoaRange[k];
       if (typeof msoaLyr !== 'undefined' && msoaLyr) restyleMsoa();
       if (typeof _updateLayerCounts === 'function') _updateLayerCounts();
-      // The legend may be showing an MSOA range computed from nothing.
+      // The legend may be showing an MSOA range computed from nothing, and
+      // the rankings an empty list.
       if (typeof _syncScaleNumbers === 'function') { try { _syncScaleNumbers(); } catch (e) {} }
+      if (typeof renderTopBottom === 'function') { try { renderTopBottom(); } catch (e) {} }
       return MSOA_DATA;
     });
   return _msoaDataLoading;
@@ -8093,7 +8118,8 @@ function getMsoaRange(ovKey) {
   if (vals.length < 2) return getOvRange(ovKey);
   const sorted = vals.slice().sort((a, b) => a - b);
   _msoaRange[ovKey] = { lo: sorted[Math.floor(sorted.length * 0.05)],
-                        hi: sorted[Math.ceil(sorted.length * 0.95 - 1)] };
+                        hi: sorted[Math.ceil(sorted.length * 0.95 - 1)],
+                        min: sorted[0], max: sorted[sorted.length - 1] };
   return _msoaRange[ovKey];
 }
 
@@ -8106,7 +8132,8 @@ function getLsoaRange(ovKey) {
     .filter(v => !isNaN(v));
   if (vals.length < 2) return getOvRange(ovKey);
   const sorted = vals.slice().sort((a,b) => a - b);
-  _lsoaRange[ovKey] = { lo: sorted[Math.floor(sorted.length*0.05)], hi: sorted[Math.ceil(sorted.length*0.95-1)] };
+  _lsoaRange[ovKey] = { lo: sorted[Math.floor(sorted.length*0.05)], hi: sorted[Math.ceil(sorted.length*0.95-1)],
+                        min: sorted[0], max: sorted[sorted.length - 1] };
   return _lsoaRange[ovKey];
 }
 
@@ -9186,6 +9213,8 @@ function loadMsoaBoundaries() {
       const el = document.getElementById('msoa-count');
       if (el) el.textContent = gj.features.length.toLocaleString();
       _msoaLoading = null;
+      // The MSOA rankings take their names from these boundaries.
+      if (typeof renderTopBottom === 'function') { try { renderTopBottom(); } catch (e) {} }
       return msoaLyr;
     })
     .catch(() => { _msoaLoading = null; return null; });
@@ -9483,9 +9512,14 @@ function renderTopBottom() {
   }
   const cfg = OV_CFG[curOv];
   if (!cfg) { panel.style.display = 'none'; return; }
-  const useLsoa = isLsoaOnlyOv(curOv);
+  // The areas the map is drawing, so the list names places that are on
+  // screen and its count is of the polygons being coloured.
+  const level = ovDrawnLevel(curOv);
+  const useLsoa = level === 'lsoa';
   const pool = useLsoa ? (typeof LSOA_DATA !== 'undefined' ? LSOA_DATA : {})
-                       : (WARD_DATA || {});
+             : level === 'msoa' ? (MSOA_DATA || {})
+             : level === 'borough' ? (BOROUGH_DATA || {})
+             : (WARD_DATA || {});
 
   // Restrict the LSOA pool to codes actually rendered on the map.
   // lsoa_data.json carries all 33k+ English LSOAs, but LSOA_IMD only has the
@@ -9503,6 +9537,19 @@ function renderTopBottom() {
         mapNames[f.properties.code] = f.properties.name || f.properties.code;
       }
     }
+  } else if (level === 'msoa' && typeof msoaLyr !== 'undefined' && msoaLyr) {
+    // msoa_data.json is figures only; the names live on the boundaries.
+    mapNames = {};
+    msoaLyr.eachLayer(l => {
+      const p = l.feature && l.feature.properties;
+      if (p && p.code) mapNames[p.code] = p.name || p.code;
+    });
+  } else if (level === 'borough' && typeof BOROUGH_GJ !== 'undefined' && BOROUGH_GJ.features) {
+    mapNames = {};
+    for (const f of BOROUGH_GJ.features) {
+      const p = f.properties || {};
+      if (p.LAD25CD) mapNames[p.LAD25CD] = p.name || p.LAD25CD;
+    }
   }
 
   // Build [id, name, value] tuples. Skip rows with no value for curOv.
@@ -9515,8 +9562,7 @@ function renderTopBottom() {
     if (useLsoa && mapCodes && !mapCodes.has(id)) continue;
     const v = (row.indicators || row || {})[fieldKey];
     if (v == null || v === '' || isNaN(parseFloat(v))) continue;
-    const name = useLsoa ? ((mapNames && mapNames[id]) || row.name || row.lsoa_name || row.LSOA21NM || id)
-                         : (row.name || id);
+    const name = (mapNames && mapNames[id]) || row.name || row.lsoa_name || row.LSOA21NM || id;
     rows.push({ id, name, v: parseFloat(v) });
   }
   if (rows.length < 3) { panel.style.display = 'none'; return; }
@@ -9528,7 +9574,7 @@ function renderTopBottom() {
   const worstSlice = cfg.wh ? rows.slice(-20).reverse() : rows.slice(0, 20);
 
   const unitEl = document.getElementById('rank-unit');
-  if (unitEl) unitEl.textContent = useLsoa ? `${rows.length} LSOAs` : `${rows.length} wards`;
+  if (unitEl) unitEl.textContent = `${rows.length} ${{ lsoa: 'LSOAs', msoa: 'MSOAs', borough: 'boroughs' }[level] || 'wards'}`;
   document.getElementById('rank-best-hdr').textContent  = `Best 20 (${cfg.wh ? 'lowest' : 'highest'})`;
   document.getElementById('rank-worst-hdr').textContent = `Worst 20 (${cfg.wh ? 'highest' : 'lowest'})`;
 
@@ -9542,7 +9588,7 @@ function renderTopBottom() {
       {'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]
     ));
     const safeId = String(r.id).replace(/'/g, '&#39;');
-    return `<div class="rank-row" data-kind="${useLsoa ? 'lsoa' : 'ward'}" data-id="${safeId}" title="${safeName}: ${fmt(r.v)}">`
+    return `<div class="rank-row" data-kind="${level}" data-id="${safeId}" title="${safeName}: ${fmt(r.v)}">`
       + `<span class="rank-rank">${i+1}.</span>`
       + `<span class="rank-name">${safeName}</span>`
       + `<span class="rank-val">${fmt(r.v)}</span>`
@@ -9579,11 +9625,35 @@ function renderTopBottom() {
           }
         });
       }
+    } else if (kind === 'msoa' || kind === 'borough') {
+      // Neither layer opens a profile, so a click frames the area.
+      const lyr = kind === 'msoa' ? msoaLyr : boroughL;
+      if (lyr) {
+        lyr.eachLayer(l => {
+          const p = (l.feature && l.feature.properties) || {};
+          if ((kind === 'msoa' ? p.code : p.LAD25CD) === id) {
+            try { map.fitBounds(l.getBounds(), { maxZoom: kind === 'msoa' ? 14 : 12, padding: [20,20] }); } catch(e){}
+          }
+        });
+      }
     }
   };
   bestEl.onclick  = click;
   worstEl.onclick = click;
   panel.style.display = 'block';
+}
+
+/**
+ * The level whose areas carry k's colour: whatever level is being viewed, if
+ * the indicator has figures there; otherwise the level it does have, which for
+ * a single-level indicator is the only answer there is. The legend's range and
+ * the rankings both read it, so they describe the same areas.
+ */
+function ovDrawnLevel(k) {
+  const lv = (typeof ovLevels === 'function') ? ovLevels(k) : [];
+  const cur = (typeof currentDataLevel !== 'undefined') ? currentDataLevel : 'ward';
+  return lv.indexOf(cur) !== -1 ? cur
+       : (lv.indexOf('ward') !== -1 ? 'ward' : (lv[0] || 'ward'));
 }
 
 /**
@@ -9604,13 +9674,7 @@ function renderTopBottom() {
  */
 function ovRangeForDisplay(k) {
   if (!k || k === 'none') return null;
-  const lv = (typeof ovLevels === 'function') ? ovLevels(k) : [];
-  // Whatever level is being viewed, if the indicator has figures there;
-  // otherwise the level it does have, which for a single-level indicator is
-  // the only answer there is.
-  const cur = (typeof currentDataLevel !== 'undefined') ? currentDataLevel : 'ward';
-  const level = lv.indexOf(cur) !== -1 ? cur
-              : (lv.indexOf('ward') !== -1 ? 'ward' : (lv[0] || 'ward'));
+  const level = ovDrawnLevel(k);
   if (level === 'lsoa') return getLsoaRange(k);
   if (level === 'msoa') return getMsoaRange(k);
   if (level === 'borough') return getBoroughRange(k);
@@ -9661,19 +9725,77 @@ function _syncScaleNumbers() {
   if (!cfg) return;
   const range = ovRangeForDisplay(curOv);
   const meta = ovMeta(curOv);
-  const unitSuffix = (meta && meta.u && meta.u.length <= 6) ? (' ' + meta.u) : '';
-  const fmtLo = range ? fmtNum(range.lo, 1) + unitSuffix : cfg.lo;
-  const fmtHi = range ? fmtNum(range.hi, 1) + unitSuffix : cfg.hi;
+  const unit = _legendUnit(meta);
+  const ends = _legendEnds(range, unit.inline);
   const lo = document.getElementById('sc-lo');
   const hi = document.getElementById('sc-hi');
-  if (lo) lo.textContent = `${cfg.lo} (${fmtLo})`;
-  if (hi) hi.textContent = `${cfg.hi} (${fmtHi})`;
+  if (lo) lo.textContent = `${cfg.lo} (${ends ? ends.lo : cfg.lo})`;
+  if (hi) hi.textContent = `${cfg.hi} (${ends ? ends.hi : cfg.hi})`;
   const midEl = document.getElementById('sc-mid');
-  if (midEl) midEl.textContent = range ? fmtNum((range.lo + range.hi) / 2, 1) + unitSuffix : '';
+  if (midEl) midEl.textContent = range ? fmtNum((range.lo + range.hi) / 2, 1) + unit.inline : '';
+  const scUnit = document.getElementById('sc-unit');
+  if (scUnit) scUnit.textContent = unit.below;
   const mlsMin = document.getElementById('mls-min');
   const mlsMax = document.getElementById('mls-max');
-  if (mlsMin) mlsMin.textContent = range ? (fmtNum(range.lo, 1) + unitSuffix) : '';
-  if (mlsMax) mlsMax.textContent = range ? (fmtNum(range.hi, 1) + unitSuffix) : '';
+  if (mlsMin) mlsMin.textContent = ends ? ends.lo : '';
+  if (mlsMax) mlsMax.textContent = ends ? ends.hi : '';
+  // Inside the strip's label rather than beside it, so that anything else
+  // that writes the label (a plain textContent) takes the unit with it.
+  const mlsLbl = document.getElementById('mls-label');
+  if (mlsLbl) {
+    let u = mlsLbl.querySelector('.mls-unit');
+    if (unit.below && !u) {
+      u = document.createElement('span');
+      u.className = 'mls-unit';
+      mlsLbl.appendChild(u);
+    }
+    if (u) {
+      if (unit.below) u.textContent = unit.below; else u.remove();
+    }
+  }
+  // Published for smaller areas but drawn on wards: say so where the colour
+  // is being read, not only in the methodology. A ward's air quality or fuel
+  // poverty is an average of its LSOAs (or MSOAs), not a ward statistic. Here
+  // rather than on the overlay change, because it is about the level drawn.
+  const metaEl = document.getElementById('sc-meta');
+  if (metaEl) {
+    const nativeG = meta && meta.g ? String(meta.g).toLowerCase() : '';
+    // currentDataLevel is a later `let`; read it guarded in case this runs first.
+    let drawnLvl = 'ward';
+    try { drawnLvl = currentDataLevel || 'ward'; } catch (e) { /* not declared yet */ }
+    const avgNote = (drawnLvl === 'ward' && (nativeG === 'lsoa' || nativeG === 'msoa'))
+      ? ` · Ward values are population-weighted averages of ${nativeG === 'lsoa' ? 'LSOAs' : 'MSOAs'}`
+      : '';
+    metaEl.textContent = meta
+      ? `${meta.g} · ${meta.src}${meta.yr ? ` (${meta.yr})` : ''}${avgNote}` : '';
+  }
+}
+
+/* The unit on both legends. Up to six characters it rides on every number
+   ("7.3 score"). A longer one ("per 1,000", "ratio (England = 100)") would
+   push the end values off a phone, so it is said once, under the legend's
+   title. Never left out: a standardised ratio read as a rate is exactly the
+   misreading the unit is there to stop. */
+function _legendUnit(meta) {
+  const u = (meta && meta.u) ? String(meta.u) : '';
+  return u.length <= 6 ? { inline: u ? '\u00a0' + u : '', below: '' }
+                       : { inline: '', below: u };
+}
+
+/* The end values are the 5th and 95th percentiles of the areas drawn, and
+   everything beyond them takes the end colour (rampIndex clamps). So an end
+   is marked ≤ or ≥ whenever some area does lie beyond it: otherwise the
+   darkest colour reads as "37.8" on a ward at 53.9. Left plain when the end
+   is the true minimum or maximum. No-break spaces, so that on a phone the
+   sign and its unit stay on the number's line. */
+function _legendEnds(range, inline) {
+  if (!range) return null;
+  const lo = fmtNum(range.lo, 1) + inline;
+  const hi = fmtNum(range.hi, 1) + inline;
+  return {
+    lo: (range.min == null || range.min < range.lo) ? '≤\u00a0' + lo : lo,
+    hi: (range.max == null || range.max > range.hi) ? '≥\u00a0' + hi : hi,
+  };
 }
 
 /* The overlay change, as a function rather than only as a listener.
@@ -9692,36 +9814,16 @@ function _applyOverlayChange(key) {
     // Clear cached range so it recomputes if data changed
     delete _ovRange[curOv];
     delete _lsoaRange[curOv];
-    const range = ovRangeForDisplay(curOv);
     const meta = ovMeta(curOv);
-    const unitSuffix = (meta && meta.u && meta.u.length <= 6) ? (' ' + meta.u) : '';
-    const fmtLo = range ? fmtNum(range.lo, 1) + unitSuffix : cfg.lo;
-    const fmtHi = range ? fmtNum(range.hi, 1) + unitSuffix : cfg.hi;
-    const fmtMid = range ? fmtNum((range.lo + range.hi) / 2, 1) + unitSuffix : '';
-    document.getElementById('sc-lo').textContent = `${cfg.lo} (${fmtLo})`;
-    document.getElementById('sc-hi').textContent = `${cfg.hi} (${fmtHi})`;
-    const midEl = document.getElementById('sc-mid');
-    if (midEl) midEl.textContent = fmtMid;
-    const metaEl = document.getElementById('sc-meta');
-    // Published for smaller areas but drawn on wards: say so where the colour
-    // is being read, not only in the methodology. A ward's air quality or fuel
-    // poverty is an average of its LSOAs (or MSOAs), not a ward statistic.
-    const nativeG = meta && meta.g ? String(meta.g).toLowerCase() : '';
-    // currentDataLevel is a later `let`; read it guarded in case this runs first.
-    let drawnLvl = 'ward';
-    try { drawnLvl = currentDataLevel || 'ward'; } catch (e) { /* not declared yet */ }
-    const avgNote = (drawnLvl === 'ward' && (nativeG === 'lsoa' || nativeG === 'msoa'))
-      ? ` · Ward values are population-weighted averages of ${nativeG === 'lsoa' ? 'LSOAs' : 'MSOAs'}`
-      : '';
-    if (metaEl) metaEl.textContent = meta ? `${meta.g} · ${meta.src} (${meta.yr})${avgNote}` : '';
     const info = document.getElementById('ov-info');
     const panel = document.getElementById('ov-info-panel');
     if (info && panel) {
       if (meta && meta.desc) {
         info.style.display = 'inline-block';
         info.onclick = () => { panel.style.display = panel.style.display === 'block' ? 'none' : 'block'; };
-        const lbl = (document.getElementById('ov').selectedOptions[0] || {}).text || curOv;
-        panel.innerHTML = `<div style="margin-bottom:3px"><b>${lbl}</b></div>${meta.desc}<div style="margin-top:5px;color:var(--ink-3)">${meta.g} · ${meta.src} · ${meta.yr}</div>`;
+        const lbl = _ovLabel(curOv) || curOv;
+        const unitLine = meta.u ? ` · ${meta.u}` : '';
+        panel.innerHTML = `<div style="margin-bottom:3px"><b>${lbl}</b></div>${meta.desc}<div style="margin-top:5px;color:var(--ink-3)">${meta.g} · ${meta.src} · ${meta.yr}${unitLine}</div>`;
         panel.style.display = 'none';
       } else {
         info.style.display = 'none';
@@ -9743,8 +9845,8 @@ function _applyOverlayChange(key) {
       // duplicated by the meta line in the sidebar and clutters the strip.
       const cleanLbl = ovOptText.replace(/ · (Ward|LSOA|MSOA|Borough)$/i, '');
       mlsLbl.textContent = cleanLbl;
-      mlsMin.textContent = range ? (fmtNum(range.lo, 1) + unitSuffix) : '';
-      mlsMax.textContent = range ? (fmtNum(range.hi, 1) + unitSuffix) : '';
+      // The numbers, the unit and the period line, for both legends.
+      _syncScaleNumbers();
       // gradient already painted by _syncScaleGradient above
       mls.style.display = 'flex';
     }
@@ -9903,8 +10005,10 @@ function _setDataLevel(level, opts) {
   // arriving and leaving have to repaint them.
   if (typeof restyleBorough === 'function') restyleBorough();
   // Each level has its own percentile pool, so the legend has to be rewritten
-  // when the level moves or it keeps describing the pool you just left.
+  // when the level moves or it keeps describing the pool you just left. The
+  // rankings likewise, which list the areas of the level drawn.
   if (typeof _syncScaleNumbers === 'function') _syncScaleNumbers();
+  if (typeof renderTopBottom === 'function') renderTopBottom();
   document.querySelectorAll('#dl-seg button').forEach(b => {
     if (!b.classList.contains('disabled')) {
       b.classList.toggle('active', b.dataset.dl === level);
@@ -10110,12 +10214,15 @@ document.querySelectorAll('#dl-seg button').forEach(b => {
 // vcse-area-filter, currentDataLevel) and renders the digest line + chip
 // bar above the map. Call _refreshUI() after any state mutation.
 // ═══════════════════════════════════════════════════════════════════════════
+// The option text ends in the level the indicator is published at
+// ("... · Ward"), which is the picker's to show as a pill. Everywhere else
+// that reads as the level being drawn, and at MSOA or borough it is not.
 function _ovLabel(k) {
   if (!k || k === 'none') return '';
   const sel = document.getElementById('ov');
   if (sel) {
     const opt = sel.querySelector(`option[value="${k}"]`);
-    if (opt) return opt.textContent.trim();
+    if (opt) return opt.textContent.trim().replace(/ · (Ward|LSOA|MSOA|Borough)$/i, '');
   }
   return k;
 }
@@ -11597,6 +11704,14 @@ async function loadData() {
     // Update overlay vintage note
     document.getElementById('data-vintage').innerHTML =
       `Crime: ${meta.crime_period||'latest 12 months'}<br>Claimants: ${meta.claimant_period||'most recent month'}<br>Health: OHID Fingertips (MSOA level)`;
+    // And beside the legends. These two move every month, and most crime keys
+    // are built here from crime_by_category, so indicators.js has no entry to
+    // carry their period: the pipeline writes it into the ward metadata.
+    Object.keys(OV_META).forEach(k => {
+      const m = OV_META[k];
+      if (meta.crime_period && /^data\.police\.uk/.test(m.src)) m.yr = meta.crime_period;
+      if (meta.claimant_period && /^NOMIS CLA01/.test(m.src)) m.yr = meta.claimant_period;
+    });
 
 
     buildWardLayer();
@@ -11624,6 +11739,7 @@ async function loadData() {
         BOROUGH_DATA = bd;
         for (const k in _boroughRange) delete _boroughRange[k];
         restyleBorough();
+        if (typeof renderTopBottom === 'function') { try { renderTopBottom(); } catch (e) {} }
       });
 
     // Now ward layer exists — init VCSE filters
@@ -15563,8 +15679,10 @@ var PH_SHOW = {
       keys.forEach(function (k) {
         var l = labelOf(k), u = unitOf(k);
         // Several CATS labels already end in their unit, so appending it again
-        // produced "Disability, any (%) (%)".
-        var suffix = (u && l.indexOf('(' + u + ')') === -1) ? ' (' + u + ')' : '';
+        // produced "Disability, any (%) (%)". A unit with brackets of its own,
+        // "ratio (England = 100)", follows a comma rather than nesting.
+        var suffix = (u && l.indexOf('(' + u + ')') === -1)
+          ? (u.indexOf('(') === -1 ? ' (' + u + ')' : ', ' + u) : '';
         html += '<option value="' + esc(k) + '"' + (k === selected ? ' selected' : '') + '>' +
           esc(l) + esc(suffix) + '</option>';
       });

@@ -101,6 +101,13 @@ that instead and this gives the official name for it.</p>
   <tr><td>Decile</td><td>Decile</td>
       <td>A tenth. Decile 1 is the most deprived tenth of England. Decile 10
           is the least deprived tenth.</td></tr>
+  <tr><td>Ratio (England = 100)</td><td>Indirectly standardised admission or
+          mortality ratio</td>
+      <td>Admissions or deaths compared with the number expected if England’s
+          rates applied to the area’s own mix of ages and sexes. 100 is as
+          expected, 120 is 20% more and 80 is 20% fewer. It is not a rate per
+          100 people. Most of the Local Health admissions and mortality
+          figures are these.</td></tr>
   <tr><td>Charity</td><td>VCSE organisation</td>
       <td>A charity registered with the Charity Commission.</td></tr>
 </table>
@@ -257,6 +264,22 @@ by testing its point against the ward polygon. A
 service used by a neighbouring ward is still counted in the ward it stands in,
 so these will not always agree with a count made a different way.</p>
 
+<h3>7. The ends of a legend are not the highest and lowest areas</h3>
+
+<p>The colours run from the 5th to the 95th percentile of the areas drawn, so
+one extreme area does not use up the whole scale. Every area beyond either end
+takes the end colour. Where any area does, the legend marks its end value with
+≤ or ≥, so “≥ 37.8” means 37.8 or more. The Top and bottom 20 list gives the
+real values.</p>
+
+<h3>8. Each indicator has its own period</h3>
+
+<p>The period beside a legend is the one the publisher gives for that
+indicator’s figures, and it differs a great deal from one to the next. The
+“Data updated” date at the foot of the map is when the data was last
+refreshed, not the date the figures describe. A refresh takes the newest
+figures published, and for some indicators those are several years old.</p>
+
 <h2>Known gaps</h2>
 
 <ul>
@@ -364,11 +387,13 @@ var SOURCES = [
 
   { name: 'Fingertips: Local Health',
     pub: 'OHID',
-    what: '33 indicators at neighbourhood scale: births, low birth weight, ' +
-          'childhood obesity, emergency admissions, injuries, unemployment benefit ' +
-          'claims, fuel poverty.',
+    what: '32 indicators at neighbourhood scale: fertility, childhood obesity, ' +
+          'emergency admissions, injuries, mortality, life expectancy, ' +
+          'unemployment benefit claims, fuel poverty.',
     geo: 'MSOA',
-    period: 'Latest published period, which differs per indicator',
+    period: 'Differs per indicator, and is shown beside each legend. At the last ' +
+            'refresh the hospital admissions pooled 2016/17 to 2020/21, and ' +
+            'mortality and life expectancy 2019 to 2023.',
     cadence: 'Varies by indicator. Most are annual.',
     manifest: 'fingertips_msoa' },
 
