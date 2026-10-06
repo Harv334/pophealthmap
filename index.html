@@ -1994,9 +1994,13 @@
              polygons are not focusable, so it is the last control here that
              should be reaching a user unnamed. -->
         <input type="text" id="hdr-search-input" autocomplete="off"
+               role="combobox" aria-autocomplete="list" aria-expanded="false"
+               aria-controls="hdr-search-results"
                aria-label="Search for a postcode, ward, LSOA, GP practice or charity"
                placeholder="Search postcode, ward, GP, charity…" />
-        <div class="hdr-search-results" id="hdr-search-results"></div>
+        <div class="hdr-search-results" id="hdr-search-results" role="listbox"
+             aria-label="Search results"></div>
+        <div class="sr-only" id="hdr-search-status" aria-live="polite"></div>
       </div>
       <div class="tb-sep"></div>
       <button type="button" class="tb-btn" id="tb-reset" title="Clear all filters and return to default view">↺ Reset</button>
@@ -4346,9 +4350,16 @@ function vcseMarkerRadius(r) {
     default:        return 6;
   }
 }
+// Thirty-odd distinct icons between eleven thousand markers, so each is built
+// once and shared.
+const _vcseIcons = {};
 function mkVCSEIcon(r) {
-  const r_px = vcseMarkerRadius(r);
   const color = vcseMarkerColor(r);
+  const key = color + '|' + r.ib;
+  return _vcseIcons[key] || (_vcseIcons[key] = _mkVCSEIcon(r, color));
+}
+function _mkVCSEIcon(r, color) {
+  const r_px = vcseMarkerRadius(r);
   const hollow = (r.ib === 'zero');
   const bg = hollow ? 'transparent' : color;
   const border = hollow ? `2px solid ${color}` : '1.5px solid #fff';
@@ -4367,28 +4378,64 @@ function vcseIncomeLabel(r) {
   if (r.inc && r.inc > 0) out += ` (£${Math.round(r.inc).toLocaleString()})`;
   return out;
 }
+/* A register's website as an http(s) URL, or '' when it is not one. The
+   field is free text typed by the charity, and a few dozen entries are an
+   email address, a street address or a mistyped scheme. A bare hostname gets
+   https://, and anything that does not then parse as http or https stays out
+   of the href, so a javascript: or data: entry can never become a link. */
+function _safeWebUrl(w) {
+  const s = String(w || '').trim();
+  if (!s) return '';
+  const full = /^https?:\/\//i.test(s) ? s
+    : (/^[a-z0-9][\w-]*(\.[\w-]+)+(?:[\/?#:]|$)/i.test(s) ? 'https://' + s : '');
+  if (!full) return '';
+  try {
+    const u = new URL(full);
+    return (u.protocol === 'http:' || u.protocol === 'https:') ? u.href : '';
+  } catch (e) { return ''; }
+}
+/* Where a charity is, in words. A small charity's contact address is often a
+   trustee's home, so for those the data carries no street address, only a
+   postcode sector in pc (see build_vcse_json). The sector and borough are
+   shown in its place, marked as an area, rather than a blank that would read
+   as "not recorded". */
+function vcseArea(r) {
+  return (!r.a && r.pc) ? [r.pc, LAD_CODE_TO_NAME[r.lad] || ''].filter(Boolean).join(', ') : '';
+}
+function vcseWhereText(r) {
+  const area = vcseArea(r);
+  return r.a || (area ? area + ' (area only)' : '');
+}
 function vcsePopupHtml(r) {
   const bucket = vcseCauseBucket(r);
   const color  = VCSE_BUCKET_COLORS[bucket];
   const tags = (r.wt || []).slice(0, 4).join(' · ') || '-';
   const who  = (r.ot || []).slice(0, 3).join(' · ');
-  const web  = r.w ? `<div class="pop-row"><div class="pop-key">Web</div><a href="${r.w.startsWith('http')?r.w:'https://'+r.w}" target="_blank" rel="noopener" style="color:#185FA5;text-decoration:none;word-break:break-all">${r.w}</a></div>` : '';
+  const href = _safeWebUrl(r.w);
+  const web  = !r.w ? ''
+    : href ? `<div class="pop-row"><div class="pop-key">Web</div><a href="${_esc(href)}" target="_blank" rel="noopener" style="color:#185FA5;text-decoration:none;word-break:break-all">${_esc(r.w)}</a></div>`
+    : `<div class="pop-row"><div class="pop-key">Web</div><span style="word-break:break-all">${_esc(r.w)}</span></div>`;
   const cov  = (r.cv || []).length ? `<div class="pop-row"><div class="pop-key">Covers</div>${r.cv.length} London borough${r.cv.length===1?'':'s'}</div>` : '';
-  return `<div class="pop-hdr" style="background:${color}">${r.n||'-'}</div>
+  const area = vcseArea(r);
+  const where = area
+    ? `<div class="pop-addr">${_esc(area)}</div><div class="pop-row" style="color:var(--ink-3)">Area only. Small charities are often run from a trustee's home, so the street address is not shown.</div>`
+    : `<div class="pop-addr">${_esc(r.a||'Address not listed')}</div>`;
+  return `<div class="pop-hdr" style="background:${color}">${_esc(r.n||'-')}</div>
     <div class="pop-body">
-      <div class="pop-addr">${r.a||'Address not listed'}</div>
+      ${where}
       <div class="pop-row"><div class="pop-key">Cause</div>${VCSE_BUCKET_LABELS[bucket]}</div>
       <div class="pop-row"><div class="pop-key">Income</div>${vcseIncomeLabel(r)}</div>
-      ${who ? `<div class="pop-row"><div class="pop-key">Serves</div>${who}</div>` : ''}
-      <div class="pop-row"><div class="pop-key">Tags</div>${tags}</div>
+      ${who ? `<div class="pop-row"><div class="pop-key">Serves</div>${_esc(who)}</div>` : ''}
+      <div class="pop-row"><div class="pop-key">Tags</div>${_esc(tags)}</div>
       ${cov}
       ${web}
-      <div class="pop-row"><div class="pop-key">No.</div>${r.num||'-'}</div>
+      <div class="pop-row"><div class="pop-key">No.</div>${_esc(r.num||'-')}</div>
     </div>`;
 }
 
+// Title, address and every row are register text, so all of it is escaped.
 function mkpop(color, title, addr, rows) {
-  return `<div class="pop-hdr" style="background:${color}">${title}</div><div class="pop-body"><div class="pop-addr">${addr||'Address not listed'}</div>${Object.entries(rows).map(([k,v])=>`<div class="pop-row"><span class="pop-key">${k}</span><span>${v}</span></div>`).join('')}</div>`;
+  return `<div class="pop-hdr" style="background:${color}">${_esc(title)}</div><div class="pop-body"><div class="pop-addr">${_esc(addr||'Address not listed')}</div>${Object.entries(rows).map(([k,v])=>`<div class="pop-row"><span class="pop-key">${_esc(k)}</span><span>${_esc(v)}</span></div>`).join('')}</div>`;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -4577,7 +4624,7 @@ const gpL = L.layerGroup(GPS.map(d => {
   if (d.code) rows['ODS'] = d.code;
   if (d.patients) rows['Patients'] = d.patients.toLocaleString();
   const popup = mkpop('#185FA5', d.n, d.a, rows);
-  const tip = d.patients ? `${d.n} · ${d.patients.toLocaleString()} pts` : d.n;
+  const tip = _esc(d.patients ? `${d.n} · ${d.patients.toLocaleString()} pts` : d.n);
   const m = L.marker([d.lat, d.lng], { icon: mkicon('#185FA5', 'G') })
     .bindPopup(popup)
     .bindTooltip(tip, { direction: 'top', className: 'marker-tip' });
@@ -4603,7 +4650,7 @@ function enrichGPFromWardData(wardData) {
 const hL  = L.layerGroup(HOSP.map(d => {
   const m = L.marker([d.lat,d.lng],{icon:mkicon('#A32D2D','H')})
     .bindPopup(mkpop('#A32D2D',d.n,d.a,{Type:d.t, Trust:d.trust||''}))
-    .bindTooltip(d.n, { direction: 'top', className: 'marker-tip' });
+    .bindTooltip(_esc(d.n), { direction: 'top', className: 'marker-tip' });
   m._lad = ladOfLatLng(d.lat, d.lng);
   return m;
 }));
@@ -4941,10 +4988,22 @@ const wardBoundaryLyr = L.geoJSON(GJ, {
 // This read "NWL borough" and "HQ in NWL" until now, from when the map was
 // eight boroughs. The filter itself was widened to all 33 some time ago; the
 // comment was not, and so described a cut that had stopped happening.
+//
+// Eleven thousand markers clustered in one pass held the page for two seconds
+// on a mid-range phone, so they are fed in in chunks and the page keeps
+// answering between them. A filter applied while that is under way cannot see
+// the markers not yet fed in, so it runs again once they all are.
+let _vcseFeeding = false, _vcseRefilter = false;
 const vcseCluster = L.markerClusterGroup({
   maxClusterRadius: 40,
   showCoverageOnHover: false,
   zoomToBoundsOnClick: true,
+  chunkedLoading: true,
+  chunkInterval: 100,
+  chunkProgress: (done, total) => {
+    _vcseFeeding = done < total;
+    if (!_vcseFeeding && _vcseRefilter) { _vcseRefilter = false; applyVCSEFilter(); }
+  },
   iconCreateFunction: cluster => {
     const c = cluster.getChildCount();
     const sz = c > 50 ? 36 : c > 20 ? 30 : 26;
@@ -4953,6 +5012,28 @@ const vcseCluster = L.markerClusterGroup({
       className: 'vcse-cluster', iconSize: [sz, sz]
     });
   }
+});
+
+/* Popups and tooltips are bound to a marker the first time it is pointed at,
+   clicked or opened from the list. Binding all eleven thousand up front was a
+   third of the cost of switching the layer on, for the handful anybody opens.
+   The cluster hears its markers' events, so a first click or hover lands here;
+   after that the marker's own handlers take over. */
+function _vcseBind(m) {
+  if (m.getPopup()) return m;
+  const r = m._vcse;
+  m.bindPopup(() => vcsePopupHtml(r), { maxWidth: 300 });
+  const bucketLbl = VCSE_BUCKET_LABELS[vcseCauseBucket(r)] || '';
+  m.bindTooltip(_esc(bucketLbl ? `${r.n} · ${bucketLbl}` : r.n), { direction: 'top', className: 'marker-tip' });
+  return m;
+}
+vcseCluster.on('mouseover', e => {
+  if (e.layer && e.layer._vcse && !e.layer.getTooltip()) _vcseBind(e.layer).openTooltip();
+});
+vcseCluster.on('click keypress', e => {
+  if (!e.layer || !e.layer._vcse || e.layer.getPopup()) return;
+  if (e.type === 'keypress' && e.originalEvent && e.originalEvent.key !== 'Enter') return;
+  _vcseBind(e.layer).openPopup();
 });
 
 let VCSE_ALL = [];
@@ -4967,11 +5048,9 @@ function wireVCSE(records) {
   vcseData.length = 0;
   VCSE_PINNED.forEach(r => {
     const marker = L.marker([r.lat, r.lng], { icon: mkVCSEIcon(r) });
-    marker.bindPopup(vcsePopupHtml(r), { maxWidth: 300 });
-    const bucketLbl = VCSE_BUCKET_LABELS[vcseCauseBucket(r)] || '';
-    marker.bindTooltip(bucketLbl ? `${r.n} · ${bucketLbl}` : r.n, { direction: 'top', className: 'marker-tip' });
+    marker._vcse = r;   // popup and tooltip are bound on first use, see _vcseBind
     vcseCluster.addLayer(marker);
-    vcseData.push({ name: r.n, addr: r.a, lat: r.lat, lng: r.lng, marker, record: r });
+    vcseData.push({ name: r.n, addr: vcseWhereText(r), lat: r.lat, lng: r.lng, marker, record: r });
   });
   const n = VCSE_PINNED.length;
   const tot = VCSE_ALL.length;
@@ -5095,9 +5174,9 @@ function loadDentalLayer(practices) {
   practices.forEach(p => {
     if (!p.lat || !p.lng) return;
     const marker = L.marker([p.lat, p.lng], {icon: mkDentalIcon()});
-    const imdBadge = p.imd_decile ? `<div class="pop-row"><span class="pop-key">IMD</span><span>Decile ${p.imd_decile}</span></div>` : '';
-    marker.bindPopup(`<div class="pop-hdr" style="background:#7B2D8E">${p.name||p.n}</div><div class="pop-body"><div class="pop-addr">${p.postcode||p.pc||'—'}</div>${imdBadge}</div>`);
-    marker.bindTooltip((p.name||p.n), { direction: 'top', className: 'marker-tip' });
+    const imdBadge = p.imd_decile ? `<div class="pop-row"><span class="pop-key">IMD</span><span>Decile ${_esc(p.imd_decile)}</span></div>` : '';
+    marker.bindPopup(`<div class="pop-hdr" style="background:#7B2D8E">${_esc(p.name||p.n)}</div><div class="pop-body"><div class="pop-addr">${_esc(p.postcode||p.pc||'—')}</div>${imdBadge}</div>`);
+    marker.bindTooltip(_esc(p.name||p.n), { direction: 'top', className: 'marker-tip' });
     dentalData.push({ name: p.name||p.n, postcode: p.postcode||p.pc, lat: p.lat, lng: p.lng, marker });
   });
   _applyDentalFilter();
@@ -5137,9 +5216,9 @@ function loadPharmacyLayer(practices) {
   practices.forEach(p => {
     if (!p.lat || !p.lng) return;
     const marker = L.marker([p.lat, p.lng], {icon: mkPharmacyIcon()});
-    const telRow = p.tel ? `<div class="pop-row"><span class="pop-key">Tel</span><span>${p.tel}</span></div>` : '';
-    marker.bindPopup(`<div class="pop-hdr" style="background:#E89B1B">${p.n}</div><div class="pop-body"><div class="pop-addr">${p.a||''}${p.pc?'<br>'+p.pc:''}</div>${telRow}</div>`);
-    marker.bindTooltip(p.n + ' · Pharmacy', { direction: 'top', className: 'marker-tip' });
+    const telRow = p.tel ? `<div class="pop-row"><span class="pop-key">Tel</span><span>${_esc(p.tel)}</span></div>` : '';
+    marker.bindPopup(`<div class="pop-hdr" style="background:#E89B1B">${_esc(p.n)}</div><div class="pop-body"><div class="pop-addr">${_esc(p.a||'')}${p.pc?'<br>'+_esc(p.pc):''}</div>${telRow}</div>`);
+    marker.bindTooltip(_esc(p.n) + ' · Pharmacy', { direction: 'top', className: 'marker-tip' });
     marker._lad = ladOfLatLng(p.lat, p.lng);
     pharmCluster.addLayer(marker);
     pharmData.push({ name: p.n, postcode: p.pc, lat: p.lat, lng: p.lng, marker, _lad: marker._lad });
@@ -5207,29 +5286,14 @@ function loadCultureLayer(rows) {
 
 // ── VCSE filtering ────────────────────────────────────────────────────────
 
-// Check if a lat/lng point falls inside a Leaflet polygon layer
+// Whether a lat/lng falls inside the named ward. Tested against the ward's own
+// boundary in GJ, holes included, so the answer does not depend on the ward
+// layer being drawn. Ward names are unique: the two Kilburns carry their
+// borough in the name.
 function pointInWardLayer(lat, lng, wardName) {
-  if (!wLyr) return false;
-  const pt = L.latLng(lat, lng);
-  let inside = false;
-  wLyr.eachLayer(l => {
-    if (l.feature.properties.WD24NM === wardName) {
-      try {
-        const poly = l.toGeoJSON().geometry;
-        if (leafletPip ? leafletPip.pointInLayer(pt, l) : roughPointInBounds(pt, l)) {
-          inside = true;
-        }
-      } catch(e) {}
-    }
-  });
-  return inside;
-}
-
-// Fast bounds-based containment check (good enough for our ward sizes)
-function roughPointInBounds(latlng, layer) {
-  try {
-    return layer.getBounds().contains(latlng);
-  } catch(e) { return false; }
+  if (lat == null || lng == null || typeof GJ === 'undefined' || !GJ.features) return false;
+  const f = GJ.features.find(x => x.properties && x.properties.WD24NM === wardName);
+  return !!f && _pointInGeom(lng, lat, f.geometry);
 }
 
 // Get the neighbourhood key for a given lat/lng using ward bounds
@@ -5291,7 +5355,7 @@ function buildVCSETagFilters() {
     for (const [code, n] of entries) {
       const label = VCSE_TAG_LABELS[fam][code] || code;
       const row = document.createElement('label');
-      row.innerHTML = `<input type="checkbox" data-fam="${fam}" data-tag="${code}"><span>${label}</span><span class="vcse-tag-n">${n.toLocaleString()}</span>`;
+      row.innerHTML = `<input type="checkbox" data-fam="${fam}" data-tag="${_esc(code)}"><span>${_esc(label)}</span><span class="vcse-tag-n">${n.toLocaleString()}</span>`;
       list.appendChild(row);
     }
   });
@@ -5356,6 +5420,7 @@ function applyVCSEFilter() {
     ? new Set(focusedLadCodes()) : new Set();
 
   // Determine visibility for each org
+  const shown = [];
   vcseData.forEach(o => {
     let areaMatch = true;
     // 'all' is no geographic filter, which is the starting value, so only a
@@ -5376,12 +5441,30 @@ function applyVCSEFilter() {
     const causeMatch = _causeMatches(o.record);
 
     const visible = areaMatch && focusMatch && textMatch && tagMatch && causeMatch;
-    if (visible) {
-      if (!vcseCluster.hasLayer(o.marker)) vcseCluster.addLayer(o.marker);
-    } else {
-      if (vcseCluster.hasLayer(o.marker)) vcseCluster.removeLayer(o.marker);
-    }
+    if (visible) shown.push(o.marker);
   });
+  // In bulk. One marker at a time, focusing a borough with the layer on took
+  // ten thousand markers out singly, re-totalling every cluster after each.
+  if (vcseCluster._map) {
+    const want = new Set(shown);
+    const out = vcseData.filter(o => !want.has(o.marker) && vcseCluster.hasLayer(o.marker)).map(o => o.marker);
+    const add = shown.filter(m => !vcseCluster.hasLayer(m));
+    if (out.length > shown.length) {
+      // Mostly removals, as when a borough is focused: starting again from
+      // the few that stay is far cheaper than taking the rest out.
+      vcseCluster.clearLayers();
+      if (shown.length) vcseCluster.addLayers(shown);
+    } else {
+      if (out.length) vcseCluster.removeLayers(out);
+      if (add.length) vcseCluster.addLayers(add);
+    }
+    if (_vcseFeeding) _vcseRefilter = true;
+  } else {
+    // Off the map the cluster only queues markers, and its hasLayer is a scan
+    // of that queue, so refilling the queue is cheaper than testing it.
+    vcseCluster.clearLayers();
+    shown.forEach(m => vcseCluster.addLayer(m));
+  }
 
   // Rebuild sidebar list with same logic
   const visible = vcseData.filter(o => {
@@ -5402,8 +5485,8 @@ function applyVCSEFilter() {
   visible.slice(0, 150).forEach(o => {
     const div = document.createElement('div');
     div.className = 'vcse-item';
-    div.innerHTML = `<div class="vcse-name">${o.name}</div><div class="vcse-addr">${o.addr||'—'}</div>`;
-    div.onclick = () => { map.setView([o.lat, o.lng], 16); o.marker.openPopup(); };
+    div.innerHTML = `<div class="vcse-name">${_esc(o.name)}</div><div class="vcse-addr">${_esc(o.addr||'—')}</div>`;
+    div.onclick = () => { map.setView([o.lat, o.lng], 16); _vcseBind(o.marker).openPopup(); };
     list.appendChild(div);
   });
   if (visible.length > 150) {
@@ -10525,11 +10608,28 @@ const _INBOUND_URL_STATE = (typeof location !== 'undefined') ? location.search :
    have loaded. Until then the pass reports failure and the next one retries. */
 const _urlDone = {};
 
+/* Whether the reader has taken over from the link.
+
+   Re-applying is right while the link is the only thing that has spoken. Once
+   the reader has changed something themselves, the 4,000ms pass would undo it:
+   pick another indicator at two and a half seconds and the link's one was back
+   by six. So the first change the reader makes to anything the link sets (the
+   indicator, the borough or board, a layer, the level, the tool, or the map's
+   position) ends the re-applying of all of those. Items still waiting for their
+   data, a query or an area, still land when it arrives.
+
+   A change counts as the reader's only after the pass that ran with the wards
+   on the map, which is the one late data needs, and only within a second of a
+   real press, click, key or scroll, since programmatic dispatches look the same
+   as the reader's otherwise. */
+let _urlApplying = false, _urlLanded = false, _urlReaderTook = false;
+let _readerInputAt = -Infinity;
+
 function _readUrlState() {
   try {
     const p = new URLSearchParams(_INBOUND_URL_STATE);
     const applyIf = (id, val, ev) => {
-      if (!val) return;
+      if (!val || _urlReaderTook) return;
       const el = document.getElementById(id);
       if (!el) return;
       if (el.type === 'checkbox') { el.checked = (val === '1' || val === 'true'); }
@@ -10550,7 +10650,7 @@ function _readUrlState() {
        boundaries are on by default, so a sender who turned them off would
        otherwise have sent a link that turns them back on. Absent means the
        defaults stand, which is the rule every other parameter here follows. */
-    if (p.has('L')) {
+    if (p.has('L') && !_urlReaderTook) {
       const want = (p.get('L') || '').split(',').filter(Boolean);
       _URL_LAYERS.forEach(id => {
         const el = document.getElementById(id);
@@ -10591,7 +10691,7 @@ function _readUrlState() {
        It also puts back whatever applyMode draws, which is how a custom area
        gets its outlines after the boundaries arrive. */
     const mode = p.get('mode');
-    if (mode && _URL_MODES.indexOf(mode) !== -1 && _urlTool() !== mode) {
+    if (mode && !_urlReaderTook && _URL_MODES.indexOf(mode) !== -1 && _urlTool() !== mode) {
       const btn = document.querySelector('.mode-rail .mode-btn[data-mode="' + mode + '"]');
       if (btn) btn.click();
     }
@@ -10619,11 +10719,15 @@ function _readUrlState() {
       if (lyr) { lyr.fire('click'); _urlDone.w = true; }
     }
 
-    if (typeof map !== 'undefined' && map) {
+    if (typeof map !== 'undefined' && map && !_urlReaderTook) {
       const z = parseInt(p.get('z'), 10);
       const c = (p.get('c') || '').split(',').map(parseFloat);
       if (Number.isFinite(z) && c.length === 2 && Number.isFinite(c[0]) && Number.isFinite(c[1])) {
-        setTimeout(() => map.setView([c[0], c[1]], z), 400);
+        setTimeout(() => {
+          if (_urlReaderTook) return;
+          _urlApplying = true;
+          try { map.setView([c[0], c[1]], z); } finally { _urlApplying = false; }
+        }, 400);
       }
     }
   } catch (e) { console.warn('_readUrlState failed', e); }
@@ -10662,12 +10766,33 @@ function _readUrlState() {
    from the other side: the fallback timer would win, apply an overlay to a map
    with no wards on it yet, and mark the job done. Re-applying is cheap and
    idempotent, it sets a few control values and dispatches change, so the last
-   caller settles it and the last caller is the one holding the data. */
+   caller settles it and the last caller is the one holding the data. It stops
+   once the reader has changed any of them, see _urlReaderTook. */
 function _applyUrlStateOnce() {
+  _urlApplying = true;
   try { _readUrlState(); } catch (e) { /* _readUrlState warns for itself */ }
+  finally { _urlApplying = false; }
+  if (typeof wLyr !== 'undefined' && wLyr) _urlLanded = true;
 }
 setTimeout(_applyUrlStateOnce, 1200);
 setTimeout(_applyUrlStateOnce, 4000);
+(function _wireUrlReader() {
+  ['pointerdown', 'keydown', 'wheel', 'touchstart'].forEach(t => {
+    window.addEventListener(t, e => { if (e.isTrusted) _readerInputAt = performance.now(); },
+                            { capture: true, passive: true });
+  });
+  const took = () => {
+    if (_urlLanded && !_urlApplying && performance.now() - _readerInputAt < 1000) _urlReaderTook = true;
+  };
+  ['ov', 'borough-focus', 'icb-focus', 'tlsoa', 'core20-toggle'].concat(_URL_LAYERS).forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', took);
+  });
+  document.querySelectorAll('#dl-seg button, .mode-rail .mode-btn').forEach(b => {
+    b.addEventListener('click', took);
+  });
+  if (typeof map !== 'undefined' && map) map.on('movestart', took);
+})();
 
 // ── Free-text search (ward / LSOA / GP / charity) ───────────────────────────
 // Lightweight in-memory index — no external lib. Rebuilt lazily on first
@@ -10681,7 +10806,9 @@ function _buildSearchIndex() {
       for (const [code, w] of Object.entries(WARD_DATA)) {
         const name = w.name || code;
         const lad = w.lad || w.LAD || '';
-        idx.push({ type:'ward', label:name, sub:lad, _lc:(name+' '+lad).toLowerCase(), _key:name });
+        // The GSS code too: analysts often hold an E05 code rather than a name.
+        const gss = w.code || '';
+        idx.push({ type:'ward', label:name, sub:lad, _lc:(name+' '+lad+' '+gss).toLowerCase(), _key:name });
       }
     }
     // LSOAs
@@ -10689,13 +10816,13 @@ function _buildSearchIndex() {
       LSOA_IMD.features.forEach(f => {
         const p = f.properties || {};
         const name = p.name || p.code;
-        idx.push({ type:'lsoa', label:name, sub:p.ward || '', _lc:(name+' '+(p.ward||'')).toLowerCase(), _code:p.code, _feat:f });
+        idx.push({ type:'lsoa', label:name, sub:p.ward || '', _lc:(name+' '+(p.ward||'')+' '+(p.code||'')).toLowerCase(), _code:p.code, _feat:f });
       });
     }
     // GPs
     if (typeof GPS !== 'undefined' && Array.isArray(GPS)) {
       GPS.forEach(d => {
-        idx.push({ type:'GP', label:d.n, sub:d.ward || d.lad || d.pc || '', _lc:(d.n+' '+(d.ward||'')+' '+(d.lad||'')+' '+(d.pc||'')).toLowerCase(), _lat:d.lat, _lng:d.lng });
+        idx.push({ type:'GP', label:d.n, sub:d.ward || d.lad || d.pc || '', _lc:(d.n+' '+(d.ward||'')+' '+(d.lad||'')+' '+(d.pc||'')+' '+(d.code||'')).toLowerCase(), _lat:d.lat, _lng:d.lng });
       });
     }
     // Hospitals
@@ -10873,7 +11000,7 @@ function _renderPostcodeRow(results, pq, q) {
   let row = document.getElementById(id);
   if (!row) {
     results.insertAdjacentHTML('afterbegin',
-      '<div class="sr-grp">postcode</div><div class="sr-row" id="' + id + '">' +
+      '<div class="sr-grp" role="presentation">postcode</div><div class="sr-row" role="option" aria-selected="false" id="' + id + '">' +
       '<span class="sr-type">postcode</span><span class="sr-name"></span>' +
       '<span class="sr-sub">Looking up…</span></div>');
     row = document.getElementById(id);
@@ -10922,9 +11049,10 @@ function _runSearch(q) {
   });
   const top = matches.slice(0, 40);
   if (top.length === 0) {
-    results.innerHTML = '<div class="sr-empty">No matches. Try a postcode, ward, LSOA code, GP name, or charity.</div>';
+    results.innerHTML = '<div class="sr-empty" role="presentation">No matches. Try a postcode, ward, LSOA code, GP name, or charity.</div>';
     results.classList.add('show');
     if (pq) _renderPostcodeRow(results, pq, q);
+    _searchAnnounce(pq ? 'Looking up postcode' : 'No matches');
     return;
   }
   // Group by type
@@ -10934,10 +11062,12 @@ function _runSearch(q) {
   let html = '';
   order.forEach(t => {
     if (!groups[t]) return;
-    html += `<div class="sr-grp">${t} (${groups[t].length})</div>`;
+    html += `<div class="sr-grp" role="presentation">${t} (${groups[t].length})</div>`;
     groups[t].forEach((m, i) => {
       const idx = top.indexOf(m);
-      html += `<div class="sr-row" data-idx="${idx}"><span class="sr-type">${m.type}</span><span class="sr-name">${m.label}</span><span class="sr-sub">${m.sub||''}</span></div>`;
+      // Labels and subtitles are register text (practice, charity and venue
+      // names), so they are escaped like every other place they are shown.
+      html += `<div class="sr-row" role="option" aria-selected="false" id="sr-opt-${idx}" data-idx="${idx}"><span class="sr-type">${_esc(m.type)}</span><span class="sr-name">${_esc(m.label)}</span><span class="sr-sub">${_esc(m.sub||'')}</span></div>`;
     });
   });
   results.innerHTML = html;
@@ -10949,6 +11079,32 @@ function _runSearch(q) {
     });
   });
   if (pq) _renderPostcodeRow(results, pq, q);
+  _searchAnnounce(top.length + (top.length === 1 ? ' result' : ' results') +
+                  (matches.length > top.length ? ', showing the first ' + top.length : ''));
+}
+/* Search is the keyboard's way on to the map (the polygons are not
+   focusable), so it behaves as a combobox: arrow keys move through the
+   results, Enter picks the highlighted one (the first if none is), and the
+   number of results is announced. */
+function _searchAnnounce(msg) {
+  const el = document.getElementById('hdr-search-status');
+  if (el) el.textContent = msg;
+}
+function _searchSetActive(row) {
+  const input = document.getElementById('hdr-search-input');
+  const results = document.getElementById('hdr-search-results');
+  if (!input || !results) return;
+  results.querySelectorAll('.sr-row.active').forEach(r => {
+    r.classList.remove('active'); r.setAttribute('aria-selected', 'false');
+  });
+  if (row) {
+    row.classList.add('active');
+    row.setAttribute('aria-selected', 'true');
+    input.setAttribute('aria-activedescendant', row.id);
+    row.scrollIntoView({ block: 'nearest' });
+  } else {
+    input.removeAttribute('aria-activedescendant');
+  }
 }
 (function _wireSearch() {
   const input = document.getElementById('hdr-search-input');
@@ -10969,12 +11125,31 @@ function _runSearch(q) {
     if (e.target.value.length >= 2) _runSearch(e.target.value);
   });
   input.addEventListener('keydown', e => {
-    if (e.key === 'Escape') { results.classList.remove('show'); input.blur(); }
+    if (e.key === 'Escape') { results.classList.remove('show'); input.blur(); return; }
+    const rows = Array.from(results.querySelectorAll('.sr-row'));
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      if (!rows.length) return;
+      e.preventDefault();
+      if (!results.classList.contains('show')) results.classList.add('show');
+      const at = rows.findIndex(r => r.classList.contains('active'));
+      const next = e.key === 'ArrowDown'
+        ? (at < 0 ? 0 : Math.min(rows.length - 1, at + 1))
+        : (at <= 0 ? 0 : at - 1);
+      _searchSetActive(rows[next]);
+      return;
+    }
     if (e.key === 'Enter') {
-      const first = results.querySelector('.sr-row');
-      if (first) first.click();
+      const pick = results.querySelector('.sr-row.active') || rows[0];
+      if (pick) pick.click();
     }
   });
+  // aria-expanded follows whether the list is showing, however it was hidden
+  // (a pick, Escape, a click elsewhere), and a hidden list has no active row.
+  new MutationObserver(() => {
+    const open = results.classList.contains('show');
+    input.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (!open) _searchSetActive(null);
+  }).observe(results, { attributes: true, attributeFilter: ['class'] });
   document.addEventListener('click', e => {
     if (!results.contains(e.target) && e.target !== input) results.classList.remove('show');
   });
