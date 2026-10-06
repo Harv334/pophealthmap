@@ -159,24 +159,38 @@ https://fingertips.phe.org.uk/api/all_data/csv/by_indicator_id?indicator_ids={ID
 
 Area type 7 = GP practice. Area type 3 = MSOA.
 
-| Indicator | Fingertips ID | Short name |
-|-----------|--------------|-----------|
-| Hypertension (QOF) | 241 | `qof_hypertension_pct` |
-| Depression (18+, QOF) | 848 | `qof_depression_pct` |
-| Severe mental illness (QOF) | 90813 | `qof_smi_pct` |
-| Diabetes (17+, QOF) | 253 | `qof_diabetes_pct` |
-| COPD (QOF) | 273 | `qof_copd_pct` |
-| Asthma (QOF) | 258 | `qof_asthma_pct` |
-| CHD (QOF) | 263 | `qof_chd_pct` |
-| CKD (18+, QOF) | 268 | `qof_ckd_pct` |
-| Dementia (65+, QOF) | 282 | `qof_dementia_pct` |
-| Atrial fibrillation (QOF) | 349 | `qof_af_pct` |
-| Smoking (15+, QOF) | 219 | `qof_smoking_pct` |
-| Obesity (18+, QOF) | 324 | `qof_obesity_pct` |
-| Stroke/TIA (QOF) | 265 | `qof_stroke_tia_pct` |
-| Heart failure (QOF) | 295 | `qof_heart_failure_pct` |
-| Cancer (QOF) | 262 | `qof_cancer_pct` |
-| Learning disability (QOF) | 266 | `qof_ld_pct` |
+GP practice QOF prevalence (`QOF_INDICATORS` in `fetch_all_data.py`). The
+name in the middle column is Fingertips' own, as recorded in
+`data/outcomes/fingertips_profiles.parquet`. `run_qof` compares it with the
+`Indicator Name` in each download and skips any id whose figures are
+something else, because a wrong id still returns plausible percentages.
+
+| Fingertips ID | Fingertips name | Short name |
+|--------------|-----------------|-----------|
+| 219 | Hypertension: QOF prevalence | `qof_hypertension_pct` |
+| 241 | Diabetes: QOF prevalence | `qof_diabetes_pct` |
+| 253 | COPD: QOF prevalence | `qof_copd_pct` |
+| 273 | CHD: QOF prevalence | `qof_chd_pct` |
+| 258 | CKD: QOF prevalence | `qof_ckd_pct` |
+| 262 | Heart Failure: QOF prevalence | `qof_heart_failure_pct` |
+| 848 | Depression: QOF prevalence | `qof_depression_pct` |
+| 90581 | Mental Health: QOF prevalence | `qof_mental_health_pct` |
+| 90933 | Asthma: QOF prevalence | `qof_asthma_pct` |
+| 247 | Dementia: QOF prevalence | `qof_dementia_pct` |
+| 280 | Atrial fibrillation: QOF prevalence | `qof_af_pct` |
+| 212 | Stroke: QOF prevalence | `qof_stroke_pct` |
+| 200 | Learning disability: QOF prevalence | `qof_ld_pct` |
+| 94136 | Obesity: QOF prevalence (new definition) | `qof_obesity_pct` |
+| 91280 | Smoking: QOF prevalence | `qof_smoking_pct` |
+
+There is no cancer prevalence column: no QOF cancer prevalence id could be
+confirmed by name. 90813 is self-harm admissions for ages 10 to 24, a borough
+indicator, and 295 is not a prevalence (its practice values run to 100), so
+neither is used here.
+
+`data/healthcare/qof_prevalence.parquet` and the `qof` object on each practice
+in `data/map/gp_practices.js` carry the seven of these that the last refresh
+returned: hypertension, diabetes, COPD, CHD, CKD, heart failure and depression.
 
 > Swap area_type_id for different geographies: `3` MSOA, `6` LA,
 > `7` GP practice, `15` STP/ICB.
