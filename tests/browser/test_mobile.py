@@ -192,7 +192,7 @@ try:
           d.execute_script("""
             var k = document.querySelectorAll('#ws-body .ws-kpi');
             var s = document.getElementById('ward-sheet').getBoundingClientRect();
-            return k.length === 6 && k[0].getBoundingClientRect().top < s.bottom;
+            return k.length === 8 && k[0].getBoundingClientRect().top < s.bottom;
           """))
     check("two columns of figures, not one strip of six",
           d.execute_script("""
@@ -222,6 +222,21 @@ try:
           d.execute_script("return PH_SHEET.state()") >= 1
           and d.execute_script("return PH_DRAWER.isOpen()"),
           f"sheet state {d.execute_script('return PH_SHEET.state()')}")
+    d.execute_script("document.getElementById('sb-close').click();")
+    time.sleep(1)
+
+    # Open profile has to bring the drawer up: switching the tab inside a
+    # closed drawer shows a phone nothing at all.
+    d.execute_script("document.getElementById('ws-profile').click();")
+    time.sleep(1.2)
+    check("Open profile opens the drawer on the Area profile",
+          d.execute_script("""
+            return PH_DRAWER.isOpen()
+              && document.getElementById('tab-ward').classList.contains('active')
+              && document.getElementById('wpanel').textContent.length > 200;
+          """))
+    check("and leaves the sheet at peek, with the button still there behind it",
+          d.execute_script("return PH_SHEET.state()") == 1)
     d.execute_script("document.getElementById('sb-close').click();")
     time.sleep(1)
 

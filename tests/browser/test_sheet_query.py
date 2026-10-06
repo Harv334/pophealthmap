@@ -158,7 +158,7 @@ try:
     check("insight sentence built from real data",
           "deprivation decile" in st["insight"] and len(st["insight"]) > 60,
           st["insight"][:150])
-    check("six KPI cards", st["kpis"] == 6, str(st["kpis"]))
+    check("eight KPI cards", st["kpis"] == 8, str(st["kpis"]))
     check("KPI values are populated, not all dashes",
           sum(1 for n in st["nums"] if n and n != "—") >= 5, str(st["nums"]))
     check("map furniture lifted above the sheet",
