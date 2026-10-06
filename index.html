@@ -257,6 +257,11 @@
   .map-legend-strip .mls-min, .map-legend-strip .mls-max { font-variant-numeric: tabular-nums; color: var(--ink-2); min-width: 34px; }
   .map-legend-strip .mls-min { text-align: right; }
   .map-legend-strip .mls-grad { width: 140px; height: 8px; border-radius: 3px; border: 1px solid var(--line); }
+  /* The IMD decile layer's key. Its name is short and its low end is words,
+     so on a phone the gradient gives way rather than "1 = most deprived"
+     breaking over two lines or the name losing letters. */
+  .map-legend-strip.is-decile .mls-label { flex-shrink: 0; }
+  .map-legend-strip.is-decile .mls-min { white-space: nowrap; flex-shrink: 0; }
   .viewing-strip .vs-row1 { display: contents; }
   .viewing-strip .vs-row2 { grid-column: 1 / -1; min-height: 0; }
   .viewing-strip .vs-row2:empty { display: none; }
@@ -3162,6 +3167,17 @@ function dataUrl(path) {
 }
 
 
+/* wh says which end of an indicator is worse: true when a higher figure is the
+   concern. It cannot say that an indicator has no worse end. descriptive:true
+   marks the ones that describe who lives somewhere (ethnicity, country of
+   birth, age, tenure, household language, occupation mix, car availability)
+   rather than how good or bad things are there. The rankings read it, and the
+   report charts carry the same flag on their rows, so that a ward with more
+   Black or more older residents is "highest", not "best" or "worst", and is
+   never coloured as a strength or a concern.
+   rev:true is for ranks and deciles, which count down: 1 is the most deprived.
+   The map ramp runs the other way for those, so that dark means more deprived
+   on every IMD view (see ovRamp). */
 const OV_CFG = {
   // Health (ward-level Census 2021)
   census_good_health_pct:          { lo:"Lower", hi:"Higher", wh:false, min:75,   max:95   },
@@ -3212,35 +3228,39 @@ const OV_CFG = {
   // Core20 density (count of LSOAs in IMD deciles 1-2)
   core20_lsoa_count:               { lo:"Fewer", hi:"More",   wh:true,  min:0,    max:15   },
   // Population & demographics
-  census_population:               { lo:"Fewer", hi:"More",   wh:false, min:6000, max:16000},
+  census_population:               { lo:"Fewer", hi:"More",   wh:false, min:6000, max:16000, descriptive:true },
   dental_practice_count:           { lo:"Fewer", hi:"More",   wh:false, min:0,    max:8    },
-  census_non_white_pct:            { lo:"Lower", hi:"Higher", wh:false, min:10,   max:80   },
-  census_born_outside_uk_pct:      { lo:"Lower", hi:"Higher", wh:false, min:20,   max:70   },
-  // Housing & transport
-  census_owned_pct:                { lo:"Less",  hi:"More",   wh:false, min:10,   max:70   },
-  census_social_rented_pct:        { lo:"Less",  hi:"More",   wh:false, min:5,    max:50   },
-  census_private_rented_pct:       { lo:"Less",  hi:"More",   wh:false, min:10,   max:60   },
-  census_no_car_pct:               { lo:"Lower", hi:"Higher", wh:false, min:20,   max:70   },
-  // Economy & education
+  census_non_white_pct:            { lo:"Lower", hi:"Higher", wh:false, min:10,   max:80,   descriptive:true },
+  census_born_outside_uk_pct:      { lo:"Lower", hi:"Higher", wh:false, min:20,   max:70,   descriptive:true },
+  // Housing & transport. Tenure and car availability are descriptive: whether
+  // a household with no car is worse off depends on where it is, and in inner
+  // London it mostly is not.
+  census_owned_pct:                { lo:"Less",  hi:"More",   wh:false, min:10,   max:70,   descriptive:true },
+  census_social_rented_pct:        { lo:"Less",  hi:"More",   wh:false, min:5,    max:50,   descriptive:true },
+  census_private_rented_pct:       { lo:"Less",  hi:"More",   wh:false, min:10,   max:60,   descriptive:true },
+  census_no_car_pct:               { lo:"Lower", hi:"Higher", wh:false, min:20,   max:70,   descriptive:true },
+  // Economy & education. Occupation mix (NS-SEC) is descriptive: ranking a ward
+  // "worst" for its share of routine jobs is a verdict on who lives there.
+  // Qualifications keep a direction, as the IMD education domain does.
   census_unemployed_pct:           { lo:"Lower", hi:"Higher", wh:true,  min:2,    max:10   },
-  census_higher_managerial_pct:    { lo:"Lower", hi:"Higher", wh:false, min:15,   max:60   },
-  census_routine_semi_routine_pct: { lo:"Lower", hi:"Higher", wh:true,  min:5,    max:25   },
+  census_higher_managerial_pct:    { lo:"Lower", hi:"Higher", wh:false, min:15,   max:60,   descriptive:true },
+  census_routine_semi_routine_pct: { lo:"Lower", hi:"Higher", wh:true,  min:5,    max:25,   descriptive:true },
   census_level4_qual_pct:          { lo:"Lower", hi:"Higher", wh:false, min:30,   max:80   },
   census_no_qual_pct:              { lo:"Lower", hi:"Higher", wh:true,  min:5,    max:25   },
-  // Ethnicity (top-level Census 2021 groups). wh=false — these are descriptive,
-  // not health "worse/better" scales. Ranges chosen to span London spread.
-  census_white_pct:                { lo:"Lower", hi:"Higher", wh:false, min:5,    max:85   },
-  census_asian_pct:                { lo:"Lower", hi:"Higher", wh:false, min:2,    max:80   },
-  census_black_pct:                { lo:"Lower", hi:"Higher", wh:false, min:1,    max:40   },
-  census_mixed_pct:                { lo:"Lower", hi:"Higher", wh:false, min:2,    max:12   },
-  census_other_ethnic_pct:         { lo:"Lower", hi:"Higher", wh:false, min:2,    max:20   },
-  // Age profile. wh=false — descriptive, but higher 85+ indicates higher
-  // frail-elderly care need and is usually read that way.
-  census_under16_pct:              { lo:"Lower", hi:"Higher", wh:false, min:10,   max:28   },
-  census_under5_pct:               { lo:"Lower", hi:"Higher", wh:false, min:0,    max:12   },
-  census_working_age_pct:          { lo:"Lower", hi:"Higher", wh:false, min:55,   max:80   },
-  census_over65_pct:               { lo:"Lower", hi:"Higher", wh:false, min:5,    max:22   },
-  census_over85_pct:               { lo:"Lower", hi:"Higher", wh:false, min:0.5,  max:4    },
+  // Ethnicity (top-level Census 2021 groups). Descriptive, not health
+  // "worse/better" scales. Ranges chosen to span London spread.
+  census_white_pct:                { lo:"Lower", hi:"Higher", wh:false, min:5,    max:85,   descriptive:true },
+  census_asian_pct:                { lo:"Lower", hi:"Higher", wh:false, min:2,    max:80,   descriptive:true },
+  census_black_pct:                { lo:"Lower", hi:"Higher", wh:false, min:1,    max:40,   descriptive:true },
+  census_mixed_pct:                { lo:"Lower", hi:"Higher", wh:false, min:2,    max:12,   descriptive:true },
+  census_other_ethnic_pct:         { lo:"Lower", hi:"Higher", wh:false, min:2,    max:20,   descriptive:true },
+  // Age profile. Descriptive. A higher 85+ share does mean more frail-elderly
+  // care need, and "highest" already says so without calling a ward "worst".
+  census_under16_pct:              { lo:"Lower", hi:"Higher", wh:false, min:10,   max:28,   descriptive:true },
+  census_under5_pct:               { lo:"Lower", hi:"Higher", wh:false, min:0,    max:12,   descriptive:true },
+  census_working_age_pct:          { lo:"Lower", hi:"Higher", wh:false, min:55,   max:80,   descriptive:true },
+  census_over65_pct:               { lo:"Lower", hi:"Higher", wh:false, min:5,    max:22,   descriptive:true },
+  census_over85_pct:               { lo:"Lower", hi:"Higher", wh:false, min:0.5,  max:4,    descriptive:true },
   // Environment & access. Higher fuel poverty = worse (wh:true).
   fuel_poverty_pct:                { lo:"Lower", hi:"Higher", wh:true,  min:5,    max:25   },
   // PTAL: higher band = better transport access, so wh:false. The scale is the
@@ -3276,14 +3296,19 @@ const OV_CFG = {
   green_neighbourhood_pct:         { lo:"Worse", hi:"Better", wh:false, min:0,    max:100  },
   blue_commitment_pct:             { lo:"Worse", hi:"Better", wh:false, min:0,    max:60   },
   // IMD 2025 domain scores (LSOA-level). Higher score = more deprived, so wh:true
-  // for every score column. imd_decile is inverted (1 = most deprived), so wh:false
-  // and the legend reads "more deprived -> less deprived".
+  // for every score column. The decile and rank count the other way (1 = most
+  // deprived), so wh:false, and rev:true so the ramp is dark at 1 like the
+  // scores, the decile layer and every published IMD map. The legend keeps the
+  // low figure on the left, so it reads "more deprived" dark to "less deprived"
+  // light.
   imd_score:                       { lo:"Lower", hi:"Higher", wh:true,  min:5,    max:60   },
-  imd_decile_mean:                 { lo:"More deprived", hi:"Less deprived", wh:false, min:1, max:10 },
+  imd_decile_mean:                 { lo:"More deprived", hi:"Less deprived", wh:false, rev:true, min:1, max:10 },
   // Ward-level IMD composite, population-weighted on MHCLG mid-2022 denominators.
   // Aliases to each ward's imd_score field via OV_FIELD_ALIAS.
   imd_score_ward:                  { lo:"Lower", hi:"Higher", wh:true,  min:5,    max:45   },
-  imd_decile:                      { lo:"More deprived", hi:"Less deprived", wh:false, min:1, max:10 },
+  imd_decile:                      { lo:"More deprived", hi:"Less deprived", wh:false, rev:true, min:1, max:10 },
+  // Not in the picker. Here so that whatever draws it gets the direction right.
+  imd_rank:                        { lo:"More deprived", hi:"Less deprived", wh:false, rev:true, min:1, max:33755 },
   income_score:                    { lo:"Lower", hi:"Higher", wh:true,  min:0,    max:0.5  },
   employment_score:                { lo:"Lower", hi:"Higher", wh:true,  min:0,    max:0.4  },
   education_score:                 { lo:"Lower", hi:"Higher", wh:true,  min:0,    max:60   },
@@ -3295,18 +3320,20 @@ const OV_CFG = {
   claimant_rate_pct:               { lo:"Lower", hi:"Higher", wh:true,  min:1,    max:10   },
   claimant_count:                  { lo:"Fewer", hi:"More",   wh:true,  min:0,    max:300  },
   // Household language (Census 2021, TS025). "All adults English" is the
-  // fully-English-speaking household share; "no people English" is the
-  // access-risk indicator so wh:true on that one.
-  census_english_hh_all_pct:       { lo:"Lower", hi:"Higher", wh:false, min:40,   max:95   },
-  census_english_hh_none_pct:      { lo:"Lower", hi:"Higher", wh:true,  min:0,    max:30   },
+  // fully-English-speaking household share; "no people English" flags where
+  // services may need interpreting, so wh:true on that one. Both are
+  // descriptive: a main language other than English is not a deficit.
+  census_english_hh_all_pct:       { lo:"Lower", hi:"Higher", wh:false, min:40,   max:95,   descriptive:true },
+  census_english_hh_none_pct:      { lo:"Lower", hi:"Higher", wh:true,  min:0,    max:30,   descriptive:true },
   // Travel to work (Census 2021, TS061). Active travel = health positive (wh:false);
   // car to work = negative (wh:true) at ward level for air-quality framing.
   census_active_travel_pct:        { lo:"Lower", hi:"Higher", wh:false, min:5,    max:40   },
   census_car_to_work_pct:          { lo:"Lower", hi:"Higher", wh:true,  min:10,   max:70   },
   // Selectable, described and present in the ward data, but with no entry here
   // it drew flat grey. Bounds are the observed 7.4-47.2 across 684 wards,
-  // rounded out. Neutral like active travel rather than penalised like car use.
-  census_public_transport_pct:     { lo:"Lower", hi:"Higher", wh:false, min:7,    max:48   },
+  // rounded out. Descriptive: commuting by public transport says more about
+  // where a ward is than about how it is doing.
+  census_public_transport_pct:     { lo:"Lower", hi:"Higher", wh:false, min:7,    max:48,   descriptive:true },
   ft_93280                      : { lo:"Lower", hi:"Higher", wh:true, min:5.5132, max:14.2429 },
   ft_93097                      : { lo:"Lower", hi:"Higher", wh:true, min:0.7017, max:13.1514 },
   ft_93098                      : { lo:"Lower", hi:"Higher", wh:true, min:-0.1326, max:2.784 },
@@ -4175,9 +4202,10 @@ function ladOfLatLng(lat, lng) {
    Seven classes, because past about eight people stop being able to tell
    adjacent bands apart, and a sequential light-to-dark scale, which reads as
    "more of this" rather than "worse than that". Direction is fixed: dark is the
-   higher figure, on every indicator. What has gone is the claim that the light
-   end is good, and with it the flip that made dark mean "worse" on one map and
-   "more" on the next.
+   higher figure, on every indicator except the IMD ranks and deciles, where the
+   number counts down and 1 is the most deprived (see ovRamp). What has gone is
+   the claim that the light end is good, and with it the flip that made dark
+   mean "worse" on one map and "more" on the next.
 
    Both palettes are safe for deuteranopia and protanopia and both are
    monotonic in luminance, so they survive greyscale printing. The toggle now
@@ -4199,10 +4227,9 @@ function rampClasses() { return window.cbSafe ? RAMP_CB : RAMP_DEFAULT; }
 /**
  * Which class a 0..1 position falls in, and its colour.
  *
- * Dark is always the higher figure. The reversing parameter is gone rather
- * than passed false everywhere, so it cannot come back one call site at a
- * time; JavaScript ignores a surplus argument, so anything missed degrades to
- * the right answer instead of throwing.
+ * Dark is the higher figure. There is no reversing parameter, so a flip cannot
+ * come back one call site at a time; the one indicator-level exception lives in
+ * ovRamp and is set in the registry, not by the caller.
  *
  * It used to take !cfg.wh, so the dark end followed the indicator's
  * polarity and meant "the concerning end" rather than "more of this". That put
@@ -4220,6 +4247,21 @@ function rampIndex(t) {
 
 function ramp(t) {
   return rampClasses()[rampIndex(t)];
+}
+
+/* The colour for position t (0 = the low end of the range) on indicator k.
+   Every layer and both legends go through here rather than ramp() directly.
+
+   The IMD decile and rank count down: 1 is the most deprived. Drawn the plain
+   way, dark would mean the least deprived on those two and the most deprived
+   on the IMD scores and on the "Colour by IMD decile" layer, so the same
+   neighbourhoods would come out navy on one map and pale on the next. rev:true
+   in OV_CFG turns them round, which keeps "dark = more deprived" true on every
+   IMD view. It is not polarity: the indicators that only say which end is
+   worse still run light to dark with the figure. */
+function ovRamp(k, t) {
+  const cfg = (typeof OV_CFG !== 'undefined') ? OV_CFG[k] : null;
+  return ramp(cfg && cfg.rev ? 1 - t : t);
 }
 function fmtNum(v, decimals=0) {
   if (v === null || v === undefined || v === '') return '—';
@@ -4868,7 +4910,7 @@ function _boroughStyle(feat) {
   if (!range || range.hi === range.lo) return base;
   const t = (v - range.lo) / (range.hi - range.lo);
   return Object.assign(base, {
-    fillColor: ramp(Math.max(0, Math.min(1, t))),
+    fillColor: ovRamp(ov, Math.max(0, Math.min(1, t))),
     fillOpacity: 0.5,
   });
 }
@@ -5608,7 +5650,7 @@ function ovColor(wn, ovKey) {
   const range = getOvRange(ovKey);
   if (!range) return '#ccc';
   const t = range.hi === range.lo ? 0.5 : (parseFloat(val) - range.lo) / (range.hi - range.lo);
-  return ramp(t);
+  return ovRamp(ovKey, t);
 }
 
 // Track which neighbourhoods are shaded (filled with their colour) via filter checkboxes.
@@ -5916,6 +5958,22 @@ window.deselectLSOA = function() {
 // ═══════════════════════════════════════════════════════════════════════════
 // WARD REPORT — opens a standalone, printable HTML report in a new window
 // ═══════════════════════════════════════════════════════════════════════════
+
+/* Bar colours for the "vs London median" charts in both reports.
+
+   Blue for the better side of the median and orange for the worse. A red and
+   green pair sits at one lightness and runs together for anyone with red/green
+   colour blindness, and in greyscale print. These three differ in lightness as
+   well as hue, so they still separate on paper.
+
+   Neutral is for descriptive rows (OV_CFG descriptive:true). Being above the
+   median on "born outside the UK" or "routine occupations" is a difference,
+   not a strength or a concern, so those bars are one colour and the median
+   tick does the work. */
+const REPORT_CMP = { better: '#2166ac', worse: '#e66101', neutral: '#a0a9b1' };
+function _reportSwatch(c) {
+  return `<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${c};vertical-align:middle;margin:0 3px 0 4px"></span>`;
+}
 // ─────────────────────────────────────────────────────────────────────────
 // Ward report — A4 at-a-glance profile (single printable page).
 // All charts inline SVG (no external libraries) so the popup remains
@@ -6075,10 +6133,12 @@ function _generateWardReport(_reportWindow, wn, opts) {
       const wr = r.ref != null ? (Math.max(0, r.ref) / dmax) * barW : null;
       const above = (r.v != null && r.ref != null) ? (r.v > r.ref) : null;
       const isWh = !!r.wh;
-      // wh:true → higher = worse (red when above), lower = better
-      // wh:false → higher = better (green when above)
-      const c = above == null ? '#888'
-              : (isWh === above ? '#c9534a' : '#2c8a4a');
+      // descriptive → one neutral colour, above the median or below it
+      // wh:true → higher = worse (orange when above), lower = better (blue)
+      // wh:false → higher = better (blue when above)
+      const c = r.descriptive ? REPORT_CMP.neutral
+              : above == null ? '#888'
+              : (isWh === above ? REPORT_CMP.worse : REPORT_CMP.better);
       svg += `<text x="${padL - 8}" y="${y + 3.5}" text-anchor="end" font-size="10" fill="#444">${_esc(r.l)}</text>`;
       svg += `<rect x="${padL}" y="${y - 6}" width="${barW}" height="11" fill="#f1f1ec" rx="2"/>`;
       if (r.v != null) {
@@ -6301,11 +6361,12 @@ function _generateWardReport(_reportWindow, wn, opts) {
   // Build a tiny "you are here" bar showing where this ward sits in London
   const _ctxBar = (pctile, polarity) => {
     if (pctile == null) return '';
-    // polarity: 'lower-better' → green left, red right; 'higher-better' → reversed
-    const left = polarity === 'higher-better' ? '#c9534a' : '#2c8a4a';
-    const right = polarity === 'higher-better' ? '#2c8a4a' : '#c9534a';
+    // polarity: 'lower-better' → blue (better) left, orange (worse) right;
+    // 'higher-better' → reversed. Same pair as the compare bars.
+    const left  = polarity === 'higher-better' ? REPORT_CMP.worse : REPORT_CMP.better;
+    const right = polarity === 'higher-better' ? REPORT_CMP.better : REPORT_CMP.worse;
     return `<div class="kpi-ctx">
-      <div class="kpi-ctx-bar" style="background:linear-gradient(90deg,${left},#f0c14a,${right})">
+      <div class="kpi-ctx-bar" style="background:linear-gradient(90deg,${left},#e4e4de,${right})">
         <div class="kpi-ctx-tick" style="left:${pctile}%"></div>
       </div>
       <div class="kpi-ctx-cap">P${pctile} in London</div>
@@ -6326,13 +6387,14 @@ function _generateWardReport(_reportWindow, wn, opts) {
     { l:'65+',   v: inds.census_over65_pct,      c:'#a05a9e' },
   ], { width: 360 });
 
+  // descriptive as in OV_CFG: these describe who lives here, so no direction.
   const compareCensus = _chartCompare([
-    { l:'Born outside UK',   v: inds.census_born_outside_uk_pct,    ref: _median(_wardVals('census_born_outside_uk_pct')),    wh: false, dp: 0 },
+    { l:'Born outside UK',   v: inds.census_born_outside_uk_pct,    ref: _median(_wardVals('census_born_outside_uk_pct')),    descriptive: true, dp: 0 },
     { l:'No qualifications', v: inds.census_no_qual_pct,            ref: _median(_wardVals('census_no_qual_pct')),            wh: true,  dp: 0 },
     { l:'Level 4+ qual',     v: inds.census_level4_qual_pct,        ref: _median(_wardVals('census_level4_qual_pct')),        wh: false, dp: 0 },
-    { l:'Higher managerial', v: inds.census_higher_managerial_pct,  ref: _median(_wardVals('census_higher_managerial_pct')),  wh: false, dp: 0 },
-    { l:'Routine/semi',      v: inds.census_routine_semi_routine_pct, ref: _median(_wardVals('census_routine_semi_routine_pct')), wh: true,  dp: 0 },
-    { l:'No adult English first lang (HH)', v: inds.census_english_hh_none_pct, ref: _median(_wardVals('census_english_hh_none_pct')), wh: true, dp: 0 },
+    { l:'Higher managerial', v: inds.census_higher_managerial_pct,  ref: _median(_wardVals('census_higher_managerial_pct')),  descriptive: true, dp: 0 },
+    { l:'Routine/semi',      v: inds.census_routine_semi_routine_pct, ref: _median(_wardVals('census_routine_semi_routine_pct')), descriptive: true, dp: 0 },
+    { l:'No adult English first lang (HH)', v: inds.census_english_hh_none_pct, ref: _median(_wardVals('census_english_hh_none_pct')), descriptive: true, dp: 0 },
   ], { width: 380 });
 
   // ── Health & deprivation: IMD-domain radar + ward-level health bars ──
@@ -6696,7 +6758,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
       <div class="panel" style="flex:1">
         <h3>Demographic indicators vs London median</h3>
         ${compareCensus}
-        <div class="legend"><span class="legend-tick"></span> London median · <span style="color:#c9534a">red</span> = concern, <span style="color:#2c8a4a">green</span> = strength</div>
+        <div class="legend"><span class="legend-tick"></span> London median ·${_reportSwatch(REPORT_CMP.better)}better than the median,${_reportSwatch(REPORT_CMP.worse)}worse ·${_reportSwatch(REPORT_CMP.neutral)}describes who lives here, neither better nor worse</div>
       </div>
     </div>
 
@@ -6710,7 +6772,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
       <div class="panel" style="flex:1">
         <h3>Health &amp; economic indicators vs London median</h3>
         ${healthBars}
-        <div class="legend"><span class="legend-tick"></span> London median &nbsp;·&nbsp; bar colour shows direction (red = concern, green = strength)</div>
+        <div class="legend"><span class="legend-tick"></span> London median &nbsp;·&nbsp; bar colour shows direction:${_reportSwatch(REPORT_CMP.better)}better than the median,${_reportSwatch(REPORT_CMP.worse)}worse</div>
       </div>
     </div>
 
@@ -8036,7 +8098,7 @@ function imdStyle(feat, state) {
         const range = getLsoaRange(curOv);
         if (range && range.hi !== range.lo) {
           const t = (parseFloat(val) - range.lo) / (range.hi - range.lo);
-          base.fillColor = ramp(Math.max(0, Math.min(1, t)));
+          base.fillColor = ovRamp(curOv, Math.max(0, Math.min(1, t)));
           shaded = true;
         }
       }
@@ -8390,7 +8452,6 @@ window.generateLSOAReport = function(code) {
     const data = (rows || []).map(r => ({...r, v: r.v == null ? null : parseFloat(r.v), ref: r.ref == null ? null : parseFloat(r.ref)}));
     const dmax = Math.max(0.0001, ...data.map(r => Math.max(r.v || 0, r.ref || 0)), opts.minMax || 1);
     const H = 6 + data.length * rowH + 12, barW = W - padL - padR;
-    const GOOD = '#2c8a4a', BAD = '#c9534a';
     let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" class="ch-compare">`;
     data.forEach((r, i) => {
       const y = 6 + i * rowH + rowH/2;
@@ -8398,7 +8459,10 @@ window.generateLSOAReport = function(code) {
       const wr = r.ref != null ? (Math.max(0, r.ref) / dmax) * barW : null;
       const above = (r.v != null && r.ref != null) ? (r.v > r.ref) : null;
       const isWh = !!r.wh;
-      const c = above == null ? '#888' : (isWh === above ? BAD : GOOD);
+      // Descriptive rows are one neutral colour; the rest blue when on the
+      // better side of the median and orange when on the worse.
+      const c = r.descriptive ? REPORT_CMP.neutral
+              : above == null ? '#888' : (isWh === above ? REPORT_CMP.worse : REPORT_CMP.better);
       svg += `<text x="${padL - 8}" y="${y + 3.5}" text-anchor="end" font-size="10" fill="#444">${_esc(r.l)}</text>`;
       svg += `<rect x="${padL}" y="${y - 6}" width="${barW}" height="11" fill="#f1f1ec" rx="2"/>`;
       if (r.v != null) {
@@ -8578,12 +8642,13 @@ window.generateLSOAReport = function(code) {
     { l:'16–64',  v: inds.census_working_age_pct, c:'#3b6eaf' },
     { l:'65+',    v: inds.census_over65_pct,      c:'#a05a9e' },
   ], { width: 360 });
+  // descriptive as in OV_CFG: these describe who lives here, so no direction.
   const compareCensus = _chartCompare([
-    { l:'Born outside UK',     v: inds.census_born_outside_uk_pct,    ref: _median(_lsoaVals('census_born_outside_uk_pct')),    wh: false, dp: 0 },
+    { l:'Born outside UK',     v: inds.census_born_outside_uk_pct,    ref: _median(_lsoaVals('census_born_outside_uk_pct')),    descriptive: true, dp: 0 },
     { l:'No qualifications',   v: inds.census_no_qual_pct,            ref: _median(_lsoaVals('census_no_qual_pct')),            wh: true,  dp: 0 },
     { l:'Level 4+ qual',       v: inds.census_level4_qual_pct,        ref: _median(_lsoaVals('census_level4_qual_pct')),        wh: false, dp: 0 },
-    { l:'Higher managerial',   v: inds.census_higher_managerial_pct,  ref: _median(_lsoaVals('census_higher_managerial_pct')),  wh: false, dp: 0 },
-    { l:'Routine/semi',        v: inds.census_routine_semi_routine_pct, ref: _median(_lsoaVals('census_routine_semi_routine_pct')), wh: true,  dp: 0 },
+    { l:'Higher managerial',   v: inds.census_higher_managerial_pct,  ref: _median(_lsoaVals('census_higher_managerial_pct')),  descriptive: true, dp: 0 },
+    { l:'Routine/semi',        v: inds.census_routine_semi_routine_pct, ref: _median(_lsoaVals('census_routine_semi_routine_pct')), descriptive: true, dp: 0 },
   ], { width: 380 });
 
   // ── Charts: health & deprivation ──
@@ -8662,10 +8727,10 @@ window.generateLSOAReport = function(code) {
   };
   const _ctxBar = (pctile, polarity) => {
     if (pctile == null) return '';
-    const left  = polarity === 'higher-better' ? '#c9534a' : '#2c8a4a';
-    const right = polarity === 'higher-better' ? '#2c8a4a' : '#c9534a';
+    const left  = polarity === 'higher-better' ? REPORT_CMP.worse : REPORT_CMP.better;
+    const right = polarity === 'higher-better' ? REPORT_CMP.better : REPORT_CMP.worse;
     return `<div class="kpi-ctx">
-      <div class="kpi-ctx-bar" style="background:linear-gradient(90deg,${left},#f0c14a,${right})">
+      <div class="kpi-ctx-bar" style="background:linear-gradient(90deg,${left},#e4e4de,${right})">
         <div class="kpi-ctx-tick" style="left:${pctile}%"></div>
       </div>
       <div class="kpi-ctx-cap">P${pctile} in London</div>
@@ -8863,7 +8928,7 @@ window.generateLSOAReport = function(code) {
       <div class="panel" style="flex:1">
         <h3>Demographic indicators vs London LSOA median</h3>
         ${compareCensus}
-        <div class="legend"><span class="legend-tick"></span> London median (${_ALL_LSOAS.length.toLocaleString()} LSOAs) · <span style="color:#c9534a">red</span> = concern, <span style="color:#2c8a4a">green</span> = strength</div>
+        <div class="legend"><span class="legend-tick"></span> London median (${_ALL_LSOAS.length.toLocaleString()} LSOAs) ·${_reportSwatch(REPORT_CMP.better)}better than the median,${_reportSwatch(REPORT_CMP.worse)}worse ·${_reportSwatch(REPORT_CMP.neutral)}describes who lives here, neither better nor worse</div>
       </div>
     </div>
 
@@ -8877,6 +8942,7 @@ window.generateLSOAReport = function(code) {
       <div class="panel" style="flex:1">
         <h3>Health &amp; economic indicators vs London LSOA median</h3>
         ${healthBars}
+        <div class="legend"><span class="legend-tick"></span> London median &nbsp;·&nbsp; bar colour shows direction:${_reportSwatch(REPORT_CMP.better)}better than the median,${_reportSwatch(REPORT_CMP.worse)}worse</div>
       </div>
     </div>
 
@@ -9168,7 +9234,7 @@ function msoaStyle(feat) {
   const t = (v - range.lo) / (range.hi - range.lo);
   return Object.assign(base, {
     fill: true,
-    fillColor: ramp(Math.max(0, Math.min(1, t))),
+    fillColor: ovRamp(curOv, Math.max(0, Math.min(1, t))),
     fillOpacity: 0.45,
     color: '#555',
   });
@@ -9359,6 +9425,8 @@ document.getElementById('tlsoa').addEventListener('change', e => {
   lsoaActive = e.target.checked;
   document.getElementById('lsoa-filter-row').style.display = lsoaActive ? 'block' : 'none';
   document.getElementById('lsoa-imd-row').style.display = lsoaActive ? 'flex' : 'none';
+  // The decile key goes with the layer it describes.
+  _syncDecileStrip();
   if (!lsoaActive) {
     if (lsoaLyr) map.removeLayer(lsoaLyr);
     selLSOA = null;
@@ -9386,6 +9454,7 @@ document.getElementById('tlsoa-imd').addEventListener('change', e => {
     lsoaLyr.eachLayer(l => l.setStyle(imdStyle(l.feature,
       l.feature.properties.code === selLSOA ? 'selected' : 'default')));
   }
+  _syncDecileStrip();
 });
 
 // ── Inject worst/best IMD decile into WARD_DATA after loading ──
@@ -9497,7 +9566,8 @@ function injectWardIMD() {
 
 // Top 20 / bottom 20 rankings — single-indicator mode only. Uses WARD_DATA
 // for ward-level metrics and LSOA_DATA for LSOA-only metrics. The "best" end
-// depends on cfg.wh: wh:true means higher=worse, so best = lowest values.
+// depends on cfg.wh: wh:true means higher=worse, so best = lowest values. A
+// descriptive indicator has no best end, so its columns are named by the figure.
 function renderTopBottom() {
   const panel = document.getElementById('rank-panel');
   if (!panel) return;
@@ -9548,13 +9618,28 @@ function renderTopBottom() {
 
   // wh:true → higher is worse; best = lowest values (front of ascending list).
   // wh:false → higher is better; best = highest values (end of ascending list).
-  const bestSlice  = cfg.wh ? rows.slice(0, 20) : rows.slice(-20).reverse();
-  const worstSlice = cfg.wh ? rows.slice(-20).reverse() : rows.slice(0, 20);
+  // Descriptive → highest first, whatever wh says.
+  const descriptive = !!cfg.descriptive;
+  const lowFirst = cfg.wh && !descriptive;
+  const bestSlice  = lowFirst ? rows.slice(0, 20) : rows.slice(-20).reverse();
+  const worstSlice = lowFirst ? rows.slice(-20).reverse() : rows.slice(0, 20);
 
   const unitEl = document.getElementById('rank-unit');
   if (unitEl) unitEl.textContent = useLsoa ? `${rows.length} LSOAs` : `${rows.length} wards`;
-  document.getElementById('rank-best-hdr').textContent  = `Best 20 (${cfg.wh ? 'lowest' : 'highest'})`;
-  document.getElementById('rank-worst-hdr').textContent = `Worst 20 (${cfg.wh ? 'highest' : 'lowest'})`;
+  const bestHdr  = document.getElementById('rank-best-hdr');
+  const worstHdr = document.getElementById('rank-worst-hdr');
+  // "Best 20" in green over the wards with the most Black residents would read
+  // as a verdict on who lives there. Descriptive lists are named by the figure
+  // and set in ink.
+  if (descriptive) {
+    bestHdr.textContent  = 'Highest 20';
+    worstHdr.textContent = 'Lowest 20';
+  } else {
+    bestHdr.textContent  = `Best 20 (${cfg.wh ? 'lowest' : 'highest'})`;
+    worstHdr.textContent = `Worst 20 (${cfg.wh ? 'highest' : 'lowest'})`;
+  }
+  bestHdr.style.color  = descriptive ? 'var(--ink)' : '#0F6E56';
+  worstHdr.style.color = descriptive ? 'var(--ink)' : '#A32D2D';
 
   const fmt = v => {
     if (Math.abs(v) >= 100) return v.toFixed(0);
@@ -9657,11 +9742,11 @@ function ovRangeForDisplay(k) {
  */
 function _syncScaleGradient() {
   if (typeof ramp !== 'function') return;
-  const cfg = (typeof OV_CFG !== 'undefined' && curOv) ? OV_CFG[curOv] : null;
-  // No flip. The map paints dark for the higher figure whatever the indicator
-  // is, so the key has to run the same way or it describes a map that is not
-  // on screen.
-  const inv = false;
+  // Through ovRamp, like the map, so the key runs the way the map is painted:
+  // dark for the higher figure, and dark at 1 on the ranks and deciles. The
+  // numbers and the lo/hi words stay low on the left either way, so "More
+  // deprived" sits beside the dark end it describes.
+  //
   // Hard stops, so the key shows the seven bands the map is actually painted
   // in. A smooth blend here was a picture of a scale the map does not use: it
   // implied every intermediate colour existed and gave no way to match a ward
@@ -9669,7 +9754,7 @@ function _syncScaleGradient() {
   const n = RAMP_CLASSES;
   const stops = [];
   for (let i = 0; i < n; i++) {
-    const c = ramp((i + 0.5) / n, inv);
+    const c = ovRamp(curOv, (i + 0.5) / n);
     stops.push(`${c} ${(i / n) * 100}%`, `${c} ${((i + 1) / n) * 100}%`);
   }
   const css = `linear-gradient(to right, ${stops.join(', ')})`;
@@ -9678,6 +9763,39 @@ function _syncScaleGradient() {
     if (el) el.style.background = css;
   });
   return css;
+}
+
+/**
+ * The strip along the bottom of the map when no indicator is chosen.
+ *
+ * The LSOA layer coloured by IMD decile is then the thing being drawn, and its
+ * only other key is the small bar in the Layers pane, which is out of sight on
+ * a phone and once the pane is closed. Ten hard stops in the layer's own
+ * colours, with the end that matters spelled out. An indicator, when there is
+ * one, owns the strip: it paints over the deciles wherever it has a figure.
+ */
+function _syncDecileStrip() {
+  const mls = document.getElementById('map-legend-strip');
+  if (!mls) return;
+  const indicatorOwns = !!(curOv && curOv !== 'none' && OV_CFG[curOv]);
+  const decile = !indicatorOwns && lsoaActive && lsoaIMDColour;
+  mls.classList.toggle('is-decile', decile);
+  if (indicatorOwns) return;
+  if (!decile) {
+    mls.style.display = 'none';
+    return;
+  }
+  const stops = [];
+  for (let d = 1; d <= 10; d++) {
+    const c = imdDecileColor(d);
+    stops.push(`${c} ${(d - 1) * 10}%`, `${c} ${d * 10}%`);
+  }
+  document.getElementById('mls-label').textContent = 'IMD decile';
+  document.getElementById('mls-min').textContent = '1 = most deprived';
+  document.getElementById('mls-max').textContent = '10';
+  document.getElementById('mls-grad').style.background =
+    `linear-gradient(to right, ${stops.join(', ')})`;
+  mls.style.display = 'flex';
 }
 
 function _syncScaleNumbers() {
@@ -9770,12 +9888,13 @@ function _applyOverlayChange(key) {
       mlsMin.textContent = range ? (fmtNum(range.lo, 1) + unitSuffix) : '';
       mlsMax.textContent = range ? (fmtNum(range.hi, 1) + unitSuffix) : '';
       // gradient already painted by _syncScaleGradient above
+      mls.classList.remove('is-decile');
       mls.style.display = 'flex';
     }
   } else {
-    // No overlay → hide the strip
-    const mls = document.getElementById('map-legend-strip');
-    if (mls) mls.style.display = 'none';
+    // No overlay: the strip is the decile layer's key if that is on, and
+    // hidden otherwise.
+    _syncDecileStrip();
   }
   // Auto-enable the LSOA layer if the overlay only has LSOA-level data
   // (IMD domains, claimant count etc.). Without this, users pick e.g.
@@ -10339,6 +10458,9 @@ function _applyColourPalette() {
     // indicator change rebuilt it, which is why the map and its own key
     // disagreed about what a colour meant.
     _syncScaleGradient();
+    // The strip's decile key, when it is showing one, over the ramp just
+    // painted into it.
+    _syncDecileStrip();
     document.querySelectorAll('[data-imd-decile]').forEach(el => {
       const d = parseInt(el.getAttribute('data-imd-decile'), 10);
       if (d >= 1 && d <= 10) el.style.background = imdDecileColor(d);
