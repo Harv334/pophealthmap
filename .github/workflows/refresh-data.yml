@@ -161,7 +161,7 @@ jobs:
           echo "Could not push after 3 attempts."
           exit 1
 
-      - name: Open an issue if anything failed
+      - name: Open or update an issue if anything failed
         if: steps.run.outcome == 'failure' || steps.manifest.outputs.failed != ''
         uses: actions/github-script@v9
         with:
@@ -169,19 +169,6 @@ jobs:
             const failed = '${{ steps.manifest.outputs.failed }}';
             const crashed = '${{ steps.run.outcome }}' === 'failure';
             const title = 'Scheduled data refresh failed';
-
-            // Do not pile up duplicates: if the last failure has not been dealt
-            // with, add nothing rather than opening a second identical issue.
-            const open = await github.rest.issues.listForRepo({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'open',
-              per_page: 100,
-            });
-            if (open.data.some(i => i.title === title)) {
-              core.info('An open issue with this title already exists; not opening another.');
-              return;
-            }
 
             const lines = [
               `The scheduled data refresh did not complete cleanly.`,
@@ -196,6 +183,28 @@ jobs:
               ``,
               `Per-source failures do not stop the other sources, so any data that did refresh has still been committed.`,
             ];
+
+            // One issue at a time, but every failing run reported on it. If one
+            // is already open, this run goes on it as a comment. Saying nothing
+            // instead would let a stale issue silence every later failure,
+            // including a different source failing months afterwards.
+            const open = await github.paginate(github.rest.issues.listForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 100,
+            });
+            const existing = open.find(i => i.title === title && !i.pull_request);
+            if (existing) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body: lines.join('\n'),
+              });
+              core.info(`Added this run to the open issue #${existing.number}.`);
+              return;
+            }
 
             await github.rest.issues.create({
               owner: context.repo.owner,

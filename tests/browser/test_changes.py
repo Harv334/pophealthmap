@@ -5,7 +5,9 @@
    the badge reading LSOA, with nothing painted.
 
 2. Dark has to mean the higher figure on every indicator, including the ones
-   where higher is better, and both legends have to run the same way.
+   where higher is better, and both legends have to run the same way. The IMD
+   rank and decile (rev:true) are the exception: they count down, so dark is
+   the low figure there and still means more deprived.
 """
 import sys
 import time
@@ -90,7 +92,7 @@ try:
           "distinct ward fill colours: %s" % b["shaded"])
     check("and the badge agrees with the level", b["badge"] == "ward", str(b["badge"]))
 
-    # ---- 2. dark is the higher figure ---------------------------------------
+    # ---- 2. dark is the higher figure, or the lower on a rank or decile -----
     print("\n== colour direction ==")
     res = d.execute_script("""
       var out = [];
@@ -111,15 +113,20 @@ try:
           if (!worst || v < worst.v) worst = { n: nm, v: v };
         }
         if (!best || !worst || best.v === worst.v) continue;
-        out.push({ key: k, wh: !!cfg.wh,
+        out.push({ key: k, wh: !!cfg.wh, rev: !!cfg.rev,
                    highColour: ovColor(best.n, k), lowColour: ovColor(worst.n, k),
                    darkest: darkest, lightest: lightest });
       }
       return out;
     """)
     for r in res:
-        ok = r["highColour"] == r["darkest"] and r["lowColour"] == r["lightest"]
-        check("%s (wh=%s): highest value is darkest" % (r["key"][:34], r["wh"]), ok,
+        # rev:true is the IMD rank and decile, which count down (1 = most
+        # deprived), so the low figure is the dark one there.
+        dark_end, light_end = ((r["lowColour"], r["highColour"]) if r["rev"]
+                               else (r["highColour"], r["lowColour"]))
+        ok = dark_end == r["darkest"] and light_end == r["lightest"]
+        check("%s (wh=%s): %s value is darkest" % (r["key"][:34], r["wh"],
+              "lowest" if r["rev"] else "highest"), ok,
               "high=%s low=%s (darkest=%s)" % (r["highColour"], r["lowColour"], r["darkest"]))
 
     grad = d.execute_script(

@@ -2051,26 +2051,49 @@ def run_claimant_count() -> pd.DataFrame:
 # after the fact by matching ODS codes against gp_practices.parquet.
 # Indicator IDs below are the OHID Fingertips IDs for QOF prevalence
 # indicators; values are GP-practice-level percentages.
+#
+# The third column is Fingertips' own name for the id, copied from
+# data/outcomes/fingertips_profiles.parquet, which run_fingertips_profiles
+# fills from the API's indicator metadata. It is not a description to be
+# reworded: run_qof compares it with the name in every download and skips any
+# id whose figures turn out to be something else. A wrong id still returns a
+# full set of plausible percentages, so the name is the only thing that can
+# catch it.
+#
+# Cancer is not listed: no QOF cancer prevalence id could be confirmed by name.
 # ---------------------------------------------------------------------------
 QOF_INDICATORS = [
-    # (fingertips_id, short_name,              human label)
-    (   241,           "qof_hypertension_pct",  "Hypertension: QOF prevalence"),
-    (   848,           "qof_depression_pct",    "Depression: QOF prevalence (18+)"),
-    ( 90813,           "qof_smi_pct",           "Severe mental illness: QOF prevalence"),
-    (   253,           "qof_diabetes_pct",      "Diabetes: QOF prevalence (17+)"),
-    (   273,           "qof_copd_pct",          "COPD: QOF prevalence"),
-    (   258,           "qof_asthma_pct",        "Asthma: QOF prevalence"),
-    (   263,           "qof_chd_pct",           "CHD: QOF prevalence"),
-    (   268,           "qof_ckd_pct",           "CKD: QOF prevalence (18+)"),
-    (   282,           "qof_dementia_pct",      "Dementia: QOF prevalence (aged 65+)"),
-    (   349,           "qof_af_pct",            "Atrial fibrillation: QOF prevalence"),
-    (   219,           "qof_smoking_pct",       "Smoking: QOF prevalence (15+)"),
-    (   324,           "qof_obesity_pct",       "Obesity: QOF prevalence (18+)"),
-    (   265,           "qof_stroke_tia_pct",    "Stroke/TIA: QOF prevalence"),
-    (   295,           "qof_heart_failure_pct", "Heart failure: QOF prevalence"),
-    (   262,           "qof_cancer_pct",        "Cancer: QOF prevalence"),
-    (   266,           "qof_ld_pct",            "Learning disability: QOF prevalence"),
+    # (fingertips_id, short_name,              Fingertips' name for the id)
+    (   219,           "qof_hypertension_pct",  "Hypertension: QOF prevalence"),
+    (   241,           "qof_diabetes_pct",      "Diabetes: QOF prevalence"),
+    (   253,           "qof_copd_pct",          "COPD: QOF prevalence"),
+    (   273,           "qof_chd_pct",           "CHD: QOF prevalence"),
+    (   258,           "qof_ckd_pct",           "CKD: QOF prevalence"),
+    (   262,           "qof_heart_failure_pct", "Heart Failure: QOF prevalence"),
+    (   848,           "qof_depression_pct",    "Depression: QOF prevalence"),
+    ( 90581,           "qof_mental_health_pct", "Mental Health: QOF prevalence"),
+    ( 90933,           "qof_asthma_pct",        "Asthma: QOF prevalence"),
+    (   247,           "qof_dementia_pct",      "Dementia: QOF prevalence"),
+    (   280,           "qof_af_pct",            "Atrial fibrillation: QOF prevalence"),
+    (   212,           "qof_stroke_pct",        "Stroke: QOF prevalence"),
+    (   200,           "qof_ld_pct",            "Learning disability: QOF prevalence"),
+    ( 94136,           "qof_obesity_pct",       "Obesity: QOF prevalence (new definition)"),
+    ( 91280,           "qof_smoking_pct",       "Smoking: QOF prevalence"),
 ]
+
+
+def _ft_name_mismatch(label: str, actual: str) -> bool:
+    """
+    True when the name in a Fingertips download is not the indicator asked for.
+
+    Compared on the first fourteen letters with case, spaces and punctuation
+    ignored. That passes Fingertips' own small rewordings ("Heart Failure"
+    against "Heart failure", a trailing age band) and fails a different
+    indicator, whose name differs in its first words.
+    """
+    stem = re.sub(r"[^a-z]", "", (label or "").lower())[:14]
+    return bool(stem) and stem not in re.sub(r"[^a-z]", "", str(actual or "").lower())
+
 
 def run_qof() -> pd.DataFrame:
     rule("OHID Fingertips QOF (GP-practice prevalence)")
@@ -2079,7 +2102,7 @@ def run_qof() -> pd.DataFrame:
     AREA_TYPE_PRACTICE = 7  # GP practice
 
     rows: list[dict] = []
-    for ind_id, short, _desc in QOF_INDICATORS:
+    for ind_id, short, name in QOF_INDICATORS:
         cache = cache_dir / f"ind_{ind_id}_practice.csv"
         if not cache.exists() or cache.stat().st_size < 1024:
             url = (
@@ -2105,6 +2128,14 @@ def run_qof() -> pd.DataFrame:
             continue
         if df.empty or "Area Code" not in df.columns:
             continue
+        # Skipped rather than warned past: a column of some other measure
+        # under this name is worse than no column.
+        if "Indicator Name" in df.columns and not df["Indicator Name"].empty:
+            actual = str(df["Indicator Name"].iloc[0])
+            if _ft_name_mismatch(name, actual):
+                warn(f"  {short} ({ind_id}): asked for {name!r} but the data is "
+                     f"{actual!r}; skipped. Fix the id in QOF_INDICATORS.")
+                continue
         # Keep latest period per practice
         if "Time period Sortable" in df.columns:
             df = df.sort_values("Time period Sortable")
@@ -2239,8 +2270,7 @@ def run_fingertips() -> pd.DataFrame:
         # was 10.8%, and looked entirely reasonable, for months.
         if "Indicator Name" in df.columns and not df["Indicator Name"].empty:
             actual = str(df["Indicator Name"].iloc[0])
-            stem = re.sub(r"[^a-z]", "", desc.lower())[:14]
-            if stem and stem not in re.sub(r"[^a-z]", "", actual.lower()):
+            if _ft_name_mismatch(desc, actual):
                 warn(f"fingertips {ind_id}: asked for {desc!r} but the data is "
                      f"{actual!r}. Verify the id before trusting this column.")
         df = df[df["Area Code"].isin(SCOPE_LADS)]
@@ -2465,10 +2495,13 @@ def run_fingertips_profiles() -> pd.DataFrame:
 #
 # Ward is not an option: area type 8 exists but returns nothing for these, so
 # MSOA is the finest published geography and it has to be bridged to wards.
+#
+# Low birth weight (93092) is not listed. It has no London MSOA figures, so it
+# could only ever appear in the picker as an indicator with nothing to draw.
 FINGERTIPS_MSOA_AREA_TYPE = 3   # Middle Super Output Area
 FINGERTIPS_MSOA_INDICATORS = [
     93465, 93233, 93229, 93227, 93115, 93280, 93089, 93232, 93241, 93240,
-    93239, 93283, 93098, 93092, 93250, 93252, 93253, 93254, 93255, 93256,
+    93239, 93283, 93098, 93250, 93252, 93253, 93254, 93255, 93256,
     93480, 93257, 93260, 93259, 93105, 93106, 93231, 93097, 93114, 93219,
     93224, 93107, 93108,
 ]
@@ -4455,7 +4488,9 @@ def build_vcse_json():
     #   act (activities), ar (areas), lsoa (LSOA21CD) - read nowhere at all
     #   reg (registered)  - the only .reg read is cicPopupHtml, which consumes
     #                       cics.json, not this file
-    #   pc  (postcode)    - every .pc read belongs to GP, dental or pharmacy data
+    #   pc  (postcode)    - dropped as a full postcode. Small charities carry
+    #                       only the postcode sector in pc instead of an
+    #                       address; see _generalise_small_charity
     #   ward (WD25CD)     - every .ward read is a CSS class, an LSOA_IMD
     #                       property, or a GP record
     # Together they were 37.9% of a 9.7 MB payload that every visitor downloads.
@@ -4475,7 +4510,43 @@ def build_vcse_json():
         "how_tags":  "ht", "how_desc":  "hd",
         "who_tags":  "ot", "who_desc":  "od",
     })
-    return out.to_dict(orient="records")
+    records = out.to_dict(orient="records")
+    pcs = df["postcode"].tolist() if "postcode" in df.columns else [None] * len(records)
+    n = 0
+    for rec, pc in zip(records, pcs):
+        n += _generalise_small_charity(rec, pc)
+    info(f"vcse: {n:,} of {len(records):,} charities shown by area only "
+         f"(income under \u00a3{SMALL_CHARITY_INCOME:,} or not filed)")
+    return records
+
+
+# A small charity's contact address on the register is often a trustee's home.
+# Below this income, or with no income filed, the map shows where a charity is
+# only to the postcode sector and its borough: no street address, and the pin
+# moved to three decimal places (about 110 m by 70 m in London) so it does not
+# land on one front door. Larger charities nearly always give an office, so
+# theirs are shown as registered.
+SMALL_CHARITY_INCOME = 100_000
+
+
+def _postcode_sector(pc) -> str:
+    """'E16AN' or 'E1 6AN' -> 'E1 6'. Empty when it does not look like a postcode."""
+    s = str(pc or "").upper().replace(" ", "")
+    return f"{s[:-3]} {s[-3]}" if 5 <= len(s) <= 7 else ""
+
+
+def _generalise_small_charity(rec: dict, postcode) -> int:
+    """Strip a small charity's record to an area in place. Returns 1 if it did."""
+    inc = rec.get("inc")
+    if isinstance(inc, (int, float)) and not pd.isna(inc) and inc >= SMALL_CHARITY_INCOME:
+        return 0
+    rec["a"] = ""
+    rec["pc"] = _postcode_sector(postcode)
+    for k in ("lat", "lng"):
+        v = rec.get(k)
+        if isinstance(v, float) and not pd.isna(v):
+            rec[k] = round(v, 3)
+    return 1
 
 
 def build_pharmacies_json() -> list:
@@ -4577,6 +4648,65 @@ def write_map_blob(name: str, payload, description: str) -> None:
         f"var {name} = {body};\n"
     ))
 
+# Indicators read from a register as it stood on the day it was fetched, so
+# their only date is that day. Keyed by the manifest's source name.
+REGISTER_KEYS = {
+    "tfl":        ("rail_station_dist_m", "rail_stations_1km",
+                   "bus_stop_dist_m", "bus_stops_800m"),
+    "dentists":   ("dental_practice_count",),
+    "gp":         ("gp_practice_count",),
+    "pharmacies": ("pharmacy_count",),
+}
+
+
+def _indicator_periods() -> dict[str, str]:
+    """
+    Indicator key -> the period its figures cover, from the source itself.
+
+    Fingertips states a period on every row, and it differs a great deal from
+    one indicator to the next: the Local Health admissions pool 2016/17 to
+    2020/21 while the borough QOF figures are 2024/25. Saying "latest" for all
+    of them reads as current to anyone who does not go and check.
+
+    Each indicator takes the period most of its areas carry. A register has no
+    period, only the date it was read, which comes from the manifest and only
+    from a run that succeeded: a failed fetch leaves the previous file in
+    place, and dating it today would be wrong.
+    """
+    out: dict[str, str] = {}
+
+    def _modal(df, key_col, prefix):
+        if df is None or df.empty or "period" not in df.columns:
+            return
+        df = df[df["period"].fillna("").astype(str).str.strip() != ""]
+        for key, s in df.groupby(key_col)["period"]:
+            out[f"{prefix}{key}"] = str(s.astype(str).mode().iloc[0]).strip()
+
+    msoa = _read_parquet_opt(DATA_DIR / "outcomes" / "fingertips_msoa.parquet")
+    if msoa is not None and "indicator_id" in msoa.columns:
+        _modal(msoa.assign(indicator_id=msoa["indicator_id"].astype(int)),
+               "indicator_id", "ft_")
+    boro = _read_parquet_opt(DATA_DIR / "outcomes" / "fingertips.parquet")
+    if boro is not None and "indicator_short" in boro.columns:
+        _modal(boro, "indicator_short", "ft_")
+
+    try:
+        sources = json.loads(MANIFEST_PATH.read_text(encoding="utf-8")).get("sources") or {}
+    except (OSError, ValueError):
+        sources = {}
+    for src, keys in REGISTER_KEYS.items():
+        rec = sources.get(src) or {}
+        if rec.get("status") != "ok" or not rec.get("fetched_at"):
+            continue
+        try:
+            when = datetime.fromisoformat(str(rec["fetched_at"])).strftime("%b %Y")
+        except ValueError:
+            continue
+        for k in keys:
+            out[k] = f"as at {when}"
+    return out
+
+
 def build_indicator_stats(ward_data: dict, lsoa_data: dict,
                           msoa_data: dict, borough_data: dict) -> dict:
     """
@@ -4613,6 +4743,11 @@ def build_indicator_stats(ward_data: dict, lsoa_data: dict,
     scripts/fingertips_metadata.json has an entry, its wh flag is carried
     through, which is how the 600 can arrive without anyone deciding by hand
     which direction is bad.
+
+      yr    the period the figures cover, where the source says so (see
+            _indicator_periods). The map shows it beside every legend in
+            place of the hand-typed one, which is written once and is wrong
+            from the first refresh that moves the source on.
 
     Deliberately emits FACTS ONLY, no labels, groups or descriptions. Those
     stay hand-written in index.html where they are edited. Parsing JS object
@@ -4678,8 +4813,15 @@ def build_indicator_stats(ward_data: dict, lsoa_data: dict,
         except (OSError, ValueError) as e:
             warn(f"indicator stats: could not read fingertips metadata ({e})")
 
+    dated = 0
+    for key, period in _indicator_periods().items():
+        if key in stats and period:
+            stats[key]["yr"] = period
+            dated += 1
+
     info(f"indicator stats: {len(stats):,} indicators measured across "
-         f"{sum(1 for _ in LEVELS)} levels; polarity carried for {carried}")
+         f"{sum(1 for _ in LEVELS)} levels; polarity carried for {carried}; "
+         f"period carried for {dated}")
     return {
         "generated": datetime.now(timezone.utc).isoformat(),
         "stats": stats,
@@ -4934,8 +5076,9 @@ def export_all() -> None:
         "PH_IND_STATS",
         build_indicator_stats(ward_data, lsoa_data, msoa_data, boro_data),
         "Per-indicator facts measured from the payloads: which levels carry "
-        "it, how many distinct values it has at each, and a 5th-95th "
-        "percentile range. Generated — do not edit.",
+        "it, how many distinct values it has at each, a 5th-95th "
+        "percentile range, and the period it covers where the source "
+        "states one. Generated — do not edit.",
     )
 
     ok(f"ward_data.json:  {len(ward_data.get('wards', {})):,} wards")

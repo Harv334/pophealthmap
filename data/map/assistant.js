@@ -3,9 +3,14 @@
  *
  * The model never receives the dataset. It receives tool definitions, and the
  * four functions below run against the JSON this page has already loaded. So
- * every figure in an answer is the same number the map is drawing, nothing is
- * uploaded, and the model cannot invent a statistic: if a tool returns nothing,
- * there is nothing for it to report.
+ * every figure in an answer is the same number the map is drawing, and the
+ * model cannot invent a statistic: if a tool returns nothing, there is nothing
+ * for it to report.
+ *
+ * That is not the same as nothing leaving the browser. Each question, the
+ * conversation so far and every tool result go to the Worker and on to
+ * Anthropic, and the Worker keeps the caller's IP for 48 hours to enforce the
+ * daily cap. privacy.html says so, and the panel's copy must not contradict it.
  *
  * Set ASSISTANT_ENDPOINT to the deployed Worker URL. While it is empty the
  * panel stays hidden, so the map works normally without the AI layer.
@@ -469,14 +474,17 @@ var MODEL_LABEL = "Claude Sonnet 5";
    * countdown, and asking a question and watching a static number is not a
    * countdown either.
    *
-   * So this browser keeps its own tally for the UTC day, decremented the moment
-   * a question is sent, and every reply the Worker gives overwrites it with the
-   * authoritative number. It is a running count that is right from the first
-   * question and self-corrects if it drifts, rather than nothing until the
-   * first answer lands. It can undercount an allowance shared across an office
-   * IP, which the tooltip says.
+   * So this browser keeps its own tally for the UTC day, and every reply the
+   * Worker gives overwrites it with the authoritative number. The tally only
+   * moves once a question has been answered: the Worker counts a question when
+   * the model has answered it, not when it arrives, so a question that never
+   * got through has cost nothing and the panel should not say it has. It can
+   * undercount an allowance shared across an office IP, which the tooltip says.
    */
   var USED_KEY = "phAskUsed";
+  // Bumped whenever the Worker reports a count, so submit() can tell whether
+  // a question was counted by the server or still needs counting here.
+  var workerCounts = 0;
 
   function utcDay() { return new Date().toISOString().slice(0, 10); }
 
@@ -597,16 +605,51 @@ var MODEL_LABEL = "Claude Sonnet 5";
     if (typeof window.ensureWardDetail === "function") {
       try { await window.ensureWardDetail(); } catch (e) {}
     }
-    history.push({ role: "user", content: question });
+    var asked = { role: "user", content: question };
+    history.push(asked);
     trimHistory();
+    try {
+      return await answerRounds();
+    } catch (err) {
+      // Take the unanswered question back out, so asking it again sends it
+      // once rather than run together with its failed first attempt.
+      var at = history.indexOf(asked);
+      if (at !== -1) history.length = at;
+      throw err;
+    }
+  }
+
+  // "Failed to fetch" is the browser's wording for any request that got no
+  // response at all, which here usually means a network that blocks
+  // workers.dev. It tells a reader nothing, so the panel says what happened.
+  var UNREACHABLE = "The question service could not be reached from this network. "
+    + "The rest of the map still works.";
+
+  async function answerRounds() {
     for (var round = 0; round < MAX_TOOL_ROUNDS; round++) {
-      var res = await fetch(ASSISTANT_ENDPOINT, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ messages: history }),
-      });
-      var data = await res.json();
-      if (!res.ok) throw new Error(data && data.error ? data.error : "Request failed");
+      var res;
+      try {
+        res = await fetch(ASSISTANT_ENDPOINT, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ messages: history }),
+        });
+      } catch (e) {
+        throw new Error(UNREACHABLE);
+      }
+      // Not always JSON: a proxy or Cloudflare itself can answer with a page.
+      var data = null;
+      try { data = await res.json(); } catch (e) { /* reported below */ }
+      // Refused for the day. The Worker says so in words; the badge should
+      // agree rather than go on offering questions that will be refused.
+      if (res.status === 429) {
+        writeUsed(capNow());
+        renderLimit();
+      }
+      if (!res.ok || !data) {
+        throw new Error(data && data.error ? data.error
+          : "The question service is not answering right now. Please try again later.");
+      }
       // The Worker's count is the real one. Whenever it reports, this browser's
       // running tally is set to match rather than being trusted over it.
       // The reply carries the model that actually served it, so the panel can
@@ -618,6 +661,7 @@ var MODEL_LABEL = "Claude Sonnet 5";
         lastLimit = data._limit;
         if (typeof lastLimit.remaining === "number") {
           writeUsed((lastLimit.cap || DAILY_CAP) - lastLimit.remaining);
+          workerCounts++;
           renderLimit();
         }
       }
@@ -682,17 +726,26 @@ var MODEL_LABEL = "Claude Sonnet 5";
 
     var log = document.createElement("div");
     log.id = "ai-log";
+    // A log, so an answer arriving after "Reading the data..." is read out
+    // rather than appearing silently below whatever has focus.
+    log.setAttribute("role", "log");
+    log.setAttribute("aria-live", "polite");
+    log.setAttribute("aria-label", "Conversation");
 
     // One opening message, not three stacked notices. It carries the reason
     // for the cap as well, so the count in the header can be just a count.
+    // It also says where a question goes, because "read from your browser" on
+    // its own invites the belief that nothing leaves it.
     var intro = document.createElement("div");
     intro.className = "ai-msg ai-bot";
     intro.textContent = "Ask about any ward or borough on the map. Every figure " +
       "in an answer is read from the data already loaded in your browser, so " +
-      "nothing is uploaded and no number is written from memory. This is a free " +
-      "service with running costs, so questions are limited to " + DAILY_CAP +
-      " a day per person. If it asks you to narrow something down, your answer " +
-      "to that is free. The map itself is unlimited.";
+      "no number is written from memory. Your question, and the figures looked " +
+      "up to answer it, are sent through this site's server to Anthropic, " +
+      "whose Claude model writes the reply. This is a free service with " +
+      "running costs, so questions are limited to " + DAILY_CAP + " a day per " +
+      "person. If it asks you to narrow something down, your answer to that is " +
+      "free. The map itself is unlimited.";
     log.appendChild(intro);
 
     var chips = document.createElement("div");
@@ -713,6 +766,9 @@ var MODEL_LABEL = "Claude Sonnet 5";
     input.id = "ai-input";
     input.autocomplete = "off";
     input.placeholder = "Ask a question about the data...";
+    // A placeholder is not a name: it is gone once anyone types.
+    input.setAttribute("aria-label", "Your question about the data");
+    input.setAttribute("aria-describedby", "ai-caution");
     var send = document.createElement("button");
     send.type = "submit";
     send.id = "ai-send";
@@ -726,10 +782,25 @@ var MODEL_LABEL = "Claude Sonnet 5";
     // the log: at the top it was read once, before there was anything to
     // verify, and then scrolled away above every answer it applied to. At the
     // bottom it stays beside them.
+    //
+    // The personal data warning goes first, beside the box it is about, and
+    // the input is described by this line so a screen reader hears it too.
+    // The privacy link opens a new tab so following it does not lose the
+    // conversation.
     var caution = document.createElement("div");
     caution.className = "ai-caution";
-    caution.textContent = "AI generated output should be independently verified "
-      + "before making any decisions.";
+    caution.id = "ai-caution";
+    var warn = document.createElement("strong");
+    warn.textContent = "Please do not enter patient or personal information.";
+    var privacy = document.createElement("a");
+    privacy.href = "privacy.html#ask";
+    privacy.target = "_blank";
+    privacy.rel = "noopener";
+    privacy.textContent = "About and privacy";
+    caution.appendChild(warn);
+    caution.appendChild(document.createTextNode(" AI generated output should be "
+      + "independently verified before making any decisions. "));
+    caution.appendChild(privacy);
 
     // Which model wrote the sentence, named on the page rather than left to be
     // guessed. Read from the Worker's reply when it says so, and falling back
@@ -763,23 +834,25 @@ var MODEL_LABEL = "Claude Sonnet 5";
       send.disabled = true;
       if (chips.parentNode) chips.parentNode.removeChild(chips);
       add("ai-user", q);
-      // Count it down as it is spent, not once the answer arrives. The Worker
-      // counts the question when it receives it, so this is when it is gone.
-      // Unless it is the free reply to a clarification the assistant asked, in
-      // which case nothing is spent and the counter should not flinch.
-      if (!nextMessageIsFree()) {
-        writeUsed(readUsed() + 1);
-        renderLimit();
-      }
+      // Settled before the question joins the history: the free reply to a
+      // clarification the assistant asked costs nothing.
+      var free = nextMessageIsFree();
+      var countsBefore = workerCounts;
       var thinking = add("ai-bot ai-thinking", "Reading the data...");
       try {
         var answer = await ask(q);
         thinking.className = "ai-msg ai-bot";
         thinking.innerHTML = render(answer);
+        // Counted once answered, as the Worker counts it. When the Worker sent
+        // its own figure that has already been written; this covers a reply
+        // that carried none.
+        if (!free && workerCounts === countsBefore) writeUsed(readUsed() + 1);
         renderLimit();
       } catch (err) {
         thinking.className = "ai-msg ai-bot ai-error";
         thinking.textContent = (err && err.message) ? err.message : "Something went wrong.";
+        // Back in the box, so trying again is one press rather than retyping.
+        if (!input.value) input.value = q;
       } finally {
         busy = false;
         send.disabled = false;
@@ -812,10 +885,15 @@ var MODEL_LABEL = "Claude Sonnet 5";
 
     var panel = document.createElement("div");
     panel.id = "ai-panel";
+    // A named region, so it is listed as a landmark and announced by name
+    // when focus moves into it.
+    panel.setAttribute("role", "region");
+    panel.setAttribute("aria-labelledby", "ai-title");
 
     var head = document.createElement("div");
     head.id = "ai-head";
     var heading = document.createElement("span");
+    heading.id = "ai-title";
     heading.textContent = "Ask about this data";
     var close = document.createElement("button");
     close.id = "ai-close";
