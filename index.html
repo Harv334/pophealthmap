@@ -3146,6 +3146,9 @@ var LOADER_MAP = {w:1000,h:771,n:704,d:'IAAAAAAAAAAAAAJAAIAAFAAAIDFEECDGGCFDCCIC
 // rather than pinned to a stale token: worst case is the previous default
 // caching behaviour, never a permanently stuck copy.
 let DATA_VERSION = '';
+// The same refresh as a YYYY-MM-DD date, for the things that leave the page
+// and have to say which data they hold: export filenames and report footers.
+let DATA_DATE = '';
 let _manifestPromise = null;
 
 function loadManifest() {
@@ -3154,7 +3157,10 @@ function loadManifest() {
     .then(r => (r.ok ? r.json() : null))
     .catch(() => null)
     .then(m => {
-      if (m && m.last_run) DATA_VERSION = encodeURIComponent(m.last_run);
+      if (m && m.last_run) {
+        DATA_VERSION = encodeURIComponent(m.last_run);
+        DATA_DATE = String(m.last_run).slice(0, 10);
+      }
       return m;
     });
   return _manifestPromise;
@@ -5614,6 +5620,9 @@ function ensureWardDetail() {
 let wLyr = null, selW = null, curOv = 'none';
 let WARD_DATA = {};
 let WARD_DATA_BY_CODE = {};
+// The ward file's metadata block: crime and claimant periods and the source
+// of each figure, written by the pipeline on every refresh.
+let WARD_META = {};
 // focusedBorough is hoisted near the top of the script (see `var focusedBorough`)
 // so boroughL / wardBoundaryLyr style callbacks can read it at construction time.
 
@@ -5954,6 +5963,74 @@ window.deselectLSOA = function() {
   const vsd = document.getElementById('vs-digest');
   if (vsd) vsd.textContent = 'All of London';
 };
+
+/* What a printed report credits.
+
+   A report is the copy most likely to be read away from the map, so it has
+   to say where its figures came from and when. Publishers and periods are
+   read from the metadata the pipeline writes into the ward data on each
+   refresh, so the crime period named is the one the chart counts. A report
+   passes the keys for what it shows, and only those are credited.
+
+   The point layers have no entry in that metadata. Each comes from a single
+   register, named here as its layer in the sidebar names it. */
+const REPORT_CREDITS = {
+  census:       { meta: 'census',       use: 'Demographics, health and work' },
+  imd:          { meta: 'imd',          use: 'Deprivation and Core20' },
+  crime:        { meta: 'crime',        use: 'Recorded crime', period: 'crime_period' },
+  fuel_poverty: { meta: 'fuel_poverty', use: 'Fuel poverty' },
+  claimant:     { meta: 'claimant',     use: 'Claimant rate' },
+  health:       { meta: 'health_msoa',  use: 'Health outcomes' },
+  greenblue:    { ov: 'gb_commitment_pct', use: 'Green and blue space' },
+  gp:           { meta: 'gp',           use: 'GP practices' },
+  pharmacy:     { meta: 'pharmacy',     use: 'Pharmacies' },
+  dental:       { meta: 'dental',       use: 'Dental practices' },
+  hospitals:    { name: 'NHS ODS trust sites register',     use: 'Hospitals' },
+  culture:      { name: 'GLA Cultural Infrastructure Map',  use: 'Culture and creative spaces' },
+  vcse:         { name: 'Charity Commission register',      use: 'VCSE organisations' },
+};
+function reportCredits(keys) {
+  const src = (WARD_META && WARD_META.sources) || {};
+  return keys.map(k => {
+    const c = REPORT_CREDITS[k];
+    if (!c) return '';
+    let who = c.name || (c.meta ? src[c.meta] : '') || '';
+    let when = c.period ? (WARD_META[c.period] || '') : '';
+    if (c.ov && OV_META[c.ov]) {
+      who = OV_META[c.ov].src || who;
+      when = OV_META[c.ov].yr || when;
+    }
+    // A figure the pipeline recorded no source for is not credited to a guess.
+    return who ? c.use + (when ? ', ' + when : '') + ': ' + who : '';
+  }).filter(Boolean);
+}
+// The crime period for a heading, falling back to the same words the sidebar
+// uses when the metadata does not carry one.
+function reportCrimePeriod() {
+  return (WARD_META && WARD_META.crime_period) || 'latest 12 months';
+}
+// The closing lines every report carries: when the data was refreshed, where
+// it came from, and the licence most of it is published under.
+function reportProvenanceHtml() {
+  let when = '';
+  if (DATA_DATE) {
+    const d = new Date(DATA_DATE + 'T00:00:00Z');
+    if (!isNaN(d.getTime())) {
+      when = 'Data updated ' + d.toLocaleDateString('en-GB',
+        { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }) + '. ';
+    }
+  }
+  return '<div style="margin-top:6px">' + when +
+    'Made with PopHealth Map, <a href="https://pophealth.uk">https://pophealth.uk</a>. ' +
+    'Contains public sector information licensed under the Open Government Licence v3.0.</div>';
+}
+/* "Where this area sits in London" as a percentile. The share of areas below
+   it runs from 0 to 100, and P0 or P100 reads as off the scale or as a
+   mistake. Percentiles are cut points between 1 and 99, so the caption is
+   held to that range; the tick on the bar still sits at the true position. */
+function pctileCaption(p) {
+  return 'P' + Math.min(99, Math.max(1, Math.round(p))) + ' in London';
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // WARD REPORT — opens a standalone, printable HTML report in a new window
@@ -6369,7 +6446,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
       <div class="kpi-ctx-bar" style="background:linear-gradient(90deg,${left},#e4e4de,${right})">
         <div class="kpi-ctx-tick" style="left:${pctile}%"></div>
       </div>
-      <div class="kpi-ctx-cap">P${pctile} in London</div>
+      <div class="kpi-ctx-cap">${pctileCaption(pctile)}</div>
     </div>`;
   };
 
@@ -6779,7 +6856,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
     ${crimeRows.length ? `<div class="section-h">Crime — last 12 months${crimeTotal != null ? ` · total ${Math.round(crimeTotal).toLocaleString()}` : ''}</div>
     <div class="row">
       <div class="panel" style="flex:1">
-        <h3>MPS recorded crime — Apr 2025 to Mar 2026</h3>
+        <h3>MPS recorded crime, ${_esc(reportCrimePeriod())}</h3>
         ${crimeSVG}
         <div class="legend"><span class="legend-tick"></span> London median · sorted by ward count · source: data.police.uk street-level crime</div>
       </div>
@@ -6801,8 +6878,9 @@ function _generateWardReport(_reportWindow, wn, opts) {
   </div>
 
   <div class="footer">
-    <strong>Data sources:</strong> ONS Census 2021 (demographics, health, household language, travel-to-work) · MHCLG Indices of Deprivation 2025, mid-2022 population-weighted · data.police.uk street-level crime (crime, Apr 2025 – Mar 2026) · DESNZ LILEE (fuel poverty) · NOMIS / DWP (claimant count, working-age) · NHS Digital ODS (GP, pharmacy, dental practice registers) · DfE GIAS (schools) · GLA ESOL Planning Map (community centres, libraries, formal ESOL providers).
+    <strong>Data sources:</strong> ${reportCredits(['census', 'imd', crimeRows.length ? 'crime' : '', 'fuel_poverty', 'claimant', 'gp', 'pharmacy', 'dental', 'hospitals', 'culture', 'vcse']).map(_esc).join(' · ')}.
     <div style="margin-top:6px">Service counts use a spatial test against the ward polygon (hospitals, dental, pharmacies, culture, VCSE). GP and pharmacy counts come from the ward indicator. &quot;vs London median&quot; bars use the median across every London ward that has a figure for that indicator — ${_ALL_WARDS.length.toLocaleString()} wards are on the map, and an indicator published at a coarser geography, or missing for the City, is compared against fewer. &quot;London percentile&quot; = % of those wards below this one.</div>
+    ${reportProvenanceHtml()}
   </div>
 </div>
 <div class="actions">
@@ -8706,6 +8784,10 @@ window.generateLSOAReport = function(code) {
     { l:'Blue space ≤15min',       v: _fmt(inds.blue_commitment_pct),     c:'#0288D1' },
   ];
   const greenSVG = _chartHbar(greenRows, { width: 380, padL: 150, max: 100, dp: 0, unit: '%' });
+  // Named from the indicator's own metadata, the same entry the map's info
+  // panel reads, so the chart and the map credit one publisher.
+  const _gbMeta = OV_META.gb_commitment_pct || {};
+  const _gbSource = [_gbMeta.src, 'LSOA', _gbMeta.yr].filter(Boolean).join(', ');
 
   // ── Locations block helper ──
   function _locBlock(title, items, fmt, extra) {
@@ -8733,7 +8815,7 @@ window.generateLSOAReport = function(code) {
       <div class="kpi-ctx-bar" style="background:linear-gradient(90deg,${left},#e4e4de,${right})">
         <div class="kpi-ctx-tick" style="left:${pctile}%"></div>
       </div>
-      <div class="kpi-ctx-cap">P${pctile} in London</div>
+      <div class="kpi-ctx-cap">${pctileCaption(pctile)}</div>
     </div>`;
   };
 
@@ -8951,14 +9033,14 @@ window.generateLSOAReport = function(code) {
       <div class="panel" style="flex:1">
         <h3>% of UPRNs within walking distance of qualifying greenspace</h3>
         ${greenSVG}
-        <div class="legend">Source: Defra ANGSt / Friends of the Earth (LSOA, 2023)</div>
+        <div class="legend">Source: ${_esc(_gbSource)}</div>
       </div>
     </div>
 
     ${crimeRows.length ? `<div class="section-h">Crime — last 12 months${crimeTotal != null ? ` · total ${Math.round(crimeTotal).toLocaleString()}` : ''}</div>
     <div class="row">
       <div class="panel" style="flex:1">
-        <h3>MPS recorded crime — Apr 2025 to Mar 2026</h3>
+        <h3>MPS recorded crime, ${_esc(reportCrimePeriod())}</h3>
         ${crimeSVG}
         <div class="legend"><span class="legend-tick"></span> London LSOA median · sorted by this LSOA's count · sexual offences not published at LSOA level</div>
       </div>
@@ -8979,8 +9061,9 @@ window.generateLSOAReport = function(code) {
   </div>
 
   <div class="footer">
-    <strong>Data sources:</strong> MHCLG Indices of Deprivation 2025 (LSOA-level, all 7 domains) · ONS Census 2021 (NOMIS topic-summary tables) · data.police.uk street-level crime (crime, Apr 2025 – Mar 2026, 10 categories at LSOA level — sexual offences not published) · DESNZ LILEE (fuel poverty) · NOMIS / DWP (claimant rate) · Defra ANGSt / Friends of the Earth (green &amp; blue space, 2023) · NHS Digital ODS, GLA ESOL Planning Map, DfE GIAS (services).
+    <strong>Data sources:</strong> ${reportCredits(['imd', 'census', crimeRows.length ? 'crime' : '', 'fuel_poverty', 'claimant', 'greenblue', 'gp', 'pharmacy', 'dental', 'hospitals', 'culture', 'vcse']).map(_esc).join(' · ')}.
     <div style="margin-top:6px">Service counts use spatial point-in-polygon test against this LSOA's boundary. &quot;vs London median&quot; bars compute against every London LSOA that has a figure for that indicator, out of ${_ALL_LSOAS.length.toLocaleString()} on the map.</div>
+    ${reportProvenanceHtml()}
   </div>
 </div>
 <div class="actions">
@@ -11726,6 +11809,8 @@ async function loadData() {
 
     const meta     = json.metadata || {};
     const dateStr  = meta.generated || '';
+    WARD_META = meta;
+    if (!DATA_DATE && dateStr) DATA_DATE = String(dateStr).slice(0, 10);
 
     // The bar carries the freshness date and nothing else now. The source list
     // is being given a proper home, and the data-point count was a measure of
@@ -13127,6 +13212,11 @@ var PH_SHOW = {
     return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
   }
   function download(filename, text, mime) {
+    // Every file this page writes carries the date of the data in its name,
+    // so two downloads either side of a monthly refresh neither overwrite each
+    // other nor pass for the same figures. The file itself stays one header
+    // row and data, so it opens and joins without editing.
+    if (DATA_DATE) filename = filename.replace(/(\.[A-Za-z0-9]+)?$/, '-' + DATA_DATE + '$1');
     var blob = new Blob([text], { type: mime || 'text/plain;charset=utf-8' });
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
@@ -13752,29 +13842,56 @@ var PH_SHOW = {
     wardsOf: cmpWardsOf,
   };
 
+  // The official code for a pinned area: E01 for an LSOA, E05 for a ward,
+  // E09 for a borough. The boards are not coded in the data here.
+  function cmpCode(name) {
+    if (cmpLevel === 'lsoa') return name;
+    if (cmpLevel === 'ward') return (wardRec(name) || {}).code || '';
+    if (cmpLevel === 'borough') {
+      return LAD_NAME_TO_CODE[name] ||
+        LAD_NAME_TO_CODE[name === 'City of Westminster' ? 'Westminster' : name] || '';
+    }
+    return '';
+  }
+  /* One row per pinned area, laid out as every other file the page writes is,
+     so a comparison can be joined on its code column to anything else that
+     uses the same geography. Units ride in the column headings. */
   function cmpCsv() {
     var lvl = cmpLvl();
     if (!pinned.length) { alert('Pin at least one ' + lvl.one + ' first.'); return; }
     var mets = cmpActive();
-    var lines = [['indicator', 'unit'].concat(pinned.map(cmpAreaLabel)).map(csvCell).join(',')];
-    mets.forEach(function (m) {
-      lines.push([labelOf(m.k), unitOf(m.k)].concat(pinned.map(function (n) {
-        var v = num(cmpIndsOf(n)[m.k]);
-        return v === null ? '' : v;
-      })).map(csvCell).join(','));
+    var added = (cmpLevel === 'borough' || cmpLevel === 'icb');
+    var head = ['code', 'name'];
+    if (cmpLevel === 'lsoa') head.push('ward');
+    if (!added) head.push('borough');
+    // Above a ward the figures are added up, and the file says from how many
+    // wards and by what rule, which a spreadsheet away from this page has no
+    // other way of recording.
+    if (added) head.push('wards counted', 'method');
+    head = head.concat(mets.map(function (m) {
+      // Most labels already carry their unit ("Bad/very bad health (%)").
+      var l = labelOf(m.k), u = unitOf(m.k);
+      return l + (u && l.toLowerCase().indexOf(u.toLowerCase()) === -1 ? ' (' + u + ')' : '');
+    }));
+    var lines = [head.map(csvCell).join(',')];
+    pinned.forEach(function (n) {
+      var row = [cmpCode(n), cmpAreaLabel(n)];
+      if (cmpLevel === 'lsoa') {
+        var p = (lsoaFeat(n) || {}).properties || {};
+        row.push(p.ward || '', p.borough || '');
+      } else if (cmpLevel === 'ward') {
+        row.push((wardRec(n) || {}).lad || '');
+      } else {
+        row.push(cmpWardsOf(n).length, 'summed for counts, population-weighted otherwise');
+      }
+      var inds = cmpIndsOf(n);
+      mets.forEach(function (m) {
+        var v = num(inds[m.k]);
+        row.push(v === null ? '' : v);
+      });
+      lines.push(row.map(csvCell).join(','));
     });
-    // At ward level this names the borough each one is in. Above it, the row
-    // says what the figures were added up from, which is the thing a
-    // spreadsheet away from this page has no other way of recording.
-    lines.push([cmpLevel === 'ward' ? 'borough' : 'wards counted', ''].concat(pinned.map(function (n) {
-      return cmpLevel === 'ward' ? ((wardRec(n) || {}).lad || '') : cmpWardsOf(n).length;
-    })).map(csvCell).join(','));
-    if (cmpLevel !== 'ward') {
-      lines.push(['method', ''].concat(pinned.map(function () {
-        return 'summed for counts, population-weighted otherwise';
-      })).map(csvCell).join(','));
-    }
-    download(lvl.one + '-comparison.csv', lines.join('\n'), 'text/csv;charset=utf-8');
+    download('pophealth-' + lvl.one + '-comparison.csv', lines.join('\n'), 'text/csv;charset=utf-8');
   }
 
   /* ─────────────────────────────────────────────────────────────────────────
@@ -14945,13 +15062,14 @@ var PH_SHOW = {
   var _rbProps = null;
   function rbProps(code) {
     if (!_rbProps) {
+      // Not cached until the boundaries are here, or an early call would fix
+      // every LSOA as nameless for the rest of the session.
+      if (typeof LSOA_IMD === 'undefined' || !LSOA_IMD || !LSOA_IMD.features) return {};
       _rbProps = {};
-      if (typeof LSOA_IMD !== 'undefined' && LSOA_IMD.features) {
-        LSOA_IMD.features.forEach(function (f) {
-          var p = f.properties || {};
-          if (p.code) _rbProps[p.code] = p;
-        });
-      }
+      LSOA_IMD.features.forEach(function (f) {
+        var p = f.properties || {};
+        if (p.code) _rbProps[p.code] = p;
+      });
     }
     return _rbProps[code] || {};
   }
@@ -15249,9 +15367,13 @@ var PH_SHOW = {
       '<th>How it was combined</th></tr>' + rows + '</table>' +
       '<h2>LSOAs included</h2><table><tr><th>LSOA</th><th>Name</th><th>Ward</th>' +
       '<th>Borough</th><th>Population</th></tr>' + list + '</table>' +
-      '<h2>Source</h2><p style="color:var(--ink-2);font-size:var(--t-sm)">Built with PopHealth Map, ' +
-      'pophealth.uk. Figures are the same ones the map draws; see the methodology page ' +
-      'for where each comes from and what it cannot tell you.</p>' +
+      // Absolute, so the link still leads somewhere from a copy of this page
+      // saved to disk or printed.
+      '<h2>Source</h2><p style="color:var(--ink-2);font-size:var(--t-sm)">Figures are the ' +
+      'same ones the map draws; see the <a href="' +
+      esc(new URL('methodology.html', location.href).href) + '" target="_blank" rel="noopener">' +
+      'methodology page</a> for where each comes from and what it cannot tell you.</p>' +
+      reportProvenanceHtml() +
       '</div><div class="actions">' +
       '<button onclick="window.print()">Print or save as PDF</button>' +
       '<button class="s" onclick="window.close()">Close</button></div></body></html>';
@@ -15277,11 +15399,14 @@ var PH_SHOW = {
      ───────────────────────────────────────────────────────────────────────── */
   var cbPane = $('tab-csv');
   var cbLevel = 'ward';
-  /* True while lsoa_data.json is on its way. Ward, borough and MSOA figures
-     are all in memory by the time this pane can be opened; the LSOA ones are
-     7.8 MB and are fetched only when something asks. Nothing here asked, so
-     picking LSOA offered a file of nought rows for the rest of the session. */
-  var _cbLsoaPending = false;
+  /* Levels still waiting on a fetch, keyed by level. Ward and borough are in
+     memory by the time this pane can be opened. LSOA figures are 7.8 MB and
+     MSOA figures 600 KB, and the names, wards and boroughs for both are on
+     their boundary files; all of these are fetched only when something asks.
+     Until the figures and the names have both landed a row would carry its
+     code where its name belongs, or not be counted at all, so the pane says
+     it is waiting instead of offering that file. */
+  var _cbPending = {};
   var cbScope = '';
   var cbCols = {};          // indicator key -> true
   var cbOpenGroups = {};
@@ -15301,37 +15426,55 @@ var PH_SHOW = {
   }
   function cbInds(rec) { return (rec && (rec.indicators || rec)) || {}; }
 
-  // Names and parents differ by level, and only the ward records carry them
-  // inline. The rest are looked up from the boundary features, the same way
-  // Custom area does it.
-  function cbLabels(code, rec) {
+  /* The GSS code, name and parents of one row. The code column is what a
+     file is joined on elsewhere, so it is always the official code (E05 ward,
+     E01 LSOA, E02 MSOA, E09 borough) and never a name standing in for one.
+     WARD_DATA is keyed by the ward's map name and carries its code inline;
+     the other levels are keyed by code and carry no labels, so their names
+     come from the boundary files. */
+  function cbLabels(key, rec) {
     if (cbLevel === 'ward') {
-      return { name: (rec && rec.name) || code, parent: (rec && rec.lad) || '' };
+      return { code: (rec && rec.code) || '', name: (rec && rec.name) || key,
+               parent: (rec && rec.lad) || '' };
     }
-    if (cbLevel === 'borough') return { name: (rec && rec.name) || code, parent: '' };
+    if (cbLevel === 'borough') return { code: key, name: cbBoroughName(key), parent: '' };
     if (cbLevel === 'lsoa') {
-      var p = rbProps(code);
-      return { name: p.name || code, parent: p.borough || '', ward: p.ward || '' };
+      var p = rbProps(key);
+      return { code: key, name: p.name || '', parent: p.borough || '', ward: p.ward || '' };
     }
-    var mp = cbMsoaProps(code);
-    return { name: mp.name || code, parent: mp.borough || '' };
+    var mp = cbMsoaProps(key);
+    return { code: key, name: mp.name || '', parent: mp.borough || '' };
   }
+  // From boroughs.js, which names each borough as its ward and LSOA records
+  // do, so a borough reads the same in every file this pane writes.
+  var _cbBoroughs = null;
+  function cbBoroughName(code) {
+    if (!_cbBoroughs) {
+      _cbBoroughs = {};
+      ((typeof BOROUGH_GJ !== 'undefined' && BOROUGH_GJ.features) || []).forEach(function (f) {
+        var p = f.properties || {};
+        if (p.LAD25CD && p.name) _cbBoroughs[p.LAD25CD] = p.name;
+      });
+    }
+    return _cbBoroughs[code] || '';
+  }
+  // MSOA names are on the boundary file, which setCsvLevel loads. The borough
+  // is the name less its number, read the way the map reads it (msoaLad).
   var _cbMsoa = null;
   function cbMsoaProps(code) {
     if (!_cbMsoa) {
+      if (typeof msoaLyr === 'undefined' || !msoaLyr) return {};
       _cbMsoa = {};
-      // msoaLyr is loaded on demand, so this may legitimately be empty. The
-      // MSOA name is in the record when the layer has not been fetched.
-      var src = (typeof MSOA_DATA !== 'undefined' && MSOA_DATA) || {};
-      Object.keys(src).forEach(function (k) {
-        _cbMsoa[k] = { name: (src[k] && src[k].name) || k,
-                       borough: (src[k] && (src[k].lad || src[k].borough)) || '' };
+      msoaLyr.eachLayer(function (l) {
+        var p = (l.feature && l.feature.properties) || {};
+        if (p.code) _cbMsoa[p.code] = { name: p.name || '', borough: msoaLad(l.feature) };
       });
     }
     return _cbMsoa[code] || {};
   }
 
   function cbRows() {
+    if (_cbPending[cbLevel]) return [];
     var src = cbSource();
     var codes = Object.keys(src);
     if (cbScope && cbLevel !== 'borough') {
@@ -15340,8 +15483,10 @@ var PH_SHOW = {
         return scopeMatchesLad(cbScope, l.parent);
       });
     } else if (cbScope && cbLevel === 'borough') {
+      // A borough is its own scope, so it is matched on its name. The record
+      // is keyed by its E09 code, which no scope value ever equals.
       codes = codes.filter(function (c) {
-        return scopeMatchesLad(cbScope, (src[c] && src[c].name) || c);
+        return scopeMatchesLad(cbScope, cbBoroughName(c));
       });
     }
     return codes.sort(function (a, b) {
@@ -15437,13 +15582,16 @@ var PH_SHOW = {
           (dropped.length > 1 ? ' are' : ' is') + ' not published for ' + esc(lv.plural) +
           ', so ' + (dropped.length > 1 ? 'they have' : 'it has') + ' been removed.</span>'
         : '') +
-      (_cbLsoaPending && cbLevel === 'lsoa'
+      (_cbPending[cbLevel]
         /* There is no honest count to give yet. cbRows would say nought, of
            4,994, and it said exactly that: "The file will have 0 LSOAs and 0
            figures". Say what is happening instead of stating a figure that is
            only true for as long as the fetch takes. */
-        ? 'Fetching the LSOA figures. They are 7.8 MB and are not loaded until ' +
-          'something asks for them, so this fills in when they land.'
+        ? (cbLevel === 'lsoa'
+            ? 'Fetching the LSOA figures and boundaries. The figures are 7.8 MB and ' +
+              'are not loaded until something asks for them, so this fills in when they land.'
+            : 'Fetching the MSOA figures and names. They are not loaded until ' +
+              'something asks for them, so this fills in when they land.')
         : 'The file will have <strong>' + n.toLocaleString() + '</strong> ' +
           esc(n === 1 ? lv.label : lv.plural) + ' and <strong>' + chosen + '</strong> figure' +
           (chosen === 1 ? '' : 's') + '. Each figure is a stored value for that area. ' +
@@ -15466,7 +15614,7 @@ var PH_SHOW = {
     var lines = [head.map(csvCell).join(',')];
     codes.forEach(function (c) {
       var rec = src[c], l = cbLabels(c, rec), i = cbInds(rec);
-      var row = [c, l.name];
+      var row = [l.code, l.name];
       if (cbLevel === 'lsoa') row.push(l.ward || '');
       if (cbLevel !== 'borough') row.push(l.parent || '');
       cols.forEach(function (k) {
@@ -15478,37 +15626,43 @@ var PH_SHOW = {
     return { text: lines.join('\n'), rows: codes.length, cols: cols.length, header: head };
   }
 
-  /* Every route to a new export level goes through here, so the one level that
+  /* Every route to a new export level goes through here, so a level that
      needs a fetch cannot be reached without it.
 
-     Only LSOA does. Ward, borough and MSOA figures all arrive during loadData,
-     but lsoa_data.json is 7.8 MB and was taken off the critical path, and
-     cbSource returns an empty object while it is missing. Choosing LSOA
-     therefore offered a file of nought rows, said so in the panel, and stayed
-     that way: nothing in this pane ever asked for the file. */
+     Ward and borough figures and names arrive during loadData and boroughs.js.
+     LSOA and MSOA need two files each, both off the critical path: the figures
+     (lsoa_data.json, msoa_data.json) and the boundaries, which are where their
+     names, wards and boroughs live (lsoa_imd.js, msoa_boundaries.json). With
+     the figures alone a row has no name, ward or borough, and a borough or
+     board scope matches nothing, so the level waits for both. */
+  function cbLevelReady(l) {
+    if (l === 'lsoa') {
+      return !!(typeof LSOA_DATA === 'object' && LSOA_DATA && Object.keys(LSOA_DATA).length &&
+                typeof LSOA_IMD !== 'undefined' && LSOA_IMD && LSOA_IMD.features);
+    }
+    if (l === 'msoa') return !!(Object.keys(MSOA_DATA).length && msoaLyr);
+    return true;
+  }
   function setCsvLevel(l) {
     cbLevel = l;
     _cbMsoa = null;
-    if (l === 'msoa' && typeof ensureMsoaData === 'function' &&
-        !Object.keys(MSOA_DATA).length) {
-      ensureMsoaData().then(function () {
-        _cbMsoa = null;
-        if (cbLevel === 'msoa') renderCsvPane();
-      });
-    }
-    var need = (l === 'lsoa') &&
-      !(typeof LSOA_DATA === 'object' && LSOA_DATA && Object.keys(LSOA_DATA).length);
-    _cbLsoaPending = need;
+    _cbPending[l] = !cbLevelReady(l);
     renderCsvPane();
-    if (need && typeof ensureLsoaData === 'function') {
-      ensureLsoaData().then(function () {
-        _cbLsoaPending = false;
-        // Only if the reader is still on this level. They can pick another
-        // while 7.8 MB is in flight, and repainting the pane under them would
-        // undo the choice they just made.
-        if (cbLevel === 'lsoa') renderCsvPane();
-      });
-    }
+    if (!_cbPending[l]) return;
+    var loads = (l === 'lsoa')
+      ? [ensureLsoaData(), ensureLsoaImd()]
+      : [ensureMsoaData(), loadMsoaBoundaries()];
+    // The loaders resolve null on failure rather than reject, so this always
+    // settles, and a level whose files never came stops waiting and says so
+    // with a count of nought rather than waiting for ever.
+    Promise.all(loads).then(function () {
+      _cbPending[l] = false;
+      _cbMsoa = null;
+      // Only if the reader is still on this level. They can pick another
+      // while 7.8 MB is in flight, and repainting the pane under them would
+      // undo the choice they just made.
+      if (cbLevel === l) renderCsvPane();
+    });
   }
 
   if (cbPane) {
@@ -15542,12 +15696,14 @@ var PH_SHOW = {
     });
     $('cb-download').addEventListener('click', function () {
       if (!Object.keys(cbCols).length) { alert('Choose at least one figure first.'); return; }
+      if (_cbPending[cbLevel]) { alert('Still fetching the ' + CB_LEVELS[cbLevel].label + ' figures. Try again in a moment.'); return; }
       var out = cbBuild();
       var nm = 'pophealth-' + cbLevel + (cbScope ? '-' + cbScope.replace(/[^A-Za-z0-9]+/g, '-') : '');
       download(nm.toLowerCase() + '.csv', out.text, 'text/csv;charset=utf-8');
     });
     $('cb-preview').addEventListener('click', function () {
       if (!Object.keys(cbCols).length) { alert('Choose at least one figure first.'); return; }
+      if (_cbPending[cbLevel]) { alert('Still fetching the ' + CB_LEVELS[cbLevel].label + ' figures. Try again in a moment.'); return; }
       var out = cbBuild();
       var rows = out.text.split('\n').slice(0, 11);
       var w = window.open('', '_blank');
@@ -15941,7 +16097,7 @@ var PH_SHOW = {
 
         q.services.forEach(function (id, si) { svcTotals[id] += (maps[si][w.name] || 0); });
         rows.push({
-          name: w.name, lad: w.lad,
+          name: w.name, code: w.code, lad: w.lad,
           sortVal: num(w.inds[q.sort]),
           counts: q.services.map(function (id, si) { return maps[si][w.name] || 0; }),
         });
@@ -16077,14 +16233,16 @@ var PH_SHOW = {
     if (!rows || !rows.length) { alert('Run a query first.'); return; }
     var condKeys = q.conds.filter(function (c) { return c.key && c.value != null; })
                           .map(function (c) { return c.key; });
-    var header = ['ward', 'borough']
+    // The E05 code first: ward names repeat across boroughs, so the code is
+    // the only column another dataset can be joined on.
+    var header = ['code', 'ward', 'borough']
       .concat(q.services.map(function (id) { return serviceById(id).label; }))
       .concat([labelOf(q.sort)])
       .concat(condKeys.map(labelOf));
     var lines = [header.map(csvCell).join(',')];
     rows.forEach(function (r) {
       var inds = indsOf(r.name);
-      lines.push([r.name, r.lad].concat(r.counts)
+      lines.push([r.code || '', r.name, r.lad].concat(r.counts)
         .concat([r.sortVal == null ? '' : r.sortVal])
         .concat(condKeys.map(function (k) { var v = num(inds[k]); return v == null ? '' : v; }))
         .map(csvCell).join(','));
