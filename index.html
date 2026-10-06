@@ -4664,6 +4664,58 @@ const map = L.map('map', {
   center:[51.540,-0.300], zoom:10, zoomControl:true,
   zoomSnap: 0.25,
 });
+/* One hover label at a time, and none left behind by a drag.
+
+   Dragging the map used to strand area labels on screen, two or three at
+   once. The pane trails the cursor by a frame, so a drag crosses ward edges
+   and fires hovers. Leaflet holds each hover that lands mid-drag and replays
+   it on moveend, by which time the pointer has usually left that area and
+   its mouseout has already been and gone, so nothing ever closes the label.
+
+   So: the newest label closes the last one, a drag or zoom closes the open
+   one, a label opened mid-drag is shut at once, and a replayed one survives
+   only if the pointer really is over its area. Registered here, before any
+   layer exists, so this moveend listener runs ahead of the replays Leaflet
+   queues during a drag. The closes for the label being opened wait a
+   microtask, until Leaflet has finished adding it, and still land before
+   anything is painted. Labels opened by a tap or by keyboard focus outside
+   a drag are left alone. When the map comes to rest, the label for the
+   area under the pointer comes back if no replay has already shown it, as
+   it would have if the label had never gone. */
+(function () {
+  let openTip = null, replaying = false, resume = null;
+  map.on('tooltipopen', e => {
+    const t = e.tooltip;
+    const src = t._source;
+    const el = src && typeof src.getElement === 'function' && src.getElement();
+    const hovered = !!(el && el.matches(':hover'));
+    const dragging = map.dragging && map.dragging.moving();
+    // A stray is shut without touching the label that is showing, so a
+    // replay for an area the pointer has left cannot close the right one.
+    if (dragging || (replaying && !hovered)) {
+      if (dragging && hovered) resume = src;
+      queueMicrotask(() => map.closeTooltip(t));
+      return;
+    }
+    if (openTip && openTip !== t) map.closeTooltip(openTip);
+    openTip = t;
+  });
+  map.on('tooltipclose', e => { if (openTip === e.tooltip) openTip = null; });
+  map.on('dragstart zoomstart', () => {
+    if (openTip) { resume = openTip._source; map.closeTooltip(openTip); }
+  });
+  map.on('moveend', () => {
+    replaying = true;
+    setTimeout(() => {
+      replaying = false;
+      const src = resume;
+      resume = null;
+      if (openTip || !src || !src._map || !src.getTooltip()) return;
+      const el = typeof src.getElement === 'function' && src.getElement();
+      if (el && el.matches(':hover')) src.openTooltip(src.getTooltip().getLatLng() || undefined);
+    }, 0);
+  });
+})();
 // Carto Positron basemap — calm light-grey tiles that let choropleths do the
 // visual work. crossOrigin:'anonymous' is kept from the days of the canvas
 // exporter, which needed to read tile pixels; it costs nothing now and keeps
