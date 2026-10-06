@@ -7151,11 +7151,14 @@ function _generateWardReport(_reportWindow, wn, opts) {
         const clone = svg.cloneNode(true);
         if (!clone.getAttribute('xmlns')) clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
         if (!clone.getAttribute('xmlns:xlink')) clone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
-        const xml = '<?xml version="1.0" standalone="no"?>\n' +
+        // Doubled backslashes: this script is written out from inside a template
+        // literal, which would otherwise turn the newline escape into a real line
+        // break (a syntax error in the report) and the whitespace class into "s".
+        const xml = '<?xml version="1.0" standalone="no"?>\\n' +
                     new XMLSerializer().serializeToString(clone);
         const safe = (baseTitle + ' — ' + lbl)
           .replace(/[^A-Za-z0-9 ()&,_-]+/g, ' ')
-          .replace(/\s+/g, ' ')
+          .replace(/\\s+/g, ' ')
           .trim()
           .slice(0, 80) || 'chart';
         const blob = new Blob([xml], { type: 'image/svg+xml;charset=utf-8' });
@@ -9346,11 +9349,14 @@ window.generateLSOAReport = function(code) {
         const clone = svg.cloneNode(true);
         if (!clone.getAttribute('xmlns')) clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
         if (!clone.getAttribute('xmlns:xlink')) clone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
-        const xml = '<?xml version="1.0" standalone="no"?>\n' +
+        // Doubled backslashes: this script is written out from inside a template
+        // literal, which would otherwise turn the newline escape into a real line
+        // break (a syntax error in the report) and the whitespace class into "s".
+        const xml = '<?xml version="1.0" standalone="no"?>\\n' +
                     new XMLSerializer().serializeToString(clone);
         const safe = (baseTitle + ' — ' + lbl)
           .replace(/[^A-Za-z0-9 ()&,_-]+/g, ' ')
-          .replace(/\s+/g, ' ')
+          .replace(/\\s+/g, ' ')
           .trim()
           .slice(0, 80) || 'chart';
         const blob = new Blob([xml], { type: 'image/svg+xml;charset=utf-8' });

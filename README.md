@@ -24,7 +24,7 @@ shows a figure that was not published for that exact area:
 |---------------------|----------------------------------------------------|
 | `index.html`        | The map itself - Leaflet, deployed to GitHub Pages |
 | `data/map/`         | The map's data as classic scripts loaded before the app: ward and borough boundaries, LSOA IMD, GP practices, hospitals. Moved out of `index.html` in Phase 3.1, which took it from 1.77 MB to 486 KB. |
-| `data/map/assistant.js` | The AI question panel. Inert until `ASSISTANT_ENDPOINT` points at a deployed Worker. |
+| `data/map/assistant.js` | The Ask panel (AI questions). Talks to the Worker named in `ASSISTANT_ENDPOINT`; empty that to hide the panel. |
 | `worker/`           | Cloudflare Worker that proxies the Anthropic API. Holds the only secret in the project. See `worker/README.md`. |
 | `map_data.py`       | Reads `data/map/*.js` from Python. Use this rather than parsing `index.html`. |
 | `fetch_all_data.py` | One script. Downloads everything, builds the JSON the map reads, writes `data/map/`. |
@@ -129,14 +129,17 @@ To trigger one by hand, use **Run workflow** in the Actions tab, not
 The map has an optional question panel: ask for a comparison, a ranking or a
 summary of any ward or borough in plain English.
 
-The model never receives the dataset. It is given four tools, and the browser
-runs them against the JSON already loaded on the page, so every figure in an
-answer is the same number the map is drawing, nothing is uploaded, and the model
-cannot invent a statistic because it has none in its context.
+The model is not given the dataset up front. It is given four tools, and the
+browser runs them against the JSON already loaded on the page, so every figure in
+an answer is the same number the map is drawing. What does leave the browser is
+the question, the earlier turns of that conversation and the figures the tools
+return: they go to the Worker and on to Anthropic. The Worker also keeps a count
+of questions per IP address for the daily limit, deleted after 48 hours. The
+details users see are in `privacy.html`.
 
-It is off by default. `data/map/assistant.js` has an empty `ASSISTANT_ENDPOINT`
-and the panel does not render until that points at a deployed Worker, so the map
-works normally without it. See `worker/README.md` to deploy one.
+It is on for pophealth.uk: `data/map/assistant.js` sets `ASSISTANT_ENDPOINT` to the
+deployed Worker. Set it to an empty string and the panel does not render, and the
+map works normally without it. See `worker/README.md` to deploy a Worker.
 
 ## Hosting
 

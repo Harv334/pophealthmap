@@ -80,7 +80,16 @@ in favour of sources that refresh themselves.
 
 ## Personal data
 
-Nothing here is personal data. The organisation records (practices, pharmacies,
-charities) are published business contact details, and every statistical layer
-is aggregated to LSOA or ward level with the publishers' own disclosure control
-already applied.
+The statistical layers are not personal data: each is aggregated to LSOA, ward
+or borough level with the publishers' own disclosure control already applied.
+
+The organisation records (practices, pharmacies, charities) are published
+contact details, but a small charity's registered address is often a trustee's
+home. So for charities with income under £100,000, or none filed, the map drops
+the street address and shows only the postcode sector and borough, with the pin
+rounded to about 100 m (`_generalise_small_charity` in `fetch_all_data.py`).
+Larger charities keep the address the Charity Commission publishes.
+
+The site itself collects nothing about visitors. The Ask panel, postcode search
+and basemap tiles do send requests elsewhere; `privacy.html` sets out what each
+one sends and to whom.
