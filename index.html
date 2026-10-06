@@ -471,6 +471,17 @@
   .gpill-lsoa { background: var(--tint-amber); color: var(--tint-amber-ink); }
   .gpill-msoa { background: var(--nhs-light); color: var(--nhs-dark); }
   .gpill-la   { background: var(--tint-pink); color: #330072; }
+  /* Fingertips rows in the area profile: the period sits beside the pill and
+     the unit beside the figure, because the Local Health set mixes years,
+     rates and ratios under labels that name none of them. */
+  .sr-per { margin-left: 5px; color: var(--ink-3); white-space: nowrap; }
+  .sv-u { margin-left: 3px; color: var(--ink-3); font-weight: 400; font-family: Inter, system-ui, sans-serif; }
+  .sr-sub { margin: 10px 0 2px; font-size: var(--t-xs); font-weight: 600; color: var(--ink); }
+  .sr-sub-note { font-size: var(--t-xs); color: var(--ink-3); line-height: 1.45; margin-bottom: 2px; }
+  .sr-ctx { margin-top: 10px; padding: 6px 9px 2px; background: var(--paper-2);
+    border-left: 3px solid var(--tint-pink); border-radius: 0 5px 5px 0; }
+  .sr-ctx .sr-sub { margin-top: 0; }
+  .sr-ctx .sr:last-child { border-bottom: 0; }
   .data-note { margin-top: 10px; padding: 7px 10px; background: var(--paper-2); border-left: 3px solid var(--line); font-size: var(--t-xs); color: var(--ink-3); line-height: 1.5; border-radius: 0 5px 5px 0; }
   .data-note a { color: var(--nhs-blue); text-decoration: none; }
 
@@ -1136,7 +1147,11 @@
   @media (min-width: 1100px) {
     .ws-body { display: flex; align-items: flex-start; gap: 14px; }
     .ws-body .ws-insight { flex: 1 1 44%; min-width: 0; }
-    .ws-body .ws-strip { flex: 1 1 56%; margin-top: 0; min-width: 0; }
+    /* Eight figures as two rows of four. Auto-fit would pack five into a row
+       at 1366px with the rest hanging beneath, and cut labels to
+       "GP PRACTIC…" to make the five fit. */
+    .ws-body .ws-strip { flex: 1 1 56%; margin-top: 0; min-width: 0;
+      grid-template-columns: repeat(4, minmax(0, 1fr)); }
     .ws-body .ws-pins { flex: 1 1 100%; margin-top: 4px; }
   }
   .ws-insight { border-left: 3px solid var(--nhs-blue); background: var(--nhs-light);
@@ -5701,6 +5716,31 @@ function pillClass(g) {
   return 'gpill gpill-la';
 }
 
+/* The period a figure covers, as OV_META records it. "latest" and its
+   variants only say that some period applies, so they are not shown as one. */
+function ovPeriodOf(k) {
+  const m = (typeof OV_META === 'object' && OV_META) ? OV_META[k] : null;
+  const yr = (m && m.yr != null) ? String(m.yr).trim() : '';
+  return /^(latest|live|current)\b/i.test(yr) ? '' : yr;
+}
+
+/* The Local Health admissions and mortality series are standardised ratios:
+   England = 100, so 120 is a fifth more admissions or deaths than the ages of
+   the people living there would predict. The unit is accepted either named as
+   a ratio or as "per 100", the form the Local Health metadata gives, which
+   shown as a rate would say 159 deaths per 100 people. */
+function ovIsStdRatio(k) {
+  const m = (typeof OV_META === 'object' && OV_META) ? OV_META[k] : null;
+  const u = (m && m.u) ? String(m.u).trim().toLowerCase() : '';
+  return u === 'per 100' || /ratio|england\s*=\s*100/.test(u);
+}
+
+/* The health outcomes a ward's views lead with: life expectancy, deaths from
+   all causes, preventable deaths and emergency admissions. All four are Local
+   Health figures, estimated per MSOA and carried onto wards through the LSOA
+   bridge, so unlike the borough series they differ from ward to ward. */
+const WARD_HEALTH_LEAD = ['ft_93283', 'ft_93250', 'ft_93480', 'ft_93227'];
+
 // Horizontal stacked bar: parts = [{k, l, v, c}, ...]. Returns '' if nothing
 // populated (e.g. age fields before TS007A is loaded).
 function stackedBar(parts) {
@@ -5736,6 +5776,10 @@ function showWard(wn) {
     return;
   }
 
+  // The health outcomes in the sheet and the profile are in the deferred half
+  // of the ward data. The merge calls showWard again when it lands, so a ward
+  // picked before then only has to make sure the fetch has started.
+  if (!wardDetailReady()) ensureWardDetail();
 
   // The sidebar is deliberately left where it is.
   //
@@ -5784,29 +5828,67 @@ function showWard(wn) {
 
   // Ward sidebar profile: fields that carry a real ward figure.
   //
-  // That means natively-ward fields, plus LSOA-native ones the pipeline
-  // population-weights onto wards — air quality and transport access are
-  // built per LSOA and aggregated, so a ward figure exists and is meaningful.
-  // The test is deliberately not "has a ward level", because the Fingertips
-  // sets declare lv:["ward","msoa"] and would put roughly six hundred rows in
-  // this panel, each repeating one borough figure across every ward in it.
-  // The pill still reads 'lsoa', which is the honest label: this is LSOA data
-  // shown at ward level, not something published per ward.
+  // That means natively-ward fields, plus ones the pipeline population-weights
+  // onto wards from another geography: air quality and transport access are
+  // built per LSOA, and the Local Health set is published per MSOA and carried
+  // through the LSOA bridge. The pill names where each was published, which is
+  // the honest label: these are estimates shown at ward level, not something
+  // published per ward. The Local Health rows are the only health outcomes the
+  // panel has, and they do tell wards apart (life expectancy has 677 distinct
+  // ward values), so they come with their period and lead with the outcomes.
+  //
+  // The borough Fingertips series are a different case: one figure per
+  // borough, repeated across every ward in it. Listed with the rest they would
+  // read as this ward's own, so they sit apart under Borough context, which
+  // says whose figures they are.
   //
   // Only the first category starts open. All six expanded put roughly eighty
   // rows in the panel before the user had asked for any of them, and the ones
   // below the fold were unreachable without scrolling past the rest.
+  const cls = hasReal ? 'sv real' : 'sv sample';
+  const profRow = f => {
+    const val = inds[f.k];
+    if (val === null || val === undefined || val === '') return '';
+    const isNum = !isNaN(parseFloat(val));
+    const display = isNum ? parseFloat(val).toLocaleString(undefined, {maximumFractionDigits:1}) : val;
+    // 'la' for a borough series, the word the key at the foot of the panel uses.
+    const pill = f.g === 'borough' ? 'la' : f.g;
+    let per = '', unit = '';
+    if (f.k.startsWith('ft_')) {
+      per = ovPeriodOf(f.k);
+      const u = String((ovMeta(f.k) || {}).u || '').trim();
+      // A ratio is left bare: the note above the rows says what it is.
+      if (isNum && u && !ovIsStdRatio(f.k)) {
+        unit = u === '%' ? '%' : `<span class="sv-u">${u.toLowerCase()}</span>`;
+      }
+    }
+    return `<div class="sr"><span class="sl">${f.l}<span class="${pillClass(f.g)}">${pill}</span>` +
+      `${per ? `<span class="sr-per">${per}</span>` : ''}</span>` +
+      `<span class="${cls}">${display}${unit}</span></div>`;
+  };
+  const leadRank = f => {
+    const i = WARD_HEALTH_LEAD.indexOf(f.k);
+    return i === -1 ? WARD_HEALTH_LEAD.length : i;
+  };
   const cats = CATS.map((cat, catIdx) => {
     const wardFields = cat.fields.filter(f =>
-      f.g === 'ward' || (f.g === 'lsoa' && ovHasLevel(f.k, 'ward')));
-    const rows = wardFields.map(f => {
-      const val = inds[f.k];
-      if (val === null || val === undefined || val === '') return '';
-      const isNum = !isNaN(parseFloat(val));
-      const display = isNum ? parseFloat(val).toLocaleString(undefined, {maximumFractionDigits:1}) : val;
-      const cls = hasReal ? 'sv real' : 'sv sample';
-      return `<div class="sr"><span class="sl">${f.l}<span class="${pillClass(f.g)}">${f.g}</span></span><span class="${cls}">${display}</span></div>`;
-    }).filter(Boolean).join('');
+      f.g === 'ward' || ((f.g === 'lsoa' || f.g === 'msoa') && ovHasLevel(f.k, 'ward')));
+    const ownRows = wardFields.filter(f => f.g !== 'msoa').map(profRow).filter(Boolean).join('');
+    const msoaFields = wardFields.filter(f => f.g === 'msoa' && profRow(f))
+      .sort((a, b) => leadRank(a) - leadRank(b));
+    const msoaRows = msoaFields.map(profRow).join('');
+    const msoa = msoaRows ? `<div class="sr-sub">Local Health estimates</div>
+      <div class="sr-sub-note">Published per MSOA and population-weighted onto this ward.${
+        msoaFields.some(f => ovIsStdRatio(f.k))
+          ? ' Admissions and mortality are standardised ratios, where England = 100.' : ''}</div>
+      ${msoaRows}` : '';
+    const ctxRows = cat.fields.filter(f => f.g === 'borough').map(profRow).filter(Boolean).join('');
+    const bor = wdata.lad || 'the borough';
+    const ctx = ctxRows ? `<div class="sr-ctx">
+      <div class="sr-sub">Borough context${wdata.lad ? ': ' + wdata.lad : ''}</div>
+      <div class="sr-sub-note">These figures are for the whole of ${bor}. Every ward in it shows the same values, so they cannot tell this ward apart from its neighbours.</div>
+      ${ctxRows}</div>` : '';
+    const rows = ownRows + msoa + ctx;
     if (!rows) return '';
     // Prepend a stacked bar at the top of the ethnicity/age category bodies.
     const pre = cat.key === 'ethnicity' ? ethBar : (cat.key === 'age' ? ageBar : '');
@@ -5922,7 +6004,9 @@ window.generateWardReport = function(wn, opts) {
      is written once and then printed. LSOA_IMD is 4.2 MB and arrives
      first, so the report was routinely built in the window where the
      deprivation radar had boundaries to place but no figures to plot. */
-  Promise.all([ensureAllLayerData(), ensureLsoaImd(), ensureLsoaData()])
+  /* ensureWardDetail for the health outcomes, which are in the deferred half
+     of the ward data; a report built before it lands would print dashes. */
+  Promise.all([ensureAllLayerData(), ensureLsoaImd(), ensureLsoaData(), ensureWardDetail()])
     .then(() => _generateWardReport(_w, wn, opts))
     .catch(err => {
       /* Nothing else was catching this, and the tab is already open and
@@ -6382,6 +6466,48 @@ function _generateWardReport(_reportWindow, wn, opts) {
     { l:'Claimant rate (16-64)', v: inds.claimant_rate_pct,             ref: _median(_wardVals('claimant_rate_pct')),             wh: true,  dp: 1 },
   ], { width: 380 });
 
+  // ── Health outcomes: Local Health estimates, as a table ──
+  // A table rather than more bars: the census bars are percentages on one
+  // scale, and these are years and standardised ratios, which a shared axis
+  // and a "%" after every figure would misstate. The borough median sits
+  // beside London's because these figures do differ between wards in a
+  // borough, unlike the borough series, which are left out.
+  const _HO_LABELS = {
+    ft_93283: 'Life expectancy at birth',
+    ft_93250: 'Mortality, all causes',
+    ft_93480: 'Preventable mortality, under 75',
+    ft_93227: 'Emergency admissions, all causes',
+  };
+  const _boroughWardMedian = (k) => _median(_ALL_WARDS
+    .filter(w => borough && w.lad === borough)
+    .map(w => parseFloat((w.indicators || {})[k]))
+    .filter(v => !isNaN(v)));
+  const healthOutcomes = WARD_HEALTH_LEAD.map(k => {
+    const v = _fmt(inds[k]);
+    if (v == null) return null;
+    const ratio = ovIsStdRatio(k);
+    // Fixed places, so a median of 84.0 years does not print as "84".
+    const fx = x => (x == null ? 'n/a' : x.toFixed(ratio ? 0 : 1));
+    const f = ovField(k);
+    return {
+      l: _HO_LABELS[k] || (f && f.l) || k,
+      u: ratio ? 'ratio, England = 100' : String((ovMeta(k) || {}).u || '').toLowerCase(),
+      v: fx(v),
+      lon: fx(_median(_wardVals(k))),
+      bor: fx(_boroughWardMedian(k)),
+      per: ovPeriodOf(k),
+    };
+  }).filter(Boolean);
+  // The period column only appears when the metadata gives one to put in it.
+  const _hoPer = healthOutcomes.some(r => r.per);
+  const healthOutcomesTable = healthOutcomes.length ? `<table class="ho">
+      <thead><tr><th>Measure</th><th>This ward</th><th>London ward median</th>${borough ? `<th>${_esc(borough)} ward median</th>` : ''}${_hoPer ? '<th>Period</th>' : ''}</tr></thead>
+      <tbody>${healthOutcomes.map(r => `<tr>
+        <td>${_esc(r.l)}${r.u ? `<span class="u">${_esc(r.u)}</span>` : ''}</td>
+        <td class="w">${r.v}</td><td>${r.lon}</td>${borough ? `<td>${r.bor}</td>` : ''}${_hoPer ? `<td>${_esc(r.per)}</td>` : ''}
+      </tr>`).join('')}</tbody>
+    </table>` : '';
+
   // ── Crime breakdown — 11 MPS categories sorted descending, London median tick ──
   const crimeCats = [
     { k:'crime_violence_12mo',          l:'Violence' },
@@ -6596,6 +6722,12 @@ function _generateWardReport(_reportWindow, wn, opts) {
   table.kv { width:100%; border-collapse: collapse; font-size:11px; }
   table.kv td { padding:4px 6px 4px 0; border-bottom:1px solid #f3f3ef; vertical-align:top; }
   table.kv td.v { font-weight:500; color:#1a1a1a; text-align:right; font-variant-numeric: tabular-nums; }
+  table.ho { width:100%; border-collapse: collapse; font-size:11px; }
+  table.ho th { font-size:9.5px; color:#666; text-transform:uppercase; letter-spacing:.04em; font-weight:600; text-align:right; padding:2px 0 4px 18px; border-bottom:1px solid #e3e3dc; white-space:nowrap; }
+  table.ho td { padding:5px 0 5px 18px; border-bottom:1px solid #f0f0ec; text-align:right; vertical-align:top; color:#444; font-variant-numeric: tabular-nums; white-space:nowrap; }
+  table.ho th:first-child, table.ho td:first-child { text-align:left; padding-left:0; color:#1a1a1a; width:100%; white-space:normal; }
+  table.ho td.w { font-weight:700; color:#1a1a1a; }
+  table.ho .u { display:block; font-size:9.5px; color:#888; }
   .legend { font-size:9.5px; color:#888; margin-top:4px; }
   .legend-tick { display:inline-block; width:1px; height:9px; background:#1a1a1a; margin: 0 2px 0 0; vertical-align:middle; }
   .footer { padding: 10px 22px 14px; background:#fafaf6; border-top:1px solid #eee; font-size:10px; color:#666; line-height:1.5; }
@@ -6689,6 +6821,13 @@ function _generateWardReport(_reportWindow, wn, opts) {
         <div class="legend"><span class="legend-tick"></span> London median &nbsp;·&nbsp; bar colour shows direction (red = concern, green = strength)</div>
       </div>
     </div>
+    ${healthOutcomesTable ? `<div class="row">
+      <div class="panel" style="flex:1">
+        <h3>Health outcomes</h3>
+        ${healthOutcomesTable}
+        <div class="legend">OHID Fingertips Local Health estimates, published per MSOA and population-weighted onto the ward, so they are approximate. A standardised ratio compares deaths or admissions with what England's rates would give for the ages of the people living here: 100 is the England level, 120 is a fifth higher.</div>
+      </div>
+    </div>` : ''}
 
     ${crimeRows.length ? `<div class="section-h">Crime — last 12 months${crimeTotal != null ? ` · total ${Math.round(crimeTotal).toLocaleString()}` : ''}</div>
     <div class="row">
@@ -7269,8 +7408,16 @@ function _applyBoroughSolo() {
     if (input) setTimeout(() => input.focus(), 60);
   });
 
+  /* Bring the panel into view in whichever shape it has: the drawer on a
+     phone, the column on a desktop if it was collapsed. For a button whose
+     whole effect is to put something in the panel, such as Open profile. */
+  function reveal() {
+    if (narrow()) setOpen(true);
+    else if (isCollapsed()) setCollapsed(false);
+  }
+
   window.PH_DRAWER = { open: () => setOpen(true), close: () => setOpen(false),
-                       isOpen: isOpen, narrow: narrow };
+                       isOpen: isOpen, narrow: narrow, reveal: reveal };
 })();
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -12557,10 +12704,13 @@ var PH_SHOW = {
     var cls = 'ws-kpi' + (opts.emphasis ? ' emphasis' : '');
     var numCls = 'ws-k-num' + (value == null ? ' dim' : '');
     var shown = value == null ? '—' : value;
-    return '<div class="' + cls + '">' +
-      '<div class="ws-k-lbl">' + esc(label) + '</div>' +
+    // The label and the note are cut short with an ellipsis in a narrow
+    // column, so each carries its full text as a title. opts.title explains
+    // a figure whose label cannot.
+    return '<div class="' + cls + '"' + (opts.title ? ' title="' + esc(opts.title) + '"' : '') + '>' +
+      '<div class="ws-k-lbl" title="' + esc(label) + '">' + esc(label) + '</div>' +
       '<div class="' + numCls + '">' + shown + '</div>' +
-      (sub ? '<div class="ws-k-sub">' + esc(sub) + '</div>' : '') +
+      (sub ? '<div class="ws-k-sub" title="' + esc(sub) + '">' + esc(sub) + '</div>' : '') +
       '</div>';
   }
 
@@ -12635,6 +12785,21 @@ var PH_SHOW = {
         '%</strong>, ' + dir + ' the London ward median of ' + badMed.toFixed(1) + '%' +
         (badBor !== null ? ' (' + esc(w.lad) + ' ward median ' + badBor.toFixed(1) + '%)' : '') + '.');
     }
+    // Life expectancy is the one outcome measure here, so it is compared with
+    // both medians by how many years it differs. "Estimated" because it is an
+    // MSOA figure carried onto the ward, not one published for it.
+    var le = num(i.ft_93283), leMed = median('ft_93283');
+    if (le !== null && leMed !== null) {
+      var gap = function (ref, what) {
+        var d = le - ref;
+        return (Math.abs(d) < 0.05 ? 'level with ' : Math.abs(d).toFixed(1) +
+          (d > 0 ? ' years above ' : ' years below ')) + what + ' of ' + ref.toFixed(1);
+      };
+      var leBor = boroughMedian('ft_93283', w.lad);
+      bits.push('Estimated life expectancy at birth is <strong>' + le.toFixed(1) + ' years</strong>, ' +
+        gap(leMed, 'the London ward median') +
+        (leBor !== null ? ' and ' + gap(leBor, 'the ' + esc(w.lad) + ' ward median') : '') + '.');
+    }
     if (!bits.length) return '<div class="ws-insight">No indicator data has loaded for this ward yet.</div>';
     return '<div class="ws-insight">' + bits.join(' ') + '</div>';
   }
@@ -12694,6 +12859,11 @@ var PH_SHOW = {
     var o65 = num(i.census_over65_pct);
     var dis = num(i.census_disability_any_pct);
     var ph  = num(i.pharmacy_count);
+    // Health outcomes, from the Local Health set: they arrive with the
+    // deferred half of the ward data, and the sheet is redrawn when it lands.
+    var le  = num(i.ft_93283);
+    var mr  = num(i.ft_93250);
+    var lePer = typeof ovPeriodOf === 'function' ? ovPeriodOf('ft_93283') : '';
 
     var strip = '<div class="ws-strip">' +
       kpi('Avg decile', dec == null ? null : dec.toFixed(1),
@@ -12701,6 +12871,13 @@ var PH_SHOW = {
       kpi('Population', pop == null ? null : (pop >= 10000
             ? (pop / 1000).toFixed(1) + '<span>k</span>'
             : Math.round(pop).toLocaleString()), 'Census 2021') +
+      kpi('Life expectancy', le == null ? null : le.toFixed(1) + '<span>yrs</span>',
+          'at birth' + (lePer ? ', ' + lePer : '')) +
+      // All causes, as a standardised ratio. The sub-line is short because a
+      // quarter of the strip is all it has at 1366px.
+      kpi('Mortality ratio', mr == null ? null : mr.toFixed(0), 'England = 100',
+          { title: 'Deaths from all causes against the England rate for the same ages. ' +
+                   '100 is the England level; 120 is a fifth more deaths than expected.' }) +
       kpi('Aged 65+', o65 == null ? null : o65.toFixed(0) + '<span>%</span>', 'of residents') +
       kpi('Disability (any)', dis == null ? null : dis.toFixed(0) + '<span>%</span>', 'Equality Act') +
       kpi('GP practices', gpCount == null ? null : String(gpCount), 'in this ward') +
@@ -12889,7 +13066,9 @@ var PH_SHOW = {
     if (currentWard) {
       var rec = wardRec(currentWard);
       serviceCounts('gp').then(function (m) {
-        renderBody({ name: currentWard, inds: (rec && rec.indicators) || {} }, m[currentWard] || 0);
+        // lad as well, or the summary drops its borough comparisons on a pin.
+        renderBody({ name: currentWard, inds: (rec && rec.indicators) || {},
+                     lad: (rec && rec.lad) || '' }, m[currentWard] || 0);
       });
     }
     renderComparePane();
@@ -12928,7 +13107,15 @@ var PH_SHOW = {
     });
     var wp = $('wpanel');
     if (wp) wp.scrollTop = 0;
-    sheetState = 2; applyState();   // out of the way of the profile it just opened
+    // Out of the way of the profile it just opened. On a phone the drawer
+    // covers the sheet anyway, so it goes to peek rather than collapsed:
+    // closing the drawer then shows the ward's name and this button again,
+    // where collapsed would leave a strip with nothing to press.
+    sheetState = isNarrow() ? 1 : 2; applyState();
+    // Switching the tab is not enough on its own: on a phone the panel is a
+    // closed drawer and on a desktop it may be collapsed, and either way the
+    // profile would fill in where nobody can see it.
+    if (window.PH_DRAWER && window.PH_DRAWER.reveal) window.PH_DRAWER.reveal();
   });
 
   closeBtn.addEventListener('click', function (e) {
@@ -12975,6 +13162,12 @@ var PH_SHOW = {
     state: function () { return sheetState; },
     setState: setSheetState,
   };
+
+  // The ward-data merge calls this once the deferred half has landed. The
+  // ward list, the indicator keys and the distribution pools here were built
+  // from the first half, and a median taken over a Fingertips field before
+  // then is an empty pool cached for the rest of the session.
+  window.PH_DATA_REFRESH = invalidate;
 
   /* ─────────────────────────────────────────────────────────────────────────
      COMPARE MODE
