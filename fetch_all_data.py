@@ -4488,7 +4488,9 @@ def build_vcse_json():
     #   act (activities), ar (areas), lsoa (LSOA21CD) - read nowhere at all
     #   reg (registered)  - the only .reg read is cicPopupHtml, which consumes
     #                       cics.json, not this file
-    #   pc  (postcode)    - every .pc read belongs to GP, dental or pharmacy data
+    #   pc  (postcode)    - dropped as a full postcode. Small charities carry
+    #                       only the postcode sector in pc instead of an
+    #                       address; see _generalise_small_charity
     #   ward (WD25CD)     - every .ward read is a CSS class, an LSOA_IMD
     #                       property, or a GP record
     # Together they were 37.9% of a 9.7 MB payload that every visitor downloads.
@@ -4508,7 +4510,43 @@ def build_vcse_json():
         "how_tags":  "ht", "how_desc":  "hd",
         "who_tags":  "ot", "who_desc":  "od",
     })
-    return out.to_dict(orient="records")
+    records = out.to_dict(orient="records")
+    pcs = df["postcode"].tolist() if "postcode" in df.columns else [None] * len(records)
+    n = 0
+    for rec, pc in zip(records, pcs):
+        n += _generalise_small_charity(rec, pc)
+    info(f"vcse: {n:,} of {len(records):,} charities shown by area only "
+         f"(income under \u00a3{SMALL_CHARITY_INCOME:,} or not filed)")
+    return records
+
+
+# A small charity's contact address on the register is often a trustee's home.
+# Below this income, or with no income filed, the map shows where a charity is
+# only to the postcode sector and its borough: no street address, and the pin
+# moved to three decimal places (about 110 m by 70 m in London) so it does not
+# land on one front door. Larger charities nearly always give an office, so
+# theirs are shown as registered.
+SMALL_CHARITY_INCOME = 100_000
+
+
+def _postcode_sector(pc) -> str:
+    """'E16AN' or 'E1 6AN' -> 'E1 6'. Empty when it does not look like a postcode."""
+    s = str(pc or "").upper().replace(" ", "")
+    return f"{s[:-3]} {s[-3]}" if 5 <= len(s) <= 7 else ""
+
+
+def _generalise_small_charity(rec: dict, postcode) -> int:
+    """Strip a small charity's record to an area in place. Returns 1 if it did."""
+    inc = rec.get("inc")
+    if isinstance(inc, (int, float)) and not pd.isna(inc) and inc >= SMALL_CHARITY_INCOME:
+        return 0
+    rec["a"] = ""
+    rec["pc"] = _postcode_sector(postcode)
+    for k in ("lat", "lng"):
+        v = rec.get(k)
+        if isinstance(v, float) and not pd.isna(v):
+            rec[k] = round(v, 3)
+    return 1
 
 
 def build_pharmacies_json() -> list:
