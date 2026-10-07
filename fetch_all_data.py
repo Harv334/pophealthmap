@@ -234,6 +234,92 @@ def write_parquet_guarded(path: Path, df: "pd.DataFrame", *, source: str) -> "pd
     _record_write(path, len(df))
     return df
 
+# Sources that kept some of last run's figures because this run's came back
+# missing or thin. main() reads it to mark the source "partial", which the
+# refresh workflow reports in an issue like a failure.
+_SOURCE_PARTIAL: dict[str, str] = {}
+
+def carry_forward_thin(path: Path, df: "pd.DataFrame", *, key: str, source: str,
+                       requested, cache_file=None,
+                       min_share: float = 0.9) -> "pd.DataFrame":
+    """
+    Keep last run's rows for any requested indicator this run lost or thinned.
+
+    write_parquet_guarded only catches a source that returns nothing. The
+    October 2026 refresh showed the other half: Fingertips timed out on some
+    indicators and sent a fraction of the rows for others, so six Local Health
+    indicators vanished, five fell from 963 MSOAs to 77, and the run still
+    reported ok. Here an indicator that has fewer than min_share of the rows
+    it had last time is replaced by last time's rows, which carry their own
+    period, so the map labels them correctly as older figures.
+
+    `requested` is the set of keys this run asked for, so an indicator that was
+    dropped on purpose is not resurrected. `cache_file(key)`, when given, names
+    the cached download behind a key; a thin one is deleted so the next run
+    asks again rather than rereading the same short file every month.
+    """
+    if not path.exists():
+        return df
+    try:
+        prev = pd.read_parquet(path)
+    except Exception:
+        return df
+    if prev.empty or key not in prev.columns:
+        return df
+    prev_n = prev[key].value_counts()
+    new_n = (df[key].value_counts() if len(df) and key in df.columns
+             else pd.Series(dtype="int64"))
+    thin = [k for k, n in prev_n.items()
+            if k in requested and new_n.get(k, 0) < n * min_share]
+    if not thin:
+        return df
+    kept = prev[prev[key].isin(thin)]
+    fresh = df[~df[key].isin(thin)] if len(df) and key in df.columns else df
+    out = pd.concat([fresh, kept], ignore_index=True)
+    if cache_file is not None:
+        for k in thin:
+            try:
+                cache_file(k).unlink(missing_ok=True)
+            except Exception:
+                pass
+    shown = ", ".join(str(k) for k in thin[:12]) + (" ..." if len(thin) > 12 else "")
+    msg = (f"kept last run's figures for {len(thin)} indicator(s) that came back "
+           f"missing or incomplete: {shown}")
+    warn(f"{source}: {msg}")
+    _SOURCE_PARTIAL[source] = msg
+    return out
+
+_FT_FAILS_IN_A_ROW = [0]
+
+def _ft_get(url: str, timeout: int) -> "requests.Response":
+    """GET a Fingertips download, retrying twice. One slow answer used to cost
+    an indicator for the whole month.
+
+    A 4xx is an answer, not a hiccup, so it is not retried. Five downloads in a
+    row failing means Fingertips is down rather than slow, and asking for each
+    of the 600 or so remaining indicators three times would run the refresh past
+    its two-hour limit and lose every other source with it. So it stops asking,
+    and carry_forward_thin keeps last run's figures for what was not fetched."""
+    if _FT_FAILS_IN_A_ROW[0] >= 5:
+        raise RuntimeError("Fingertips is not answering; not asking again this run")
+    last = None
+    for wait in (0, 5, 20):
+        if wait:
+            time.sleep(wait)
+        try:
+            r = requests.get(url, timeout=timeout)
+            r.raise_for_status()
+            _FT_FAILS_IN_A_ROW[0] = 0
+            return r
+        except requests.HTTPError as e:
+            if e.response is not None and 400 <= e.response.status_code < 500:
+                raise
+            last = e
+        except Exception as e:
+            last = e
+    _FT_FAILS_IN_A_ROW[0] += 1
+    raise last
+
 def _scrub_nan(obj):
     """Recursively replace NaN/Infinity with None so JSON is browser-parseable."""
     import math
@@ -2239,8 +2325,7 @@ def run_fingertips() -> pd.DataFrame:
                 f"&parent_area_type_id=15"
             )
             try:
-                r = requests.get(url, timeout=30)
-                r.raise_for_status()
+                r = _ft_get(url, timeout=60)
                 # A non-existent indicator id answers 200 with a header row and
                 # nothing under it. Caching that makes the gap permanent: the
                 # file exists, so no rerun ever asks again, and the indicator
@@ -2313,6 +2398,10 @@ def run_fingertips() -> pd.DataFrame:
 
     out = pd.DataFrame(rows)
     out_path = DATA_DIR / "outcomes" / "fingertips.parquet"
+    ft_id = {short: ind_id for ind_id, short, _ in FINGERTIPS_INDICATORS}
+    out = carry_forward_thin(out_path, out, key="indicator_short", source="fingertips",
+                             requested=set(ft_id),
+                             cache_file=lambda k: cache_dir / f"ind_{ft_id[k]}.csv")
     out = write_parquet_guarded(out_path, out, source="fingertips")
     ok(f"fingertips: {len(out):,} rows -> {out_path.relative_to(REPO_ROOT)}")
     return out
@@ -2380,8 +2469,7 @@ def _ft_profile_indicators(profile_id: int, cache_dir: "Path") -> dict[int, str]
         url = ("https://fingertips.phe.org.uk/api/indicator_metadata/by_profile_id"
                f"?profile_id={profile_id}")
         try:
-            r = requests.get(url, timeout=60)
-            r.raise_for_status()
+            r = _ft_get(url, timeout=60)
             cache.write_bytes(r.content)
             time.sleep(0.5)
         except Exception as e:
@@ -2410,11 +2498,18 @@ def run_fingertips_profiles() -> pd.DataFrame:
     AREA_TYPE_LA = 502
 
     rows: list = []
+    # What this run asked for. A profile whose index could not be read asked
+    # for nothing, so its previous indicators are claimed by profile id instead,
+    # which lets carry_forward_thin keep them rather than lose the profile.
+    requested: set = set()
+    unread: set = set()
     for profile_id, prefix, label in FINGERTIPS_PROFILES:
         inds = _ft_profile_indicators(profile_id, cache_dir)
         if not inds:
+            unread.add(profile_id)
             continue
         chosen = sorted(inds)[:FINGERTIPS_PER_PROFILE]
+        requested.update(f"{prefix}_{i}" for i in chosen)
         if len(inds) > len(chosen):
             info(f"  {label}: {len(inds)} indicators published, taking {len(chosen)}")
         kept = 0
@@ -2426,8 +2521,7 @@ def run_fingertips_profiles() -> pd.DataFrame:
                        f"&child_area_type_id={AREA_TYPE_LA}"
                        f"&parent_area_type_id=15")
                 try:
-                    r = requests.get(url, timeout=60)
-                    r.raise_for_status()
+                    r = _ft_get(url, timeout=60)
                     # Same trap as the older fetcher: an id with nothing behind
                     # it answers 200 with a header row. Caching that makes the
                     # gap permanent.
@@ -2473,6 +2567,15 @@ def run_fingertips_profiles() -> pd.DataFrame:
 
     out = pd.DataFrame(rows)
     out_path = DATA_DIR / "outcomes" / "fingertips_profiles.parquet"
+    if unread and out_path.exists():
+        try:
+            prev = pd.read_parquet(out_path, columns=["profile_id", "indicator_short"])
+            requested.update(prev.loc[prev["profile_id"].isin(unread), "indicator_short"])
+        except Exception:
+            pass
+    out = carry_forward_thin(out_path, out, key="indicator_short",
+                             source="fingertips_profiles", requested=requested,
+                             cache_file=lambda k: cache_dir / f"ind_{str(k).rsplit('_', 1)[-1]}.csv")
     out = write_parquet_guarded(out_path, out, source="fingertips_profiles")
     n_ind = out["indicator_short"].nunique() if not out.empty else 0
     ok(f"fingertips_profiles: {len(out):,} rows, {n_ind} indicators "
@@ -2568,8 +2671,7 @@ def run_fingertips_msoa() -> pd.DataFrame:
                    f"&child_area_type_id={FINGERTIPS_MSOA_AREA_TYPE}"
                    f"&parent_area_type_id=502")
             try:
-                r = requests.get(url, timeout=180)
-                r.raise_for_status()
+                r = _ft_get(url, timeout=180)
                 if len(r.content.splitlines()) < 2:
                     warn(f"fingertips msoa {ind_id}: no rows; not caching")
                     continue
@@ -2610,6 +2712,9 @@ def run_fingertips_msoa() -> pd.DataFrame:
 
     out = pd.DataFrame(rows)
     out_path = DATA_DIR / "outcomes" / "fingertips_msoa.parquet"
+    out = carry_forward_thin(out_path, out, key="indicator_id", source="fingertips_msoa",
+                             requested=set(FINGERTIPS_MSOA_INDICATORS),
+                             cache_file=lambda k: cache_dir / f"ind_{int(k)}.csv")
     out = write_parquet_guarded(out_path, out, source="fingertips_msoa")
     n_ind = out["indicator_id"].nunique() if not out.empty else 0
     ok(f"fingertips msoa: {len(out):,} rows, {n_ind} indicators across "
@@ -6031,6 +6136,7 @@ def main() -> int:
         for s in to_run:
             _MANIFEST_SOURCE = s
             _MANIFEST_WRITES.pop(s, None)
+            _SOURCE_PARTIAL.pop(s, None)
             t0 = time.time()
             rec: dict = {"status": "ok", "error": "", "notes": "",
                          "fetched_at": datetime.now(timezone.utc).isoformat(),
@@ -6055,6 +6161,12 @@ def main() -> int:
                         rec["status"] = "failed"
                         rec["error"] = ("source produced no rows; see the run "
                                         "log for the upstream error")
+                    elif s in _SOURCE_PARTIAL:
+                        # Usable, but some of it is last run's. Not ok, so the
+                        # refresh workflow raises it; not failed, because the
+                        # map is right, just partly older than the date says.
+                        rec["status"] = "partial"
+                        rec["notes"] = _SOURCE_PARTIAL[s]
             except Exception as e:
                 rec["status"] = "failed"
                 rec["error"] = f"{type(e).__name__}: {e}"
