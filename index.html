@@ -657,6 +657,15 @@
     font: inherit; font-size: var(--t-xs); color: var(--nhs-blue); text-decoration: underline;
     text-underline-offset: 2px; }
   .sbar-btn:hover { color: var(--nhs-dark); }
+  /* The data credits dialog, opened from the map's attribution corner. */
+  .credits-dlg { max-width: min(520px, calc(100vw - 32px)); margin: auto; padding: 18px 20px 16px;
+    border: 1px solid var(--line-2); border-radius: 8px; background: var(--paper);
+    color: var(--ink); font-size: var(--t-sm); line-height: 1.5; }
+  .credits-dlg::backdrop { background: rgba(0,0,0,.35); }
+  .credits-dlg h2 { margin: 0 0 10px; font-size: var(--t-lg); }
+  .credits-dlg p { margin: 0 0 10px; color: var(--ink-2); }
+  .credits-dlg a { color: var(--nhs-blue); }
+  .credits-dlg form { margin: 4px 0 0; text-align: right; }
 
   /* ── Leaflet overrides ── */
   .leaflet-popup-content-wrapper { border-radius: 8px !important; box-shadow: 0 2px 12px rgba(0,0,0,.12) !important; border: none !important; padding: 0 !important; overflow: hidden; }
@@ -760,7 +769,8 @@
   .mode-btn:hover { color: var(--nhs-blue); background: var(--paper-2); }
   .mode-btn[aria-selected="true"] { color: var(--nhs-dark);
     border-bottom-color: var(--nhs-blue); }
-  .mode-btn:focus-visible { outline: 3px solid var(--nhs-yellow); outline-offset: -3px; }
+  /* Blue, not NHS yellow: yellow on this white rail is under 2:1. */
+  .mode-btn:focus-visible { outline: 2px solid var(--nhs-blue); outline-offset: -3px; }
 
   @media (max-width: 900px) {
     .main { grid-template-columns: minmax(0, 1fr); }
@@ -918,7 +928,7 @@
   font-weight:600;cursor:pointer;box-shadow:0 2px 10px rgba(33,43,50,.22);
   font-family:'Inter Tight',Inter,system-ui,sans-serif;display:flex;align-items:center;gap:7px}
 #ai-toggle:hover{background:var(--nhs-dark);border-color:var(--nhs-dark)}
-#ai-toggle:focus-visible{outline:3px solid var(--nhs-yellow);outline-offset:2px}
+#ai-toggle:focus-visible{outline:2px solid #212b32;outline-offset:2px}
 #ai-panel{position:absolute;right:12px;top:54px;bottom:12px;z-index:2600;
   width:min(390px,calc(100% - 24px));display:none;flex-direction:column;background: var(--paper);
   border:1px solid var(--line);border-radius:10px;
@@ -1041,10 +1051,26 @@
 
   .gpill.on, .gpill.active { background:var(--nhs-blue); border-color:var(--nhs-blue); color: var(--on-accent); }
 
-  /* Focus ring in the accent, so keyboard users get the same colour language. */
-  input:focus, select:focus, button:focus-visible, .lrow:focus-visible {
-    outline:none; border-color:var(--nhs-bright);
-    box-shadow:0 0 0 3px rgba(0,114,206,.15); }
+  /* Keyboard focus. A solid 2px ring in NHS blue (6.7:1 on white), drawn just
+     outside the control, on anything you can tab to. The old ring was a 15%
+     tint of blue, which nobody could find. :focus-visible, so a mouse click
+     does not leave a ring behind; text boxes always show it while typing,
+     which is what browsers do. Component rules that set their own ring (the
+     sidebar tabs, the map) still apply, and map shapes keep no outline (see
+     path.leaflet-interactive near the top). */
+  input:focus, select:focus { border-color:var(--nhs-bright); }
+  a:focus-visible, button:focus-visible, summary:focus-visible,
+  input:focus-visible, select:focus-visible, textarea:focus-visible,
+  [role="button"]:focus-visible, [role="tab"]:focus-visible,
+  [role="option"]:focus-visible, [role="switch"]:focus-visible,
+  .lrow:focus-visible,
+  [tabindex]:not([tabindex="-1"]):not(path):focus-visible {
+    outline:2px solid var(--nhs-blue); outline-offset:2px; }
+  input:focus-visible, select:focus-visible, textarea:focus-visible { outline-offset:1px; }
+  /* A layer row holds a checkbox, so the row is ringed as well as the box when
+     the box was reached by keyboard. A rule of its own, because a browser
+     without :has() drops the whole rule it sits in. */
+  .lrow:has(input:focus-visible) { outline:2px solid var(--nhs-blue); outline-offset:-2px; }
 
 
   /* Accent placement. The palette alone reads as a grey refresh; the design
@@ -1355,7 +1381,7 @@
   .ov-search { width: 100%; border: 0; border-bottom: 1px solid var(--line); font: inherit;
     font-size: var(--t-sm); padding: 7px 9px 7px 26px; color: var(--ink); background: var(--paper)
     url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23768692' stroke-width='2'><circle cx='11' cy='11' r='7'/><path d='m21 21-4.35-4.35'/></svg>") no-repeat 8px center; }
-  .ov-search:focus { outline: none; border-bottom-color: var(--nhs-bright); }
+  .ov-search:focus { border-bottom-color: var(--nhs-bright); }
   .ov-groups { max-height: 340px; overflow-y: auto; overflow-x: hidden; }
   .ov-grp-hd { display: flex; align-items: center; gap: 6px; padding: 7px 10px; cursor: pointer;
     background: var(--paper-2); border-bottom: 1px solid var(--line); font-size: var(--t-xs);
@@ -1474,7 +1500,7 @@
     margin: 0; letter-spacing: -.01em; color: var(--nhs-dark); flex: 1; min-width: 0; }
   .rb-name { width: 100%; font: inherit; font-size: var(--t-md); padding: 7px 9px; margin-top: 9px;
     border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: var(--paper); }
-  .rb-name:focus { outline: none; border-color: var(--nhs-bright);
+  .rb-name:focus { border-color: var(--nhs-bright);
     box-shadow: 0 0 0 3px rgba(0,114,206,.15); }
   .rb-hint { font-size: var(--t-xs); color: var(--ink-3); line-height: 1.45; margin-top: 7px; }
   .rb-count { padding: 9px 14px; font-size: var(--t-sm); font-weight: 600; color: var(--nhs-blue);
@@ -1580,7 +1606,7 @@
   .dir-search { width: 100%; font: inherit; font-size: var(--t-sm); padding: 7px 9px 7px 28px;
     border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: var(--paper)
     url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23768692' stroke-width='2'><circle cx='11' cy='11' r='7'/><path d='m21 21-4.35-4.35'/></svg>") no-repeat 8px center; }
-  .dir-search:focus { outline: none; border-color: var(--nhs-bright);
+  .dir-search:focus { border-color: var(--nhs-bright);
     box-shadow: 0 0 0 3px rgba(0,114,206,.15); }
   .dir-row2 { display: grid; grid-template-columns: 1fr auto; gap: 6px; margin-top: 7px; }
   .dir-types { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
@@ -1614,6 +1640,10 @@
   .q-scroll { overflow-y: auto; min-height: 0; flex: 1; }
   .q-block { padding: 12px 12px 13px; border-bottom: 1px solid var(--line); background: var(--paper-2); }
   .q-sub { font-size: var(--t-xs); color: var(--ink-3); line-height: 1.45; margin-bottom: 9px; }
+  /* "Try an example": a text link, not a third button competing with Run. */
+  .q-example { display: inline; padding: 0; margin: 0 0 0 2px; border: 0; background: none;
+    font: inherit; color: var(--nhs-blue); text-decoration: underline; cursor: pointer; }
+  .q-example:hover { color: var(--nhs-dark); }
   .q-lbl { font-size: var(--t-xs); text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3);
     font-weight: 600; margin-bottom: 6px; }
   /* Numbered steps. "Show me wards with" left the reader to guess whether the
@@ -2155,7 +2185,7 @@
       <div class="tab-pane active" id="tab-layers" role="tabpanel" aria-labelledby="sbtab-layers">
         <div class="sb-sec">
           <div class="sb-lbl">Point layers</div>
-          <label class="lrow"><div class="ldot" style="background:#185FA5"></div><span class="lname">GP practices <span class="lcount" id="gp-count">0</span></span><input type="checkbox" id="tg"></label>
+          <label class="lrow"><div class="ldot" style="background:#fff;box-shadow:inset 0 0 0 2px #2F3B45"></div><span class="lname">GP practices <span class="lcount" id="gp-count">0</span></span><input type="checkbox" id="tg"></label>
           <label class="lrow"><div class="ldot" style="background:#A32D2D"></div><span class="lname">Hospitals &amp; clinics <span class="lcount" id="hosp-count">0</span></span><input type="checkbox" id="th"></label>
           <label class="lrow"><div class="ldot" style="background:#2E7D32"></div><span class="lname">Parks &amp; greenspaces <span class="lcount" id="greenspace-count"></span></span><input type="checkbox" id="tgr"></label>
           <div id="greenspace-legend" style="display:none;margin:2px 0 6px 18px;padding:4px 6px;background:var(--paper-2);border-radius:4px">
@@ -2320,7 +2350,7 @@
           </div>
 
           <select id="ov" hidden aria-hidden="true" tabindex="-1">
-            <option value="none">— none (neighbourhood colours) —</option>
+            <option value="none">— none (area colours) —</option>
             <optgroup label="Health &amp; care">
               <option value="census_good_health_pct">Good/very good health % · Ward</option>
               <option value="census_bad_health_pct">Bad/very bad health % · Ward</option>
@@ -2346,43 +2376,43 @@
               <option value="ft_self_harm_admissions_10_24">Hospital admissions for self-harm (10 to 24) · Borough</option>
               <option value="ft_smoking_prevalence_adults">Smoking prevalence in adults (18+), current smokers · Borough</option>
               <option value="ft_suicide_rate">Suicide rate · Borough</option>
-              <option value="ft_93465">Alcohol-related conditions: admission episodes (all primary and secondary diagnoses) · Ward</option>
-              <option value="ft_93233">Chronic obstructive pulmonary disease (COPD): emergency hospital admissions · Ward</option>
-              <option value="ft_93229">Coronary heart disease: emergency hospital admissions · Ward</option>
-              <option value="ft_93227">Emergency hospital admissions: all causes · Ward</option>
-              <option value="ft_93115">Emergency hospital admissions: all causes (aged under 5) · Ward</option>
-              <option value="ft_93280">Fuel poverty (low income, low energy efficiency methodology) · Ward</option>
-              <option value="ft_93089">General fertility rate (women aged 15 to 44) · Ward</option>
-              <option value="ft_93232">Heart attack (myocardial infarction): emergency hospital admissions · Ward</option>
-              <option value="ft_93241">Hip fracture: emergency hospital admissions (aged 65 and over) · Ward</option>
-              <option value="ft_93240">Hospital admissions for alcohol attributable conditions, narrow definition · Ward</option>
-              <option value="ft_93239">Intentional self-harm: emergency hospital admissions · Ward</option>
-              <option value="ft_93283">Life expectancy at birth · Ward</option>
-              <option value="ft_93098">Long-term unemployment: people claiming out of work benefit for over 12 months (aged 16 to 64) · Ward</option>
-              <option value="ft_93250">Mortality from all causes · Ward</option>
-              <option value="ft_93252">Mortality from all causes (aged under 75) · Ward</option>
-              <option value="ft_93253">Mortality from cancer · Ward</option>
-              <option value="ft_93254">Mortality from cancer (aged under 75) · Ward</option>
-              <option value="ft_93255">Mortality from cardiovascular disease · Ward</option>
-              <option value="ft_93256">Mortality from cardiovascular disease (aged under 75) · Ward</option>
-              <option value="ft_93480">Mortality from causes considered preventable (aged under 75) · Ward</option>
-              <option value="ft_93257">Mortality from coronary heart disease · Ward</option>
-              <option value="ft_93260">Mortality from respiratory diseases · Ward</option>
-              <option value="ft_93259">Mortality from stroke · Ward</option>
-              <option value="ft_93105">Reception prevalence of obesity (including severe obesity), 3 years data combined · Ward</option>
-              <option value="ft_93106">Reception prevalence of overweight (including obesity), 3 years data combined · Ward</option>
-              <option value="ft_93231">Stroke: emergency hospital admissions · Ward</option>
-              <option value="ft_93097">Unemployment: people claiming out of work benefit (aged 16 to 64) · Ward</option>
-              <option value="ft_93114">Unintentional and deliberate injuries: emergency hospital admissions in children (aged under 5) · Ward</option>
-              <option value="ft_93219">Unintentional and deliberate injuries: hospital admissions in children (aged under 15) · Ward</option>
-              <option value="ft_93224">Unintentional and deliberate injuries: hospital admissions in young people (aged 15 to 24) · Ward</option>
-              <option value="ft_93107">Year 6 prevalence of obesity (including severe obesity), 3 years data combined · Ward</option>
-              <option value="ft_93108">Year 6 prevalence of overweight (including obesity), 3 years data combined · Ward</option>
+              <option value="ft_93465">Alcohol-related conditions: admission episodes (all primary and secondary diagnoses) · MSOA</option>
+              <option value="ft_93233">Chronic obstructive pulmonary disease (COPD): emergency hospital admissions · MSOA</option>
+              <option value="ft_93229">Coronary heart disease: emergency hospital admissions · MSOA</option>
+              <option value="ft_93227">Emergency hospital admissions: all causes · MSOA</option>
+              <option value="ft_93115">Emergency hospital admissions: all causes (aged under 5) · MSOA</option>
+              <option value="ft_93280">Fuel poverty (low income, low energy efficiency methodology) · MSOA</option>
+              <option value="ft_93089">General fertility rate (women aged 15 to 44) · MSOA</option>
+              <option value="ft_93232">Heart attack (myocardial infarction): emergency hospital admissions · MSOA</option>
+              <option value="ft_93241">Hip fracture: emergency hospital admissions (aged 65 and over) · MSOA</option>
+              <option value="ft_93240">Hospital admissions for alcohol attributable conditions, narrow definition · MSOA</option>
+              <option value="ft_93239">Intentional self-harm: emergency hospital admissions · MSOA</option>
+              <option value="ft_93283">Life expectancy at birth · MSOA</option>
+              <option value="ft_93098">Long-term unemployment: people claiming out of work benefit for over 12 months (aged 16 to 64) · MSOA</option>
+              <option value="ft_93250">Mortality from all causes · MSOA</option>
+              <option value="ft_93252">Mortality from all causes (aged under 75) · MSOA</option>
+              <option value="ft_93253">Mortality from cancer · MSOA</option>
+              <option value="ft_93254">Mortality from cancer (aged under 75) · MSOA</option>
+              <option value="ft_93255">Mortality from cardiovascular disease · MSOA</option>
+              <option value="ft_93256">Mortality from cardiovascular disease (aged under 75) · MSOA</option>
+              <option value="ft_93480">Mortality from causes considered preventable (aged under 75) · MSOA</option>
+              <option value="ft_93257">Mortality from coronary heart disease · MSOA</option>
+              <option value="ft_93260">Mortality from respiratory diseases · MSOA</option>
+              <option value="ft_93259">Mortality from stroke · MSOA</option>
+              <option value="ft_93105">Reception prevalence of obesity (including severe obesity), 3 years data combined · MSOA</option>
+              <option value="ft_93106">Reception prevalence of overweight (including obesity), 3 years data combined · MSOA</option>
+              <option value="ft_93231">Stroke: emergency hospital admissions · MSOA</option>
+              <option value="ft_93097">Unemployment: people claiming out of work benefit (aged 16 to 64) · MSOA</option>
+              <option value="ft_93114">Unintentional and deliberate injuries: emergency hospital admissions in children (aged under 5) · MSOA</option>
+              <option value="ft_93219">Unintentional and deliberate injuries: hospital admissions in children (aged under 15) · MSOA</option>
+              <option value="ft_93224">Unintentional and deliberate injuries: hospital admissions in young people (aged 15 to 24) · MSOA</option>
+              <option value="ft_93107">Year 6 prevalence of obesity (including severe obesity), 3 years data combined · MSOA</option>
+              <option value="ft_93108">Year 6 prevalence of overweight (including obesity), 3 years data combined · MSOA</option>
             </optgroup>
             <optgroup label="Deprivation">
               <option value="core20_lsoa_count">Core20 LSOAs in ward · Ward</option>
               <option value="imd_score_ward">IMD composite score (ward, pop-weighted) · Ward</option>
-              <option value="imd_score">IMD score (composite) · LSOA</option>
+              <option value="imd_score">IMD composite score · LSOA</option>
               <option value="imd_decile_mean">IMD decile (ward mean) · Ward</option>
               <option value="imd_decile">IMD decile (1 = most deprived) · LSOA</option>
               <option value="income_score">Income deprivation score · LSOA</option>
@@ -2433,9 +2463,9 @@
               <option value="pm25_ugm3">Fine particulates PM2.5 µg/m³ (Defra) · LSOA</option>
               <option value="pm10_ugm3">Particulates PM10 µg/m³ (Defra) · LSOA</option>
               <option value="ptal_score">Public transport accessibility, PTAL 0–8 (TfL/GLA) · LSOA</option>
-              <option value="rail_station_dist_m">Walk to nearest station, m (TfL) · LSOA</option>
+              <option value="rail_station_dist_m">Distance to nearest station, straight line, m (TfL) · LSOA</option>
               <option value="rail_stations_1km">Stations within 1 km (TfL) · LSOA</option>
-              <option value="bus_stop_dist_m">Walk to nearest bus stop, m (TfL) · LSOA</option>
+              <option value="bus_stop_dist_m">Distance to nearest bus stop, straight line, m (TfL) · LSOA</option>
               <option value="bus_stops_800m">Bus stops within 800 m (TfL) · LSOA</option>
               <option value="gb_commitment_pct">Green OR blue space within 15 min walk % (Defra) · LSOA</option>
               <option value="green_commitment_pct">Green space within 15 min walk % (Defra) · LSOA</option>
@@ -2497,7 +2527,7 @@
           <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line-2)">
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--t-sm);color:var(--ink);font-weight:500">
               <input type="checkbox" id="core20-toggle" style="cursor:pointer">
-              <span>Highlight Core20<button type="button" class="lhelp" title="Core20 = the 20% most deprived neighbourhoods nationally (IMD deciles 1–2). NHS England's Core20PLUS5 framework prioritises them for targeted health action." aria-label="Explain this" aria-expanded="false">?</button> LSOAs</span>
+              <span>Highlight Core20<button type="button" class="lhelp" title="Core20 = the 20% most deprived LSOAs (small areas) nationally (IMD deciles 1–2). NHS England's Core20PLUS5 framework prioritises them for targeted health action." aria-label="Explain this" aria-expanded="false">?</button> LSOAs</span>
             </label>
             <div style="font-size:var(--t-xs);color:var(--ink-3);margin-top:4px;line-height:1.45">
               NHS Core20PLUS5: LSOAs in IMD deciles 1-2 (most deprived 20% nationally).
@@ -2680,7 +2710,11 @@
         </div>
         <div class="q-scroll">
           <div class="q-block">
-            <div class="q-sub">Build a filter across every metric on the map. Wards that match are listed below and highlighted on the map.</div>
+            <div class="q-sub">Build a filter across every metric on the map. Wards that match are listed below and highlighted on the map.
+              <!-- The worked example used to be filled in on first open, so the
+                   panel arrived holding somebody else's question about Brent.
+                   It now opens empty and the example is one click away. -->
+              <button type="button" class="q-example" id="q-example">Try an example</button></div>
             <!-- Step 1 is optional, and used to say so only in the hint: "tick
                  none and services are not used to filter at all". That is true
                  and it asks someone to infer a whole step's absence from
@@ -2850,7 +2884,7 @@
           </div>
           <div class="ws-acts">
             <button type="button" class="ws-btn" id="ws-pin">+ Pin to compare</button>
-            <button type="button" class="ws-btn" id="ws-pdf">Download PDF</button>
+            <button type="button" class="ws-btn" id="ws-pdf" title="Open the printable ward report, which you can save as a PDF">Ward report</button>
             <button type="button" class="ws-btn primary" id="ws-profile">Open profile</button>
             <button type="button" class="ws-close" id="ws-close" title="Deselect this ward"
                     aria-label="Deselect this ward">&times;</button>
@@ -2898,16 +2932,16 @@
        failed ward_data.json load reports itself, and it is empty otherwise. -->
   <footer class="sbar">
     <span class="sbar-left">
-      <a class="sbar-link" id="meth-link" href="methodology.html">Methodology &amp; technical notes</a>
-      <!-- The Accessibility link was taken out of this bar on request.
-           accessibility.html is still published and still reachable at its own
-           URL, and the methodology page header still links to it, so the
-           statement is not orphaned. It is the link in the footer that has
-           gone, not the statement. -->
       <!-- The palette is NHS blue and the audience is NHS staff, so who runs
            this has to be said on the page, not left to be inferred. -->
       <span class="sbar-note">Independent project, not an NHS service</span>
       <a class="sbar-link" href="privacy.html">About and privacy</a>
+      <!-- Back in the bar: an accessibility statement has to be easy to find
+           from every page, not only reachable at its own URL. -->
+      <a class="sbar-link" href="accessibility.html">Accessibility</a>
+      <!-- "Methodology" alone, beside the other page links, so the bar does not
+           gain a line on a phone. The page's own title says the rest. -->
+      <a class="sbar-link" id="meth-link" href="methodology.html">Methodology</a>
       <a class="sbar-link" href="mailto:contact@pophealth.uk">contact@pophealth.uk</a>
       <span id="src-lbl"></span>
     </span>
@@ -2929,6 +2963,32 @@
       <span id="site-ver" title="Version of the website itself. The date beside it is when the data was last refreshed.">v0.9.0</span>
     </span>
   </footer>
+
+  <!-- Data credits. The attribution statements the data licences require
+       (DATA_LICENCES.md), opened from "Data credits" in the map's attribution
+       corner. Kept in a dialog rather than in the corner itself, where a dozen
+       lines would sit over the map. TfL's three lines are a condition of its
+       licence and must stay word for word. -->
+  <dialog id="credits-dlg" class="credits-dlg" aria-labelledby="credits-h">
+    <h2 id="credits-h">Data credits</h2>
+    <p>Contains OS data &copy; Crown copyright and database right 2026.<br>
+       Contains Royal Mail data &copy; Royal Mail copyright and database right 2026.<br>
+       Contains National Statistics data &copy; Crown copyright and database right 2026.</p>
+    <p>Census 2021. Source: Office for National Statistics licensed under the
+       Open Government Licence v.3.0.</p>
+    <p>Station and bus stop measures: <strong>Powered by TfL Open Data.</strong>
+       Contains OS data &copy; Crown copyright and database rights 2016.
+       Geomni UK Map data &copy; and database rights 2019.
+       Licensed under version 2.0 of the Open Government Licence with
+       amendments for Transport for London.</p>
+    <p>Air quality: &copy; Crown copyright Defra via uk-air.defra.gov.uk,
+       licenced under the Open Government Licence (OGL).</p>
+    <p>All other data is public sector information licensed under the Open
+       Government Licence v3.0. Every source is listed in the
+       <a href="methodology.html">methodology notes</a>. Basemap credits are in
+       the corner of the map.</p>
+    <form method="dialog"><button type="submit" class="ws-btn primary">Close</button></form>
+  </dialog>
 
 </div><!-- .app -->
 
@@ -3639,9 +3699,9 @@ const CATS = [
     { k: "census_public_transport_pct",      l: "Public transport to work (%)",  g: "ward" },
     { k: "census_car_to_work_pct",           l: "Car/van to work (%)",           g: "ward" },
     { k: "ptal_score",          l: "Transport accessibility (PTAL, 0–8)", g: "lsoa", lv: ["ward","lsoa"] },
-    { k: "rail_station_dist_m", l: "Walk to nearest station (m)",      g: "lsoa", lv: ["ward","lsoa"] },
+    { k: "rail_station_dist_m", l: "Distance to nearest station, straight line (m)", g: "lsoa", lv: ["ward","lsoa"] },
     { k: "rail_stations_1km",   l: "Stations within 1 km",             g: "lsoa", lv: ["ward","lsoa"] },
-    { k: "bus_stop_dist_m",     l: "Walk to nearest bus stop (m)",     g: "lsoa", lv: ["ward","lsoa"] },
+    { k: "bus_stop_dist_m",     l: "Distance to nearest bus stop, straight line (m)", g: "lsoa", lv: ["ward","lsoa"] },
     { k: "bus_stops_800m",      l: "Bus stops within 800 m",           g: "lsoa", lv: ["ward","lsoa"] },
   ]},
   { key: "environment", label: "Environment & access", ico: "🌫️", fields: [
@@ -3843,7 +3903,7 @@ const OV_META = {
 
   // IMD 2025
   imd_score:                      { src: "MHCLG IMD 2025",       yr: "2025", g: "LSOA", u: "score",  desc: "Composite Index of Multiple Deprivation. Higher = more deprived." },
-  imd_decile_mean:                { src: "MHCLG IMD 2025", yr: "2025", g: "Ward, population-weighted mean of its LSOAs", u: "decile", desc: "Population-weighted mean of the IMD deciles of the neighbourhoods in the ward. Not a decile itself: a ward at 3 is not in the third decile, its typical neighbourhood is." },
+  imd_decile_mean:                { src: "MHCLG IMD 2025", yr: "2025", g: "Ward, population-weighted mean of its LSOAs", u: "decile", desc: "Population-weighted mean of the IMD deciles of the LSOAs (small areas) in the ward. Not a decile itself: a ward at 3 is not in the third decile, its typical LSOA is." },
   imd_score_ward:                 { src: "MHCLG IMD 2025 (pop-weighted, mid-2022)", yr: "2025", g: "Ward", u: "score",  desc: "Ward-aggregate IMD composite score. Population-weighted mean of constituent LSOA scores using MHCLG File_7 mid-2022 denominators." },
   imd_decile:                     { src: "MHCLG IMD 2025",       yr: "2025", g: "LSOA", u: "decile", desc: "National deprivation decile. 1 = most deprived 10%." },
   income_score:                   { src: "MHCLG IMD 2025",       yr: "2025", g: "LSOA", u: "score",  desc: "Income Deprivation domain score." },
@@ -4786,28 +4846,50 @@ if (CARTO_KEY) {
 } else {
   esriBasemap().addTo(map);
 }
+/* The data licences need their attribution lines shown with the map. The full
+   set is too long for the corner, so the corner carries a "Data credits" link
+   that opens them in a dialog (#credits-dlg, beside the footer). */
+map.attributionControl.addAttribution('<a href="methodology.html" class="credits-link">Data credits</a>');
+document.addEventListener('click', e => {
+  const a = e.target.closest && e.target.closest('.credits-link');
+  if (!a) return;
+  const dlg = document.getElementById('credits-dlg');
+  if (!dlg || typeof dlg.showModal !== 'function') return; // falls back to the methodology page
+  e.preventDefault();
+  dlg.showModal();
+});
 
 // Static layers
-// GP layer: circleMarkers sized by registered-patients list size.
-// Bands: <3k micro, 3-7k small, 7-12k medium, 12-20k large, 20k+ very large.
-function gpRadius_UNUSED(p) {
-  if (!p) return 7;
-  if (p < 3000)  return 4;
-  if (p < 7000)  return 7;
-  if (p < 12000) return 10;
-  if (p < 20000) return 13;
-  return 16;
+// GP layer: small white dots with a dark slate ring, clustered when zoomed out
+// the same way as the pharmacy and dental layers. The big blue lettered pins
+// that were here covered the shading underneath and their blue sat inside the
+// choropleth ramps, so a practice could read as a shaded area. White and slate
+// are outside every ramp. These stay L.marker (not circleMarker) so each dot is
+// still a focusable element that keyboard users can tab to.
+const GP_RING = '#2F3B45';
+function mkGpIcon() {
+  return L.divIcon({ html: `<div style="background:#fff;width:11px;height:11px;border-radius:50%;border:2.5px solid ${GP_RING};box-sizing:border-box;box-shadow:0 1px 2px rgba(0,0,0,.3)"></div>`, iconSize:[11,11], iconAnchor:[5.5,5.5], className:'' });
 }
-const gpL = L.layerGroup(GPS.map(d => {
+const gpL = L.markerClusterGroup({
+  maxClusterRadius: 40,
+  showCoverageOnHover: false,
+  zoomToBoundsOnClick: true,
+  iconCreateFunction: cluster => {
+    const c = cluster.getChildCount();
+    const sz = c > 50 ? 36 : c > 20 ? 30 : 26;
+    return L.divIcon({ html:`<div style="background:#fff;width:${sz}px;height:${sz}px;border-radius:50%;border:2.5px solid ${GP_RING};box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:var(--t-xs);font-weight:600;color:${GP_RING};box-shadow:0 1px 4px rgba(0,0,0,.25)">${c}</div>`, iconSize:[sz,sz], iconAnchor:[sz/2,sz/2], className:'' });
+  }
+});
+gpL.addLayers(GPS.map(d => {
   const rows = {};
   if (d.pc) rows['Postcode'] = d.pc;
   if (d.ward) rows['Ward'] = d.ward + (d.lad ? ' (' + d.lad + ')' : '');
   if (d.tel) rows['Tel'] = d.tel;
   if (d.code) rows['ODS'] = d.code;
   if (d.patients) rows['Patients'] = d.patients.toLocaleString();
-  const popup = mkpop('#185FA5', d.n, d.a, rows);
+  const popup = mkpop(GP_RING, d.n, d.a, rows);
   const tip = _esc(d.patients ? `${d.n} · ${d.patients.toLocaleString()} pts` : d.n);
-  const m = L.marker([d.lat, d.lng], { icon: mkicon('#185FA5', 'G') })
+  const m = L.marker([d.lat, d.lng], { icon: mkGpIcon() })
     .bindPopup(popup)
     .bindTooltip(tip, { direction: 'top', className: 'marker-tip' });
   // Canonicalise LAD name so 'Westminster' (feed) matches 'City of Westminster' (map).
@@ -5357,7 +5439,7 @@ function loadDentalLayer(practices) {
   practices.forEach(p => {
     if (!p.lat || !p.lng) return;
     const marker = L.marker([p.lat, p.lng], {icon: mkDentalIcon()});
-    const imdBadge = p.imd_decile ? `<div class="pop-row"><span class="pop-key">IMD</span><span>Decile ${_esc(p.imd_decile)}</span></div>` : '';
+    const imdBadge = p.imd_decile ? `<div class="pop-row"><span class="pop-key">IMD decile</span><span>${_esc(p.imd_decile)}</span></div>` : '';
     marker.bindPopup(`<div class="pop-hdr" style="background:#7B2D8E">${_esc(p.name||p.n)}</div><div class="pop-body"><div class="pop-addr">${_esc(p.postcode||p.pc||'—')}</div>${imdBadge}</div>`);
     marker.bindTooltip(_esc(p.name||p.n), { direction: 'top', className: 'marker-tip' });
     dentalData.push({ name: p.name||p.n, postcode: p.postcode||p.pc, lat: p.lat, lng: p.lng, marker });
@@ -6187,7 +6269,9 @@ function showWard(wn) {
     </div>
     <div class="wname">${wdata.name} <span class="wpop">${pop}</span></div>
     ${keyStats}
-    <button class="wbtn" onclick="generateWardReport('${wn.replace(/'/g, "\\'")}')">Generate ward report ↗</button>
+    <!-- No report button here: the ward sheet's "Ward report" button stays on
+         screen beside this profile and is the one route to the report, so a
+         second button with a different name for the same thing is not needed. -->
     ${cats || '<div class="data-note">No indicator data — run fetch_all_data.py and re-upload ward_data.json</div>'}
     <div class="data-note">
       <span class="gpill gpill-ward">ward</span> = ward level &nbsp;
@@ -8715,9 +8799,9 @@ function showLSOA(feat) {
       row('pm25_ugm3', 'Fine particulates PM2.5 (µg/m³)'),
       row('pm10_ugm3', 'Particulates PM10 (µg/m³)'),
       row('ptal_score', 'Transport accessibility (PTAL, 0–8)'),
-      row('rail_station_dist_m', 'Walk to nearest station (m)'),
+      row('rail_station_dist_m', 'Distance to nearest station, straight line (m)'),
       row('rail_stations_1km',   'Stations within 1 km'),
-      row('bus_stop_dist_m',     'Walk to nearest bus stop (m)'),
+      row('bus_stop_dist_m',     'Distance to nearest bus stop, straight line (m)'),
       row('bus_stops_800m',      'Bus stops within 800 m'),
     ].filter(Boolean).join('');
     if (envRows) {
@@ -8760,7 +8844,7 @@ function showLSOA(feat) {
       <button class="deselect-btn" onclick="deselectLSOA()" title="Deselect this LSOA">Deselect &times;</button>
     </div>
     <div class="wname">${props.name} <span class="wpop">${code}</span></div>
-    <button class="wbtn" onclick='generateLSOAReport(${JSON.stringify(code)})'>Generate LSOA report ↗</button>
+    <button class="wbtn" onclick='generateLSOAReport(${JSON.stringify(code)})'>LSOA report ↗</button>
     <div class="cat-block">
       <div class="cat-hdr" onclick="toggleCat(this)">
         <span class="cat-hdr-l"><span class="cat-ico">£</span>IMD 2025 Deprivation</span>
@@ -10508,7 +10592,7 @@ function _dlHint(msg, ms) {
 function _setDataLevel(level, opts) {
   opts = opts || {};
   if (level === 'nbhd') {
-    _dlHint('Neighbourhood-level data — in development');
+    _dlHint('LSOA-level data: in development');
     return;
   }
   if (['borough', 'ward', 'msoa', 'lsoa'].indexOf(level) === -1) return;
@@ -11417,6 +11501,53 @@ function _searchFlyTo(lat, lng, zoom) {
     map.setView([lat, lng], zoom || 15, { animate: true });
   }
 }
+/**
+ * Fit the map to an area so it lands in the part of the map you can see.
+ *
+ * A plain fitBounds frames the whole map pane, but the ward sheet and the
+ * compare bar sit over the bottom of it. On a phone that put a searched-for
+ * ward under the sheet, and with no zoom cap a small LSOA filled the screen
+ * so there was nothing around it to say where it was. So the panels over the
+ * bottom are measured and passed as bottom padding, never so much that no map
+ * is left, and the zoom is capped (callers use about 14 for a ward and 15 for
+ * an LSOA).
+ */
+function _fitVisible(bounds, maxZoom, opts) {
+  if (typeof map === 'undefined' || !map || !bounds) return;
+  if (bounds.isValid && !bounds.isValid()) return;
+  const mapEl = document.getElementById('map');
+  const mb = mapEl ? mapEl.getBoundingClientRect() : null;
+  let hidden = 0;
+  ['ward-sheet', 'cmp-bar'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el || !mb) return;
+    const cs = window.getComputedStyle(el);
+    if (cs.display === 'none' || cs.visibility === 'hidden') return;
+    const r = el.getBoundingClientRect();
+    if (r.height > 0 && r.bottom > mb.top && r.top < mb.bottom) {
+      hidden = Math.max(hidden, mb.bottom - r.top);
+    }
+  });
+  // Always leave at least 35% of the map (and 120px) to frame the area in.
+  const room = mb ? Math.max(120, mb.height * 0.35) : 120;
+  const pad = mb ? Math.min(hidden, Math.max(0, mb.height - room)) : 0;
+  // onlyIfHidden: leave the view alone when the whole area is already in the
+  // visible part of the map, so the map does not jump under someone who is
+  // still clicking areas in it.
+  if (opts && opts.onlyIfHidden && mb) {
+    const sw = map.latLngToContainerPoint(bounds.getSouthWest());
+    const ne = map.latLngToContainerPoint(bounds.getNorthEast());
+    if (sw.x >= 0 && ne.x <= mb.width && ne.y >= 0 && sw.y <= mb.height - pad) return;
+  }
+  try { map.stop(); } catch (e) { /* not animating */ }
+  try {
+    map.fitBounds(bounds, {
+      paddingTopLeft: [24, 24],
+      paddingBottomRight: [24, 24 + pad],
+      maxZoom: maxZoom || 14,
+    });
+  } catch (e) { /* degenerate bounds */ }
+}
 
 /**
  * Mark what was searched for.
@@ -11483,7 +11614,7 @@ function _searchPickResult(item) {
     // Trigger the ward's click handler via wLyr
     if (typeof wLyr !== 'undefined' && wLyr) {
       const lyr = wLyr.getLayers().find(l => l.feature.properties.WD24NM === item._key);
-      if (lyr) { lyr.fire('click'); if (typeof map !== 'undefined') map.fitBounds(lyr.getBounds(), { padding:[30,30] }); }
+      if (lyr) { lyr.fire('click'); _fitVisible(lyr.getBounds(), 14); }
     }
   } else if (item.type === 'lsoa') {
     if (typeof lsoaLyr !== 'undefined' && lsoaLyr) {
@@ -11493,7 +11624,7 @@ function _searchPickResult(item) {
         const t = document.getElementById('tlsoa');
         if (t && !t.checked) { t.checked = true; t.dispatchEvent(new Event('change')); }
         lyr.fire('click');
-        if (typeof map !== 'undefined') map.fitBounds(lyr.getBounds(), { padding:[40,40] });
+        _fitVisible(lyr.getBounds(), 15);
       }
     }
   } else {
@@ -11561,7 +11692,7 @@ function _pickPostcode(pq, res) {
   const lyr = _wardLayerFor(codes.admin_ward, res.admin_ward);
   if (lyr) {
     lyr.fire('click');
-    if (typeof map !== 'undefined') map.fitBounds(lyr.getBounds(), { padding: [30, 30] });
+    _fitVisible(lyr.getBounds(), 14);
   } else {
     _searchFlyTo(res.latitude, res.longitude, 15);
   }
@@ -12502,13 +12633,13 @@ loadData();
                 handover build sets it false: a caveat about somebody else's
                 release schedule is noise in a repository that has just changed
                 hands.
-   methodology  the "Methodology & technical notes" link in the footer. Off by
-                default. methodology.html is still published and still reachable
-                at its own URL, and the page itself is unchanged; it is the
-                footer link that is hidden until somebody turns it on. */
+   methodology  the "Methodology" link in the footer. On:
+                the page holds the data licences and the caveats behind every
+                figure, and the map should point to it. Set false to hide the
+                link; methodology.html stays published either way. */
 var PH_SHOW = {
   devBanner:   true,
-  methodology: false,
+  methodology: true,
 };
 (function () {
   var link = document.getElementById('meth-link');
@@ -12836,7 +12967,7 @@ var PH_SHOW = {
 
    The sheet is the bar along the bottom of the map: whichever ward is
    selected, its headline figures, and the three actions the design file asks
-   for (pin to compare, download PDF, open profile).
+   for (pin to compare, ward report, open profile).
 
    The query builder is the sidebar's Query tab: pick the services a ward must
    have, the borough it must be in, and any number of indicator conditions,
@@ -13233,6 +13364,7 @@ var PH_SHOW = {
   var PIN_COLOURS = ['#005EB8', '#AE2573', '#FFB81C', '#009639'];
   var pinned = [];
   var pinLyr = null;
+  var lastPinFitKey = '';
   // Which of Explore / Query / Compare is open. The map layers below read it
   // so that nothing a mode draws outlives the mode.
   var currentMode = 'explore';
@@ -13383,7 +13515,7 @@ var PH_SHOW = {
       // An average of deciles is not itself a decile, so it is named as an
       // average. The share of the ward's LSOAs in deciles 1-2 is the figure
       // that is actually a count.
-      bits.push('Its neighbourhoods average national deprivation decile <strong>' +
+      bits.push('Its LSOAs (small areas) average national deprivation decile <strong>' +
         dec.toFixed(1) + '</strong>, roughly among the ' + band.dir + ' deprived <strong>' +
         band.pct + '%</strong> of England.');
       var c20 = num(i.core20_lsoa_count), nl = num(i.total_lsoa_count);
@@ -13444,7 +13576,7 @@ var PH_SHOW = {
     var ROWS = [
       { k: 'census_population',        l: 'Population',        dp: 0 },
       { k: 'imd_decile_mean',          l: 'IMD decile (mean)', dp: 1 },
-      { k: 'imd_score',                l: 'IMD score',         dp: 1 },
+      { k: 'imd_score',                l: 'IMD composite score', dp: 1 },
       { k: 'census_over65_pct',        l: 'Aged 65+',          dp: 1, pct: true },
       { k: 'census_disability_any_pct', l: 'Disability (any)', dp: 1, pct: true },
       { k: 'census_bad_health_pct',    l: 'Bad health',        dp: 1, pct: true },
@@ -13685,6 +13817,16 @@ var PH_SHOW = {
       },
       interactive: false,
     }).addTo(map);
+    /* Two or more pins: bring them all into view. Only when the set of pins
+       changes (not on every redraw, such as a tab switch), and only when one
+       is off screen or under the sheet. It waits a frame so the compare bar
+       that refreshPins draws next is there to be measured. */
+    var fitKey = cmpLevel + '|' + pinned.slice().sort().join('|');
+    if (pinned.length >= 2 && fitKey !== lastPinFitKey) {
+      var union = pinLyr.getBounds();
+      setTimeout(function () { _fitVisible(union, 14, { onlyIfHidden: true }); }, 0);
+    }
+    lastPinFitKey = fitKey;
   }
 
   function refreshPins() {
@@ -13773,9 +13915,18 @@ var PH_SHOW = {
   function download(filename, text, mime) {
     // Every file this page writes carries the date of the data in its name,
     // so two downloads either side of a monthly refresh neither overwrite each
-    // other nor pass for the same figures. The file itself stays one header
-    // row and data, so it opens and joins without editing.
+    // other nor pass for the same figures.
     if (DATA_DATE) filename = filename.replace(/(\.[A-Za-z0-9]+)?$/, '-' + DATA_DATE + '$1');
+    // Every CSV (Data export, Compare, Query, Directory, Custom area) also says
+    // where it came from, so a file passed on without its email still names
+    // its source. At the end, after a blank line, rather than the top: the
+    // header row stays the first line, so the file still opens and joins the
+    // same way; delete the last two lines before loading it somewhere strict.
+    if (/^text\/csv/.test(mime || '')) {
+      text = String(text).replace(/\n+$/, '') + '\n\n' + csvCell(
+        'Source: PopHealth Map (pophealth.uk), independent project, not an NHS service.' +
+        (DATA_DATE ? ' Data updated ' + DATA_DATE + '.' : '')) + '\n';
+    }
     var blob = new Blob([text], { type: mime || 'text/plain;charset=utf-8' });
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
@@ -13824,7 +13975,7 @@ var PH_SHOW = {
   // The design's default row: IMD, bad health and social rent on; over 65 and
   // no qualifications offered but off.
   var cmpMetrics = [
-    { k: 'imd_decile_mean',           l: 'IMD',          on: true  },
+    { k: 'imd_decile_mean',           l: 'IMD decile (mean)', on: true  },
     { k: 'census_bad_health_pct',     l: 'Bad health',   on: true  },
     { k: 'census_social_rented_pct',  l: 'Soc rent',     on: true  },
     { k: 'census_over65_pct',         l: 'Over 65',      on: false },
@@ -13856,7 +14007,7 @@ var PH_SHOW = {
   var CMP_LEVELS = [
     // Below a ward, and so the one level that is not aggregated from wards: an
     // LSOA has its own published figures and is compared on those directly.
-    { k: 'lsoa',    one: 'neighbourhood', many: 'neighbourhoods' },
+    { k: 'lsoa',    one: 'LSOA', many: 'LSOAs' },
     { k: 'ward',    one: 'ward',    many: 'wards' },
     { k: 'borough', one: 'borough', many: 'boroughs' },
     { k: 'icb',     one: 'board',   many: 'boards' },
@@ -14098,17 +14249,17 @@ var PH_SHOW = {
       var mostDep  = Math.min.apply(null, decs);
       if (leastDep <= 5.5) {
         bits.push('All ' + pinned.length + ' pinned ' + lvl.many + ' sit in the most deprived <strong>' +
-          decileBand(leastDep).pct + '%</strong> of England on the mean decile of their neighbourhoods.');
+          decileBand(leastDep).pct + '%</strong> of England on the mean decile of their LSOAs.');
       } else if (mostDep > 5.5) {
         bits.push('All ' + pinned.length + ' pinned ' + lvl.many + ' sit in the least deprived <strong>' +
-          decileBand(mostDep).pct + '%</strong> of England on the mean decile of their neighbourhoods.');
+          decileBand(mostDep).pct + '%</strong> of England on the mean decile of their LSOAs.');
       } else {
         // Straddling the middle, where neither framing says anything: one of
         // these wards is in the more deprived half and another is not, and any
         // single band wide enough to hold both is too wide to be worth stating.
         bits.push('These ' + pinned.length + ' ' + lvl.many + ' sit either side of the national middle, from decile <strong>' +
           mostDep.toFixed(1) + '</strong> to <strong>' + leastDep.toFixed(1) +
-          '</strong> on the mean decile of their neighbourhoods.');
+          '</strong> on the mean decile of their LSOAs.');
       }
     }
     // Name the outlier on each active metric that actually separates them.
@@ -14133,7 +14284,7 @@ var PH_SHOW = {
       // is spelled out for those two rather than left to the word "highest".
       if (m.k === 'imd_decile_mean') {
         bits.push('<strong>' + esc(cmpAreaLabel(top.n)) + '</strong> is the least deprived of them on the mean ' +
-          'decile of its neighbourhoods (' + vs + ')' + context + '.');
+          'decile of its LSOAs (' + vs + ')' + context + '.');
         return;
       }
       if (m.k === 'imd_score') {
@@ -15094,7 +15245,7 @@ var PH_SHOW = {
     {
       t: 'Compare: put wards side by side',
       n: '<strong>Compare</strong> holds up to four areas side by side. First choose ' +
-         'the size of area. You can compare neighbourhoods, wards, boroughs or health ' +
+         'the size of area. You can compare LSOAs (small areas), wards, boroughs or health ' +
          'board areas. Then click them on the map, and choose the figures. Each area ' +
          'keeps one colour on its card, its row and its outline. On every row an arrow ' +
          'marks the highest and the lowest value. The arrows rank the areas you pinned. ' +
@@ -15694,7 +15845,7 @@ var PH_SHOW = {
   var RB_HEADLINE = [
     { k: 'census_population',         l: 'Population',      dp: 0, wide: false },
     { k: 'imd_decile',                l: 'Avg IMD decile',  dp: 1 },
-    { k: 'imd_score',                 l: 'IMD score',       dp: 1 },
+    { k: 'imd_score',                 l: 'IMD composite score', dp: 1 },
     { k: 'census_bad_health_pct',     l: 'Bad health',      dp: 1, pct: true },
     { k: 'census_disability_any_pct', l: 'Disability',      dp: 1, pct: true },
     { k: 'census_over65_pct',         l: 'Aged 65+',        dp: 1, pct: true },
@@ -15715,7 +15866,7 @@ var PH_SHOW = {
 
     var sumEl = $('rb-summary');
     if (!rbSelected.length) {
-      sumEl.innerHTML = '<div class="rb-empty">Switch on the neighbourhood layer and click the ' +
+      sumEl.innerHTML = '<div class="rb-empty">Switch on the LSOA (small area) layer and click the ' +
         'areas you want. The figures for whatever you pick are totalled up here, and you can ' +
         'open them as a report or take them away as a CSV.</div>';
     } else {
@@ -15840,12 +15991,12 @@ var PH_SHOW = {
   }
 
   function rbCsv() {
-    if (!rbSelected.length) { alert('Pick some neighbourhoods first.'); return; }
+    if (!rbSelected.length) { alert('Pick some LSOAs first.'); return; }
     var agg = rbAggregate();
     var keys = Object.keys(agg.indicators).sort();
     var lines = [];
     lines.push(['area', rbAreaName()].map(csvCell).join(','));
-    lines.push(['neighbourhoods', agg.lsoas].map(csvCell).join(','));
+    lines.push(['LSOAs', agg.lsoas].map(csvCell).join(','));
     lines.push([]);
     lines.push(['indicator', 'value', 'method'].map(csvCell).join(','));
     keys.forEach(function (k) {
@@ -15866,7 +16017,7 @@ var PH_SHOW = {
   }
 
   function rbReport() {
-    if (!rbSelected.length) { alert('Pick some neighbourhoods first.'); return; }
+    if (!rbSelected.length) { alert('Pick some LSOAs first.'); return; }
     var agg = rbAggregate();
     var bs = rbBoroughs();
     var boroughLine = Object.keys(bs).sort().map(function (b) {
@@ -16788,8 +16939,15 @@ var PH_SHOW = {
   }
 
   $('q-run').addEventListener('click', runQuery);
+  $('q-example').addEventListener('click', function () { buildOnce(); seedExample(); });
   $('q-clear').addEventListener('click', function () {
     q.services = []; q.scope = ''; q.conds = []; q._rows = null;
+    // Clear means all of it, so step 1's box is unticked too. Left ticked, it
+    // showed an empty set of service chips under a step still switched on.
+    if (qUseServices && qUseServices.checked) {
+      qUseServices.checked = false;
+      applyServicesToggle(false, false);
+    }
     renderBuilder();
     qBarEl.innerHTML = '<span class="q-empty">No query run yet.</span>';
     qResEl.innerHTML = '';
@@ -16817,8 +16975,9 @@ var PH_SHOW = {
     download('pophealth-query.csv', lines.join('\n'), 'text/csv;charset=utf-8');
   });
 
-  // The example from the brief, wired up so the pane is not an empty form on
-  // first open: services plus a borough plus two indicator conditions.
+  // The example from the brief: services plus a borough plus two indicator
+  // conditions. Laid down by the "Try an example" link and by the tour, not on
+  // first open.
   function seedExample() {
     q.services = ['gp', 'pharmacy'];
     // The worked example filters on services, so step 1 is switched on to match
@@ -16846,7 +17005,7 @@ var PH_SHOW = {
     _built = true;
     if (indicatorKeys().indexOf(q.sort) === -1) q.sort = indicatorKeys()[0];
     renderSort();
-    seedExample();
+    renderBuilder();
     // The ward data has arrived, so a first-time visitor can be shown round.
     // Hooked here rather than to a timer because chapter 4 picks its ward out
     // of the data and there is nothing to pick from before this point.
