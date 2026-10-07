@@ -90,33 +90,46 @@ CACHE_DIR = REPO_ROOT / ".cache"
 DATA_DIR  = REPO_ROOT / "data"
 
 # ============================================================================
-# SCOPE: the 33 London local authorities (32 boroughs + the City of London).
-# Codes and names are the ONS LAD25 set, taken from LAD_MAY_2025_UK_BGC_V2.
-# This single list is what defines the map's footprint. Everything else, the
-# boundaries, the LSOA set, the ward set, the facility filters, derives from it.
+# SCOPE: which local authorities this run builds.
+# Each scope is a reviewable file in scopes/: a name, its ONS region code and
+# its LAD25 codes and names. This single list is what defines the map's
+# footprint. Everything else, the boundaries, the LSOA set, the ward set, the
+# facility filters, derives from it.
+#
+# London is the default and builds exactly what it always has, into the same
+# places. Any other scope (--scope north-east, or PH_SCOPE=north-east) writes
+# everything it produces under data/regions/<scope>/, intermediates included,
+# so a regional build can never overwrite the live London files. Read before
+# argparse, because these constants are used at import time.
 # ============================================================================
-SCOPE_NAME = "London"
-BOROUGHS = [
-    ("City of London",         "E09000001"), ("Barking and Dagenham",   "E09000002"),
-    ("Barnet",                 "E09000003"), ("Bexley",                 "E09000004"),
-    ("Brent",                  "E09000005"), ("Bromley",                "E09000006"),
-    ("Camden",                 "E09000007"), ("Croydon",                "E09000008"),
-    ("Ealing",                 "E09000009"), ("Enfield",                "E09000010"),
-    ("Greenwich",              "E09000011"), ("Hackney",                "E09000012"),
-    ("Hammersmith and Fulham", "E09000013"), ("Haringey",               "E09000014"),
-    ("Harrow",                 "E09000015"), ("Havering",               "E09000016"),
-    ("Hillingdon",             "E09000017"), ("Hounslow",               "E09000018"),
-    ("Islington",              "E09000019"), ("Kensington and Chelsea", "E09000020"),
-    ("Kingston upon Thames",   "E09000021"), ("Lambeth",                "E09000022"),
-    ("Lewisham",               "E09000023"), ("Merton",                 "E09000024"),
-    ("Newham",                 "E09000025"), ("Redbridge",              "E09000026"),
-    ("Richmond upon Thames",   "E09000027"), ("Southwark",              "E09000028"),
-    ("Sutton",                 "E09000029"), ("Tower Hamlets",          "E09000030"),
-    ("Waltham Forest",         "E09000031"), ("Wandsworth",             "E09000032"),
-    ("Westminster",            "E09000033"),
-]
+def _scope_arg() -> str:
+    argv = sys.argv[1:]
+    for i, a in enumerate(argv):
+        if a == "--scope" and i + 1 < len(argv):
+            return argv[i + 1]
+        if a.startswith("--scope="):
+            return a.split("=", 1)[1]
+    return os.environ.get("PH_SCOPE", "london")
+
+SCOPE_ID = _scope_arg().strip().lower()
+_scope_file = REPO_ROOT / "scopes" / f"{SCOPE_ID}.json"
+if not _scope_file.exists():
+    raise SystemExit(f"Unknown scope {SCOPE_ID!r}: no {_scope_file}. "
+                     f"Available: {', '.join(sorted(p.stem for p in (REPO_ROOT / 'scopes').glob('*.json')))}")
+_scope = json.loads(_scope_file.read_text(encoding="utf-8"))
+SCOPE_NAME = _scope["name"]
+SCOPE_REGION = _scope.get("region_code", "")
+BOROUGHS = [(n, c) for n, c in _scope["lads"]]
 SCOPE_LADS = {b[1] for b in BOROUGHS}
 LAD_NAMES = {b[1]: b[0] for b in BOROUGHS}
+IS_LONDON = SCOPE_ID == "london"
+
+# Where this scope's outputs go. London: the repo root and data/, as before.
+# Anywhere else: one folder holding that region's whole build.
+NATIONAL_DATA_DIR = REPO_ROOT / "data"
+if not IS_LONDON:
+    DATA_DIR = REPO_ROOT / "data" / "regions" / SCOPE_ID
+OUT_ROOT = REPO_ROOT if IS_LONDON else DATA_DIR
 
 # A scope fingerprint, so caches cannot silently replay a different footprint.
 SCOPE_KEY = hashlib.sha256(",".join(sorted(SCOPE_LADS)).encode()).hexdigest()[:10]
@@ -883,8 +896,17 @@ def get_lsoa_ward_lookup() -> dict:
             f"ONS LSOA->ward lookup: {ONS_LOOKUP_LAYER} returned no rows for "
             f"LAD25CD in {sorted(SCOPE_LADS)}. Has the ward vintage moved on?"
         )
+    # Every authority in the scope must come back. A mistyped or retired code
+    # in scopes/*.json would otherwise build a map with a hole where that
+    # authority should be, and nothing downstream would say so.
+    missing = sorted(SCOPE_LADS - {lad for _wd, lad in lookup.values()})
+    if missing:
+        raise RuntimeError(
+            f"ONS LSOA->ward lookup: no LSOAs for {', '.join(f'{LAD_NAMES[c]} ({c})' for c in missing)} "
+            f"in scope {SCOPE_ID}. Check scopes/{SCOPE_ID}.json against the LAD25 codes."
+        )
     write_json_atomic(ONS_LOOKUP_CACHE, {k: list(v) for k, v in lookup.items()})
-    ok(f"ONS lookup: {len(lookup):,} LSOAs across {len(SCOPE_LADS)} boroughs")
+    ok(f"ONS lookup: {len(lookup):,} LSOAs across {len(SCOPE_LADS)} authorities in {SCOPE_NAME}")
     return lookup
 
 def get_lsoa_to_ward() -> dict:
@@ -1365,6 +1387,12 @@ def run_imd2025() -> pd.DataFrame:
         key=lambda p: p.stat().st_size, reverse=True,
     )
     if not candidates:
+        # IMD is national and committed once, in data/demographics. A region
+        # reads that copy rather than needing its own.
+        national = NATIONAL_DATA_DIR / "demographics" / "imd2025.parquet"
+        if not out_path.exists() and national.exists():
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            out_path.write_bytes(national.read_bytes())
         if out_path.exists():
             out = pd.read_parquet(out_path)
             ok(f"imd2025: {len(out):,} LSOAs from the committed parquet "
@@ -2615,7 +2643,7 @@ LSOA_MSOA_LOOKUP = ("https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/"
 @lru_cache(maxsize=1)
 def get_lsoa_to_msoa() -> dict:
     """LSOA21CD -> MSOA21CD, from the ONS lookup, cached on disk."""
-    cache = CACHE_DIR / "lookups" / "lsoa21_msoa21.json"
+    cache = CACHE_DIR / "lookups" / f"lsoa21_msoa21_{SCOPE_KEY}.json"
     cache.parent.mkdir(parents=True, exist_ok=True)
     if cache.exists():
         try:
@@ -5020,14 +5048,14 @@ def export_all() -> None:
     vcse_data  = build_vcse_json()
     dental_data = build_dental_json()
 
-    write_json_atomic(REPO_ROOT / "ward_data.json",  ward_data)
-    write_json_atomic(REPO_ROOT / "lsoa_data.json",  lsoa_data)
-    write_json_atomic(REPO_ROOT / "msoa_data.json",  msoa_data)
-    write_json_atomic(REPO_ROOT / "borough_data.json", boro_data)
-    write_json_atomic(REPO_ROOT / "pharmacies.json", pharm_data)
-    write_json_atomic(REPO_ROOT / "vcse_data.json",  vcse_data)
+    write_json_atomic(OUT_ROOT / "ward_data.json",  ward_data)
+    write_json_atomic(OUT_ROOT / "lsoa_data.json",  lsoa_data)
+    write_json_atomic(OUT_ROOT / "msoa_data.json",  msoa_data)
+    write_json_atomic(OUT_ROOT / "borough_data.json", boro_data)
+    write_json_atomic(OUT_ROOT / "pharmacies.json", pharm_data)
+    write_json_atomic(OUT_ROOT / "vcse_data.json",  vcse_data)
     if dental_data:
-        write_json_atomic(REPO_ROOT / "dental_practices.json", dental_data)
+        write_json_atomic(OUT_ROOT / "dental_practices.json", dental_data)
     # Measured from the four payloads above, so it can never describe a
     # different build than the one being shipped.
     # Descriptors for anything in data/custom, so index.html can add the
@@ -5986,6 +6014,9 @@ def main() -> int:
                    help="Only run the named sources (default: all).")
     p.add_argument("--skip", nargs="+", choices=list(SOURCES), default=[],
                    help="Skip the named sources.")
+    p.add_argument("--scope", default=SCOPE_ID,
+                   help="Which scopes/<name>.json to build (default london). Read at "
+                        "import time; listed here so --help shows it.")
     p.add_argument("--export-only", action="store_true",
                    help="Skip all fetches; just rebuild ward/lsoa/pharmacy JSON "
                         "from the existing parquets and rewrite data/map/.")
