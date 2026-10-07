@@ -2413,7 +2413,7 @@
               <option value="core20_lsoa_count">Core20 LSOAs in ward · Ward</option>
               <option value="imd_score_ward">IMD composite score (ward, pop-weighted) · Ward</option>
               <option value="imd_score">IMD composite score · LSOA</option>
-              <option value="imd_decile_mean">IMD decile (ward mean) · Ward</option>
+              <option value="imd_decile_mean">IMD decile, ward mean (1 = most deprived) · Ward</option>
               <option value="imd_decile">IMD decile (1 = most deprived) · LSOA</option>
               <option value="income_score">Income deprivation score · LSOA</option>
               <option value="employment_score">Employment deprivation score · LSOA</option>
@@ -3655,7 +3655,7 @@ const CATS = [
   { key: "imd2025", label: "Deprivation", ico: "⚖", fields: [
     { k: "imd_score_ward",                   l: "IMD composite score (ward, pop-weighted mid-2022)", g: "ward" },
     { k: "imd_score",                        l: "IMD composite score",           g: "lsoa" },
-    { k: "imd_decile_mean",                  l: "IMD decile (ward mean)",        g: "ward" },
+    { k: "imd_decile_mean",                  l: "IMD decile, ward mean (1 = most deprived)", g: "ward" },
     { k: "imd_decile",                       l: "IMD decile (1 = most deprived)",g: "lsoa" },
     { k: "income_score",                     l: "Income deprivation",            g: "lsoa" },
     { k: "employment_score",                 l: "Employment deprivation",        g: "lsoa" },
@@ -5439,7 +5439,7 @@ function loadDentalLayer(practices) {
   practices.forEach(p => {
     if (!p.lat || !p.lng) return;
     const marker = L.marker([p.lat, p.lng], {icon: mkDentalIcon()});
-    const imdBadge = p.imd_decile ? `<div class="pop-row"><span class="pop-key">IMD decile</span><span>${_esc(p.imd_decile)}</span></div>` : '';
+    const imdBadge = p.imd_decile ? `<div class="pop-row"><span class="pop-key">IMD decile</span><span>${_esc(p.imd_decile)} of 10 (1 = most deprived)</span></div>` : '';
     marker.bindPopup(`<div class="pop-hdr" style="background:#7B2D8E">${_esc(p.name||p.n)}</div><div class="pop-body"><div class="pop-addr">${_esc(p.postcode||p.pc||'—')}</div>${imdBadge}</div>`);
     marker.bindTooltip(_esc(p.name||p.n), { direction: 'top', className: 'marker-tip' });
     dentalData.push({ name: p.name||p.n, postcode: p.postcode||p.pc, lat: p.lat, lng: p.lng, marker });
@@ -8895,7 +8895,7 @@ function showLSOA(feat) {
         <span class="cat-arrow open">▶</span>
       </div>
       <div class="cat-body open">
-        <div class="sr"><span class="sl">IMD decile<span class="gpill gpill-ward">lsoa</span></span><span class="sv real">${decile} / 10</span></div>
+        <div class="sr"><span class="sl">IMD decile<span class="gpill gpill-ward">lsoa</span></span><span class="sv real">${decile} of 10 (1 = most deprived)</span></div>
         <div class="sr"><span class="sl">IMD rank (of 33,755)<span class="gpill gpill-ward">lsoa</span></span><span class="sv real">${rank}</span></div>
         <div class="sr"><span class="sl">Assessment<span class="gpill gpill-ward">lsoa</span></span><span class="sv real">${depLabel}</span></div>
       </div>
@@ -9497,7 +9497,7 @@ function buildEmbeddedLSOALayer() {
         // distracting when panning/scrolling. Keep the tooltip but leave the
         // fill/border untouched. The selected LSOA still keeps its selected
         // style from imdStyle(..., 'selected').
-        const decStr = p.imd_decile ? `IMD decile ${p.imd_decile}` : '';
+        const decStr = p.imd_decile ? `IMD decile ${p.imd_decile} of 10 (1 = most deprived)` : '';
         const ovRows = ovTooltipRows(k => lsoaOvValue(p.code, k));
         lyr.bindTooltip(`<b style="font-size:var(--t-xs)">${p.name}</b><br><span style="font-size:var(--t-xs);color:var(--ink-3)">${p.ward}</span>${decStr ? '<br><span style="font-size:var(--t-xs)">'+decStr+'</span>' : ''}${ovRows}`, {sticky:true, opacity:.94}).openTooltip(e.latlng);
       });
@@ -10258,7 +10258,7 @@ function _syncDecileStrip() {
     const c = imdDecileColor(d);
     stops.push(`${c} ${(d - 1) * 10}%`, `${c} ${d * 10}%`);
   }
-  document.getElementById('mls-label').textContent = 'IMD decile';
+  document.getElementById('mls-label').textContent = 'IMD decile (1 = most deprived)';
   document.getElementById('mls-min').textContent = '1 = most deprived';
   document.getElementById('mls-max').textContent = '10';
   document.getElementById('mls-grad').style.background =
@@ -13845,13 +13845,24 @@ var PH_SHOW = {
     if (DATA_DATE) filename = filename.replace(/(\.[A-Za-z0-9]+)?$/, '-' + DATA_DATE + '$1');
     // Every CSV (Data export, Compare, Query, Directory, Custom area) also says
     // where it came from, so a file passed on without its email still names
-    // its source. At the end, after a blank line, rather than the top: the
-    // header row stays the first line, so the file still opens and joins the
-    // same way; delete the last two lines before loading it somewhere strict.
+    // its source. As a last column rather than trailing rows: rows after the
+    // data load as data in pandas, Excel and Power BI and break the join a
+    // CSV exists for, while an extra column is ignored by anything that does
+    // not ask for it. Line ends inside quoted cells are respected.
     if (/^text\/csv/.test(mime || '')) {
-      text = String(text).replace(/\n+$/, '') + '\n\n' + csvCell(
-        'Source: PopHealth Map (pophealth.uk), independent project, not an NHS service.' +
-        (DATA_DATE ? ' Data updated ' + DATA_DATE + '.' : '')) + '\n';
+      var src = csvCell('PopHealth Map (pophealth.uk), independent project, not an NHS service' +
+        (DATA_DATE ? '; data updated ' + DATA_DATE : ''));
+      var out = '', q = false, row = 0, start = 0, body = String(text).replace(/\n+$/, '');
+      for (var ci = 0; ci <= body.length; ci++) {
+        var ch = body[ci];
+        if (ch === '"') q = !q;
+        if ((ch === '\n' && !q) || ci === body.length) {
+          var line = body.slice(start, ci).replace(/\r$/, '');
+          out += line + (line ? ',' + (row ? src : 'source') : '') + '\n';
+          row++; start = ci + 1;
+        }
+      }
+      text = out;
     }
     var blob = new Blob([text], { type: mime || 'text/plain;charset=utf-8' });
     var url = URL.createObjectURL(blob);
