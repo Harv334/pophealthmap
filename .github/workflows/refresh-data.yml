@@ -116,8 +116,11 @@ jobs:
               print("failed=MANIFEST_UNREADABLE")
               print("last_run=")
               raise SystemExit(0)
+          # "partial" means a source kept some of last run's figures because
+          # this run's came back missing or thin. The map is still right, but
+          # somebody should know the upstream misbehaved, so it is reported.
           bad = sorted(k for k, v in (m.get("sources") or {}).items()
-                       if v.get("status") == "failed")
+                       if v.get("status") in ("failed", "partial"))
           print("failed=" + ",".join(bad))
           print("last_run=" + str(m.get("last_run", "")))
           PY

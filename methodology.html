@@ -682,6 +682,12 @@ var SOURCES = [
         '<br><span style="font-size:12px">The map is serving the last figures ' +
         'that did load, which are older than the date above.</span>';
     }
+    if (s.status === 'partial') {
+      return '<strong style="color:#8A5A00">partial</strong>' +
+        (when ? ' · ' + esc(when) : '') +
+        '<br><span style="font-size:12px">Some indicators did not load this time, ' +
+        'so the map keeps their previous figures, each labelled with its own period.</span>';
+    }
     return esc(when || 'unknown') + (rows ? '<br><span style="font-size:12px;color:var(--ink-3)">' +
       esc(rows) + '</span>' : '') +
       (rec.note ? '<br><span style="font-size:12px;color:var(--ink-3)">' + esc(rec.note) +
