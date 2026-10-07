@@ -83,7 +83,6 @@ def main() -> int:
     for key, filename in (
         ("dental", "dental_practices.json"),
         ("pharmacy", "pharmacies.json"),
-        ("culture", "culture.json"),
     ):
         rows = load(filename)
         if rows is None:

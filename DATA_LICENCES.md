@@ -69,7 +69,6 @@ uk-air.defra.gov.uk; the site asks for the domain as well as the department.
 | Street crime | data.police.uk (Home Office) | OGL v3 | |
 | Charity register | Charity Commission for England and Wales | OGL v3 | |
 | NHS trust sites (hospitals) | NHS Organisation Data Service | OGL v3 | |
-| Cultural Infrastructure Map | Greater London Authority | OGL v3 | "Contains public sector information licensed under the Open Government Licence v3.0" |
 | Basemap tiles | OpenStreetMap contributors | ODbL 1.0 | Attribution rendered by the map itself |
 
 ## Hand-compiled layers

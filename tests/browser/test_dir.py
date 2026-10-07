@@ -37,9 +37,8 @@ try:
     """)
     check("Directory mode opens its own pane",
           st["pane"] and st["rail"] == "true" and st["strip"], str(st))
-    # Six, not ten: schools, community centres, libraries, ESOL providers
-    # and CICs were replaced by one London-wide cultural infrastructure set.
-    check("all six datasets are listed", st["types"] == 6, str(st["types"]))
+    # GP practices, pharmacies, hospitals, dental practices and charities.
+    check("all five datasets are listed", st["types"] == 5, str(st["types"]))
     check("a substantial number of places loaded", st["total"] > 20000, str(st["total"]))
     check("the count states matches out of the total",
           "of" in st["count"] and "places" in st["count"], st["count"])
@@ -91,7 +90,7 @@ try:
     d.execute_script("""
       var q = document.getElementById('dir-q'); q.value = '';
       q.dispatchEvent(new Event('input', {bubbles:true}));
-      document.querySelector('#dir-types [data-dtype="culture"]').click();
+      document.querySelector('#dir-types [data-dtype="dentist"]').click();
     """)
     time.sleep(1.2)
     t = d.execute_script("""
@@ -100,7 +99,7 @@ try:
                count: document.getElementById('dir-count').textContent.trim() };
     """)
     check("a type filter restricts to that type",
-          t["rows"] and all("Culture" in r for r in t["rows"]),
+          t["rows"] and all("Dental" in r for r in t["rows"]),
           str(t["count"]) + " / " + (t["rows"][0][:60] if t["rows"] else "none"))
 
     # clicking a row puts it on the map
@@ -127,12 +126,12 @@ try:
 
     # re-entering does not refetch
     before = d.execute_script("""
-      return performance.getEntriesByType('resource').filter(r => r.name.includes('culture.json')).length;
+      return performance.getEntriesByType('resource').filter(r => r.name.includes('dental_practices.json')).length;
     """)
     d.execute_script("""document.querySelector('.mode-btn[data-mode="directory"]').click();""")
     time.sleep(3)
     after = d.execute_script("""
-      return { fetches: performance.getEntriesByType('resource').filter(r => r.name.includes('culture.json')).length,
+      return { fetches: performance.getEntriesByType('resource').filter(r => r.name.includes('dental_practices.json')).length,
                rows: document.querySelectorAll('#dir-list .dir-item').length };
     """)
     check("re-entering reuses what it loaded", after["fetches"] == before and after["rows"] > 0,

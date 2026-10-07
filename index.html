@@ -2207,11 +2207,6 @@
           <label class="lrow"><div class="ldot" style="background:#E89B1B"></div><span class="lname">Pharmacies <span class="lcount" id="pharm-count"></span></span><input type="checkbox" id="tph"></label>
         </div>
         <div class="sb-sec" style="flex-shrink:0;border-bottom:1px solid var(--line-2)">
-          <div class="sb-lbl">Culture &amp; creative space<button type="button" class="lhelp" title="Theatres, rehearsal rooms, artist and maker workspaces, recording studios and design workshops, from the GLA Cultural Infrastructure Map. This is where culture is made rather than where it is watched, so a rehearsal room counts and a cinema does not. It covers all 33 boroughs." aria-label="Explain this" aria-expanded="false">?</button></div>
-          <label class="lrow"><div class="ldot" style="background:#C2185B"></div><span class="lname">Culture &amp; creative spaces <span class="lcount" id="cult-count"></span></span><input type="checkbox" id="tcult"></label>
-          <div style="font-size:var(--t-xs);color:var(--ink-3);margin-top:4px;line-height:1.3">Source: GLA Cultural Infrastructure Map</div>
-        </div>
-        <div class="sb-sec" style="flex-shrink:0;border-bottom:1px solid var(--line-2)">
           <div class="sb-lbl">Boundaries and regions</div>
           <!-- The five Integrated Care Boards. Their footprints in London are
                unions of whole boroughs, so the geometry is dissolved from the
@@ -5078,7 +5073,6 @@ function applyPrefetchedCounts() {
       };
       setIf('dental-count', c.dental);
       setIf('pharm-count', c.pharmacy);
-      setIf('cult-count', c.culture);
       setIf('greenspace-count', c.greenspace);
       setIf('icb-count', c.icb);
       setIf('lsoa-count', c.lsoa);
@@ -5340,14 +5334,14 @@ function wireVCSE(records) {
 // ═══════════════════════════════════════════════════════════════════════════
 // LAZY POINT LAYERS
 // ═══════════════════════════════════════════════════════════════════════════
-/* These eight payloads used to be fetched from the top level of this script,
+/* These payloads used to be fetched from the top level of this script,
    so the browser started every one of them while the map was still being
    built, and finished none of them before the reader could have wanted any.
    Every single one of their toggles is off by default.
 
-   A cold load pulled about 15.4 MB of JSON, roughly 2.1 MB over the wire, to
-   put nothing on the screen: 11,134 VCSE organisations, 1,737 pharmacies,
-   1,663 dental practices and 1,557 cultural spaces, none of them drawn.
+   A cold load pulled about 14 MB of JSON to put nothing on the screen:
+   11,134 VCSE organisations, 1,737 pharmacies and 1,663 dental practices,
+   none of them drawn.
 
    They are fetched when something actually needs them now, following
    loadMsoaBoundaries, which has worked this way for a while. Three things
@@ -5367,7 +5361,6 @@ const LAYER_SOURCES = {
   vcse:      { url: 'vcse_data.json',        apply: d => wireVCSE(d) },
   dental:    { url: 'dental_practices.json', apply: d => loadDentalLayer(d) },
   pharmacy:  { url: 'pharmacies.json',       apply: d => loadPharmacyLayer(d) },
-  culture:   { url: 'culture.json',          apply: d => loadCultureLayer(d) },
 };
 const _layerLoads = {};
 
@@ -5499,54 +5492,10 @@ function loadPharmacyLayer(practices) {
 // Fetched by ensureLayerData('pharmacy') when the toggle asks for it.
 
 
-// Generic helper to build a clustered point layer with consistent styling
-function _mkCivicCluster(colour, rgba) {
-  return L.markerClusterGroup({
-    maxClusterRadius: 40,
-    showCoverageOnHover: false,
-    zoomToBoundsOnClick: true,
-    iconCreateFunction: cluster => {
-      const c = cluster.getChildCount();
-      const sz = c > 50 ? 36 : c > 20 ? 30 : 26;
-      return L.divIcon({ html:`<div style="background:${rgba};width:${sz}px;height:${sz}px;border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:var(--t-xs);font-weight:600;color:#fff;box-shadow:0 1px 4px rgba(0,0,0,.25)">${c}</div>`, iconSize:[sz,sz], iconAnchor:[sz/2,sz/2], className:'' });
-    }
-  });
-}
-function _mkCivicIcon(colour) {
-  return L.divIcon({ html: `<div style="background:${colour};width:10px;height:10px;border-radius:50%;border:1.5px solid #fff;box-shadow:0 1px 2px rgba(0,0,0,.3)"></div>`, iconSize:[10,10], iconAnchor:[5,5], className:'' });
-}
 function _esc(s) {
   if (s == null) return '';
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
-
-// ── Culture and creative spaces (GLA Cultural Infrastructure Map) ─────────
-// One layer in place of the four that used to sit here: schools, community
-// centres, libraries and ESOL providers. Each was a one-off scrape covering
-// only North West London, and a blank map in 24 boroughs reads as "none here"
-// rather than "never collected". This one is published, refreshed and covers
-// all 33. It is where culture is made rather than consumed, so it holds
-// rehearsal rooms and workshops, and no cinemas or libraries.
-const cultCluster  = _mkCivicCluster('#C2185B', 'rgba(194,24,91,.78)');
-let cultData = [];
-function loadCultureLayer(rows) {
-  cultCluster.clearLayers();
-  cultData = [];
-  rows.forEach(p => {
-    if (!p.lat || !p.lng) return;
-    const marker = L.marker([p.lat, p.lng], {icon: _mkCivicIcon('#C2185B')});
-    const tyRow = p.type ? `<div class="pop-row"><span class="pop-key">Type</span><span>${_esc(p.type)}</span></div>` : '';
-    const wdRow = p.ward_name ? `<div class="pop-row"><span class="pop-key">Ward</span><span>${_esc(p.ward_name)}</span></div>` : '';
-    marker.bindPopup(`<div class="pop-hdr" style="background:#C2185B">${_esc(p.name)}</div><div class="pop-body"><div class="pop-addr">${_esc([p.address,p.postcode].filter(Boolean).join(', '))}</div>${tyRow}<div class="pop-row"><span class="pop-key">Borough</span><span>${_esc(p.borough)}</span></div>${wdRow}</div>`);
-    marker.bindTooltip(`${_esc(p.name)} · ${_esc(p.type||'Cultural space')}`, { direction:'top', className:'marker-tip' });
-    cultCluster.addLayer(marker);
-    cultData.push({ ...p, marker });
-  });
-  const el = document.getElementById('cult-count');
-  if (el) el.textContent = cultData.length.toLocaleString();
-  console.log(`Loaded ${cultData.length} cultural spaces`);
-}
-// Fetched by ensureLayerData('culture') when the toggle asks for it.
 
 
 // ── VCSE filtering ────────────────────────────────────────────────────────
@@ -6332,7 +6281,6 @@ const REPORT_CREDITS = {
   pharmacy:     { meta: 'pharmacy',     use: 'Pharmacies' },
   dental:       { meta: 'dental',       use: 'Dental practices' },
   hospitals:    { name: 'NHS ODS trust sites register',     use: 'Hospitals' },
-  culture:      { name: 'GLA Cultural Infrastructure Map',  use: 'Culture and creative spaces' },
   vcse:         { name: 'Charity Commission register',      use: 'VCSE organisations' },
 };
 function reportCredits(keys) {
@@ -6527,7 +6475,7 @@ const REPORT_CSS = `
 
   .services-wrap { padding: 22px 40px 0; }
   .services-title { font-size: 9.5px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 8px; }
-  .services { display: grid; grid-template-columns: repeat(6, 1fr); border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
+  .services { display: grid; grid-template-columns: repeat(5, 1fr); border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
   .svc { padding: 12px 0 11px; }
   .svc + .svc { padding-left: 14px; border-left: 1px solid var(--rule); }
   .svc-val { font-size: 20px; font-weight: 700; line-height: 1.05; color: var(--ink); }
@@ -6864,10 +6812,6 @@ function _generateWardReport(_reportWindow, wn, opts) {
   let dentN  = _matchSpatial(typeof dentalData !== 'undefined' ? dentalData : []);
   let vcseN  = _matchSpatial(typeof vcseData !== 'undefined' ? vcseData : []);
   let grnN   = _matchSpatial(typeof GRN !== 'undefined' ? GRN : []);
-  // Spatially, not by ward_code: the GLA file names the ward but does not code
-  // it, and _matchByWardCode returns 0 rather than null for a list with no
-  // codes, which would pin this count at zero for every ward on the map.
-  let cultN  = _matchSpatial(typeof cultData !== 'undefined' ? cultData : []);
 
   // Lists for the comprehensive "Physical locations in this ward" section.
   const _byWardCode = (arr) => Array.isArray(arr) && wcode
@@ -6880,7 +6824,6 @@ function _generateWardReport(_reportWindow, wn, opts) {
       return _inWard(lat, lng);
     });
   };
-  const _cult     = _bySpatial(typeof cultData !== 'undefined' ? cultData : []);
   const _dental   = _bySpatial(typeof dentalData !== 'undefined' ? dentalData : []);
   const _hosp     = _bySpatial(typeof HOSP !== 'undefined' ? HOSP : []);
   const _vcse     = _bySpatial(typeof vcseData !== 'undefined' ? vcseData : []);
@@ -7251,7 +7194,6 @@ function _generateWardReport(_reportWindow, wn, opts) {
       <div class="svc"><div class="svc-val ${pharmN ? '' : 'dim'}">${pharmN ?? 0}</div><div class="svc-lbl">Pharmacy</div></div>
       <div class="svc"><div class="svc-val ${dentN ? '' : 'dim'}">${dentN  ?? 0}</div><div class="svc-lbl">Dental</div></div>
       <div class="svc"><div class="svc-val ${hospN ? '' : 'dim'}">${hospN  ?? 0}</div><div class="svc-lbl">Hospital</div></div>
-      <div class="svc"><div class="svc-val ${cultN ? '' : 'dim'}">${cultN  ?? 0}</div><div class="svc-lbl">Culture</div></div>
       <div class="svc"><div class="svc-val ${vcseN ? '' : 'dim'}">${vcseN  ?? 0}</div><div class="svc-lbl">VCSE</div></div>
     </div>
   </div>
@@ -7317,7 +7259,6 @@ function _generateWardReport(_reportWindow, wn, opts) {
       ${_locBlock('Pharmacies',           phs,      p => `<strong>${_esc(p.name||'')}</strong> <span class="meta">${_esc(p.addr||'')}${p.postcode?' · '+_esc(p.postcode):''}</span>`)}
       ${_locBlock('Dental practices',     _dental,  d => `<strong>${_esc(d.name||'')}</strong> <span class="meta">${d.postcode?_esc(d.postcode):''}</span>`)}
       ${_locBlock('Hospitals & clinics',  _hosp,    h => `<strong>${_esc(h.n||'')}</strong> <span class="meta">${_esc(h.a||'')}${h.t?' · '+_esc(h.t):''}${h.trust?' · '+_esc(h.trust):''}</span>`, 'span-2')}
-      ${_locBlock('Culture & creative spaces', _cult, c => `<strong>${_esc(c.name||'')}</strong> <span class="meta">${c.type?_esc(c.type):''}${c.address?' · '+_esc(c.address):''}${c.postcode?' · '+_esc(c.postcode):''}</span>`, 'span-2')}
       ${_locBlock('VCSE organisations',   _vcse,    v => `<strong>${_esc(v.name||'')}</strong> <span class="meta">${_esc(v.addr||'')}</span>`, 'span-2')}
       ${_locBlock('Parks & greenspaces',  _green,   g => `<strong>${_esc(g.n||'')}</strong> <span class="meta">${_esc(g.a||'')}${g.sz?' · '+_esc(g.sz):''}</span>`)}
     </div>
@@ -7325,8 +7266,8 @@ function _generateWardReport(_reportWindow, wn, opts) {
 
   <div class="footer">
     <div class="indep">PopHealth Map is an independent project, not an NHS service. Figures are published statistics for planning and discussion; check the source before relying on one.</div>
-    <strong>Data sources:</strong> ${reportCredits(['census', 'imd', crimeRows.length ? 'crime' : '', 'fuel_poverty', 'claimant', 'gp', 'pharmacy', 'dental', 'hospitals', 'culture', 'vcse']).map(_esc).join(' · ')}.
-    <div style="margin-top:6px">Service counts use a spatial test against the ward polygon (hospitals, dental, pharmacies, culture, VCSE). GP and pharmacy counts come from the ward indicator. &quot;vs London median&quot; bars use the median across every London ward that has a figure for that indicator — ${_ALL_WARDS.length.toLocaleString()} wards are on the map, and an indicator published at a coarser geography, or missing for the City, is compared against fewer. &quot;London percentile&quot; = % of those wards below this one.</div>
+    <strong>Data sources:</strong> ${reportCredits(['census', 'imd', crimeRows.length ? 'crime' : '', 'fuel_poverty', 'claimant', 'gp', 'pharmacy', 'dental', 'hospitals', 'vcse']).map(_esc).join(' · ')}.
+    <div style="margin-top:6px">Service counts use a spatial test against the ward polygon (hospitals, dental, pharmacies, VCSE). GP and pharmacy counts come from the ward indicator. &quot;vs London median&quot; bars use the median across every London ward that has a figure for that indicator — ${_ALL_WARDS.length.toLocaleString()} wards are on the map, and an indicator published at a coarser geography, or missing for the City, is compared against fewer. &quot;London percentile&quot; = % of those wards below this one.</div>
     ${reportProvenanceHtml()}
   </div>
 </div>
@@ -7527,7 +7468,7 @@ function _applyBoroughSolo() {
   _toggleLayerGroup(gpL, 'gp');
   _toggleLayerGroup(hL, 'hosp');
 
-  // 5. Marker-cluster point layers — pharmacy, dental, culture. They share the same
+  // 5. Marker-cluster point layers, pharmacy and dental. They share the same
   // shape (cluster + a data array of {marker, lat, lng}) so a single helper
   // filters them. _lad is computed lazily via the geocoder.
   const _filterClusterByBorough = (cluster, dataArr) => {
@@ -7547,7 +7488,6 @@ function _applyBoroughSolo() {
   };
   _filterClusterByBorough(pharmCluster,  typeof pharmData   !== 'undefined' ? pharmData   : []);
   _filterClusterByBorough(dentalCluster, typeof dentalData  !== 'undefined' ? dentalData  : []);
-  _filterClusterByBorough(cultCluster,   typeof cultData    !== 'undefined' ? cultData    : []);
 
   // 6. VCSE layer — re-use applyVCSEFilter() which already supports 'lad-<code>'.
   //    Also sync the VCSE-tab dropdown so the UI reflects the current focus.
@@ -8532,9 +8472,6 @@ function _setVcseLayerVisible(on) {
 _wireLazyToggle('td',  'dental',   dentalCluster);
 _wireLazyToggle('tph', 'pharmacy', pharmCluster);
 
-// ── Culture and creative space toggle (GLA Cultural Infrastructure Map) ──
-_wireLazyToggle('tcult', 'culture', cultCluster);
-
 // ═══════════════════════════════════════════════════════════════════════════
 // LSOA IMD LAYER (embedded — no external files needed)
 // ═══════════════════════════════════════════════════════════════════════════
@@ -9097,13 +9034,11 @@ window.generateLSOAReport = function(code) {
   const pharmN  = _matchSpatial(typeof pharmData !== 'undefined' ? pharmData : []);
   const dentN   = _matchSpatial(typeof dentalData !== 'undefined' ? dentalData : []);
   const hospN   = _matchSpatial(typeof HOSP !== 'undefined' ? HOSP : []);
-  const cultN   = _matchSpatial(typeof cultData !== 'undefined' ? cultData : []);
   const vcseN   = _matchSpatial(typeof vcseData !== 'undefined' ? vcseData : []);
   const _gp     = _bySpatial(typeof GPS !== 'undefined' ? GPS : []);
   const _pharm  = _bySpatial(typeof pharmData !== 'undefined' ? pharmData : []);
   const _dental = _bySpatial(typeof dentalData !== 'undefined' ? dentalData : []);
   const _hosp   = _bySpatial(typeof HOSP !== 'undefined' ? HOSP : []);
-  const _cult   = _bySpatial(typeof cultData !== 'undefined' ? cultData : []);
   const _vcse   = _bySpatial(typeof vcseData !== 'undefined' ? vcseData : []);
   const _green  = _bySpatial(typeof GRN !== 'undefined' ? GRN : []);
 
@@ -9339,7 +9274,6 @@ window.generateLSOAReport = function(code) {
       <div class="svc"><div class="svc-val ${pharmN ? '' : 'dim'}">${pharmN ?? 0}</div><div class="svc-lbl">Pharmacy</div></div>
       <div class="svc"><div class="svc-val ${dentN ? '' : 'dim'}">${dentN  ?? 0}</div><div class="svc-lbl">Dental</div></div>
       <div class="svc"><div class="svc-val ${hospN ? '' : 'dim'}">${hospN  ?? 0}</div><div class="svc-lbl">Hospital</div></div>
-      <div class="svc"><div class="svc-val ${cultN ? '' : 'dim'}">${cultN  ?? 0}</div><div class="svc-lbl">Culture</div></div>
       <div class="svc"><div class="svc-val ${vcseN ? '' : 'dim'}">${vcseN  ?? 0}</div><div class="svc-lbl">VCSE</div></div>
     </div>
   </div>
@@ -9398,7 +9332,6 @@ window.generateLSOAReport = function(code) {
       ${_locBlock('Pharmacies',           _pharm,   p => `<strong>${_esc(p.name||p.n||'')}</strong> <span class="meta">${_esc(p.addr||p.a||'')}${p.postcode||p.pc?' · '+_esc(p.postcode||p.pc):''}</span>`)}
       ${_locBlock('Dental practices',     _dental,  d => `<strong>${_esc(d.name||'')}</strong> <span class="meta">${d.postcode?_esc(d.postcode):''}</span>`)}
       ${_locBlock('Hospitals & clinics',  _hosp,    h => `<strong>${_esc(h.n||'')}</strong> <span class="meta">${_esc(h.a||'')}${h.t?' · '+_esc(h.t):''}</span>`, 'span-2')}
-      ${_locBlock('Culture & creative spaces', _cult, c => `<strong>${_esc(c.name||'')}</strong> <span class="meta">${c.type?_esc(c.type):''}${c.address?' · '+_esc(c.address):''}${c.postcode?' · '+_esc(c.postcode):''}</span>`, 'span-2')}
       ${_locBlock('VCSE organisations',   _vcse,    v => `<strong>${_esc(v.name||'')}</strong> <span class="meta">${_esc(v.addr||'')}</span>`, 'span-2')}
       ${_locBlock('Parks & greenspaces',  _green,   g => `<strong>${_esc(g.n||'')}</strong> <span class="meta">${_esc(g.a||'')}${g.sz?' · '+_esc(g.sz):''}</span>`)}
     </div>
@@ -9406,7 +9339,7 @@ window.generateLSOAReport = function(code) {
 
   <div class="footer">
     <div class="indep">PopHealth Map is an independent project, not an NHS service. Figures are published statistics for planning and discussion; check the source before relying on one.</div>
-    <strong>Data sources:</strong> ${reportCredits(['imd', 'census', crimeRows.length ? 'crime' : '', 'fuel_poverty', 'claimant', 'greenblue', 'gp', 'pharmacy', 'dental', 'hospitals', 'culture', 'vcse']).map(_esc).join(' · ')}.
+    <strong>Data sources:</strong> ${reportCredits(['imd', 'census', crimeRows.length ? 'crime' : '', 'fuel_poverty', 'claimant', 'greenblue', 'gp', 'pharmacy', 'dental', 'hospitals', 'vcse']).map(_esc).join(' · ')}.
     <div style="margin-top:6px">Service counts use spatial point-in-polygon test against this LSOA's boundary. &quot;vs London median&quot; bars compute against every London LSOA that has a figure for that indicator, out of ${_ALL_LSOAS.length.toLocaleString()} on the map.</div>
     ${reportProvenanceHtml()}
   </div>
@@ -11020,7 +10953,7 @@ _applyColourPalette();
 // The layers that ride in ?L=. tlsoa is deliberately not among them: it has
 // carried its own ?lsoa=1 since before this list existed, and links already in
 // circulation use it.
-const _URL_LAYERS = ['tg', 'th', 'tgr', 'td', 'tph', 'tv', 'tcult',
+const _URL_LAYERS = ['tg', 'th', 'tgr', 'td', 'tph', 'tv',
                      'ticb', 'tb', 'tnw', 'tmsoa'];
 const _URL_MODES = ['query', 'compare', 'report', 'csv', 'directory'];
 
@@ -11411,10 +11344,6 @@ function _buildSearchIndex() {
     if (typeof pharmData !== 'undefined' && Array.isArray(pharmData)) {
       pharmData.forEach(d => idx.push({ type:'pharmacy', label:d.name, sub:d.postcode || '', _lc:(d.name+' '+(d.postcode||'')).toLowerCase(), _lat:d.lat, _lng:d.lng }));
     }
-    // Culture and creative spaces
-    if (typeof cultData !== 'undefined' && Array.isArray(cultData)) {
-      cultData.forEach(d => idx.push({ type:'culture', label:d.name, sub:d.type || d.borough || '', _lc:(d.name+' '+(d.type||'')+' '+(d.postcode||'')).toLowerCase(), _lat:d.lat, _lng:d.lng }));
-    }
     // Charities (VCSE)
     if (typeof vcseData !== 'undefined' && Array.isArray(vcseData)) {
       vcseData.forEach(d => idx.push({ type:'charity', label:d.name, sub:d.addr || '', _lc:(d.name+' '+(d.addr||'')).toLowerCase(), _lat:d.lat, _lng:d.lng }));
@@ -11703,7 +11632,7 @@ function _runSearch(q) {
   // Group by type
   const groups = {};
   top.forEach(m => { (groups[m.type] = groups[m.type] || []).push(m); });
-  const order = ['ward','lsoa','GP','hospital','dental','pharmacy','culture','charity'];
+  const order = ['ward','lsoa','GP','hospital','dental','pharmacy','charity'];
   let html = '';
   order.forEach(t => {
     if (!groups[t]) return;
@@ -13159,7 +13088,6 @@ var PH_SHOW = {
     { id: 'pharmacy', label: 'Pharmacies',        one: 'pharmacy',         mode: 'indicator', key: 'pharmacy_count' },
     { id: 'hospital', label: 'Hospitals',         one: 'hospital',         mode: 'pip',       glob: 'HOSP' },
     { id: 'dentist',  label: 'Dental practices',  one: 'dental practice',  mode: 'pip',       src: 'dental_practices.json' },
-    { id: 'culture',  label: 'Culture spaces',    one: 'cultural space',   mode: 'pip',       src: 'culture.json' },
   ];
   function serviceById(id) {
     for (var i = 0; i < SERVICES.length; i++) if (SERVICES[i].id === id) return SERVICES[i];
@@ -14582,7 +14510,6 @@ var PH_SHOW = {
     { id: 'pharmacy', label: 'Pharmacies',        colour: '#E89B1B', src: 'pharmacies.json' },
     { id: 'hospital', label: 'Hospitals',         colour: '#A32D2D', glob: 'HOSP' },
     { id: 'dentist',  label: 'Dental practices',  colour: '#7B2D8E', src: 'dental_practices.json' },
-    { id: 'culture',  label: 'Culture & creative spaces', colour: '#C2185B', src: 'culture.json' },
     { id: 'vcse',     label: 'Charities (VCSE)',  colour: '#AE2573', src: 'vcse_data.json' },
   ];
   var DIR_CAP = 250;               // rows rendered; the count and the CSV are complete

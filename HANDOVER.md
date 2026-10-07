@@ -74,7 +74,6 @@ Not faults. Dates and identifiers that were true when written.
 | **Air quality year** | Each autumn | The run prints a warning telling you which labels to update |
 | **IMD** | About every 6 years | New release changes the file name and columns |
 | **Census** | 2031 | Fixed until then |
-| **Culture** | Yearly | The GLA republishes the Cultural Infrastructure Map. The pipeline finds the newest edition itself |
 
 ---
 
@@ -217,9 +216,6 @@ not rank. `sitemap.xml` and `robots.txt` were left out and would need writing.
   that always fails is one you learn to ignore.
 - **The City of London's 20 wards** have no deprivation or health figures. The
   wards are tiny and share almost no LSOAs, so there is nothing to average.
-- **Culture means where culture is made.** The GLA set holds rehearsal rooms,
-  workshops and studios, not cinemas or libraries. It replaced five
-  hand-compiled layers that covered North West London only.
 - **DWP benefits are absent.** The public figures stop in 2018. Current ones
   need a DWP Stat-Xplore API key.
 - **The question panel** from the original site is not here. It needed a paid
