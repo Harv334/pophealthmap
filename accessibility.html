@@ -114,7 +114,7 @@
   <div class="box warn">
     <p>
       <strong>The map's areas cannot be reached with a keyboard.</strong> The wards,
-      neighbourhoods and boundaries are drawn as shapes that only respond to a
+      LSOAs (small areas) and boundaries are drawn as shapes that only respond to a
       mouse or a touch. There are about 1,400 of them on screen at once, and making
       each one a keyboard stop would put the rest of the page hundreds of presses
       away.
@@ -123,8 +123,8 @@
       Everything the map can tell you is reachable another way:
     </p>
     <ul>
-      <li>The <strong>search box</strong> in the header finds a ward, a
-        neighbourhood, a GP practice, a pharmacy, a hospital or a charity by name
+      <li>The <strong>search box</strong> in the header finds a ward, an
+        LSOA, a GP practice, a pharmacy, a hospital or a charity by name
         or postcode.
         Choosing a result does exactly what clicking it on the map does.</li>
       <li><strong>Query</strong> lists the wards matching any set of conditions, as
@@ -141,7 +141,7 @@
   <dl>
     <dt>Building a custom area needs a mouse</dt>
     <dd>
-      A custom area is assembled by clicking neighbourhoods on the map, so it
+      A custom area is assembled by clicking LSOAs (small areas) on the map, so it
       currently cannot be built with a keyboard. Once built it can be sent as a
       link, which does open for anyone. Data export covers the same figures for
       published areas without needing the map.
@@ -171,6 +171,23 @@
     <dd>
       A few small bar and distribution graphics are drawn rather than written out.
       Every figure in them appears as a number nearby or in the ward's full profile.
+    </dd>
+
+    <dt>The printable ward and LSOA reports may not be fully accessible</dt>
+    <dd>
+      The reports open as a separate page for printing or saving as a PDF. Their
+      charts may not have full text alternatives, and a PDF saved from your
+      browser's print dialog may not carry the structure a screen reader needs.
+      The same figures are in the area's profile on the map and in Data export.
+    </dd>
+
+    <dt>Answers in the Ask panel are written by AI</dt>
+    <dd>
+      The <strong>Ask about this data</strong> panel answers questions in plain
+      text, and those answers are written by an AI model. They can be wrong or
+      leave things out, so check any figure against the area's profile or the
+      downloads before relying on it. The panel has not been tested with a screen
+      reader in the way the rest of the map has.
     </dd>
   </dl>
 
@@ -216,12 +233,12 @@
 
   <h3>How this was tested</h3>
   <p>
-    The site is checked with automated tests run in a real browser against the
-    published pages. Those tests measure the contrast of the site's text colours
-    against the WCAG formula, check that every control
-    has a name a screen reader can announce, check that every image has a text
-    alternative, and check that the page has one main heading, a main landmark and a
-    language set. Keyboard order and screen-reader behaviour are checked by hand.
+    The site was checked by hand in a real browser. The contrast of the site's
+    text colours was measured against the WCAG formula, controls were checked for
+    a name a screen reader can announce, images for a text alternative, and the
+    page for one main heading, a main landmark and a language set. Keyboard order
+    and screen-reader behaviour were tried by hand. These checks are not automated:
+    there is no accessibility test that runs each time the site changes.
   </p>
   <p>
     The site has <strong>not</strong> been through a formal external audit. This
@@ -235,13 +252,16 @@
       shortlist of areas rather than all 1,400 shapes.</li>
     <li>Making the custom area builder usable without a mouse, by letting areas be
       added from a list as well as from the map.</li>
-    <li>Adding the automated checks above to the build, so a change that breaks one
-      of them fails before it is published rather than after.</li>
+    <li>Turning the checks above into automated tests that run on every change,
+      so a change that breaks one of them fails before it is published rather than
+      after.</li>
   </ul>
 
   <p class="updated">
     This statement was prepared on 17 August 2026. It was last reviewed on
     5 October 2026. The site was last tested on 17 August 2026 against WCAG 2.2 AA.
+    <br>Last updated: 7 October 2026 (the text of this statement; the site has not
+    been re-tested since 17 August 2026).
   </p>
 
 </main>
