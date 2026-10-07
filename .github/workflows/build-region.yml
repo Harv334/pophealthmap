@@ -1,0 +1,86 @@
+name: Build region (pilot)
+
+# A trial build of one English region, for the rollout beyond London.
+#
+# Runs the same pipeline as the monthly refresh with --scope, which writes
+# everything under data/regions/<scope>/ and never touches the London files.
+# Nothing is committed: the region's outputs are uploaded as a run artifact to
+# download and inspect. Publishing regions on the site is a later step, once
+# the outputs have been checked and the app can switch region.
+#
+# The London-only sources are skipped until they have national replacements:
+#   tfl          TfL StopPoint covers London only (NaPTAN is the national one)
+#   ptal         GLA LSOA Atlas, London only
+#   air_quality  still cropped to a London bounding box
+
+on:
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: "Scope to build (a file in scopes/, e.g. north-east)"
+        required: true
+        default: "north-east"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-region-${{ github.event.inputs.scope }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      # Its own cache, keyed by scope, so a region build cannot evict or
+      # replace the downloads the monthly London refresh depends on.
+      - name: Restore upstream download cache
+        uses: actions/cache@v6
+        with:
+          path: .cache
+          key: region-cache-${{ github.event.inputs.scope }}-${{ github.run_id }}
+          restore-keys: |
+            region-cache-${{ github.event.inputs.scope }}-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run pipeline for the region
+        run: python fetch_all_data.py --scope "${{ github.event.inputs.scope }}" --skip tfl ptal air_quality
+
+      - name: Summarise the manifest
+        if: always()
+        run: |
+          python - <<'PY'
+          import json, pathlib, os
+          scope = os.environ["SCOPE"]
+          p = pathlib.Path("data/regions") / scope / "meta" / "manifest.json"
+          if not p.exists():
+              print("No manifest written."); raise SystemExit(0)
+          m = json.loads(p.read_text(encoding="utf-8"))
+          for k, v in sorted((m.get("sources") or {}).items()):
+              print(f"{k:22} {v.get('status',''):8} rows={v.get('rows_written','')} {v.get('error','')[:120]}")
+          PY
+        env:
+          SCOPE: ${{ github.event.inputs.scope }}
+
+      - name: Upload the region's outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: region-${{ github.event.inputs.scope }}
+          path: data/regions/${{ github.event.inputs.scope }}
+          if-no-files-found: warn
