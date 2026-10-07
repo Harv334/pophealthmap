@@ -141,6 +141,14 @@
      focus, and it should not draw a ring when clicked. */
   #map:focus { outline: none; }
   #map:focus-visible { outline: 3px solid var(--nhs-blue); outline-offset: -3px; }
+  /* Clicking or tapping an area should only thicken its border. Browsers can
+     add a box of their own on top: a focus outline round the shape on desktop,
+     and a shaded tap highlight over its bounding box on phones. Neither is the
+     selection, so both are off for map shapes. Paths only: marker icons keep
+     their focus ring, because keyboard users tab to them. */
+  .leaflet-container svg, path.leaflet-interactive { -webkit-tap-highlight-color: transparent; }
+  .leaflet-container svg:focus, path.leaflet-interactive:focus,
+  path.leaflet-interactive:focus-visible { outline: none; }
   html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--ink); }
 
   /* ── Layout ── */
@@ -4683,16 +4691,30 @@ const map = L.map('map', {
    area under the pointer comes back if no replay has already shown it, as
    it would have if the label had never gone. */
 (function () {
-  let openTip = null, replaying = false, resume = null;
+  let openTip = null, replaying = false, resume = null, touchedAt = -1e9;
+  // A tap on a ward or LSOA selects it and the sheet names it, so the hover
+  // label would only be a box drawn over the area just selected. On touch the
+  // selection is the bold border and nothing else. Parks, regions and markers
+  // keep their labels, because a tap on those opens nothing else.
+  map.getContainer().addEventListener('pointerdown', e => {
+    if (e.pointerType === 'touch') touchedAt = performance.now();
+  }, { capture: true, passive: true });
+  const selectable = src => {
+    try {
+      return !!src && ((typeof wLyr !== 'undefined' && wLyr && wLyr.hasLayer(src)) ||
+                       (typeof lsoaLyr !== 'undefined' && lsoaLyr && lsoaLyr.hasLayer(src)));
+    } catch (err) { return false; }
+  };
   map.on('tooltipopen', e => {
     const t = e.tooltip;
     const src = t._source;
     const el = src && typeof src.getElement === 'function' && src.getElement();
     const hovered = !!(el && el.matches(':hover'));
     const dragging = map.dragging && map.dragging.moving();
+    const tapped = performance.now() - touchedAt < 1000 && selectable(src);
     // A stray is shut without touching the label that is showing, so a
     // replay for an area the pointer has left cannot close the right one.
-    if (dragging || (replaying && !hovered)) {
+    if (tapped || dragging || (replaying && !hovered)) {
       if (dragging && hovered) resume = src;
       queueMicrotask(() => map.closeTooltip(t));
       return;
@@ -8000,11 +8022,12 @@ function _applyBoroughSolo() {
     });
   })();
 
-  /* "Start here": a handful of the most-asked-about figures above the eight
-     subject groups, so a first-time visitor faced with 126 indicators has an
-     obvious place to begin. The rows are the same indicators as in their own
+  /* "Key indicators": a handful of the most-asked-about figures above the
+     eight subject groups, so a visitor faced with 126 indicators has an
+     obvious place to begin. Named for what the rows are rather than for the
+     reader, who does not need telling where to start. The rows are the same indicators as in their own
      groups, so it is hidden while filtering rather than listing hits twice. */
-  const START_HERE = 'Start here';
+  const START_HERE = 'Key indicators';
   (function addStartHere() {
     const keys = ['imd_score_ward', 'census_bad_health_pct', 'census_disability_any_pct',
                   'claimant_rate_pct', 'fuel_poverty_pct', 'crime_rate_per_1000',
@@ -15262,7 +15285,7 @@ var PH_SHOW = {
       task: true,
       n: '<span class="tour-task-ask">Now try it yourself. Open the <strong>Indicators</strong> ' +
          'tab' + '<span class="tour-phone-only"> (tap the &#9776; button first)</span>' +
-         ', then tick <strong>IMD composite score</strong> under <em>Start here</em>. ' +
+         ', then tick <strong>IMD composite score</strong> under <em>Key indicators</em>. ' +
          'The map will colour every ward by how deprived it is.</span>' +
          '<span class="tour-task-done">That is it: every ward is now coloured by ' +
          'deprivation, and darker means more deprived. Click any ward to see its ' +
