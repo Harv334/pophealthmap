@@ -6400,8 +6400,8 @@ function _reportPercentile(vals, v) {
    its axes. Each row is one IMD domain; the dot is where the area sits among
    every London LSOA (left least deprived, right most), the tick is the London
    median. rows: [{ l, p }] with p from _reportPercentile. */
-function _reportDotPlot(rows) {
-  const W = 380, padL = 92, padR = 46, rowH = 23, top = 22;
+function _reportDotPlot(rows, opts) {
+  const W = 380, padL = 92, padR = 46, rowH = (opts && opts.rowH) || 23, top = 22;
   const x0 = padL, x1 = W - padR, span = x1 - x0;
   const H = top + rows.length * rowH + 6;
   const X = p => x0 + span * Math.max(0, Math.min(100, p)) / 100;
@@ -6544,6 +6544,60 @@ const REPORT_CSS = `
     .hero, .kpis, .keypoints, .services, .panel, .locblock { break-inside: avoid; page-break-inside: avoid; }
     .keypoints { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .badge, .kpi-ctx-bar, svg { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+`;
+/* The ward report is one A4 sheet: a compact header, the figures in two
+   columns, and the lists cut to three names each when printed. The LSOA and
+   area reports keep the longer single-column flow. */
+const WARD_ONEPAGE_CSS = `
+  .onepage .masthead { padding: 10px 32px; }
+  .onepage .hero { padding: 14px 32px 12px; gap: 22px; align-items: flex-start; }
+  .onepage .kicker .badge { font-size: 8.5px; padding: 2px 6px; margin: 0; }
+  .onepage .hero-text h1 { font-size: 30px; margin-top: 4px; }
+  .onepage .hero-text .sub { margin-top: 6px; font-size: 11.5px; }
+  .onepage .svcline { margin-top: 6px; font-size: 11px; color: var(--ink-2); }
+  .onepage .svcline span { color: var(--ink-3); }
+  .onepage .hero-text .badges { margin-top: 8px; }
+  .onepage .hero-map { flex: 0 0 150px; }
+  .onepage .minimap { width: 150px; height: 88px; }
+  .onepage .minimap-cap { display: none; }
+  .onepage .kpis { padding: 0 32px; }
+  .onepage .kpi { padding: 8px 10px 8px 0; }
+  .onepage .kpi-sub { margin-top: 2px; }
+  .onepage .kpi + .kpi { padding-left: 12px; }
+  .onepage .kpi-val { font-size: 20px; margin-top: 3px; }
+  .onepage .kpi-ctx { margin-top: 6px; }
+  .onepage .content.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 28px; padding: 0 32px 4px; }
+  .onepage .col { min-width: 0; }
+  .onepage .section-h, .onepage .locations h2 { margin: 16px 0 8px; padding-bottom: 6px; font-size: 13.5px; }
+  .onepage .panel { padding: 0 0 4px; margin-bottom: 8px; }
+  .onepage .panel h3 { margin-bottom: 5px; font-size: 10.5px; }
+  .onepage .legend { margin-top: 3px; font-size: 8.5px; }
+  .onepage table.ho { font-size: 10px; }
+  .onepage table.ho th { white-space: normal; vertical-align: bottom; line-height: 1.25; }
+  .onepage table.ho { table-layout: fixed; }
+  .onepage table.ho th:first-child, .onepage table.ho td:first-child { width: 34%; white-space: normal; }
+  .onepage table.ho th:last-child, .onepage table.ho td:last-child { width: 19%; white-space: normal; font-size: 9px; }
+  .onepage table.ho .u { display: none; }
+  .onepage table.ho td { padding: 4px 0 4px 10px; }
+  .onepage table.ho th { padding: 0 0 4px 10px; }
+  .onepage .locations { padding: 0 32px 10px; }
+  .onepage .locations-grid { gap: 8px 22px; }
+  .onepage .locblock h4 { margin-bottom: 4px; padding-bottom: 3px; font-size: 9px; }
+  .onepage .locblock ol { font-size: 9.5px; }
+  .onepage .locblock li { margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .onepage .locblock ol { list-style-position: inside; padding-left: 0; }
+  .onepage .locblock li.more { display: none; list-style: none; color: var(--ink-3); }
+  .onepage .footer { padding: 10px 32px 14px; font-size: 8.5px; line-height: 1.45; }
+  .onepage .footer .indep { font-size: 9.5px; margin-bottom: 4px; }
+  .onepage.measure .locblock li.extra { display: none; }
+  .onepage.measure .locblock li.more { display: list-item; }
+  @media print {
+    @page { size: A4 portrait; margin: 8mm; }
+    .onepage { zoom: var(--fit, 1); }
+    .onepage .locblock li.extra { display: none; }
+    .onepage .locblock li.more { display: list-item; }
+    .onepage .section-h, .onepage .locations h2 { margin-top: 12px; }
   }
 `;
 // ─────────────────────────────────────────────────────────────────────────
@@ -6691,7 +6745,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
   function _chartCompare(rows, opts) {
     opts = opts || {};
     const W = opts.width || 360;
-    const rowH = 22;
+    const rowH = opts.rowH || 22;
     const padL = opts.padL || 150;
     const padR = 60;
     const dp   = opts.dp == null ? 1 : opts.dp;
@@ -6896,7 +6950,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
     { l:'Higher managerial', v: inds.census_higher_managerial_pct,  ref: _median(_wardVals('census_higher_managerial_pct')),  descriptive: true, dp: 0 },
     { l:'Routine/semi',      v: inds.census_routine_semi_routine_pct, ref: _median(_wardVals('census_routine_semi_routine_pct')), descriptive: true, dp: 0 },
     { l:'No adult English first lang (HH)', v: inds.census_english_hh_none_pct, ref: _median(_wardVals('census_english_hh_none_pct')), descriptive: true, dp: 0 },
-  ], { width: 780, padL: 240 });
+  ], { width: 376, padL: 172, rowH: 18 });
 
   // ── Health & deprivation: IMD-domain radar + ward-level health bars ──
   const wardCode = (wdata && wdata.code) || '';
@@ -6943,7 +6997,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
   };
   const domainSVG = _reportDotPlot(_IMD_DOMAINS.map(d => ({
     l: d.l, p: _reportPercentile(_londonDomainVals(d.k), _wardDomainMean(d.k)),
-  })));
+  })), { rowH: 19 });
 
   const healthBars = _chartCompare([
     { l:'Good/very good health', v: inds.census_good_health_pct,        ref: _median(_wardVals('census_good_health_pct')),        wh: false, dp: 0 },
@@ -6954,7 +7008,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
     { l:'Fuel poverty',          v: inds.fuel_poverty_pct,              ref: _median(_wardVals('fuel_poverty_pct')),              wh: true,  dp: 1 },
     { l:'Unemployed',            v: inds.census_unemployed_pct,         ref: _median(_wardVals('census_unemployed_pct')),         wh: true,  dp: 1 },
     { l:'Claimant rate (16-64)', v: inds.claimant_rate_pct,             ref: _median(_wardVals('claimant_rate_pct')),             wh: true,  dp: 1 },
-  ], { width: 408, padL: 150 });
+  ], { width: 376, padL: 140, rowH: 16 });
 
   // ── Health outcomes: Local Health estimates, as a table ──
   // A table rather than more bars: the census bars are percentages on one
@@ -7018,7 +7072,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
     ref: _median(_wardVals(c.k)),
     c: '#7a3a3a',
   })).filter(r => r.v != null).sort((a,b) => (b.v||0) - (a.v||0));
-  const crimeSVG = crimeRows.length ? _chartHbar(crimeRows, { width: 780, padL: 200, dp: 0, unit: '' }) : '';
+  const crimeSVG = crimeRows.length ? _chartHbar(crimeRows, { width: 376, padL: 130, rowH: 15, dp: 0, unit: '' }) : '';
   const crimeTotal = _fmt(inds.crime_total);
 
   // ── Mini-map SVG: ward polygon on a borough-context backdrop ────────────
@@ -7118,7 +7172,10 @@ function _generateWardReport(_reportWindow, wn, opts) {
     if (!items || !items.length) {
       return `<div class="${cls}"><h4>${_esc(title)} <span class="count">0</span></h4><div class="empty">none</div></div>`;
     }
-    const lis = items.map(d => `<li>${fmt(d)}</li>`).join('');
+    // On screen every item; on paper the first two and a count of the rest,
+    // so the report still fits one A4 sheet however busy the ward is.
+    const lis = items.map((d, i) => `<li${i >= 2 ? ' class="extra"' : ''}>${fmt(d)}</li>`).join('') +
+      (items.length > 2 ? `<li class="more">and ${items.length - 2} more</li>` : '');
     return `<div class="${cls}"><h4>${_esc(title)} <span class="count">${items.length}</span></h4><ol>${lis}</ol></div>`;
   }
 
@@ -7136,138 +7193,88 @@ function _generateWardReport(_reportWindow, wn, opts) {
   const unempPctR = _pctile('census_unemployed_pct',  unempPct);
   const imdPct    = _pctile('imd_score', imdW);
 
-  // Key points: the handful of figures a reader should leave with, each
-  // against the London ward median so the number has something to mean.
-  const _medBad   = _median(_wardVals('census_bad_health_pct'));
-  const _medDis   = _median(_wardVals('census_disability_any_pct'));
-  const _claim    = _fmt(inds.claimant_rate_pct);
-  const _medClaim = _median(_wardVals('claimant_rate_pct'));
-  const keyPoints = _reportKeyPoints([
-    imdRank ? `Ranks <b>${imdRank} of ${totalWards}</b> London wards on deprivation, where 1 is the most deprived.` : '',
-    (c20L != null && totL) ? `<b>${c20L.toFixed(0)} of its ${totL.toFixed(0)} LSOAs</b> are among the most deprived 20% of areas in England (Core20).` : '',
-    (badHlt != null && _medBad != null) ? `<b>${badHlt.toFixed(1)}%</b> of residents report bad or very bad health, ${_reportVs(badHlt, _medBad, 1)} the London ward median of ${_medBad.toFixed(1)}%.` : '',
-    (disAny != null && _medDis != null) ? `<b>${disAny.toFixed(1)}%</b> are disabled under the Equality Act, ${_reportVs(disAny, _medDis, 1)} the median of ${_medDis.toFixed(1)}%.` : '',
-    (_claim != null && _medClaim != null) ? `The claimant rate is <b>${_claim.toFixed(1)}%</b> of 16 to 64 year olds, ${_reportVs(_claim, _medClaim, 1)} the median of ${_medClaim.toFixed(1)}%.` : '',
-  ]);
 
   const html = `<!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8">
 <title>${_esc(wdata ? wdata.name : wn)} | Ward profile | PopHealth Map</title>
 <link rel="stylesheet" href="${_reportFontsHref()}">
-<style>${REPORT_CSS}</style>
+<style>${REPORT_CSS}${WARD_ONEPAGE_CSS}</style>
 </head><body>
-<div class="report">
+<div class="report onepage">
   ${_reportMasthead('Ward profile')}
 
-  <!-- HERO -->
   <div class="hero">
     <div class="hero-text">
-      <div class="kicker">London ward profile · ${_esc(today)}</div>
+      <div class="kicker">London ward profile · ${_esc(today)}${isCore20 ? ' &nbsp;' + core20Badge : ''}</div>
       <h1>${_esc(wdata ? wdata.name : wn)}</h1>
-      <div class="sub">${_esc(borough)}${borough && population !== '—' ? ' · ' : ''}${population !== '—' ? 'Population ' + population : ''}${imdRank ? ' · IMD rank ' + imdRank + ' of ' + totalWards + ' London wards' : ''}</div>
-      <div class="badges">
-        ${core20Badge}
-        ${imdW != null ? `<span class="badge imd">IMD score ${imdW.toFixed(1)}</span>` : ''}
-      </div>
+      <div class="sub">${_esc(borough)}${borough && population !== '—' ? ' · ' : ''}${population !== '—' ? 'Population ' + population : ''}${imdRank ? ' · IMD rank ' + imdRank + ' of ' + totalWards + ' London wards (1 = most deprived)' : ''}</div>
+      <div class="svcline"><span>In this ward:</span> <b>${gpN ?? 0}</b> GP${gpN === 1 ? '' : 's'} · <b>${pharmN ?? 0}</b> pharmac${pharmN === 1 ? 'y' : 'ies'} · <b>${dentN ?? 0}</b> dental · <b>${hospN ?? 0}</b> hospital${hospN === 1 ? '' : 's'} · <b>${vcseN ?? 0}</b> VCSE</div>
     </div>
     ${miniMapSVG ? `<div class="hero-map">${miniMapSVG}</div>` : ''}
   </div>
 
-  <!-- KPI strip -->
   <div class="kpis">
     ${_kpi('Population',     popN  != null ? Math.round(popN).toLocaleString() : null, 'Census 2021')}
     ${_kpi('IMD score',      imdW != null ? imdW.toFixed(1) : null,   'higher = more deprived', _ctxBar(imdPct, 'lower-better'))}
     ${_kpi('Good health',    goodHlt != null ? goodHlt.toFixed(0) + '%' : null, 'of residents', _ctxBar(goodHpct, 'higher-better'))}
     ${_kpi('Bad health',     badHlt  != null ? badHlt.toFixed(1) + '%' : null, 'of residents', _ctxBar(badHpct, 'lower-better'))}
     ${_kpi('Disability',     disAny  != null ? disAny.toFixed(1) + '%' : null, 'any condition', _ctxBar(disAnyPct, 'lower-better'))}
-    ${_kpi('Core20 LSOAs',   (c20L != null && totL != null) ? c20L.toFixed(0) + '/' + totL.toFixed(0) : null, 'most deprived')}
+    ${_kpi('Core20 LSOAs',   (c20L != null && totL != null) ? c20L.toFixed(0) + '/' + totL.toFixed(0) : null, 'most deprived 20%')}
   </div>
 
-  ${keyPoints}
-
-  <!-- Services strip -->
-  <div class="services-wrap">
-    <div class="services-title">Services in this ward (counts)</div>
-    <div class="services">
-      <div class="svc"><div class="svc-val ${gpN ? '' : 'dim'}">${gpN  ?? 0}</div><div class="svc-lbl">GP</div></div>
-      <div class="svc"><div class="svc-val ${pharmN ? '' : 'dim'}">${pharmN ?? 0}</div><div class="svc-lbl">Pharmacy</div></div>
-      <div class="svc"><div class="svc-val ${dentN ? '' : 'dim'}">${dentN  ?? 0}</div><div class="svc-lbl">Dental</div></div>
-      <div class="svc"><div class="svc-val ${hospN ? '' : 'dim'}">${hospN  ?? 0}</div><div class="svc-lbl">Hospital</div></div>
-      <div class="svc"><div class="svc-val ${vcseN ? '' : 'dim'}">${vcseN  ?? 0}</div><div class="svc-lbl">VCSE</div></div>
-    </div>
-  </div>
-
-  <!-- All charts in flow, no forced page breaks -->
-  <div class="content">
-    <div class="section-h">Who lives here</div>
-    <div class="row row-2">
+  <div class="content cols">
+    <div class="col">
+      <div class="section-h">Who lives here</div>
+      <div class="panel"><h3>Ethnicity (Census 2021)</h3>${ethStack}</div>
+      <div class="panel"><h3>Age (Census 2021)</h3>${ageStack}</div>
       <div class="panel">
-        <h3>Ethnicity (Census 2021)</h3>
-        ${ethStack}
-      </div>
-      <div class="panel">
-        <h3>Age (Census 2021)</h3>
-        ${ageStack}
-        ${inds.census_over85_pct != null ? `<div class="note">85+: ${parseFloat(inds.census_over85_pct).toFixed(1)}% of residents</div>` : ''}
-      </div>
-    </div>
-    <div class="row">
-      <div class="panel" style="flex:1">
-        <h3>Demographic indicators vs London median</h3>
+        <h3>Compared with the London ward median</h3>
         ${compareCensus}
-        <div class="legend"><span class="legend-tick"></span> London median ·${_reportSwatch(REPORT_CMP.better)}better than the median,${_reportSwatch(REPORT_CMP.worse)}worse ·${_reportSwatch(REPORT_CMP.neutral)}describes who lives here, neither better nor worse</div>
+        <div class="legend"><span class="legend-tick"></span> London median ·${_reportSwatch(REPORT_CMP.better)}better ·${_reportSwatch(REPORT_CMP.worse)}worse ·${_reportSwatch(REPORT_CMP.neutral)}neither</div>
       </div>
+      ${crimeRows.length ? `<div class="section-h">Crime${crimeTotal != null ? ` · ${Math.round(crimeTotal).toLocaleString()} in 12 months` : ''}</div>
+      <div class="panel">
+        <h3>Recorded crime, ${_esc(reportCrimePeriod())}</h3>
+        ${crimeSVG}
+        <div class="legend"><span class="legend-tick"></span> London ward median · data.police.uk</div>
+      </div>` : ''}
     </div>
-
-    <div class="section-h">Health and deprivation</div>
-    <div class="row">
-      <div class="panel" style="flex:0 0 340px">
+    <div class="col">
+      <div class="section-h">Health and deprivation</div>
+      <div class="panel">
         <h3>Deprivation by domain, IMD 2025</h3>
         ${domainSVG}
-        <div class="legend">Where the ward (mean of its ${_wardLSOACodes.length} LSOAs) sits among all London LSOAs on each domain. P90 is more deprived than 90% of them; the dashed line is the London median.</div>
+        <div class="legend">Ward (mean of ${_wardLSOACodes.length} LSOAs) among all London LSOAs; P90 = more deprived than 90%. Dashed line: London median.</div>
       </div>
-      <div class="panel" style="flex:1">
-        <h3>Health &amp; economic indicators vs London median</h3>
+      <div class="panel">
+        <h3>Health and economic indicators</h3>
         ${healthBars}
-        <div class="legend"><span class="legend-tick"></span> London median &nbsp;·&nbsp; bar colour shows direction:${_reportSwatch(REPORT_CMP.better)}better than the median,${_reportSwatch(REPORT_CMP.worse)}worse</div>
+        <div class="legend"><span class="legend-tick"></span> London ward median ·${_reportSwatch(REPORT_CMP.better)}better ·${_reportSwatch(REPORT_CMP.worse)}worse</div>
       </div>
-    </div>
-    ${healthOutcomesTable ? `<div class="row">
-      <div class="panel" style="flex:1">
+      ${healthOutcomesTable ? `<div class="panel">
         <h3>Health outcomes</h3>
         ${healthOutcomesTable}
-        <div class="legend">OHID Fingertips Local Health estimates, published per MSOA and population-weighted onto the ward, so they are approximate. A standardised ratio compares deaths or admissions with what England's rates would give for the ages of the people living here: 100 is the England level, 120 is a fifth higher.</div>
-      </div>
-    </div>` : ''}
-
-    ${crimeRows.length ? `<div class="section-h">Crime in the last 12 months${crimeTotal != null ? ` · total ${Math.round(crimeTotal).toLocaleString()}` : ''}</div>
-    <div class="row">
-      <div class="panel" style="flex:1">
-        <h3>MPS recorded crime, ${_esc(reportCrimePeriod())}</h3>
-        ${crimeSVG}
-        <div class="legend"><span class="legend-tick"></span> London median · sorted by ward count · source: data.police.uk street-level crime</div>
-      </div>
-    </div>` : ''}
+        <div class="legend">OHID Local Health, MSOA estimates weighted onto the ward. Ratios: England = 100.</div>
+      </div>` : ''}
+    </div>
   </div>
 
-  <!-- ═══════════════ PHYSICAL LOCATIONS — comprehensive named lists ═══════════════ -->
   <div class="locations">
     <h2>Services and places in this ward</h2>
     <div class="locations-grid">
-      ${_locBlock('GP practices',         gps,      g => `<strong>${_esc(g.name||'')}</strong> <span class="meta">${_esc(g.addr||'')}${g.postcode?' · '+_esc(g.postcode):''}${g.tel?' · '+_esc(g.tel):''}</span>`)}
-      ${_locBlock('Pharmacies',           phs,      p => `<strong>${_esc(p.name||'')}</strong> <span class="meta">${_esc(p.addr||'')}${p.postcode?' · '+_esc(p.postcode):''}</span>`)}
+      ${_locBlock('GP practices',         gps,      g => `<strong>${_esc(g.name||'')}</strong> <span class="meta">${g.postcode?_esc(g.postcode):''}</span>`)}
+      ${_locBlock('Pharmacies',           phs,      p => `<strong>${_esc(p.name||'')}</strong> <span class="meta">${p.postcode?_esc(p.postcode):''}</span>`)}
       ${_locBlock('Dental practices',     _dental,  d => `<strong>${_esc(d.name||'')}</strong> <span class="meta">${d.postcode?_esc(d.postcode):''}</span>`)}
-      ${_locBlock('Hospitals & clinics',  _hosp,    h => `<strong>${_esc(h.n||'')}</strong> <span class="meta">${_esc(h.a||'')}${h.t?' · '+_esc(h.t):''}${h.trust?' · '+_esc(h.trust):''}</span>`, 'span-2')}
-      ${_locBlock('VCSE organisations',   _vcse,    v => `<strong>${_esc(v.name||'')}</strong> <span class="meta">${_esc(v.addr||'')}</span>`, 'span-2')}
-      ${_locBlock('Parks & greenspaces',  _green,   g => `<strong>${_esc(g.n||'')}</strong> <span class="meta">${_esc(g.a||'')}${g.sz?' · '+_esc(g.sz):''}</span>`)}
+      ${_locBlock('Hospitals and clinics', _hosp,   h => `<strong>${_esc(h.n||'')}</strong> <span class="meta">${h.t?_esc(h.t):''}</span>`)}
+      ${_locBlock('VCSE organisations',   _vcse,    v => `<strong>${_esc(v.name||'')}</strong>`)}
+      ${_locBlock('Parks and green spaces', _green, g => `<strong>${_esc(g.n||'')}</strong> <span class="meta">${g.sz?_esc(g.sz):''}</span>`)}
     </div>
   </div>
 
   <div class="footer">
     <div class="indep">PopHealth Map is an independent project, not an NHS service. Figures are published statistics for planning and discussion; check the source before relying on one.</div>
-    <strong>Data sources:</strong> ${reportCredits(['census', 'imd', crimeRows.length ? 'crime' : '', 'fuel_poverty', 'claimant', 'gp', 'pharmacy', 'dental', 'hospitals', 'vcse']).map(_esc).join(' · ')}.
-    <div style="margin-top:6px">Service counts use a spatial test against the ward polygon (hospitals, dental, pharmacies, VCSE). GP and pharmacy counts come from the ward indicator. &quot;vs London median&quot; bars use the median across every London ward that has a figure for that indicator — ${_ALL_WARDS.length.toLocaleString()} wards are on the map, and an indicator published at a coarser geography, or missing for the City, is compared against fewer. &quot;London percentile&quot; = % of those wards below this one.</div>
+    <strong>Sources:</strong> ${reportCredits(['census', 'imd', crimeRows.length ? 'crime' : '', 'fuel_poverty', 'claimant', 'gp', 'pharmacy', 'dental', 'hospitals', 'vcse']).map(_esc).join(' · ')}. Medians are across the ${_ALL_WARDS.length.toLocaleString()} London wards with a figure.
     ${reportProvenanceHtml()}
   </div>
 </div>
@@ -7275,6 +7282,27 @@ function _generateWardReport(_reportWindow, wn, opts) {
   <button onclick="window.print()">Print / Save as PDF</button>
   <button onclick="window.close()">Close</button>
 </div>
+<script>
+  // One A4 sheet, whatever the ward. Measured at the printed width with the
+  // print-only list rules applied, then scaled down for print if it would run
+  // onto a second page. A4 less 8 mm margins is 733 x 1062 CSS px.
+  (function _fitOnePage() {
+    const r = document.querySelector('.report.onepage');
+    if (!r) return;
+    const measure = () => {
+      const w = r.style.width;
+      r.style.width = '733px';
+      r.classList.add('measure');
+      const h = r.getBoundingClientRect().height;
+      r.classList.remove('measure');
+      r.style.width = w;
+      document.documentElement.style.setProperty('--fit', String(Math.min(1, 1050 / h)));
+    };
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(measure); else measure();
+    window.addEventListener('load', measure);
+    window.addEventListener('beforeprint', measure);
+  })();
+<\/script>
 <script>
   // Auto-wire per-chart "↓ SVG" download button on every .panel that contains
   // an <svg>. Click → serialize and download the chart as standalone SVG.
