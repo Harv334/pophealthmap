@@ -183,10 +183,7 @@ def main() -> int:
             "year it downloads, and the run warns you that the year printed on the "
             "map now needs updating."),
            ("Census 2021", "Cached. Fixed until the next census in 2031."),
-           ("Boundaries", "Cached. Changes only when ONS revise them."),
-           ("Culture and creative spaces", "Cached per edition. The pipeline "
-            "reads the GLA dataset listing and takes the newest workbook, so a "
-            "new edition arrives by itself.")],
+           ("Boundaries", "Cached. Changes only when ONS revise them.")],
           widths=[2.3, 4.0])
 
     h("Never refreshes on its own", 2)
@@ -222,9 +219,7 @@ def main() -> int:
             "The run tells you which labels to change."),
            ("Deprivation", "About every 6 years",
             "A new release changes the file name and the columns."),
-           ("Census", "2031", "Fixed until then."),
-           ("Culture and creative spaces", "Yearly",
-            "The GLA republish it. The pipeline finds the newest edition itself.")],
+           ("Census", "2031", "Fixed until then.")],
           widths=[1.5, 1.4, 3.4])
 
     # ── 5 ────────────────────────────────────────────────────────────────────
@@ -290,10 +285,6 @@ def main() -> int:
     bullet("The City of London's 20 wards have no deprivation or health figures. "
            "The wards are tiny and share almost no neighbourhoods, so there is "
            "nothing to average. That is the geography, not a fault.")
-    bullet("Culture means where culture is made. The GLA set holds rehearsal "
-           "rooms, workshops and studios, and no cinemas or libraries. It "
-           "replaced five hand-compiled layers that covered North West London "
-           "only, so every layer on the map now covers all 33 boroughs.")
     bullet("DWP benefit figures are not included. The publicly available ones "
            "stop in 2018. Current figures need a DWP Stat-Xplore account.")
     bullet("Some health figures are published for a whole borough and repeated "

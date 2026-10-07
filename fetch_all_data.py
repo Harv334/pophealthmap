@@ -23,7 +23,6 @@ only files you can drop in .cache/ are these, and both are optional:
 
 No cache needed - the script hits these APIs directly (cached between runs):
   - ODS 'ets' extract    (NHS trust sites, which hospitals are derived from)
-  - GLA London Datastore (Cultural Infrastructure Map)
   - OHID Fingertips      (health outcomes per LAD)
   - data.police.uk       (crime per borough polygon per month)
   - Nomis Census 2021    (topic-summary tables, ~150 MB first run, cached)
@@ -3440,125 +3439,6 @@ def run_hospitals() -> pd.DataFrame | None:
 
 
 # ============================================================================
-# SOURCE 6b: Cultural infrastructure  (GLA Cultural Infrastructure Map)
-# ============================================================================
-# Replaces five hand-built layers that only ever covered North West London:
-# schools, community centres, libraries, ESOL providers and CICs. Each was a
-# one-off scrape with nobody maintaining it, and a blank map in 24 of the 33
-# boroughs reads as "none here" rather than "not collected". This is one
-# published register, refreshed by the GLA, covering every borough.
-#
-# It is not a like-for-like swap. There are no libraries or schools in it: this
-# is where culture is MADE, not consumed, so a jewellery workshop and a rehearsal
-# room count and a cinema does not. That is a real narrowing, and it is written
-# up in methodology.html rather than left for somebody to notice.
-CULTURE_PACKAGE_URL = "https://data.london.gov.uk/api/action/package_show?id=2rj5o"
-CULTURE_FILE_RE = re.compile(r"GLA_Cultural_Infrastructure_Map_data_(\d{4})\.xlsx$", re.I)
-
-# The 20 typology codes the workbook ships, in the words a reader would use.
-# Anything new falls back to the code with its underscores taken out, so an
-# added typology appears rather than disappearing into a blank label.
-CULTURE_TYPES = {
-    "theatre": "Theatre",
-    "artist_workspaces": "Artist workspace",
-    "creative_workspace": "Creative workspace",
-    "jewellery_design": "Jewellery design",
-    "music_recording_studios": "Music recording studio",
-    "dance_rehearsal": "Dance rehearsal space",
-    "theatre_rehearsal": "Theatre rehearsal space",
-    "prop_and_costume_making": "Prop and costume making",
-    "makerspace": "Makerspace",
-    "making_and_manufacturing": "Making and manufacturing",
-    "set_and_exhibition_building": "Set and exhibition building",
-    "fashion_and_design": "Fashion and design",
-    "music_rehearsal_studios": "Music rehearsal studio",
-    "music_rehearsal": "Music rehearsal studio",
-    "creative_coworking_deskspace": "Creative co-working space",
-    "dance_performance": "Dance performance space",
-    "arts_centres": "Arts centre",
-    "textile_design": "Textile design",
-    "live_in_artists_workspace": "Live-in artist workspace",
-    "livein_artists_workspace": "Live-in artist workspace",
-}
-
-def _culture_discover_url() -> tuple[str, int]:
-    """The newest CIM workbook, from the dataset's own resource list.
-
-    The download path carries a short hash (.../2rj5o/e2b/...) that changes
-    every time GLA republish, so a hardcoded URL rots silently. Two sources
-    here were broken that way for months before anyone noticed.
-    """
-    r = _http_bytes(CULTURE_PACKAGE_URL, source="culture")
-    pkg = json.loads(r.content.decode("utf-8"))["result"]
-    found = []
-    for res in pkg.get("resources", []):
-        url = (res.get("url") or "").strip()
-        m = CULTURE_FILE_RE.search(url)
-        if m:
-            found.append((int(m.group(1)), url))
-    if not found:
-        raise RuntimeError(
-            f"culture: no GLA_Cultural_Infrastructure_Map_data_YYYY.xlsx in "
-            f"{CULTURE_PACKAGE_URL}. The dataset was restructured; check "
-            f"https://data.london.gov.uk/dataset/cultural-infrastructure-map")
-    year, url = max(found)
-    return url, year
-
-def run_culture() -> pd.DataFrame | None:
-    rule("Cultural infrastructure (GLA)")
-    url, year = _culture_discover_url()
-    cache = CACHE_DIR / "culture" / f"cim_{year}.xlsx"
-    cache.parent.mkdir(parents=True, exist_ok=True)
-    if cache.exists():
-        ok(f"CIM {year}: cached")
-    else:
-        r = _http_bytes(url, source="culture")
-        write_bytes_atomic(cache, r.content)
-        ok(f"CIM {year}: downloaded {len(r.content)/1e6:.2f} MB")
-
-    # keep_default_na=False, or an empty postcode cell arrives as a float NaN
-    # and every .strip() on this frame is a coin toss.
-    df = pd.read_excel(cache, dtype=str, keep_default_na=False)
-    need = {"name", "borough", "ward", "latitude", "longitude", "typology"}
-    missing = need - set(df.columns)
-    if missing:
-        raise RuntimeError(f"culture: CIM {year} is missing {sorted(missing)}; "
-                           f"the workbook layout changed ({url})")
-
-    lad_by_borough = {b.lower(): c for b, c in BOROUGHS}
-    rows = []
-    for _, r in df.iterrows():
-        lat, lng = _tofloat(r.get("latitude")), _tofloat(r.get("longitude"))
-        if lat is None or lng is None:
-            continue
-        borough = (r.get("borough") or "").strip()
-        lad = lad_by_borough.get(borough.lower(), "")
-        if not lad:
-            continue          # the file is London-only, so this is a rename
-        typ = (r.get("typology") or "").strip().lower()
-        addr = ", ".join(x.strip() for x in
-                         [r.get("address1"), r.get("address2"), r.get("address3")]
-                         if isinstance(x, str) and x.strip())
-        rows.append({
-            "name": (r.get("name") or "").strip(),
-            "address": addr,
-            "postcode": (r.get("postcode") or "").strip(),
-            "borough": borough,
-            "lad_code": lad,
-            "ward_name": (r.get("ward") or "").strip(),
-            "type": CULTURE_TYPES.get(typ, typ.replace("_", " ").capitalize()),
-            "lat": lat, "lng": lng,
-        })
-
-    out = pd.DataFrame(rows)
-    out_path = DATA_DIR / "culture" / "cultural_infrastructure.parquet"
-    out = write_parquet_guarded(out_path, out, source="culture")
-    ok(f"culture: {len(out):,} venues, {out.borough.nunique()} boroughs, "
-       f"{out['type'].nunique()} types (CIM {year})")
-    return out
-
-
-# ============================================================================
 # SOURCE 7: VCSE - Charity Commission for England & Wales (bulk extract)
 # ============================================================================
 CCEW_URLS = {
@@ -5130,16 +5010,6 @@ def build_dental_json() -> list:
     return out
 
 
-def build_culture_json() -> list:
-    """culture.json, in the shape the map's point layers already read."""
-    df = _read_parquet_opt(DATA_DIR / "culture" / "cultural_infrastructure.parquet")
-    if df is None:
-        return []
-    keep = [c for c in ["name", "address", "postcode", "borough", "lad_code",
-                        "ward_name", "type", "lat", "lng"] if c in df.columns]
-    return df[keep].sort_values("name").to_dict(orient="records")
-
-
 def export_all() -> None:
     rule("Export Leaflet JSON outputs")
     ward_data  = build_ward_data()
@@ -5149,7 +5019,6 @@ def export_all() -> None:
     pharm_data = build_pharmacies_json()
     vcse_data  = build_vcse_json()
     dental_data = build_dental_json()
-    culture_data = build_culture_json()
 
     write_json_atomic(REPO_ROOT / "ward_data.json",  ward_data)
     write_json_atomic(REPO_ROOT / "lsoa_data.json",  lsoa_data)
@@ -5159,8 +5028,6 @@ def export_all() -> None:
     write_json_atomic(REPO_ROOT / "vcse_data.json",  vcse_data)
     if dental_data:
         write_json_atomic(REPO_ROOT / "dental_practices.json", dental_data)
-    if culture_data:
-        write_json_atomic(REPO_ROOT / "culture.json", culture_data)
     # Measured from the four payloads above, so it can never describe a
     # different build than the one being shipped.
     # Descriptors for anything in data/custom, so index.html can add the
@@ -6063,7 +5930,6 @@ SOURCES = {
     "ptal":        run_ptal,
     "crime":       run_police_crime,
     "hospitals":   run_hospitals,
-    "culture":     run_culture,
     "charities":   run_charities,
     "dentists":    run_dentists,
 }
