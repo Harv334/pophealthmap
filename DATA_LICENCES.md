@@ -4,7 +4,8 @@ The code in this repository is MIT licensed (see LICENSE). The data is not.
 Nearly all of it is published under the **Open Government Licence v3.0**,
 which permits reuse including commercially, but **requires attribution**. That
 requirement is not satisfied by the MIT licence, so it is set out here and
-mirrored in the map's about panel.
+mirrored on the map itself, in the "Data credits" dialog opened from the map's
+attribution corner (index.html, `#credits-dlg`), and on methodology.html.
 
 If you reuse this project's outputs, carry these attributions with them.
 
