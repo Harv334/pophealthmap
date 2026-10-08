@@ -2352,7 +2352,6 @@
               <option value="census_disability_any_pct">Disability (any) % · Ward</option>
               <option value="census_disability_lot_pct">Disability (limited a lot) % · Ward</option>
               <option value="census_provides_unpaid_care_pct">Provides unpaid care % · Ward</option>
-              <option value="dental_practice_count">Dental practices (NHS) · Ward</option>
               <option value="ft_a_e_attendance_under_5">A&E attendances, ages 0 to 4 · Borough</option>
               <option value="ft_cervical_screening_25_49">Cancer screening coverage: cervical (25 to 49) · Borough</option>
               <option value="ft_child_poverty_low_income">Children in relative low income families (under 16) · Borough</option>
@@ -3323,7 +3322,6 @@ const OV_CFG = {
   core20_lsoa_count:               { lo:"Fewer", hi:"More",   wh:true,  min:0,    max:15   },
   // Population & demographics
   census_population:               { lo:"Fewer", hi:"More",   wh:false, min:6000, max:16000, descriptive:true },
-  dental_practice_count:           { lo:"Fewer", hi:"More",   wh:false, min:0,    max:8    },
   census_non_white_pct:            { lo:"Lower", hi:"Higher", wh:false, min:10,   max:80,   descriptive:true },
   census_born_outside_uk_pct:      { lo:"Lower", hi:"Higher", wh:false, min:20,   max:70,   descriptive:true },
   // Housing & transport. Tenure and car availability are descriptive: whether
@@ -3582,9 +3580,6 @@ const CATS = [
   // layer up on selection and dropping them from the ward sidebar.
   { key: "headline", label: "At a glance", ico: "◎", fields: [
     { k: "census_population",                l: "Census 2021 population",        g: "ward" },
-    { k: "gp_practice_count",                l: "GP practices",                  g: "ward" },
-    { k: "pharmacy_count",                   l: "Pharmacies",                    g: "ward" },
-    { k: "dental_practice_count",            l: "Dental practices (NHS)",        g: "ward" },
     { k: "crime_rate_per_1000",              l: "Crime rate per 1,000 residents", g: "ward" },
     { k: "crime_total",                      l: "Total crimes (12 months)",      g: "ward" },
     { k: "core20_lsoa_count",                l: "Core20 LSOAs in ward",          g: "ward" },
@@ -3803,7 +3798,6 @@ function _levelToast(msg) {
 const OV_META = {
   // Census (TS tables) — all ward-level via NOMIS
   census_population:              { src: "Census 2021 (TS001)", yr: "2021", g: "Ward", u: "people",  desc: "Usual resident population on Census day, 21 March 2021." },
-  dental_practice_count:          { src: "NHS ODS (egdpprac)", yr: "as at Sep 2026", g: "Ward, counted from point data", u: "practices", desc: "NHS contracted dental practices with a postcode in the ward. Private-only practices are not in the register, so a ward can read as empty when it is not, and people register across boundaries freely: this counts buildings, not access." },
   census_good_health_pct:         { src: "Census 2021 (TS037)",  yr: "2021", g: "Ward", u: "%",       desc: "Self-reported 'Good' or 'Very good' general health." },
   census_bad_health_pct:          { src: "Census 2021 (TS037)",  yr: "2021", g: "Ward", u: "%",       desc: "Self-reported 'Bad' or 'Very bad' general health." },
   census_disability_any_pct:      { src: "Census 2021 (TS038)",  yr: "2021", g: "Ward", u: "%",       desc: "Activities limited a little or a lot under the Equality Act." },
@@ -6190,10 +6184,12 @@ function showWard(wn) {
 
   const pop = inds.census_population ? `~${parseInt(inds.census_population).toLocaleString()}` : (wdata.pop || '');
 
-  // ── Key stats strip: population, good health %, GP count, Core20 ratio (all ward-level) ──
+  // ── Key stats strip: population, good health %, bad health %, Core20 ratio (all ward-level) ──
+  // Published figures only: a count of practices the site places in the ward
+  // is the site's own arithmetic, so it is not presented as an indicator.
   const fmt = v => (v === null || v === undefined || v === '' || isNaN(parseFloat(v))) ? null : parseFloat(v);
   const goodHlt = fmt(inds.census_good_health_pct);
-  const gpN     = fmt(inds.gp_practice_count);
+  const badHlt  = fmt(inds.census_bad_health_pct);
   const popN    = fmt(inds.census_population);
   const c20L    = fmt(inds.core20_lsoa_count);
   const totL    = fmt(inds.total_lsoa_count);
@@ -6208,7 +6204,7 @@ function showWard(wn) {
     <div class="keystats">
       ${stat('Population', popN !== null ? Math.round(popN).toLocaleString() : null, 'Census 2021')}
       ${stat('Good health', goodHlt !== null ? goodHlt.toFixed(0) + '%' : null, 'of residents')}
-      ${stat('GP practices', gpN !== null ? gpN.toFixed(0) : null, 'in ward')}
+      ${stat('Bad health', badHlt !== null ? badHlt.toFixed(1) + '%' : null, 'of residents')}
       ${stat('Core20 LSOAs', (c20L !== null && totL !== null) ? c20L.toFixed(0) + '/' + totL.toFixed(0) : null, 'most deprived')}
     </div>`;
 
@@ -7209,7 +7205,6 @@ function _generateWardReport(_reportWindow, wn, opts) {
       <div class="kicker">London ward profile · ${_esc(today)}${isCore20 ? ' &nbsp;' + core20Badge : ''}</div>
       <h1>${_esc(wdata ? wdata.name : wn)}</h1>
       <div class="sub">${_esc(borough)}${borough && population !== '—' ? ' · ' : ''}${population !== '—' ? 'Population ' + population : ''}${imdRank ? ' · IMD rank ' + imdRank + ' of ' + totalWards + ' London wards (1 = most deprived)' : ''}</div>
-      <div class="svcline"><span>In this ward:</span> <b>${gpN ?? 0}</b> GP${gpN === 1 ? '' : 's'} · <b>${pharmN ?? 0}</b> pharmac${pharmN === 1 ? 'y' : 'ies'} · <b>${dentN ?? 0}</b> dental · <b>${hospN ?? 0}</b> hospital${hospN === 1 ? '' : 's'} · <b>${vcseN ?? 0}</b> VCSE</div>
     </div>
     ${miniMapSVG ? `<div class="hero-map">${miniMapSVG}</div>` : ''}
   </div>
@@ -9295,16 +9290,6 @@ window.generateLSOAReport = function(code) {
 
   ${keyPoints}
 
-  <div class="services-wrap">
-    <div class="services-title">Services in this LSOA (counts inside polygon)</div>
-    <div class="services">
-      <div class="svc"><div class="svc-val ${gpN ? '' : 'dim'}">${gpN  ?? 0}</div><div class="svc-lbl">GP</div></div>
-      <div class="svc"><div class="svc-val ${pharmN ? '' : 'dim'}">${pharmN ?? 0}</div><div class="svc-lbl">Pharmacy</div></div>
-      <div class="svc"><div class="svc-val ${dentN ? '' : 'dim'}">${dentN  ?? 0}</div><div class="svc-lbl">Dental</div></div>
-      <div class="svc"><div class="svc-val ${hospN ? '' : 'dim'}">${hospN  ?? 0}</div><div class="svc-lbl">Hospital</div></div>
-      <div class="svc"><div class="svc-val ${vcseN ? '' : 'dim'}">${vcseN  ?? 0}</div><div class="svc-lbl">VCSE</div></div>
-    </div>
-  </div>
 
   <div class="content">
     <div class="section-h">Who lives here</div>
@@ -12521,7 +12506,7 @@ loadData();
                 figure, and the map should point to it. Set false to hide the
                 link; methodology.html stays published either way. */
 var PH_SHOW = {
-  devBanner:   true,
+  devBanner:   false,
   methodology: true,
 };
 (function () {
@@ -12959,7 +12944,6 @@ var PH_SHOW = {
     census_population: 'population',
     core20_lsoa_count: 'Core20 LSOAs',
     total_lsoa_count: 'LSOAs in the ward',
-    pharmacy_count: 'pharmacies',
     crime_total: 'total recorded crime',
     crime_rate_per_1000: 'crimes per 1,000 residents',
   };
@@ -13113,7 +13097,7 @@ var PH_SHOW = {
   // off the plural gets "pharmacie", so they are written out.
   var SERVICES = [
     { id: 'gp',       label: 'GP practices',      one: 'GP practice',      mode: 'pip',       glob: 'GPS' },
-    { id: 'pharmacy', label: 'Pharmacies',        one: 'pharmacy',         mode: 'indicator', key: 'pharmacy_count' },
+    { id: 'pharmacy', label: 'Pharmacies',        one: 'pharmacy',         mode: 'pip',       src: 'pharmacies.json' },
     { id: 'hospital', label: 'Hospitals',         one: 'hospital',         mode: 'pip',       glob: 'HOSP' },
     { id: 'dentist',  label: 'Dental practices',  one: 'dental practice',  mode: 'pip',       src: 'dental_practices.json' },
   ];
@@ -13493,13 +13477,12 @@ var PH_SHOW = {
       '</div>';
   }
 
-  function renderBody(w, gpCount) {
+  function renderBody(w) {
     var i = w.inds;
     var pop = num(i.census_population);
     var dec = num(i.imd_decile_mean);
     var o65 = num(i.census_over65_pct);
     var dis = num(i.census_disability_any_pct);
-    var ph  = num(i.pharmacy_count);
     // Health outcomes, from the Local Health set: they arrive with the
     // deferred half of the ward data, and the sheet is redrawn when it lands.
     var le  = num(i.ft_93283);
@@ -13521,8 +13504,6 @@ var PH_SHOW = {
                    '100 is the England level; 120 is a fifth more deaths than expected.' }) +
       kpi('Aged 65+', o65 == null ? null : o65.toFixed(0) + '<span>%</span>', 'of residents') +
       kpi('Disability (any)', dis == null ? null : dis.toFixed(0) + '<span>%</span>', 'Equality Act') +
-      kpi('GP practices', gpCount == null ? null : String(gpCount), 'in this ward') +
-      kpi('Pharmacies', ph == null ? null : String(Math.round(ph)), 'in this ward') +
       '</div>';
 
     bodyEl.innerHTML = insight(w) + strip + pinTable();
@@ -13558,7 +13539,7 @@ var PH_SHOW = {
     metaEl.textContent = meta.join(' · ');
 
     syncPinBtn();
-    renderBody(w, null);
+    renderBody(w);
     var wasOpen = sheet.classList.contains('open');
     sheet.classList.add('open');
     if (isNarrow()) {
@@ -13575,14 +13556,6 @@ var PH_SHOW = {
       sheetState = 0;
     }
     applyState();
-
-    // GP practices are not a pipeline indicator, so the count comes from a
-    // spatial test. It resolves in the same tick once GPS is loaded, but it is
-    // a promise, so the strip is filled in when it lands rather than blocking.
-    serviceCounts('gp').then(function (m) {
-      if (currentWard !== wn) return;
-      renderBody(w, m[wn] || 0);
-    });
   }
 
   function hide() {
@@ -13716,11 +13689,9 @@ var PH_SHOW = {
     syncPinBtn();
     if (currentWard) {
       var rec = wardRec(currentWard);
-      serviceCounts('gp').then(function (m) {
-        // lad as well, or the summary drops its borough comparisons on a pin.
-        renderBody({ name: currentWard, inds: (rec && rec.indicators) || {},
-                     lad: (rec && rec.lad) || '' }, m[currentWard] || 0);
-      });
+      // lad as well, or the summary drops its borough comparisons on a pin.
+      renderBody({ name: currentWard, inds: (rec && rec.indicators) || {},
+                   lad: (rec && rec.lad) || '' });
     }
     renderComparePane();
     renderCompareBar();

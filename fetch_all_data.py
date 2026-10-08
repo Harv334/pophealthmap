@@ -3877,10 +3877,11 @@ def build_ward_data() -> dict:
         return wards[code]
 
     gps = _read_parquet_opt(DATA_DIR / "healthcare" / "gp_practices.parquet")
+    # Practices, pharmacies and dentists are listed per ward but not counted
+    # into indicators: a count of points the site places in a ward is its own
+    # arithmetic, not a published figure, and the map only presents published
+    # figures as indicators.
     if gps is not None and "WD25CD" in gps.columns:
-        for wd, n in gps.groupby("WD25CD").size().items():
-            if wd:
-                _get(wd)["indicators"]["gp_practice_count"] = int(n)
         # Named GP list per ward (for ward-profile download)
         for wd, grp in gps.groupby("WD25CD"):
             if not wd:
@@ -3896,9 +3897,6 @@ def build_ward_data() -> dict:
 
     pharm = _read_parquet_opt(DATA_DIR / "healthcare" / "pharmacies.parquet")
     if pharm is not None and "WD25CD" in pharm.columns:
-        for wd, n in pharm.groupby("WD25CD").size().items():
-            if wd:
-                _get(wd)["indicators"]["pharmacy_count"] = int(n)
         # Named pharmacy list per ward
         for wd, grp in pharm.groupby("WD25CD"):
             if not wd:
@@ -3911,19 +3909,10 @@ def build_ward_data() -> dict:
             ]
         sources["pharmacy"] = "NHS ODS (edispensary)"
 
-    # Dental practices. The parquet has carried WD25CD on every row since the
-    # ODS rewrite, and nothing counted them: GP and pharmacy got a ward count
-    # each and dental was left out, so no ward has ever reported one.
-    #
-    # No named list to go with it, unlike GP and pharmacy. This is the NHS
-    # contracted register only, so a ward with private-only practices reads as
-    # empty; a count carries that caveat more honestly than a list of names
-    # that looks complete and is not.
+    # Dental practices are credited as a source (the reports list them) but,
+    # like GP practices and pharmacies, not counted into a ward indicator.
     dent = _read_parquet_opt(DATA_DIR / "healthcare" / "dental_practices.parquet")
-    if dent is not None and "WD25CD" in dent.columns:
-        for wd, n in dent.groupby("WD25CD").size().items():
-            if wd:
-                _get(wd)["indicators"]["dental_practice_count"] = int(n)
+    if dent is not None:
         sources["dental"] = "NHS ODS (egdpprac), NHS contracted practices only"
 
     crime = _read_parquet_opt(DATA_DIR / "crime" / "police_uk_crime.parquet")
@@ -4666,9 +4655,6 @@ def write_map_blob(name: str, payload, description: str) -> None:
 REGISTER_KEYS = {
     "tfl":        ("rail_station_dist_m", "rail_stations_1km",
                    "bus_stop_dist_m", "bus_stops_800m"),
-    "dentists":   ("dental_practice_count",),
-    "gp":         ("gp_practice_count",),
-    "pharmacies": ("pharmacy_count",),
 }
 
 
