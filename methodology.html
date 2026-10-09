@@ -374,14 +374,15 @@ not publish and practices do not work to.</p>
       and no Local Health indicators. They are tiny and share very few LSOAs,
       so there is nothing to aggregate. This is a property of the geography,
       not a fetch failure.</li>
-  <li><strong>MSOAs redrawn in 2021.</strong> Fingertips still publishes the
-      older Local Health series against 2011 MSOA codes. About 2% of MSOAs were
-      split, merged or redrawn for 2021. Using the ONS lookup
-      <code>MSOA11_MSOA21_LAD22_EW_LU</code>, a 2021 MSOA with no figure of its
-      own takes its 2011 parent's (where the parent was split) or the plain mean
-      of its 2011 parents' (where they were merged). These are estimates of the
-      2021 area, not published figures. Where a figure is still missing,
-      Fingertips suppressed it for small numbers or did not publish it.</li>
+  <li><strong>MSOAs redrawn in 2021.</strong> The older Local Health series
+      (the 2016/17 to 2020/21 hospital admissions) are published against 2011
+      MSOA codes, and Fingertips leaves out the MSOAs whose boundaries changed
+      in 2021: about 2% nationally, 39 in London. Those areas are blank for
+      those series rather than estimated. Where a 2011 figure is published for
+      an area that was split or merged, the pipeline carries it to the 2021
+      area using the ONS lookup <code>MSOA11_MSOA21_LAD22_EW_LU</code> (a split
+      takes its parent's figure, a merge the mean of its parents'). The newer
+      series are published on 2021 codes and cover every MSOA.</li>
   <li><strong>PTAL is London only.</strong> The public transport accessibility
       level is TfL's measure and has no national equivalent. Every region has
       the four NaPTAN station and bus stop measures instead.</li>
