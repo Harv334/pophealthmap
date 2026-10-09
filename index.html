@@ -2447,24 +2447,24 @@
               <option value="census_disability_any_pct">Disability (any) % · Ward</option>
               <option value="census_disability_lot_pct">Disability (limited a lot) % · Ward</option>
               <option value="census_provides_unpaid_care_pct">Provides unpaid care % · Ward</option>
-              <option value="ft_a_e_attendance_under_5">A&E attendances, ages 0 to 4 · Borough</option>
-              <option value="ft_cervical_screening_25_49">Cancer screening coverage: cervical (25 to 49) · Borough</option>
-              <option value="ft_child_poverty_low_income">Children in relative low income families (under 16) · Borough</option>
-              <option value="ft_depression_qof">Depression: QOF prevalence · Borough</option>
-              <option value="ft_flu_vaccination_65plus">Vaccination coverage: flu (65 and over) · Borough</option>
-              <option value="ft_healthy_life_expectancy_female">Healthy life expectancy at birth (female) · Borough</option>
-              <option value="ft_healthy_life_expectancy_male">Healthy life expectancy at birth (male) · Borough</option>
-              <option value="ft_hypertension_qof">Hypertension: QOF prevalence · Borough</option>
-              <option value="ft_life_expectancy_female">Life expectancy at birth (female) · Borough</option>
-              <option value="ft_life_expectancy_male">Life expectancy at birth (male) · Borough</option>
-              <option value="ft_mental_health_qof">Mental health: QOF prevalence · Borough</option>
-              <option value="ft_mmr_2_doses_age5">Vaccination coverage: MMR two doses at 5 years · Borough</option>
-              <option value="ft_obesity_adults">Overweight including obesity prevalence in adults · Borough</option>
-              <option value="ft_obesity_year6">Year 6 obesity, including severe obesity · Borough</option>
-              <option value="ft_physical_activity_adults">Physically active adults · Borough</option>
-              <option value="ft_self_harm_admissions_10_24">Hospital admissions for self-harm (10 to 24) · Borough</option>
-              <option value="ft_smoking_prevalence_adults">Smoking prevalence in adults (18+), current smokers · Borough</option>
-              <option value="ft_suicide_rate">Suicide rate · Borough</option>
+              <option value="ft_a_e_attendance_under_5">A&E attendances, ages 0 to 4 · Borough/council</option>
+              <option value="ft_cervical_screening_25_49">Cancer screening coverage: cervical (25 to 49) · Borough/council</option>
+              <option value="ft_child_poverty_low_income">Children in relative low income families (under 16) · Borough/council</option>
+              <option value="ft_depression_qof">Depression: QOF prevalence · Borough/council</option>
+              <option value="ft_flu_vaccination_65plus">Vaccination coverage: flu (65 and over) · Borough/council</option>
+              <option value="ft_healthy_life_expectancy_female">Healthy life expectancy at birth (female) · Borough/council</option>
+              <option value="ft_healthy_life_expectancy_male">Healthy life expectancy at birth (male) · Borough/council</option>
+              <option value="ft_hypertension_qof">Hypertension: QOF prevalence · Borough/council</option>
+              <option value="ft_life_expectancy_female">Life expectancy at birth (female) · Borough/council</option>
+              <option value="ft_life_expectancy_male">Life expectancy at birth (male) · Borough/council</option>
+              <option value="ft_mental_health_qof">Mental health: QOF prevalence · Borough/council</option>
+              <option value="ft_mmr_2_doses_age5">Vaccination coverage: MMR two doses at 5 years · Borough/council</option>
+              <option value="ft_obesity_adults">Overweight including obesity prevalence in adults · Borough/council</option>
+              <option value="ft_obesity_year6">Year 6 obesity, including severe obesity · Borough/council</option>
+              <option value="ft_physical_activity_adults">Physically active adults · Borough/council</option>
+              <option value="ft_self_harm_admissions_10_24">Hospital admissions for self-harm (10 to 24) · Borough/council</option>
+              <option value="ft_smoking_prevalence_adults">Smoking prevalence in adults (18+), current smokers · Borough/council</option>
+              <option value="ft_suicide_rate">Suicide rate · Borough/council</option>
               <option value="ft_93465">Alcohol-related conditions: admission episodes (all primary and secondary diagnoses) · MSOA</option>
               <option value="ft_93233">Chronic obstructive pulmonary disease (COPD): emergency hospital admissions · MSOA</option>
               <option value="ft_93229">Coronary heart disease: emergency hospital admissions · MSOA</option>
@@ -2951,7 +2951,7 @@
                 aria-label="What these area levels mean" aria-expanded="false"
                 title="The four sizes of area this map can colour. Borough is one of the 33 London local authorities. Ward is the electoral area a borough divides into, and London has 704. MSOA means Middle Layer Super Output Area, a statistical area of about 7,500 people, and London has 1,002. LSOA means Lower Layer Super Output Area, the smallest here, about 1,500 people, and London has 4,994. Wards sit inside boroughs, but MSOAs and LSOAs do not, so a ward is not a whole number of either. An indicator is only offered at the level it is published for."><span class="dl-help-word">Area level</span><span class="dl-help-mark" aria-hidden="true">?</span></button>
         <div class="dl-seg" id="dl-seg">
-          <button type="button" data-dl="borough" title="Borough level. The main Fingertips series is published per local authority, so this is the level those figures are actually measured at rather than repeated across every ward.">Borough</button>
+          <button type="button" data-dl="borough" title="Borough or council level. The main Fingertips series is published per local authority, so this is the level those figures are actually measured at rather than repeated across every ward.">Borough/council</button>
           <button type="button" data-dl="ward" class="active" title="Ward-level data (704 wards)">Ward</button>
           <button type="button" data-dl="msoa" title="MSOA level. MSOAs sit between wards and LSOAs and do not nest into wards. The Local Health indicators are published at this level, so they shade here; anything published elsewhere draws the boundaries only.">MSOA</button>
           <button type="button" data-dl="lsoa" title="LSOA-level data (4,994 LSOAs, the most detailed level here)">LSOA</button>
@@ -8461,7 +8461,7 @@ function _applyBoroughSolo() {
   // _levelName reads as part of a sentence ("no ward figures"), so it is lower
   // case. A pill is a label, not a sentence, and 'ward' beside 'MSOA' looks
   // like a mistake rather than a choice.
-  const _LVL_TITLE = { borough: 'Borough', ward: 'Ward', msoa: 'MSOA', lsoa: 'LSOA' };
+  const _LVL_TITLE = { borough: 'Borough/council', ward: 'Ward', msoa: 'MSOA', lsoa: 'LSOA' };
   function _levelTitle(lv) { return _LVL_TITLE[lv] || lv; }
   // Registries declare lv in whatever order was convenient. Pills always read
   // largest area first, so the same indicator looks the same everywhere.
@@ -15090,7 +15090,7 @@ var PH_SHOW = {
       '<div class="pop-body"><div class="pop-addr">' +
       _esc([rec.a, rec.pc].filter(Boolean).join(', ')) + '</div>' +
       '<div class="pop-row"><span class="pop-key">Type</span><span>' + _esc(rec.label) + '</span></div>' +
-      (rec.lad ? '<div class="pop-row"><span class="pop-key">Borough</span><span>' +
+      (rec.lad ? '<div class="pop-row"><span class="pop-key">Borough/council</span><span>' +
         _esc(rec.lad) + '</span></div>' : '') + '</div>'
     ).openPopup();
     map.setView([rec.lat, rec.lng], Math.max(map.getZoom(), 15));
@@ -16306,7 +16306,7 @@ var PH_SHOW = {
       '<div class="section-h">Figures for this area</div>' +
       '<table class="tbl"><tr><th>Indicator</th><th class="n">Value</th><th>How it was combined</th></tr>' + rows + '</table>' +
       '<div class="section-h">LSOAs included</div>' +
-      '<table class="tbl"><tr><th>LSOA</th><th>Name</th><th>Ward</th><th>Borough</th><th class="n">Population</th></tr>' + list + '</table>' +
+      '<table class="tbl"><tr><th>LSOA</th><th>Name</th><th>Ward</th><th>Borough/council</th><th class="n">Population</th></tr>' + list + '</table>' +
       '</div>' +
       '<div class="footer"><div class="indep">PopHealth Map is an independent project, not an NHS service. ' +
       'Figures are published statistics for planning and discussion; check the source before relying on one.</div>' +
