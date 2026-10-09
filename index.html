@@ -1507,8 +1507,7 @@
      working through the same element they always used, and the list is built
      from the select's own options so the two cannot drift apart. */
   /* Indicator picker: a card for what is on the map, then search, key
-     indicators, themes and recently used. A theme opens the library over the
-     map (.ovlib), where there is room for names and one-line meanings. */
+     indicators and themes. A theme opens in the sidebar (.ov-tv). */
   .ov-picker { display: flex; flex-direction: column; gap: 8px; }
   .ov-current { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px;
     border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
@@ -1559,56 +1558,36 @@
   .ov-theme-n { font-size: var(--t-xs); color: var(--ink-3); flex-shrink: 0; }
   .ov-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
 
-  /* The library, over the map. */
-  .ovlib { position: absolute; inset: 0; z-index: 3500; display: flex; background: rgba(33,43,50,.35); }
-  .ovlib[hidden] { display: none; }
-  .ovlib.full { position: fixed; z-index: 5000; }
-  .ovlib-panel { width: min(880px, 100%); height: 100%; background: var(--paper); display: flex;
-    flex-direction: column; box-shadow: 8px 0 24px rgba(0,0,0,.14); }
-  .ovlib-hd { display: flex; align-items: center; gap: 14px; padding: 12px 18px 12px 22px;
-    border-bottom: 1px solid var(--line); flex-wrap: wrap; }
-  .ovlib-hd h2 { margin: 0; font-size: 19px; font-weight: 700; color: var(--ink); }
-  .ovlib-hd .ovlib-n { font-size: 13px; color: var(--ink-3); flex: 1; }
-  .ovlib-x { appearance: none; width: 44px; height: 44px; border: 1px solid var(--line); border-radius: 8px;
-    background: var(--paper); cursor: pointer; display: flex; align-items: center; justify-content: center; }
-  .ovlib-body { flex: 1; display: flex; min-height: 0; }
-  .ovlib-rail { width: 220px; flex-shrink: 0; padding: 10px; border-right: 1px solid var(--line-2);
-    background: var(--paper-2); overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
-  .ovlib-rail button { appearance: none; font: inherit; font-size: 14px; min-height: 44px; padding: 0 10px;
-    border: 0; border-radius: 8px; background: transparent; color: var(--ink); cursor: pointer;
-    display: flex; align-items: center; gap: 9px; text-align: left; }
-  .ovlib-rail button span.t { flex: 1; }
-  .ovlib-rail button span.n { font-size: var(--t-xs); color: var(--ink-3); }
-  .ovlib-rail button:hover { background: var(--nhs-light); }
-  .ovlib-rail button.on { background: var(--line-2); font-weight: 700; }
-  .ovlib-main { flex: 1; min-width: 0; overflow-y: auto; padding: 18px 24px 32px; }
-  .ovlib-main h3 { margin: 0 0 4px; font-size: 22px; font-weight: 700; color: var(--ink); }
-  .ovlib-main .ovlib-blurb { margin: 0 0 18px; font-size: 14px; color: var(--ink-2); line-height: 1.5; }
-  .ovlib-main h4 { margin: 18px 0 6px; font-size: var(--t-xs); font-weight: 700; letter-spacing: .06em;
+  /* A theme, opened in the sidebar. */
+  .ov-tv { display: flex; flex-direction: column; gap: 4px; }
+  .ov-tv[hidden] { display: none; }
+  .ov-tv.in { animation: ov-tv-in .18s ease-out; }
+  @keyframes ov-tv-in { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .ov-tv.in { animation: none; } }
+  /* Back and the theme name stay in view while a long theme scrolls. */
+  .ov-tv-top { position: sticky; top: 0; z-index: 2; background: var(--paper);
+    padding: 4px 0 2px;
+    /* The sidebar's own top padding sits above a sticky element; the first
+       shadow paints over it so rows do not show through above the header. */
+    box-shadow: 0 -24px 0 var(--paper), 0 6px 6px -6px rgba(0,0,0,.12); }
+  .ov-back { appearance: none; font: inherit; align-self: flex-start; display: inline-flex; align-items: center;
+    gap: 4px; min-height: 32px; padding: 0 8px 0 4px; border: 0; border-radius: 6px; background: transparent;
+    color: var(--nhs-blue); font-size: 13.5px; font-weight: 600; cursor: pointer; }
+  .ov-back:hover { background: var(--nhs-light); }
+  .ov-tv-h { margin: 2px 0 4px; font-size: 17px; font-weight: 700; color: var(--ink);
+    display: flex; align-items: center; gap: 8px; }
+  .ov-tv-n { margin-left: auto; font-size: var(--t-xs); font-weight: 500; color: var(--ink-3); }
+  .ov-tv-sub { margin: 10px 0 3px; font-size: var(--t-xs); font-weight: 700; letter-spacing: .06em;
     text-transform: uppercase; color: var(--ink-3); }
-  .ovlib-row { appearance: none; font: inherit; width: 100%; box-sizing: border-box; text-align: left;
-    display: flex; gap: 14px; align-items: center; padding: 11px 13px; margin-bottom: 6px;
+  .ov-tv-row { appearance: none; font: inherit; width: 100%; box-sizing: border-box; text-align: left;
+    display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; margin-bottom: 4px;
     border: 1px solid var(--line-2); border-radius: 8px; background: var(--paper); cursor: pointer; }
-  .ovlib-row:hover { border-color: var(--nhs-blue); }
-  .ovlib-row.on { border-color: var(--nhs-blue); background: var(--nhs-light); }
-  .ovlib-row .txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-  .ovlib-row .nm { font-size: 15px; font-weight: 600; color: var(--ink); line-height: 1.3; }
-  .ovlib-row .ds { font-size: 13px; color: var(--ink-2); line-height: 1.4;
+  .ov-tv-row:hover { border-color: var(--nhs-blue); }
+  .ov-tv-row.on { border-color: var(--nhs-blue); background: var(--nhs-light); }
+  .ov-tv-row .nm { font-size: 14px; font-weight: 600; color: var(--ink); line-height: 1.3; }
+  .ov-tv-row .ds { font-size: 12.5px; color: var(--ink-2); line-height: 1.35;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  .ovlib-row .mt { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 3px;
-    max-width: 38%; }
-  .ovlib-row .lv { font-size: var(--t-xs); color: var(--ink); background: var(--line-2); border-radius: 4px;
-    padding: 2px 6px; white-space: nowrap; }
-  .ovlib-row .sr { font-size: var(--t-xs); color: var(--ink-3); text-align: right; }
-  @media (max-width: 700px) {
-    .ovlib-body { flex-direction: column; }
-    .ovlib-rail { width: auto; flex-direction: row; overflow-x: auto; border-right: 0;
-      border-bottom: 1px solid var(--line-2); padding: 8px; }
-    .ovlib-rail button { white-space: nowrap; flex-shrink: 0; }
-    .ovlib-main { padding: 14px 16px 24px; }
-    .ovlib-row { flex-direction: column; align-items: flex-start; }
-    .ovlib-row .mt { align-items: flex-start; max-width: none; flex-direction: row; flex-wrap: wrap; }
-  }
+  .ov-tv-row .mt { font-size: var(--t-xs); color: var(--ink-3); }
 
   /* ── Tour ─────────────────────────────────────────────────────────────────
      The design file's story strip: a chapter counter, a progress bar, one
@@ -2519,6 +2498,15 @@
             <input type="search" class="ov-search" id="ov-search" autocomplete="off"
                    placeholder="Search indicators" aria-label="Search indicators">
             <div class="ov-results" id="ov-results" hidden></div>
+            <div id="ov-theme-view" class="ov-tv" hidden>
+              <div class="ov-tv-top">
+              <button type="button" class="ov-back" id="ov-back">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+                All themes</button>
+              <h3 class="ov-tv-h" id="ov-tv-h"></h3>
+              </div>
+              <div class="ov-tv-list" id="ov-tv-list" role="list"></div>
+            </div>
             <div id="ov-home">
               <h3 class="ov-h">Key indicators</h3>
               <div class="ov-chips" id="ov-chips"></div>
@@ -2681,16 +2669,16 @@
           <!-- Top 20 / Bottom 20 rankings — single-indicator mode only -->
           <div id="rank-panel" style="display:none;margin-top:14px;padding-top:12px;border-top:1px solid var(--line-2)">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-              <div class="sb-lbl" style="margin:0">Top & bottom 20</div>
+              <div class="sb-lbl" style="margin:0">Top & bottom 10</div>
               <div id="rank-unit" style="font-size:var(--t-xs);color:var(--ink-3)"></div>
             </div>
             <div style="display:flex;gap:8px">
               <div style="flex:1;min-width:0">
-                <div id="rank-best-hdr" style="font-size:var(--t-xs);color:#0F6E56;font-weight:600;margin-bottom:4px">Best 20</div>
+                <div id="rank-best-hdr" style="font-size:var(--t-xs);color:#0F6E56;font-weight:600;margin-bottom:4px">Best 10</div>
                 <div id="rank-best" class="rank-list"></div>
               </div>
               <div style="flex:1;min-width:0">
-                <div id="rank-worst-hdr" style="font-size:var(--t-xs);color:#A32D2D;font-weight:600;margin-bottom:4px">Worst 20</div>
+                <div id="rank-worst-hdr" style="font-size:var(--t-xs);color:#A32D2D;font-weight:600;margin-bottom:4px">Worst 10</div>
                 <div id="rank-worst" class="rank-list"></div>
               </div>
             </div>
@@ -8889,79 +8877,50 @@ function _applyBoroughSolo() {
   const curBtns = document.getElementById('ov-cur-btns');
   searchEl.placeholder = 'Search ' + all.length + ' indicators, e.g. smoking';
 
-  // The library: built once, over the map.
-  const wrap = document.getElementById('map-wrap') || document.body;
-  const lib = document.createElement('div');
-  lib.className = 'ovlib';
-  lib.hidden = true;
-  lib.innerHTML =
-    '<div class="ovlib-panel" role="dialog" aria-modal="true" aria-labelledby="ovlib-h">' +
-      '<div class="ovlib-hd"><h2 id="ovlib-h">Indicator library</h2>' +
-        '<span class="ovlib-n">' + all.length + ' indicators in ' + model.length + ' themes</span>' +
-        '<button type="button" class="ovlib-x" aria-label="Close the library">' +
-          '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>' +
-        '</button></div>' +
-      '<div class="ovlib-body"><nav class="ovlib-rail" aria-label="Themes"></nav>' +
-        '<div class="ovlib-main"></div></div>' +
-    '</div>';
-  wrap.appendChild(lib);
-  const railEl = lib.querySelector('.ovlib-rail');
-  const mainEl = lib.querySelector('.ovlib-main');
-  let libTheme = model.length ? model[0].label : '';
-  let lastFocus = null;
+  /* A theme opens in the sidebar itself, sliding in over the home view,
+     rather than over the map: the map stays in sight and recolours with each
+     pick, and the list stays open so several can be tried in a row. */
+  const tvEl = document.getElementById('ov-theme-view');
+  const tvH = document.getElementById('ov-tv-h');
+  const tvList = document.getElementById('ov-tv-list');
+  let libTheme = null;
 
   function renderLib() {
     const cur = sel.value;
-    railEl.innerHTML = model.map((g, gi) =>
-      '<button type="button" data-th="' + gi + '" class="' + (g.label === libTheme ? 'on' : '') + '"' +
-        (g.label === libTheme ? ' aria-current="true"' : '') + '>' +
-        '<span class="ov-dot" style="background:' + colourOf(g.label) + '"></span>' +
-        '<span class="t">' + esc(g.label) + '</span><span class="n">' + g.opts.length + '</span></button>').join('');
-    const g = model.find(x => x.label === libTheme) || model[0];
-    if (!g) { mainEl.innerHTML = ''; return; }
-    mainEl.innerHTML = '<h3>' + esc(g.label) + '</h3>' +
-      '<p class="ovlib-blurb">' + esc((THEME_INFO[g.label] || ['', ''])[1]) + '</p>' +
-      subgroupsOf(g).map(sg =>
-        (sg.name ? '<h4>' + esc(sg.name) + '</h4>' : '') +
-        sg.opts.map(o =>
-          '<button type="button" class="ovlib-row' + (o.value === cur ? ' on' : '') + '" data-ov="' + esc(o.value) + '"' +
-            (o.value === cur ? ' aria-pressed="true"' : '') + '>' +
-            '<span class="txt"><span class="nm">' + esc(o.name) + '</span>' +
-              (descOf(o) ? '<span class="ds">' + esc(descOf(o)) + '</span>' : '') + '</span>' +
-            '<span class="mt"><span class="lv">' + esc(levelsText(o)) + '</span>' +
-              (o.native === 'borough' ? '<span class="sr" title="Published for each council as a whole, so every ward in a council shows the same figure">One figure per council</span>' : '') +
-              '<span class="sr">' + esc(srcText(o)) + '</span></span>' +
-          '</button>').join('')).join('');
-    mainEl.scrollTop = 0;
+    const g = model.find(x => x.label === libTheme);
+    if (!g) return;
+    tvH.innerHTML = '<span class="ov-dot" style="background:' + colourOf(g.label) + '"></span>' + esc(g.label) +
+      '<span class="ov-tv-n">' + g.opts.length + '</span>';
+    tvList.innerHTML = subgroupsOf(g).map(sg =>
+      (sg.name ? '<div class="ov-tv-sub">' + esc(sg.name) + '</div>' : '') +
+      sg.opts.map(o =>
+        '<button type="button" role="listitem" class="ov-tv-row' + (o.value === cur ? ' on' : '') + '" data-ov="' + esc(o.value) + '"' +
+          ' aria-pressed="' + (o.value === cur) + '">' +
+          '<span class="nm">' + esc(o.name) + '</span>' +
+          (descOf(o) ? '<span class="ds">' + esc(descOf(o)) + '</span>' : '') +
+          '<span class="mt">' + esc(levelsText(o)) + (o.native === 'borough' ? ' · one figure per council' : '') + '</span>' +
+        '</button>').join('')).join('');
   }
   function openLib(theme) {
-    if (theme) libTheme = theme;
-    lastFocus = document.activeElement;
-    // On a phone the sidebar is a drawer over the map, so the library covers
-    // the whole screen instead of sitting under it.
-    const narrow = window.PH_DRAWER && typeof PH_DRAWER.narrow === 'function' && PH_DRAWER.narrow();
-    lib.classList.toggle('full', !!narrow);
+    libTheme = theme || (model[0] && model[0].label);
     renderLib();
-    lib.hidden = false;
-    const on = railEl.querySelector('button.on');
-    if (on) on.focus();
+    homeEl.hidden = true;
+    tvEl.hidden = false;
+    // Restart the slide each time a theme opens.
+    tvEl.classList.remove('in'); void tvEl.offsetWidth; tvEl.classList.add('in');
+    const on = tvList.querySelector('.ov-tv-row.on');
+    (on && on.scrollIntoView) ? on.scrollIntoView({ block: 'nearest' }) : tvEl.scrollIntoView({ block: 'nearest' });
+    document.getElementById('ov-back').focus({ preventScroll: true });
   }
   function closeLib() {
-    lib.hidden = true;
-    if (lastFocus && lastFocus.focus) lastFocus.focus();
+    libTheme = null;
+    tvEl.hidden = true;
+    homeEl.hidden = false;
+    const t = themesEl.querySelector('.ov-theme.has-sel') || themesEl.querySelector('.ov-theme');
+    if (t) t.focus({ preventScroll: true });
   }
-  lib.addEventListener('click', e => {
-    if (e.target === lib) { closeLib(); return; }
-    if (e.target.closest('.ovlib-x')) { closeLib(); return; }
-    const th = e.target.closest('[data-th]');
-    if (th) { libTheme = model[+th.getAttribute('data-th')].label; renderLib();
-      const b = railEl.querySelector('button.on'); if (b) b.focus(); return; }
-    const row = e.target.closest('[data-ov]');
-    if (row) { choose(row.getAttribute('data-ov')); closeLib(); }
-  });
-  lib.addEventListener('keydown', e => {
-    if (e.key === 'Escape') { e.stopPropagation(); closeLib(); }
-  });
+  document.getElementById('ov-back').addEventListener('click', closeLib);
+  tvEl.addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); closeLib(); } });
 
   let filter = '';
 
@@ -9001,7 +8960,8 @@ function _applyBoroughSolo() {
         : '<div class="ov-empty">No indicator matches that.</div>';
     }
     resultsEl.hidden = !q;
-    homeEl.hidden = !!q;
+    homeEl.hidden = !!q || !!libTheme;
+    tvEl.hidden = !!q || !libTheme;
     if (q) return;
 
     chipsEl.innerHTML = KEY.map(k =>
@@ -9027,7 +8987,7 @@ function _applyBoroughSolo() {
 
   document.getElementById('ov-picker').addEventListener('click', e => {
     const th = e.target.closest('[data-th]');
-    if (th && !lib.contains(th)) { openLib(model[+th.getAttribute('data-th')].label); return; }
+    if (th) { openLib(model[+th.getAttribute('data-th')].label); return; }
     const pick = e.target.closest('[data-ov]');
     if (pick) choose(pick.getAttribute('data-ov'));
   });
@@ -9044,7 +9004,7 @@ function _applyBoroughSolo() {
   clearBtn.addEventListener('click', () => choose('none'));
 
   // Anything else that changes the overlay re-syncs the picker.
-  sel.addEventListener('change', () => setTimeout(() => { render(); if (!lib.hidden) renderLib(); }, 0));
+  sel.addEventListener('change', () => setTimeout(() => { render(); if (libTheme) renderLib(); }, 0));
 
   render();
 })();
@@ -10697,8 +10657,8 @@ function renderTopBottom() {
   // Descriptive → highest first, whatever wh says.
   const descriptive = !!cfg.descriptive;
   const lowFirst = cfg.wh && !descriptive;
-  const bestSlice  = lowFirst ? rows.slice(0, 20) : rows.slice(-20).reverse();
-  const worstSlice = lowFirst ? rows.slice(-20).reverse() : rows.slice(0, 20);
+  const bestSlice  = lowFirst ? rows.slice(0, 10) : rows.slice(-10).reverse();
+  const worstSlice = lowFirst ? rows.slice(-10).reverse() : rows.slice(0, 10);
 
   const unitEl = document.getElementById('rank-unit');
   if (unitEl) unitEl.textContent = `${rows.length} ${{ lsoa: 'LSOAs', msoa: 'MSOAs', borough: PH_IS_LONDON ? 'boroughs' : 'councils' }[level] || 'wards'}`;
@@ -10708,11 +10668,11 @@ function renderTopBottom() {
   // as a verdict on who lives there. Descriptive lists are named by the figure
   // and set in ink.
   if (descriptive) {
-    bestHdr.textContent  = 'Highest 20';
-    worstHdr.textContent = 'Lowest 20';
+    bestHdr.textContent  = 'Highest 10';
+    worstHdr.textContent = 'Lowest 10';
   } else {
-    bestHdr.textContent  = `Best 20 (${cfg.wh ? 'lowest' : 'highest'})`;
-    worstHdr.textContent = `Worst 20 (${cfg.wh ? 'highest' : 'lowest'})`;
+    bestHdr.textContent  = `Best 10 (${cfg.wh ? 'lowest' : 'highest'})`;
+    worstHdr.textContent = `Worst 10 (${cfg.wh ? 'highest' : 'lowest'})`;
   }
   bestHdr.style.color  = descriptive ? 'var(--ink)' : '#0F6E56';
   worstHdr.style.color = descriptive ? 'var(--ink)' : '#A32D2D';
