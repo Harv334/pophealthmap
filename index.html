@@ -76,6 +76,13 @@
     document.write('<link rel="preload" as="script" href="' +
       window.regionPath(window.PH_HEAD_DATA[k]) + '">');
   }
+
+  /* A region's own loading map (REGION_LOADER_MAP, made by
+     scripts/build_loader_map.py --region), loaded before the loader script
+     reads it. London's is inlined in the page as LOADER_MAP. */
+  if (!isLondon) {
+    document.write('<script src="' + window.PH_REGION.base + 'map/loader.js"><\/script>');
+  }
 })();
 </script>
 <title>PopHealth Map - London population health by ward and LSOA</title>
@@ -641,7 +648,10 @@
   .loading-overlay.hidden { display: none; }
   .ldr-card { display: flex; flex-direction: column; align-items: center;
     padding: 0 20px; max-width: 100%; }
-  .ldr-map { width: min(440px, 72vw); height: auto; display: block; overflow: visible; }
+  .ldr-map { width: min(440px, 72vw); height: auto; display: block; overflow: visible;
+    /* A region taller than it is wide (the North East) would otherwise run off
+       a short screen; the viewBox keeps its shape inside the cap. */
+    max-height: 62vh; }
   /* Empty wards are drawn, not hidden: the outline of London is recognisable
      immediately, and only the colour arrives progressively. --line rather than
      --line-2 because at this size the wards are a few pixels across, and
@@ -3123,20 +3133,30 @@ var LOADER_MAP = {w:1000,h:771,n:704,d:'IAAAAAAAAAAAAAJAAIAAFAAAIDFEECDGGCFDCCIC
   var svg = document.getElementById('ldr-map');
   var paths = [], order = [], painted = 0;
 
+  // London's map is inlined; a region's comes from its map/loader.js. A
+  // region without one gets the plain screen, the word "Loading" and no map,
+  // rather than the wrong place filling in.
+  var R0 = window.PH_REGION;
+  var LM = (R0 && !R0.isLondon)
+    ? window.REGION_LOADER_MAP
+    : (typeof LOADER_MAP === 'undefined' ? undefined : LOADER_MAP);
+
   function build() {
-    if (typeof LOADER_MAP === 'undefined' || !svg) return false;
-    // The loader map is London's wards. A region gets the plain screen: the
-    // word "Loading" and no map, rather than the wrong place filling in.
-    if (window.PH_REGION && !window.PH_REGION.isLondon) {
+    if (!svg) return false;
+    if (!LM) {
       svg.style.display = 'none';
       svg.setAttribute('aria-hidden', 'true');
       return false;
     }
-    var nums = decode(LOADER_MAP.p), i = 0, w = 0;
+    if (R0 && !R0.isLondon) {
+      svg.setAttribute('aria-label', 'A map of ' + R0.name +
+        "'s wards, filling in with deprivation colour while the page loads");
+    }
+    var nums = decode(LM.p), i = 0, w = 0;
     var frag = document.createDocumentFragment();
     var metrics = [];
 
-    while (i < nums.length && w < LOADER_MAP.n) {
+    while (i < nums.length && w < LM.n) {
       var count = nums[i++];
       var x = nums[i++], y = nums[i++];
       var d = 'M' + x + ' ' + y, sum = x;
@@ -3158,7 +3178,7 @@ var LOADER_MAP = {w:1000,h:771,n:704,d:'IAAAAAAAAAAAAAJAAIAAFAAAIDFEECDGGCFDCCIC
       w++;
     }
 
-    svg.setAttribute('viewBox', '0 0 ' + LOADER_MAP.w + ' ' + LOADER_MAP.h);
+    svg.setAttribute('viewBox', '0 0 ' + LM.w + ' ' + LM.h);
     svg.appendChild(frag);
     metrics.sort(function (m1, m2) { return m1.k - m2.k; });
     order = metrics.map(function (m) { return m.i; });
@@ -3184,7 +3204,7 @@ var LOADER_MAP = {w:1000,h:771,n:704,d:'IAAAAAAAAAAAAAJAAIAAFAAAIDFEECDGGCFDCCIC
       //
       // 'A' is index 0, the "no IMD mean for this ward" grey, so an unknown
       // ward needs no special case: it lands on IMD[0] and stays as it was.
-      paths[idx].style.fill = IMD[IDX[LOADER_MAP.d.charCodeAt(idx)]];
+      paths[idx].style.fill = IMD[IDX[LM.d.charCodeAt(idx)]];
     }
   }
 

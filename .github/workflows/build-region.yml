@@ -65,6 +65,11 @@ jobs:
       - name: Run pipeline for the region
         run: python fetch_all_data.py --scope "${{ github.event.inputs.scope }}" --skip tfl ptal
 
+      # The loading screen's ward map for this region (map/loader.js), drawn
+      # from the wards and IMD the pipeline has just written.
+      - name: Build the region's loading map
+        run: python scripts/build_loader_map.py --region "${{ github.event.inputs.scope }}"
+
       - name: Summarise the manifest
         if: always()
         run: |

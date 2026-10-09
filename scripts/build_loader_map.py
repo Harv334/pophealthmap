@@ -17,10 +17,19 @@ Run after any change to the ward boundaries or the IMD data:
 
 It rewrites the block between the LOADER MAP markers in index.html and makes
 no other change to the file.
+
+For a region build (see build-region.yml), pass the region's slug:
+
+    py scripts/build_loader_map.py --region north-east
+
+That reads the region's own wards and IMD from data/regions/<slug>/map/ and
+writes data/regions/<slug>/map/loader.js, which the page loads in place of the
+London map when it is opened on that region. index.html is not touched.
 """
 
 from __future__ import annotations
 
+import argparse
 import json
 import math
 import re
@@ -49,6 +58,10 @@ BOX = 1000
 # screen throws away. This is a little under a pixel: past it the Thames starts
 # losing its bends and the outer borough edges go visibly straight.
 TOLERANCE = 0.0011
+# The span (in cosine corrected degrees) London's tolerance was tuned for. A
+# region several times wider is drawn at the same size, so its tolerance
+# scales with its span: a pixel there covers proportionally more ground.
+LONDON_SPAN = 0.52
 
 
 def read_js_const(path: Path, name: str) -> dict:
@@ -120,15 +133,22 @@ def encode_varints(values) -> str:
 
 
 def main() -> int:
-    if not WARDS_JS.exists() or not IMD_JS.exists():
-        print(f"missing input: {WARDS_JS} or {IMD_JS}", file=sys.stderr)
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--region", help="region slug; writes data/regions/<slug>/map/loader.js")
+    args = ap.parse_args()
+    wards_js, imd_js = WARDS_JS, IMD_JS
+    if args.region:
+        map_dir = ROOT / "data" / "regions" / args.region / "map"
+        wards_js, imd_js = map_dir / "wards.js", map_dir / "lsoa_imd.js"
+    if not wards_js.exists() or not imd_js.exists():
+        print(f"missing input: {wards_js} or {imd_js}", file=sys.stderr)
         return 1
 
     print("reading ward boundaries...")
-    wards = read_js_const(WARDS_JS, "GJ")
+    wards = read_js_const(wards_js, "GJ")
 
     print("reading IMD and averaging to ward...")
-    imd = read_js_const(IMD_JS, "LSOA_IMD")
+    imd = read_js_const(imd_js, "LSOA_IMD")
     totals: dict[str, list[int]] = {}
     for feat in imd["features"]:
         props = feat.get("properties") or {}
@@ -173,11 +193,14 @@ def main() -> int:
         y = (max_y - pt[1]) * scale
         return round(x), round(y)
 
-    print(f"simplifying {len(feats)} wards at tolerance {TOLERANCE}...")
+    tolerance = TOLERANCE
+    if args.region:
+        tolerance = TOLERANCE * max(span, LONDON_SPAN) / LONDON_SPAN
+    print(f"simplifying {len(feats)} wards at tolerance {tolerance:.5f}...")
     packed, deciles, kept, raw_points, simple_points = [], [], 0, 0, 0
     for code, ring in feats:
         raw_points += len(ring)
-        simplified = rdp(ring, TOLERANCE)
+        simplified = rdp(ring, tolerance)
         pts, last = [], None
         for pt in simplified:
             xy = project(pt)
@@ -205,6 +228,17 @@ def main() -> int:
     )
     print(f"  encoded {len(blob) / 1024:.1f} KB")
 
+    data = (f"{{w:{width},h:{height},n:{kept},"
+            f"d:'{decile_str}',p:'{blob}'}}")
+    if args.region:
+        out = wards_js.parent / "loader.js"
+        out.write_text(
+            f"// The loading screen's ward map for this region, made by\n"
+            f"// scripts/build_loader_map.py --region {args.region}. Do not hand edit.\n"
+            f"var REGION_LOADER_MAP = {data};\n", encoding="utf-8")
+        print(f"wrote {out.relative_to(ROOT)} ({width}x{height} viewBox)")
+        return 0
+
     block = (
         f"{BEGIN}\n"
         "/* A simplified ward map of London with one IMD decile per ward, so the\n"
@@ -212,8 +246,7 @@ def main() -> int:
         "   Delta encoded varints in a base64 alphabet: see the decoder in\n"
         "   _paintLoaderMap, and scripts/build_loader_map.py for how it is made.\n"
         "   Do not hand edit. */\n"
-        f"var LOADER_MAP = {{w:{width},h:{height},n:{kept},"
-        f"d:'{decile_str}',p:'{blob}'}};\n"
+        f"var LOADER_MAP = {data};\n"
         f"{END}"
     )
 
