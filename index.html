@@ -4,6 +4,79 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- Which region this page is showing. London is the default and lives at the
+     repo root exactly as it always has; any other English region is opt-in via
+     ?r=<slug> and reads its data from data/regions/<slug>/. Inline and first so
+     everything below, including the data script loader at the end of the body,
+     can read PH_REGION. With no ?r= this changes nothing London fetches. -->
+<script>
+(function () {
+  var REGIONS = [
+    ['north-east', 'North East'],
+    ['north-west', 'North West'],
+    ['yorkshire-and-the-humber', 'Yorkshire and The Humber'],
+    ['east-midlands', 'East Midlands'],
+    ['west-midlands', 'West Midlands'],
+    ['east-of-england', 'East of England'],
+    ['london', 'London'],
+    ['south-east', 'South East'],
+    ['south-west', 'South West']
+  ];
+  // Regions whose data is published on the live site. The picker lists only
+  // these; any valid slug still opens via ?r= so a local build can be tested.
+  var LIVE = ['london'];
+  var id = 'london';
+  try {
+    var q = new URLSearchParams(location.search).get('r');
+    if (q) {
+      q = String(q).toLowerCase();
+      for (var i = 0; i < REGIONS.length; i++) if (REGIONS[i][0] === q) id = q;
+    }
+  } catch (e) { /* no URLSearchParams: London */ }
+  var name = 'London';
+  for (var j = 0; j < REGIONS.length; j++) if (REGIONS[j][0] === id) name = REGIONS[j][1];
+  var isLondon = id === 'london';
+  window.PH_REGIONS = REGIONS.map(function (r) { return { id: r[0], name: r[1] }; });
+  window.PH_REGIONS_LIVE = LIVE;
+  window.PH_REGION = {
+    id: id, name: name, isLondon: isLondon,
+    base: isLondon ? '' : 'data/regions/' + id + '/',
+    live: LIVE.indexOf(id) !== -1,
+    missing: false
+  };
+
+  /* Every data path the page asks for goes through here. London's paths come
+     back unchanged; a region's are moved into its folder:
+       ward_data.json            -> data/regions/<id>/ward_data.json
+       data/map/wards.js         -> data/regions/<id>/map/wards.js
+       data/meta/manifest.json   -> data/regions/<id>/meta/manifest.json
+       data/ward_core.json       -> data/regions/<id>/ward_core.json
+     A region build has no ward_core/ward_rest split, so those two 404 and the
+     loader falls back to ward_data.json, as it already does for London. */
+  window.regionPath = function (p) {
+    var R = window.PH_REGION;
+    if (!R || R.isLondon || typeof p !== 'string') return p;
+    if (/^(https?:)?\/\//.test(p) || p.indexOf(R.base) === 0) return p;
+    if (p.indexOf('data/map/') === 0) return R.base + 'map/' + p.slice(9);
+    if (p.indexOf('data/meta/') === 0) return R.base + 'meta/' + p.slice(10);
+    if (p.indexOf('data/') === 0) return R.base + p.slice(5);
+    if (p.indexOf('/') === -1) return R.base + p;
+    return p;
+  };
+
+  /* The classic data scripts the app needs before its main block runs. They
+     are written by the loader at the end of the body; preloading them here
+     keeps them downloading in parallel with everything above, as the static
+     tags they replaced did. */
+  window.PH_HEAD_DATA = ['data/map/wards.js', 'data/map/gp_practices.js',
+    'data/map/hospitals.js', 'data/map/boroughs.js', 'data/map/indicators.js',
+    'data/map/custom.js'];
+  for (var k = 0; k < window.PH_HEAD_DATA.length; k++) {
+    document.write('<link rel="preload" as="script" href="' +
+      window.regionPath(window.PH_HEAD_DATA[k]) + '">');
+  }
+})();
+</script>
 <title>PopHealth Map - London population health by ward and LSOA</title>
 <meta name="description" content="Population health across all 33 London boroughs at ward and LSOA level. Deprivation, life expectancy, GP and pharmacy access, crime and green space, built entirely from open NHS and government data.">
 
@@ -177,6 +250,9 @@
      had before. */
   .hdr-logo { font-size: var(--t-lg); font-weight: 600; color: var(--nhs-dark); margin: 0;
     letter-spacing: -.01em; }
+  .hdr-region { font-size: var(--t-xs); font-weight: 600; color: var(--ink-2);
+    margin-top: 1px; white-space: nowrap; }
+  .hdr-region[hidden] { display: none; }
   .hdr-right { display: flex; align-items: center; gap: 8px; }
 
   /* ── Header toolbar (Reset / Copy link / PNG / CSV) ── */
@@ -2043,6 +2119,8 @@
            shared link previewed under one name and opened under another. -->
       <div>
         <h1 class="hdr-logo">PopHealth Map<span class="dev-badge" title="This tool is still in development">In development</span></h1>
+        <!-- The region, shown only when it is not London (the default). -->
+        <div class="hdr-region" id="hdr-region" hidden></div>
       </div>
       <!-- Phones only. The search box lives in the drawer below 900px, which
            left the most-used control two taps away and invisible. This opens
@@ -2183,11 +2261,17 @@
 
       <!-- Layers tab -->
       <div class="tab-pane active" id="tab-layers" role="tabpanel" aria-labelledby="sbtab-layers">
+        <!-- Which region the map shows. Hidden while London is the only one
+             published; see PH_REGIONS_LIVE in the head and initRegionUi. -->
+        <div class="sb-sec" id="region-picker-wrap" hidden>
+          <label class="sb-lbl" for="region-picker" style="display:block">Area</label>
+          <select id="region-picker" aria-label="Area: which region the map shows" style="width:100%;padding:4px 6px;border:1px solid var(--line);border-radius:5px;font-size:var(--t-xs);color:var(--ink);background:var(--paper)"></select>
+        </div>
         <div class="sb-sec">
           <div class="sb-lbl">Point layers</div>
           <label class="lrow"><div class="ldot" style="background:#fff;box-shadow:inset 0 0 0 2px #2F3B45"></div><span class="lname">GP practices <span class="lcount" id="gp-count">0</span></span><input type="checkbox" id="tg"></label>
           <label class="lrow"><div class="ldot" style="background:#A32D2D"></div><span class="lname">Hospitals &amp; clinics <span class="lcount" id="hosp-count">0</span></span><input type="checkbox" id="th"></label>
-          <label class="lrow"><div class="ldot" style="background:#2E7D32"></div><span class="lname">Parks &amp; greenspaces <span class="lcount" id="greenspace-count"></span></span><input type="checkbox" id="tgr"></label>
+          <label class="lrow" id="greenspace-row"><div class="ldot" style="background:#2E7D32"></div><span class="lname">Parks &amp; greenspaces <span class="lcount" id="greenspace-count"></span></span><input type="checkbox" id="tgr"></label>
           <div id="greenspace-legend" style="display:none;margin:2px 0 6px 18px;padding:4px 6px;background:var(--paper-2);border-radius:4px">
             <div style="font-size:var(--t-xs);color:var(--ink-2);margin-bottom:3px">OS Open Greenspace categories</div>
             <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 6px;font-size:var(--t-xs);line-height:1.2">
@@ -2215,18 +2299,18 @@
                is the larger geography, and because an NHS reader usually
                knows their ICB before they know which borough they are
                looking at. -->
-          <label class="lrow"><div style="width:9px;height:9px;border:2px solid #8E44AD;border-radius:2px;flex-shrink:0"></div><span class="lname">ICB regions <span class="lcount" id="icb-count"></span><span class="lhelp" title="Integrated Care Boards. London has four, and each one covers whole boroughs: West and North, North East, South East and South West. Switch this on and click a region to zoom to it.">?</span></span><input type="checkbox" id="ticb"></label>
+          <label class="lrow" id="icb-row"><div style="width:9px;height:9px;border:2px solid #8E44AD;border-radius:2px;flex-shrink:0"></div><span class="lname">ICB regions <span class="lcount" id="icb-count"></span><span class="lhelp" title="Integrated Care Boards. London has four, and each one covers whole boroughs: West and North, North East, South East and South West. Switch this on and click a region to zoom to it.">?</span></span><input type="checkbox" id="ticb"></label>
           <!-- Its own control, under the layer it belongs to, rather than a
                group inside the borough dropdown. A board and a borough are two
                different sizes of thing, and one list offering both made the
                reader work out which kind each row was before choosing. -->
-          <div style="margin:2px 0 8px 18px">
+          <div id="icb-focus-wrap" style="margin:2px 0 8px 18px">
             <div style="font-size:var(--t-xs);color:var(--ink-2);margin-bottom:3px">Focus by ICB</div>
             <select id="icb-focus" aria-label="Focus by Integrated Care Board" style="width:100%;padding:4px 6px;border:1px solid var(--line);border-radius:5px;font-size:var(--t-xs);color:var(--ink);background:var(--paper)">
               <option value="all">All ICBs</option>
             </select>
           </div>
-          <label class="lrow"><div style="width:9px;height:9px;border:2px solid #1a1a1a;border-radius:2px;flex-shrink:0"></div><span class="lname">London boroughs</span><input type="checkbox" id="tb"></label>
+          <label class="lrow"><div style="width:9px;height:9px;border:2px solid #1a1a1a;border-radius:2px;flex-shrink:0"></div><span class="lname" id="tb-name">London boroughs</span><input type="checkbox" id="tb"></label>
           <div style="margin:4px 0 8px 0">
             <div style="font-size:var(--t-xs);color:var(--ink-2);margin-bottom:3px">Focus by borough</div>
             <select id="borough-focus" style="width:100%;padding:4px 6px;border:1px solid var(--line);border-radius:5px;font-size:var(--t-xs);color:var(--ink);background:var(--paper)">
@@ -2728,7 +2812,7 @@
             <div class="q-sentence" id="q-services"></div>
 
             <div class="q-step" style="margin-top:12px"><span class="q-step-n">2</span>Where should it be?</div>
-            <div class="q-hint">One borough, or all 33.</div>
+            <div class="q-hint" id="q-scope-hint">One borough, or all 33.</div>
             <div class="q-sentence" id="q-scope"></div>
 
             <div class="q-step" style="margin-top:12px"><span class="q-step-n">3</span>Which figures must it meet?</div>
@@ -3040,6 +3124,13 @@ var LOADER_MAP = {w:1000,h:771,n:704,d:'IAAAAAAAAAAAAAJAAIAAFAAAIDFEECDGGCFDCCIC
 
   function build() {
     if (typeof LOADER_MAP === 'undefined' || !svg) return false;
+    // The loader map is London's wards. A region gets the plain screen: the
+    // word "Loading" and no map, rather than the wrong place filling in.
+    if (window.PH_REGION && !window.PH_REGION.isLondon) {
+      svg.style.display = 'none';
+      svg.setAttribute('aria-hidden', 'true');
+      return false;
+    }
     var nums = decode(LOADER_MAP.p), i = 0, w = 0;
     var frag = document.createDocumentFragment();
     var metrics = [];
@@ -3195,25 +3286,67 @@ var LOADER_MAP = {w:1000,h:771,n:704,d:'IAAAAAAAAAAAAAJAAIAAFAAAIDFEECDGGCFDCCIC
 
 <!-- Map data. Separate files so they cache independently of the app,
      and so the pipeline can regenerate them. Classic scripts, loaded in
-     order before the app, so the globals exist at parse time. -->
-<script src="data/map/wards.js"></script>
-<script src="data/map/gp_practices.js"></script>
-<script src="data/map/hospitals.js"></script>
-<!-- data/map/lsoa_imd.js is NOT here any more. At 4.2 MB it was the single
+     order before the app, so the globals exist at parse time.
+
+     Written rather than typed, so a region (?r=, see PH_REGION in the head)
+     reads its own copies from data/regions/<id>/map/. For London the tags
+     written are exactly the ones that used to sit here, in the same order:
+       wards.js, gp_practices.js, hospitals.js, boroughs.js, indicators.js
+       (generated by the pipeline: which levels carry each indicator and a
+       percentile range; OV_CFG is augmented from it at parse time; missing,
+       the app falls back to the hand-written registry), custom.js (anything
+       dropped into data/custom, added to the picker before the picker reads
+       it). They are parser-inserted classic scripts either way, so they still
+       run in order before the main block.
+
+     data/map/lsoa_imd.js is NOT here any more. At 4.2 MB it was the single
      largest thing this page loaded, it blocked the map behind it, and the
      layer it draws is off by default. It is injected by ensureLsoaImd when
      something actually needs an LSOA. -->
-<script src="data/map/boroughs.js"></script>
-<!-- Generated by the pipeline from the payloads it just wrote: which levels
-     carry each indicator, how many distinct values it has at each, and a
-     percentile range. Loaded here, before the main block, because OV_CFG is
-     augmented from it at parse time. Missing or stale, the app falls back to
-     the hand-written registry exactly as it did before. -->
-<script src="data/map/indicators.js"></script>
-<!-- Anything somebody dropped into data/custom. Generated by the pipeline, and
-     loaded here so the block below can add it to the picker before the picker
-     reads the picker. -->
-<script src="data/map/custom.js"></script>
+<script>
+(function () {
+  var files = window.PH_HEAD_DATA;
+  for (var i = 0; i < files.length; i++) {
+    // onerror marks a region whose folder is not there; checked just below.
+    document.write('<script src="' + window.regionPath(files[i]) + '"' +
+      (window.PH_REGION.isLondon ? '' : ' onerror="PH_REGION.missing=true"') +
+      '><\/script>');
+  }
+})();
+</script>
+<script>
+/* A region named in ?r= whose data has not been published. The main block
+   needs these globals at parse time, so empty ones stand in, and the reader
+   gets a plain message and a way back to London instead of a broken map. */
+(function () {
+  var R = window.PH_REGION;
+  if (R.isLondon || (!R.missing && typeof GJ !== 'undefined')) return;
+  R.missing = true;
+  var empty = function () { return { type: 'FeatureCollection', features: [] }; };
+  if (typeof GJ === 'undefined') window.GJ = empty();
+  if (typeof BOROUGH_GJ === 'undefined') window.BOROUGH_GJ = empty();
+  if (typeof GPS === 'undefined') window.GPS = [];
+  if (typeof HOSP === 'undefined') window.HOSP = [];
+  if (typeof PH_CUSTOM === 'undefined') window.PH_CUSTOM = [];
+  var box = document.createElement('div');
+  box.id = 'region-missing';
+  box.setAttribute('role', 'alertdialog');
+  box.setAttribute('aria-labelledby', 'region-missing-h');
+  box.style.cssText = 'position:fixed;inset:0;z-index:100000;display:flex;' +
+    'align-items:center;justify-content:center;padding:16px;background:var(--bg,#F4F7F9);' +
+    'font:15px/1.5 Inter,system-ui,sans-serif;color:var(--ink,#212B32);text-align:center';
+  var esc = function (s) { return String(s).replace(/[<>&"]/g, ''); };
+  box.innerHTML = '<div style="max-width:30em">' +
+    '<h2 id="region-missing-h" style="margin:0 0 8px;font-size:20px">' +
+    'This region is not available yet</h2>' +
+    '<p style="margin:0 0 16px;color:var(--ink-2,#4C6272)">The map for ' + esc(R.name) +
+    ' has not been published. London is available now.</p>' +
+    '<a href="' + esc(location.pathname) + '" style="display:inline-block;padding:8px 16px;' +
+    'border-radius:6px;background:var(--nhs-blue,#005EB8);color:#fff;text-decoration:none;' +
+    'font-weight:600">Open the London map</a></div>';
+  document.body.appendChild(box);
+})();
+</script>
 
 <script>
 // ═══════════════════════════════════════════════════════════════════════════
@@ -3240,7 +3373,7 @@ let _manifestPromise = null;
 
 function loadManifest() {
   if (_manifestPromise) return _manifestPromise;
-  _manifestPromise = fetch('data/meta/manifest.json', { cache: 'no-store' })
+  _manifestPromise = fetch(regionPath('data/meta/manifest.json'), { cache: 'no-store' })
     .then(r => (r.ok ? r.json() : null))
     .catch(() => null)
     .then(m => {
@@ -3255,9 +3388,115 @@ function loadManifest() {
 
 // A data URL stamped with the current data version. Callers that can run
 // before the manifest resolves should await loadManifest() first.
+// Region builds keep the same names under data/regions/<id>/, so the path is
+// mapped first (regionPath, in the head; London's paths are unchanged).
 function dataUrl(path) {
+  path = regionPath(path);
   return DATA_VERSION ? path + '?v=' + DATA_VERSION : path;
 }
+
+// ── The area this page covers ───────────────────────────────────────────────
+// Every sentence that says "London" meaning "the whole area on this map" reads
+// it from here, so London's wording is unchanged and a region build says
+// "North East median", "All of North East" and so on. Things that really are
+// about London (PTAL, TfL, the London ICBs) keep their own wording and are
+// hidden outside London instead.
+const PH_IS_LONDON = !window.PH_REGION || window.PH_REGION.isLondon;
+const PH_AREA = (window.PH_REGION && window.PH_REGION.name) || 'London';
+// "London borough(s)" in London; elsewhere the area is a mix of unitary,
+// metropolitan and county authorities, so the neutral name.
+function ladNoun(n) {
+  if (PH_IS_LONDON) return n === 1 ? 'London borough' : 'London boroughs';
+  return n === 1 ? 'local authority' : 'local authorities';
+}
+// The aria-label every "where" picker carries.
+const PH_WHERE_ARIA = PH_IS_LONDON
+  ? 'Where: all of London, an ICB, or a borough'
+  : 'Where: all of ' + PH_AREA + ', or one local authority';
+
+/* The region picker, and the static wording a region build has to change.
+   London's markup already says the right thing, so for London this only
+   fills the (hidden) picker. */
+(function initRegionUi() {
+  const R = window.PH_REGION || { id: 'london', name: 'London', isLondon: true };
+  const $ = id => document.getElementById(id);
+
+  // ── Picker: the published regions, plus this one if it was opened by ?r=.
+  const live = window.PH_REGIONS_LIVE || ['london'];
+  const opts = (window.PH_REGIONS || []).filter(r => live.indexOf(r.id) !== -1 || r.id === R.id);
+  const pick = $('region-picker'), wrap = $('region-picker-wrap');
+  if (pick) {
+    opts.forEach(r => {
+      const o = document.createElement('option');
+      o.value = r.id;
+      o.textContent = r.name + (live.indexOf(r.id) === -1 ? ' (preview)' : '');
+      if (r.id === R.id) o.selected = true;
+      pick.appendChild(o);
+    });
+    pick.addEventListener('change', () => { location.href = regionHref(pick.value); });
+  }
+  // One choice is not a choice: hidden until a second region is published.
+  if (wrap) wrap.hidden = opts.length < 2;
+
+  if (R.isLondon) return;
+
+  const setText = (id, t) => { const e = $(id); if (e) e.textContent = t; };
+  const setAttr = (id, a, t) => { const e = $(id); if (e) e.setAttribute(a, t); };
+  const hide = id => { const e = $(id); if (e) e.style.display = 'none'; };
+  const nWards = (typeof GJ !== 'undefined' && GJ.features) ? GJ.features.length : 0;
+  const nLads = (typeof BOROUGH_GJ !== 'undefined' && BOROUGH_GJ.features) ? BOROUGH_GJ.features.length : 0;
+
+  const hr = $('hdr-region');
+  if (hr) { hr.textContent = R.name; hr.hidden = false; }
+
+  // London's boards. The layer, its focus control and its count go.
+  hide('icb-row'); hide('icb-focus-wrap');
+  // The tour visits named London wards.
+  hide('sbar-tour');
+
+  setText('tb-name', 'Local authorities');
+  const firstOpt = (id, t) => {
+    const s = $(id);
+    if (s && s.options.length) s.options[0].textContent = t;
+  };
+  firstOpt('borough-focus', 'All of ' + R.name);
+  firstOpt('vcse-area-filter', 'All of ' + R.name);
+  firstOpt('cb-scope', 'All of ' + R.name);
+  firstOpt('dir-borough', 'All of ' + R.name);
+  setAttr('dir-borough', 'aria-label', PH_WHERE_ARIA);
+  const cbh = document.querySelector('#cb-scope') && document.querySelector('#cb-scope').previousElementSibling;
+  if (cbh && cbh.classList.contains('cb-help')) {
+    cbh.textContent = 'Choose all of ' + R.name + ', or one local authority.';
+  }
+  setText('vs-digest', 'All of ' + R.name);
+  setText('q-scope-hint', 'One local authority, or all ' + (nLads || '') + '.');
+  setAttr('map', 'aria-label', 'Map of ' + R.name + '. Wards are shaded by the selected indicator.');
+  if (nWards) setText('ward-count', nWards.toLocaleString());
+  setAttr('dl-help', 'title',
+    'The four sizes of area this map can colour. Borough is one of the ' +
+    (nLads ? nLads + ' ' : '') + 'local authorities in ' + R.name + '. Ward is the ' +
+    'electoral area an authority divides into' + (nWards ? ', and ' + R.name + ' has ' +
+    nWards.toLocaleString() : '') + '. MSOA means Middle Layer Super Output Area, a ' +
+    'statistical area of about 7,500 people. LSOA means Lower Layer Super Output Area, ' +
+    'the smallest here, about 1,500 people. Wards sit inside local authorities, but ' +
+    'MSOAs and LSOAs do not, so a ward is not a whole number of either. An indicator ' +
+    'is only offered at the level it is published for.');
+  const dlb = s => document.querySelector('#dl-seg button[data-dl="' + s + '"]');
+  if (dlb('ward') && nWards) dlb('ward').title = 'Ward-level data (' + nWards.toLocaleString() + ' wards)';
+  if (dlb('lsoa')) dlb('lsoa').title = 'LSOA-level data (the most detailed level here)';
+
+  // Green space is a London build so far. Asked once, cheaply, so the layer
+  // is only offered where its file exists.
+  fetch(regionPath('greenspaces.geojson'), { method: 'HEAD' })
+    .then(r => r.ok)
+    .catch(() => false)
+    .then(ok => {
+      if (ok) return;
+      hide('greenspace-row'); hide('greenspace-legend');
+      const cb = $('tgr');
+      if (cb) { cb.checked = false; cb.disabled = true; }
+    });
+})();
 
 
 /* wh says which end of an indicator is worse: true when a higher figure is the
@@ -4027,6 +4266,49 @@ const OV_META = {
     console.info('[custom] ' + added + ' indicator(s) added from data/custom');
   }
 })();
+
+/* Outside London, leave out what the region's build does not carry.
+
+   A region's indicators.js is measured from its own payloads, so an indicator
+   it has no entry for has no figures there: PTAL and the station and bus stop
+   measures (TfL, London only), the London air quality grid, and any
+   Fingertips series that was suppressed for the region. Offering them would
+   draw an all-grey map. The exceptions are the figures the page derives
+   itself rather than reads (the per-category crime counts, the crime rate and
+   the ward IMD score), which indicators.js never lists, for London either.
+   London is untouched: this returns at once. Runs here, with the custom
+   indicators, because the picker builds its model from the <select> once. */
+(function _regionIndicatorFilter() {
+  if (PH_IS_LONDON) return;
+  var G = (typeof PH_IND_STATS === 'object' && PH_IND_STATS && PH_IND_STATS.stats)
+    ? PH_IND_STATS.stats : null;
+  if (!G) return;
+  var keep = function (k) {
+    return !k || k === 'none' || !!G[k] || /^crime_/.test(k) || k === 'imd_score_ward' ||
+      !!(OV_CFG[k] && OV_CFG[k]._custom);
+  };
+  var dropped = [];
+  CATS.forEach(function (c) {
+    c.fields = c.fields.filter(function (f) {
+      if (keep(f.k)) return true;
+      dropped.push(f.k);
+      return false;
+    });
+  });
+  var sel = document.getElementById('ov');
+  if (sel) {
+    Array.prototype.slice.call(sel.querySelectorAll('option')).forEach(function (o) {
+      if (!keep(o.value)) o.remove();
+    });
+    Array.prototype.slice.call(sel.querySelectorAll('optgroup')).forEach(function (g) {
+      if (!g.querySelector('option')) g.remove();
+    });
+  }
+  if (dropped.length) {
+    console.info('[region] ' + dropped.length + ' indicator(s) not in the ' +
+      PH_AREA + ' build left out: ' + dropped.join(', '));
+  }
+})();
 function ovMeta(k) { return OV_META[k] || null; }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -4189,7 +4471,7 @@ function scopeLabel(scope) {
    so the two kinds are never mistaken for one list. */
 function scopeOptionsHtml(selected, esc) {
   const e = esc || function (s) { return String(s); };
-  let html = '<option value=""' + (!selected ? ' selected' : '') + '>All of London</option>';
+  let html = '<option value=""' + (!selected ? ' selected' : '') + '>All of ' + e(PH_AREA) + '</option>';
   if (ICB_ORDER && ICB_ORDER.length) {
     html += '<optgroup label="Integrated Care Boards">';
     ICB_ORDER.forEach(function (name) {
@@ -4199,9 +4481,14 @@ function scopeOptionsHtml(selected, esc) {
     });
     html += '</optgroup>';
   }
-  const lads = Object.keys(ICB_OF_LAD).sort();
+  let lads = Object.keys(ICB_OF_LAD).sort();
+  // Outside London there are no boards, so the authorities come from the
+  // ward boundaries themselves rather than from the board lookup.
+  if (!lads.length && !PH_IS_LONDON && typeof GJ !== 'undefined' && GJ.features) {
+    lads = [...new Set(GJ.features.map(f => (f.properties || {}).LAD).filter(Boolean))].sort();
+  }
   if (lads.length) {
-    html += '<optgroup label="Boroughs">';
+    html += '<optgroup label="' + (PH_IS_LONDON ? 'Boroughs' : 'Local authorities') + '">';
     lads.forEach(function (b) {
       html += '<option value="' + e(b) + '"' + (b === selected ? ' selected' : '') + '>' +
               e(b) + '</option>';
@@ -4563,7 +4850,7 @@ function vcsePopupHtml(r) {
   const web  = !r.w ? ''
     : href ? `<div class="pop-row"><div class="pop-key">Web</div><a href="${_esc(href)}" target="_blank" rel="noopener" style="color:#185FA5;text-decoration:none;word-break:break-all">${_esc(r.w)}</a></div>`
     : `<div class="pop-row"><div class="pop-key">Web</div><span style="word-break:break-all">${_esc(r.w)}</span></div>`;
-  const cov  = (r.cv || []).length ? `<div class="pop-row"><div class="pop-key">Covers</div>${r.cv.length} London borough${r.cv.length===1?'':'s'}</div>` : '';
+  const cov  = (r.cv || []).length ? `<div class="pop-row"><div class="pop-key">Covers</div>${r.cv.length} ${ladNoun(r.cv.length)}</div>` : '';
   const area = vcseArea(r);
   const where = area
     ? `<div class="pop-addr">${_esc(area)}</div><div class="pop-row" style="color:var(--ink-3)">Area only. Small charities are often run from a trustee's home, so the street address is not shown.</div>`
@@ -4654,7 +4941,7 @@ function ensureLsoaImd() {
 
   _lsoaImdLoading = new Promise((resolve) => {
     const s = document.createElement('script');
-    s.src = 'data/map/lsoa_imd.js';
+    s.src = regionPath('data/map/lsoa_imd.js');
     s.onload = () => {
       if (typeof LSOA_IMD === 'undefined' || !LSOA_IMD || !LSOA_IMD.features) {
         _lsoaImdLoading = null;
@@ -4717,10 +5004,24 @@ function ensureLsoaImd() {
 // per press, because a zoom control that advances a quarter of a step at a
 // time reads as an unresponsive one. Fractional snap and whole-step controls
 // are not in conflict — from 10.25 the + button simply goes to 11.25.
+/* A region opens on its own footprint rather than on London: the authority
+   outlines are already loaded (boroughs.js), so their box gives the first
+   view, and the fit to the ward layer later only refines it. */
+const _regionStartBounds = (function () {
+  if (PH_IS_LONDON) return null;
+  try {
+    const b = L.geoJSON(BOROUGH_GJ).getBounds();
+    return b.isValid() ? b : null;
+  } catch (e) { return null; }
+})();
 const map = L.map('map', {
-  center:[51.540,-0.300], zoom:10, zoomControl:true,
+  center: _regionStartBounds ? _regionStartBounds.getCenter() : [51.540,-0.300],
+  zoom: _regionStartBounds ? 8 : 10, zoomControl:true,
   zoomSnap: 0.25,
 });
+if (_regionStartBounds) {
+  try { map.fitBounds(_regionStartBounds, { padding: [18, 18], animate: false }); } catch (e) {}
+}
 /* One hover label at a time, and none left behind by a drag.
 
    Dragging the map used to strand area labels on screen, two or three at
@@ -5363,7 +5664,7 @@ function ensureLayerData(key) {
   const src = LAYER_SOURCES[key];
   if (!src) return Promise.resolve(null);
 
-  _layerLoads[key] = fetch(src.url)
+  _layerLoads[key] = fetch(regionPath(src.url))
     .then(r => (r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))))
     .then(data => {
       if (!data || !data.length) throw new Error('empty');
@@ -6243,7 +6544,7 @@ window.deselectWard = function() {
   const p = document.getElementById('wpanel');
   if (p) p.innerHTML = `<div class="ph"><div class="ph-icon">\u2196</div>Click any ward on the map to explore its health, crime, deprivation and service data</div>`;
   const vsd = document.getElementById('vs-digest');
-  if (vsd) vsd.textContent = 'All of London';
+  if (vsd) vsd.textContent = 'All of ' + PH_AREA;
   if (window.PH_URL) window.PH_URL.write();
 };
 window.deselectLSOA = function() {
@@ -6252,7 +6553,7 @@ window.deselectLSOA = function() {
   const p = document.getElementById('wpanel');
   if (p) p.innerHTML = `<div class="ph"><div class="ph-icon">\u2196</div>Click any ward on the map to explore its health, crime, deprivation and service data</div>`;
   const vsd = document.getElementById('vs-digest');
-  if (vsd) vsd.textContent = 'All of London';
+  if (vsd) vsd.textContent = 'All of ' + PH_AREA;
 };
 
 /* What a printed report credits.
@@ -6319,7 +6620,7 @@ function reportProvenanceHtml() {
    mistake. Percentiles are cut points between 1 and 99, so the caption is
    held to that range; the tick on the bar still sits at the true position. */
 function pctileCaption(p) {
-  return 'P' + Math.min(99, Math.max(1, Math.round(p))) + ' in London';
+  return 'P' + Math.min(99, Math.max(1, Math.round(p))) + ' in ' + PH_AREA;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -6402,7 +6703,7 @@ function _reportDotPlot(rows, opts) {
   const H = top + rows.length * rowH + 6;
   const X = p => x0 + span * Math.max(0, Math.min(100, p)) / 100;
   let s = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" class="ch-dots" role="img" ` +
-          `aria-label="Deprivation by IMD domain, as a position among London LSOAs">`;
+          `aria-label="Deprivation by IMD domain, as a position among ${PH_AREA} LSOAs">`;
   s += `<text x="${x0}" y="11" font-size="8.5" fill="#64748B">Less deprived</text>`;
   s += `<text x="${x1}" y="11" font-size="8.5" fill="#64748B" text-anchor="end">More deprived</text>`;
   s += `<line x1="${X(50)}" y1="${top - 6}" x2="${X(50)}" y2="${H - 4}" stroke="${REPORT_INK}" stroke-width="1" stroke-dasharray="2,2"/>`;
@@ -7041,7 +7342,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
   // The period column only appears when the metadata gives one to put in it.
   const _hoPer = healthOutcomes.some(r => r.per);
   const healthOutcomesTable = healthOutcomes.length ? `<table class="ho">
-      <thead><tr><th>Measure</th><th>This ward</th><th>London ward median</th>${borough ? `<th>${_esc(borough)} ward median</th>` : ''}${_hoPer ? '<th>Period</th>' : ''}</tr></thead>
+      <thead><tr><th>Measure</th><th>This ward</th><th>${PH_AREA} ward median</th>${borough ? `<th>${_esc(borough)} ward median</th>` : ''}${_hoPer ? '<th>Period</th>' : ''}</tr></thead>
       <tbody>${healthOutcomes.map(r => `<tr>
         <td>${_esc(r.l)}${r.u ? `<span class="u">${_esc(r.u)}</span>` : ''}</td>
         <td class="w">${r.v}</td><td>${r.lon}</td>${borough ? `<td>${r.bor}</td>` : ''}${_hoPer ? `<td>${_esc(r.per)}</td>` : ''}
@@ -7202,9 +7503,9 @@ function _generateWardReport(_reportWindow, wn, opts) {
 
   <div class="hero">
     <div class="hero-text">
-      <div class="kicker">London ward profile · ${_esc(today)}${isCore20 ? ' &nbsp;' + core20Badge : ''}</div>
+      <div class="kicker">${PH_AREA} ward profile · ${_esc(today)}${isCore20 ? ' &nbsp;' + core20Badge : ''}</div>
       <h1>${_esc(wdata ? wdata.name : wn)}</h1>
-      <div class="sub">${_esc(borough)}${borough && population !== '—' ? ' · ' : ''}${population !== '—' ? 'Population ' + population : ''}${imdRank ? ' · IMD rank ' + imdRank + ' of ' + totalWards + ' London wards (1 = most deprived)' : ''}</div>
+      <div class="sub">${_esc(borough)}${borough && population !== '—' ? ' · ' : ''}${population !== '—' ? 'Population ' + population : ''}${imdRank ? ' · IMD rank ' + imdRank + ' of ' + totalWards + ' ' + PH_AREA + ' wards (1 = most deprived)' : ''}</div>
     </div>
     ${miniMapSVG ? `<div class="hero-map">${miniMapSVG}</div>` : ''}
   </div>
@@ -7224,15 +7525,15 @@ function _generateWardReport(_reportWindow, wn, opts) {
       <div class="panel"><h3>Ethnicity (Census 2021)</h3>${ethStack}</div>
       <div class="panel"><h3>Age (Census 2021)</h3>${ageStack}</div>
       <div class="panel">
-        <h3>Compared with the London ward median</h3>
+        <h3>Compared with the ${PH_AREA} ward median</h3>
         ${compareCensus}
-        <div class="legend"><span class="legend-tick"></span> London median ·${_reportSwatch(REPORT_CMP.better)}better ·${_reportSwatch(REPORT_CMP.worse)}worse ·${_reportSwatch(REPORT_CMP.neutral)}neither</div>
+        <div class="legend"><span class="legend-tick"></span> ${PH_AREA} median ·${_reportSwatch(REPORT_CMP.better)}better ·${_reportSwatch(REPORT_CMP.worse)}worse ·${_reportSwatch(REPORT_CMP.neutral)}neither</div>
       </div>
       ${crimeRows.length ? `<div class="section-h">Crime${crimeTotal != null ? ` · ${Math.round(crimeTotal).toLocaleString()} in 12 months` : ''}</div>
       <div class="panel">
         <h3>Recorded crime, ${_esc(reportCrimePeriod())}</h3>
         ${crimeSVG}
-        <div class="legend"><span class="legend-tick"></span> London ward median · data.police.uk</div>
+        <div class="legend"><span class="legend-tick"></span> ${PH_AREA} ward median · data.police.uk</div>
       </div>` : ''}
     </div>
     <div class="col">
@@ -7240,12 +7541,12 @@ function _generateWardReport(_reportWindow, wn, opts) {
       <div class="panel">
         <h3>Deprivation by domain, IMD 2025</h3>
         ${domainSVG}
-        <div class="legend">Ward (mean of ${_wardLSOACodes.length} LSOAs) among all London LSOAs; P90 = more deprived than 90%. Dashed line: London median.</div>
+        <div class="legend">Ward (mean of ${_wardLSOACodes.length} LSOAs) among all ${PH_AREA} LSOAs; P90 = more deprived than 90%. Dashed line: ${PH_AREA} median.</div>
       </div>
       <div class="panel">
         <h3>Health and economic indicators</h3>
         ${healthBars}
-        <div class="legend"><span class="legend-tick"></span> London ward median ·${_reportSwatch(REPORT_CMP.better)}better ·${_reportSwatch(REPORT_CMP.worse)}worse</div>
+        <div class="legend"><span class="legend-tick"></span> ${PH_AREA} ward median ·${_reportSwatch(REPORT_CMP.better)}better ·${_reportSwatch(REPORT_CMP.worse)}worse</div>
       </div>
       ${healthOutcomesTable ? `<div class="panel">
         <h3>Health outcomes</h3>
@@ -7263,13 +7564,13 @@ function _generateWardReport(_reportWindow, wn, opts) {
       ${_locBlock('Dental practices',     _dental,  d => `<strong>${_esc(d.name||'')}</strong> <span class="meta">${d.postcode?_esc(d.postcode):''}</span>`)}
       ${_locBlock('Hospitals and clinics', _hosp,   h => `<strong>${_esc(h.n||'')}</strong> <span class="meta">${h.t?_esc(h.t):''}</span>`)}
       ${_locBlock('VCSE organisations',   _vcse,    v => `<strong>${_esc(v.name||'')}</strong>`)}
-      ${_locBlock('Parks and green spaces', _green, g => `<strong>${_esc(g.n||'')}</strong> <span class="meta">${g.sz?_esc(g.sz):''}</span>`)}
+      ${PH_IS_LONDON ? _locBlock('Parks and green spaces', _green, g => `<strong>${_esc(g.n||'')}</strong> <span class="meta">${g.sz?_esc(g.sz):''}</span>`) : '' /* GRN is a list of London parks */}
     </div>
   </div>
 
   <div class="footer">
     <div class="indep">PopHealth Map is an independent project, not an NHS service. Figures are published statistics for planning and discussion; check the source before relying on one.</div>
-    <strong>Sources:</strong> ${reportCredits(['census', 'imd', crimeRows.length ? 'crime' : '', 'fuel_poverty', 'claimant', 'gp', 'pharmacy', 'dental', 'hospitals', 'vcse']).map(_esc).join(' · ')}. Medians are across the ${_ALL_WARDS.length.toLocaleString()} London wards with a figure.
+    <strong>Sources:</strong> ${reportCredits(['census', 'imd', crimeRows.length ? 'crime' : '', 'fuel_poverty', 'claimant', 'gp', 'pharmacy', 'dental', 'hospitals', 'vcse']).map(_esc).join(' · ')}. Medians are across the ${_ALL_WARDS.length.toLocaleString()} ${PH_AREA} wards with a figure.
     ${reportProvenanceHtml()}
   </div>
 </div>
@@ -7399,7 +7700,8 @@ function buildWardLayer() {
   // desktop and hold the map out further than it needed to be. Padding is
   // tighter for the same reason: 28px each side was a visible margin of empty
   // countryside on top of a fit that was already too far out.
-  map.fitBounds(wLyr.getBounds(), { padding:[18,18], maxZoom:12 });
+  // Guarded for a region opened before its data exists, which has no wards.
+  if (wLyr.getBounds().isValid()) map.fitBounds(wLyr.getBounds(), { padding:[18,18], maxZoom:12 });
   if (typeof _updateLayerCounts === 'function') _updateLayerCounts();
 }
 
@@ -7651,7 +7953,7 @@ function _applyBoroughSolo() {
     if (typeof _announce === 'function') {
       _announce(focusActive()
         ? ('Focused on ' + focusLabel() + '.')
-        : 'Showing all of London.');
+        : 'Showing all of ' + PH_AREA + '.');
     }
   });
 
@@ -7670,6 +7972,9 @@ function _applyBoroughSolo() {
 (function initIcbFocus() {
   const sel = document.getElementById('icb-focus');
   if (!sel) return;
+  // London's boards only. Outside London the control is hidden (initRegionUi)
+  // and there is no lookup to fetch.
+  if (!PH_IS_LONDON) return;
 
   fetch(dataUrl('data/map/icb_lookup.json'))
     .then(r => (r.ok ? r.json() : null))
@@ -7730,7 +8035,7 @@ function _applyBoroughSolo() {
 
     applyBoroughLock();
     if (typeof _announce === 'function') {
-      _announce(focusActive() ? ('Focused on ' + focusLabel() + '.') : 'Showing all of London.');
+      _announce(focusActive() ? ('Focused on ' + focusLabel() + '.') : 'Showing all of ' + PH_AREA + '.');
     }
   });
 })();
@@ -9252,7 +9557,7 @@ window.generateLSOAReport = function(code) {
   const keyPoints = _reportKeyPoints([
     decile != null ? `In national IMD decile <b>${decile} of 10</b>, where 1 is the most deprived tenth of England and 10 the least` + (decile <= 2 ? ': a Core20 area.' : '.') : '',
     rank ? `Ranks <b>${Math.round(rank).toLocaleString()} of 33,755</b> areas in England on the IMD, where 1 is the most deprived.` : '',
-    (badH != null && _medBadL != null) ? `<b>${badH.toFixed(1)}%</b> of residents report bad or very bad health, ${_reportVs(badH, _medBadL, 1)} the London LSOA median of ${_medBadL.toFixed(1)}%.` : '',
+    (badH != null && _medBadL != null) ? `<b>${badH.toFixed(1)}%</b> of residents report bad or very bad health, ${_reportVs(badH, _medBadL, 1)} the ${PH_AREA} LSOA median of ${_medBadL.toFixed(1)}%.` : '',
     (_claimL != null && _medClaimL != null) ? `The claimant rate is <b>${_claimL.toFixed(1)}%</b> of 16 to 64 year olds, ${_reportVs(_claimL, _medClaimL, 1)} the median of ${_medClaimL.toFixed(1)}%.` : '',
   ]);
 
@@ -9268,7 +9573,7 @@ window.generateLSOAReport = function(code) {
 
   <div class="hero">
     <div class="hero-text">
-      <div class="kicker">London LSOA profile · ${_esc(today)}</div>
+      <div class="kicker">${PH_AREA} LSOA profile · ${_esc(today)}</div>
       <h1>${_esc(props.name || code)}</h1>
       <div class="sub">${_esc(code)}${wardName ? ' · Ward: ' + _esc(wardName) : ''}${borough ? ' · ' + _esc(borough) : ''}${rank ? ' · IMD rank ' + Math.round(rank).toLocaleString() + ' of 33,755 in England' : ''}</div>
       <div class="badges">
@@ -9299,9 +9604,9 @@ window.generateLSOAReport = function(code) {
     </div>
     <div class="row">
       <div class="panel" style="flex:1">
-        <h3>Demographic indicators vs London LSOA median</h3>
+        <h3>Demographic indicators vs ${PH_AREA} LSOA median</h3>
         ${compareCensus}
-        <div class="legend"><span class="legend-tick"></span> London median (${_ALL_LSOAS.length.toLocaleString()} LSOAs) ·${_reportSwatch(REPORT_CMP.better)}better than the median,${_reportSwatch(REPORT_CMP.worse)}worse ·${_reportSwatch(REPORT_CMP.neutral)}describes who lives here, neither better nor worse</div>
+        <div class="legend"><span class="legend-tick"></span> ${PH_AREA} median (${_ALL_LSOAS.length.toLocaleString()} LSOAs) ·${_reportSwatch(REPORT_CMP.better)}better than the median,${_reportSwatch(REPORT_CMP.worse)}worse ·${_reportSwatch(REPORT_CMP.neutral)}describes who lives here, neither better nor worse</div>
       </div>
     </div>
 
@@ -9310,12 +9615,12 @@ window.generateLSOAReport = function(code) {
       <div class="panel" style="flex:0 0 340px">
         <h3>Deprivation by domain, IMD 2025</h3>
         ${domainSVG}
-        <div class="legend">Where this LSOA sits among all London LSOAs on each domain. P90 is more deprived than 90% of them; the dashed line is the London median.</div>
+        <div class="legend">Where this LSOA sits among all ${PH_AREA} LSOAs on each domain. P90 is more deprived than 90% of them; the dashed line is the ${PH_AREA} median.</div>
       </div>
       <div class="panel" style="flex:1">
-        <h3>Health &amp; economic indicators vs London LSOA median</h3>
+        <h3>Health &amp; economic indicators vs ${PH_AREA} LSOA median</h3>
         ${healthBars}
-        <div class="legend"><span class="legend-tick"></span> London median &nbsp;·&nbsp; bar colour shows direction:${_reportSwatch(REPORT_CMP.better)}better than the median,${_reportSwatch(REPORT_CMP.worse)}worse</div>
+        <div class="legend"><span class="legend-tick"></span> ${PH_AREA} median &nbsp;·&nbsp; bar colour shows direction:${_reportSwatch(REPORT_CMP.better)}better than the median,${_reportSwatch(REPORT_CMP.worse)}worse</div>
       </div>
     </div>
 
@@ -9333,7 +9638,7 @@ window.generateLSOAReport = function(code) {
       <div class="panel" style="flex:1">
         <h3>MPS recorded crime, ${_esc(reportCrimePeriod())}</h3>
         ${crimeSVG}
-        <div class="legend"><span class="legend-tick"></span> London LSOA median · sorted by this LSOA's count · sexual offences not published at LSOA level</div>
+        <div class="legend"><span class="legend-tick"></span> ${PH_AREA} LSOA median · sorted by this LSOA's count · sexual offences not published at LSOA level</div>
       </div>
     </div>` : ''}
   </div>
@@ -9346,14 +9651,14 @@ window.generateLSOAReport = function(code) {
       ${_locBlock('Dental practices',     _dental,  d => `<strong>${_esc(d.name||'')}</strong> <span class="meta">${d.postcode?_esc(d.postcode):''}</span>`)}
       ${_locBlock('Hospitals & clinics',  _hosp,    h => `<strong>${_esc(h.n||'')}</strong> <span class="meta">${_esc(h.a||'')}${h.t?' · '+_esc(h.t):''}</span>`, 'span-2')}
       ${_locBlock('VCSE organisations',   _vcse,    v => `<strong>${_esc(v.name||'')}</strong> <span class="meta">${_esc(v.addr||'')}</span>`, 'span-2')}
-      ${_locBlock('Parks & greenspaces',  _green,   g => `<strong>${_esc(g.n||'')}</strong> <span class="meta">${_esc(g.a||'')}${g.sz?' · '+_esc(g.sz):''}</span>`)}
+      ${PH_IS_LONDON ? _locBlock('Parks & greenspaces',  _green,   g => `<strong>${_esc(g.n||'')}</strong> <span class="meta">${_esc(g.a||'')}${g.sz?' · '+_esc(g.sz):''}</span>`) : '' /* GRN is a list of London parks */}
     </div>
   </div>
 
   <div class="footer">
     <div class="indep">PopHealth Map is an independent project, not an NHS service. Figures are published statistics for planning and discussion; check the source before relying on one.</div>
     <strong>Data sources:</strong> ${reportCredits(['imd', 'census', crimeRows.length ? 'crime' : '', 'fuel_poverty', 'claimant', 'greenblue', 'gp', 'pharmacy', 'dental', 'hospitals', 'vcse']).map(_esc).join(' · ')}.
-    <div style="margin-top:6px">Service counts use spatial point-in-polygon test against this LSOA's boundary. &quot;vs London median&quot; bars compute against every London LSOA that has a figure for that indicator, out of ${_ALL_LSOAS.length.toLocaleString()} on the map.</div>
+    <div style="margin-top:6px">Service counts use spatial point-in-polygon test against this LSOA's boundary. &quot;vs ${PH_AREA} median&quot; bars compute against every ${PH_AREA} LSOA that has a figure for that indicator, out of ${_ALL_LSOAS.length.toLocaleString()} on the map.</div>
     ${reportProvenanceHtml()}
   </div>
 </div>
@@ -9626,7 +9931,7 @@ function loadMsoaBoundaries() {
   ensureMsoaData();
   if (msoaLyr) return Promise.resolve(msoaLyr);
   if (_msoaLoading) return _msoaLoading;
-  _msoaLoading = fetch('data/map/msoa_boundaries.json')
+  _msoaLoading = fetch(regionPath('data/map/msoa_boundaries.json'))
     .then(r => (r.ok ? r.json() : null))
     .then(gj => {
       if (!gj || !gj.features) { _msoaLoading = null; return null; }
@@ -9695,6 +10000,8 @@ function icbStyle(feat) {
 function loadIcbRegions() {
   if (icbLyr) return Promise.resolve(icbLyr);
   if (_icbLoading) return _icbLoading;
+  // The board outlines are London's five; a region build has none to draw.
+  if (!PH_IS_LONDON) return Promise.resolve(null);
   _icbLoading = fetch(dataUrl('data/map/icbs.json'))
     .then(r => (r.ok ? r.json() : null))
     .then(gj => {
@@ -10745,7 +11052,7 @@ function _refreshUI() {
     const dig = document.getElementById('vs-digest');
     if (dig) {
       const parts = [];
-      parts.push(focusActive() ? `<b>${focusLabel()}</b>` : 'All of London');
+      parts.push(focusActive() ? `<b>${focusLabel()}</b>` : 'All of ' + PH_AREA);
       // The level is not repeated here. The Viewing badge in the corner of the
       // map is the control for it and shows which one is active, so the strip
       // saying "Ward mode" a second time under the word "Viewing" was the same
@@ -10978,6 +11285,9 @@ function _urlTool() {
 function _writeUrlState() {
   try {
     const p = new URLSearchParams();
+    // The region rides first, so a shared link opens on the same map. London
+    // is the default and carries nothing, as before.
+    if (!PH_IS_LONDON) p.set('r', PH_REGION.id);
     const ovEl = document.getElementById('ov');
     const bfEl = document.getElementById('borough-focus');
     const lsEl = document.getElementById('tlsoa');
@@ -11550,6 +11860,19 @@ function _wardLayerFor(code, name) {
       || (name ? ls.find(l => l.feature.properties.WD24NM === name) : null)
       || null;
 }
+/* The English region a postcodes.io result sits in, as {id, name, live}, or
+   null outside England. Matched on name, ignoring case ("Yorkshire and The
+   Humber" is spelled that way by both). */
+function _regionOfPostcode(res) {
+  const nm = String((res && res.region) || '').toLowerCase();
+  if (!nm) return null;
+  const r = (window.PH_REGIONS || []).find(x => x.name.toLowerCase() === nm);
+  return r ? { id: r.id, name: r.name, live: (window.PH_REGIONS_LIVE || []).indexOf(r.id) !== -1 } : null;
+}
+/* The address of the map for a region: London is the bare page. */
+function regionHref(id) {
+  return location.pathname + (id && id !== 'london' ? '?r=' + encodeURIComponent(id) : '');
+}
 function _pickPostcode(pq, res) {
   const results = document.getElementById('hdr-search-results');
   if (results) results.classList.remove('show');
@@ -11601,13 +11924,21 @@ function _renderPostcodeRow(results, pq, q) {
       row.onclick = null;
       return;
     }
-    const inLondon = pq.kind === 'outcode'
-      || (res.region === 'London');
+    // postcodes.io names the English region ("London", "North East", ...).
+    const other = pq.kind === 'postcode' ? _regionOfPostcode(res) : null;
+    const inArea = pq.kind === 'outcode' || (other ? other.id === PH_REGION.id
+      : (res.region === PH_AREA));
     sub.textContent = pq.kind === 'postcode'
       ? (res.admin_ward || '') + (res.admin_district ? ' · ' + res.admin_district : '')
-        + (inLondon ? '' : ' (outside London)')
+        + (inArea ? '' : (other
+            ? ' · This postcode is in ' + other.name + (other.live
+                ? '; open ' + other.name
+                : '; the ' + other.name + ' map is not available yet')
+            : ' (outside ' + PH_AREA + ')'))
       : 'Postcode area';
-    row.onclick = () => _pickPostcode(pq, res);
+    row.onclick = (!inArea && other && other.live)
+      ? () => { location.href = regionHref(other.id); }
+      : () => _pickPostcode(pq, res);
   }, () => {
     if (!current()) return;
     const sub = row.querySelector('.sr-sub');
@@ -11788,7 +12119,7 @@ function _pngScopeFeatures() {
 // Human-readable scope name for the caption + filename.
 function _pngScopeLabel() {
   const label = (typeof focusLabel === 'function') ? focusLabel() : null;
-  return label ? label.replace(/^City of /, '') : 'London';
+  return label ? label.replace(/^City of /, '') : PH_AREA;
 }
 
 // L.LatLngBounds for the current scope — used both to fit the map before
@@ -11978,9 +12309,9 @@ async function _prepareScreenForScreenshot(opts) {
     const focused = (typeof focusLabel === 'function') ? focusLabel() : null;
     const opts = [
       { key: 'prepare-current', label: 'This view',
-        desc: 'Keeps your current pan and zoom, whitens everything outside London and clears the controls out of the way.' },
-      { key: 'prepare-london', label: 'All of London, framed',
-        desc: 'Refits to the whole London footprint first, then whitens everything outside it.' },
+        desc: 'Keeps your current pan and zoom, whitens everything outside ' + PH_AREA + ' and clears the controls out of the way.' },
+      { key: 'prepare-london', label: 'All of ' + PH_AREA + ', framed',
+        desc: 'Refits to the whole ' + PH_AREA + ' footprint first, then whitens everything outside it.' },
     ];
     if (focused) opts.push({
       key: 'prepare-borough', label: `Just ${focused}, framed`,
@@ -12289,7 +12620,19 @@ async function loadData() {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
     const json = await response.json();
-    const wards = json.wards || {};
+    let wards = json.wards || {};
+    /* A region build's ward_data.json can carry records for ward codes that
+       are not on its map: no name, no authority, only service counts (87 of
+       421 in the North East pilot). They are not wards anyone can select,
+       and left in they would sit in every median and ward count. Only the
+       wards the map draws are kept. London's payload matches its map, and is
+       not touched. */
+    if (!PH_IS_LONDON && typeof GJ !== 'undefined' && GJ.features && GJ.features.length) {
+      const onMap = new Set(GJ.features.map(f => f.properties && f.properties.WD24CD));
+      const kept = {};
+      for (const [code, ward] of Object.entries(wards)) if (onMap.has(code)) kept[code] = ward;
+      wards = kept;
+    }
 
     // Index by ward code first (unambiguous), then by the GJ display name so
     // disambiguated names like "Kilburn (Brent)" resolve to the right ward.
@@ -13156,7 +13499,7 @@ var PH_SHOW = {
   var _json = {};
   function loadJson(path) {
     if (!_json[path]) {
-      _json[path] = fetch(path)
+      _json[path] = fetch(regionPath(path))
         .then(function (r) { return r.ok ? r.json() : []; })
         .catch(function () { return []; });
     }
@@ -13397,7 +13740,7 @@ var PH_SHOW = {
       var pc = percentile('imd_score', score);
       if (pc !== null) {
         bits.push('On the IMD score it is more deprived than <strong>' + pc +
-          '%</strong> of London wards.');
+          '%</strong> of ' + PH_AREA + ' wards.');
       }
     }
     var bad = num(i.census_bad_health_pct), badMed = median('census_bad_health_pct');
@@ -13407,7 +13750,7 @@ var PH_SHOW = {
       // usually wants to know how it sits among its neighbours too.
       var badBor = boroughMedian('census_bad_health_pct', w.lad);
       bits.push('Bad or very bad self-reported health is <strong>' + bad.toFixed(1) +
-        '%</strong>, ' + dir + ' the London ward median of ' + badMed.toFixed(1) + '%' +
+        '%</strong>, ' + dir + ' the ' + PH_AREA + ' ward median of ' + badMed.toFixed(1) + '%' +
         (badBor !== null ? ' (' + esc(w.lad) + ' ward median ' + badBor.toFixed(1) + '%)' : '') + '.');
     }
     // Life expectancy is the one outcome measure here, so it is compared with
@@ -13422,7 +13765,7 @@ var PH_SHOW = {
       };
       var leBor = boroughMedian('ft_93283', w.lad);
       bits.push('Estimated life expectancy at birth is <strong>' + le.toFixed(1) + ' years</strong>, ' +
-        gap(leMed, 'the London ward median') +
+        gap(leMed, 'the ' + PH_AREA + ' ward median') +
         (leBor !== null ? ' and ' + gap(leBor, 'the ' + esc(w.lad) + ' ward median') : '') + '.');
     }
     if (!bits.length) return '<div class="ws-insight">No indicator data has loaded for this ward yet.</div>';
@@ -13876,6 +14219,8 @@ var PH_SHOW = {
     { k: 'borough', one: 'borough', many: 'boroughs' },
     { k: 'icb',     one: 'board',   many: 'boards' },
   ];
+  // The boards are London's; a region build has none to compare.
+  if (!PH_IS_LONDON) CMP_LEVELS = CMP_LEVELS.filter(function (l) { return l.k !== 'icb'; });
   var cmpLevel = 'ward';
   function cmpLvl() {
     return CMP_LEVELS.filter(function (l) { return l.k === cmpLevel; })[0] || CMP_LEVELS[0];
@@ -14141,7 +14486,7 @@ var PH_SHOW = {
          London's wards are more deprived than the median ward, and that says
          nothing about whether a board of 275 of them is. Better to say less. */
       var med = cmpLevel === 'ward' ? median(m.k) : null;
-      var context = med !== null ? ' against a London ward median of ' + fmtVal(med, m.k) : '';
+      var context = med !== null ? ' against a ' + PH_AREA + ' ward median of ' + fmtVal(med, m.k) : '';
 
       // Deprivation runs backwards and saying "the highest IMD" of a decile
       // means the least deprived, which reads as the opposite. The direction
@@ -14709,7 +15054,7 @@ var PH_SHOW = {
       sub.textContent = dirRecords.length.toLocaleString() + ' places across ' +
         DIR_SOURCES.length + ' datasets' +
         (dirOutOfScope ? ', with ' + dirOutOfScope.toLocaleString() +
-          ' outside London left out' : '');
+          ' outside ' + PH_AREA + ' left out' : '');
     }
   }
 
@@ -15514,6 +15859,8 @@ var PH_SHOW = {
 
   function tourStart() {
     if (!tourStrip) return;
+    // The chapters visit named London wards; a region has none of them.
+    if (!PH_IS_LONDON) return;
     tourAt = 0;
     tourStrip.classList.add('open');
     // The development banner is a separate fixed element that shows itself on
@@ -16484,7 +16831,7 @@ var PH_SHOW = {
   }
   function renderScope() {
     qScopeEl.innerHTML = '<select class="q-chip outline" id="q-scope-sel" ' +
-      'aria-label="Where: all of London, an ICB, or a borough">' +
+      'aria-label="' + PH_WHERE_ARIA + '">' +
       scopeOptionsHtml(q.scope, esc) + '</select>';
   }
   function renderConds() {
@@ -16543,7 +16890,7 @@ var PH_SHOW = {
     var el = $('q-readback');
     if (!el) return;
     var parts = ['Wards'];
-    parts.push(q.scope ? 'in <strong>' + esc(scopeLabel(q.scope)) + '</strong>' : 'anywhere in London');
+    parts.push(q.scope ? 'in <strong>' + esc(scopeLabel(q.scope)) + '</strong>' : 'anywhere in ' + PH_AREA);
 
     if (q.services.length) {
       parts.push('containing at least one ' + q.services.map(function (id) {
