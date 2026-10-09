@@ -1,0 +1,75 @@
+name: Refresh regions
+
+# Every English region outside London, rebuilt and republished once a month.
+#
+# London is the monthly "Refresh data" run, which commits its files on the 15th
+# at 03:00 UTC. The regions follow at 06:17, each through build-region.yml with
+# publish on: a region that fails keeps last month's pack on the site rather
+# than losing it, and the run opens an issue naming it. The site is redeployed
+# once at the end, which also rebuilds the England view from every region.
+
+on:
+  schedule:
+    - cron: "17 6 15 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write   # region packs go on the region-data release
+  actions: write    # the closing site deploy
+  issues: write     # a failed region is reported as an issue
+
+concurrency:
+  group: refresh-regions
+  cancel-in-progress: false
+
+jobs:
+  regions:
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        scope:
+          - north-east
+          - north-west
+          - yorkshire-and-the-humber
+          - east-midlands
+          - west-midlands
+          - east-of-england
+          - south-east
+          - south-west
+    uses: ./.github/workflows/build-region.yml
+    with:
+      scope: ${{ matrix.scope }}
+      publish: true
+      deploy: false
+    secrets: inherit
+
+  deploy:
+    needs: regions
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Redeploy the site
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run jekyll-gh-pages.yml --repo "${{ github.repository }}" --ref main
+
+      - name: Report regions that failed
+        if: needs.regions.result != 'success'
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const run = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const title = 'Monthly region refresh: one or more regions failed';
+            const body = `The monthly region refresh did not finish cleanly: ${run}\n\n` +
+              `Regions that failed kept last month's data on the site. Open the run to see which, ` +
+              `fix the cause, then rerun those regions from "Build region (pilot)" with publish on.`;
+            const open = await github.paginate(github.rest.issues.listForRepo, {
+              owner: context.repo.owner, repo: context.repo.repo, state: 'open' });
+            const same = open.find(i => i.title === title);
+            if (same) {
+              await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: same.number, body });
+            } else {
+              await github.rest.issues.create({ owner: context.repo.owner, repo: context.repo.repo, title, body });
+            }

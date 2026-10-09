@@ -23,17 +23,31 @@ on:
         description: "Publish to the site (attach to the region-data release and redeploy)"
         type: boolean
         default: false
+  # The monthly refresh (refresh-regions.yml) calls this once per region, with
+  # deploy off, and redeploys the site once when every region has finished.
+  workflow_call:
+    inputs:
+      scope:
+        type: string
+        required: true
+      publish:
+        type: boolean
+        default: true
+      deploy:
+        type: boolean
+        default: true
 
 permissions:
   contents: write   # to attach the region pack to the region-data release
   actions: write    # to start the site deploy
 
-concurrency:
-  group: build-region-${{ github.event.inputs.scope }}
-  cancel-in-progress: false
-
 jobs:
   build:
+    # Per region, at job level so it holds whether this runs on its own or is
+    # called by the monthly refresh.
+    concurrency:
+      group: build-region-${{ inputs.scope }}
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 300
     steps:
@@ -53,9 +67,9 @@ jobs:
         uses: actions/cache@v6
         with:
           path: .cache
-          key: region-cache-${{ github.event.inputs.scope }}-${{ github.run_id }}
+          key: region-cache-${{ inputs.scope }}-${{ github.run_id }}
           restore-keys: |
-            region-cache-${{ github.event.inputs.scope }}-
+            region-cache-${{ inputs.scope }}-
 
       - name: Install dependencies
         run: |
@@ -65,12 +79,12 @@ jobs:
       - name: Run pipeline for the region
         # -u: unbuffered, so the log shows each source as it runs. Buffered, a
         # slow source left the log silent for hours with no clue which it was.
-        run: python -u fetch_all_data.py --scope "${{ github.event.inputs.scope }}" --skip tfl ptal
+        run: python -u fetch_all_data.py --scope "${{ inputs.scope }}" --skip tfl ptal
 
       # The loading screen's ward map for this region (map/loader.js), drawn
       # from the wards and IMD the pipeline has just written.
       - name: Build the region's loading map
-        run: python scripts/build_loader_map.py --region "${{ github.event.inputs.scope }}"
+        run: python scripts/build_loader_map.py --region "${{ inputs.scope }}"
 
       # The region's Integrated Care Boards (map/icbs.json, map/icb_lookup.json),
       # membership from ONS's council to ICB lookup. A failure here leaves the
@@ -78,7 +92,7 @@ jobs:
       # hides the layer when the files are missing.
       - name: Build the region's ICB layer
         continue-on-error: true
-        run: python scripts/build_icb_boundaries.py --region "${{ github.event.inputs.scope }}"
+        run: python scripts/build_icb_boundaries.py --region "${{ inputs.scope }}"
 
       - name: Summarise the manifest
         if: always()
@@ -94,14 +108,14 @@ jobs:
               print(f"{k:22} {v.get('status',''):8} rows={v.get('rows_written','')} {v.get('error','')[:120]}")
           PY
         env:
-          SCOPE: ${{ github.event.inputs.scope }}
+          SCOPE: ${{ inputs.scope }}
 
       - name: Upload the region's outputs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: region-${{ github.event.inputs.scope }}
-          path: data/regions/${{ github.event.inputs.scope }}
+          name: region-${{ inputs.scope }}
+          path: data/regions/${{ inputs.scope }}
           if-no-files-found: warn
 
       # Publishing: the served files only (no parquet intermediates, no
@@ -110,10 +124,10 @@ jobs:
       # the repository's history, so monthly region data does not grow it.
       # Then the site deploy is started so the new pack goes live.
       - name: Publish to the site
-        if: success() && github.event.inputs.publish == 'true'
+        if: success() && inputs.publish
         env:
           GH_TOKEN: ${{ github.token }}
-          SCOPE: ${{ github.event.inputs.scope }}
+          SCOPE: ${{ inputs.scope }}
         run: |
           cd "data/regions/$SCOPE"
           files="$(ls -d ward_data.json lsoa_data.json msoa_data.json borough_data.json \
@@ -125,4 +139,9 @@ jobs:
             gh release create region-data --latest=false --title "Region data" \
               --notes "Published region builds for the site, one pack per region. Replaced on each publish; not code releases."
           gh release upload region-data "region-$SCOPE.tar.gz" --clobber
-          gh workflow run jekyll-gh-pages.yml --ref main
+
+      - name: Redeploy the site
+        if: success() && inputs.publish && inputs.deploy != false
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run jekyll-gh-pages.yml --ref main
