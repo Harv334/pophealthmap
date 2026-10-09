@@ -1,0 +1,22 @@
+name: Probe sources (temporary)
+on:
+  push:
+    branches: [claude/amazing-bardeen-dc62j4]
+    paths: [.github/workflows/probe-sources.yml, scripts/probe_sources.py]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.13' }
+      - run: pip install requests pandas openpyxl
+      - run: python -u scripts/probe_sources.py
+      - run: |
+          for u in https://files.digital.nhs.uk/assets/ods/current/epcn.zip "https://digital.nhs.uk/data-and-information/publications/statistical/patients-registered-at-a-gp-practice"; do
+            curl -s -o /dev/null -w "%{http_code} curl $u\n" -A "curl/8.5.0" "$u" || true
+            curl -s -o /dev/null -w "%{http_code} curl-http1 $u\n" --http1.1 -A "Mozilla/5.0" "$u" || true
+          done
