@@ -1506,83 +1506,112 @@
      replacement: the level gate, the URL state, the tour and Reset all keep
      working through the same element they always used, and the list is built
      from the select's own options so the two cannot drift apart. */
-  .ov-picker { border: 1px solid var(--line); border-radius: 8px; background: var(--paper);
-    margin-bottom: 9px; overflow: hidden; }
-  .ov-current { display: flex; align-items: center; gap: 7px; padding: 8px 10px;
-    border-bottom: 1px solid var(--line); background: var(--nhs-light); font-size: var(--t-sm); }
-  .ov-current .ov-cur-nm { flex: 1; min-width: 0; font-weight: 600; color: var(--nhs-dark);
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Indicator picker: a card for what is on the map, then search, key
+     indicators, themes and recently used. A theme opens the library over the
+     map (.ovlib), where there is room for names and one-line meanings. */
+  .ov-picker { display: flex; flex-direction: column; gap: 10px; }
+  .ov-current { display: flex; flex-direction: column; gap: 5px; padding: 12px 14px;
+    border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
   .ov-current.empty { background: var(--paper-2); }
-  .ov-current.empty .ov-cur-nm { font-weight: 500; color: var(--ink-3); }
-  .ov-clear { appearance: none; background: none; border: 0; cursor: pointer; padding: 0 2px;
-    color: var(--ink-3); font-size: var(--t-lg); line-height: 1; }
-  .ov-clear:hover { color: var(--nhs-red); }
-  .ov-search { width: 100%; border: 0; border-bottom: 1px solid var(--line); font: inherit;
-    font-size: var(--t-sm); padding: 7px 9px 7px 26px; color: var(--ink); background: var(--paper)
-    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23768692' stroke-width='2'><circle cx='11' cy='11' r='7'/><path d='m21 21-4.35-4.35'/></svg>") no-repeat 8px center; }
-  .ov-search:focus { border-bottom-color: var(--nhs-bright); }
-  .ov-groups { max-height: 340px; overflow-y: auto; overflow-x: hidden; }
-  .ov-grp-hd { display: flex; align-items: center; gap: 6px; padding: 7px 10px; cursor: pointer;
-    background: var(--paper-2); border-bottom: 1px solid var(--line); font-size: var(--t-xs);
-    font-weight: 600; color: var(--ink-2); user-select: none; }
-  .ov-grp-hd:hover { background: var(--nhs-light); }
-  .ov-grp-hd .ov-arrow { color: var(--ink-3); font-size: 8px; transition: transform .12s;
-    flex-shrink: 0; }
-  .ov-grp-hd.open .ov-arrow { transform: rotate(90deg); }
-  .ov-grp-hd .ov-grp-nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
-    white-space: nowrap; }
-  .ov-grp-hd .ov-grp-n { color: var(--ink-3); font-weight: 500;
-    font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: var(--t-xs); }
-  .ov-grp-hd.has-sel .ov-grp-nm { color: var(--nhs-dark); }
-  .ov-grp-body { display: none; }
-  .ov-grp-body.open { display: block; }
-  .ov-opt { display: flex; align-items: flex-start; gap: 7px; padding: 5px 10px 5px 16px;
-    cursor: pointer; font-size: var(--t-sm); color: var(--ink); border-bottom: 1px solid var(--paper-2); }
-  .ov-opt:hover { background: var(--nhs-light); }
-  .ov-opt input { margin: 2px 0 0; flex-shrink: 0; accent-color: var(--nhs-blue); cursor: pointer; }
-  .ov-opt .ov-opt-nm { flex: 1; min-width: 0; line-height: 1.35; }
-  /* One pill per level the indicator can be drawn at. They wrap rather than
-     squeeze the name: four levels on a phone would otherwise leave the label
-     a few characters wide. The filled pill is where the figures are actually
-     published; the outlined ones are levels this map can carry it to. */
-  /* Name on top, provenance underneath, rather than side by side.
-     Side by side worked while the trailing block was two level pills. Adding a
-     publisher name made it wide enough that in a 270px sidebar the name was
-     squeezed into a 120px column and "Year 6 obesity, including severe
-     obesity" wrapped to five lines — a taller row, and a harder one to scan,
-     than simply putting the metadata on its own line. Stacked, the name reads
-     across the full width and the chips sit under it as a caption. */
-  .ov-opt .ov-opt-body { flex: 1; min-width: 0; display: flex; flex-direction: column;
-    gap: 3px; align-items: flex-start; }
-  .ov-opt .ov-lvls { display: flex; flex-wrap: wrap; gap: 3px; justify-content: flex-start;
-    max-width: 100%; }
-  .ov-opt .ov-lvl { font-size: var(--t-xs); color: var(--ink-3); border: 1px solid var(--line);
-    border-radius: 3px; padding: 0 3px; white-space: nowrap; }
-  .ov-opt .ov-lvl.native { color: var(--nhs-dark); border-color: var(--nhs-blue);
-    background: var(--nhs-light); font-weight: 600; }
-  /* "33 of 704" — how many distinct figures there are across how many areas.
-     Amber rather than red: a coarse indicator is not an error, it is a fact
-     about the publication that the reader needs before choosing it. Sits after
-     the level pills and stays out of the way when it is absent, which is most
-     of the time. */
-  /* Who published it. Filled rather than outlined, so it reads as a different
-     kind of fact from the level pills beside it: those say where the figure
-     can be drawn, this says where it came from. Quiet on purpose — it is the
-     answer to a question the reader has not asked yet. */
-  .ov-opt .ov-src { font-size: var(--t-xs); color: var(--ink-2); background: var(--paper-2);
-    border: 1px solid transparent; border-radius: 3px; padding: 0 4px;
-    white-space: nowrap; flex-shrink: 0; font-weight: 600;
-    letter-spacing: .01em; cursor: help; }
-  /* There was a dark-mode override here, for this one badge, on a site that
-     has no dark mode. On a machine set to dark it turned a single amber chip
-     into a dark chip in the middle of an otherwise light page, which reads as
-     a rendering fault rather than as a theme. One component cannot believe in
-     a theme by itself. Removed until the whole palette has a dark half, which
-     is a real piece of work and is what folding the design layer down is the
-     precondition for. */
-  .ov-opt.on { background: var(--nhs-light); }
-  .ov-opt.on .ov-opt-nm { font-weight: 600; color: var(--nhs-dark); }
-  .ov-empty { padding: 12px 10px; font-size: var(--t-xs); color: var(--ink-3); text-align: center; }
+  .ov-cur-lbl, .ov-h { font-size: var(--t-xs); font-weight: 700; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--ink-3); margin: 0; }
+  .ov-h { margin: 8px 0 2px; }
+  .ov-cur-nm { font-size: 17px; font-weight: 700; line-height: 1.3; color: var(--ink); }
+  .ov-current.empty .ov-cur-nm { font-size: 15px; font-weight: 600; color: var(--ink-2); }
+  .ov-cur-desc { font-size: 13.5px; line-height: 1.45; color: var(--ink-2);
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .ov-cur-meta { font-size: var(--t-xs); color: var(--ink-3); }
+  .ov-cur-btns { display: flex; gap: 8px; margin-top: 4px; }
+  .ov-cur-btns[hidden] { display: none; }
+  .ov-btn { appearance: none; font: inherit; font-size: 14px; font-weight: 600; min-height: 40px;
+    padding: 0 14px; border-radius: 8px; border: 1px solid var(--nhs-blue); background: var(--paper);
+    color: var(--nhs-blue); cursor: pointer; }
+  .ov-btn:hover { background: var(--nhs-light); }
+  .ov-btn.quiet { border-color: var(--line); color: var(--ink-2); font-weight: 500; }
+  .ov-search-lbl { font-size: 13px; font-weight: 600; color: var(--ink); margin-top: 2px; }
+  .ov-search { width: 100%; box-sizing: border-box; min-height: 44px; padding: 0 12px; font: inherit;
+    font-size: 15px; color: var(--ink); background: var(--paper); border: 1px solid var(--ink-faint);
+    border-radius: 8px; }
+  .ov-search:focus { outline: 2px solid var(--nhs-bright); outline-offset: 0; border-color: var(--nhs-bright); }
+  .ov-results { display: flex; flex-direction: column; gap: 2px; }
+  .ov-results[hidden] { display: none; }
+  .ov-res { appearance: none; font: inherit; text-align: left; padding: 9px 10px; border: 0;
+    border-radius: 8px; background: transparent; cursor: pointer; display: flex; flex-direction: column; gap: 2px; }
+  .ov-res:hover, .ov-res.on { background: var(--nhs-light); }
+  .ov-res-nm { font-size: 14.5px; font-weight: 600; color: var(--ink); line-height: 1.3; }
+  .ov-res-sub { font-size: var(--t-xs); color: var(--ink-3); }
+  .ov-empty { padding: 10px; font-size: 13px; color: var(--ink-3); }
+  .ov-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .ov-chip { appearance: none; font: inherit; font-size: 13.5px; font-weight: 600; min-height: 38px;
+    padding: 0 13px; border-radius: 19px; border: 1px solid var(--ink-faint); background: var(--paper);
+    color: var(--ink); cursor: pointer; }
+  .ov-chip:hover { border-color: var(--nhs-blue); color: var(--nhs-blue); }
+  .ov-chip.on { background: var(--nhs-blue); border-color: var(--nhs-blue); color: var(--on-accent); }
+  .ov-themes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .ov-theme { appearance: none; font: inherit; text-align: left; min-height: 64px; padding: 10px 11px;
+    border: 1px solid var(--line); border-radius: 10px; background: var(--paper); cursor: pointer;
+    display: flex; flex-direction: column; justify-content: space-between; gap: 4px; }
+  .ov-theme:hover { border-color: var(--nhs-blue); }
+  .ov-theme.has-sel { border-color: var(--nhs-blue); background: var(--nhs-light); }
+  .ov-theme-nm { font-size: 14px; font-weight: 600; color: var(--ink); line-height: 1.25;
+    display: flex; align-items: center; gap: 7px; }
+  .ov-theme-n { font-size: var(--t-xs); color: var(--ink-3); }
+  .ov-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .ov-recent { display: flex; flex-direction: column; }
+  .ov-recent button { appearance: none; font: inherit; font-size: 14px; text-align: left; padding: 7px 8px;
+    border: 0; border-radius: 6px; background: transparent; color: var(--nhs-blue); cursor: pointer; }
+  .ov-recent button:hover { background: var(--nhs-light); }
+
+  /* The library, over the map. */
+  .ovlib { position: absolute; inset: 0; z-index: 3500; display: flex; background: rgba(33,43,50,.35); }
+  .ovlib[hidden] { display: none; }
+  .ovlib.full { position: fixed; z-index: 5000; }
+  .ovlib-panel { width: min(880px, 100%); height: 100%; background: var(--paper); display: flex;
+    flex-direction: column; box-shadow: 8px 0 24px rgba(0,0,0,.14); }
+  .ovlib-hd { display: flex; align-items: center; gap: 14px; padding: 12px 18px 12px 22px;
+    border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .ovlib-hd h2 { margin: 0; font-size: 19px; font-weight: 700; color: var(--ink); }
+  .ovlib-hd .ovlib-n { font-size: 13px; color: var(--ink-3); flex: 1; }
+  .ovlib-x { appearance: none; width: 44px; height: 44px; border: 1px solid var(--line); border-radius: 8px;
+    background: var(--paper); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .ovlib-body { flex: 1; display: flex; min-height: 0; }
+  .ovlib-rail { width: 220px; flex-shrink: 0; padding: 10px; border-right: 1px solid var(--line-2);
+    background: var(--paper-2); overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+  .ovlib-rail button { appearance: none; font: inherit; font-size: 14px; min-height: 44px; padding: 0 10px;
+    border: 0; border-radius: 8px; background: transparent; color: var(--ink); cursor: pointer;
+    display: flex; align-items: center; gap: 9px; text-align: left; }
+  .ovlib-rail button span.t { flex: 1; }
+  .ovlib-rail button span.n { font-size: var(--t-xs); color: var(--ink-3); }
+  .ovlib-rail button:hover { background: var(--nhs-light); }
+  .ovlib-rail button.on { background: var(--line-2); font-weight: 700; }
+  .ovlib-main { flex: 1; min-width: 0; overflow-y: auto; padding: 18px 24px 32px; }
+  .ovlib-main h3 { margin: 0 0 4px; font-size: 22px; font-weight: 700; color: var(--ink); }
+  .ovlib-main .ovlib-blurb { margin: 0 0 18px; font-size: 14px; color: var(--ink-2); line-height: 1.5; }
+  .ovlib-main h4 { margin: 18px 0 6px; font-size: var(--t-xs); font-weight: 700; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--ink-3); }
+  .ovlib-row { appearance: none; font: inherit; width: 100%; box-sizing: border-box; text-align: left;
+    display: flex; gap: 14px; align-items: center; padding: 11px 13px; margin-bottom: 6px;
+    border: 1px solid var(--line-2); border-radius: 8px; background: var(--paper); cursor: pointer; }
+  .ovlib-row:hover { border-color: var(--nhs-blue); }
+  .ovlib-row.on { border-color: var(--nhs-blue); background: var(--nhs-light); }
+  .ovlib-row .txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .ovlib-row .nm { font-size: 15px; font-weight: 600; color: var(--ink); line-height: 1.3; }
+  .ovlib-row .ds { font-size: 13px; color: var(--ink-2); line-height: 1.4;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .ovlib-row .mt { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 3px;
+    max-width: 38%; }
+  .ovlib-row .lv { font-size: var(--t-xs); color: var(--ink); background: var(--line-2); border-radius: 4px;
+    padding: 2px 6px; white-space: nowrap; }
+  .ovlib-row .sr { font-size: var(--t-xs); color: var(--ink-3); text-align: right; }
+  @media (max-width: 700px) {
+    .ovlib-body { flex-direction: column; }
+    .ovlib-rail { width: auto; flex-direction: row; overflow-x: auto; border-right: 0;
+      border-bottom: 1px solid var(--line-2); padding: 8px; }
+    .ovlib-rail button { white-space: nowrap; flex-shrink: 0; }
+    .ovlib-main { padding: 14px 16px 24px; }
+    .ovlib-row { flex-direction: column; align-items: flex-start; }
+    .ovlib-row .mt { align-items: flex-start; max-width: none; flex-direction: row; flex-wrap: wrap; }
+  }
 
   /* ── Tour ─────────────────────────────────────────────────────────────────
      The design file's story strip: a chapter counter, a progress bar, one
@@ -2482,13 +2511,29 @@
                every other consumer reads and listens to. -->
           <div class="ov-picker" id="ov-picker">
             <div class="ov-current empty" id="ov-current">
-              <span class="ov-cur-nm" id="ov-cur-nm">No overlay</span>
-              <button type="button" class="ov-clear" id="ov-clear" title="Clear the overlay"
-                      aria-label="Clear the overlay" hidden>&times;</button>
+              <div class="ov-cur-lbl">Showing on the map</div>
+              <div class="ov-cur-nm" id="ov-cur-nm">No indicator selected</div>
+              <div class="ov-cur-desc" id="ov-cur-desc">Pick one below to shade the map.</div>
+              <div class="ov-cur-meta" id="ov-cur-meta"></div>
+              <div class="ov-cur-btns" id="ov-cur-btns" hidden>
+                <button type="button" class="ov-btn" id="ov-change">Change</button>
+                <button type="button" class="ov-btn quiet" id="ov-clear">Clear</button>
+              </div>
             </div>
+            <label class="ov-search-lbl" for="ov-search" id="ov-search-lbl">Search indicators</label>
             <input type="search" class="ov-search" id="ov-search" autocomplete="off"
-                   placeholder="Filter indicators" aria-label="Filter indicators">
-            <div class="ov-groups" id="ov-groups" role="group" aria-label="Choropleth indicator"></div>
+                   placeholder="Try smoking, life expectancy, air">
+            <div class="ov-results" id="ov-results" hidden></div>
+            <div id="ov-home">
+              <h3 class="ov-h">Key indicators</h3>
+              <div class="ov-chips" id="ov-chips"></div>
+              <h3 class="ov-h">Browse by theme</h3>
+              <div class="ov-themes" id="ov-themes"></div>
+              <div id="ov-recent-wrap" hidden>
+                <h3 class="ov-h">Recently used</h3>
+                <div class="ov-recent" id="ov-recent"></div>
+              </div>
+            </div>
           </div>
 
           <select id="ov" hidden aria-hidden="true" tabindex="-1">
@@ -8453,12 +8498,11 @@ function _applyBoroughSolo() {
    ═══════════════════════════════════════════════════════════════════════════ */
 (function _overlayPicker() {
   const sel = document.getElementById('ov');
-  const groupsEl = document.getElementById('ov-groups');
   const searchEl = document.getElementById('ov-search');
   const curEl = document.getElementById('ov-current');
   const curNm = document.getElementById('ov-cur-nm');
   const clearBtn = document.getElementById('ov-clear');
-  if (!sel || !groupsEl) return;
+  if (!sel || !searchEl) return;
 
   // "Bad/very bad health % · Ward" carries its level in the label. Split it out
   // so the level can be a pill and the filter can match the name alone.
@@ -8467,7 +8511,7 @@ function _applyBoroughSolo() {
     const at = t.lastIndexOf(' · ');
     if (at === -1) return { name: t, level: '' };
     const level = t.slice(at + 3).trim();
-    return /^(Ward|LSOA|MSOA|Borough)$/i.test(level)
+    return /^(Ward|LSOA|MSOA|Borough|Borough\/council)$/i.test(level)
       ? { name: t.slice(0, at).trim(), level: level }
       : { name: t, level: '' };
   }
@@ -8518,22 +8562,6 @@ function _applyBoroughSolo() {
         loose.opts.push(withLevels(node.value, node.textContent));
       }
     });
-  })();
-
-  /* "Key indicators": a handful of the most-asked-about figures above the
-     eight subject groups, so a visitor faced with 126 indicators has an
-     obvious place to begin. Named for what the rows are rather than for the
-     reader, who does not need telling where to start. The rows are the same indicators as in their own
-     groups, so it is hidden while filtering rather than listing hits twice. */
-  const START_HERE = 'Key indicators';
-  (function addStartHere() {
-    const keys = ['imd_score_ward', 'census_bad_health_pct', 'census_disability_any_pct',
-                  'claimant_rate_pct', 'fuel_poverty_pct', 'crime_rate_per_1000',
-                  'no2_ugm3', 'census_over65_pct'];
-    const byVal = {};
-    model.forEach(g => g.opts.forEach(o => { byVal[o.value] = o; }));
-    const opts = keys.map(k => byVal[k]).filter(Boolean);
-    if (opts.length) model.unshift({ label: START_HERE, opts: opts });
   })();
 
   // One pill per level the indicator can be drawn at, with the level the
@@ -8644,90 +8672,238 @@ function _applyBoroughSolo() {
      directly above the indicators, it was a third route to the same rows that
      pushed the real list down the pane every time it appeared. */
 
-  const openGroups = {};   // label -> bool
-  openGroups[START_HERE] = true;
-  let filter = '';
-
   function esc(s) {
     return String(s == null ? '' : s)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;')
       .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
+  const all = [].concat.apply([], model.map(g => g.opts));
+  const byVal = {};
+  model.forEach(g => g.opts.forEach(o => { o.theme = g.label; byVal[o.value] = o; }));
+
+  /* Themes: the select's groups, each with a colour and a line saying what is
+     in it. A large theme is split into sub-groups by subject, matched on the
+     indicator's key, so Health is six short lists rather than one of 55. */
+  const THEME_INFO = {
+    'Health & care':            ['#AE2573', 'Life expectancy, illness, hospital use, lifestyle and prevention.'],
+    'Deprivation':              ['#003087', 'The Index of Multiple Deprivation 2025 and its domains. Decile 1 is the most deprived tenth of areas in England.'],
+    'People & communities':     ['#7C2855', 'Age, ethnicity, country of birth and language, from Census 2021.'],
+    'Work, money & education':  ['#00703C', 'Jobs, benefits and qualifications.'],
+    'Housing & transport':      ['#8A6400', 'Tenure, cars, travel to work and access to transport.'],
+    'Environment & access':     ['#006F79', 'Air pollution, fuel poverty and access to green and blue space.'],
+    'Crime & safety':           ['#B3261E', 'Street-level crime from police.uk over the last 12 months.'],
+    'At a glance':              ['#4C6272', 'Population and the building blocks of each ward.'],
+  };
+  const SUBGROUPS = {
+    'Health & care': [
+      ['Life expectancy and deaths', /life expectancy|mortality|suicide/],
+      ['Mental health', /depression|mental health|self-harm|self harm/],
+      ['Children and young people', /year 6|reception|child|under 5|0 to 4|aged under|young people|mmr|fertility/],
+      ['Lifestyle', /smok|in adults|physically active|alcohol/],
+      ['Screening and vaccination', /screening|vaccination/],
+      ['Long-term conditions', /hypertension|qof/],
+      ['Hospital admissions', /admission|a&e|injur/],
+      ['Everyday health (Census 2021)', /^census_/],
+    ],
+  };
+  function subgroupsOf(g) {
+    const rules = SUBGROUPS[g.label];
+    if (!rules) return [{ name: '', opts: g.opts }];
+    const out = rules.map(r => ({ name: r[0], opts: [] }));
+    const other = { name: 'Other', opts: [] };
+    g.opts.forEach(o => {
+      const text = o.value + ' ' + o.name.toLowerCase();
+      const i = rules.findIndex(r => r[1].test(text));
+      (i === -1 ? other : out[i]).opts.push(o);
+    });
+    return out.concat(other).filter(x => x.opts.length);
+  }
+  const colourOf = label => (THEME_INFO[label] || ['#4C6272'])[0];
+
+  /* Key indicators: the figures most people come for. Only those this build
+     carries are shown, so a region without one simply has one fewer. */
+  const KEY = [
+    ['ft_life_expectancy_male', 'Life expectancy'],
+    ['ft_healthy_life_expectancy_male', 'Healthy life expectancy'],
+    ['imd_decile', 'Deprivation (IMD)'],
+    ['ft_child_poverty_low_income', 'Child poverty'],
+    ['ft_smoking_prevalence_adults', 'Smoking'],
+    ['ft_obesity_year6', 'Year 6 obesity'],
+    ['crime_rate_per_1000', 'Crime rate'],
+    ['no2_ugm3', 'Air pollution (NO2)'],
+  ].filter(k => byVal[k[0]]);
+
+  // Recently used, per browser. A convenience only, so storage that is
+  // blocked or empty just means the section stays hidden.
+  const RECENT_KEY = 'ph-ov-recent';
+  let recent = [];
+  try { recent = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]').filter(v => byVal[v]); } catch (e) {}
+  function remember(v) {
+    if (!byVal[v]) return;
+    recent = [v].concat(recent.filter(x => x !== v)).slice(0, 4);
+    try { localStorage.setItem(RECENT_KEY, JSON.stringify(recent)); } catch (e) {}
+  }
+
+  // Many descriptions open by restating the name ("Suicide rate. Published
+  // for..."). Under the name that sentence is noise, so it is dropped.
+  function descOf(o) {
+    let d = (o.meta && o.meta.desc) || '';
+    const nm = o.name.replace(/[.\s]+$/, '').toLowerCase();
+    if (d.toLowerCase().indexOf(nm) === 0) {
+      const rest = d.slice(nm.length).replace(/^[\s.:,;-]+/, '');
+      d = rest ? rest.charAt(0).toUpperCase() + rest.slice(1) : '';
+    }
+    return d;
+  }
+  function levelsText(o) {
+    const lv = ((o.levels && o.levels.length) ? o.levels.slice() : (o.level ? [o.level.toLowerCase()] : []))
+      .sort((a, b) => LADDER.indexOf(a) - LADDER.indexOf(b));
+    return lv.map(_levelTitle).join(' · ');
+  }
+  function srcText(o) {
+    const src = (o.meta && o.meta.src) || '';
+    for (const [re, t] of SRC_TAGS) { if (re.test(src)) return t + (o.meta.yr ? ' ' + o.meta.yr : ''); }
+    return src.split(/[\s(,]/)[0];
+  }
+
+  const resultsEl = document.getElementById('ov-results');
+  const homeEl = document.getElementById('ov-home');
+  const chipsEl = document.getElementById('ov-chips');
+  const themesEl = document.getElementById('ov-themes');
+  const recentWrap = document.getElementById('ov-recent-wrap');
+  const recentEl = document.getElementById('ov-recent');
+  const curDesc = document.getElementById('ov-cur-desc');
+  const curMeta = document.getElementById('ov-cur-meta');
+  const curBtns = document.getElementById('ov-cur-btns');
+  const searchLbl = document.getElementById('ov-search-lbl');
+  if (searchLbl) searchLbl.textContent = 'Search ' + all.length + ' indicators';
+
+  // The library: built once, over the map.
+  const wrap = document.getElementById('map-wrap') || document.body;
+  const lib = document.createElement('div');
+  lib.className = 'ovlib';
+  lib.hidden = true;
+  lib.innerHTML =
+    '<div class="ovlib-panel" role="dialog" aria-modal="true" aria-labelledby="ovlib-h">' +
+      '<div class="ovlib-hd"><h2 id="ovlib-h">Indicator library</h2>' +
+        '<span class="ovlib-n">' + all.length + ' indicators in ' + model.length + ' themes</span>' +
+        '<button type="button" class="ovlib-x" aria-label="Close the library">' +
+          '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>' +
+        '</button></div>' +
+      '<div class="ovlib-body"><nav class="ovlib-rail" aria-label="Themes"></nav>' +
+        '<div class="ovlib-main"></div></div>' +
+    '</div>';
+  wrap.appendChild(lib);
+  const railEl = lib.querySelector('.ovlib-rail');
+  const mainEl = lib.querySelector('.ovlib-main');
+  let libTheme = model.length ? model[0].label : '';
+  let lastFocus = null;
+
+  function renderLib() {
+    const cur = sel.value;
+    railEl.innerHTML = model.map((g, gi) =>
+      '<button type="button" data-th="' + gi + '" class="' + (g.label === libTheme ? 'on' : '') + '"' +
+        (g.label === libTheme ? ' aria-current="true"' : '') + '>' +
+        '<span class="ov-dot" style="background:' + colourOf(g.label) + '"></span>' +
+        '<span class="t">' + esc(g.label) + '</span><span class="n">' + g.opts.length + '</span></button>').join('');
+    const g = model.find(x => x.label === libTheme) || model[0];
+    if (!g) { mainEl.innerHTML = ''; return; }
+    mainEl.innerHTML = '<h3>' + esc(g.label) + '</h3>' +
+      '<p class="ovlib-blurb">' + esc((THEME_INFO[g.label] || ['', ''])[1]) + '</p>' +
+      subgroupsOf(g).map(sg =>
+        (sg.name ? '<h4>' + esc(sg.name) + '</h4>' : '') +
+        sg.opts.map(o =>
+          '<button type="button" class="ovlib-row' + (o.value === cur ? ' on' : '') + '" data-ov="' + esc(o.value) + '"' +
+            (o.value === cur ? ' aria-pressed="true"' : '') + '>' +
+            '<span class="txt"><span class="nm">' + esc(o.name) + '</span>' +
+              (descOf(o) ? '<span class="ds">' + esc(descOf(o)) + '</span>' : '') + '</span>' +
+            '<span class="mt"><span class="lv">' + esc(levelsText(o)) + '</span>' +
+              '<span class="sr">' + esc(srcText(o)) + '</span></span>' +
+          '</button>').join('')).join('');
+    mainEl.scrollTop = 0;
+  }
+  function openLib(theme) {
+    if (theme) libTheme = theme;
+    lastFocus = document.activeElement;
+    // On a phone the sidebar is a drawer over the map, so the library covers
+    // the whole screen instead of sitting under it.
+    const narrow = window.PH_DRAWER && typeof PH_DRAWER.narrow === 'function' && PH_DRAWER.narrow();
+    lib.classList.toggle('full', !!narrow);
+    renderLib();
+    lib.hidden = false;
+    const on = railEl.querySelector('button.on');
+    if (on) on.focus();
+  }
+  function closeLib() {
+    lib.hidden = true;
+    if (lastFocus && lastFocus.focus) lastFocus.focus();
+  }
+  lib.addEventListener('click', e => {
+    if (e.target === lib) { closeLib(); return; }
+    if (e.target.closest('.ovlib-x')) { closeLib(); return; }
+    const th = e.target.closest('[data-th]');
+    if (th) { libTheme = model[+th.getAttribute('data-th')].label; renderLib();
+      const b = railEl.querySelector('button.on'); if (b) b.focus(); return; }
+    const row = e.target.closest('[data-ov]');
+    if (row) { choose(row.getAttribute('data-ov')); closeLib(); }
+  });
+  lib.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { e.stopPropagation(); closeLib(); }
+  });
+
+  let filter = '';
+
+  function scoreHits(q) {
+    return all.map(o => {
+      const nm = o.name.toLowerCase();
+      let sc = 0;
+      if (nm === q) sc = 100;
+      else if (nm.indexOf(q) === 0) sc = 80;
+      else if (nm.indexOf(q) !== -1) sc = 60;
+      else if ((o.levels || []).some(lv => lv.indexOf(q) === 0)) sc = 40;
+      else if (o.theme.toLowerCase().indexOf(q) !== -1) sc = 30;
+      else if (o.hay && o.hay.indexOf(q) !== -1) sc = 20;
+      return sc ? { o: o, s: sc } : null;
+    }).filter(Boolean).sort((a, b) => b.s - a.s).map(x => x.o);
+  }
+
   function render() {
     const cur = sel.value;
+    const curOpt = cur && cur !== 'none' ? byVal[cur] : null;
     const q = filter.trim().toLowerCase();
-    let html = '';
-    let shown = 0;
 
-    model.forEach((g, gi) => {
-      // Level is searchable now that it is shown: typing "msoa" is a reasonable
-      // way to ask what can be drawn there, and the pills are the answer.
-      // Ranked, not just filtered. Searching only the visible label meant
-      // "asthma", "COPD" or "Fingertips" found nothing while sitting in the
-      // description of an indicator that was right there, and a plain filter
-      // puts a description match above a name match purely because its group
-      // is listed first. Score, then order within the group.
-      let hits;
-      if (q && g.label === START_HERE) return;
-      if (q) {
-        hits = g.opts.map(o => {
-          const nm = o.name.toLowerCase();
-          let s = 0;
-          if (nm === q) s = 100;                       // exact name
-          else if (nm.indexOf(q) === 0) s = 80;        // name starts with it
-          else if (nm.indexOf(q) !== -1) s = 60;       // name contains it
-          else if ((o.levels || []).some(lv => lv.indexOf(q) === 0)) s = 40;
-          else if (g.label.toLowerCase().indexOf(q) !== -1) s = 30;
-          else if (o.hay && o.hay.indexOf(q) !== -1) s = 20;  // unit/source/description
-          return s ? { o: o, s: s } : null;
-        }).filter(Boolean).sort((a, b) => b.s - a.s).map(x => x.o);
-      } else {
-        hits = g.opts;
-      }
-      if (!hits.length) return;
-      shown += hits.length;
-      const hasSel = hits.some(o => o.value === cur);
-      // A filter opens what it matched; otherwise the group holding the current
-      // overlay is the one open, so the pane opens on what is actually drawn.
-      const open = q ? true : (openGroups[g.label] != null ? openGroups[g.label] : hasSel);
-      html += '<div class="ov-grp">' +
-        '<div class="ov-grp-hd' + (open ? ' open' : '') + (hasSel ? ' has-sel' : '') +
-          '" data-grp="' + gi + '" role="button" tabindex="0" aria-expanded="' + open + '">' +
-          '<span class="ov-arrow">&#9654;</span>' +
-          '<span class="ov-grp-nm">' + esc(g.label) + '</span>' +
-          '<span class="ov-grp-n">' + hits.length + '</span>' +
-        '</div>' +
-        '<div class="ov-grp-body' + (open ? ' open' : '') + '">' +
-          hits.map(o =>
-            '<label class="ov-opt' + (o.value === cur ? ' on' : '') + '">' +
-              '<input type="checkbox" data-ov="' + esc(o.value) + '"' +
-                (o.value === cur ? ' checked' : '') + '>' +
-              '<span class="ov-opt-body">' +
-                '<span class="ov-opt-nm">' + esc(o.name) + '</span>' +
-                rowMeta(o) +
-              '</span>' +
-            '</label>').join('') +
-        '</div></div>';
-    });
-
-    groupsEl.innerHTML = html || '<div class="ov-empty">No indicator matches that.</div>';
-
-    const curOpt = cur && cur !== 'none'
-      ? [].concat.apply([], model.map(g => g.opts)).filter(o => o.value === cur)[0]
-      : null;
-    curNm.textContent = curOpt
-      ? curOpt.name + (curOpt.native ? ' · ' + _levelTitle(curOpt.native)
-                                     : (curOpt.level ? ' · ' + curOpt.level : ''))
-      : 'No overlay';
+    curNm.textContent = curOpt ? curOpt.name : 'No indicator selected';
+    curDesc.textContent = curOpt ? descOf(curOpt) : 'Pick one below to shade the map.';
+    curMeta.textContent = curOpt ? [levelsText(curOpt), (curOpt.meta && curOpt.meta.src) || ''].filter(Boolean).join(' · ') : '';
     curEl.classList.toggle('empty', !curOpt);
-    clearBtn.hidden = !curOpt;
+    curBtns.hidden = !curOpt;
 
-    // Keep the chosen one in view when the list is rebuilt from elsewhere.
-    if (curOpt && !q) {
-      const on = groupsEl.querySelector('.ov-opt.on');
-      if (on && on.scrollIntoView) on.scrollIntoView({ block: 'nearest' });
+    if (q) {
+      const hits = scoreHits(q).slice(0, 15);
+      resultsEl.innerHTML = hits.length
+        ? '<div class="ov-res-sub" style="padding:0 2px 4px">' + hits.length + (hits.length === 15 ? '+' : '') + ' matches</div>' +
+          hits.map(o => '<button type="button" class="ov-res' + (o.value === cur ? ' on' : '') + '" data-ov="' + esc(o.value) + '">' +
+            '<span class="ov-res-nm">' + esc(o.name) + '</span>' +
+            '<span class="ov-res-sub">' + esc(o.theme) + ' · ' + esc(levelsText(o)) + '</span></button>').join('')
+        : '<div class="ov-empty">No indicator matches that.</div>';
     }
+    resultsEl.hidden = !q;
+    homeEl.hidden = !!q;
+    if (q) return;
+
+    chipsEl.innerHTML = KEY.map(k =>
+      '<button type="button" class="ov-chip' + (k[0] === cur ? ' on' : '') + '" data-ov="' + k[0] + '"' +
+        (k[0] === cur ? ' aria-pressed="true"' : ' aria-pressed="false"') + '>' + esc(k[1]) + '</button>').join('');
+    themesEl.innerHTML = model.map((g, gi) => {
+      const has = g.opts.some(o => o.value === cur);
+      return '<button type="button" class="ov-theme' + (has ? ' has-sel' : '') + '" data-th="' + gi + '">' +
+        '<span class="ov-theme-nm"><span class="ov-dot" style="background:' + colourOf(g.label) + '"></span>' + esc(g.label) + '</span>' +
+        '<span class="ov-theme-n">' + g.opts.length + ' indicator' + (g.opts.length === 1 ? '' : 's') + '</span></button>';
+    }).join('');
+    const rec = recent.filter(v => v !== cur && byVal[v]);
+    recentWrap.hidden = !rec.length;
+    recentEl.innerHTML = rec.map(v => '<button type="button" data-ov="' + esc(v) + '">' + esc(byVal[v].name) + '</button>').join('');
   }
 
   function choose(value) {
@@ -8735,44 +8911,32 @@ function _applyBoroughSolo() {
     // everything else downstream behave exactly as they did for the dropdown.
     sel.value = value;
     sel.dispatchEvent(new Event('change', { bubbles: true }));
-    // The gate can refuse the change and put the value back; render after it
-    // has had its say rather than assuming the tick took.
+    if (value !== 'none') remember(value);
+    if (filter) { filter = ''; searchEl.value = ''; }
+    // The gate can refuse the change and put the value back; render after it.
     setTimeout(render, 0);
   }
 
-  groupsEl.addEventListener('click', e => {
-    const hd = e.target.closest('[data-grp]');
-    if (hd) {
-      const g = model[+hd.getAttribute('data-grp')];
-      const bodyOpen = hd.nextElementSibling.classList.contains('open');
-      openGroups[g.label] = !bodyOpen;
-      hd.classList.toggle('open', !bodyOpen);
-      hd.setAttribute('aria-expanded', String(!bodyOpen));
-      hd.nextElementSibling.classList.toggle('open', !bodyOpen);
-      return;
-    }
-    const box = e.target.closest('input[data-ov]');
-    if (!box) return;
-    // One at a time: unticking the current one clears the overlay, ticking a
-    // different one replaces it.
-    choose(box.checked ? box.getAttribute('data-ov') : 'none');
+  document.getElementById('ov-picker').addEventListener('click', e => {
+    const th = e.target.closest('[data-th]');
+    if (th && !lib.contains(th)) { openLib(model[+th.getAttribute('data-th')].label); return; }
+    const pick = e.target.closest('[data-ov]');
+    if (pick) choose(pick.getAttribute('data-ov'));
   });
-
-  groupsEl.addEventListener('keydown', e => {
-    if ((e.key === 'Enter' || e.key === ' ') && e.target.closest('[data-grp]')) {
-      e.preventDefault(); e.target.click();
-    }
+  document.getElementById('ov-change').addEventListener('click', () => {
+    const cur = byVal[sel.value];
+    openLib(cur ? cur.theme : null);
   });
 
   let searchT = null;
   searchEl.addEventListener('input', () => {
     clearTimeout(searchT);
-    searchT = setTimeout(() => { filter = searchEl.value; render(); }, 120);
+    searchT = setTimeout(() => { filter = searchEl.value; render(); }, 100);
   });
   clearBtn.addEventListener('click', () => choose('none'));
 
-  // Anything else that changes the overlay re-syncs the ticks.
-  sel.addEventListener('change', () => setTimeout(render, 0));
+  // Anything else that changes the overlay re-syncs the picker.
+  sel.addEventListener('change', () => setTimeout(() => { render(); if (!lib.hidden) renderLib(); }, 0));
 
   render();
 })();
