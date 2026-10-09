@@ -63,7 +63,9 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run pipeline for the region
-        run: python fetch_all_data.py --scope "${{ github.event.inputs.scope }}" --skip tfl ptal
+        # -u: unbuffered, so the log shows each source as it runs. Buffered, a
+        # slow source left the log silent for hours with no clue which it was.
+        run: python -u fetch_all_data.py --scope "${{ github.event.inputs.scope }}" --skip tfl ptal
 
       # The loading screen's ward map for this region (map/loader.js), drawn
       # from the wards and IMD the pipeline has just written.
