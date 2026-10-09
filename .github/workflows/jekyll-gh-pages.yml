@@ -62,11 +62,13 @@ jobs:
             echo "No region-data release yet; deploying London only."
           fi
           rm -rf regions-dl
-      # England (?r=england): every council on one map, stitched from London
-      # and the region packs just unpacked. Needs no network or packages.
+      # England (?r=england): London and every region pack just unpacked,
+      # merged into one map at every level. Shapely re-joins the ICBs a region
+      # boundary split and simplifies the geometry.
       - name: Build the England view
         run: |
-          if ls data/regions/*/map/boroughs.js >/dev/null 2>&1; then
+          if ls data/regions/*/map/wards.js >/dev/null 2>&1; then
+            python3 -m pip install --quiet "$(grep -i '^shapely' requirements.txt)"
             python3 scripts/build_england.py
           else
             echo "No regions published; no England view."
