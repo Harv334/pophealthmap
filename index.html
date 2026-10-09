@@ -51,6 +51,50 @@
     missing: false
   };
 
+  /* England is the heaviest thing this site serves: every ward in the
+     country and tens of MB of figures. So it asks first, before a single byte
+     of its data is requested. The question is written straight into the
+     page and the rest of the document is swallowed unparsed (<plaintext>),
+     so no script, preload or fetch below this point runs until the reader
+     says yes. A yes is remembered for the browser session, and ?go=1 stands
+     in where session storage is blocked. */
+  if (isEngland) {
+    var ok = /[?&]go=1(&|$)/.test(location.search);
+    try { ok = ok || sessionStorage.getItem('ph-england-ok') === '1'; } catch (e) {}
+    if (!ok) {
+      var back = location.pathname;
+      try {
+        if (document.referrer && new URL(document.referrer).origin === location.origin &&
+            !/[?&]r=england/.test(document.referrer)) back = document.referrer;
+      } catch (e) {}
+      window.PH_ENGLAND_GO = function () {
+        try { sessionStorage.setItem('ph-england-ok', '1'); location.reload(); return; } catch (e) {}
+        location.search = (location.search ? location.search + '&' : '?') + 'go=1';
+      };
+      var btn = 'display:inline-block;padding:9px 18px;border-radius:6px;font-weight:600;' +
+        'text-decoration:none;font-size:15px;font-family:inherit;line-height:1.4;cursor:pointer;margin:4px;';
+      document.write(
+        '<title>PopHealth Map - England</title>' +
+        '<meta name="viewport" content="width=device-width, initial-scale=1">' +
+        '<div role="alertdialog" aria-labelledby="eng-h" aria-describedby="eng-p" style="position:fixed;inset:0;' +
+        'display:flex;align-items:center;justify-content:center;padding:16px;background:#F4F7F9;' +
+        'font:15px/1.55 Inter,system-ui,-apple-system,sans-serif;color:#212B32;text-align:center">' +
+        '<div style="max-width:32em;background:#fff;border:1px solid #D8DDE0;border-radius:10px;padding:28px 24px">' +
+        '<h1 id="eng-h" style="margin:0 0 10px;font-size:21px">The England map is large</h1>' +
+        '<p id="eng-p" style="margin:0 0 10px;color:#4C6272">It loads every ward in England, about ' +
+        '7,000 areas and tens of megabytes of data. That can take a while and use a lot of memory, ' +
+        'especially on a phone or a slow connection.</p>' +
+        '<p style="margin:0 0 20px;color:#4C6272">If you are looking at one place, its region map ' +
+        'is much quicker and has the same detail.</p>' +
+        '<button type="button" onclick="PH_ENGLAND_GO()" autofocus style="' + btn +
+        'border:0;background:#005EB8;color:#fff">Load England</button>' +
+        '<a href="' + back.replace(/"/g, '&quot;') + '" style="' + btn +
+        'border:1px solid #005EB8;color:#005EB8;background:#fff">Choose a region instead</a>' +
+        '</div></div><plaintext style="display:none">');
+      return;
+    }
+  }
+
   /* Every data path the page asks for goes through here. London's paths come
      back unchanged; a region's are moved into its folder:
        ward_data.json            -> data/regions/<id>/ward_data.json
