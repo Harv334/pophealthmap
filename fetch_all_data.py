@@ -4332,7 +4332,8 @@ def build_ward_data() -> dict:
 
     tfl = _read_parquet_opt(DATA_DIR / "environment" / "tfl_transport_lsoa.parquet")
     if tfl is not None and not tfl.empty:
-        sources["tfl"] = "TfL Unified API (StopPoint register)"
+        sources["tfl"] = ("TfL Unified API (StopPoint register)" if IS_LONDON
+                          else "DfT NaPTAN (national stops register)")
         for col in ("rail_station_dist_m", "rail_stations_1km",
                     "bus_stop_dist_m", "bus_stops_800m"):
             if col in tfl.columns:
@@ -4853,6 +4854,8 @@ def write_map_blob(name: str, payload, description: str) -> None:
 # their only date is that day. Keyed by the manifest's source name.
 REGISTER_KEYS = {
     "tfl":        ("rail_station_dist_m", "rail_stations_1km",
+                   "bus_stop_dist_m", "bus_stops_800m"),
+    "naptan":     ("rail_station_dist_m", "rail_stations_1km",
                    "bus_stop_dist_m", "bus_stops_800m"),
 }
 
@@ -6037,6 +6040,125 @@ def run_tfl_transport() -> "pd.DataFrame | None":
 
 
 # ============================================================================
+# SOURCE: public transport access outside London (DfT NaPTAN)
+# ============================================================================
+# The TfL register above covers London only. NaPTAN, the Department for
+# Transport's national register of every public transport access point, gives
+# the same four measures for any region, so a region build writes the same
+# file with the same columns and nothing downstream changes. London keeps TfL,
+# which knows the Tube and Overground as TfL runs them.
+#
+# Stations are NaPTAN's station access areas, RLY for rail and MET for metro
+# and tram, one per station; the same site under two codes is collapsed
+# spatially as for TfL. Bus stops are on-street stops (BCT) and bus station
+# bays (BCS, BCQ), each side of a road its own stop, as TfL registers them.
+NAPTAN_URL = "https://naptan.api.dft.gov.uk/v1/access-nodes?dataFormat=csv"
+NAPTAN_STATION_TYPES = {"RLY", "MET"}
+NAPTAN_BUS_TYPES = {"BCT", "BCS", "BCQ"}
+# Stops this far beyond the scope's edge still count: the nearest station to a
+# border village can be in the next region.
+NAPTAN_MARGIN_M = 5000
+
+
+def run_naptan_transport() -> "pd.DataFrame | None":
+    rule("Public transport access (DfT NaPTAN)")
+    if IS_LONDON:
+        info("naptan: London uses the TfL register (source tfl); skipped")
+        return None
+    from shapely.geometry import Point, shape
+    from shapely.ops import transform as shp_transform
+    from shapely.strtree import STRtree
+    from pyproj import Transformer
+
+    cache_dir = CACHE_DIR / "naptan"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    csv_path = cache_dir / "access_nodes.csv"
+    fresh = csv_path.exists() and (time.time() - csv_path.stat().st_mtime) < 20 * 86400
+    if not fresh:
+        info("naptan: downloading the national register")
+        r = requests.get(NAPTAN_URL, timeout=300)
+        r.raise_for_status()
+        if len(r.content) < 1_000_000:
+            raise RuntimeError(f"naptan: register is only {len(r.content):,} bytes")
+        csv_path.write_bytes(r.content)
+    df = pd.read_csv(csv_path, usecols=lambda c: c in {"ATCOCode", "StopType", "Status",
+                                                      "Longitude", "Latitude"},
+                     dtype={"ATCOCode": str, "StopType": str, "Status": str}, low_memory=False)
+    if "Status" in df.columns:
+        df = df[~df["Status"].fillna("").str.lower().isin({"inactive", "del", "deleted"})]
+    df = df.dropna(subset=["Longitude", "Latitude"])
+
+    lsoa_path = DATA_DIR / "boundaries" / "lsoa.geojson"
+    if not lsoa_path.exists():
+        warn(f"naptan: {lsoa_path} missing; run `--only boundaries` first")
+        return None
+    with open(lsoa_path, encoding="utf-8") as f:
+        feats = json.load(f)["features"]
+    to_bng = Transformer.from_crs(4326, 27700, always_xy=True).transform
+
+    codes, origins = [], []
+    for feat in feats:
+        code = str(feat["properties"].get("LSOA21CD") or feat["properties"].get("code") or "")
+        if not code.startswith("E01"):
+            continue
+        geom = shp_transform(to_bng, shape(feat["geometry"]))
+        if not geom.is_valid:
+            geom = geom.buffer(0)
+        if geom.is_empty:
+            continue
+        pt = geom.centroid
+        if not geom.contains(pt):
+            pt = geom.representative_point()
+        codes.append(code)
+        origins.append(pt)
+    if not origins:
+        warn("naptan: no LSOAs in scope")
+        return None
+    xs = [p.x for p in origins]
+    ys = [p.y for p in origins]
+    x0, x1 = min(xs) - NAPTAN_MARGIN_M, max(xs) + NAPTAN_MARGIN_M
+    y0, y1 = min(ys) - NAPTAN_MARGIN_M, max(ys) + NAPTAN_MARGIN_M
+
+    def points(types):
+        sub = df[df["StopType"].isin(types)]
+        out = []
+        for lon, lat in zip(sub["Longitude"].astype(float), sub["Latitude"].astype(float)):
+            x, y = to_bng(lon, lat)
+            if x0 <= x <= x1 and y0 <= y <= y1:
+                out.append((x, y))
+        return out
+
+    rail_xy = _collapse_sites(points(NAPTAN_STATION_TYPES), TFL_SITE_RADIUS_M)
+    bus_xy = points(NAPTAN_BUS_TYPES)
+    info(f"naptan: {len(rail_xy):,} station sites and {len(bus_xy):,} bus stops "
+         f"within {NAPTAN_MARGIN_M // 1000} km of the scope")
+    if not rail_xy or not bus_xy:
+        warn("naptan: no stations or no bus stops near the scope; nothing written")
+        return None
+
+    def measure(points_xy, radius_m):
+        geoms = [Point(x, y) for x, y in points_xy]
+        tree = STRtree(geoms)
+        dists, counts = [], []
+        for pt in origins:
+            nearest = tree.nearest(pt)
+            dists.append(round(pt.distance(geoms[int(nearest)]), 1))
+            counts.append(int(len(tree.query(pt, predicate="dwithin", distance=radius_m))))
+        return dists, counts
+
+    rail_d, rail_n = measure(rail_xy, 1000)
+    bus_d, bus_n = measure(bus_xy, 800)
+    out = pd.DataFrame({"LSOA21CD": codes,
+                        "rail_station_dist_m": rail_d, "rail_stations_1km": rail_n,
+                        "bus_stop_dist_m": bus_d, "bus_stops_800m": bus_n})
+    out_path = DATA_DIR / "environment" / "tfl_transport_lsoa.parquet"
+    out = write_parquet_guarded(out_path, out, source="naptan")
+    ok(f"naptan: {len(out):,} LSOAs, median distance to a station "
+       f"{out['rail_station_dist_m'].median():,.0f} m -> {out_path.relative_to(REPO_ROOT)}")
+    return out
+
+
+# ============================================================================
 # SOURCE: your own figures, from data/custom/
 # ============================================================================
 # Everything else in this file fetches from a national publisher. This one
@@ -6173,6 +6295,7 @@ SOURCES = {
     "greenblue":   run_greenblue,
     "air_quality": run_air_quality,
     "tfl":         run_tfl_transport,
+    "naptan":      run_naptan_transport,
     "gp":          run_gp_practices,
     "pharmacies":  run_pharmacies,
     "imd":         run_imd2025,
