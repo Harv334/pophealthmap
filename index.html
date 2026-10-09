@@ -3027,7 +3027,7 @@
                 aria-label="What these area levels mean" aria-expanded="false"
                 title="The four sizes of area this map can colour. Borough is one of the 33 London local authorities. Ward is the electoral area a borough divides into, and London has 704. MSOA means Middle Layer Super Output Area, a statistical area of about 7,500 people, and London has 1,002. LSOA means Lower Layer Super Output Area, the smallest here, about 1,500 people, and London has 4,994. Wards sit inside boroughs, but MSOAs and LSOAs do not, so a ward is not a whole number of either. An indicator is only offered at the level it is published for."><span class="dl-help-word">Area level</span><span class="dl-help-mark" aria-hidden="true">?</span></button>
         <div class="dl-seg" id="dl-seg">
-          <button type="button" data-dl="borough" title="Borough or council level. The main Fingertips series is published per local authority, so this is the level those figures are actually measured at rather than repeated across every ward.">Borough/council</button>
+          <button type="button" data-dl="borough" title="Local authority level: each council coloured by its figure, worked out from its wards (counts added up, rates weighted by population).">Local authority</button>
           <button type="button" data-dl="ward" class="active" title="Ward-level data (704 wards)">Ward</button>
           <button type="button" data-dl="msoa" title="MSOA level. MSOAs sit between wards and LSOAs and do not nest into wards. The Local Health indicators are published at this level, so they shade here; anything published elsewhere draws the boundaries only.">MSOA</button>
           <button type="button" data-dl="lsoa" title="LSOA-level data (4,994 LSOAs, the most detailed level here)">LSOA</button>
@@ -4091,8 +4091,10 @@ function ovField(k) {
 function ovLevels(k) {
   const f = ovField(k);
   if (!f) return [];
-  if (Array.isArray(f.lv) && f.lv.length) return f.lv;
-  return f.g ? [f.g] : [];
+  const lv = (Array.isArray(f.lv) && f.lv.length) ? f.lv : (f.g ? [f.g] : []);
+  // Anything with ward figures can be shown per local authority too, worked
+  // out from its wards (see laAggregate).
+  return (lv.indexOf('ward') !== -1 && lv.indexOf('borough') === -1) ? ['borough'].concat(lv) : lv;
 }
 function ovHasLevel(k, level) { return ovLevels(k).indexOf(level) !== -1; }
 
@@ -5683,10 +5685,49 @@ function _boroughStyle(feat) {
 
 // Indicators published per local authority. Empty until the fetch lands.
 let BOROUGH_DATA = {};
+
+/* Local authority figures for indicators published per ward or below,
+   worked out from the ward figures: counts are added up, everything else is
+   averaged with each ward weighted by its population, so a council's rate is
+   its residents' rate rather than an average of unequal wards. Computed once
+   per indicator, after the ward data has loaded. */
+const _laAgg = {};
+const LA_SUM_UNITS = new Set(['crimes', 'people', 'LSOAs']);
+function laAggregate(k) {
+  if (_laAgg[k]) return _laAgg[k];
+  const wards = (typeof WARD_DATA_BY_CODE !== 'undefined' && WARD_DATA_BY_CODE &&
+                 Object.keys(WARD_DATA_BY_CODE).length) ? WARD_DATA_BY_CODE : null;
+  if (!wards) return {};
+  const fld = resolveOvField(k);
+  const meta = (typeof OV_META === 'object' && OV_META[k]) || {};
+  const sum = LA_SUM_UNITS.has(meta.u) || /_12mo$|^crime_total$|^census_population$|_lsoa_count$/.test(fld);
+  const acc = {};
+  for (const w of Object.values(wards)) {
+    const code = w && w.lad_code;
+    const ind = w && (w.indicators || w);
+    if (!code || !ind) continue;
+    const v = parseFloat(ind[fld]);
+    if (!isFinite(v)) continue;
+    const pop = parseFloat(ind.census_population);
+    const wt = isFinite(pop) && pop > 0 ? pop : 1;
+    const a = acc[code] || (acc[code] = { s: 0, w: 0 });
+    if (sum) { a.s += v; a.w = 1; } else { a.s += v * wt; a.w += wt; }
+  }
+  const out = {};
+  for (const code in acc) if (acc[code].w > 0) out[code] = acc[code].s / acc[code].w;
+  _laAgg[k] = out;
+  return out;
+}
 function boroughOvValue(code, k) {
   const d = BOROUGH_DATA[code];
-  if (!d) return null;
-  return (d.indicators || d)[resolveOvField(k)];
+  const own = d ? (d.indicators || d)[resolveOvField(k)] : null;
+  if (own != null && own !== '') return own;
+  const agg = laAggregate(k)[code];
+  return agg == null ? null : agg;
+}
+function _laCodes() {
+  return (typeof BOROUGH_GJ !== 'undefined' && BOROUGH_GJ.features)
+    ? BOROUGH_GJ.features.map(f => (f.properties || {}).LAD25CD).filter(Boolean) : [];
 }
 const _boroughRange = {};
 function getBoroughRange(ovKey) {
@@ -5696,11 +5737,15 @@ function getBoroughRange(ovKey) {
   // legend — which reads the ward range — describes what is actually on screen,
   // and a borough does not change colour when you switch between Ward and
   // Borough on an indicator whose value did not change.
-  const shared = getOvRange(ovKey);
-  if (shared) return shared;
+  // Only for an indicator published per council: one worked out from wards
+  // has a narrower spread than its wards, and needs its own scale.
+  if (ovNativeLevel(ovKey) === 'borough') {
+    const shared = getOvRange(ovKey);
+    if (shared) return shared;
+  }
   if (_boroughRange[ovKey]) return _boroughRange[ovKey];
-  const vals = Object.values(BOROUGH_DATA)
-    .map(d => parseFloat((d.indicators || d)?.[resolveOvField(ovKey)]))
+  const vals = _laCodes()
+    .map(c => parseFloat(boroughOvValue(c, ovKey)))
     .filter(v => !isNaN(v));
   if (vals.length < 2) return null;
   const sorted = vals.slice().sort((a, b) => a - b);
@@ -8677,7 +8722,7 @@ function _applyBoroughSolo() {
   // _levelName reads as part of a sentence ("no ward figures"), so it is lower
   // case. A pill is a label, not a sentence, and 'ward' beside 'MSOA' looks
   // like a mistake rather than a choice.
-  const _LVL_TITLE = { borough: 'Borough/council', ward: 'Ward', msoa: 'MSOA', lsoa: 'LSOA' };
+  const _LVL_TITLE = { borough: 'Local authority', ward: 'Ward', msoa: 'MSOA', lsoa: 'LSOA' };
   function _levelTitle(lv) { return _LVL_TITLE[lv] || lv; }
   // Registries declare lv in whatever order was convenient. Pills always read
   // largest area first, so the same indicator looks the same everywhere.
@@ -8836,11 +8881,6 @@ function _applyBoroughSolo() {
     model.length = 0;
     labels.forEach(l => model.push({ label: l, opts: out[l] }));
     if (sel.value && !sel.querySelector('option[value="' + sel.value + '"]')) sel.value = 'none';
-    // With nothing left that is only published per council, the council
-    // level would only ever say "no figures here".
-    const anyBorough = model.some(g => g.opts.some(o => (o.levels || []).indexOf('borough') !== -1));
-    const btn = document.querySelector('#dl-seg button[data-dl="borough"]');
-    if (btn && !anyBorough) btn.hidden = true;
   })();
 
   const all = [].concat.apply([], model.map(g => g.opts));
@@ -10667,7 +10707,7 @@ function renderTopBottom() {
   const useLsoa = level === 'lsoa';
   const pool = useLsoa ? (typeof LSOA_DATA !== 'undefined' ? LSOA_DATA : {})
              : level === 'msoa' ? (MSOA_DATA || {})
-             : level === 'borough' ? (BOROUGH_DATA || {})
+             : level === 'borough' ? Object.fromEntries(_laCodes().map(c => [c, { [resolveOvField(curOv)]: boroughOvValue(c, curOv) }]))
              : (WARD_DATA || {});
 
   // Restrict the LSOA pool to codes actually rendered on the map.
@@ -11154,7 +11194,7 @@ let _dlDriving = false;
 
 // Level names as a reader would say them, for the toasts and the badges.
 function _levelName(level) {
-  return { borough: 'borough', ward: 'ward', msoa: 'MSOA', lsoa: 'LSOA' }[level] || level;
+  return { borough: 'local authority', ward: 'ward', msoa: 'MSOA', lsoa: 'LSOA' }[level] || level;
 }
 
 function _dlHint(msg, ms) {
@@ -11230,10 +11270,12 @@ function _setDataLevel(level, opts) {
   if (level === 'borough') {
     var _ovOnB = typeof curOv !== 'undefined' && curOv && curOv !== 'none';
     _dlHint(!_ovOnB
-      ? 'Borough outlines drawn. Pick an overlay to shade them.'
+      ? 'Local authority outlines drawn. Pick an indicator to shade them.'
       : (ovHasLevel(curOv, 'borough')
-          ? 'Shaded per borough, which is where these figures are published.'
-          : 'Borough outlines only. This indicator has no borough figures to shade with.'),
+          ? (ovNativeLevel(curOv) === 'borough'
+              ? 'Shaded per local authority, which is where these figures are published.'
+              : 'Each local authority shaded by its figure, worked out from its wards.')
+          : 'Local authority outlines only. This indicator has no local authority figures.'),
       3600);
   }
 
@@ -13136,6 +13178,7 @@ async function loadData() {
         if (!bd) return;
         BOROUGH_DATA = bd;
         for (const k in _boroughRange) delete _boroughRange[k];
+        for (const k in _laAgg) delete _laAgg[k];
         restyleBorough();
         if (typeof renderTopBottom === 'function') { try { renderTopBottom(); } catch (e) {} }
       });
