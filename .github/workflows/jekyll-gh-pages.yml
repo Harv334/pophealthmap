@@ -6,13 +6,22 @@ on:
   push:
     branches: ["main"]
 
-  # Allows you to run this workflow manually from the Actions tab
+  # Allows you to run this workflow manually from the Actions tab. A region
+  # build that publishes also starts it this way.
   workflow_dispatch:
+
+  # The monthly refresh pushes with GITHUB_TOKEN, and a push made with that
+  # token does not start other workflows, so refreshed data used to wait for
+  # the next human merge to go live. Deploy when a refresh finishes instead.
+  workflow_run:
+    workflows: ["Refresh data"]
+    types: [completed]
 
 # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
   contents: read
   pages: write
+  actions: read
   id-token: write
 
 # Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
@@ -24,10 +33,35 @@ concurrency:
 jobs:
   # Build job
   build:
+    # From a refresh, only deploy if the refresh itself succeeded.
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          ref: main
+      # Regions other than London are not committed: each region build packs
+      # the files the site serves and attaches them to the "region-data"
+      # release. They are unpacked into data/regions/<scope>/ here, so the
+      # site gets them and the repository's history does not.
+      - name: Add published regions
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p regions-dl
+          if gh release download region-data --repo "${{ github.repository }}" \
+               --dir regions-dl --pattern 'region-*.tar.gz'; then
+            for f in regions-dl/region-*.tar.gz; do
+              scope="$(basename "$f" .tar.gz)"; scope="${scope#region-}"
+              mkdir -p "data/regions/$scope"
+              tar -xzf "$f" -C "data/regions/$scope"
+              echo "region $scope: $(find "data/regions/$scope" -type f | wc -l) files"
+            done
+          else
+            echo "No region-data release yet; deploying London only."
+          fi
+          rm -rf regions-dl
       - name: Setup Pages
         uses: actions/configure-pages@v6
       - name: Build with Jekyll
