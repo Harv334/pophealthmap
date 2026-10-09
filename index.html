@@ -4430,6 +4430,134 @@ const OV_META = {
       PH_AREA + ' build left out: ' + dropped.join(', '));
   }
 })();
+/* One plain-English line per indicator: what the number measures, for the
+   indicator picker and library. The fuller technical note stays in OV_META.desc
+   and the info panel. */
+const OV_PLAIN = {
+  census_good_health_pct: "People who describe their own health as good or very good.",
+  census_bad_health_pct: "People who describe their own health as bad or very bad.",
+  census_disability_any_pct: "People whose day-to-day activities are limited by a health problem or disability.",
+  census_disability_lot_pct: "People whose day-to-day activities are limited a lot by a health problem or disability.",
+  census_provides_unpaid_care_pct: "People who look after a relative, friend or neighbour without being paid.",
+  ft_a_e_attendance_under_5: "How often children under 5 go to A&E, per 1,000 children.",
+  ft_cervical_screening_25_49: "Women aged 25 to 49 who are up to date with cervical screening.",
+  ft_child_poverty_low_income: "Children under 16 living in families on a low income.",
+  ft_depression_qof: "Adults on a GP register for depression.",
+  ft_flu_vaccination_65plus: "People aged 65 and over who had the flu vaccine.",
+  ft_healthy_life_expectancy_female: "Years a girl born now can expect to live in good health.",
+  ft_healthy_life_expectancy_male: "Years a boy born now can expect to live in good health.",
+  ft_hypertension_qof: "Patients on a GP register for high blood pressure.",
+  ft_life_expectancy_female: "How long a girl born now can expect to live, in years.",
+  ft_life_expectancy_male: "How long a boy born now can expect to live, in years.",
+  ft_mental_health_qof: "Patients on a GP register for serious mental illness, such as schizophrenia or bipolar disorder.",
+  ft_mmr_2_doses_age5: "Children who have had both doses of the MMR vaccine by age 5.",
+  ft_obesity_adults: "Adults who are overweight or living with obesity.",
+  ft_obesity_year6: "Children aged 10 to 11 living with obesity.",
+  ft_physical_activity_adults: "Adults doing at least 150 minutes of moderate activity a week.",
+  ft_self_harm_admissions_10_24: "Hospital admissions for self-harm among 10 to 24 year olds, per 100,000.",
+  ft_smoking_prevalence_adults: "Adults aged 18 and over who currently smoke.",
+  ft_suicide_rate: "Deaths from suicide, per 100,000 people.",
+  ft_93465: "Hospital admissions where alcohol played a part, compared with England (100 = average).",
+  ft_93233: "Emergency admissions for COPD, a long-term lung disease, compared with England (100 = average).",
+  ft_93229: "Emergency admissions for coronary heart disease, compared with England (100 = average).",
+  ft_93227: "Unplanned hospital admissions for any reason, compared with England (100 = average).",
+  ft_93115: "Unplanned hospital admissions of children under 5, per 1,000 children.",
+  ft_93280: "Households on a low income living in a home that is hard to heat.",
+  ft_93089: "Births per 1,000 women aged 15 to 44.",
+  ft_93232: "Emergency admissions for heart attacks, compared with England (100 = average).",
+  ft_93241: "Emergency admissions for hip fractures in people aged 65 and over, compared with England (100 = average).",
+  ft_93240: "Admissions for conditions caused wholly or mainly by alcohol, compared with England (100 = average).",
+  ft_93239: "Emergency admissions for self-harm, compared with England (100 = average).",
+  ft_93283: "How long a baby born now can expect to live, in years, for this small area.",
+  ft_93098: "People aged 16 to 64 claiming out-of-work benefits for more than a year, per 1,000.",
+  ft_93250: "Deaths from any cause, compared with England (100 = average).",
+  ft_93252: "Deaths under 75 from any cause, compared with England (100 = average).",
+  ft_93253: "Deaths from cancer, compared with England (100 = average).",
+  ft_93254: "Deaths under 75 from cancer, compared with England (100 = average).",
+  ft_93255: "Deaths from heart and circulatory disease, compared with England (100 = average).",
+  ft_93256: "Deaths under 75 from heart and circulatory disease, compared with England (100 = average).",
+  ft_93480: "Deaths under 75 that public health action could have avoided, compared with England (100 = average).",
+  ft_93257: "Deaths from coronary heart disease, compared with England (100 = average).",
+  ft_93260: "Deaths from lung and breathing diseases, compared with England (100 = average).",
+  ft_93259: "Deaths from stroke, compared with England (100 = average).",
+  ft_93105: "Children aged 4 to 5 living with obesity.",
+  ft_93106: "Children aged 4 to 5 who are overweight or living with obesity.",
+  ft_93231: "Emergency admissions for stroke, compared with England (100 = average).",
+  ft_93097: "People aged 16 to 64 claiming out-of-work benefits.",
+  ft_93114: "Hospital admissions of children under 5 for injuries, per 10,000.",
+  ft_93219: "Hospital admissions of children under 15 for injuries, per 10,000.",
+  ft_93224: "Hospital admissions of 15 to 24 year olds for injuries, per 10,000.",
+  ft_93107: "Children aged 10 to 11 living with obesity.",
+  ft_93108: "Children aged 10 to 11 who are overweight or living with obesity.",
+  core20_lsoa_count: "Neighbourhoods in the ward that are among the most deprived fifth in England (NHS Core20).",
+  imd_score_ward: "Overall deprivation score for the ward. Higher means more deprived.",
+  imd_score: "Overall deprivation score for the neighbourhood. Higher means more deprived.",
+  imd_decile_mean: "Average deprivation decile of the ward's neighbourhoods. 1 is the most deprived tenth of England.",
+  imd_decile: "Which tenth of England the neighbourhood falls in for deprivation. 1 is the most deprived.",
+  income_score: "Share of people on low incomes or income-related benefits.",
+  employment_score: "Share of working-age people kept out of work by sickness, disability or caring.",
+  education_score: "Lack of qualifications and skills among children and adults.",
+  health_score: "Risk of early death and poor physical or mental health.",
+  crime_score: "Risk of being a victim of crime.",
+  barriers_score: "How hard it is to get housing and reach local services.",
+  environment_score: "Quality of homes and the local environment, including air quality and road safety.",
+  census_population: "Number of people living in the area on Census day 2021.",
+  census_non_white_pct: "People from an ethnic group other than White.",
+  census_born_outside_uk_pct: "People born outside the UK.",
+  census_white_pct: "People from a White ethnic group.",
+  census_asian_pct: "People from an Asian or Asian British ethnic group.",
+  census_black_pct: "People from a Black or Black British ethnic group.",
+  census_mixed_pct: "People from a Mixed or Multiple ethnic group.",
+  census_other_ethnic_pct: "People from another ethnic group, such as Arab.",
+  census_under16_pct: "Residents aged under 16.",
+  census_under5_pct: "Residents aged under 5.",
+  census_working_age_pct: "Residents aged 16 to 64.",
+  census_over65_pct: "Residents aged 65 and over.",
+  census_over85_pct: "Residents aged 85 and over.",
+  census_english_hh_all_pct: "Households where every adult's main language is English.",
+  census_english_hh_none_pct: "Households where no adult's main language is English. They may still speak English well.",
+  census_unemployed_pct: "People aged 16 and over who are looking for work.",
+  census_no_qual_pct: "People aged 16 and over with no qualifications.",
+  census_level4_qual_pct: "People aged 16 and over with a degree or equivalent.",
+  census_higher_managerial_pct: "People in senior managerial and professional jobs.",
+  census_routine_semi_routine_pct: "People in routine and semi-routine jobs, such as care, retail or manual work.",
+  claimant_rate_pct: "Working-age people claiming Universal Credit or Jobseeker's Allowance for being out of work.",
+  census_no_car_pct: "Households without a car or van.",
+  census_social_rented_pct: "Households renting from the council or a housing association.",
+  census_private_rented_pct: "Households renting from a private landlord.",
+  census_owned_pct: "Households that own their home, outright or with a mortgage.",
+  census_active_travel_pct: "Working people who walk or cycle to work.",
+  census_public_transport_pct: "Working people who take a bus, train or tube to work.",
+  census_car_to_work_pct: "Working people who drive or are driven to work.",
+  fuel_poverty_pct: "Households on a low income living in a home that is hard to heat.",
+  no2_ugm3: "Average nitrogen dioxide in the air, mostly from traffic.",
+  pm25_ugm3: "Average fine particles in the air, the type most harmful to health.",
+  pm10_ugm3: "Average coarser particles in the air, from traffic, building and dust.",
+  ptal_score: "How well connected the area is by public transport, from 0 (poor) to 8 (excellent).",
+  rail_station_dist_m: "Straight-line distance to the nearest train, tube or tram station, in metres.",
+  rail_stations_1km: "Number of train, tube or tram stations within 1 km.",
+  bus_stop_dist_m: "Straight-line distance to the nearest bus stop, in metres.",
+  bus_stops_800m: "Number of bus stops within 800 m, about a ten-minute walk.",
+  gb_commitment_pct: "Homes within a 15-minute walk of a park, green space or water.",
+  green_commitment_pct: "Homes within a 15-minute walk of a park or green space.",
+  green_doorstep_pct: "Homes within 200 m of a small green space.",
+  green_local_pct: "Homes within 300 m of a local park.",
+  green_neighbourhood_pct: "Homes within 1 km of a large park.",
+  blue_commitment_pct: "Homes within a 15-minute walk of a river, lake, canal or coast.",
+  crime_rate_per_1000: "Recorded crimes in the last 12 months for every 1,000 residents.",
+  crime_total: "All recorded crimes in the last 12 months.",
+  crime_violence_12mo: "Recorded violent and sexual offences in the last 12 months.",
+  crime_asb_12mo: "Reported anti-social behaviour in the last 12 months.",
+  crime_theft_12mo: "Recorded thefts, including shoplifting and bike theft, in the last 12 months.",
+  crime_burglary_12mo: "Recorded burglaries of homes and businesses in the last 12 months.",
+  crime_robbery_12mo: "Recorded robberies in the last 12 months.",
+  crime_vehicle_12mo: "Recorded thefts of and from vehicles in the last 12 months.",
+  crime_drug_offences_12mo: "Recorded drug offences in the last 12 months.",
+  crime_public_order_12mo: "Recorded public order offences in the last 12 months.",
+  crime_arson_12mo: "Recorded arson and criminal damage in the last 12 months.",
+  crime_weapons_12mo: "Recorded offences for carrying weapons in the last 12 months.",
+  crime_misc_society_12mo: "Other recorded crimes, such as handling stolen goods, in the last 12 months.",
+};
 function ovMeta(k) { return OV_META[k] || null; }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -8748,6 +8876,7 @@ function _applyBoroughSolo() {
   // Many descriptions open by restating the name ("Suicide rate. Published
   // for..."). Under the name that sentence is noise, so it is dropped.
   function descOf(o) {
+    if (typeof OV_PLAIN === 'object' && OV_PLAIN[o.value]) return OV_PLAIN[o.value];
     let d = (o.meta && o.meta.desc) || '';
     const nm = o.name.replace(/[.\s]+$/, '').toLowerCase();
     if (d.toLowerCase().indexOf(nm) === 0) {
@@ -8819,6 +8948,7 @@ function _applyBoroughSolo() {
             '<span class="txt"><span class="nm">' + esc(o.name) + '</span>' +
               (descOf(o) ? '<span class="ds">' + esc(descOf(o)) + '</span>' : '') + '</span>' +
             '<span class="mt"><span class="lv">' + esc(levelsText(o)) + '</span>' +
+              (o.native === 'borough' ? '<span class="sr" title="Published for each council as a whole, so every ward in a council shows the same figure">One figure per council</span>' : '') +
               '<span class="sr">' + esc(srcText(o)) + '</span></span>' +
           '</button>').join('')).join('');
     mainEl.scrollTop = 0;
@@ -8875,7 +9005,8 @@ function _applyBoroughSolo() {
 
     curNm.textContent = curOpt ? curOpt.name : 'No indicator selected';
     curDesc.textContent = curOpt ? descOf(curOpt) : 'Pick one below to shade the map.';
-    curMeta.textContent = curOpt ? [levelsText(curOpt), (curOpt.meta && curOpt.meta.src) || ''].filter(Boolean).join(' · ') : '';
+    curMeta.textContent = curOpt ? [levelsText(curOpt), (curOpt.meta && curOpt.meta.src) || '',
+      curOpt.native === 'borough' ? 'one figure per council' : ''].filter(Boolean).join(' · ') : '';
     curEl.classList.toggle('empty', !curOpt);
     curBtns.hidden = !curOpt;
 
