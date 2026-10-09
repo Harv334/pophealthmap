@@ -2697,6 +2697,10 @@ FINGERTIPS_MSOA_INDICATORS = [
 
 LSOA_MSOA_LOOKUP = ("https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/"
                     "services/OA21_LAD23_LSOA21_MSOA21_LEP23_EN_LU/FeatureServer/0/query")
+# 2011 MSOAs to 2021 MSOAs. Local Health is still published against 2011 codes
+# for its older series; about 2% of MSOAs were split, merged or redrawn in 2021.
+MSOA11_MSOA21_LOOKUP = ("https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/"
+                        "services/MSOA11_MSOA21_LAD22_EW_LU_v2/FeatureServer/0/query")
 
 
 @lru_cache(maxsize=1)
@@ -2740,6 +2744,101 @@ def get_lsoa_to_msoa() -> dict:
     return pairs
 
 
+@lru_cache(maxsize=1)
+def get_msoa21_to_msoa11() -> dict:
+    """MSOA21CD -> [MSOA11CD, ...] for the MSOAs in scope, cached on disk.
+
+    Unchanged and split 2021 MSOAs have one 2011 parent; merged ones have
+    several. Returns {} rather than failing: this only fills gaps."""
+    cache = CACHE_DIR / "lookups" / f"msoa21_msoa11_{SCOPE_KEY}.json"
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    if cache.exists():
+        try:
+            return json.loads(cache.read_text(encoding="utf-8"))
+        except ValueError:
+            pass
+    codes = sorted(set(get_lsoa_to_msoa().values()))
+    out: dict = {}
+    try:
+        for i in range(0, len(codes), 120):
+            batch = codes[i:i + 120]
+            payload = {
+                "where": "MSOA21CD IN (" + ",".join(f"'{c}'" for c in batch) + ")",
+                "outFields": "MSOA11CD,MSOA21CD",
+                "returnGeometry": "false",
+                "f": "json",
+                "resultRecordCount": 4000,
+            }
+            r = requests.post(MSOA11_MSOA21_LOOKUP, data=payload, timeout=180)
+            r.raise_for_status()
+            for feat in r.json().get("features", []):
+                a = feat.get("attributes", {})
+                if a.get("MSOA21CD") and a.get("MSOA11CD"):
+                    out.setdefault(a["MSOA21CD"], [])
+                    if a["MSOA11CD"] not in out[a["MSOA21CD"]]:
+                        out[a["MSOA21CD"]].append(a["MSOA11CD"])
+    except Exception as e:
+        warn(f"msoa11->msoa21 lookup: {e}; 2011-coded figures will not be bridged")
+        return {}
+    if len(out) < len(codes) * 0.9:
+        warn(f"msoa11->msoa21 lookup: only {len(out):,} of {len(codes):,} MSOAs; not caching")
+        return out
+    cache.write_text(json.dumps(out), encoding="utf-8")
+    ok(f"ONS lookup: {len(out):,} MSOAs (2021) -> 2011 parents")
+    return out
+
+
+def FT_MALE_ID(ind_id: int) -> int:
+    """The id the men's figure of a sex-split Local Health series is kept under."""
+    return ind_id * 10 + 1
+
+
+def _ft_msoa_variant(ind_id, df, name, want_msoa, rows, missing_codes) -> int:
+    """Latest period per MSOA, 2011 codes bridged, rows appended. Returns the
+    number of figures bridged from 2011 codes."""
+    bridged = 0
+    if "Time period Sortable" in df.columns:
+        df = df.sort_values("Time period Sortable").groupby("Area Code", as_index=False).tail(1)
+    # 2021 MSOAs with no figure under their own code take their 2011
+    # parent's (a split) or the mean of their parents' (a merge).
+    lookup = get_msoa21_to_msoa11()
+    have = set(df["Area Code"])
+    by_code = df.set_index("Area Code")
+    extra = []
+    for m21 in want_msoa - have:
+        parents = [p for p in lookup.get(m21, []) if p in by_code.index and p != m21]
+        vals = [_tofloat(by_code.at[p, "Value"]) for p in parents]
+        vals = [v for v in vals if v is not None and v == v]
+        if vals:
+            row = by_code.loc[parents[0]].copy()
+            row["Value"] = repr(sum(vals) / len(vals))
+            row["Area Code"] = m21
+            extra.append(row)
+    if extra:
+        bridged += len(extra)
+        df = pd.concat([df, pd.DataFrame(extra)], ignore_index=True)
+    df = df[df["Area Code"].isin(want_msoa)]
+    if df.empty:
+        # Fingertips still publishes these against 2011 MSOA codes, and 39
+        # London MSOAs were renumbered in 2021. A total miss means
+        # something else changed.
+        warn(f"fingertips msoa {ind_id}: no rows matched an in-scope MSOA")
+        return bridged
+
+    got = set(df["Area Code"])
+    missing_codes |= (want_msoa - got)
+    for _, row in df.iterrows():
+        rows.append({
+            "MSOA21CD": row["Area Code"],
+            "indicator_id": int(ind_id),
+            "indicator_name": name,
+            "value": _tofloat(row.get("Value")),
+            "period": row.get("Time period", ""),
+        })
+
+    return bridged
+
+
 def run_fingertips_msoa() -> pd.DataFrame:
     rule("OHID Fingertips Local Health (MSOA)")
     cache_dir = CACHE_DIR / "fingertips_msoa"
@@ -2749,13 +2848,19 @@ def run_fingertips_msoa() -> pd.DataFrame:
     rows: list = []
     missing_codes: set = set()
 
+    bridged_total = 0
     for ind_id in FINGERTIPS_MSOA_INDICATORS:
-        cache = cache_dir / f"ind_{ind_id}.csv"
+        # England as the parent, not counties and UAs (502). Under 502,
+        # Fingertips returned only the MSOAs it had re-parented since 2023,
+        # which for the series last uploaded in 2022 was 77 MSOAs in all of
+        # England: whole indicators went missing outside London. Under England
+        # every series comes back complete. _p15 so old caches are not reused.
+        cache = cache_dir / f"ind_{ind_id}_p15.csv"
         if not cache.exists():
             url = (f"https://fingertips.phe.org.uk/api/all_data/csv/by_indicator_id"
                    f"?indicator_ids={ind_id}"
                    f"&child_area_type_id={FINGERTIPS_MSOA_AREA_TYPE}"
-                   f"&parent_area_type_id=502")
+                   f"&parent_area_type_id=15")
             try:
                 r = _ft_get(url, timeout=180)
                 if len(r.content.splitlines()) < 2:
@@ -2774,41 +2879,38 @@ def run_fingertips_msoa() -> pd.DataFrame:
             continue
 
         name = str(df["Indicator Name"].iloc[0]) if "Indicator Name" in df.columns else ""
-        df = df[df["Area Code"].isin(want_msoa)]
-        if df.empty:
-            # Fingertips still publishes these against 2011 MSOA codes, and 39
-            # London MSOAs were renumbered in 2021. A total miss means
-            # something else changed.
-            warn(f"fingertips msoa {ind_id}: no rows matched an in-scope MSOA")
-            continue
-        if "Sex" in df.columns and (df["Sex"] == "Persons").any():
-            df = df[df["Sex"] == "Persons"]
-        df = df.sort_values("Time period Sortable").groupby("Area Code", as_index=False).tail(1)
-
-        got = set(df["Area Code"])
-        missing_codes |= (want_msoa - got)
-        for _, row in df.iterrows():
-            rows.append({
-                "MSOA21CD": row["Area Code"],
-                "indicator_id": int(ind_id),
-                "indicator_name": name,
-                "value": _tofloat(row.get("Value")),
-                "period": row.get("Time period", ""),
-            })
+        if "Area Type" in df.columns:
+            df = df[df["Area Type"].astype(str).str.contains("MSOA", na=False)]
+        # Persons where published. Life expectancy has no Persons figure, only
+        # Female and Male, and taking the last row per MSOA mixed the two
+        # without saying which: women keep this indicator's id, men get
+        # FT_MALE_ID(id), and each says so in its name.
+        variants = [(int(ind_id), df, name)]
+        if "Sex" in df.columns:
+            sexes = set(df["Sex"].dropna().astype(str))
+            if "Persons" in sexes:
+                variants = [(int(ind_id), df[df["Sex"] == "Persons"], name)]
+            elif {"Female", "Male"} <= sexes:
+                variants = [(int(ind_id), df[df["Sex"] == "Female"], name + " (women)"),
+                            (FT_MALE_ID(int(ind_id)), df[df["Sex"] == "Male"], name + " (men)")]
+        for out_id, df, name in variants:
+            bridged_total += _ft_msoa_variant(out_id, df, name, want_msoa, rows, missing_codes)
 
     out = pd.DataFrame(rows)
     out_path = DATA_DIR / "outcomes" / "fingertips_msoa.parquet"
     out = carry_forward_thin(out_path, out, key="indicator_id", source="fingertips_msoa",
                              requested=set(FINGERTIPS_MSOA_INDICATORS),
-                             cache_file=lambda k: cache_dir / f"ind_{int(k)}.csv")
+                             cache_file=lambda k: cache_dir / f"ind_{int(k)}_p15.csv")
     out = write_parquet_guarded(out_path, out, source="fingertips_msoa")
     n_ind = out["indicator_id"].nunique() if not out.empty else 0
     ok(f"fingertips msoa: {len(out):,} rows, {n_ind} indicators across "
        f"{out['MSOA21CD'].nunique() if not out.empty else 0:,} MSOAs "
        f"-> {out_path.relative_to(REPO_ROOT)}")
+    if bridged_total:
+        info(f"fingertips msoa: {bridged_total:,} figures carried from 2011 MSOA codes to 2021 ones")
     if missing_codes:
-        warn(f"fingertips msoa: {len(missing_codes):,} in-scope MSOAs had no data "
-             f"in at least one indicator (2011 vs 2021 MSOA codes)")
+        warn(f"fingertips msoa: {len(missing_codes):,} in-scope MSOAs had no figure "
+             f"in at least one indicator (suppressed or not published)")
     return out
 
 
