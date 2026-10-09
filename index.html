@@ -653,7 +653,10 @@
 
   /* ── Overlay scale ── */
   .scale-bar { display: none; margin-top: 8px; }
-  .scale-labels { display: flex; justify-content: space-between; font-size: var(--t-xs); color: var(--ink-3); margin-bottom: 3px; }
+  .scale-labels { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: start; font-size: var(--t-xs); color: var(--ink-3); margin-bottom: 3px; }
+  /* A grid, not space-between: the end labels wrap onto two lines and the
+     middle figure ran straight into them. */
+  .scale-labels > :last-child { text-align: right; }
   .scale-grad { display: block; height: 6px; border-radius: 3px; overflow: hidden; }
   /* A unit too long to sit on each number, said once above the scale. */
   .sc-unit { font-size: var(--t-xs); color: var(--ink-2); margin-bottom: 2px; }
@@ -2380,7 +2383,7 @@
           </div>
           <label class="lrow"><div style="width:9px;height:9px;border:2px solid #1a1a1a;border-radius:2px;flex-shrink:0"></div><span class="lname" id="tb-name">London boroughs</span><input type="checkbox" id="tb"></label>
           <div style="margin:4px 0 8px 0">
-            <div style="font-size:var(--t-xs);color:var(--ink-2);margin-bottom:3px">Focus by borough</div>
+            <div style="font-size:var(--t-xs);color:var(--ink-2);margin-bottom:3px" id="borough-focus-label">Focus by borough</div>
             <select id="borough-focus" style="width:100%;padding:4px 6px;border:1px solid var(--line);border-radius:5px;font-size:var(--t-xs);color:var(--ink);background:var(--paper)">
               <option value="all">All London</option>
             </select>
@@ -3554,6 +3557,7 @@ const PH_WHERE_ARIA = PH_IS_LONDON
   hide('sbar-tour');
 
   setText('tb-name', 'Local authorities');
+  setText('borough-focus-label', 'Focus by local authority');
   const firstOpt = (id, t) => {
     const s = $(id);
     if (s && s.options.length) s.options[0].textContent = t;
@@ -10969,7 +10973,7 @@ function _syncScaleNumbers() {
   if (lo) lo.textContent = `${cfg.lo} (${ends ? ends.lo : cfg.lo})`;
   if (hi) hi.textContent = `${cfg.hi} (${ends ? ends.hi : cfg.hi})`;
   const midEl = document.getElementById('sc-mid');
-  if (midEl) midEl.textContent = range ? fmtNum((range.lo + range.hi) / 2, 1) + unit.inline : '';
+  if (midEl) midEl.textContent = range ? fmtNum((range.lo + range.hi) / 2, _legendDecimals({ lo: (range.lo + range.hi) / 2, hi: 0 })) + unit.inline : '';
   const scUnit = document.getElementById('sc-unit');
   if (scUnit) scUnit.textContent = unit.below;
   const mlsMin = document.getElementById('mls-min');
@@ -11025,10 +11029,17 @@ function _legendUnit(meta) {
    darkest colour reads as "37.8" on a ward at 53.9. Left plain when the end
    is the true minimum or maximum. No-break spaces, so that on a phone the
    sign and its unit stay on the number's line. */
+/* Whole-number scales (deciles, ranks, counts) read "1 to 10", not
+   "1.0 to 10.0". Anything with a fractional end keeps one decimal. */
+function _legendDecimals(range) {
+  return (Number.isInteger(range.lo) && Number.isInteger(range.hi)) ? 0 : 1;
+}
+
 function _legendEnds(range, inline) {
   if (!range) return null;
-  const lo = fmtNum(range.lo, 1) + inline;
-  const hi = fmtNum(range.hi, 1) + inline;
+  const d = _legendDecimals(range);
+  const lo = fmtNum(range.lo, d) + inline;
+  const hi = fmtNum(range.hi, d) + inline;
   return {
     lo: (range.min == null || range.min < range.lo) ? '≤\u00a0' + lo : lo,
     hi: (range.max == null || range.max > range.hi) ? '≥\u00a0' + hi : hi,
@@ -11530,7 +11541,7 @@ function _refreshUI() {
         box.appendChild(c);
       };
       if (focusActive()) {
-        addChip('', (focusedIcb ? '' : 'Borough: ') + focusLabel(), () => {
+        addChip('', (focusedIcb ? '' : (window.PH_REGION && !PH_REGION.isLondon ? 'Local authority: ' : 'Borough: ')) + focusLabel(), () => {
           focusedBorough = 'all';
           focusedIcb = null;
           const bsel = document.getElementById('borough-focus');
