@@ -1,0 +1,36 @@
+name: Make region scopes
+
+# Writes scopes/<region>.json for the English regions that do not have one
+# yet, from the ONS LAD-to-region lookup (scripts/make_scopes.py), and pushes
+# them to the branch auto/region-scopes for review. Existing scopes, London's
+# included, are only compared and reported, never rewritten.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  scopes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - run: pip install requests
+      - run: python scripts/make_scopes.py
+      - name: Push new scopes for review
+        run: |
+          git add scopes
+          if git diff --cached --quiet; then
+            echo "No new scopes."
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b auto/region-scopes
+          git commit -m "Add region scopes from the ONS LAD-to-region lookup"
+          git push --force origin auto/region-scopes

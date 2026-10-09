@@ -11,7 +11,6 @@ name: Build region (pilot)
 # The London-only sources are skipped until they have national replacements:
 #   tfl          TfL StopPoint covers London only (NaPTAN is the national one)
 #   ptal         GLA LSOA Atlas, London only
-#   air_quality  still cropped to a London bounding box
 
 on:
   workflow_dispatch:
@@ -59,7 +58,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run pipeline for the region
-        run: python fetch_all_data.py --scope "${{ github.event.inputs.scope }}" --skip tfl ptal air_quality
+        run: python fetch_all_data.py --scope "${{ github.event.inputs.scope }}" --skip tfl ptal
 
       - name: Summarise the manifest
         if: always()
