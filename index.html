@@ -2260,7 +2260,7 @@
           <div class="sb-lbl">Point layers</div>
           <label class="lrow"><div class="ldot" style="background:#fff;box-shadow:inset 0 0 0 2px #2F3B45"></div><span class="lname">GP practices <span class="lcount" id="gp-count">0</span></span><input type="checkbox" id="tg"></label>
           <label class="lrow"><div class="ldot" style="background:#A32D2D"></div><span class="lname">Hospitals &amp; clinics <span class="lcount" id="hosp-count">0</span></span><input type="checkbox" id="th"></label>
-          <label class="lrow"><div class="ldot" style="background:#2E7D32"></div><span class="lname">Parks &amp; greenspaces <span class="lcount" id="greenspace-count"></span></span><input type="checkbox" id="tgr"></label>
+          <label class="lrow" id="greenspace-row"><div class="ldot" style="background:#2E7D32"></div><span class="lname">Parks &amp; greenspaces <span class="lcount" id="greenspace-count"></span></span><input type="checkbox" id="tgr"></label>
           <div id="greenspace-legend" style="display:none;margin:2px 0 6px 18px;padding:4px 6px;background:var(--paper-2);border-radius:4px">
             <div style="font-size:var(--t-xs);color:var(--ink-2);margin-bottom:3px">OS Open Greenspace categories</div>
             <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 6px;font-size:var(--t-xs);line-height:1.2">
@@ -2288,12 +2288,12 @@
                is the larger geography, and because an NHS reader usually
                knows their ICB before they know which borough they are
                looking at. -->
-          <label class="lrow"><div style="width:9px;height:9px;border:2px solid #8E44AD;border-radius:2px;flex-shrink:0"></div><span class="lname">ICB regions <span class="lcount" id="icb-count"></span><span class="lhelp" title="Integrated Care Boards. London has four, and each one covers whole boroughs: West and North, North East, South East and South West. Switch this on and click a region to zoom to it.">?</span></span><input type="checkbox" id="ticb"></label>
+          <label class="lrow" id="icb-row"><div style="width:9px;height:9px;border:2px solid #8E44AD;border-radius:2px;flex-shrink:0"></div><span class="lname">ICB regions <span class="lcount" id="icb-count"></span><span class="lhelp" title="Integrated Care Boards. London has four, and each one covers whole boroughs: West and North, North East, South East and South West. Switch this on and click a region to zoom to it.">?</span></span><input type="checkbox" id="ticb"></label>
           <!-- Its own control, under the layer it belongs to, rather than a
                group inside the borough dropdown. A board and a borough are two
                different sizes of thing, and one list offering both made the
                reader work out which kind each row was before choosing. -->
-          <div style="margin:2px 0 8px 18px">
+          <div id="icb-focus-wrap" style="margin:2px 0 8px 18px">
             <div style="font-size:var(--t-xs);color:var(--ink-2);margin-bottom:3px">Focus by ICB</div>
             <select id="icb-focus" aria-label="Focus by Integrated Care Board" style="width:100%;padding:4px 6px;border:1px solid var(--line);border-radius:5px;font-size:var(--t-xs);color:var(--ink);background:var(--paper)">
               <option value="all">All ICBs</option>
@@ -3113,6 +3113,13 @@ var LOADER_MAP = {w:1000,h:771,n:704,d:'IAAAAAAAAAAAAAJAAIAAFAAAIDFEECDGGCFDCCIC
 
   function build() {
     if (typeof LOADER_MAP === 'undefined' || !svg) return false;
+    // The loader map is London's wards. A region gets the plain screen: the
+    // word "Loading" and no map, rather than the wrong place filling in.
+    if (window.PH_REGION && !window.PH_REGION.isLondon) {
+      svg.style.display = 'none';
+      svg.setAttribute('aria-hidden', 'true');
+      return false;
+    }
     var nums = decode(LOADER_MAP.p), i = 0, w = 0;
     var frag = document.createDocumentFragment();
     var metrics = [];
@@ -4165,6 +4172,49 @@ const OV_META = {
     console.info('[custom] ' + added + ' indicator(s) added from data/custom');
   }
 })();
+
+/* Outside London, leave out what the region's build does not carry.
+
+   A region's indicators.js is measured from its own payloads, so an indicator
+   it has no entry for has no figures there: PTAL and the station and bus stop
+   measures (TfL, London only), the London air quality grid, and any
+   Fingertips series that was suppressed for the region. Offering them would
+   draw an all-grey map. The exceptions are the figures the page derives
+   itself rather than reads (the per-category crime counts, the crime rate and
+   the ward IMD score), which indicators.js never lists, for London either.
+   London is untouched: this returns at once. Runs here, with the custom
+   indicators, because the picker builds its model from the <select> once. */
+(function _regionIndicatorFilter() {
+  if (PH_IS_LONDON) return;
+  var G = (typeof PH_IND_STATS === 'object' && PH_IND_STATS && PH_IND_STATS.stats)
+    ? PH_IND_STATS.stats : null;
+  if (!G) return;
+  var keep = function (k) {
+    return !k || k === 'none' || !!G[k] || /^crime_/.test(k) || k === 'imd_score_ward' ||
+      !!(OV_CFG[k] && OV_CFG[k]._custom);
+  };
+  var dropped = [];
+  CATS.forEach(function (c) {
+    c.fields = c.fields.filter(function (f) {
+      if (keep(f.k)) return true;
+      dropped.push(f.k);
+      return false;
+    });
+  });
+  var sel = document.getElementById('ov');
+  if (sel) {
+    Array.prototype.slice.call(sel.querySelectorAll('option')).forEach(function (o) {
+      if (!keep(o.value)) o.remove();
+    });
+    Array.prototype.slice.call(sel.querySelectorAll('optgroup')).forEach(function (g) {
+      if (!g.querySelector('option')) g.remove();
+    });
+  }
+  if (dropped.length) {
+    console.info('[region] ' + dropped.length + ' indicator(s) not in the ' +
+      PH_AREA + ' build left out: ' + dropped.join(', '));
+  }
+})();
 function ovMeta(k) { return OV_META[k] || null; }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -4337,9 +4387,14 @@ function scopeOptionsHtml(selected, esc) {
     });
     html += '</optgroup>';
   }
-  const lads = Object.keys(ICB_OF_LAD).sort();
+  let lads = Object.keys(ICB_OF_LAD).sort();
+  // Outside London there are no boards, so the authorities come from the
+  // ward boundaries themselves rather than from the board lookup.
+  if (!lads.length && !PH_IS_LONDON && typeof GJ !== 'undefined' && GJ.features) {
+    lads = [...new Set(GJ.features.map(f => (f.properties || {}).LAD).filter(Boolean))].sort();
+  }
   if (lads.length) {
-    html += '<optgroup label="Boroughs">';
+    html += '<optgroup label="' + (PH_IS_LONDON ? 'Boroughs' : 'Local authorities') + '">';
     lads.forEach(function (b) {
       html += '<option value="' + e(b) + '"' + (b === selected ? ' selected' : '') + '>' +
               e(b) + '</option>';
@@ -7415,7 +7470,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
       ${_locBlock('Dental practices',     _dental,  d => `<strong>${_esc(d.name||'')}</strong> <span class="meta">${d.postcode?_esc(d.postcode):''}</span>`)}
       ${_locBlock('Hospitals and clinics', _hosp,   h => `<strong>${_esc(h.n||'')}</strong> <span class="meta">${h.t?_esc(h.t):''}</span>`)}
       ${_locBlock('VCSE organisations',   _vcse,    v => `<strong>${_esc(v.name||'')}</strong>`)}
-      ${_locBlock('Parks and green spaces', _green, g => `<strong>${_esc(g.n||'')}</strong> <span class="meta">${g.sz?_esc(g.sz):''}</span>`)}
+      ${PH_IS_LONDON ? _locBlock('Parks and green spaces', _green, g => `<strong>${_esc(g.n||'')}</strong> <span class="meta">${g.sz?_esc(g.sz):''}</span>`) : '' /* GRN is a list of London parks */}
     </div>
   </div>
 
@@ -7823,6 +7878,9 @@ function _applyBoroughSolo() {
 (function initIcbFocus() {
   const sel = document.getElementById('icb-focus');
   if (!sel) return;
+  // London's boards only. Outside London the control is hidden (initRegionUi)
+  // and there is no lookup to fetch.
+  if (!PH_IS_LONDON) return;
 
   fetch(dataUrl('data/map/icb_lookup.json'))
     .then(r => (r.ok ? r.json() : null))
@@ -9499,7 +9557,7 @@ window.generateLSOAReport = function(code) {
       ${_locBlock('Dental practices',     _dental,  d => `<strong>${_esc(d.name||'')}</strong> <span class="meta">${d.postcode?_esc(d.postcode):''}</span>`)}
       ${_locBlock('Hospitals & clinics',  _hosp,    h => `<strong>${_esc(h.n||'')}</strong> <span class="meta">${_esc(h.a||'')}${h.t?' · '+_esc(h.t):''}</span>`, 'span-2')}
       ${_locBlock('VCSE organisations',   _vcse,    v => `<strong>${_esc(v.name||'')}</strong> <span class="meta">${_esc(v.addr||'')}</span>`, 'span-2')}
-      ${_locBlock('Parks & greenspaces',  _green,   g => `<strong>${_esc(g.n||'')}</strong> <span class="meta">${_esc(g.a||'')}${g.sz?' · '+_esc(g.sz):''}</span>`)}
+      ${PH_IS_LONDON ? _locBlock('Parks & greenspaces',  _green,   g => `<strong>${_esc(g.n||'')}</strong> <span class="meta">${_esc(g.a||'')}${g.sz?' · '+_esc(g.sz):''}</span>`) : '' /* GRN is a list of London parks */}
     </div>
   </div>
 
@@ -9848,6 +9906,8 @@ function icbStyle(feat) {
 function loadIcbRegions() {
   if (icbLyr) return Promise.resolve(icbLyr);
   if (_icbLoading) return _icbLoading;
+  // The board outlines are London's five; a region build has none to draw.
+  if (!PH_IS_LONDON) return Promise.resolve(null);
   _icbLoading = fetch(dataUrl('data/map/icbs.json'))
     .then(r => (r.ok ? r.json() : null))
     .then(gj => {
@@ -14041,6 +14101,8 @@ var PH_SHOW = {
     { k: 'borough', one: 'borough', many: 'boroughs' },
     { k: 'icb',     one: 'board',   many: 'boards' },
   ];
+  // The boards are London's; a region build has none to compare.
+  if (!PH_IS_LONDON) CMP_LEVELS = CMP_LEVELS.filter(function (l) { return l.k !== 'icb'; });
   var cmpLevel = 'ward';
   function cmpLvl() {
     return CMP_LEVELS.filter(function (l) { return l.k === cmpLevel; })[0] || CMP_LEVELS[0];
@@ -15679,6 +15741,8 @@ var PH_SHOW = {
 
   function tourStart() {
     if (!tourStrip) return;
+    // The chapters visit named London wards; a region has none of them.
+    if (!PH_IS_LONDON) return;
     tourAt = 0;
     tourStrip.classList.add('open');
     // The development banner is a separate fixed element that shows itself on
