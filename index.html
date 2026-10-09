@@ -1509,58 +1509,55 @@
   /* Indicator picker: a card for what is on the map, then search, key
      indicators, themes and recently used. A theme opens the library over the
      map (.ovlib), where there is room for names and one-line meanings. */
-  .ov-picker { display: flex; flex-direction: column; gap: 10px; }
-  .ov-current { display: flex; flex-direction: column; gap: 5px; padding: 12px 14px;
+  .ov-picker { display: flex; flex-direction: column; gap: 8px; }
+  .ov-current { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px;
     border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
   .ov-current.empty { background: var(--paper-2); }
   .ov-cur-lbl, .ov-h { font-size: var(--t-xs); font-weight: 700; letter-spacing: .06em;
     text-transform: uppercase; color: var(--ink-3); margin: 0; }
-  .ov-h { margin: 8px 0 2px; }
-  .ov-cur-nm { font-size: 17px; font-weight: 700; line-height: 1.3; color: var(--ink); }
-  .ov-current.empty .ov-cur-nm { font-size: 15px; font-weight: 600; color: var(--ink-2); }
-  .ov-cur-desc { font-size: 13.5px; line-height: 1.45; color: var(--ink-2);
-    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .ov-h { margin: 4px 0 0; }
+  .ov-cur-nm { font-size: 16px; font-weight: 700; line-height: 1.3; color: var(--ink); }
+  .ov-current.empty .ov-cur-nm { font-size: 14.5px; font-weight: 600; color: var(--ink-2); }
+  .ov-cur-desc { font-size: 13px; line-height: 1.4; color: var(--ink-2);
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .ov-cur-meta { font-size: var(--t-xs); color: var(--ink-3); }
-  .ov-cur-btns { display: flex; gap: 8px; margin-top: 4px; }
+  .ov-cur-btns { display: flex; gap: 6px; margin-top: 4px; }
   .ov-cur-btns[hidden] { display: none; }
-  .ov-btn { appearance: none; font: inherit; font-size: 14px; font-weight: 600; min-height: 40px;
+  .ov-btn { appearance: none; font: inherit; font-size: 13.5px; font-weight: 600; min-height: 36px;
     padding: 0 14px; border-radius: 8px; border: 1px solid var(--nhs-blue); background: var(--paper);
     color: var(--nhs-blue); cursor: pointer; }
   .ov-btn:hover { background: var(--nhs-light); }
   .ov-btn.quiet { border-color: var(--line); color: var(--ink-2); font-weight: 500; }
-  .ov-search-lbl { font-size: 13px; font-weight: 600; color: var(--ink); margin-top: 2px; }
-  .ov-search { width: 100%; box-sizing: border-box; min-height: 44px; padding: 0 12px; font: inherit;
-    font-size: 15px; color: var(--ink); background: var(--paper); border: 1px solid var(--ink-faint);
+  .ov-search { width: 100%; box-sizing: border-box; min-height: 40px; padding: 0 12px; font: inherit;
+    font-size: 14.5px; color: var(--ink); background: var(--paper); border: 1px solid var(--ink-faint);
     border-radius: 8px; }
   .ov-search:focus { outline: 2px solid var(--nhs-bright); outline-offset: 0; border-color: var(--nhs-bright); }
   .ov-results { display: flex; flex-direction: column; gap: 2px; }
   .ov-results[hidden] { display: none; }
-  .ov-res { appearance: none; font: inherit; text-align: left; padding: 9px 10px; border: 0;
+  .ov-res { appearance: none; font: inherit; text-align: left; padding: 8px 10px; border: 0;
     border-radius: 8px; background: transparent; cursor: pointer; display: flex; flex-direction: column; gap: 2px; }
   .ov-res:hover, .ov-res.on { background: var(--nhs-light); }
-  .ov-res-nm { font-size: 14.5px; font-weight: 600; color: var(--ink); line-height: 1.3; }
+  .ov-res-nm { font-size: 14px; font-weight: 600; color: var(--ink); line-height: 1.3; }
   .ov-res-sub { font-size: var(--t-xs); color: var(--ink-3); }
   .ov-empty { padding: 10px; font-size: 13px; color: var(--ink-3); }
-  .ov-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-  .ov-chip { appearance: none; font: inherit; font-size: 13.5px; font-weight: 600; min-height: 38px;
-    padding: 0 13px; border-radius: 19px; border: 1px solid var(--ink-faint); background: var(--paper);
-    color: var(--ink); cursor: pointer; }
+  #ov-home { display: flex; flex-direction: column; gap: 6px; }
+  #ov-home[hidden] { display: none; }
+  .ov-chips { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .ov-chip { appearance: none; font: inherit; font-size: 13px; font-weight: 600; min-height: 36px;
+    padding: 4px 10px; border-radius: 8px; border: 1px solid var(--ink-faint); background: var(--paper);
+    color: var(--ink); cursor: pointer; text-align: left; line-height: 1.25; }
   .ov-chip:hover { border-color: var(--nhs-blue); color: var(--nhs-blue); }
   .ov-chip.on { background: var(--nhs-blue); border-color: var(--nhs-blue); color: var(--on-accent); }
   .ov-themes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
-  .ov-theme { appearance: none; font: inherit; text-align: left; min-height: 64px; padding: 10px 11px;
-    border: 1px solid var(--line); border-radius: 10px; background: var(--paper); cursor: pointer;
-    display: flex; flex-direction: column; justify-content: space-between; gap: 4px; }
+  .ov-theme { appearance: none; font: inherit; text-align: left; min-height: 36px; padding: 4px 7px;
+    border: 1px solid var(--line); border-radius: 8px; background: var(--paper); cursor: pointer;
+    display: flex; align-items: center; gap: 7px; }
   .ov-theme:hover { border-color: var(--nhs-blue); }
   .ov-theme.has-sel { border-color: var(--nhs-blue); background: var(--nhs-light); }
-  .ov-theme-nm { font-size: 14px; font-weight: 600; color: var(--ink); line-height: 1.25;
-    display: flex; align-items: center; gap: 7px; }
-  .ov-theme-n { font-size: var(--t-xs); color: var(--ink-3); }
+  .ov-theme-nm { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; color: var(--ink); line-height: 1.25;
+    display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ov-theme-n { font-size: var(--t-xs); color: var(--ink-3); flex-shrink: 0; }
   .ov-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
-  .ov-recent { display: flex; flex-direction: column; }
-  .ov-recent button { appearance: none; font: inherit; font-size: 14px; text-align: left; padding: 7px 8px;
-    border: 0; border-radius: 6px; background: transparent; color: var(--nhs-blue); cursor: pointer; }
-  .ov-recent button:hover { background: var(--nhs-light); }
 
   /* The library, over the map. */
   .ovlib { position: absolute; inset: 0; z-index: 3500; display: flex; background: rgba(33,43,50,.35); }
@@ -2511,7 +2508,6 @@
                every other consumer reads and listens to. -->
           <div class="ov-picker" id="ov-picker">
             <div class="ov-current empty" id="ov-current">
-              <div class="ov-cur-lbl">Showing on the map</div>
               <div class="ov-cur-nm" id="ov-cur-nm">No indicator selected</div>
               <div class="ov-cur-desc" id="ov-cur-desc">Pick one below to shade the map.</div>
               <div class="ov-cur-meta" id="ov-cur-meta"></div>
@@ -2520,19 +2516,14 @@
                 <button type="button" class="ov-btn quiet" id="ov-clear">Clear</button>
               </div>
             </div>
-            <label class="ov-search-lbl" for="ov-search" id="ov-search-lbl">Search indicators</label>
             <input type="search" class="ov-search" id="ov-search" autocomplete="off"
-                   placeholder="Try smoking, life expectancy, air">
+                   placeholder="Search indicators" aria-label="Search indicators">
             <div class="ov-results" id="ov-results" hidden></div>
             <div id="ov-home">
               <h3 class="ov-h">Key indicators</h3>
               <div class="ov-chips" id="ov-chips"></div>
               <h3 class="ov-h">Browse by theme</h3>
               <div class="ov-themes" id="ov-themes"></div>
-              <div id="ov-recent-wrap" hidden>
-                <h3 class="ov-h">Recently used</h3>
-                <div class="ov-recent" id="ov-recent"></div>
-              </div>
             </div>
           </div>
 
@@ -8848,30 +8839,23 @@ function _applyBoroughSolo() {
     return out.concat(other).filter(x => x.opts.length);
   }
   const colourOf = label => (THEME_INFO[label] || ['#4C6272'])[0];
+  // One-line names for the sidebar tiles, which are half the sidebar wide.
+  // The library keeps the full names.
+  const SHORT = {
+    'Health & care': 'Health', 'People & communities': 'People',
+    'Work, money & education': 'Work', 'Housing & transport': 'Housing',
+    'Environment & access': 'Environment', 'Crime & safety': 'Crime', 'At a glance': 'Basics',
+  };
 
-  /* Key indicators: the figures most people come for. Only those this build
-     carries are shown, so a region without one simply has one fewer. */
+  /* Key indicators: four that are published per LSOA, so they vary
+     neighbourhood by neighbourhood rather than repeating one figure across a
+     council. Only those this build carries are shown. */
   const KEY = [
-    ['ft_life_expectancy_male', 'Life expectancy'],
-    ['ft_healthy_life_expectancy_male', 'Healthy life expectancy'],
-    ['imd_decile', 'Deprivation (IMD)'],
-    ['ft_child_poverty_low_income', 'Child poverty'],
-    ['ft_smoking_prevalence_adults', 'Smoking'],
-    ['ft_obesity_year6', 'Year 6 obesity'],
-    ['crime_rate_per_1000', 'Crime rate'],
-    ['no2_ugm3', 'Air pollution (NO2)'],
+    ['imd_decile', 'Deprivation'],
+    ['health_score', 'Health deprivation'],
+    ['fuel_poverty_pct', 'Fuel poverty'],
+    ['no2_ugm3', 'Air pollution'],
   ].filter(k => byVal[k[0]]);
-
-  // Recently used, per browser. A convenience only, so storage that is
-  // blocked or empty just means the section stays hidden.
-  const RECENT_KEY = 'ph-ov-recent';
-  let recent = [];
-  try { recent = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]').filter(v => byVal[v]); } catch (e) {}
-  function remember(v) {
-    if (!byVal[v]) return;
-    recent = [v].concat(recent.filter(x => x !== v)).slice(0, 4);
-    try { localStorage.setItem(RECENT_KEY, JSON.stringify(recent)); } catch (e) {}
-  }
 
   // Many descriptions open by restating the name ("Suicide rate. Published
   // for..."). Under the name that sentence is noise, so it is dropped.
@@ -8900,13 +8884,10 @@ function _applyBoroughSolo() {
   const homeEl = document.getElementById('ov-home');
   const chipsEl = document.getElementById('ov-chips');
   const themesEl = document.getElementById('ov-themes');
-  const recentWrap = document.getElementById('ov-recent-wrap');
-  const recentEl = document.getElementById('ov-recent');
   const curDesc = document.getElementById('ov-cur-desc');
   const curMeta = document.getElementById('ov-cur-meta');
   const curBtns = document.getElementById('ov-cur-btns');
-  const searchLbl = document.getElementById('ov-search-lbl');
-  if (searchLbl) searchLbl.textContent = 'Search ' + all.length + ' indicators';
+  searchEl.placeholder = 'Search ' + all.length + ' indicators, e.g. smoking';
 
   // The library: built once, over the map.
   const wrap = document.getElementById('map-wrap') || document.body;
@@ -9028,13 +9009,10 @@ function _applyBoroughSolo() {
         (k[0] === cur ? ' aria-pressed="true"' : ' aria-pressed="false"') + '>' + esc(k[1]) + '</button>').join('');
     themesEl.innerHTML = model.map((g, gi) => {
       const has = g.opts.some(o => o.value === cur);
-      return '<button type="button" class="ov-theme' + (has ? ' has-sel' : '') + '" data-th="' + gi + '">' +
-        '<span class="ov-theme-nm"><span class="ov-dot" style="background:' + colourOf(g.label) + '"></span>' + esc(g.label) + '</span>' +
-        '<span class="ov-theme-n">' + g.opts.length + ' indicator' + (g.opts.length === 1 ? '' : 's') + '</span></button>';
+      return '<button type="button" class="ov-theme' + (has ? ' has-sel' : '') + '" data-th="' + gi + '" title="' + esc(g.label + ': ' + g.opts.length + ' indicators') + '">' +
+        '<span class="ov-theme-nm"><span class="ov-dot" style="background:' + colourOf(g.label) + '"></span>' + esc(SHORT[g.label] || g.label) + '</span>' +
+        '</button>';
     }).join('');
-    const rec = recent.filter(v => v !== cur && byVal[v]);
-    recentWrap.hidden = !rec.length;
-    recentEl.innerHTML = rec.map(v => '<button type="button" data-ov="' + esc(v) + '">' + esc(byVal[v].name) + '</button>').join('');
   }
 
   function choose(value) {
@@ -9042,7 +9020,6 @@ function _applyBoroughSolo() {
     // everything else downstream behave exactly as they did for the dropdown.
     sel.value = value;
     sel.dispatchEvent(new Event('change', { bubbles: true }));
-    if (value !== 'none') remember(value);
     if (filter) { filter = ''; searchEl.value = ''; }
     // The gate can refuse the change and put the value back; render after it.
     setTimeout(render, 0);
