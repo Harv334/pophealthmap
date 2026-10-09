@@ -3266,8 +3266,143 @@ def _police_fetch_area(geom, ym: str, cache_dir: pathlib.Path, stem: str,
     return [], [(stem, ym, reason, depth)]
 
 
+# ── The bulk archive ─────────────────────────────────────────────────────────
+# police.uk publishes every force's street-level crime as one zip
+# (data/archive/latest.zip: the last 36 months, one CSV per force per month),
+# with coordinates, month and crime type on every row. Reading that is one
+# download and a few minutes of pandas. The polygon API above costs one request
+# per council per month, more when a council is over the 10,000 cap, and on a
+# region of large rural councils it ran past two hours (East of England never
+# finished). Region builds use the archive; London stays on the API until the
+# archive has proved itself, and PH_CRIME_SOURCE=archive|api overrides both.
+POLICE_ARCHIVE_URL = "https://data.police.uk/data/archive/latest.zip"
+
+# The archive spells crime types out; the API, and everything downstream of
+# this source, uses its slugs.
+POLICE_TYPE_SLUG = {
+    "Anti-social behaviour": "anti-social-behaviour",
+    "Bicycle theft": "bicycle-theft",
+    "Burglary": "burglary",
+    "Criminal damage and arson": "criminal-damage-arson",
+    "Drugs": "drugs",
+    "Other crime": "other-crime",
+    "Other theft": "other-theft",
+    "Possession of weapons": "possession-of-weapons",
+    "Public order": "public-order",
+    "Robbery": "robbery",
+    "Shoplifting": "shoplifting",
+    "Theft from the person": "theft-from-the-person",
+    "Vehicle crime": "vehicle-crime",
+    "Violence and sexual offences": "violent-crime",
+}
+
+
+def _police_from_archive(months_back: int) -> pd.DataFrame:
+    """Street crime for the scope from the bulk archive, in the API's shape."""
+    import shapely
+    import tempfile
+    from shapely.geometry import shape
+    from shapely.strtree import STRtree
+
+    # Outside .cache on purpose: it is well over a gigabyte, and .cache is
+    # saved between runs.
+    zpath = Path(os.environ.get("RUNNER_TEMP") or tempfile.gettempdir()) / "police_latest.zip"
+    if not zpath.exists() or zpath.stat().st_size < 1_000_000:
+        info(f"police.uk archive: downloading {POLICE_ARCHIVE_URL}")
+        with requests.get(POLICE_ARCHIVE_URL, stream=True, timeout=120) as r:
+            r.raise_for_status()
+            tmp = zpath.with_suffix(".part")
+            with open(tmp, "wb") as f:
+                for chunk in r.iter_content(chunk_size=1 << 20):
+                    f.write(chunk)
+            tmp.replace(zpath)
+    info(f"police.uk archive: {zpath.stat().st_size / 1e9:.2f} GB")
+
+    # Councils in scope, their outline box, and indexes for the joins.
+    def index(kind):
+        path = DATA_DIR / "boundaries" / f"{kind}.geojson"
+        fc = json.loads(path.read_text(encoding="utf-8"))
+        geoms = [shape(f["geometry"]) for f in fc["features"]]
+        geoms = [g if g.is_valid else g.buffer(0) for g in geoms]
+        return geoms, [f["properties"] for f in fc["features"]]
+
+    b_geoms, b_props = index("boroughs")
+    keep = [i for i, p in enumerate(b_props)
+            if (p.get("LAD25CD") or p.get("LAD24CD") or p.get("code")) in SCOPE_LADS]
+    b_geoms = [b_geoms[i] for i in keep]
+    b_props = [b_props[i] for i in keep]
+    minx, miny, maxx, maxy = shapely.union_all(b_geoms).bounds
+
+    with zipfile.ZipFile(zpath) as z:
+        street = [n for n in z.namelist() if n.endswith("-street.csv")]
+        months = sorted({n.split("/")[0] for n in street}, reverse=True)[:months_back]
+        info(f"police.uk archive: months {months[-1]} to {months[0]}")
+        frames = []
+        for n in street:
+            if n.split("/")[0] not in months:
+                continue
+            with z.open(n) as fh:
+                df = pd.read_csv(fh, usecols=["Month", "Longitude", "Latitude",
+                                              "Location", "Crime type"],
+                                 dtype={"Month": str, "Location": str, "Crime type": str})
+            df = df.dropna(subset=["Longitude", "Latitude"])
+            df = df[df.Longitude.between(minx, maxx) & df.Latitude.between(miny, maxy)]
+            if len(df):
+                frames.append(df)
+    crimes = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+    if crimes.empty:
+        raise RuntimeError("police.uk archive: no crimes inside the scope's box")
+
+    pts = shapely.points(crimes.Longitude.to_numpy(), crimes.Latitude.to_numpy())
+
+    def join(geoms, props, key_fn):
+        """First polygon each point falls in -> key, or ''."""
+        tree = STRtree(geoms)
+        pi, gi = tree.query(pts, predicate="within")
+        out = [""] * len(pts)
+        for p, g in zip(pi.tolist(), gi.tolist()):
+            if not out[p]:
+                out[p] = key_fn(props[g])
+        return out
+
+    lad = join(b_geoms, b_props, lambda p: p.get("LAD25CD") or p.get("LAD24CD") or p.get("code") or "")
+    crimes["LAD25CD"] = lad
+    crimes = crimes[crimes.LAD25CD != ""].reset_index(drop=True)
+    pts = shapely.points(crimes.Longitude.to_numpy(), crimes.Latitude.to_numpy())
+    w_geoms, w_props = index("wards")
+    l_geoms, l_props = index("lsoa")
+    crimes["WD25CD"] = join(w_geoms, w_props, lambda p: p.get("WD25CD") or p.get("WD24CD") or "")
+    crimes["LSOA21CD"] = join(l_geoms, l_props, lambda p: p.get("code") or p.get("LSOA21CD") or "")
+    name_of = {(p.get("LAD25CD") or p.get("LAD24CD") or p.get("code")):
+               (p.get("LAD25NM") or p.get("name") or "") for p in b_props}
+    return pd.DataFrame({
+        "category": crimes["Crime type"].map(lambda t: POLICE_TYPE_SLUG.get(
+            t, re.sub(r"[^a-z]+", "-", str(t).lower()).strip("-"))),
+        "lat": crimes.Latitude.astype(float),
+        "lng": crimes.Longitude.astype(float),
+        "month": crimes.Month.astype(str),
+        "street_name": crimes.Location.fillna(""),
+        "LSOA21CD": crimes.LSOA21CD,
+        "WD25CD": crimes.WD25CD,
+        "LAD25CD": crimes.LAD25CD,
+        "borough_name": crimes.LAD25CD.map(name_of).fillna(""),
+    })
+
+
 def run_police_crime(months_back: int = 12) -> pd.DataFrame:
     rule(f"Police.uk crime (last {months_back} months)")
+    mode = os.environ.get("PH_CRIME_SOURCE") or ("api" if IS_LONDON else "archive")
+    if mode == "archive":
+        try:
+            out = _police_from_archive(months_back)
+            out_path = DATA_DIR / "crime" / "police_uk_crime.parquet"
+            out = write_parquet_guarded(out_path, out, source="police_uk_crime")
+            ok(f"police_uk_crime: {len(out):,} crimes from the bulk archive "
+               f"-> {out_path.relative_to(REPO_ROOT)}")
+            return out
+        except Exception as e:
+            warn(f"police.uk archive failed ({type(e).__name__}: {e}); "
+                 f"falling back to the polygon API")
     cache_dir = CACHE_DIR / "police_uk_crime"
     cache_dir.mkdir(parents=True, exist_ok=True)
 
