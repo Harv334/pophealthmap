@@ -379,11 +379,15 @@
      Styled from here rather than from a style attribute on the element. An
      inline style beats an id selector, so the narrow-screen rule below it was
      dead and had never once applied. */
-  #fingertips-banner { position: absolute; right: 12px; bottom: 54px; max-width: 300px;
+  #fingertips-banner { position: absolute; right: 12px; bottom: 88px; max-width: 300px;
     background: var(--tint-amber); border: 1px solid var(--tint-amber-line); color: var(--tint-amber-ink);
     padding: 9px 12px; border-radius: 6px; box-shadow: 0 2px 10px rgba(0,0,0,.10);
     font-size: var(--t-sm); line-height: 1.45; z-index: 560; display: none;
     pointer-events: none; }
+  /* Above the Ask button, not under it. At bottom:54px it shared the corner
+     with that button (bottom:34px, about 44px tall, and drawn on top), which
+     covered the notice and its close button on some screen sizes. */
+  .map-wrap.has-sheet #fingertips-banner { bottom: calc(var(--sheet-lift) + 66px); }
   #fingertips-banner .ft-i { display: inline-block; background: #b88030; color: var(--on-accent);
     border-radius: 50%; width: 18px; height: 18px; text-align: center;
     line-height: 18px; font-weight: 700; margin-right: 6px; font-size: var(--t-xs);
@@ -1532,7 +1536,11 @@
   .ov-btn.quiet { border-color: var(--line); color: var(--ink-2); font-weight: 500; }
   .ov-search { width: 100%; box-sizing: border-box; min-height: 40px; padding: 0 12px; font: inherit;
     font-size: 14.5px; color: var(--ink); background: var(--paper); border: 1px solid var(--ink-faint);
-    border-radius: 8px; }
+    border-radius: 8px;
+    /* Drawn above the theme header below it, whose upward paint (there to
+       hide rows scrolling past once it sticks) otherwise cut off the bottom
+       of this box while the header sat at rest just under it. */
+    position: relative; z-index: 3; }
   .ov-search:focus { outline: 2px solid var(--nhs-bright); outline-offset: 0; border-color: var(--nhs-bright); }
   .ov-results { display: flex; flex-direction: column; gap: 2px; }
   .ov-results[hidden] { display: none; }
@@ -1980,9 +1988,10 @@
        about 36px tall) with a small gap. */
     #ai-toggle { right: 8px; padding: 8px 12px; font-size: var(--t-sm); bottom: 56px; }
     .map-wrap.has-sheet #ai-toggle { bottom: calc(var(--sheet-lift) + 56px); }
+    .map-wrap.has-sheet #fingertips-banner { bottom: calc(var(--sheet-lift) + 104px); }
     /* Full width along the bottom instead: at this width there is no room for
        300px of notice beside anything and still a map. */
-    #fingertips-banner { left: 8px; right: 8px; bottom: 48px; max-width: none;
+    #fingertips-banner { left: 8px; right: 8px; bottom: 104px; max-width: none;
       font-size: var(--t-xs); padding: 8px 10px; }
     .map-legend-strip { left: 8px; right: 8px; transform: none; max-width: none;
       font-size: var(--t-xs); padding: 5px 9px; }
@@ -8850,6 +8859,13 @@ function _applyBoroughSolo() {
   const DROP = new Set(['ft_93280']);
   const MOVE = { ft_93097: 'Work, money & education', ft_93098: 'Work, money & education',
                  ft_93089: 'People & communities' };
+  /* Transport is its own theme: car ownership and travel to work from
+     Housing, and the station and bus stop measures from Environment. What is
+     left of Housing & transport is tenure, so it is called Housing. */
+  ['census_no_car_pct', 'census_active_travel_pct', 'census_public_transport_pct',
+   'census_car_to_work_pct', 'ptal_score', 'rail_station_dist_m', 'rail_stations_1km',
+   'bus_stop_dist_m', 'bus_stops_800m'].forEach(k => { MOVE[k] = 'Transport'; });
+  const RENAME = { 'Housing & transport': 'Housing' };
   const HEALTH_SPLIT = [
     ['Life expectancy & deaths', /life expectancy|mortality/],
     ['Hospital admissions', /admission|injur/],
@@ -8867,7 +8883,14 @@ function _applyBoroughSolo() {
         if (opt) opt.remove();
         return;
       }
-      let label = MOVE[o.value] || g.label;
+      // Outside London the station and bus stop measures come from DfT
+      // NaPTAN, not TfL, so the name should not say TfL.
+      if (window.PH_REGION && !PH_REGION.isLondon && / \(TfL\)$/.test(o.name)) {
+        o.name = o.name.replace(/ \(TfL\)$/, ' (NaPTAN)');
+        const opt = sel.querySelector('option[value="' + o.value + '"]');
+        if (opt) opt.textContent = opt.textContent.replace('(TfL)', '(NaPTAN)');
+      }
+      let label = MOVE[o.value] || RENAME[g.label] || g.label;
       if (label === 'Health & care') {
         const text = o.name.toLowerCase();
         const hit = HEALTH_SPLIT.find(r => r[1].test(text));
@@ -8875,10 +8898,12 @@ function _applyBoroughSolo() {
       }
       put(label, o);
     }));
-    // The select's own order, with Health's three in Health's place.
+    // The select's own order, with Health's three in Health's place and
+    // Transport after Housing.
     const labels = [];
     model.forEach(g => {
-      (g.label === 'Health & care' ? ['Health', 'Life expectancy & deaths', 'Hospital admissions'] : [g.label])
+      (g.label === 'Health & care' ? ['Health', 'Life expectancy & deaths', 'Hospital admissions']
+        : g.label === 'Housing & transport' ? ['Housing', 'Transport'] : [g.label])
         .forEach(l => { if (out[l] && labels.indexOf(l) === -1) labels.push(l); });
     });
     order.forEach(l => { if (labels.indexOf(l) === -1) labels.push(l); });
@@ -8901,7 +8926,8 @@ function _applyBoroughSolo() {
     'Deprivation':              ['#003087', 'The Index of Multiple Deprivation 2025 and its domains. Decile 1 is the most deprived tenth of areas in England.'],
     'People & communities':     ['#7C2855', 'Age, ethnicity, country of birth and language, from Census 2021.'],
     'Work, money & education':  ['#00703C', 'Jobs, benefits and qualifications.'],
-    'Housing & transport':      ['#8A6400', 'Tenure, cars, travel to work and access to transport.'],
+    'Housing':                  ['#8A6400', 'Who owns and who rents, from Census 2021.'],
+    'Transport':                ['#0072CE', 'Car ownership, how people get to work, and how far it is to a station or bus stop.'],
     'Environment & access':     ['#006F79', 'Air pollution, fuel poverty and access to green and blue space.'],
     'Crime & safety':           ['#B3261E', 'Street-level crime from police.uk over the last 12 months.'],
     'At a glance':              ['#4C6272', 'Population and the building blocks of each ward.'],
@@ -8940,7 +8966,7 @@ function _applyBoroughSolo() {
   // The library keeps the full names.
   const SHORT = {
     'Life expectancy & deaths': 'Deaths', 'Hospital admissions': 'Hospital', 'People & communities': 'People',
-    'Work, money & education': 'Work', 'Housing & transport': 'Housing',
+    'Work, money & education': 'Work', 
     'Environment & access': 'Environment', 'Crime & safety': 'Crime', 'At a glance': 'Basics',
   };
 
