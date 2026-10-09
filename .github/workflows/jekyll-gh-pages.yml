@@ -62,6 +62,15 @@ jobs:
             echo "No region-data release yet; deploying London only."
           fi
           rm -rf regions-dl
+      # England (?r=england): every council on one map, stitched from London
+      # and the region packs just unpacked. Needs no network or packages.
+      - name: Build the England view
+        run: |
+          if ls data/regions/*/map/boroughs.js >/dev/null 2>&1; then
+            python3 scripts/build_england.py
+          else
+            echo "No regions published; no England view."
+          fi
       - name: Setup Pages
         uses: actions/configure-pages@v6
       - name: Build with Jekyll

@@ -12,6 +12,7 @@
 <script>
 (function () {
   var REGIONS = [
+    ['england', 'England'],
     ['north-east', 'North East'],
     ['north-west', 'North West'],
     ['yorkshire-and-the-humber', 'Yorkshire and The Humber'],
@@ -24,7 +25,7 @@
   ];
   // Regions whose data is published on the live site. The picker lists only
   // these; any valid slug still opens via ?r= so a local build can be tested.
-  var LIVE = ['london', 'north-east', 'north-west', 'yorkshire-and-the-humber',
+  var LIVE = ['england', 'london', 'north-east', 'north-west', 'yorkshire-and-the-humber',
               'east-midlands', 'west-midlands', 'south-east', 'south-west'];
   var id = 'london';
   try {
@@ -37,10 +38,14 @@
   var name = 'London';
   for (var j = 0; j < REGIONS.length; j++) if (REGIONS[j][0] === id) name = REGIONS[j][1];
   var isLondon = id === 'london';
+  // England is every council on one map, at local authority level only. Built
+  // from the published regions by scripts/build_england.py at deploy time.
+  var isEngland = id === 'england';
+  if (isEngland) document.documentElement.classList.add('ph-england');
   window.PH_REGIONS = REGIONS.map(function (r) { return { id: r[0], name: r[1] }; });
   window.PH_REGIONS_LIVE = LIVE;
   window.PH_REGION = {
-    id: id, name: name, isLondon: isLondon,
+    id: id, name: name, isLondon: isLondon, isEngland: isEngland,
     base: isLondon ? '' : 'data/regions/' + id + '/',
     live: LIVE.indexOf(id) !== -1,
     missing: false
@@ -648,6 +653,12 @@
   .loading-overlay.hidden { display: none; }
   .ldr-card { display: flex; flex-direction: column; align-items: center;
     padding: 0 20px; max-width: 100%; }
+  /* England (?r=england) is council level only: no wards, LSOAs, MSOAs or
+     points, so the controls for them go, and so do the modes built on wards. */
+  .ph-england .mode-btn:not([data-mode="explore"]),
+  .ph-england #dl-seg button:not([data-dl="borough"]),
+  .ph-england #pointlayers-sec, .ph-england #wardrow, .ph-england #msoarow,
+  .ph-england #lsoarow, .ph-england #sbtab-vcse, .ph-england #sbtab-ward { display: none !important; }
   .ldr-map { width: min(440px, 72vw); height: auto; display: block; overflow: visible;
     /* A region taller than it is wide (the North East) would otherwise run off
        a short screen; the viewBox keeps its shape inside the cap. */
@@ -2278,7 +2289,7 @@
           <label class="sb-lbl" for="region-picker" style="display:block">Area</label>
           <select id="region-picker" aria-label="Area: which region the map shows" style="width:100%;padding:4px 6px;border:1px solid var(--line);border-radius:5px;font-size:var(--t-xs);color:var(--ink);background:var(--paper)"></select>
         </div>
-        <div class="sb-sec">
+        <div class="sb-sec" id="pointlayers-sec">
           <div class="sb-lbl">Point layers</div>
           <label class="lrow"><div class="ldot" style="background:#fff;box-shadow:inset 0 0 0 2px #2F3B45"></div><span class="lname">GP practices <span class="lcount" id="gp-count">0</span></span><input type="checkbox" id="tg"></label>
           <label class="lrow"><div class="ldot" style="background:#A32D2D"></div><span class="lname">Hospitals &amp; clinics <span class="lcount" id="hosp-count">0</span></span><input type="checkbox" id="th"></label>
@@ -2328,9 +2339,9 @@
               <option value="all">All London</option>
             </select>
           </div>
-          <label class="lrow"><div style="width:9px;height:9px;border:1.5px solid #000;border-radius:2px;flex-shrink:0"></div><span class="lname">Ward boundaries <span class="lcount" id="ward-count">704</span></span><input type="checkbox" id="tnw" checked></label>
-          <label class="lrow"><div style="width:9px;height:9px;border:1.5px solid #7A2E8E;border-radius:2px;flex-shrink:0"></div><span class="lname">MSOA boundaries <span class="lcount" id="msoa-count"></span></span><input type="checkbox" id="tmsoa"></label>
-          <label class="lrow"><div style="width:9px;height:9px;border:1.5px solid #1E4B8E;border-radius:2px;flex-shrink:0"></div><span class="lname">LSOA boundaries <span class="lcount" id="lsoa-count"></span></span><input type="checkbox" id="tlsoa"></label>
+          <label class="lrow" id="wardrow"><div style="width:9px;height:9px;border:1.5px solid #000;border-radius:2px;flex-shrink:0"></div><span class="lname">Ward boundaries <span class="lcount" id="ward-count">704</span></span><input type="checkbox" id="tnw" checked></label>
+          <label class="lrow" id="msoarow"><div style="width:9px;height:9px;border:1.5px solid #7A2E8E;border-radius:2px;flex-shrink:0"></div><span class="lname">MSOA boundaries <span class="lcount" id="msoa-count"></span></span><input type="checkbox" id="tmsoa"></label>
+          <label class="lrow" id="lsoarow"><div style="width:9px;height:9px;border:1.5px solid #1E4B8E;border-radius:2px;flex-shrink:0"></div><span class="lname">LSOA boundaries <span class="lcount" id="lsoa-count"></span></span><input type="checkbox" id="tlsoa"></label>
           <label id="lsoa-imd-row" class="lrow" style="display:none;margin-left:18px;padding:3px 0 0"><div id="imd-row-swatch" style="width:9px;height:9px;border-radius:2px;flex-shrink:0"></div><span class="lname" style="font-size:var(--t-xs)">Colour by IMD decile</span><input type="checkbox" id="tlsoa-imd"></label>
           <div id="lsoa-filter-row" style="display:none;margin:4px 0 0 18px">
             <div style="margin-top:6px;display:flex;align-items:center;gap:2px;font-size:var(--t-xs);color:var(--ink-2)">
@@ -4310,6 +4321,12 @@ const OV_META = {
     return !k || k === 'none' || !!G[k] || /^crime_/.test(k) || k === 'imd_score_ward' ||
       !!(OV_CFG[k] && OV_CFG[k]._custom);
   };
+  // England has council figures only: keep what has them, nothing ward based.
+  if (window.PH_REGION && window.PH_REGION.isEngland) {
+    keep = function (k) {
+      return !k || k === 'none' || !!(G[k] && G[k].lv && G[k].lv.borough);
+    };
+  }
   var dropped = [];
   CATS.forEach(function (c) {
     c.fields = c.fields.filter(function (f) {
@@ -5432,7 +5449,9 @@ function _activeOv() {
 // Same reason, same shape: currentDataLevel is declared far below too, and the
 // first paint happens before it exists. Ward is the level the map opens on.
 function _activeLevel() {
-  try { return currentDataLevel; } catch (e) { return 'ward'; }
+  try { return currentDataLevel; } catch (e) {
+    return (window.PH_REGION && window.PH_REGION.isEngland) ? 'borough' : 'ward';
+  }
 }
 
 
@@ -5454,6 +5473,10 @@ function _boroughStyle(feat) {
   // Only at borough level, though. This layer is also the context outline
   // people tick at any level, and filling it over a ward choropleth would
   // change what an unrelated checkbox does to the map.
+  // England draws ~300 councils at once: a 2.5px outline on each would bury
+  // the shading, so hairlines and a stronger fill.
+  const ENG = window.PH_REGION && window.PH_REGION.isEngland;
+  if (ENG) { base.weight = 0.6; base.color = '#33414d'; }
   const ov = _activeOv();
   if (hidden || _activeLevel() !== 'borough') return base;
   if (!ov || ov === 'none' || !ovHasLevel(ov, 'borough')) return base;
@@ -5468,7 +5491,7 @@ function _boroughStyle(feat) {
   const t = (v - range.lo) / (range.hi - range.lo);
   return Object.assign(base, {
     fillColor: ovRamp(ov, Math.max(0, Math.min(1, t))),
-    fillOpacity: 0.5,
+    fillOpacity: ENG ? 0.8 : 0.5,
   });
 }
 
@@ -5496,21 +5519,61 @@ function getBoroughRange(ovKey) {
   if (vals.length < 2) return null;
   const sorted = vals.slice().sort((a, b) => a - b);
   // 33 areas, so no percentile trimming: with this few, clipping the ends
-  // throws away real boroughs rather than outliers.
-  _boroughRange[ovKey] = { lo: sorted[0], hi: sorted[sorted.length - 1],
-                           min: sorted[0], max: sorted[sorted.length - 1] };
+  // throws away real boroughs rather than outliers. England's ~300 councils
+  // are trimmed to the 5th and 95th percentiles, as wards are, so one extreme
+  // council does not flatten the rest of the country into one colour.
+  const eng = window.PH_REGION && window.PH_REGION.isEngland && sorted.length > 40;
+  _boroughRange[ovKey] = {
+    lo: eng ? sorted[Math.floor(sorted.length * 0.05)] : sorted[0],
+    hi: eng ? sorted[Math.ceil(sorted.length * 0.95 - 1)] : sorted[sorted.length - 1],
+    min: sorted[0], max: sorted[sorted.length - 1] };
   return _boroughRange[ovKey];
 }
 function restyleBorough() {
   if (typeof boroughL !== 'undefined' && boroughL) boroughL.setStyle(_boroughStyle);
 }
 const boroughL = L.geoJSON(BOROUGH_GJ, {
-  interactive: false,
+  // Only England's councils answer the pointer: everywhere else this layer is
+  // a context outline over wards, and the wards take the clicks.
+  interactive: !!(window.PH_REGION && window.PH_REGION.isEngland),
   style: _boroughStyle,
   onEachFeature: (feat, lyr) => {
-    // No tooltip — borough labels are distracting on scroll
+    // No tooltip outside England: borough labels are distracting on scroll.
+    if (!(window.PH_REGION && window.PH_REGION.isEngland)) return;
+    const p = feat.properties || {};
+    const regionName = r => ((window.PH_REGIONS || []).filter(x => x.id === r)[0] || {}).name || r;
+    const valueLine = () => {
+      const ov = _activeOv();
+      if (!ov || ov === 'none') return '';
+      const v = boroughOvValue(p.LAD25CD, ov);
+      return '<br><span style="font-size:var(--t-xs)">' + _esc(ovLabel(ov)) + ': <b>' +
+        _esc(fmtOv(v == null ? null : parseFloat(v), ov)) + '</b></span>';
+    };
+    lyr.bindTooltip(() => '<b>' + _esc(p.name || '') + '</b>' + valueLine() +
+      '<br><span style="font-size:var(--t-xs);color:var(--ink-3)">' +
+      _esc(regionName(p.region)) + ' · click for wards</span>',
+      { sticky: true, opacity: 0.95 });
+    // A council's wards, LSOAs and services live in its region's build, so a
+    // click offers that, opened on the council.
+    lyr.on('click', ev => {
+      const href = regionHref(p.region) + (p.region && p.region !== 'london' ? '&' : '?') +
+        'b=' + encodeURIComponent(p.name || '');
+      L.popup({ maxWidth: 260 }).setLatLng(ev.latlng).setContent(
+        '<b>' + _esc(p.name || '') + '</b>' + valueLine() +
+        '<div style="margin-top:6px"><a href="' + _esc(href) + '">Open ' +
+        _esc(p.name || '') + ' in ' + _esc(regionName(p.region)) +
+        ' (wards, LSOAs, services) &rarr;</a></div>').openOn(map);
+    });
   }
 });
+// England opens on the councils, shaded, with the council level selected.
+if (window.PH_REGION && window.PH_REGION.isEngland) {
+  boroughL.addTo(map);
+  const tb = document.getElementById('tb');
+  if (tb) tb.checked = true;
+  document.querySelectorAll('#dl-seg button').forEach(b =>
+    b.classList.toggle('active', b.getAttribute('data-dl') === 'borough'));
+}
 // Borough outlines start off — user toggles via 'London boroughs' checkbox
 
 // ── London context wards layer ────────────────────────────────────────────
@@ -10367,7 +10430,7 @@ function renderTopBottom() {
   const worstSlice = lowFirst ? rows.slice(-20).reverse() : rows.slice(0, 20);
 
   const unitEl = document.getElementById('rank-unit');
-  if (unitEl) unitEl.textContent = `${rows.length} ${{ lsoa: 'LSOAs', msoa: 'MSOAs', borough: 'boroughs' }[level] || 'wards'}`;
+  if (unitEl) unitEl.textContent = `${rows.length} ${{ lsoa: 'LSOAs', msoa: 'MSOAs', borough: PH_IS_LONDON ? 'boroughs' : 'councils' }[level] || 'wards'}`;
   const bestHdr  = document.getElementById('rank-best-hdr');
   const worstHdr = document.getElementById('rank-worst-hdr');
   // "Best 20" in green over the wards with the most Black residents would read
@@ -10786,7 +10849,7 @@ document.getElementById('ov').addEventListener('change', e => {
 // the badge auto-syncs when the user picks an overlay in the sidebar or
 // toggles the LSOA layer directly.
 // ═══════════════════════════════════════════════════════════════════════════
-let currentDataLevel = 'ward';
+let currentDataLevel = (window.PH_REGION && window.PH_REGION.isEngland) ? 'borough' : 'ward';
 // Raised while the badge is driving the boundary checkboxes, so their own
 // badge-sync listeners stay quiet. Without it, switching LSOA to MSOA unticks
 // the LSOA box, and that box's listener reports "ward" straight back, undoing
@@ -10814,6 +10877,8 @@ function _setDataLevel(level, opts) {
     return;
   }
   if (['borough', 'ward', 'msoa', 'lsoa'].indexOf(level) === -1) return;
+  // England is council level only; every other level lives in a region.
+  if (window.PH_REGION && window.PH_REGION.isEngland && level !== 'borough') return;
 
   // ── Compatibility gate ───────────────────────────────────────────────
   // When the user clicks a Ward/LSOA badge button (i.e. not via the
@@ -11001,6 +11066,9 @@ document.querySelectorAll('#dl-seg button').forEach(b => {
   const banner = document.getElementById('fingertips-banner');
   const closeBtn = document.getElementById('fingertips-banner-close');
   if (!banner) return;
+  // England is council figures only, so the note about suppressed ward and
+  // MSOA values does not apply.
+  if (window.PH_REGION && window.PH_REGION.isEngland) return;
   let dismissed = false;
   const isFt = k => typeof k === 'string' && k.startsWith('ft_');
 
