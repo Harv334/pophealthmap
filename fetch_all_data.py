@@ -4258,6 +4258,12 @@ def build_ward_data() -> dict:
                 w["indicators"]["total_lsoa_count"] = n_ward_lsoas[wd]
         sources["core20"] = "IMD2025 deciles 1-2 per LSOA"
 
+    # Only the scope's own wards. A practice or charity just over the scope's
+    # edge carries the code of a ward outside it, and _get() then made a blank
+    # record for that ward: 87 of them in the first North East build. London
+    # never showed it (its edge is the region's edge), so London is unchanged.
+    wards = {wd: w for wd, w in wards.items() if w.get("name")}
+
     return {
         "wards": wards,
         "metadata": {
