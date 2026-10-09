@@ -134,8 +134,8 @@
   }
 })();
 </script>
-<title>PopHealth Map - London population health by ward and LSOA</title>
-<meta name="description" content="Population health across all 33 London boroughs at ward and LSOA level. Deprivation, life expectancy, GP and pharmacy access, crime and green space, built entirely from open NHS and government data.">
+<title>PopHealth Map - population health across England by ward and neighbourhood</title>
+<meta name="description" content="Deprivation, health, hospital use, crime, air quality, transport and green space for every ward and neighbourhood in England, from London to the North East. Built entirely from open NHS and government data.">
 
 <!-- One canonical address. The site also answers on www and on the GitHub
      Pages address, both of which redirect here, and any mirror carries a
@@ -151,15 +151,15 @@
 <meta property="og:site_name" content="PopHealth Map">
 <meta property="og:locale" content="en_GB">
 <meta property="og:url" content="https://pophealth.uk/">
-<meta property="og:title" content="PopHealth Map - London population health by ward and LSOA">
-<meta property="og:description" content="Deprivation, life expectancy, GP and pharmacy access, crime, air quality, transport access and green space for all 704 London wards and 4,994 LSOAs. Built entirely from open data.">
+<meta property="og:title" content="PopHealth Map - population health across England by ward and neighbourhood">
+<meta property="og:description" content="Deprivation, health, hospital use, crime, air quality, transport and green space for every ward and neighbourhood in England, from London to the North East. Built entirely from open NHS and government data.">
 <meta property="og:image" content="https://pophealth.uk/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="PopHealth Map: population health across the 33 London boroughs at ward and LSOA level">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="PopHealth Map - London population health by ward and LSOA">
-<meta name="twitter:description" content="Deprivation, life expectancy, GP and pharmacy access, crime and green space for all 704 London wards and 4,994 LSOAs.">
+<meta name="twitter:title" content="PopHealth Map - population health across England by ward and neighbourhood">
+<meta name="twitter:description" content="Deprivation, health, hospital use, crime, air quality, transport and green space for every ward and neighbourhood in England, from London to the North East. Built entirely from open NHS and government data.">
 <meta name="twitter:image" content="https://pophealth.uk/og.png">
 
 <!-- Inline so it costs no request and cannot 404. A map pin in the map's own ink. -->
@@ -9112,6 +9112,50 @@ function _applyBoroughSolo() {
   sel.addEventListener('change', () => setTimeout(() => { render(); if (libTheme) renderLib(); }, 0));
 
   render();
+})();
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   USAGE COUNTS
+
+   Anonymous, cookie-free counts of which regions are opened and which
+   indicators are picked, sent to GoatCounter as a plain request to its /count
+   address: no script from anywhere else, no cookie, nothing stored in the
+   browser, and no personal data (GoatCounter does not keep IP addresses).
+   Nothing is sent when the browser asks not to be tracked (Do Not Track or
+   Global Privacy Control), from a local copy, or until the account named in
+   PH_STATS_SITE exists. Described on the privacy page.
+   ═══════════════════════════════════════════════════════════════════════════ */
+const PH_STATS_SITE = 'pophealth';   // https://pophealth.goatcounter.com
+const phCount = (function () {
+  let off = !PH_STATS_SITE || location.protocol === 'file:' ||
+    /^(localhost|127\.|0\.0\.0\.0)/.test(location.hostname);
+  try {
+    if (navigator.doNotTrack === '1' || window.doNotTrack === '1' || navigator.globalPrivacyControl) off = true;
+  } catch (e) {}
+  return function (path, title, isEvent) {
+    if (off) return;
+    try {
+      const q = 'p=' + encodeURIComponent(path) + '&t=' + encodeURIComponent(title || path) +
+        (isEvent ? '&e=true' : '') + '&rnd=' + Math.random().toString(36).slice(2);
+      const img = new Image();
+      img.referrerPolicy = 'no-referrer';
+      img.src = 'https://' + PH_STATS_SITE + '.goatcounter.com/count?' + q;
+    } catch (e) {}
+  };
+})();
+(function _usageCounts() {
+  const R = window.PH_REGION || { id: 'london', name: 'London' };
+  phCount('/' + (R.id || 'london'), 'Map: ' + (R.name || 'London'), false);
+  const sel = document.getElementById('ov');
+  if (!sel) return;
+  let last = sel.value;
+  sel.addEventListener('change', () => {
+    const v = sel.value;
+    if (!v || v === 'none' || v === last) return;
+    last = v;
+    const opt = sel.querySelector('option[value="' + v + '"]');
+    phCount('indicator/' + v, 'Indicator: ' + (opt ? opt.textContent : v), true);
+  });
 })();
 
 /* ═══════════════════════════════════════════════════════════════════════════
