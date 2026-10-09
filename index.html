@@ -1599,6 +1599,13 @@
   .ov-tv-row .ds { font-size: 12.5px; color: var(--ink-2); line-height: 1.35;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .ov-tv-row .mt { font-size: var(--t-xs); color: var(--ink-3); }
+  /* The level an indicator is published at, boxed wherever levels are listed. */
+  .ov-lv-nat { display: inline-block; padding: 0 4px; border: 1px solid var(--nhs-blue); border-radius: 4px;
+    color: var(--nhs-blue); font-weight: 600; line-height: 1.35; background: var(--paper); }
+  .ov-tv-key { margin: 0 0 4px; font-size: var(--t-xs); color: var(--ink-3); line-height: 1.5; }
+  /* The same mark on the map's area level switch. */
+  .dl-seg button.native { box-shadow: inset 0 0 0 1.5px var(--nhs-blue); }
+  .dl-seg button.native.active { box-shadow: inset 0 0 0 1.5px var(--on-accent), 0 1px 3px rgba(0,94,184,.3); }
 
   /* ── Tour ─────────────────────────────────────────────────────────────────
      The design file's story strip: a chapter counter, a progress bar, one
@@ -2516,6 +2523,7 @@
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
                 All themes</button>
               <h3 class="ov-tv-h" id="ov-tv-h"></h3>
+              <div class="ov-tv-key"><span class="ov-lv-nat">Boxed</span> level: as published by the source. Other levels are worked out from it.</div>
               </div>
               <div class="ov-tv-list" id="ov-tv-list" role="list"></div>
             </div>
@@ -8992,6 +9000,16 @@ function _applyBoroughSolo() {
     }
     return d;
   }
+  /* The levels again, with the one the source publishes at boxed, so it is
+     plain which figures are as published and which are worked out from them
+     (summed or weighted up to a council, or shared down to smaller areas). */
+  function levelsHTML(o) {
+    const lv = ((o.levels && o.levels.length) ? o.levels.slice() : (o.level ? [o.level.toLowerCase()] : []))
+      .sort((a, b) => LADDER.indexOf(a) - LADDER.indexOf(b));
+    return lv.map(l => l === o.native
+      ? '<span class="ov-lv-nat" title="Published at this level by the source">' + esc(_levelTitle(l)) + '</span>'
+      : esc(_levelTitle(l))).join(' · ');
+  }
   function levelsText(o) {
     const lv = ((o.levels && o.levels.length) ? o.levels.slice() : (o.level ? [o.level.toLowerCase()] : []))
       .sort((a, b) => LADDER.indexOf(a) - LADDER.indexOf(b));
@@ -9033,7 +9051,7 @@ function _applyBoroughSolo() {
           ' aria-pressed="' + (o.value === cur) + '">' +
           '<span class="nm">' + esc(o.name) + '</span>' +
           (descOf(o) ? '<span class="ds">' + esc(descOf(o)) + '</span>' : '') +
-          '<span class="mt">' + esc(levelsText(o)) + (o.native === 'borough' ? ' · one figure per council' : '') + '</span>' +
+          '<span class="mt">' + levelsHTML(o) + (o.native === 'borough' ? ' · one figure per council' : '') + '</span>' +
         '</button>').join('')).join('');
   }
   function openLib(theme) {
@@ -9080,7 +9098,7 @@ function _applyBoroughSolo() {
 
     curNm.textContent = curOpt ? curOpt.name : 'No indicator selected';
     curDesc.textContent = curOpt ? descOf(curOpt) : 'Pick one below to shade the map.';
-    curMeta.textContent = curOpt ? [levelsText(curOpt), (curOpt.meta && curOpt.meta.src) || '',
+    curMeta.innerHTML = curOpt ? [levelsHTML(curOpt), esc((curOpt.meta && curOpt.meta.src) || ''),
       curOpt.native === 'borough' ? 'one figure per council' : ''].filter(Boolean).join(' · ') : '';
     curEl.classList.toggle('empty', !curOpt);
     curBtns.hidden = !curOpt;
@@ -9091,7 +9109,7 @@ function _applyBoroughSolo() {
         ? '<div class="ov-res-sub" style="padding:0 2px 4px">' + hits.length + (hits.length === 15 ? '+' : '') + ' matches</div>' +
           hits.map(o => '<button type="button" class="ov-res' + (o.value === cur ? ' on' : '') + '" data-ov="' + esc(o.value) + '">' +
             '<span class="ov-res-nm">' + esc(o.name) + '</span>' +
-            '<span class="ov-res-sub">' + esc(o.theme) + ' · ' + esc(levelsText(o)) + '</span></button>').join('')
+            '<span class="ov-res-sub">' + esc(o.theme) + ' · ' + levelsHTML(o) + '</span></button>').join('')
         : '<div class="ov-empty">No indicator matches that.</div>';
     }
     resultsEl.hidden = !q;
@@ -11079,8 +11097,19 @@ function _legendEnds(range, inline) {
    that overlay was already chosen. Restyling the layers alone would repaint
    the map and leave the scale and the legend strip stating the range that was
    computed while there was nothing to compute it over. */
+function _markNativeLevel() {
+  const nat = (curOv && curOv !== 'none' && typeof ovNativeLevel === 'function') ? ovNativeLevel(curOv) : '';
+  document.querySelectorAll('#dl-seg button').forEach(b => {
+    const on = !!nat && b.dataset.dl === nat;
+    b.classList.toggle('native', on);
+    if (b.dataset.baseTitle === undefined) b.dataset.baseTitle = b.title || '';
+    b.title = b.dataset.baseTitle + (on ? ' Boxed: this indicator is published at this level.' : '');
+  });
+}
+
 function _applyOverlayChange(key) {
   curOv = key;
+  _markNativeLevel();
   const cfg = OV_CFG[curOv];
   const sc  = document.getElementById('scale');
   sc.style.display = curOv !== 'none' ? 'block' : 'none';
