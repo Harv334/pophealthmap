@@ -5426,6 +5426,28 @@ def _pcm_discover_urls() -> dict[str, tuple[int, str]]:
     missing = sorted(set(PCM_POLLUTANTS) - set(latest))
     if missing:
         warn(f"air_quality: the index listed no files for {', '.join(missing)}")
+        # The index has come back empty while the files themselves were still
+        # served (9 Oct 2026, every regional build at once). Ask for the files
+        # by their usual names before giving up: map<token><year>.csv, with a
+        # "g" after the year for the gravimetric PM files.
+        sess = browser_session(referer=PCM_INDEX_URL)
+        for token in missing:
+            for year in (PCM_LABELLED_YEAR + 1, PCM_LABELLED_YEAR):
+                hit = None
+                for suffix in ("", "g"):
+                    url = urljoin(PCM_INDEX_URL, f"../datastore/pcm/map{token}{year}{suffix}.csv")
+                    try:
+                        r = sess.head(url, timeout=60, allow_redirects=True)
+                        ctype = r.headers.get("content-type", "")
+                        if r.ok and "html" not in ctype.lower():
+                            hit = url
+                            break
+                    except Exception:
+                        pass
+                if hit:
+                    info(f"air_quality: {token} found by name: {hit.rsplit('/', 1)[-1]}")
+                    latest[token] = (year, hit)
+                    break
     return latest
 
 
