@@ -1,0 +1,47 @@
+name: Region build to branch
+
+# Copies a "Build region (pilot)" run's output onto its own orphan branch,
+# pilot/region-<scope>, so it can be fetched with git (for example to try the
+# region in the app locally) without downloading the artifact through the
+# browser. The branch shares no history with main and nothing on main or the
+# site changes; delete the branch when done with it.
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "Run ID of the Build region (pilot) run"
+        required: true
+      scope:
+        description: "Scope that run built (e.g. north-east)"
+        required: true
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  copy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: region-${{ github.event.inputs.scope }}
+          path: out/data/regions/${{ github.event.inputs.scope }}
+          run-id: ${{ github.event.inputs.run_id }}
+          github-token: ${{ github.token }}
+      - name: Push to pilot/region-<scope>
+        env:
+          SCOPE: ${{ github.event.inputs.scope }}
+          RUN_ID: ${{ github.event.inputs.run_id }}
+          REPO: ${{ github.repository }}
+          TOKEN: ${{ github.token }}
+        run: |
+          cd out
+          git init -q -b "pilot/region-$SCOPE"
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Pilot build of $SCOPE from run $RUN_ID (not for main)"
+          git push -q --force "https://x-access-token:${TOKEN}@github.com/${REPO}.git" "pilot/region-$SCOPE"
