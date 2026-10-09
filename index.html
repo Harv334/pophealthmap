@@ -1542,6 +1542,13 @@
     color: var(--nhs-blue); cursor: pointer; }
   .ov-btn:hover { background: var(--nhs-light); }
   .ov-btn.quiet { border-color: var(--line); color: var(--ink-2); font-weight: 500; }
+  /* Primary care networks */
+  .pcn-info { margin-top: 6px; font-size: var(--t-xs); color: var(--ink-2); line-height: 1.45; }
+  .pcn-info b { color: var(--ink); }
+  .pcn-grad { height: 8px; border-radius: 3px; margin: 5px 0 2px;
+    background: linear-gradient(to right, #E6F4F3, #7CC4BF, #0B7A75, #05403D); }
+  .pcn-ends { display: flex; justify-content: space-between; color: var(--ink-3); }
+  .pcn-note { color: var(--ink-3); margin-top: 4px; }
   /* Two-variable map */
   .ov-biv { margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--line-2); }
   .ov-biv[hidden], .ov-biv-pick[hidden], .ov-biv-on[hidden], .biv-legend[hidden] { display: none; }
@@ -2428,6 +2435,17 @@
             <select id="icb-focus" aria-label="Focus by Integrated Care Board" style="width:100%;padding:4px 6px;border:1px solid var(--line);border-radius:5px;font-size:var(--t-xs);color:var(--ink);background:var(--paper)">
               <option value="all">All ICBs</option>
             </select>
+          </div>
+          <!-- Primary care networks. Shown once this region's pcn.json loads. -->
+          <div id="pcn-block" hidden>
+            <label class="lrow" id="pcn-row"><div style="width:9px;height:9px;border:2px solid #0B7A75;border-radius:2px;flex-shrink:0"></div><span class="lname">PCN footprints <span class="lcount" id="pcn-count"></span><button type="button" class="lhelp" title="Primary care networks: groups of GP practices that plan services together. A footprint is the set of neighbourhoods (LSOAs) where most registered residents use that network's practices. PCNs are defined by their practices' patient lists, not by a boundary, so footprints overlap in reality: the shading after choosing one shows its full catchment.">?</button></span><input type="checkbox" id="tpcn"></label>
+            <div style="margin:2px 0 8px 18px">
+              <div style="font-size:var(--t-xs);color:var(--ink-2);margin-bottom:3px">Focus by PCN</div>
+              <select id="pcn-focus" aria-label="Focus by primary care network" style="width:100%;padding:4px 6px;border:1px solid var(--line);border-radius:5px;font-size:var(--t-xs);color:var(--ink);background:var(--paper)">
+                <option value="">Choose a network</option>
+              </select>
+              <div class="pcn-info" id="pcn-info" hidden></div>
+            </div>
           </div>
           <label class="lrow"><div style="width:9px;height:9px;border:2px solid #1a1a1a;border-radius:2px;flex-shrink:0"></div><span class="lname" id="tb-name">London boroughs</span><input type="checkbox" id="tb"></label>
           <div style="margin:4px 0 8px 0">
@@ -9474,6 +9492,123 @@ function _applyBoroughSolo() {
   sel.addEventListener('change', () => setTimeout(() => { render(); if (libTheme) renderLib(); }, 0));
 
   render();
+})();
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PRIMARY CARE NETWORKS
+
+   pcn.json (written by the pipeline) lists this region's networks and their
+   practices and, when NHS Digital's registrations by LSOA were available to
+   the build, each network's catchment: for every LSOA, how many residents
+   are registered with its practices and what share of the area's registered
+   residents that is. Choosing a network highlights its practices and shades
+   that catchment. PCN footprints (the LSOAs where most registered residents
+   use one network) are drawn from pcn_footprints.json.
+   ═══════════════════════════════════════════════════════════════════════════ */
+(function _pcnLayer() {
+  const block = document.getElementById('pcn-block');
+  const sel = document.getElementById('pcn-focus');
+  const tog = document.getElementById('tpcn');
+  const row = document.getElementById('pcn-row');
+  const infoEl = document.getElementById('pcn-info');
+  const countEl = document.getElementById('pcn-count');
+  if (!block || !sel || typeof fetch !== 'function') return;
+  const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  let DATA = null, byCode = {}, fpLyr = null, focusLyr = null;
+  const RAMP = ['#E6F4F3', '#7CC4BF', '#0B7A75', '#05403D'];
+  const shareColour = pct => {
+    const t = Math.max(0, Math.min(1, pct / 100)) * (RAMP.length - 1);
+    const i = Math.min(RAMP.length - 2, Math.floor(t)), f = t - i;
+    const h = c => [1, 3, 5].map(j => parseInt(c.slice(j, j + 2), 16));
+    const a = h(RAMP[i]), b = h(RAMP[i + 1]);
+    return 'rgb(' + a.map((v, j) => Math.round(v + (b[j] - v) * f)).join(',') + ')';
+  };
+
+  fetch(dataUrl('data/map/pcn.json')).then(r => r.ok ? r.json() : null).then(d => {
+    if (!d || !d.pcns || !d.pcns.length) return;
+    DATA = d;
+    d.pcns.forEach(p => { byCode[p.code] = p; });
+    sel.insertAdjacentHTML('beforeend', d.pcns.map(p =>
+      '<option value="' + esc(p.code) + '">' + esc(p.name.replace(/\s+PCN$/i, '')) + ' (' + p.practices.length + ')</option>').join(''));
+    if (countEl) countEl.textContent = d.pcns.length;
+    row.hidden = !d.has_catchments;
+    block.hidden = false;
+  }).catch(() => {});
+
+  function practiceIndex() {
+    const idx = {};
+    (typeof GPS !== 'undefined' ? GPS : []).forEach(g => { if (g && g.code) idx[g.code] = g; });
+    return idx;
+  }
+
+  tog && tog.addEventListener('change', () => {
+    if (!tog.checked) { if (fpLyr) map.removeLayer(fpLyr); return; }
+    if (fpLyr) { fpLyr.addTo(map); return; }
+    fetch(dataUrl('data/map/pcn_footprints.json')).then(r => r.ok ? r.json() : null).then(gj => {
+      if (!gj || !tog.checked) return;
+      fpLyr = L.geoJSON(gj, {
+        style: { color: '#0B7A75', weight: 2, fill: true, fillOpacity: 0, opacity: 0.9 },
+        onEachFeature: (f, l) => {
+          l.bindTooltip('<b>' + esc(f.properties.name) + '</b><br><span style="font-size:var(--t-xs)">Click to see its catchment</span>', { sticky: true });
+          l.on('click', () => { sel.value = f.properties.code; sel.dispatchEvent(new Event('change')); });
+        },
+      }).addTo(map);
+    }).catch(() => {});
+  });
+
+  function clearFocus() {
+    if (focusLyr) { map.removeLayer(focusLyr); focusLyr = null; }
+    infoEl.hidden = true; infoEl.innerHTML = '';
+  }
+
+  sel.addEventListener('change', () => {
+    clearFocus();
+    const p = byCode[sel.value];
+    if (!p) return;
+    // The LSOA outlines load on demand; the catchment needs them.
+    const ready = (DATA.has_catchments && typeof ensureLsoaImd === 'function') ? ensureLsoaImd() : Promise.resolve();
+    ready.then(() => { if (sel.value === p.code) drawFocus(p); });
+  });
+
+  function drawFocus(p) {
+    clearFocus();
+    const idx = practiceIndex();
+    const grp = L.featureGroup();
+    const lsoas = p.lsoas || {};
+    if (DATA.has_catchments && typeof LSOA_IMD !== 'undefined') {
+      const feats = LSOA_IMD.features.filter(f => lsoas[f.properties.code]);
+      L.geoJSON({ type: 'FeatureCollection', features: feats }, {
+        style: f => ({ color: '#05403D', weight: 0.6, opacity: 0.7,
+                       fillColor: shareColour(lsoas[f.properties.code][1]), fillOpacity: 0.8 }),
+        onEachFeature: (f, l) => {
+          const v = lsoas[f.properties.code];
+          l.bindTooltip('<b>' + esc(f.properties.name) + '</b><br><span style="font-size:var(--t-xs)">' +
+            v[1] + '% of registered residents use ' + esc(p.name) + ' (' + v[0].toLocaleString() + ' people)</span>', { sticky: true });
+        },
+      }).addTo(grp);
+    }
+    p.practices.forEach(code => {
+      const g = idx[code];
+      if (!g || g.lat == null) return;
+      L.circleMarker([g.lat, g.lng], { radius: 8, color: '#05403D', weight: 3, fillColor: '#fff', fillOpacity: 1 })
+        .bindTooltip('<b>' + esc(g.n) + '</b><br><span style="font-size:var(--t-xs)">' + esc(code) + ' · ' + esc(p.name) + '</span>')
+        .addTo(grp);
+    });
+    focusLyr = grp.addTo(map);
+    try { const b = grp.getBounds(); if (b.isValid()) map.fitBounds(b, { padding: [30, 30], maxZoom: 14 }); } catch (e) {}
+    const nL = Object.keys(lsoas).length;
+    const outside = p.all_practices > p.practices.length ? ' ' + (p.all_practices - p.practices.length) + ' more of its practices are outside this region.' : '';
+    infoEl.innerHTML = '<b>' + esc(p.name) + '</b>: ' + p.practices.length + ' practice' + (p.practices.length === 1 ? '' : 's') +
+      (p.patients ? ', ' + p.patients.toLocaleString() + ' registered patients' : '') + '.' + outside +
+      (DATA.has_catchments
+        ? '<div class="pcn-note" style="margin-top:6px">Shading: share of each area\'s registered residents who use its practices</div>' +
+          '<div class="pcn-grad"></div><div class="pcn-ends"><span>0%</span><span>100%</span></div>' +
+          '<div class="pcn-note">' + nL.toLocaleString() + ' neighbourhoods with 5 or more of its patients. Registrations: ' + esc(DATA.registrations) + ', NHS Digital.</div>'
+        : '<div class="pcn-note">Catchments are not loaded for this build, so only its practices are shown.</div>') +
+      '<button type="button" class="ov-btn quiet" id="pcn-clear" style="margin-top:6px">Clear</button>';
+    infoEl.hidden = false;
+    document.getElementById('pcn-clear').addEventListener('click', () => { sel.value = ''; clearFocus(); });
+  }
 })();
 
 /* The two-variable map's controls and legend. The colouring itself is
