@@ -3273,8 +3273,9 @@ def _police_fetch_area(geom, ym: str, cache_dir: pathlib.Path, stem: str,
 # download and a few minutes of pandas. The polygon API above costs one request
 # per council per month, more when a council is over the 10,000 cap, and on a
 # region of large rural councils it ran past two hours (East of England never
-# finished). Region builds use the archive; London stays on the API until the
-# archive has proved itself, and PH_CRIME_SOURCE=archive|api overrides both.
+# finished). Every scope uses the archive, London included since East of
+# England proved it (530,387 crimes in 80 seconds); the API is the fallback if
+# the archive cannot be read, and PH_CRIME_SOURCE=archive|api overrides.
 POLICE_ARCHIVE_URL = "https://data.police.uk/data/archive/latest.zip"
 
 # The archive spells crime types out; the API, and everything downstream of
@@ -3391,7 +3392,7 @@ def _police_from_archive(months_back: int) -> pd.DataFrame:
 
 def run_police_crime(months_back: int = 12) -> pd.DataFrame:
     rule(f"Police.uk crime (last {months_back} months)")
-    mode = os.environ.get("PH_CRIME_SOURCE") or ("api" if IS_LONDON else "archive")
+    mode = os.environ.get("PH_CRIME_SOURCE") or "archive"
     if mode == "archive":
         try:
             out = _police_from_archive(months_back)
