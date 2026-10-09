@@ -123,6 +123,8 @@ BOROUGHS = [(n, c) for n, c in _scope["lads"]]
 SCOPE_LADS = {b[1] for b in BOROUGHS}
 LAD_NAMES = {b[1]: b[0] for b in BOROUGHS}
 IS_LONDON = SCOPE_ID == "london"
+# Log wording only: London's councils are boroughs, elsewhere they are not.
+LA_WORD = "borough" if IS_LONDON else "council"
 
 # Where this scope's outputs go. London: the repo root and data/, as before.
 # Anywhere else: one folder holding that region's whole build.
@@ -860,7 +862,7 @@ def get_lsoa_ward_lookup() -> dict:
         except (OSError, ValueError) as e:
             warn(f"ONS lookup: cache unreadable ({e}); refetching")
 
-    info(f"ONS lookup: fetching {ONS_LOOKUP_LAYER} for {len(SCOPE_LADS)} boroughs")
+    info(f"ONS lookup: fetching {ONS_LOOKUP_LAYER} for {len(SCOPE_LADS)} {LA_WORD}s")
     where = "LAD25CD IN (" + ",".join(f"'{c}'" for c in sorted(SCOPE_LADS)) + ")"
     lookup: dict[str, tuple[str, str]] = {}
     offset = 0
@@ -2647,7 +2649,7 @@ def run_fingertips_profiles() -> pd.DataFrame:
                     "unit": row.get("Value note", ""),
                 })
             kept += 1
-        ok(f"  {label}: {kept} indicators with London figures")
+        ok(f"  {label}: {kept} indicators with {SCOPE_NAME} figures")
 
     out = pd.DataFrame(rows)
     out_path = DATA_DIR / "outcomes" / "fingertips_profiles.parquet"
@@ -3655,7 +3657,7 @@ def run_hospitals() -> pd.DataFrame | None:
     out_path = DATA_DIR / "healthcare" / "hospitals.parquet"
     out = write_parquet_guarded(out_path, out, source="hospitals")
     ok(f"hospitals: {len(named):,} hospital-named records -> {len(sites):,} "
-       f"postcodes -> {len(out):,} London sites")
+       f"postcodes -> {len(out):,} {SCOPE_NAME} sites")
     return out
 
 
@@ -3861,9 +3863,9 @@ def run_charities():
             if scope_map.get(num) != "explicit":
                 scope_map[num] = "london_wide"
 
-    info(f"CCEW: {len(covers_map):,} charities cover at least one borough in scope "
+    info(f"CCEW: {len(covers_map):,} charities cover at least one {LA_WORD} in scope "
          f"(explicit: {sum(1 for v in scope_map.values() if v == 'explicit'):,}, "
-         f"london_wide only: {sum(1 for v in scope_map.values() if v == 'london_wide'):,})")
+         f"{SCOPE_NAME}-wide only: {sum(1 for v in scope_map.values() if v == 'london_wide'):,})")
 
     # ---- Pass 2: read main extract, keep only charities in covers_map ----
     info(f"CCEW: reading main extract {main_zip.name}")
@@ -4469,7 +4471,7 @@ def build_borough_data() -> dict:
         out.setdefault(lad, {})[f"ft_{row['indicator_short']}"] = float(v)
 
     n_vals = sum(len(v) for v in out.values())
-    info(f"borough_data: {len(out):,} boroughs, {n_vals:,} published values, none derived")
+    info(f"borough_data: {len(out):,} {LA_WORD}s, {n_vals:,} published values, none derived")
     return out
 
 
@@ -5138,8 +5140,8 @@ def export_map_blobs() -> None:
             }
         shared = sum(1 for n, c in name_counts.items() if c > 1)
         if shared:
-            info(f"  {shared} ward name(s) shared by more than one borough; "
-                 f"disambiguated with the borough name")
+            info(f"  {shared} ward name(s) shared by more than one {LA_WORD}; "
+                 f"disambiguated with the {LA_WORD} name")
         write_map_blob("GJ", wards_gj,
                        "Ward boundaries. ONS WD_MAY_2025_UK_BGC_V2, scoped to the borough list.")
         ok(f"map blob: {len(wards_gj['features']):,} wards -> data/map/{MAP_BLOBS['GJ']}")
@@ -5151,7 +5153,7 @@ def export_map_blobs() -> None:
             f["properties"] = {"name": p.get("LAD25NM", ""), "LAD25CD": p.get("LAD25CD", "")}
         write_map_blob("BOROUGH_GJ", bor_gj,
                        "Borough outlines. ONS LAD_MAY_2025_UK_BGC_V2, scoped to the borough list.")
-        ok(f"map blob: {len(bor_gj['features']):,} boroughs -> data/map/{MAP_BLOBS['BOROUGH_GJ']}")
+        ok(f"map blob: {len(bor_gj['features']):,} {LA_WORD}s -> data/map/{MAP_BLOBS['BOROUGH_GJ']}")
 
     # LSOA shapes carrying the IMD figures and their ward, which is what the
     # LSOA choropleth and the ward drill-down both read.
@@ -5272,7 +5274,7 @@ def export_all() -> None:
     ok(f"ward_data.json:  {len(ward_data.get('wards', {})):,} wards")
     ok(f"lsoa_data.json:  {len(lsoa_data):,} LSOAs")
     ok(f"msoa_data.json:  {len(msoa_data):,} MSOAs")
-    ok(f"borough_data.json: {len(boro_data):,} boroughs")
+    ok(f"borough_data.json: {len(boro_data):,} {LA_WORD}s")
     ok(f"pharmacies.json: {len(pharm_data):,} rows")
     ok(f"vcse_data.json:  {len(vcse_data):,} charities")
     if dental_data:

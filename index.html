@@ -9115,50 +9115,6 @@ function _applyBoroughSolo() {
 })();
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   USAGE COUNTS
-
-   Anonymous, cookie-free counts of which regions are opened and which
-   indicators are picked, sent to GoatCounter as a plain request to its /count
-   address: no script from anywhere else, no cookie, nothing stored in the
-   browser, and no personal data (GoatCounter does not keep IP addresses).
-   Nothing is sent when the browser asks not to be tracked (Do Not Track or
-   Global Privacy Control), from a local copy, or until the account named in
-   PH_STATS_SITE exists. Described on the privacy page.
-   ═══════════════════════════════════════════════════════════════════════════ */
-const PH_STATS_SITE = 'pophealth';   // https://pophealth.goatcounter.com
-const phCount = (function () {
-  let off = !PH_STATS_SITE || location.protocol === 'file:' ||
-    /^(localhost|127\.|0\.0\.0\.0)/.test(location.hostname);
-  try {
-    if (navigator.doNotTrack === '1' || window.doNotTrack === '1' || navigator.globalPrivacyControl) off = true;
-  } catch (e) {}
-  return function (path, title, isEvent) {
-    if (off) return;
-    try {
-      const q = 'p=' + encodeURIComponent(path) + '&t=' + encodeURIComponent(title || path) +
-        (isEvent ? '&e=true' : '') + '&rnd=' + Math.random().toString(36).slice(2);
-      const img = new Image();
-      img.referrerPolicy = 'no-referrer';
-      img.src = 'https://' + PH_STATS_SITE + '.goatcounter.com/count?' + q;
-    } catch (e) {}
-  };
-})();
-(function _usageCounts() {
-  const R = window.PH_REGION || { id: 'london', name: 'London' };
-  phCount('/' + (R.id || 'london'), 'Map: ' + (R.name || 'London'), false);
-  const sel = document.getElementById('ov');
-  if (!sel) return;
-  let last = sel.value;
-  sel.addEventListener('change', () => {
-    const v = sel.value;
-    if (!v || v === 'none' || v === last) return;
-    last = v;
-    const opt = sel.querySelector('option[value="' + v + '"]');
-    phCount('indicator/' + v, 'Indicator: ' + (opt ? opt.textContent : v), true);
-  });
-})();
-
-/* ═══════════════════════════════════════════════════════════════════════════
    BOROUGH LOCK
 
    Focusing a borough is a statement about what you are looking at, and the
@@ -12700,6 +12656,11 @@ async function _prepareScreenForScreenshot(opts) {
   const ctrlPrevVis = ctrlCorners.map(el => el.style.visibility);
   if (dlBadge) dlBadge.style.visibility = 'hidden';
   ctrlCorners.forEach(el => { el.style.visibility = 'hidden'; });
+  // Hover labels follow the pointer, which is over the map while the
+  // screenshot tool is in use, so one would otherwise land in the picture.
+  const tipStyle = document.createElement('style');
+  tipStyle.textContent = '.leaflet-tooltip{display:none!important}';
+  document.head.appendChild(tipStyle);
 
   let movedMap = false;
   let whiteOverlay = null;
@@ -12729,7 +12690,16 @@ async function _prepareScreenForScreenshot(opts) {
     try {
       const feats = _pngScopeFeatures();
       if (feats && feats.length) {
-        const outerRing = [[51.0, -2.0], [51.0, 2.0], [53.0, 2.0], [53.0, -2.0]];
+        /* The outer frame has to enclose every hole cut into it. It was a
+           fixed box around London (51 to 53 N), so in any region outside
+           that box the holes fell outside the frame, the even-odd fill
+           inverted, and the mapped area itself was painted white. Size it
+           from the scope instead, with a wide margin so it still covers
+           the screen at any zoom the map allows. */
+        const sb = L.geoJSON({ type: 'FeatureCollection', features: feats }).getBounds();
+        const s = sb.getSouth() - 20, n = sb.getNorth() + 20;
+        const w = sb.getWest() - 30, e = sb.getEast() + 30;
+        const outerRing = [[s, w], [s, e], [n, e], [n, w]];
         const allRings = [outerRing];
         feats.forEach(f => {
           const g = f && f.geometry; if (!g) return;
@@ -12757,6 +12727,7 @@ async function _prepareScreenForScreenshot(opts) {
   _screenshotState = {
     cleanup: () => {
       try { if (whiteOverlay) map.removeLayer(whiteOverlay); } catch(e) {}
+      if (tipStyle.parentNode) tipStyle.parentNode.removeChild(tipStyle);
       if (dlBadge) dlBadge.style.visibility = dlPrevVis;
       ctrlCorners.forEach((el, i) => { el.style.visibility = ctrlPrevVis[i] || ''; });
       if (movedMap) {
