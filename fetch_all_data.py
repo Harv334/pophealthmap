@@ -2335,6 +2335,63 @@ FINGERTIPS_INDICATORS = [
     #                   and a plausible-looking guess is what caused this mess.
 ]
 
+# Fingertips publishes these at upper-tier local authority (area type 502):
+# counties, unitaries, metropolitan and London boroughs. A district (E07) in a
+# shire county has no row of its own, so outside London and the big cities a
+# third of England's authorities would match nothing. Each such district takes
+# its county's published figure instead, found through Fingertips' own
+# county-to-district lookup. The figure is the county's, as the indicator's
+# metadata already says ("upper-tier local authority"); nothing is estimated.
+FT_PARENTS_URL = ("https://fingertips.phe.org.uk/api/parent_to_child_areas"
+                  "?child_area_type_id=501&parent_area_type_id=502")
+
+@lru_cache(maxsize=1)
+def _ft_district_parents() -> dict:
+    """District code -> upper-tier (county) code, for districts in scope."""
+    cache = CACHE_DIR / "fingertips" / "parents_502_501.json"
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    data = None
+    if cache.exists():
+        try:
+            data = json.loads(cache.read_text(encoding="utf-8"))
+        except ValueError:
+            data = None
+    if data is None:
+        try:
+            data = _ft_get(FT_PARENTS_URL, timeout=60).json()
+            cache.write_text(json.dumps(data), encoding="utf-8")
+        except Exception as e:
+            warn(f"fingertips: county lookup failed ({e}); districts get no figures")
+            return {}
+    out = {}
+    for parent, kids in (data or {}).items():
+        for k in kids or []:
+            if k in SCOPE_LADS and k != parent:
+                out[k] = parent
+    return out
+
+
+def _ft_in_scope(df: "pd.DataFrame") -> "pd.DataFrame":
+    """Rows for the scope's authorities, districts filled from their county."""
+    own = df[df["Area Code"].isin(SCOPE_LADS)]
+    missing = SCOPE_LADS - set(own["Area Code"])
+    if not missing:
+        return own
+    parents = {d: c for d, c in _ft_district_parents().items() if d in missing}
+    if not parents:
+        return own
+    extra = []
+    for d, c in parents.items():
+        rows = df[df["Area Code"] == c]
+        if rows.empty:
+            continue
+        rows = rows.copy()
+        rows["Area Code"] = d
+        rows["Area Name"] = LAD_NAMES.get(d, d)
+        extra.append(rows)
+    return pd.concat([own] + extra, ignore_index=True) if extra else own
+
+
 def run_fingertips() -> pd.DataFrame:
     rule("OHID Fingertips (public health outcomes)")
     cache_dir = CACHE_DIR / "fingertips"
@@ -2385,7 +2442,7 @@ def run_fingertips() -> pd.DataFrame:
             if _ft_name_mismatch(desc, actual):
                 warn(f"fingertips {ind_id}: asked for {desc!r} but the data is "
                      f"{actual!r}. Verify the id before trusting this column.")
-        df = df[df["Area Code"].isin(SCOPE_LADS)]
+        df = _ft_in_scope(df)
         if df.empty:
             continue
         # Fingertips returns Male, Female and Persons rows for the same
@@ -2564,7 +2621,7 @@ def run_fingertips_profiles() -> pd.DataFrame:
                 continue
             if df.empty or "Area Code" not in df.columns:
                 continue
-            df = df[df["Area Code"].isin(SCOPE_LADS)]
+            df = _ft_in_scope(df)
             if df.empty:
                 continue
             if "Sex" in df.columns:
@@ -5316,9 +5373,11 @@ PCM_ALL_TOKENS = ["coamean", "com8hr", "dgt1", "pm25", "pm10", "nox",
 # publish the next year those labels become wrong silently, so the mismatch is
 # announced rather than left for someone to notice.
 PCM_LABELLED_YEAR = 2024
-# Greater London in British National Grid, with a margin. Only used to trim the
-# UK-wide grid (about 255,000 cells) down to what can possibly touch an LSOA.
-LONDON_BNG_BBOX = (495000, 148000, 570000, 208000)
+# The UK-wide grid (about 255,000 cells) is trimmed to the scope's LSOAs, in
+# British National Grid with a margin, before matching. It used to be a fixed
+# box around Greater London, which left every other region with no cells.
+# A cell is 1 km, so a 2 km margin keeps every cell that can touch an LSOA.
+PCM_BBOX_MARGIN_M = 2000
 
 
 def _pcm_discover_urls() -> dict[str, tuple[int, str]]:
@@ -5365,8 +5424,8 @@ def _pcm_discover_urls() -> dict[str, tuple[int, str]]:
 
 
 def _pcm_read_grid(token: str, year: int, url: str,
-                   cache_dir: "Path") -> "pd.DataFrame | None":
-    """One pollutant's London cells as columns gridcode, x, y, value."""
+                   cache_dir: "Path", bbox: tuple) -> "pd.DataFrame | None":
+    """One pollutant's cells inside bbox (BNG) as columns x, y, value."""
     src = cache_dir / f"pcm_{token}_{year}.csv"
     if not src.exists():
         info(f"air_quality: downloading {url.rsplit('/', 1)[-1]}")
@@ -5396,7 +5455,7 @@ def _pcm_read_grid(token: str, year: int, url: str,
     # last column rather than rebuilding that name, so a change in Defra's
     # spelling does not empty the layer without saying so.
     val_col = df.columns[-1]
-    x0, y0, x1, y1 = LONDON_BNG_BBOX
+    x0, y0, x1, y1 = bbox
     df = df[df.x.between(x0, x1) & df.y.between(y0, y1)].copy()
     # PCM writes "MISSING" into cells the model does not cover (open sea, and
     # a few Scottish islands). Numeric coercion turns those into NaN.
@@ -5404,7 +5463,7 @@ def _pcm_read_grid(token: str, year: int, url: str,
     df = df.dropna(subset=["value"])
     df = df[df["value"] > 0]
     if df.empty:
-        warn(f"air_quality: {token} had no usable cells over London")
+        warn(f"air_quality: {token} had no usable cells over {SCOPE_NAME}")
         return None
     return df[["x", "y", "value"]]
 
@@ -5418,27 +5477,6 @@ def run_air_quality() -> "pd.DataFrame | None":
 
     cache_dir = CACHE_DIR / "air_quality"
     cache_dir.mkdir(parents=True, exist_ok=True)
-
-    latest = _pcm_discover_urls()
-    if not latest:
-        warn("air_quality: nothing to fetch")
-        return None
-
-    grids: dict[str, "pd.DataFrame"] = {}
-    years: dict[str, int] = {}
-    for token in PCM_POLLUTANTS:
-        if token not in latest:
-            continue
-        year, url = latest[token]
-        g = _pcm_read_grid(token, year, url, cache_dir)
-        if g is not None:
-            grids[token] = g
-            years[token] = year
-            info(f"air_quality: {token} {year} — {len(g):,} London cells, "
-                 f"{g['value'].min():.1f}–{g['value'].max():.1f} µg/m³")
-    if not grids:
-        warn("air_quality: no pollutant grid could be read")
-        return None
 
     # LSOA polygons are WGS84; the grid is BNG. Project the polygons rather
     # than the grid, because a projected 1 km square stops being a square and
@@ -5461,6 +5499,35 @@ def run_air_quality() -> "pd.DataFrame | None":
         polys.append(geom)
         codes.append(code)
     info(f"air_quality: {len(polys):,} LSOA polygons projected to BNG")
+    if not polys:
+        warn("air_quality: no LSOA polygons in scope")
+        return None
+    bx = [p.bounds for p in polys]
+    m = PCM_BBOX_MARGIN_M
+    bbox = (min(b[0] for b in bx) - m, min(b[1] for b in bx) - m,
+            max(b[2] for b in bx) + m, max(b[3] for b in bx) + m)
+
+    latest = _pcm_discover_urls()
+    if not latest:
+        warn("air_quality: nothing to fetch")
+        return None
+
+    grids: dict[str, "pd.DataFrame"] = {}
+    years: dict[str, int] = {}
+    for token in PCM_POLLUTANTS:
+        if token not in latest:
+            continue
+        year, url = latest[token]
+        g = _pcm_read_grid(token, year, url, cache_dir, bbox)
+        if g is not None:
+            grids[token] = g
+            years[token] = year
+            info(f"air_quality: {token} {year} — {len(g):,} cells in scope, "
+                 f"{g['value'].min():.1f}–{g['value'].max():.1f} µg/m³")
+    if not grids:
+        warn("air_quality: no pollutant grid could be read")
+        return None
+
 
     records: dict[str, dict] = {c: {"LSOA21CD": c} for c in codes}
     for token, grid in grids.items():
