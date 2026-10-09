@@ -132,17 +132,24 @@ def ons_lad_to_icb() -> tuple[str, dict, dict]:
     if not best:
         raise SystemExit("no LAD to ICB lookup found on the ONS ArcGIS server")
     service = best[1]
-    url = f"{ARCGIS}/{service}/FeatureServer/0/query"
+    base = f"{ARCGIS}/{service}/FeatureServer/0"
+    # Only the three columns needed: an LSOA level lookup is ~33,000 rows.
+    fields = [f["name"] for f in requests.get(base, params={"f": "json"}, timeout=60).json().get("fields", [])]
+    want = [f for f in fields if re.fullmatch(r"(LAD\d\dCD|ICB\d\dCD|ICB\d\dNM)", f, re.I)]
     rows, offset = [], 0
     while True:
-        r = requests.get(url, params={"where": "1=1", "outFields": "*", "f": "json",
-                                      "returnGeometry": "false",
-                                      "resultOffset": offset, "resultRecordCount": 2000},
-                         timeout=120)
+        r = requests.get(f"{base}/query", params={
+            "where": "1=1", "outFields": ",".join(want) or "*", "f": "json",
+            "returnGeometry": "false", "resultOffset": offset, "resultRecordCount": 2000},
+            timeout=120)
         r.raise_for_status()
-        feats = r.json().get("features", [])
+        js = r.json()
+        feats = js.get("features", [])
         rows += [f["attributes"] for f in feats]
-        if len(feats) < 2000:
+        # The server caps a page at its own maxRecordCount (1,000 here), so a
+        # short page is not the last one; exceededTransferLimit says whether
+        # more remain. Stopping on a short page read 8 councils of 296.
+        if not feats or not js.get("exceededTransferLimit"):
             break
         offset += len(feats)
     votes: dict = {}

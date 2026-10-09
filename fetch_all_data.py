@@ -5528,6 +5528,11 @@ def run_air_quality() -> "pd.DataFrame | None":
         if not code.startswith("E01"):
             continue
         geom = shp_transform(to_bng, shape(feat["geometry"]))
+        # One North West LSOA came through self-intersecting and GEOS refused
+        # to intersect it with the grid ("side location conflict"), which
+        # failed the whole source. buffer(0) repairs it without moving edges.
+        if not geom.is_valid:
+            geom = geom.buffer(0)
         if geom.is_empty:
             continue
         polys.append(geom)
