@@ -247,7 +247,7 @@ file size.</p>
 
 <h2>What can go wrong when you read a figure</h2>
 
-<p>Six things on this map are easy to read the wrong way. Each one is a
+<p>Several things on this map are easy to read the wrong way. Each one is a
 property of how the figures are published, not a fault, and each changes what a
 number means.</p>
 
@@ -328,6 +328,32 @@ indicator’s figures, and it differs a great deal from one to the next. The
 refreshed, not the date the figures describe. A refresh takes the newest
 figures published, and for some indicators those are several years old.</p>
 
+<h3>9. Every indicator has a card</h3>
+
+<p>The <strong>About</strong> button under the chosen indicator, or the
+<strong>i</strong> beside the heading, opens its card: what is counted and out
+of what, the level its source publishes it at and how it reaches the other
+levels, the period, the source and how often the source updates it. For the
+Local Health series the value type, unit, year type and last upload date are
+OHID's own, read from the Fingertips API.</p>
+
+<h3>10. Two indicators at once</h3>
+
+<p>“Compare with a second indicator” draws two indicators on one map. Each is
+cut into thirds across the areas of the level being drawn (so the thirds of
+the North East's LSOAs, not England's), and each area takes one of nine
+colours for its pair. Thirds are relative to the areas on screen, so the same
+LSOA can fall in a different third in a different region. A pattern on this
+map is a place to look, not evidence that one thing causes the other: two
+indicators can move together because both follow deprivation, age or how
+urban an area is.</p>
+
+<h3>11. Life expectancy is shown for women and men separately</h3>
+
+<p>Local Health publishes life expectancy at birth by sex only, with no figure
+for everyone. It is offered as two indicators. Before October 2026 the map
+showed one of the two without saying which.</p>
+
 <h2>Known gaps</h2>
 
 <ul>
@@ -335,10 +361,14 @@ figures published, and for some indicators those are several years old.</p>
       and no Local Health indicators. They are tiny and share very few LSOAs,
       so there is nothing to aggregate. This is a property of the geography,
       not a fetch failure.</li>
-  <li><strong>39 renumbered MSOAs.</strong> Fingertips still publishes the
-      Local Health set against 2011 MSOA codes. Where a code no longer matches
-      a 2021 one, the value is left missing rather than filled from a
-      neighbour.</li>
+  <li><strong>MSOAs redrawn in 2021.</strong> Fingertips still publishes the
+      older Local Health series against 2011 MSOA codes. About 2% of MSOAs were
+      split, merged or redrawn for 2021. Using the ONS lookup
+      <code>MSOA11_MSOA21_LAD22_EW_LU</code>, a 2021 MSOA with no figure of its
+      own takes its 2011 parent's (where the parent was split) or the plain mean
+      of its 2011 parents' (where they were merged). These are estimates of the
+      2021 area, not published figures. Where a figure is still missing,
+      Fingertips suppressed it for small numbers or did not publish it.</li>
   <li><strong>PTAL is London only.</strong> The public transport accessibility
       level is TfL's measure and has no national equivalent. Every region has
       the four NaPTAN station and bus stop measures instead.</li>

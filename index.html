@@ -1527,6 +1527,14 @@
   .ov-cur-desc { font-size: 13px; line-height: 1.4; color: var(--ink-2);
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .ov-cur-meta { font-size: var(--t-xs); color: var(--ink-3); }
+  /* Indicator card */
+  #ov-info-panel .ic-h { font-weight: 700; color: var(--ink); font-size: 13px; margin-bottom: 3px; }
+  #ov-info-panel .ic-d { margin: 0 0 6px; }
+  #ov-info-panel dl.ic { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; margin: 0; }
+  #ov-info-panel dl.ic dt { color: var(--ink-3); font-weight: 600; white-space: nowrap; }
+  #ov-info-panel dl.ic dd { margin: 0; color: var(--ink-2); }
+  #ov-info-panel .ic-sub { display: block; color: var(--ink-3); margin-top: 2px; }
+  #ov-info-panel .ic-more { display: inline-block; margin-top: 7px; color: var(--nhs-blue); font-weight: 600; }
   .ov-cur-btns { display: flex; gap: 6px; margin-top: 4px; }
   .ov-cur-btns[hidden] { display: none; }
   .ov-btn { appearance: none; font: inherit; font-size: 13.5px; font-weight: 600; min-height: 36px;
@@ -2536,6 +2544,7 @@
               <div class="ov-cur-btns" id="ov-cur-btns" hidden>
                 <button type="button" class="ov-btn" id="ov-change">Change</button>
                 <button type="button" class="ov-btn quiet" id="ov-clear">Clear</button>
+                <button type="button" class="ov-btn quiet" id="ov-about" aria-controls="ov-info-panel">About</button>
               </div>
               <!-- Two-variable map: a second indicator drawn against the first. -->
               <div class="ov-biv" id="ov-biv" hidden>
@@ -2608,7 +2617,8 @@
               <option value="ft_93241">Hip fracture: emergency hospital admissions (aged 65 and over) · MSOA</option>
               <option value="ft_93240">Hospital admissions for alcohol attributable conditions, narrow definition · MSOA</option>
               <option value="ft_93239">Intentional self-harm: emergency hospital admissions · MSOA</option>
-              <option value="ft_93283">Life expectancy at birth · MSOA</option>
+              <option value="ft_93283">Life expectancy at birth, women · MSOA</option>
+              <option value="ft_932831">Life expectancy at birth, men · MSOA</option>
               <option value="ft_93098">Long-term unemployment: people claiming out of work benefit for over 12 months (aged 16 to 64) · MSOA</option>
               <option value="ft_93250">Mortality from all causes · MSOA</option>
               <option value="ft_93252">Mortality from all causes (aged under 75) · MSOA</option>
@@ -3845,6 +3855,7 @@ const OV_CFG = {
   ft_93465                      : { lo:"Lower", hi:"Higher", wh:true, min:38.6552, max:199.7579 },
   ft_93240                      : { lo:"Lower", hi:"Higher", wh:true, min:27.8614, max:167.9237 },
   ft_93283                      : { lo:"Lower", hi:"Higher", wh:false, min:79.0728, max:89.6794 },
+  ft_932831                     : { lo:"Lower", hi:"Higher", wh:false, min:74, max:88 },
   ft_93250                      : { lo:"Lower", hi:"Higher", wh:true, min:48.6908, max:173.9462 },
   ft_93252                      : { lo:"Lower", hi:"Higher", wh:true, min:28.0535, max:220.1707 },
   ft_93253                      : { lo:"Lower", hi:"Higher", wh:true, min:47.0495, max:131.6352 },
@@ -4009,7 +4020,8 @@ const CATS = [
     { k: "ft_93241", l: "Hip fracture: emergency hospital admissions (aged 65 and over)", g: "msoa", lv: ["ward","msoa"] },
     { k: "ft_93465", l: "Alcohol-related conditions: admission episodes (all primary and secondary diagnoses)", g: "msoa", lv: ["ward","msoa"] },
     { k: "ft_93240", l: "Hospital admissions for alcohol attributable conditions, narrow definition", g: "msoa", lv: ["ward","msoa"] },
-    { k: "ft_93283", l: "Life expectancy at birth", g: "msoa", lv: ["ward","msoa"] },
+    { k: "ft_93283", l: "Life expectancy at birth, women", g: "msoa", lv: ["ward","msoa"] },
+    { k: "ft_932831", l: "Life expectancy at birth, men", g: "msoa", lv: ["ward","msoa"] },
     { k: "ft_93250", l: "Mortality from all causes", g: "msoa", lv: ["ward","msoa"] },
     { k: "ft_93252", l: "Mortality from all causes (aged under 75)", g: "msoa", lv: ["ward","msoa"] },
     { k: "ft_93253", l: "Mortality from cancer", g: "msoa", lv: ["ward","msoa"] },
@@ -4330,7 +4342,8 @@ const OV_META = {
   ft_93241                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2016/17 - 20/21", g: "MSOA", u: "ratio (England = 100)", desc: "Hip fracture: emergency hospital admissions (aged 65 and over). An indirectly standardised ratio, not a rate: 100 is the number of admissions expected if England's rates applied to this area's age and sex mix, so 120 means 20% more admissions than expected and 80 means 20% fewer. Lower is better." },
   ft_93465                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2016/17 - 20/21", g: "MSOA", u: "ratio (England = 100)", desc: "Alcohol-related conditions: admission episodes (all primary and secondary diagnoses). An indirectly standardised ratio, not a rate: 100 is the number of admissions expected if England's rates applied to this area's age and sex mix, so 120 means 20% more admissions than expected and 80 means 20% fewer. Lower is better." },
   ft_93240                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2016/17 - 20/21", g: "MSOA", u: "ratio (England = 100)", desc: "Hospital admissions for alcohol attributable conditions, narrow definition. An indirectly standardised ratio, not a rate: 100 is the number of admissions expected if England's rates applied to this area's age and sex mix, so 120 means 20% more admissions than expected and 80 means 20% fewer. Lower is better." },
-  ft_93283                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2019 - 23", g: "MSOA", u: "Years", desc: "Life expectancy at birth. Higher is better." },
+  ft_93283                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2019 - 23", g: "MSOA", u: "Years", desc: "Life expectancy at birth for women. Higher is better." },
+  ft_932831                     : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2019 - 23", g: "MSOA", u: "Years", desc: "Life expectancy at birth for men. Higher is better." },
   ft_93250                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2019 - 23", g: "MSOA", u: "ratio (England = 100)", desc: "Mortality from all causes. An indirectly standardised ratio, not a rate: 100 is the number of deaths expected if England's rates applied to this area's age and sex mix, so 120 means 20% more deaths than expected and 80 means 20% fewer. Lower is better." },
   ft_93252                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2019 - 23", g: "MSOA", u: "ratio (England = 100)", desc: "Mortality from all causes (aged under 75). An indirectly standardised ratio, not a rate: 100 is the number of deaths expected if England's rates applied to this area's age and sex mix, so 120 means 20% more deaths than expected and 80 means 20% fewer. Lower is better." },
   ft_93253                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2019 - 23", g: "MSOA", u: "ratio (England = 100)", desc: "Mortality from cancer. An indirectly standardised ratio, not a rate: 100 is the number of deaths expected if England's rates applied to this area's age and sex mix, so 120 means 20% more deaths than expected and 80 means 20% fewer. Lower is better." },
@@ -4508,7 +4521,8 @@ const OV_PLAIN = {
   ft_93241: "Emergency admissions for hip fractures in people aged 65 and over, compared with England (100 = average).",
   ft_93240: "Admissions for conditions caused wholly or mainly by alcohol, compared with England (100 = average).",
   ft_93239: "Emergency admissions for self-harm, compared with England (100 = average).",
-  ft_93283: "How long a baby born now can expect to live, in years, for this small area.",
+  ft_93283: "How long a girl born now can expect to live, in years, for this small area.",
+  ft_932831: "How long a boy born now can expect to live, in years, for this small area.",
   ft_93098: "People aged 16 to 64 claiming out-of-work benefits for more than a year, per 1,000.",
   ft_93250: "Deaths from any cause, compared with England (100 = average).",
   ft_93252: "Deaths under 75 from any cause, compared with England (100 = average).",
@@ -4941,6 +4955,185 @@ function ramp(t) {
 function ovRamp(k, t) {
   const cfg = (typeof OV_CFG !== 'undefined') ? OV_CFG[k] : null;
   return ramp(cfg && cfg.rev ? 1 - t : t);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   INDICATOR CARDS
+
+   What a public health analyst checks before using a figure: what is
+   counted and out of what, the level the source publishes it at and how it
+   reaches the other levels, the period, who publishes it and how often.
+
+   FT_INFO is OHID's own metadata for the Local Health series (value type,
+   unit, year type, last upload), read from the Fingertips API. The rest is
+   set out per source family below; Census tables share one rule per table.
+   ═══════════════════════════════════════════════════════════════════════════ */
+const FT_INFO = {
+  "93089": ["Crude rate", "per 1,000", "Calendar", "2025-07-03", "OHID, based on Office for National Statistics data"],
+  "93097": ["Proportion", "%", "Financial", "2025-09-25", "NOMIS"],
+  "93098": ["Crude rate", "per 1,000", "Financial", "2025-07-24", "NOMIS"],
+  "93105": ["Proportion", "%", "Academic", "2025-10-27", "DHSC, National Child Measurement Programme"],
+  "93106": ["Proportion", "%", "Academic", "2025-10-27", "DHSC, National Child Measurement Programme"],
+  "93107": ["Proportion", "%", "Academic", "2025-10-27", "DHSC, National Child Measurement Programme"],
+  "93108": ["Proportion", "%", "Academic", "2025-10-27", "DHSC, National Child Measurement Programme"],
+  "93114": ["Crude rate", "per 10,000", "Financial", "2022-09-01"],
+  "93115": ["Crude rate", "per 1,000", "Financial", "2022-09-01"],
+  "93219": ["Crude rate", "per 10,000", "Financial", "2022-09-01"],
+  "93224": ["Crude rate", "per 10,000", "Financial", "2022-09-01"],
+  "93227": ["Indirectly standardised ratio", "per 100", "Financial", "2022-07-05"],
+  "93229": ["Indirectly standardised ratio", "per 100", "Financial", "2022-07-05"],
+  "93231": ["Indirectly standardised ratio", "per 100", "Financial", "2022-07-05"],
+  "93232": ["Indirectly standardised ratio", "per 100", "Financial", "2022-07-05"],
+  "93233": ["Indirectly standardised ratio", "per 100", "Financial", "2022-07-05"],
+  "93239": ["Indirectly standardised ratio", "per 100", "Financial", "2022-07-05"],
+  "93240": ["Indirectly standardised ratio", "per 100", "Financial", "2022-07-05"],
+  "93241": ["Indirectly standardised ratio", "per 100", "Financial", "2022-07-12"],
+  "93250": ["Indirectly standardised ratio", "per 100", "Calendar", "2025-07-03"],
+  "93252": ["Indirectly standardised ratio", "per 100", "Calendar", "2025-07-03"],
+  "93253": ["Indirectly standardised ratio", "per 100", "Calendar", "2025-07-03"],
+  "93254": ["Indirectly standardised ratio", "per 100", "Calendar", "2025-07-03"],
+  "93255": ["Indirectly standardised ratio", "per 100", "Calendar", "2025-07-03"],
+  "93256": ["Indirectly standardised ratio", "per 100", "Calendar", "2025-07-03"],
+  "93257": ["Indirectly standardised ratio", "per 100", "Calendar", "2025-07-03"],
+  "93259": ["Indirectly standardised ratio", "per 100", "Calendar", "2025-07-03"],
+  "93260": ["Indirectly standardised ratio", "per 100", "Calendar", "2025-07-03"],
+  "93283": ["Life expectancy", "Years", "Calendar", "2025-07-21"],
+  "93465": ["Indirectly standardised ratio", "per 100", "Financial", "2022-07-05"],
+  "93480": ["Indirectly standardised ratio", "per 100", "Calendar", "2025-07-03"],
+  "932831": ["Life expectancy", "Years", "Calendar", "2025-07-21"]
+};
+const CENSUS_BASE = {
+  TS001: ['Usual residents', ''],
+  TS004: ['Residents born outside the UK', 'All usual residents'],
+  TS007A: ['Residents in the age band', 'All usual residents'],
+  TS021: ['Residents in the ethnic group', 'All usual residents'],
+  TS025: ['Households in the group', 'All households'],
+  TS037: ['Residents reporting that level of health', 'All usual residents'],
+  TS038: ['Residents disabled under the Equality Act at that level', 'All usual residents'],
+  TS039: ['Residents providing unpaid care', 'Usual residents aged 5 and over'],
+  TS045: ['Households with no car or van', 'All households'],
+  TS054: ['Households with that tenure', 'All households'],
+  TS061: ['Working residents who travel to work that way', 'Usual residents aged 16 and over in employment'],
+  TS062: ['Residents in that occupational class (NS-SeC)', 'Usual residents aged 16 and over'],
+  TS066: ['Residents unemployed', 'Usual residents aged 16 and over'],
+  TS067: ['Residents with that highest qualification', 'Usual residents aged 16 and over'],
+};
+function indicatorFacts(k) {
+  const m = (typeof OV_META === 'object' && OV_META[k]) || {};
+  const src = String(m.src || '');
+  const f = { num: '', den: '', cadence: '', method: '' };
+  const ftId = (k.match(/^ft_(\d+)$/) || [])[1];
+  if (ftId && FT_INFO[ftId]) {
+    const [vt, unit, yt, up, ds] = FT_INFO[ftId];
+    const what = /mortality|death/i.test(m.desc || '') ? 'deaths' : /admission/i.test(m.desc || '') ? 'emergency admissions' : 'events';
+    f.cadence = 'Updated by OHID irregularly, usually every one to three years. Last uploaded ' +
+      up.split('-').reverse().join('/') + '. ' + yt + ' years.';
+    if (/standardised ratio/i.test(vt)) {
+      f.num = 'Observed ' + what + ' among residents, pooled over the period';
+      f.den = 'Expected ' + what + ' if England\'s age and sex-specific rates applied to the area\'s population';
+      f.method = 'Indirectly standardised ratio, England = 100. 120 means a fifth more than expected for the ages of the people living there. Small areas, so the period is pooled over several years.';
+    } else if (/life expectancy/i.test(vt)) {
+      f.num = 'Deaths by age in the area, pooled over five years';
+      f.den = 'Population by age (ONS mid-year estimates)';
+      f.method = 'Period life expectancy from an abridged life table. Published separately for women and men.';
+    } else if (/crude rate/i.test(vt)) {
+      f.num = what.charAt(0).toUpperCase() + what.slice(1) + ' among residents, pooled over the period';
+      f.den = 'Resident population of the relevant age, ' + unit;
+      f.method = 'Crude rate ' + unit + ', not adjusted for age.';
+    } else if (/proportion/i.test(vt)) {
+      const ncmp = ds && /Child Measurement/.test(ds);
+      f.num = ncmp ? 'Children measured with that weight status' : 'People with the characteristic';
+      f.den = ncmp ? 'All children measured in that school year' : 'All people in the group measured';
+      f.method = 'Proportion, %.' + (ds && /Child Measurement/.test(ds) ? ' Children measured in Reception or Year 6, pooled over three school years.' : '');
+    }
+    if (ds) f.method = (f.method ? f.method + ' ' : '') + 'Data: ' + ds + '.';
+    return f;
+  }
+  const ts = (src.match(/\((TS\d+A?)\)/) || [])[1];
+  if (ts && CENSUS_BASE[ts]) {
+    [f.num, f.den] = CENSUS_BASE[ts];
+    f.cadence = 'Every ten years. These are Census 2021 (21 March 2021); the next census is due in 2031.';
+    f.method = 'ONS publishes these counts for every LSOA. Ward figures here add up the LSOAs that best fit each ward, then divide, so they can differ slightly from ONS\'s own ward tables.';
+    return f;
+  }
+  if (/police/i.test(src)) {
+    f.num = 'Crimes recorded by the police at a location in the area, last 12 months';
+    f.den = k === 'crime_rate_per_1000' ? 'Usual residents (Census 2021), per 1,000' : '';
+    f.cadence = 'Monthly, about two months behind. Refreshed here on the 15th of each month.';
+    f.method = 'Street-level points are moved to an anonymised nearby location by the police before publication, so a crime can fall in the next area. Rates per resident run high where few people live but many visit, such as town centres.';
+    return f;
+  }
+  if (/NOMIS CLA01/.test(src)) {
+    f.num = 'People claiming Universal Credit or Jobseeker\'s Allowance mainly for being unemployed';
+    f.den = 'Residents aged 16 to 64';
+    f.cadence = 'Monthly. Refreshed here on the 15th.';
+    return f;
+  }
+  if (/DESNZ/.test(src)) {
+    f.num = 'Households in fuel poverty (Low Income Low Energy Efficiency)';
+    f.den = 'All households';
+    f.cadence = 'Annual, about two years behind.';
+    f.method = 'Modelled from survey and administrative data, so small-area figures are estimates.';
+    return f;
+  }
+  if (/UK-AIR|PCM/.test(src)) {
+    f.cadence = 'Annual (modelled for the previous calendar year).';
+    f.method = 'Not a rate: the modelled annual mean concentration on Defra\'s 1 km grid, averaged over the grid cells each LSOA covers.';
+    return f;
+  }
+  if (/Green\/Blue/.test(src)) {
+    f.num = 'Residents within the walking distance of a space of that size';
+    f.den = 'All residents of the area';
+    f.cadence = 'Occasional (Defra).';
+    return f;
+  }
+  if (/IMD/.test(src)) {
+    f.cadence = 'Every four to six years: 2015, 2019, 2025.';
+    f.method = /decile/.test(k)
+      ? 'Rank of the LSOA among all 33,755 in England, in tenths. 1 is the most deprived tenth. Ward figures are the population-weighted mean of their LSOAs.'
+      : 'A modelled score combining several indicators. Not a count, so it is not divided by anything.';
+    return f;
+  }
+  if (/NaPTAN|TfL Unified/.test(src)) {
+    f.cadence = 'Refreshed here monthly from the stop registers.';
+    f.method = 'Straight-line distance from the middle of each LSOA, or a count of stops within the radius. Not travel time, and not service frequency.';
+    return f;
+  }
+  if (/PTAL/.test(src)) {
+    f.cadence = 'Occasional (TfL).';
+    f.method = 'Public Transport Accessibility Level: walk time to stops plus how often services run, London only.';
+    return f;
+  }
+  return f;
+}
+function indicatorCardHTML(k) {
+  const e = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const m = (typeof OV_META === 'object' && OV_META[k]) || {};
+  const f = indicatorFacts(k);
+  const nat = (typeof ovNativeLevel === 'function') ? ovNativeLevel(k) : '';
+  const lv = (typeof ovLevels === 'function') ? ovLevels(k) : [];
+  const LADDER = ['borough', 'ward', 'msoa', 'lsoa'];
+  const nm = l => ({ borough: 'Local authority', ward: 'Ward', msoa: 'MSOA', lsoa: 'LSOA' })[l] || l;
+  const others = lv.filter(l => l !== nat);
+  const how = others.map(l =>
+    l === 'borough' ? 'local authority figures add counts up and weight rates by population'
+    : (LADDER.indexOf(l) > LADDER.indexOf(nat) ? nm(l) + ' figures share each area\'s value with the smaller areas inside it (an estimate, not a measurement)'
+    : nm(l) + ' figures are built from the ' + nm(nat) + ' figures')).join('; ');
+  const row = (t, v) => v ? '<dt>' + e(t) + '</dt><dd>' + v + '</dd>' : '';
+  return '<div class="ic-h">' + e((typeof _ovLabel === 'function' ? _ovLabel(k) : k) || k) + '</div>' +
+    (m.desc ? '<p class="ic-d">' + e(m.desc) + '</p>' : '') +
+    '<dl class="ic">' +
+    row('Counted', e(f.num)) +
+    row('Out of', e(f.den)) +
+    row('Published at', nat ? '<span class="ov-lv-nat">' + e(nm(nat)) + '</span>' +
+      (how ? ' <span class="ic-sub">' + e(how.charAt(0).toUpperCase() + how.slice(1)) + '.</span>' : '') : '') +
+    row('Period', e(m.yr)) +
+    row('Unit', e(m.u)) +
+    row('Source', e(m.src)) +
+    row('Updates', e(f.cadence)) +
+    row('Method', e(f.method)) +
+    '</dl>' +
+    '<a class="ic-more" href="methodology.html">Full methodology</a>';
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -6733,7 +6926,7 @@ function ovIsStdRatio(k) {
    all causes, preventable deaths and emergency admissions. All four are Local
    Health figures, estimated per MSOA and carried onto wards through the LSOA
    bridge, so unlike the borough series they differ from ward to ward. */
-const WARD_HEALTH_LEAD = ['ft_93283', 'ft_93250', 'ft_93480', 'ft_93227'];
+const WARD_HEALTH_LEAD = ['ft_93283', 'ft_932831', 'ft_93250', 'ft_93480', 'ft_93227'];
 
 // Horizontal stacked bar: parts = [{k, l, v, c}, ...]. Returns '' if nothing
 // populated (e.g. age fields before TS007A is loaded).
@@ -7727,7 +7920,8 @@ function _generateWardReport(_reportWindow, wn, opts) {
   // beside London's because these figures do differ between wards in a
   // borough, unlike the borough series, which are left out.
   const _HO_LABELS = {
-    ft_93283: 'Life expectancy at birth',
+    ft_93283: 'Life expectancy at birth, women',
+    ft_932831: 'Life expectancy at birth, men',
     ft_93250: 'Mortality, all causes',
     ft_93480: 'Preventable mortality, under 75',
     ft_93227: 'Emergency admissions, all causes',
@@ -8786,6 +8980,16 @@ function _applyBoroughSolo() {
   const curNm = document.getElementById('ov-cur-nm');
   const clearBtn = document.getElementById('ov-clear');
   if (!sel || !searchEl) return;
+  // The indicator card, which the "i" by the heading also opens.
+  const aboutBtn = document.getElementById('ov-about');
+  if (aboutBtn) aboutBtn.addEventListener('click', () => {
+    const panel = document.getElementById('ov-info-panel');
+    if (!panel || !panel.innerHTML) return;
+    const open = panel.style.display !== 'block';
+    panel.style.display = open ? 'block' : 'none';
+    aboutBtn.setAttribute('aria-expanded', String(open));
+    if (open) panel.scrollIntoView({ block: 'nearest' });
+  });
 
   // "Bad/very bad health % · Ward" carries its level in the label. Split it out
   // so the level can be a pill and the filter can match the name alone.
@@ -11370,9 +11574,7 @@ function _applyOverlayChange(key) {
       if (meta && meta.desc) {
         info.style.display = 'inline-block';
         info.onclick = () => { panel.style.display = panel.style.display === 'block' ? 'none' : 'block'; };
-        const lbl = _ovLabel(curOv) || curOv;
-        const unitLine = meta.u ? ` · ${meta.u}` : '';
-        panel.innerHTML = `<div style="margin-bottom:3px"><b>${lbl}</b></div>${meta.desc}<div style="margin-top:5px;color:var(--ink-3)">${meta.g} · ${meta.src} · ${meta.yr}${unitLine}</div>`;
+        panel.innerHTML = indicatorCardHTML(curOv);
         panel.style.display = 'none';
       } else {
         info.style.display = 'none';
@@ -14534,7 +14736,7 @@ var PH_SHOW = {
           (d > 0 ? ' years above ' : ' years below ')) + what + ' of ' + ref.toFixed(1);
       };
       var leBor = boroughMedian('ft_93283', w.lad);
-      bits.push('Estimated life expectancy at birth is <strong>' + le.toFixed(1) + ' years</strong>, ' +
+      bits.push('Estimated life expectancy at birth for women is <strong>' + le.toFixed(1) + ' years</strong>, ' +
         gap(leMed, 'the ' + PH_AREA + ' ward median') +
         (leBor !== null ? ' and ' + gap(leBor, 'the ' + esc(w.lad) + ' ward median') : '') + '.');
     }
@@ -14609,7 +14811,7 @@ var PH_SHOW = {
             ? (pop / 1000).toFixed(1) + '<span>k</span>'
             : Math.round(pop).toLocaleString()), 'Census 2021') +
       kpi('Life expectancy', le == null ? null : le.toFixed(1) + '<span>yrs</span>',
-          'at birth' + (lePer ? ', ' + lePer : '')) +
+          'women, at birth' + (lePer ? ', ' + lePer : '')) +
       // All causes, as a standardised ratio. The sub-line is short because a
       // quarter of the strip is all it has at 1366px.
       kpi('Mortality ratio', mr == null ? null : mr.toFixed(0), 'England = 100',
