@@ -19,9 +19,14 @@ on:
         description: "Scope to build (a file in scopes/, e.g. north-east)"
         required: true
         default: "north-east"
+      publish:
+        description: "Publish to the site (attach to the region-data release and redeploy)"
+        type: boolean
+        default: false
 
 permissions:
-  contents: read
+  contents: write   # to attach the region pack to the region-data release
+  actions: write    # to start the site deploy
 
 concurrency:
   group: build-region-${{ github.event.inputs.scope }}
@@ -83,3 +88,26 @@ jobs:
           name: region-${{ github.event.inputs.scope }}
           path: data/regions/${{ github.event.inputs.scope }}
           if-no-files-found: warn
+
+      # Publishing: the served files only (no parquet intermediates, no
+      # boundary GeoJSON), packed and attached to the "region-data" release,
+      # replacing that region's previous pack. Release assets are not part of
+      # the repository's history, so monthly region data does not grow it.
+      # Then the site deploy is started so the new pack goes live.
+      - name: Publish to the site
+        if: success() && github.event.inputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SCOPE: ${{ github.event.inputs.scope }}
+        run: |
+          cd "data/regions/$SCOPE"
+          files="$(ls -d ward_data.json lsoa_data.json msoa_data.json borough_data.json \
+                   vcse_data.json pharmacies.json dental_practices.json map meta 2>/dev/null)"
+          tar -czf "$GITHUB_WORKSPACE/region-$SCOPE.tar.gz" $files
+          cd "$GITHUB_WORKSPACE"
+          ls -la "region-$SCOPE.tar.gz"
+          gh release view region-data >/dev/null 2>&1 || \
+            gh release create region-data --latest=false --title "Region data" \
+              --notes "Published region builds for the site, one pack per region. Replaced on each publish; not code releases."
+          gh release upload region-data "region-$SCOPE.tar.gz" --clobber
+          gh workflow run jekyll-gh-pages.yml --ref main
