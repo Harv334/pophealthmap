@@ -70,6 +70,14 @@ jobs:
       - name: Build the region's loading map
         run: python scripts/build_loader_map.py --region "${{ github.event.inputs.scope }}"
 
+      # The region's Integrated Care Boards (map/icbs.json, map/icb_lookup.json),
+      # membership from ONS's council to ICB lookup. A failure here leaves the
+      # region without the ICB layer rather than failing the build: the page
+      # hides the layer when the files are missing.
+      - name: Build the region's ICB layer
+        continue-on-error: true
+        run: python scripts/build_icb_boundaries.py --region "${{ github.event.inputs.scope }}"
+
       - name: Summarise the manifest
         if: always()
         run: |

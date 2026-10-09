@@ -20,11 +20,24 @@ written into the map would be worse than none at all.
 Run when the borough boundaries change:
 
     py scripts/build_icb_boundaries.py
+
+Outside London (a region build, see build-region.yml) the membership is not
+typed here. It is read from ONS's own local authority to ICB lookup, found on
+the ONS ArcGIS server the same way scripts/make_scopes.py finds its lookup,
+and the boards are dissolved from the region's council outlines:
+
+    py scripts/build_icb_boundaries.py --region north-east
+
+That writes icbs.json and icb_lookup.json into data/regions/<slug>/map/. A
+board that reaches past the region (North East and North Cumbria does) is
+drawn for the part inside it, and its council count says "in" the region.
 """
 
 from __future__ import annotations
 
+import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -83,14 +96,162 @@ COLOURS = {
 }
 
 
-def read_borough_gj() -> dict:
-    text = BOROUGHS.read_text(encoding="utf-8")
+def read_borough_gj(path: Path = BOROUGHS) -> dict:
+    text = path.read_text(encoding="utf-8")
     marker = "var BOROUGH_GJ = "
     start = text.index(marker) + len(marker)
     return json.loads(text[start : text.rindex("}") + 1])
 
 
+ARCGIS = "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services"
+
+# Hues for the region boards, assigned so no two boards that touch share one.
+# The London four first, then four more of the same weight.
+REGION_PALETTE = ["#8E44AD", "#C2701C", "#2E7D32", "#C0392B",
+                  "#1F6FB2", "#B8860B", "#00838F", "#AD1457"]
+
+
+def ons_lad_to_icb() -> tuple[str, dict, dict]:
+    """(service, {LAD code: ICB code}, {ICB code: ICB name}) from the newest
+    ONS lookup that carries both a local authority and an ICB column. An
+    LSOA level lookup is reduced to its authorities by majority."""
+    import requests
+    r = requests.get(ARCGIS, params={"f": "json"}, timeout=60)
+    r.raise_for_status()
+    best = None
+    for svc in r.json().get("services", []):
+        name = svc.get("name", "")
+        icb = re.search(r"ICB(\d\d)", name)
+        if (svc.get("type") != "FeatureServer" or not icb or "LAD" not in name
+                or not re.search(r"_LU(_v\d+)?$", name)):
+            continue
+        v = re.search(r"_v(\d+)$", name)
+        key = (int(icb.group(1)), int(v.group(1)) if v else 0)
+        if best is None or key > best[0]:
+            best = (key, name)
+    if not best:
+        raise SystemExit("no LAD to ICB lookup found on the ONS ArcGIS server")
+    service = best[1]
+    url = f"{ARCGIS}/{service}/FeatureServer/0/query"
+    rows, offset = [], 0
+    while True:
+        r = requests.get(url, params={"where": "1=1", "outFields": "*", "f": "json",
+                                      "returnGeometry": "false",
+                                      "resultOffset": offset, "resultRecordCount": 2000},
+                         timeout=120)
+        r.raise_for_status()
+        feats = r.json().get("features", [])
+        rows += [f["attributes"] for f in feats]
+        if len(feats) < 2000:
+            break
+        offset += len(feats)
+    votes: dict = {}
+    names: dict = {}
+    for row in rows:
+        lad = next((v for k, v in row.items() if re.fullmatch(r"LAD\d\dCD", k, re.I)), None)
+        icb = next((v for k, v in row.items() if re.fullmatch(r"ICB\d\dCD", k, re.I)), None)
+        inm = next((v for k, v in row.items() if re.fullmatch(r"ICB\d\dNM", k, re.I)), None)
+        if lad and icb:
+            votes.setdefault(lad, {}).setdefault(icb, 0)
+            votes[lad][icb] += 1
+            if inm:
+                names[icb] = inm
+    lad_icb = {lad: max(c, key=c.get) for lad, c in votes.items()}
+    print(f"{service}: {len(lad_icb)} authorities in {len(set(lad_icb.values()))} boards")
+    return service, lad_icb, names
+
+
+def short_icb_name(name: str) -> str:
+    n = re.sub(r"^NHS\s+", "", name.strip())
+    n = re.sub(r"\s+(Integrated Care Board|ICB)$", "", n)
+    return n
+
+
+def region_main(slug: str) -> int:
+    map_dir = ROOT / "data" / "regions" / slug / "map"
+    gj = read_borough_gj(map_dir / "boroughs.js")
+    by_code = {}
+    for feat in gj.get("features", []):
+        p = feat.get("properties") or {}
+        code = next((v for k, v in p.items() if re.fullmatch(r"LAD\d\dCD", k)), None)
+        if code and p.get("name"):
+            by_code[code] = feat
+    print(f"read {len(by_code)} council outlines for {slug}")
+
+    service, lad_icb, names = ons_lad_to_icb()
+    missing = sorted(c for c in by_code if c not in lad_icb)
+    if missing:
+        # An authority newer than the lookup. Better no layer than a board map
+        # with a council-shaped hole in it.
+        raise SystemExit(f"no ICB in {service} for {missing}")
+
+    members: dict = {}
+    for code, feat in by_code.items():
+        members.setdefault(lad_icb[code], []).append(feat)
+    whole = {icb: sum(1 for v in lad_icb.values() if v == icb) for icb in members}
+
+    shapes = {}
+    for icb, feats in members.items():
+        merged = unary_union([shape(f["geometry"]).buffer(0) for f in feats])
+        pieces = list(merged.geoms) if merged.geom_type == "MultiPolygon" else [merged]
+        total = sum(p.area for p in pieces)
+        kept = [p for p in pieces if p.area / total >= 0.001]
+        shapes[icb] = unary_union(kept) if len(kept) > 1 else kept[0]
+
+    # Greedy colouring, most-neighboured board first, so boards that touch
+    # never share a hue.
+    order = sorted(members, key=lambda i: short_icb_name(names.get(i, i)))
+    touch = {i: {j for j in members if j != i and shapes[i].buffer(1e-4).intersects(shapes[j])}
+             for i in members}
+    colour = {}
+    for i in sorted(members, key=lambda i: -len(touch[i])):
+        used = {colour[j] for j in touch[i] if j in colour}
+        colour[i] = next((c for c in REGION_PALETTE if c not in used), REGION_PALETTE[0])
+
+    features, labels, counts, colours, lad_to, partial = [], {}, {}, {}, {}, []
+    for icb in order:
+        short = short_icb_name(names.get(icb, icb))
+        boroughs = sorted(f["properties"]["name"] for f in members[icb])
+        part = len(boroughs) < whole[icb]
+        label = f"NHS {short} ICB"
+        labels[short], counts[short], colours[short] = label, len(boroughs), colour[icb]
+        if part:
+            partial.append(short)
+        for b in boroughs:
+            lad_to[b] = short
+        features.append({
+            "type": "Feature",
+            "properties": {"name": short, "label": label, "code": icb,
+                           "boroughs": boroughs, "n_boroughs": len(boroughs),
+                           "colour": colour[icb], "partial": part},
+            "geometry": mapping(shapes[icb]),
+        })
+        print(f"  {short:40s} {len(boroughs):>2} councils{' (part)' if part else ''}")
+
+    out = map_dir / "icbs.json"
+    out.write_text(json.dumps({
+        "_comment": (f"Integrated Care Boards in this region, dissolved from the "
+                     f"council outlines in boroughs.js by scripts/build_icb_boundaries.py "
+                     f"--region {slug}, membership from ONS {service}. Do not hand edit."),
+        "type": "FeatureCollection", "features": features,
+    }, separators=(",", ":"), ensure_ascii=False) + "\n", encoding="utf-8")
+    (map_dir / "icb_lookup.json").write_text(json.dumps({
+        "_comment": f"Council to Integrated Care Board, from ONS {service}. Generated alongside icbs.json.",
+        "order": [short_icb_name(names.get(i, i)) for i in order],
+        "colours": colours, "labels": labels, "counts": counts, "lad_to_icb": lad_to,
+        # Boards that reach beyond the region; counts above are this region's.
+        "partial": partial,
+    }, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    print(f"wrote {out.relative_to(ROOT)} ({len(features)} boards)")
+    return 0
+
+
 def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--region", help="region slug; boards from the ONS lookup")
+    args = ap.parse_args()
+    if args.region:
+        return region_main(args.region)
     if not BOROUGHS.exists():
         print(f"missing {BOROUGHS}", file=sys.stderr)
         return 1

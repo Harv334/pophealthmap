@@ -3470,7 +3470,9 @@ const PH_WHERE_ARIA = PH_IS_LONDON
   const hr = $('hdr-region');
   if (hr) { hr.textContent = R.name; hr.hidden = false; }
 
-  // London's boards. The layer, its focus control and its count go.
+  // The boards come from the region's own icb_lookup.json. Hidden until it
+  // loads (initIcbFocus shows them), so a region without one has no dead
+  // control.
   hide('icb-row'); hide('icb-focus-wrap');
   // The tour visits named London wards.
   hide('sbar-tour');
@@ -7993,9 +7995,11 @@ function _applyBoroughSolo() {
 (function initIcbFocus() {
   const sel = document.getElementById('icb-focus');
   if (!sel) return;
-  // London's boards only. Outside London the control is hidden (initRegionUi)
-  // and there is no lookup to fetch.
-  if (!PH_IS_LONDON) return;
+  // Outside London the lookup is the region's own (built from ONS's council to
+  // ICB lookup by build_icb_boundaries.py --region), and the controls initRegionUi
+  // hid come back once it has loaded.
+  const unit = n => PH_IS_LONDON ? (n === 1 ? 'borough' : 'boroughs')
+                                 : (n === 1 ? 'council' : 'councils');
 
   fetch(dataUrl('data/map/icb_lookup.json'))
     .then(r => (r.ok ? r.json() : null))
@@ -8015,9 +8019,24 @@ function _applyBoroughSolo() {
         // its own reads like a description; "NHS West and North London ICB"
         // reads like the board it is, which matters most for the one that is
         // a merger of two boards people still know by their old names.
-        opt.textContent = (ICB_LABEL[name] || name) + ' (' + n + ' boroughs)';
+        // A board reaching beyond the region counts only its councils here.
+        const part = (d.partial || []).indexOf(name) !== -1;
+        opt.textContent = (ICB_LABEL[name] || name) + ' (' + n + ' ' + unit(n) +
+          (part ? ' in ' + PH_AREA : '') + ')';
         sel.appendChild(opt);
       });
+      if (!PH_IS_LONDON) {
+        ['icb-row', 'icb-focus-wrap'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.style.display = '';
+        });
+        const cnt = document.getElementById('icb-count');
+        if (cnt) cnt.textContent = ICB_ORDER.length;
+        const help = document.querySelector('#icb-row .lhelp');
+        if (help) help.title = 'Integrated Care Boards covering ' + PH_AREA +
+          ', from the ONS council to ICB lookup. A board that reaches beyond ' +
+          PH_AREA + ' is drawn for the part inside it. Switch this on and click a board to zoom to it.';
+      }
     });
 
   sel.addEventListener('change', e => {
@@ -10021,8 +10040,6 @@ function icbStyle(feat) {
 function loadIcbRegions() {
   if (icbLyr) return Promise.resolve(icbLyr);
   if (_icbLoading) return _icbLoading;
-  // The board outlines are London's five; a region build has none to draw.
-  if (!PH_IS_LONDON) return Promise.resolve(null);
   _icbLoading = fetch(dataUrl('data/map/icbs.json'))
     .then(r => (r.ok ? r.json() : null))
     .then(gj => {
@@ -10034,7 +10051,8 @@ function loadIcbRegions() {
           lyr.bindTooltip(
             `<b style="font-size:var(--t-xs)">${_esc(p.label || p.name || 'ICB')}</b>` +
             `<br><span style="font-size:var(--t-xs);color:var(--ink-3)">` +
-            `${p.n_boroughs} boroughs · click to zoom</span>`,
+            `${p.n_boroughs} ${PH_IS_LONDON ? 'boroughs' : 'councils'}` +
+            `${p.partial ? ' in ' + _esc(PH_AREA) : ''} · click to zoom</span>`,
             { sticky: true, opacity: 0.94 });
           // Click zooms to the region. Deliberately not a filter: borough
           // focus filters the whole app by a single LAD name in a dozen
@@ -10046,7 +10064,7 @@ function loadIcbRegions() {
             } catch (e) { /* degenerate geometry: leave the view alone */ }
             if (ev && ev.originalEvent) L.DomEvent.stop(ev.originalEvent);
             if (typeof _announce === 'function') {
-              _announce(`Zoomed to ${p.label || p.name}, ${p.n_boroughs} boroughs.`);
+              _announce(`Zoomed to ${p.label || p.name}, ${p.n_boroughs} ${PH_IS_LONDON ? 'boroughs' : 'councils'}.`);
             }
           });
         },
@@ -14240,11 +14258,15 @@ var PH_SHOW = {
     { k: 'borough', one: 'borough', many: 'boroughs' },
     { k: 'icb',     one: 'board',   many: 'boards' },
   ];
-  // The boards are London's; a region build has none to compare.
-  if (!PH_IS_LONDON) CMP_LEVELS = CMP_LEVELS.filter(function (l) { return l.k !== 'icb'; });
+  // Boards only where there is a lookup to name them (a region build may not
+  // have one). Read at render time: the lookup loads after this runs.
+  function cmpLevels() {
+    return (typeof ICB_ORDER !== 'undefined' && ICB_ORDER.length)
+      ? CMP_LEVELS : CMP_LEVELS.filter(function (l) { return l.k !== 'icb'; });
+  }
   var cmpLevel = 'ward';
   function cmpLvl() {
-    return CMP_LEVELS.filter(function (l) { return l.k === cmpLevel; })[0] || CMP_LEVELS[0];
+    return cmpLevels().filter(function (l) { return l.k === cmpLevel; })[0] || CMP_LEVELS[0];
   }
 
   // Every area available at the current level. Empty at ward level, where the
@@ -14384,7 +14406,7 @@ var PH_SHOW = {
 
     var lvlEl = $('cmp-levels');
     if (lvlEl) {
-      lvlEl.innerHTML = CMP_LEVELS.map(function (l) {
+      lvlEl.innerHTML = cmpLevels().map(function (l) {
         return '<span class="q-chip' + (l.k === cmpLevel ? ' on' : '') + '" data-cmplvl="' +
           l.k + '" role="button" tabindex="0" aria-pressed="' + (l.k === cmpLevel) + '">' +
           esc(l.many.charAt(0).toUpperCase() + l.many.slice(1)) + '</span>';
