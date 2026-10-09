@@ -58,7 +58,7 @@
 
 <header>
   <h1>Methodology and technical notes</h1>
-  <p><a href="index.html">← Back to the map</a> · <a href="accessibility.html">Accessibility</a> · PopHealth Map, London</p>
+  <p><a href="index.html">← Back to the map</a> · <a href="accessibility.html">Accessibility</a> · PopHealth Map, England</p>
 </header>
 
 <main>
@@ -82,18 +82,22 @@ that instead and this gives the official name for it.</p>
 <div class="wrap">
 <table>
   <tr><th>Plain word</th><th>Official name</th><th>What it is</th></tr>
-  <tr><td>Borough</td><td>Local authority district</td>
-      <td>One of the 33 councils in London.</td></tr>
+  <tr><td>Local authority (borough, council)</td><td>Local authority district</td>
+      <td>A council area. England has 296; London's 33 are called boroughs.</td></tr>
+  <tr><td>ICB</td><td>Integrated Care Board</td>
+      <td>The NHS body that plans health services for a group of local
+          authorities. England has 36.</td></tr>
   <tr><td>Ward</td><td>Electoral ward</td>
       <td>The area one or more councillors are elected for.</td></tr>
   <tr><td>MSOA</td><td>Middle Layer Super Output Area</td>
       <td>A statistical area of about 7,500 people, built from whole LSOAs.
-          London has 1,002.</td></tr>
+          England has 6,856, London 1,002.</td></tr>
   <tr><td>LSOA</td><td>Lower Layer Super Output Area</td>
       <td>A statistical area of about 1,500 people, and the smallest area this
-          map holds figures for. London has 4,994. They hold roughly equal
-          populations rather than following anything on the ground, so they are
-          small where London is dense and large where it is not. Deprivation
+          map holds figures for. England has 33,755, London 4,994. They hold
+          roughly equal populations rather than following anything on the
+          ground, so they are small where people live densely and large where
+          they do not. Deprivation
           deciles are published at this level.</td></tr>
   <tr><td>Deprivation</td><td>Index of Multiple Deprivation, or IMD</td>
       <td>The government measure of how deprived an area is. It combines
@@ -114,11 +118,40 @@ that instead and this gives the official name for it.</p>
 </table>
 </div>
 
+<h2>What the map covers</h2>
+
+<p>The map covers all of England. Each of the nine English regions is built
+separately, from the same sources and the same code, and chosen from
+<strong>Area</strong> in the sidebar: London, the North East, the North West,
+Yorkshire and The Humber, the East Midlands, the West Midlands, the East of
+England, the South East and the South West.</p>
+
+<p><strong>England</strong> is all nine regions merged into one map, at every
+level. Two things differ from a single region. Boundaries are simplified a
+little further, so that about 7,000 wards stay loadable in a browser; no edge
+moves by more than about 25 metres. And an indicator only one region carries,
+such as London's public transport accessibility level, is left out rather than
+shown as a mostly empty map. The charities directory is kept per region: for
+the whole country it is too large to serve as one file.</p>
+
+<p>London's data is refreshed on the 15th of each month at 03:00 UTC. Every
+other region follows the same morning, and the England view is rebuilt from the
+refreshed regions straight afterwards. If a region's refresh fails, the site
+keeps that region's previous month rather than showing a gap.</p>
+
 <h2>Every data source</h2>
 
 <p>Everything the map draws comes from one of the sources below. Each row says
 who publishes it, what it covers, the geography it is published at, the period
 the figures describe, and how often the publisher releases a new one.</p>
+
+<p>The table below is London's fetch log. Every region is built from the same
+sources, with three differences outside London: public transport measures come
+from the national stops register (DfT NaPTAN) rather than TfL, Integrated Care
+Boards come from the ONS lookup of local authorities to boards, and London's
+public transport accessibility level (PTAL) has no national equivalent.
+Street crime for every region, London included, is read from the police.uk
+bulk download of every force's monthly data.</p>
 
 <p>The last column is not written down here. It is read from
 <code>data/meta/manifest.json</code>, which the pipeline rewrites on every run,
@@ -167,24 +200,29 @@ Transport for London open data, licensed under version 2.0 of the Open
 Government Licence with amendments for Transport for London.
 <strong>Powered by TfL Open Data.</strong>
 Contains OS data © Crown copyright and database rights 2016.
-Geomni UK Map data © and database rights 2019.</p>
+Geomni UK Map data © and database rights 2019.
+Outside London, station and bus stop measures use the
+<a href="https://www.data.gov.uk/dataset/ff93ffc1-6656-47d8-9155-85ea0b8f2251/national-public-transport-access-nodes-naptan">National Public Transport Access Nodes (NaPTAN)</a>
+register from the Department for Transport, under the Open Government Licence v3.0.</p>
 
 <h2>Geographies, and which year each one is from</h2>
 
-<p>The four geographies on the map come from different censuses and boundary
+<p>The geographies on the map come from different censuses and boundary
 reviews. They do not nest inside one another, and that has consequences worth
 understanding before comparing them.</p>
 
 <div class="wrap">
 <table>
-  <tr><th>Level</th><th>Vintage</th><th>Count in scope</th><th>Source</th></tr>
-  <tr><td>Borough (local authority)</td><td>May 2025</td><td>33</td>
+  <tr><th>Level</th><th>Vintage</th><th>London</th><th>England</th><th>Source</th></tr>
+  <tr><td>Local authority</td><td>May 2025</td><td>33</td><td>296</td>
       <td>ONS <code>LAD_MAY_2025_UK_BGC_V2</code></td></tr>
-  <tr><td>Ward</td><td>May 2025</td><td>704</td>
+  <tr><td>Integrated Care Board</td><td>2026</td><td>4</td><td>36</td>
+      <td>ONS <code>LSOA21_SICBL26_ICB26_CAL26_LAD26_EN_LU</code>, drawn from the local authority outlines</td></tr>
+  <tr><td>Ward</td><td>May 2025</td><td>704</td><td>about 7,000</td>
       <td>ONS <code>WD_MAY_2025_UK_BGC_V2</code></td></tr>
-  <tr><td>LSOA</td><td>2021 census</td><td>4,994</td>
+  <tr><td>LSOA</td><td>2021 census</td><td>4,994</td><td>33,755</td>
       <td>ONS <code>Lower_layer_Super_Output_Areas_December_2021_..._BGC_V5</code></td></tr>
-  <tr><td>MSOA</td><td>2021 census</td><td>1,002</td>
+  <tr><td>MSOA</td><td>2021 census</td><td>1,002</td><td>6,856</td>
       <td>ONS <code>Middle_layer_Super_Output_Areas_December_2021_..._BGC_V3</code></td></tr>
 </table>
 </div>
@@ -231,15 +269,23 @@ additive measures such as population, crime totals and service counts, which
 are summed. MSOA figures reach wards through the LSOAs the two share, so a ward
 straddling two MSOAs gets a blend in proportion to where its people are.</p>
 
-<h3>3. Some health figures are a borough figure repeated</h3>
+<p>The <strong>Local authority</strong> level on the map is worked out the same
+way, from wards: a council's count is the sum of its wards' counts, and its rate
+or percentage is its wards' figures weighted by population, so it is the rate for
+the council's residents rather than an average of unequal wards. It can differ
+slightly from a figure the council or a publisher states for itself, which may
+use a different population base or year.</p>
+
+<h3>3. Figures published once per council are not offered on the map</h3>
 
 <p>The health data comes from OHID Fingertips in two pulls. The Local Health
-set is published per MSOA and varies ward by ward. The borough set is published
-per local authority and is written unchanged onto every ward in that borough,
-so 18 of the health indicators are identical for every ward in a borough.
-Ranking wards on one of those produces a real-looking order that is an artefact
-of the geography rather than a finding. The map flags them, and the indicator
-list shows how many distinct values an indicator actually has.</p>
+set is published per MSOA and varies ward by ward. The other set is published
+once per local authority, so every ward in a council would carry the same
+figure, and ranking wards on it would produce a real-looking order that is an
+artefact of the geography rather than a finding. Those 18 indicators, such as
+council-level life expectancy and smoking, are therefore not offered in the
+indicator list. Ward profiles and reports still show them, labelled as the
+council's figure.</p>
 
 <h3>4. Missing is not zero</h3>
 
@@ -271,7 +317,7 @@ so these will not always agree with a count made a different way.</p>
 <p>The colours run from the 5th to the 95th percentile of the areas drawn, so
 one extreme area does not use up the whole scale. Every area beyond either end
 takes the end colour. Where any area does, the legend marks its end value with
-≤ or ≥, so “≥ 37.8” means 37.8 or more. The Top and bottom 20 list gives the
+≤ or ≥, so “≥ 37.8” means 37.8 or more. The Top and bottom 10 list gives the
 real values.</p>
 
 <h3>8. Each indicator has its own period</h3>
@@ -293,6 +339,11 @@ figures published, and for some indicators those are several years old.</p>
       Local Health set against 2011 MSOA codes. Where a code no longer matches
       a 2021 one, the value is left missing rather than filled from a
       neighbour.</li>
+  <li><strong>PTAL is London only.</strong> The public transport accessibility
+      level is TfL's measure and has no national equivalent. Every region has
+      the four NaPTAN station and bus stop measures instead.</li>
+  <li><strong>Charities are per region.</strong> The charities directory is not
+      part of the England view; open a region to see it.</li>
   <li><strong>DWP benefits are not included.</strong> The figures are on DWP
       Stat-Xplore, which needs a registered API key. NOMIS holds nothing newer
       than November 2018 for them.</li>
@@ -302,7 +353,9 @@ figures published, and for some indicators those are several years old.</p>
 <h2>Rebuilding this</h2>
 
 <p>The whole map is rebuilt by one script, <code>fetch_all_data.py</code>, with
-no manual downloads. Sources, licences and per-source notes are in the
+no manual downloads: once for London and once per region
+(<code>--scope north-east</code> and so on), with the England view merged from
+the results by <code>scripts/build_england.py</code>. Sources, licences and per-source notes are in the
 repository: <a href="https://github.com/Harv334/pophealthmap">github.com/Harv334/pophealthmap</a>.</p>
 
 <footer>
@@ -405,7 +458,7 @@ var SOURCES = [
     manifest: 'qof' },
 
   { name: 'Street-level crime',
-    pub: 'data.police.uk (Metropolitan Police and City of London Police)',
+    pub: 'data.police.uk, bulk download of every force',
     what: 'Every recorded street-level crime, counted into 11 categories and a total.',
     geo: 'Point locations, snapped by the publisher to anonymised map points, ' +
          'counted here into wards',
