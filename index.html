@@ -11191,6 +11191,9 @@ function _urlTool() {
 function _writeUrlState() {
   try {
     const p = new URLSearchParams();
+    // The region rides first, so a shared link opens on the same map. London
+    // is the default and carries nothing, as before.
+    if (!PH_IS_LONDON) p.set('r', PH_REGION.id);
     const ovEl = document.getElementById('ov');
     const bfEl = document.getElementById('borough-focus');
     const lsEl = document.getElementById('tlsoa');
@@ -11763,6 +11766,19 @@ function _wardLayerFor(code, name) {
       || (name ? ls.find(l => l.feature.properties.WD24NM === name) : null)
       || null;
 }
+/* The English region a postcodes.io result sits in, as {id, name, live}, or
+   null outside England. Matched on name, ignoring case ("Yorkshire and The
+   Humber" is spelled that way by both). */
+function _regionOfPostcode(res) {
+  const nm = String((res && res.region) || '').toLowerCase();
+  if (!nm) return null;
+  const r = (window.PH_REGIONS || []).find(x => x.name.toLowerCase() === nm);
+  return r ? { id: r.id, name: r.name, live: (window.PH_REGIONS_LIVE || []).indexOf(r.id) !== -1 } : null;
+}
+/* The address of the map for a region: London is the bare page. */
+function regionHref(id) {
+  return location.pathname + (id && id !== 'london' ? '?r=' + encodeURIComponent(id) : '');
+}
 function _pickPostcode(pq, res) {
   const results = document.getElementById('hdr-search-results');
   if (results) results.classList.remove('show');
@@ -11814,13 +11830,21 @@ function _renderPostcodeRow(results, pq, q) {
       row.onclick = null;
       return;
     }
-    const inLondon = pq.kind === 'outcode'
-      || (res.region === 'London');
+    // postcodes.io names the English region ("London", "North East", ...).
+    const other = pq.kind === 'postcode' ? _regionOfPostcode(res) : null;
+    const inArea = pq.kind === 'outcode' || (other ? other.id === PH_REGION.id
+      : (res.region === PH_AREA));
     sub.textContent = pq.kind === 'postcode'
       ? (res.admin_ward || '') + (res.admin_district ? ' · ' + res.admin_district : '')
-        + (inLondon ? '' : ' (outside London)')
+        + (inArea ? '' : (other
+            ? ' · This postcode is in ' + other.name + (other.live
+                ? '; open ' + other.name
+                : '; the ' + other.name + ' map is not available yet')
+            : ' (outside ' + PH_AREA + ')'))
       : 'Postcode area';
-    row.onclick = () => _pickPostcode(pq, res);
+    row.onclick = (!inArea && other && other.live)
+      ? () => { location.href = regionHref(other.id); }
+      : () => _pickPostcode(pq, res);
   }, () => {
     if (!current()) return;
     const sub = row.querySelector('.sr-sub');
