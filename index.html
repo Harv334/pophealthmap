@@ -1548,7 +1548,7 @@
   .ov-chip:hover { border-color: var(--nhs-blue); color: var(--nhs-blue); }
   .ov-chip.on { background: var(--nhs-blue); border-color: var(--nhs-blue); color: var(--on-accent); }
   .ov-themes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
-  .ov-theme { appearance: none; font: inherit; text-align: left; min-height: 36px; padding: 4px 7px;
+  .ov-theme { appearance: none; font: inherit; text-align: left; min-height: 32px; padding: 3px 7px;
     border: 1px solid var(--line); border-radius: 8px; background: var(--paper); cursor: pointer;
     display: flex; align-items: center; gap: 7px; }
   .ov-theme:hover { border-color: var(--nhs-blue); }
@@ -8785,6 +8785,64 @@ function _applyBoroughSolo() {
       .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
+  /* What the picker offers, and in which themes.
+
+     Indicators published only once per council are left out: every ward in a
+     council shows the same figure, so the map cannot tell one neighbourhood
+     from another with them. They are removed from the select too, so a link
+     or the level badge cannot bring one back. The ward profile and reports
+     still read them from the data.
+
+     Health was 55 indicators in one theme. What remains is split three ways,
+     each short enough to scan: everyday health, life expectancy and deaths,
+     and hospital admissions. The two Local Health benefit measures move to
+     Work, fertility to People, and Local Health's fuel poverty goes, as the
+     DESNZ figure in Environment is the same measure, newer, per LSOA. */
+  const DROP = new Set(['ft_93280']);
+  const MOVE = { ft_93097: 'Work, money & education', ft_93098: 'Work, money & education',
+                 ft_93089: 'People & communities' };
+  const HEALTH_SPLIT = [
+    ['Life expectancy & deaths', /life expectancy|mortality/],
+    ['Hospital admissions', /admission|injur/],
+  ];
+  (function regroup() {
+    const out = {};
+    const order = [];
+    const put = (label, o) => {
+      if (!out[label]) { out[label] = []; order.push(label); }
+      out[label].push(o);
+    };
+    model.forEach(g => g.opts.forEach(o => {
+      if (DROP.has(o.value) || o.native === 'borough') {
+        const opt = sel.querySelector('option[value="' + o.value + '"]');
+        if (opt) opt.remove();
+        return;
+      }
+      let label = MOVE[o.value] || g.label;
+      if (label === 'Health & care') {
+        const text = o.name.toLowerCase();
+        const hit = HEALTH_SPLIT.find(r => r[1].test(text));
+        label = hit ? hit[0] : 'Health';
+      }
+      put(label, o);
+    }));
+    // The select's own order, with Health's three in Health's place.
+    const labels = [];
+    model.forEach(g => {
+      (g.label === 'Health & care' ? ['Health', 'Life expectancy & deaths', 'Hospital admissions'] : [g.label])
+        .forEach(l => { if (out[l] && labels.indexOf(l) === -1) labels.push(l); });
+    });
+    order.forEach(l => { if (labels.indexOf(l) === -1) labels.push(l); });
+    model.length = 0;
+    labels.forEach(l => model.push({ label: l, opts: out[l] }));
+    if (sel.value && !sel.querySelector('option[value="' + sel.value + '"]')) sel.value = 'none';
+    // With nothing left that is only published per council, the council
+    // level would only ever say "no figures here".
+    const anyBorough = model.some(g => g.opts.some(o => (o.levels || []).indexOf('borough') !== -1));
+    const btn = document.querySelector('#dl-seg button[data-dl="borough"]');
+    if (btn && !anyBorough) btn.hidden = true;
+  })();
+
   const all = [].concat.apply([], model.map(g => g.opts));
   const byVal = {};
   model.forEach(g => g.opts.forEach(o => { o.theme = g.label; byVal[o.value] = o; }));
@@ -8793,7 +8851,9 @@ function _applyBoroughSolo() {
      in it. A large theme is split into sub-groups by subject, matched on the
      indicator's key, so Health is six short lists rather than one of 55. */
   const THEME_INFO = {
-    'Health & care':            ['#AE2573', 'Life expectancy, illness, hospital use, lifestyle and prevention.'],
+    'Health':                   ['#AE2573', 'How people rate their own health, disability and care, and children\'s weight.'],
+    'Life expectancy & deaths': ['#6B2C91', 'How long people live and what they die of, compared with England.'],
+    'Hospital admissions':      ['#C2185B', 'Emergency and injury admissions to hospital, compared with England.'],
     'Deprivation':              ['#003087', 'The Index of Multiple Deprivation 2025 and its domains. Decile 1 is the most deprived tenth of areas in England.'],
     'People & communities':     ['#7C2855', 'Age, ethnicity, country of birth and language, from Census 2021.'],
     'Work, money & education':  ['#00703C', 'Jobs, benefits and qualifications.'],
@@ -8803,15 +8863,20 @@ function _applyBoroughSolo() {
     'At a glance':              ['#4C6272', 'Population and the building blocks of each ward.'],
   };
   const SUBGROUPS = {
-    'Health & care': [
-      ['Life expectancy and deaths', /life expectancy|mortality|suicide/],
-      ['Mental health', /depression|mental health|self-harm|self harm/],
-      ['Children and young people', /year 6|reception|child|under 5|0 to 4|aged under|young people|mmr|fertility/],
-      ['Lifestyle', /smok|in adults|physically active|alcohol/],
-      ['Screening and vaccination', /screening|vaccination/],
-      ['Long-term conditions', /hypertension|qof/],
-      ['Hospital admissions', /admission|a&e|injur/],
+    'Health': [
       ['Everyday health (Census 2021)', /^census_/],
+      ['Children\'s weight', /reception|year 6/],
+    ],
+    'Life expectancy & deaths': [
+      ['Life expectancy', /life expectancy/],
+      ['Deaths, all causes', /all causes|preventable/],
+      ['Deaths by cause', /mortality/],
+    ],
+    'Hospital admissions': [
+      ['Children and young people', /under 5|under 15|young people|children/],
+      ['Heart, lungs and stroke', /heart|coronary|copd|stroke/],
+      ['Alcohol', /alcohol/],
+      ['All ages', /admission/],
     ],
   };
   function subgroupsOf(g) {
@@ -8830,7 +8895,7 @@ function _applyBoroughSolo() {
   // One-line names for the sidebar tiles, which are half the sidebar wide.
   // The library keeps the full names.
   const SHORT = {
-    'Health & care': 'Health', 'People & communities': 'People',
+    'Life expectancy & deaths': 'Deaths', 'Hospital admissions': 'Hospital', 'People & communities': 'People',
     'Work, money & education': 'Work', 'Housing & transport': 'Housing',
     'Environment & access': 'Environment', 'Crime & safety': 'Crime', 'At a glance': 'Basics',
   };
