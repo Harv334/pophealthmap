@@ -76,6 +76,18 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      # NHS Digital's GP registrations by LSOA, for PCN catchments. NHS Digital
+      # refuses cloud servers, so a copy downloaded in a browser is attached to
+      # the pcn-source release; without one the PCN layer has no catchments.
+      - name: Fetch GP registrations by LSOA (for PCN catchments)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p .cache/gp_reg
+          gh release download pcn-source --pattern '*' --dir .cache/gp_reg --clobber \
+            || echo "No pcn-source release: PCNs will be built without catchments."
+          ls -la .cache/gp_reg
+
       - name: Run pipeline for the region
         # -u: unbuffered, so the log shows each source as it runs. Buffered, a
         # slow source left the log silent for hours with no clue which it was.

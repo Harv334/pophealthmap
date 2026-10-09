@@ -6393,6 +6393,191 @@ def run_custom() -> "pd.DataFrame | None":
     return pd.DataFrame([{"indicators": len(registry), "rows": written}])
 
 
+
+# ============================================================================
+# PRIMARY CARE NETWORKS
+#
+# Which practices make up each PCN comes from OHID Fingertips (area type 204,
+# PCNs, parent of area type 7, practices), which mirrors NHS England's
+# membership list and is reachable from the build servers.
+#
+# Where each PCN's patients live comes from NHS Digital's "Patients
+# Registered at a GP Practice: LSOA" file, which is the only published source
+# for it. NHS Digital refuses requests from cloud servers, so the build does
+# not download it: it reads a copy someone has downloaded in a browser and
+# attached to the "pcn-source" release (see the workflows). With it, each PCN
+# gets its real catchment: for every LSOA, how many of the people who live
+# there are registered with the PCN's practices, and what share of all the
+# registered residents that is. Without it the PCN layer still lists the
+# networks and their practices, and says catchments are not loaded.
+# ============================================================================
+FT_PCN_AREA_TYPE = 204
+FT_PRACTICE_AREA_TYPE = 7
+GP_REG_DIR = Path(os.environ.get("PH_GP_REG_DIR", str(REPO_ROOT / ".cache" / "gp_reg")))
+
+
+def _gp_reg_lsoa_frame():
+    """The newest NHS Digital LSOA registration file in GP_REG_DIR, as
+    (DataFrame[PRACTICE_CODE, LSOA_CODE, PATIENTS], label), or (None, '')."""
+    if not GP_REG_DIR.exists():
+        return None, ""
+    files = sorted([p for p in GP_REG_DIR.iterdir()
+                    if p.suffix.lower() in (".csv", ".zip")],
+                   key=lambda p: p.stat().st_mtime)
+    if not files:
+        return None, ""
+    src = files[-1]
+    try:
+        if src.suffix.lower() == ".zip":
+            z = zipfile.ZipFile(src)
+            names = [n for n in z.namelist() if n.lower().endswith(".csv")]
+            # The all-persons file if the zip has one, else every file (the
+            # male and female files), summed below.
+            pick = [n for n in names if "all" in n.lower()] or names
+            df = pd.concat([pd.read_csv(z.open(n), dtype=str, low_memory=False) for n in pick],
+                           ignore_index=True)
+        else:
+            df = pd.read_csv(src, dtype=str, low_memory=False)
+    except Exception as e:
+        warn(f"pcn: could not read {src.name}: {e}")
+        return None, ""
+    cols = {c.upper().strip(): c for c in df.columns}
+    pc = cols.get("PRACTICE_CODE")
+    lc = next((cols[c] for c in ("LSOA_CODE", "LSOA21CD", "LSOA_CODE_2021", "LSOA11CD") if c in cols), None)
+    nc = cols.get("NUMBER_OF_PATIENTS")
+    if not (pc and lc and nc):
+        warn(f"pcn: {src.name} has none of the expected columns ({', '.join(df.columns[:8])})")
+        return None, ""
+    sx = cols.get("SEX")
+    if sx and (df[sx].astype(str).str.upper() == "ALL").any():
+        df = df[df[sx].astype(str).str.upper() == "ALL"]
+    out = pd.DataFrame({
+        "PRACTICE_CODE": df[pc].astype(str).str.strip(),
+        "LSOA_CODE": df[lc].astype(str).str.strip(),
+        "PATIENTS": pd.to_numeric(df[nc], errors="coerce").fillna(0),
+    }).groupby(["PRACTICE_CODE", "LSOA_CODE"], as_index=False)["PATIENTS"].sum()
+    label = ""
+    for c in ("EXTRACT_DATE", "PUBLICATION"):
+        if c in cols:
+            v = df[cols[c]].dropna().astype(str)
+            if len(v):
+                label = v.iloc[0]
+                break
+    return out, label or src.stem
+
+
+def run_pcn() -> pd.DataFrame:
+    rule("Primary care networks (OHID Fingertips; NHS Digital registrations)")
+    gp_path = DATA_DIR / "healthcare" / "gp_practices.parquet"
+    if not gp_path.exists():
+        warn("pcn: no GP practices for this scope yet; run the gp source first")
+        return pd.DataFrame()
+    gp = pd.read_parquet(gp_path)
+    in_scope_practices = set(gp["code"].astype(str))
+
+    cache_dir = CACHE_DIR / "pcn"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    def ft_json(url, name):
+        cache = cache_dir / name
+        if cache.exists() and time.time() - cache.stat().st_mtime < 7 * 86400:
+            return json.loads(cache.read_text(encoding="utf-8"))
+        r = _ft_get(url, timeout=120)
+        cache.write_text(r.text, encoding="utf-8")
+        return r.json()
+    members = ft_json("https://fingertips.phe.org.uk/api/parent_to_child_areas"
+                      f"?child_area_type_id={FT_PRACTICE_AREA_TYPE}&parent_area_type_id={FT_PCN_AREA_TYPE}",
+                      "pcn_members.json")
+    names = {a["Code"]: a["Name"] for a in ft_json(
+        f"https://fingertips.phe.org.uk/api/areas/by_area_type?area_type_id={FT_PCN_AREA_TYPE}",
+        "pcn_names.json")}
+
+    pcns = {}
+    for code, practices in members.items():
+        mine = [p for p in practices if p in in_scope_practices]
+        if mine:
+            pcns[code] = {"code": code, "name": names.get(code, code),
+                          "practices": sorted(mine),
+                          "all_practices": len(practices)}
+    if not pcns:
+        warn("pcn: no PCN has a practice in this scope")
+        return pd.DataFrame()
+
+    reg, reg_label = _gp_reg_lsoa_frame()
+    lsoa_scope = set(get_lsoa_to_msoa().keys())
+    footprints = None
+    if reg is not None:
+        practice_pcn = {p: c for c, ps in members.items() for p in ps}
+        reg["PCN"] = reg["PRACTICE_CODE"].map(practice_pcn)
+        # Everyone registered anywhere who lives in an in-scope LSOA: the
+        # denominator for the share, so a PCN's share is of the area's whole
+        # registered population, whichever practice they use.
+        local = reg[reg["LSOA_CODE"].isin(lsoa_scope)]
+        lsoa_tot = local.groupby("LSOA_CODE")["PATIENTS"].sum()
+        by = local.dropna(subset=["PCN"]).groupby(["PCN", "LSOA_CODE"])["PATIENTS"].sum()
+        pcn_tot = reg.dropna(subset=["PCN"]).groupby("PCN")["PATIENTS"].sum()
+        main = {}
+        for (pcn, lsoa), n in by.items():
+            if pcn not in pcns or n < 5:
+                continue
+            share = n / lsoa_tot.get(lsoa, n) if lsoa_tot.get(lsoa, 0) else 0
+            pcns[pcn].setdefault("lsoas", {})[lsoa] = [int(n), round(100 * share, 1)]
+            if share > main.get(lsoa, ("", 0))[1]:
+                main[lsoa] = (pcn, share)
+        for c in pcns:
+            pcns[c]["patients"] = int(pcn_tot.get(c, 0))
+            ls = pcns[c].get("lsoas", {})
+            pcns[c]["patients_in_scope"] = int(sum(v[0] for v in ls.values()))
+        matched = len(set(reg["LSOA_CODE"]) & lsoa_scope)
+        info(f"pcn: registrations {reg_label}: {len(local):,} practice-LSOA pairs "
+             f"across {matched:,} of {len(lsoa_scope):,} in-scope LSOAs")
+        if matched < len(lsoa_scope) * 0.8:
+            warn("pcn: under 80% of in-scope LSOAs found in the registration file; "
+                 "it may use 2011 LSOA codes")
+        # Footprints: each LSOA joins the PCN most of its registered residents
+        # use, and the LSOAs of one PCN are merged into an outline.
+        try:
+            from shapely.geometry import shape, mapping
+            from shapely.ops import unary_union
+            gj = json.loads((DATA_DIR / "boundaries" / "lsoa.geojson").read_text(encoding="utf-8"))
+            groups = {}
+            for f in gj["features"]:
+                code = f["properties"].get("LSOA21CD")
+                if code in main:
+                    g = shape(f["geometry"])
+                    if not g.is_valid:
+                        g = g.buffer(0)
+                    groups.setdefault(main[code][0], []).append(g)
+            feats = []
+            for c, geoms in groups.items():
+                u = unary_union(geoms).simplify(0.0003, preserve_topology=True)
+                feats.append({"type": "Feature",
+                              "properties": {"code": c, "name": pcns[c]["name"], "lsoas": len(geoms)},
+                              "geometry": mapping(u)})
+            footprints = {"type": "FeatureCollection", "features": feats}
+        except Exception as e:
+            warn(f"pcn: footprints not drawn: {e}")
+    else:
+        info("pcn: no NHS Digital registration file in "
+             f"{GP_REG_DIR.relative_to(REPO_ROOT) if GP_REG_DIR.is_relative_to(REPO_ROOT) else GP_REG_DIR}; "
+             "networks and practices only, no catchments")
+
+    MAP_DIR.mkdir(parents=True, exist_ok=True)
+    payload = {"registrations": reg_label, "has_catchments": reg is not None,
+               "pcns": sorted(pcns.values(), key=lambda x: x["name"])}
+    write_atomic(MAP_DIR / "pcn.json", json.dumps(_scrub_nan(payload), separators=(",", ":"),
+                                                  ensure_ascii=False))
+    fp_path = MAP_DIR / "pcn_footprints.json"
+    if footprints:
+        write_atomic(fp_path, json.dumps(_round_coords(footprints), separators=(",", ":")))
+    elif fp_path.exists():
+        fp_path.unlink()
+    ok(f"pcn: {len(pcns):,} networks, "
+       f"{sum(len(p['practices']) for p in pcns.values()):,} practices"
+       + (f", catchments from {reg_label}" if reg is not None else ", no catchments")
+       + f" -> {(MAP_DIR / 'pcn.json').relative_to(REPO_ROOT)}")
+    return pd.DataFrame([{"code": c, "practices": len(p["practices"])} for c, p in pcns.items()])
+
+
 SOURCES = {
     "custom":      run_custom,
     "boundaries":  run_boundaries,
@@ -6401,6 +6586,7 @@ SOURCES = {
     "tfl":         run_tfl_transport,
     "naptan":      run_naptan_transport,
     "gp":          run_gp_practices,
+    "pcn":         run_pcn,
     "pharmacies":  run_pharmacies,
     "imd":         run_imd2025,
     "census":      run_census2021,

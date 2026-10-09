@@ -354,6 +354,19 @@ urban an area is.</p>
 for everyone. It is offered as two indicators. Before October 2026 the map
 showed one of the two without saying which.</p>
 
+<h3>12. Primary care networks are lists of patients, not areas</h3>
+
+<p>A PCN is a group of GP practices, and its population is the people
+registered with them, wherever they live. Which practices belong to which
+network comes from OHID Fingertips, which mirrors NHS England's list. Where
+their patients live comes from NHS Digital's <em>Patients Registered at a GP
+Practice</em> by LSOA. Choosing a network shades every neighbourhood with five
+or more of its patients by the share of that neighbourhood's registered
+residents who use it, so overlapping catchments show as they are. The
+<strong>PCN footprints</strong> outline gives each LSOA to the network most of
+its registered residents use: a convenient boundary, but one NHS England does
+not publish and practices do not work to.</p>
+
 <h2>Known gaps</h2>
 
 <ul>
@@ -374,6 +387,10 @@ showed one of the two without saying which.</p>
       the four NaPTAN station and bus stop measures instead.</li>
   <li><strong>Charities are per region.</strong> The charities directory is not
       part of the England view; open a region to see it.</li>
+  <li><strong>PCN catchments need a file NHS Digital will not serve to the
+      build servers.</strong> Its site refuses requests from cloud hosting, so the
+      LSOA registration file is downloaded in a browser and attached to the
+      build. When it is missing, PCNs show their practices but no catchment.</li>
   <li><strong>DWP benefits are not included.</strong> The figures are on DWP
       Stat-Xplore, which needs a registered API key. NOMIS holds nothing newer
       than November 2018 for them.</li>
