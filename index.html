@@ -1534,6 +1534,30 @@
     color: var(--nhs-blue); cursor: pointer; }
   .ov-btn:hover { background: var(--nhs-light); }
   .ov-btn.quiet { border-color: var(--line); color: var(--ink-2); font-weight: 500; }
+  /* Two-variable map */
+  .ov-biv { margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--line-2); }
+  .ov-biv[hidden], .ov-biv-pick[hidden], .ov-biv-on[hidden], .biv-legend[hidden] { display: none; }
+  .ov-biv-add { appearance: none; font: inherit; font-size: 13px; font-weight: 600; color: var(--nhs-blue);
+    background: none; border: 0; padding: 4px 0; cursor: pointer; }
+  .ov-biv-add:hover { text-decoration: underline; }
+  .ov-biv-pick { display: flex; flex-direction: column; gap: 4px; font-size: var(--t-xs); color: var(--ink-2); }
+  .ov-biv-pick select { width: 100%; min-height: 34px; padding: 4px 6px; border: 1px solid var(--line);
+    border-radius: 6px; font: inherit; font-size: 13px; color: var(--ink); background: var(--paper); }
+  .ov-biv-on { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); }
+  .ov-biv-on > span { flex: 1; min-width: 0; }
+  .ov-biv-on b { color: var(--ink); }
+  .biv-legend { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; align-items: center;
+    font-size: var(--t-xs); color: var(--ink-2); margin-bottom: 4px; }
+  .biv-grid-lg { grid-template-columns: repeat(3, 20px) !important; grid-template-rows: repeat(3, 20px) !important; }
+  .biv-axes { display: flex; flex-direction: column; gap: 6px; line-height: 1.3; }
+  .biv-axes b { color: var(--ink); }
+  .biv-grid { display: grid; grid-template-columns: repeat(3, 18px); grid-template-rows: repeat(3, 18px); gap: 1px; }
+  .biv-grid span { display: block; }
+  .biv-note { grid-column: 1 / -1; color: var(--ink-3); line-height: 1.4; margin-top: 2px; }
+  .map-legend-strip .mls-biv { display: none; }
+  .map-legend-strip.is-biv > :not(.mls-biv) { display: none; }
+  .map-legend-strip.is-biv .mls-biv { display: flex; align-items: center; gap: 8px; }
+  .mls-biv .biv-grid { grid-template-columns: repeat(3, 11px); grid-template-rows: repeat(3, 11px); }
   .ov-search { width: 100%; box-sizing: border-box; min-height: 40px; padding: 0 12px; font: inherit;
     font-size: 14.5px; color: var(--ink); background: var(--paper); border: 1px solid var(--ink-faint);
     border-radius: 8px;
@@ -2513,6 +2537,18 @@
                 <button type="button" class="ov-btn" id="ov-change">Change</button>
                 <button type="button" class="ov-btn quiet" id="ov-clear">Clear</button>
               </div>
+              <!-- Two-variable map: a second indicator drawn against the first. -->
+              <div class="ov-biv" id="ov-biv" hidden>
+                <button type="button" class="ov-biv-add" id="ov-biv-add">+ Compare with a second indicator</button>
+                <label class="ov-biv-pick" id="ov-biv-pick" hidden>
+                  <span>Second indicator, drawn against the first</span>
+                  <select id="ov2"></select>
+                </label>
+                <div class="ov-biv-on" id="ov-biv-on" hidden>
+                  <span>Against <b id="ov-biv-nm"></b></span>
+                  <button type="button" class="ov-btn quiet" id="ov-biv-x">Remove</button>
+                </div>
+              </div>
             </div>
             <input type="search" class="ov-search" id="ov-search" autocomplete="off"
                    placeholder="Search indicators" aria-label="Search indicators">
@@ -2677,6 +2713,7 @@
           </select>
 
           <div class="scale-bar" id="scale">
+            <div class="biv-legend" id="biv-legend" hidden></div>
             <div class="sc-unit" id="sc-unit"></div>
             <div class="scale-labels"><span id="sc-lo">Low</span><span id="sc-mid" style="color:var(--ink-3);font-variant-numeric:tabular-nums"></span><span id="sc-hi">High</span></div>
             <!-- Gradient must match ramp() in JS exactly: rgb(15,110,86) → rgb(239,159,39) → rgb(163,45,39) -->
@@ -2998,6 +3035,7 @@
         <span class="mls-min" id="mls-min"></span>
         <span class="mls-grad" id="mls-grad"></span>
         <span class="mls-max" id="mls-max"></span>
+        <span class="mls-biv" id="mls-biv"></span>
       </div>
       <!-- Loading screen. A map rather than a spinner: see _paintLoaderMap
            below for why, and for where the geometry comes from. The copy used
@@ -4904,6 +4942,76 @@ function ovRamp(k, t) {
   const cfg = (typeof OV_CFG !== 'undefined') ? OV_CFG[k] : null;
   return ramp(cfg && cfg.rev ? 1 - t : t);
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TWO-VARIABLE MAP
+
+   A second indicator, drawn with the first as a three-by-three grid of
+   colours: each indicator is cut into thirds (low, middle, high) across the
+   areas of the level being drawn, and each area takes the colour for its
+   pair of thirds. Thirds rather than a continuous scale because nine
+   colours are about as many as anyone can tell apart on a map.
+
+   "High" follows each indicator's own ramp, so for the IMD decile, which
+   counts down, high means more deprived, as it does on the single map.
+   An area missing either figure is grey. Every layer's style function asks
+   bivFill when bivOn() is true, so this works at all four levels.
+   ═══════════════════════════════════════════════════════════════════════════ */
+let curOv2 = 'none';
+// [second's third][first's third], low to high. A tested blue/red scheme
+// (Stevens), legible in the common forms of colour blindness.
+const BIV_COLOURS = [
+  ['#e8e8e8', '#e4acac', '#c85a5a'],
+  ['#b0d5df', '#ad9ea5', '#985356'],
+  ['#64acbe', '#627f8c', '#574249'],
+];
+const BIV_MISSING = '#cfcfcf';
+// Nine colours only read when they are close to solid; the usual see-through
+// fill washes them into one another.
+function bivOpacity(o) { return bivOn() && o > 0 ? Math.max(o, 0.85) : o; }
+function bivOn() {
+  return !!(curOv2 && curOv2 !== 'none' && typeof curOv !== 'undefined' &&
+            curOv && curOv !== 'none' && curOv2 !== curOv);
+}
+function _bivValue(level, id, k) {
+  const v = level === 'lsoa' ? lsoaOvValue(id, k)
+          : level === 'msoa' ? msoaOvValue(id, k)
+          : level === 'borough' ? boroughOvValue(id, k)
+          : wardOvValue(id, k);
+  const n = parseFloat(v);
+  return isNaN(n) ? null : n;
+}
+function _bivIds(level) {
+  if (level === 'lsoa') return Object.keys(typeof LSOA_DATA !== 'undefined' ? LSOA_DATA : {});
+  if (level === 'msoa') return Object.keys(typeof MSOA_DATA !== 'undefined' ? (MSOA_DATA || {}) : {});
+  if (level === 'borough') return (typeof _laCodes === 'function') ? _laCodes() : [];
+  return Object.keys(typeof WARD_DATA !== 'undefined' ? WARD_DATA : {});
+}
+let _bivBreakCache = {};
+function bivBreaks(level, k) {
+  const key = level + '|' + k;
+  if (_bivBreakCache[key]) return _bivBreakCache[key];
+  const vals = _bivIds(level).map(id => _bivValue(level, id, k)).filter(v => v != null)
+    .sort((a, b) => a - b);
+  // Not cached when empty: LSOA and MSOA figures load later than the wards.
+  if (vals.length < 3) return null;
+  const b = [vals[Math.floor(vals.length / 3)], vals[Math.floor(vals.length * 2 / 3)]];
+  _bivBreakCache[key] = b;
+  return b;
+}
+function bivClass(level, k, v) {
+  const b = bivBreaks(level, k);
+  if (!b || v == null) return null;
+  let c = v < b[0] ? 0 : v < b[1] ? 1 : 2;
+  const cfg = (typeof OV_CFG !== 'undefined') ? OV_CFG[k] : null;
+  if (cfg && cfg.rev) c = 2 - c;
+  return c;
+}
+function bivFill(level, id) {
+  const x = bivClass(level, curOv, _bivValue(level, id, curOv));
+  const y = bivClass(level, curOv2, _bivValue(level, id, curOv2));
+  return (x == null || y == null) ? BIV_MISSING : BIV_COLOURS[y][x];
+}
 function fmtNum(v, decimals=0) {
   if (v === null || v === undefined || v === '') return '—';
   const n = parseFloat(v);
@@ -4989,6 +5097,7 @@ function ovTooltipRows(valueForKey, ward) {
     return `<br><span style="font-size:var(--t-xs)"><b>${ovLabel(k)}:</b> ${fmtOv(v, k)}</span>`;
   };
   if (_ovK  && _ovK  !== 'none') rows += _renderRow(_ovK);
+  if (bivOn()) rows += _renderRow(curOv2);
   return rows;
 }
 function mkicon(color, label) {
@@ -5699,8 +5808,9 @@ function _boroughStyle(feat) {
   if (!range || range.hi === range.lo) return base;
   const t = (v - range.lo) / (range.hi - range.lo);
   return Object.assign(base, {
-    fillColor: ovRamp(ov, Math.max(0, Math.min(1, t))),
-    fillOpacity: 0.5,
+    fillColor: bivOn() ? bivFill('borough', props.LAD25CD || props.lad_code || props.code)
+                       : ovRamp(ov, Math.max(0, Math.min(1, t))),
+    fillOpacity: bivOpacity(0.5),
   });
 }
 
@@ -6574,7 +6684,7 @@ function wstyle(wn, ov, state) {
   }
 
   // Overlay: fill comes from the chosen indicator colour.
-  const fill = ovColor(wn, ov);
+  const fill = bivOn() ? bivFill('ward', wn) : ovColor(wn, ov);
   const baseW  = {default:0.8, hover:3.0, selected:4.0}[state] || 0.8;
   // When the overlay is LSOA-only, the ward layer has nothing meaningful to
   // colour with — making it fully opaque just hides the LSOA choropleth
@@ -6582,7 +6692,7 @@ function wstyle(wn, ov, state) {
   // layer carries the choropleth and wards keep their boundary reference.
   const lsoaOnly = (ov !== 'none' && isLsoaOnlyOv(ov));
   const baseFo = lsoaOnly ? 0.0 : absFill;
-  const fo = baseFo;
+  const fo = bivOpacity(baseFo);
   const sel = state === 'selected';
   const w  = sel ? selectedWeight(borderWeightMult)
                  : Math.max(0, baseW * borderWeightMult);
@@ -9162,6 +9272,138 @@ function _applyBoroughSolo() {
   render();
 })();
 
+/* The two-variable map's controls and legend. The colouring itself is
+   bivFill, near ovRamp; this only chooses the second indicator, keeps it
+   to ones that can be drawn at the same level as the first, and says what
+   the nine colours mean. */
+(function _bivariateUI() {
+  const sel = document.getElementById('ov');
+  const box = document.getElementById('ov-biv');
+  const add = document.getElementById('ov-biv-add');
+  const pick = document.getElementById('ov-biv-pick');
+  const sel2 = document.getElementById('ov2');
+  const on = document.getElementById('ov-biv-on');
+  const nm = document.getElementById('ov-biv-nm');
+  const x = document.getElementById('ov-biv-x');
+  const leg = document.getElementById('biv-legend');
+  if (!sel || !box || !sel2) return;
+  const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const short = k => {
+    const o = sel.querySelector('option[value="' + k + '"]');
+    return (o ? o.textContent : ovLabel(k)).replace(/\s*·\s*(Ward|LSOA|MSOA|Borough|Local authority|Borough\/council)\s*$/i, '');
+  };
+  const level = () => (typeof ovDrawnLevel === 'function' && curOv && curOv !== 'none') ? ovDrawnLevel(curOv) : 'ward';
+
+  // The second list: the first select's groups and options, less the first
+  // indicator and anything with no figures at the level being drawn.
+  function fillOptions() {
+    const lv = level();
+    let html = '<option value="none">Choose an indicator</option>';
+    sel.querySelectorAll('optgroup').forEach(g => {
+      const opts = Array.from(g.querySelectorAll('option')).filter(o =>
+        o.value && o.value !== 'none' && o.value !== curOv && ovHasLevel(o.value, lv));
+      if (!opts.length) return;
+      html += '<optgroup label="' + esc(g.label) + '">' +
+        opts.map(o => '<option value="' + esc(o.value) + '">' + esc(short(o.value)) + '</option>').join('') +
+        '</optgroup>';
+    });
+    sel2.innerHTML = html;
+    sel2.value = bivOn() ? curOv2 : 'none';
+  }
+
+  function grid(cls) {
+    let h = '<span class="biv-grid ' + (cls || '') + '">';
+    for (let y = 2; y >= 0; y--) for (let xx = 0; xx < 3; xx++) {
+      h += '<span style="background:' + BIV_COLOURS[y][xx] + '"></span>';
+    }
+    return h + '</span>';
+  }
+
+  function legend() {
+    const scale = document.getElementById('scale');
+    const mls = document.getElementById('map-legend-strip');
+    const mlsBiv = document.getElementById('mls-biv');
+    const b = bivOn();
+    if (scale) Array.from(scale.children).forEach(c => {
+      if (c !== leg) c.style.display = b ? 'none' : '';
+    });
+    if (leg) {
+      leg.hidden = !b;
+      if (b) {
+        const lv = level();
+        const missing = !ovHasLevel(curOv2, lv);
+        leg.innerHTML = grid('biv-grid-lg') +
+          '<span class="biv-axes"><span><b>Across &rarr;</b> ' + esc(short(curOv)) + '</span>' +
+          '<span><b>Up &uarr;</b> ' + esc(short(curOv2)) + '</span></span>' +
+          '<span class="biv-note">Each indicator is split into thirds across the ' +
+          esc((typeof _levelName === 'function') ? _levelName(lv) : lv) + 's on the map. ' +
+          'Dark purple: high on both. Red: high on the first only. Blue: high on the second only. ' +
+          'Grey: a figure is missing.' +
+          ([curOv, curOv2].some(k => OV_CFG[k] && OV_CFG[k].rev)
+            ? ' For the IMD decile and rank, which count down from 1 = most deprived, high means more deprived.' : '') +
+          (missing ? ' <b>' + esc(short(curOv2)) + ' has no figures at this level.</b>' : '') + '</span>';
+      }
+    }
+    if (mls && mlsBiv) {
+      mls.classList.toggle('is-biv', b);
+      if (b) {
+        mlsBiv.innerHTML = grid() + '<span><b>' + esc(short(curOv)) + '</b> &rarr; across<br><b>' +
+          esc(short(curOv2)) + '</b> &uarr; up</span>';
+        mls.style.display = 'flex';
+      }
+    }
+  }
+
+  function sync() {
+    const has = !!(curOv && curOv !== 'none');
+    box.hidden = !has;
+    // A second indicator that cannot be drawn with the new first one goes.
+    if (curOv2 !== 'none' && (!has || curOv2 === curOv || !ovHasLevel(curOv2, level()))) curOv2 = 'none';
+    const b = bivOn();
+    add.hidden = b || !pick.hidden;
+    on.hidden = !b;
+    if (b) { nm.textContent = short(curOv2); pick.hidden = true; }
+    fillOptions();
+    legend();
+  }
+
+  function apply() {
+    _bivBreakCache = {};
+    if (typeof _restyleAll === 'function') _restyleAll();
+    if (typeof renderTopBottom === 'function') renderTopBottom();
+    sync();
+    if (typeof _scheduleUrlWrite === 'function') _scheduleUrlWrite();
+  }
+
+  window._bivSet = function (k) {
+    curOv2 = (k && k !== curOv && sel.querySelector('option[value="' + k + '"]')) ? k : 'none';
+    pick.hidden = true;
+    apply();
+  };
+
+  add.addEventListener('click', () => {
+    pick.hidden = false; add.hidden = true; fillOptions(); sel2.focus();
+  });
+  sel2.addEventListener('change', () => window._bivSet(sel2.value));
+  x.addEventListener('click', () => window._bivSet('none'));
+  sel.addEventListener('change', () => setTimeout(() => {
+    pick.hidden = true; _bivBreakCache = {};
+    const had = bivOn();
+    sync();
+    // The overlay change has already repainted with the old pair; repaint
+    // once more if the second indicator was dropped or is still on.
+    if (had || curOv2 === 'none') { if (typeof _restyleAll === 'function') _restyleAll(); }
+    legend();
+  }, 0));
+  // A different level means different thirds and possibly no figures.
+  document.querySelectorAll('#dl-seg button').forEach(btn =>
+    btn.addEventListener('click', () => setTimeout(() => {
+      _bivBreakCache = {}; sync(); if (bivOn() && typeof _restyleAll === 'function') _restyleAll();
+    }, 60)));
+  sync();
+})();
+
 /* ═══════════════════════════════════════════════════════════════════════════
    BOROUGH LOCK
 
@@ -9387,7 +9629,7 @@ function imdStyle(feat, state) {
         const range = getLsoaRange(curOv);
         if (range && range.hi !== range.lo) {
           const t = (parseFloat(val) - range.lo) / (range.hi - range.lo);
-          base.fillColor = ovRamp(curOv, Math.max(0, Math.min(1, t)));
+          base.fillColor = bivOn() ? bivFill('lsoa', code) : ovRamp(curOv, Math.max(0, Math.min(1, t)));
           shaded = true;
         }
       }
@@ -9416,7 +9658,7 @@ function imdStyle(feat, state) {
     // should shade those and leave the rest as outline.
     if (shaded || lsoaIMDColour) {
       const _lift = {hover: 1.5, selected: 1.75}[state] || 1;
-      base.fillOpacity = Math.max(0, Math.min(0.9, fillOpacityMult * _lift));
+      base.fillOpacity = bivOpacity(Math.max(0, Math.min(0.9, fillOpacityMult * _lift)));
     }
     // No edge treatment here. It was set at the top of this function, from
     // LSOA_EDGE, and this branch used to override it with a second set of
@@ -10403,8 +10645,8 @@ function msoaStyle(feat) {
   const t = (v - range.lo) / (range.hi - range.lo);
   return Object.assign(base, {
     fill: true,
-    fillColor: ovRamp(curOv, Math.max(0, Math.min(1, t))),
-    fillOpacity: 0.45,
+    fillColor: bivOn() ? bivFill('msoa', (feat.properties || {}).code) : ovRamp(curOv, Math.max(0, Math.min(1, t))),
+    fillOpacity: bivOpacity(0.45),
     color: '#555',
   });
 }
@@ -10437,8 +10679,12 @@ function loadMsoaBoundaries() {
                            && v != null && !isNaN(parseFloat(v)))
               ? `<br><span style="font-size:var(--t-xs)">${_esc(_ovLabel(curOv))}: <b>${fmtOv(parseFloat(v), curOv)}</b></span>`
               : '';
+            const v2 = bivOn() ? msoaOvValue(p.code, curOv2) : null;
+            const shown2 = (v2 != null && !isNaN(parseFloat(v2)))
+              ? `<br><span style="font-size:var(--t-xs)">${_esc(_ovLabel(curOv2))}: <b>${fmtOv(parseFloat(v2), curOv2)}</b></span>`
+              : '';
             return `<b style="font-size:var(--t-xs)">${_esc(p.name || 'MSOA')}</b>` +
-                   `<br><span style="font-size:var(--t-xs);color:var(--ink-3)">${_esc(p.code || '')}</span>` + shown;
+                   `<br><span style="font-size:var(--t-xs);color:var(--ink-3)">${_esc(p.code || '')}</span>` + shown + shown2;
           }, { sticky: true, opacity: 0.94 });
         },
       });
@@ -10743,7 +10989,7 @@ function injectWardIMD() {
 function renderTopBottom() {
   const panel = document.getElementById('rank-panel');
   if (!panel) return;
-  if (!curOv || curOv === 'none') {
+  if (!curOv || curOv === 'none' || bivOn()) {
     panel.style.display = 'none';
     return;
   }
@@ -11799,6 +12045,7 @@ function _writeUrlState() {
     const lsEl = document.getElementById('tlsoa');
     const c20El = document.getElementById('core20-toggle');
     if (ovEl && ovEl.value && ovEl.value !== 'none') p.set('ov', ovEl.value);
+    if (bivOn()) p.set('ov2', curOv2);
     if (bfEl && bfEl.value && bfEl.value !== 'all') p.set('b', bfEl.value);
     const ifEl = document.getElementById('icb-focus');
     if (ifEl && ifEl.value && ifEl.value !== 'all') p.set('icb', ifEl.value);
@@ -11997,6 +12244,7 @@ function _readUrlState() {
     }
 
     applyIf('ov', p.get('ov'), 'change');
+    if (p.get('ov2') && typeof window._bivSet === 'function') window._bivSet(p.get('ov2'));
 
     // Level after the overlay, and past the compatibility gate: the link chose
     // an indicator and a level together, and they agreed when it was made.
