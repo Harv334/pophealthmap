@@ -5399,6 +5399,8 @@ def _pcm_discover_urls() -> dict[str, tuple[int, str]]:
             PCM_INDEX_URL, timeout=90)
         r.raise_for_status()
         html = r.text
+        info(f"air_quality: index HTTP {r.status_code}, {len(html):,} chars, "
+             f"{len(re.findall(r'[.]csv', html, re.I))} .csv mentions")
     except Exception as e:
         warn(f"air_quality: could not reach the UK-AIR index ({e})")
         return {}
@@ -5436,14 +5438,18 @@ def _pcm_discover_urls() -> dict[str, tuple[int, str]]:
                 hit = None
                 for suffix in ("", "g"):
                     url = urljoin(PCM_INDEX_URL, f"../datastore/pcm/map{token}{year}{suffix}.csv")
+                    # GET, not HEAD: some servers refuse HEAD outright. Only
+                    # the headers are read; the body is left for the download.
                     try:
-                        r = sess.head(url, timeout=60, allow_redirects=True)
-                        ctype = r.headers.get("content-type", "")
-                        if r.ok and "html" not in ctype.lower():
-                            hit = url
-                            break
-                    except Exception:
-                        pass
+                        with sess.get(url, timeout=60, stream=True) as r:
+                            ctype = r.headers.get("content-type", "")
+                            info(f"air_quality: tried {url.rsplit('/', 1)[-1]}: "
+                                 f"HTTP {r.status_code} {ctype}")
+                            if r.ok and "html" not in ctype.lower():
+                                hit = url
+                                break
+                    except Exception as e:
+                        info(f"air_quality: tried {url.rsplit('/', 1)[-1]}: {e}")
                 if hit:
                     info(f"air_quality: {token} found by name: {hit.rsplit('/', 1)[-1]}")
                     latest[token] = (year, hit)
