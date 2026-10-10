@@ -2788,6 +2788,14 @@ def get_msoa21_to_msoa11() -> dict:
     return out
 
 
+# OHID's own test of each small-area figure against England: whether the
+# area's 95% confidence interval excludes the England value. Kept as one
+# letter. "Better"/"Worse" where the indicator has a direction, "Higher"/
+# "Lower" where it does not; anything else (not compared) is left blank.
+FT_VS_ENGLAND_COL = "Compared to England value or percentiles"
+FT_VS_CODES = {"Better": "B", "Worse": "W", "Similar": "S", "Higher": "H", "Lower": "L"}
+
+
 def FT_MALE_ID(ind_id: int) -> int:
     """The id the men's figure of a sex-split Local Health series is kept under."""
     return ind_id * 10 + 1
@@ -2816,7 +2824,12 @@ def _ft_msoa_variant(ind_id, df, name, want_msoa, rows, missing_codes) -> int:
             extra.append(row)
     if extra:
         bridged += len(extra)
-        df = pd.concat([df, pd.DataFrame(extra)], ignore_index=True)
+        extra_df = pd.DataFrame(extra)
+        # A carried figure is an estimate for the new area, so OHID's
+        # comparison with England, made for the 2011 area, does not apply.
+        if FT_VS_ENGLAND_COL in extra_df.columns:
+            extra_df[FT_VS_ENGLAND_COL] = ""
+        df = pd.concat([df, extra_df], ignore_index=True)
     df = df[df["Area Code"].isin(want_msoa)]
     if df.empty:
         # Fingertips still publishes these against 2011 MSOA codes, and 39
@@ -2834,6 +2847,7 @@ def _ft_msoa_variant(ind_id, df, name, want_msoa, rows, missing_codes) -> int:
             "indicator_name": name,
             "value": _tofloat(row.get("Value")),
             "period": row.get("Time period", ""),
+            "vs_england": FT_VS_CODES.get(str(row.get(FT_VS_ENGLAND_COL, "")).strip(), ""),
         })
 
     return bridged
@@ -4612,6 +4626,9 @@ def build_msoa_data() -> dict:
         # Same key as the ward-level copy carries, so one overlay can be drawn
         # at either level without a second name for the same indicator.
         out.setdefault(code, {})[f"ft_{int(row['indicator_id'])}"] = round(float(v), 4)
+        vs = row.get("vs_england") if hasattr(row, "get") else None
+        if isinstance(vs, str) and vs:
+            out[code][f"ft_{int(row['indicator_id'])}_vs"] = vs
 
     n_vals = sum(len(v) for v in out.values())
     info(f"msoa_data: {len(out):,} MSOAs, {n_vals:,} published values, none derived")
