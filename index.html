@@ -905,6 +905,14 @@
      flattened all four of them. The affordance had never once appeared on a
      phone. The other loss was cosmetic: 18px of side padding instead of 10px
      on a screen with none to spare. */
+  .ml-short { display: none; }
+  /* On a phone the two long tab names shorten so all six fit. The shadow cue
+     at the rail's ends was there but too faint to read as "more". */
+  @media (max-width: 480px) {
+    .ml-long { display: none; }
+    .ml-short { display: inline; }
+    .mode-btn { padding-left: 6px !important; padding-right: 6px !important; }
+  }
   .mode-rail { display: flex; align-items: stretch; gap: 2px; padding: 0 18px;
     background: var(--paper); border-bottom: 1px solid var(--line); flex-shrink: 0; }
   .mode-btn { appearance: none; background: none; border: 0; cursor: pointer;
@@ -927,6 +935,11 @@
        and since .app clips, that request was granted by cropping everything
        above them. Wrapping is what a footer should do at this width anyway. */
     .sbar { flex-wrap: wrap; gap: 2px 12px; padding: 4px 10px; }
+    /* In the drawer, below everything else, rather than a strip under the
+       map: on a phone it was 63px taken off an already short map. */
+    .sidebar .sbar { flex-direction: column; gap: 6px; padding: 12px 14px 16px;
+      border-top: 1px solid var(--line-2); }
+    .sidebar .sbar-left, .sidebar .sbar-right { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
     .sbar-left, .sbar-right { flex-wrap: wrap; min-width: 0; }
 
     /* Flex rather than grid: the named grid areas assume a fixed set of
@@ -1542,6 +1555,20 @@
     color: var(--nhs-blue); cursor: pointer; }
   .ov-btn:hover { background: var(--nhs-light); }
   .ov-btn.quiet { border-color: var(--line); color: var(--ink-2); font-weight: 500; }
+  /* Tapped-area card, phones only (PH_PEEK) */
+  .area-peek { position: absolute; left: 8px; right: 8px; bottom: 42px; z-index: 2700;
+    background: var(--paper); border: 1px solid var(--line); border-radius: 12px;
+    box-shadow: 0 6px 20px rgba(0,0,0,.18); padding: 10px 12px 12px; font-size: 13px; color: var(--ink-2); }
+  .area-peek[hidden] { display: none; }
+  .ap-hd { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 6px; }
+  .ap-hd > div { flex: 1; min-width: 0; }
+  .ap-nm { font-weight: 700; color: var(--ink); font-size: 15px; }
+  .ap-sub { font-size: var(--t-xs); color: var(--ink-3); }
+  .ap-x { appearance: none; border: 0; background: none; font-size: 22px; line-height: 1; color: var(--ink-2);
+    min-width: 36px; min-height: 36px; cursor: pointer; }
+  .ap-row { display: flex; justify-content: space-between; gap: 10px; padding: 4px 0; border-top: 1px solid var(--line-2); }
+  .ap-row b { color: var(--ink); white-space: nowrap; }
+  .ap-more { margin-top: 8px; width: 100%; }
   /* Primary care networks */
   .pcn-info { margin-top: 6px; font-size: var(--t-xs); color: var(--ink-2); line-height: 1.45; }
   .pcn-info b { color: var(--ink); }
@@ -2032,12 +2059,18 @@
     /* Above the legend strip, which runs the full width along the bottom here
        and was hidden behind this button. 56px clears the strip (12px up and
        about 36px tall) with a small gap. */
-    #ai-toggle { right: 8px; padding: 8px 12px; font-size: var(--t-sm); bottom: 56px; }
-    .map-wrap.has-sheet #ai-toggle { bottom: calc(var(--sheet-lift) + 56px); }
-    .map-wrap.has-sheet #fingertips-banner { bottom: calc(var(--sheet-lift) + 104px); }
+    /* The map credits wrap to two lines on a phone, about 34px, and the
+       legend strip sat behind them: only the right-hand end of the scale
+       showed. The strip now sits above the credits, and the Ask button and
+       the Fingertips notice above the strip. */
+    .map-legend-strip { bottom: 42px; }
+    .map-wrap.has-sheet .map-legend-strip { bottom: calc(var(--sheet-lift) + 42px); }
+    #ai-toggle { right: 8px; padding: 8px 12px; font-size: var(--t-sm); bottom: 86px; }
+    .map-wrap.has-sheet #ai-toggle { bottom: calc(var(--sheet-lift) + 86px); }
+    .map-wrap.has-sheet #fingertips-banner { bottom: calc(var(--sheet-lift) + 134px); }
     /* Full width along the bottom instead: at this width there is no room for
        300px of notice beside anything and still a map. */
-    #fingertips-banner { left: 8px; right: 8px; bottom: 104px; max-width: none;
+    #fingertips-banner { left: 8px; right: 8px; bottom: 134px; max-width: none;
       font-size: var(--t-xs); padding: 8px 10px; }
     .map-legend-strip { left: 8px; right: 8px; transform: none; max-width: none;
       font-size: var(--t-xs); padding: 5px 9px; }
@@ -2290,8 +2323,8 @@
     <button type="button" class="mode-btn" role="tab" data-mode="explore" aria-selected="true">Explore</button>
     <button type="button" class="mode-btn" role="tab" data-mode="query" aria-selected="false">Query</button>
     <button type="button" class="mode-btn" role="tab" data-mode="compare" aria-selected="false">Compare</button>
-    <button type="button" class="mode-btn" role="tab" data-mode="report" aria-selected="false">Custom area</button>
-    <button type="button" class="mode-btn" role="tab" data-mode="csv" aria-selected="false">Data export</button>
+    <button type="button" class="mode-btn" role="tab" data-mode="report" aria-selected="false" aria-label="Custom area"><span class="ml-long">Custom area</span><span class="ml-short" aria-hidden="true">Area</span></button>
+    <button type="button" class="mode-btn" role="tab" data-mode="csv" aria-selected="false" aria-label="Data export"><span class="ml-long">Data export</span><span class="ml-short" aria-hidden="true">Export</span></button>
     <button type="button" class="mode-btn" role="tab" data-mode="directory" aria-selected="false">Directory</button>
   </nav>
 
@@ -7173,6 +7206,7 @@ window.deselectWard = function() {
 };
 window.deselectLSOA = function() {
   selLSOA = null;
+  if (typeof PH_PEEK !== 'undefined') PH_PEEK.hide();
   if (typeof _restyleAll === 'function') _restyleAll();
   const p = document.getElementById('wpanel');
   if (p) p.innerHTML = `<div class="ph"><div class="ph-icon">\u2196</div>Click any ward on the map to explore its health, crime, deprivation and service data</div>`;
@@ -8326,7 +8360,9 @@ function buildWardLayer() {
   // tighter for the same reason: 28px each side was a visible margin of empty
   // countryside on top of a fit that was already too far out.
   // Guarded for a region opened before its data exists, which has no wards.
-  if (wLyr.getBounds().isValid()) map.fitBounds(wLyr.getBounds(), { padding:[18,18], maxZoom:12 });
+  // Tighter on a phone, where 18px each side is a tenth of the width.
+  const _fitPad = window.matchMedia('(max-width: 600px)').matches ? 4 : 18;
+  if (wLyr.getBounds().isValid()) map.fitBounds(wLyr.getBounds(), { padding:[_fitPad,_fitPad], maxZoom:12 });
   if (typeof _updateLayerCounts === 'function') _updateLayerCounts();
 }
 
@@ -8720,12 +8756,21 @@ function _applyBoroughSolo() {
   }
   function isOpen() { return sidebar.classList.contains('open'); }
 
+  // The footer goes into the drawer on a phone, after everything else, and
+  // comes back under the map when the window widens. A marker keeps its place.
+  const foot = document.querySelector('footer.sbar');
+  const footMark = foot ? document.createComment('footer') : null;
+  if (foot) foot.parentNode.insertBefore(footMark, foot);
   function relocate() {
     if (narrow()) {
       if (hdrRight.parentNode !== tools) tools.appendChild(hdrRight);
+      if (foot && foot.parentNode !== sidebar) sidebar.appendChild(foot);
     } else if (hdrRight.parentNode !== hdr) {
       hdr.appendChild(hdrRight);
       setOpen(false);
+    }
+    if (!narrow() && foot && footMark && foot.parentNode === sidebar) {
+      footMark.parentNode.insertBefore(foot, footMark);
     }
     if (typeof map !== 'undefined' && map) setTimeout(() => map.invalidateSize(), 60);
   }
@@ -9468,6 +9513,11 @@ function _applyBoroughSolo() {
     if (filter) { filter = ''; searchEl.value = ''; }
     // The gate can refuse the change and put the value back; render after it.
     setTimeout(render, 0);
+    // On a phone the drawer covers the map, so the choice recoloured a map
+    // nobody could see. Close it once the pick has landed.
+    if (window.PH_DRAWER && PH_DRAWER.narrow() && PH_DRAWER.isOpen() && value && value !== 'none') {
+      setTimeout(() => PH_DRAWER.close(), 250);
+    }
   }
 
   document.getElementById('ov-picker').addEventListener('click', e => {
@@ -9609,6 +9659,55 @@ function _applyBoroughSolo() {
     infoEl.hidden = false;
     document.getElementById('pcn-clear').addEventListener('click', () => { sel.value = ''; clearFocus(); });
   }
+})();
+
+/* Restyle the LSOA and MSOA outlines when zooming crosses one of
+   zoomThin's steps, so they thin and thicken with the view. */
+(function _thinOutlinesOnZoom() {
+  if (typeof map === 'undefined' || !map) return;
+  let last = zoomThin();
+  map.on('zoomend', () => {
+    const t = zoomThin();
+    if (t === last) return;
+    last = t;
+    if (typeof lsoaLyr !== 'undefined' && lsoaLyr) lsoaLyr.eachLayer(l =>
+      l.setStyle(imdStyle(l.feature, l.feature.properties.code === selLSOA ? 'selected' : 'default')));
+    if (typeof msoaLyr !== 'undefined' && msoaLyr && typeof restyleMsoa === 'function') restyleMsoa();
+  });
+})();
+
+/* Tapping a neighbourhood on a phone. Its details go to the Area profile tab,
+   which is inside the closed drawer, so the tap seemed to do nothing. A card
+   at the foot of the map gives the name and the figures on the map, with a
+   button to the full profile. Wards have their own sheet; this is LSOAs. */
+const PH_PEEK = (function () {
+  const el = document.createElement('div');
+  el.className = 'area-peek'; el.id = 'area-peek'; el.hidden = true;
+  el.setAttribute('role', 'region'); el.setAttribute('aria-label', 'Selected area');
+  const host = document.querySelector('.map-wrap') || document.body;
+  host.appendChild(el);
+  const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  function hide() { el.hidden = true; }
+  function show(props) {
+    if (!(window.PH_DRAWER && PH_DRAWER.narrow())) return;
+    const code = props.code;
+    const row = k => {
+      if (!k || k === 'none') return '';
+      const v = lsoaOvValue(code, k);
+      return '<div class="ap-row"><span>' + esc(ovLabel(k)) + '</span><b>' +
+        (v == null || v === '' ? 'no figure' : esc(fmtOv(v, k))) + '</b></div>';
+    };
+    el.innerHTML = '<div class="ap-hd"><div><div class="ap-nm">' + esc(props.name || code) + '</div>' +
+      '<div class="ap-sub">' + esc([props.ward, props.borough].filter(Boolean).join(', ')) + '</div></div>' +
+      '<button type="button" class="ap-x" aria-label="Close">&times;</button></div>' +
+      row(curOv) + (typeof bivOn === 'function' && bivOn() ? row(curOv2) : '') +
+      (props.imd_decile && curOv !== 'imd_decile' ? '<div class="ap-row"><span>IMD decile</span><b>' + esc(props.imd_decile) + ' of 10</b></div>' : '') +
+      '<button type="button" class="ov-btn ap-more">Full profile</button>';
+    el.hidden = false;
+    el.querySelector('.ap-x').addEventListener('click', hide);
+    el.querySelector('.ap-more').addEventListener('click', () => { hide(); if (window.PH_DRAWER) PH_DRAWER.open(); });
+  }
+  return { show, hide };
 })();
 
 /* The two-variable map's controls and legend. The colouring itself is
@@ -9925,6 +10024,13 @@ const LSOA_EDGE = {
   selected: { color: '#3A3A3A', weight: 2.6, opacity: 1.0 },
 };
 function lsoaEdge(state) { return LSOA_EDGE[state] || LSOA_EDGE.default; }
+/* Resting outlines thin out as the map zooms out. At a whole region the
+   LSOAs are a few pixels across, and 1.1px edges on every one turned the
+   choropleth into grey mesh. Hover and selection keep their full weight. */
+function zoomThin() {
+  const z = (typeof map !== 'undefined' && map && map.getZoom) ? map.getZoom() : 12;
+  return z < 9.5 ? 0.3 : z < 10.5 ? 0.45 : z < 11.5 ? 0.7 : 1;
+}
 
 /* The hidden style. Anything out of scope is drawn as nothing rather than
    removed from the layer, so the layer keeps its shape and a focus change is
@@ -9946,7 +10052,7 @@ function imdStyle(feat, state) {
   const d = feat.properties.imd_decile;
   const edge = lsoaEdge(state);
   const base = {
-    color: edge.color, weight: scaledWeight(edge.weight), opacity: edge.opacity,
+    color: edge.color, weight: scaledWeight(edge.weight) * (state === 'default' || !state ? zoomThin() : 1), opacity: edge.opacity,
     fillColor: (lsoaIMDColour && d) ? (imdDecileColor(d) || '#ccc') : '#ccc',
     fillOpacity: lsoaIMDColour ? 0.45 : 0.05,
   };
@@ -10081,7 +10187,8 @@ function showLSOA(feat) {
   // Keep viewing-strip visible; update its digest to the LSOA code so the
   // .map-wrap grid row height doesn't change on LSOA click.
   const _vsd2 = document.getElementById('vs-digest');
-  if (_vsd2) _vsd2.textContent = 'LSOA: ' + (props.lsoa_name || props.code || '');
+  if (_vsd2) _vsd2.textContent = 'LSOA: ' + (props.name || props.lsoa_name || props.code || '');
+  if (typeof PH_PEEK !== 'undefined') PH_PEEK.show(props);
 
   // IMD data from embedded properties
   const decile = props.imd_decile || '—';
@@ -10969,7 +11076,7 @@ function msoaStyle(feat) {
   // Same reasoning as imdStyle: restyleMsoa is not the only caller.
   if (focusActive() && !ladInFocus(msoaLad(feat))) return HIDDEN_STYLE;
 
-  const base = { color: '#7A2E8E', weight: scaledWeight(1.1), fill: false, opacity: 0.85 };
+  const base = { color: '#7A2E8E', weight: scaledWeight(1.1) * zoomThin(), fill: false, opacity: 0.85 };
   if (!curOv || curOv === 'none' || !ovHasLevel(curOv, 'msoa')) return base;
   const cfg = OV_CFG[curOv];
   if (!cfg) return base;
@@ -11187,6 +11294,7 @@ document.getElementById('tlsoa').addEventListener('change', e => {
   if (!lsoaActive) {
     if (lsoaLyr) map.removeLayer(lsoaLyr);
     selLSOA = null;
+    if (typeof PH_PEEK !== 'undefined') PH_PEEK.hide();
     return;
   }
   // The boundaries are fetched on demand, so this is the first point at which
@@ -11997,7 +12105,14 @@ document.querySelectorAll('#dl-seg button').forEach(b => {
     // screen are LSOAs — the badge contradicting what is being looked at.
     const cur = (typeof currentDataLevel !== 'undefined') ? currentDataLevel : 'ward';
     let lv = 'ward';
-    if (typeof ovHasLevel === 'function' && ovHasLevel(k, cur)) {
+    // The level the source publishes at comes first: that is the map that
+    // shows the figures as published rather than shared out or added up, and
+    // it is the one the picker boxes. Life expectancy is an MSOA figure and
+    // opened on a ward map that could only show it averaged across MSOAs.
+    const nat = (typeof ovNativeLevel === 'function') ? ovNativeLevel(k) : '';
+    if (nat && typeof ovHasLevel === 'function' && ovHasLevel(k, nat)) {
+      lv = nat;
+    } else if (typeof ovHasLevel === 'function' && ovHasLevel(k, cur)) {
       lv = cur;
     } else if (typeof ovHasLevel === 'function' && !ovHasLevel(k, 'ward')) {
       lv = (typeof ovNativeLevel === 'function' && ovNativeLevel(k))
