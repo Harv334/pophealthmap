@@ -1558,6 +1558,14 @@
     color: var(--nhs-blue); cursor: pointer; }
   .ov-btn:hover { background: var(--nhs-light); }
   .ov-btn.quiet { border-color: var(--line); color: var(--ink-2); font-weight: 500; }
+  /* Reading a figure */
+  .vs { display: inline-block; font-size: 11px; font-weight: 600; padding: 0 5px; border-radius: 4px; margin-left: 4px; }
+  .vs-w { background: #FDECEA; color: #A32D2D; }
+  .vs-b { background: #E6F4EA; color: #1E6B35; }
+  .vs-s { background: var(--paper-2); color: var(--ink-2); }
+  .ctx { display: block; font-size: 11px; color: var(--ink-3); }
+  .ov-old { color: #8A5A00; font-weight: 600; }
+  .ov-caution { display: block; margin-top: 4px; color: #8A5A00; }
   /* Tapped-area card, phones only (PH_PEEK) */
   .area-peek { position: absolute; left: 8px; right: 8px; bottom: 42px; z-index: 2700;
     background: var(--paper); border: 1px solid var(--line); border-radius: 12px;
@@ -5012,6 +5020,81 @@ function ovRamp(k, t) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   READING A FIGURE
+
+   Three helpers that sit beside a value wherever one is shown.
+
+   ovVsEngland: OHID's own test of a Local Health MSOA figure against
+   England (its 95% confidence interval excludes England's value or not),
+   carried through by the pipeline as ft_<id>_vs. Only at MSOA, the level it
+   is published at: a ward figure is a blend of MSOAs and has no test.
+
+   ovContext: where a value sits among the other areas of the same level in
+   this region, as "higher than 82% of London's LSOAs".
+
+   ovAgeNote: indicators whose period ended more than three years ago, so an
+   old figure is not read as current. Census 2021 is left out: it is the
+   latest census there is, and flagging every census indicator would bury
+   the warnings that matter.
+   ═══════════════════════════════════════════════════════════════════════════ */
+const VS_ENGLAND_TEXT = { B: 'Better than England', W: 'Worse than England', S: 'Similar to England',
+                          H: 'Higher than England', L: 'Lower than England' };
+function ovVsEngland(level, id, k) {
+  if (level !== 'msoa' || typeof MSOA_DATA === 'undefined') return '';
+  const d = MSOA_DATA[id];
+  return (d && d[k + '_vs']) || '';
+}
+function ovVsHTML(code) {
+  if (!code || !VS_ENGLAND_TEXT[code]) return '';
+  const cls = code === 'W' ? 'vs-w' : code === 'B' ? 'vs-b' : 'vs-s';
+  return '<span class="vs ' + cls + '" title="OHID\'s test against the England value (95% confidence interval)">' +
+    VS_ENGLAND_TEXT[code] + (code === 'S' ? '' : ', statistically') + '</span>';
+}
+const _ctxCache = {};
+const _LEVEL_PLURAL = { ward: 'wards', lsoa: 'LSOAs', msoa: 'MSOAs', borough: 'local authorities' };
+function ovContext(level, k, v) {
+  const n = parseFloat(v);
+  if (isNaN(n) || typeof _bivIds !== 'function') return '';
+  const key = level + '|' + k;
+  let vals = _ctxCache[key];
+  if (!vals) {
+    vals = _bivIds(level).map(id => _bivValue(level, id, k)).filter(x => x != null).sort((a, b) => a - b);
+    if (vals.length < 5) return '';
+    _ctxCache[key] = vals;
+  }
+  let below = 0, above = 0;
+  for (const x of vals) { if (x < n) below++; else if (x > n) above++; }
+  const where = (typeof PH_AREA === 'string' ? PH_AREA : 'the region') + '’s ' + (_LEVEL_PLURAL[level] || 'areas');
+  // Deciles and ranks count down (1 = most deprived), so "lower" would read
+  // as better when it means more deprived. Those say which way they lean.
+  const rev = typeof OV_CFG !== 'undefined' && OV_CFG[k] && OV_CFG[k].rev;
+  const hi = rev ? 'Less deprived than ' : 'Higher than ', lo = rev ? 'More deprived than ' : 'Lower than ';
+  if (below >= above) return hi + Math.round(100 * below / vals.length) + '% of ' + where;
+  return lo + Math.round(100 * above / vals.length) + '% of ' + where;
+}
+function ovEndYear(k) {
+  const p = (typeof ovPeriodOf === 'function') ? ovPeriodOf(k) : '';
+  const m = String(p || '').match(/\d{4}|\b\d{2}\b/g);
+  if (!m) return null;
+  return Math.max.apply(null, m.map(t => t.length === 2 ? 2000 + (+t) : +t));
+}
+function ovAgeNote(k) {
+  const m = (typeof OV_META === 'object' && OV_META[k]) || {};
+  if (/Census 2021/.test(m.src || '')) return '';
+  const end = ovEndYear(k);
+  if (!end) return '';
+  const age = new Date().getFullYear() - end;
+  return age > 3 ? 'Figures end in ' + end + ', ' + age + ' years ago' : '';
+}
+/* Census 2021 was taken on 21 March 2021, in the third national lockdown.
+   ONS warns that the travel-to-work figures are not representative. */
+function ovCaution(k) {
+  const m = (typeof OV_META === 'object' && OV_META[k]) || {};
+  if (/TS061/.test(m.src || '')) return 'Census 2021 was taken during lockdown, so travel to work is unusual: many people were furloughed or working from home. ONS advises caution.';
+  return '';
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    INDICATOR CARDS
 
    What a public health analyst checks before using a figure: what is
@@ -5181,7 +5264,10 @@ function indicatorCardHTML(k) {
     row('Out of', e(f.den)) +
     row('Published at', nat ? '<span class="ov-lv-nat">' + e(nm(nat)) + '</span>' +
       (how ? ' <span class="ic-sub">' + e(how.charAt(0).toUpperCase() + how.slice(1)) + '.</span>' : '') : '') +
-    row('Period', e(m.yr)) +
+    row('Period', e(m.yr) + (ovAgeNote(k) ? ' <span class="ov-old">(' + e(ovAgeNote(k).replace(/^Figures end in \d+, /, '')) + ')</span>' : '')) +
+    row('Caution', ovCaution(k) ? '<span class="ov-old">' + e(ovCaution(k)) + '</span>' : '') +
+    row('Vs England', /^ft_/.test(k) && (typeof ovNativeLevel === 'function') && ovNativeLevel(k) === 'msoa'
+      ? 'OHID tests each MSOA figure against England. At MSOA level, hover an area to see whether it is better, worse or similar.' : '') +
     row('Unit', e(m.u)) +
     row('Source', e(m.src)) +
     row('Updates', e(f.cadence)) +
@@ -5317,7 +5403,7 @@ function fmtOv(v, k) {
   if (key.startsWith('ft_')) return fmtNum(v, 1);
   return fmtNum(v, 0);                                          // decile / rank / count
 }
-function ovTooltipRows(valueForKey, ward) {
+function ovTooltipRows(valueForKey, ward, level) {
   // valueForKey: function(k) -> raw value
   // ward: optional ward record (used for suppression flag lookup)
   // Read the overlay key LIVE from the dropdown rather than from the curOv
@@ -5341,7 +5427,9 @@ function ovTooltipRows(valueForKey, ward) {
     if (isMissing) {
       return `<br><span style="font-size:var(--t-xs)"><b>${ovLabel(k)}:</b> <span style="color:var(--ink-3)">—</span></span>`;
     }
-    return `<br><span style="font-size:var(--t-xs)"><b>${ovLabel(k)}:</b> ${fmtOv(v, k)}</span>`;
+    const ctx = (level && !bivOn()) ? ovContext(level, k, v) : '';
+    return `<br><span style="font-size:var(--t-xs)"><b>${ovLabel(k)}:</b> ${fmtOv(v, k)}</span>` +
+      (ctx ? `<span class="ctx">${ctx}</span>` : '');
   };
   if (_ovK  && _ovK  !== 'none') rows += _renderRow(_ovK);
   if (bivOn()) rows += _renderRow(curOv2);
@@ -8348,7 +8436,7 @@ function buildWardLayer() {
         if (typeof wardInFocus === 'function' && !wardInFocus(wn)) return;
         if (wn !== selW) lyr.setStyle(wstyle(wn, curOv, 'hover'));
         const _wardRec = WARD_DATA[wn] || (typeof WARD_DATA === 'object' && Object.values(WARD_DATA).find(w => w && w.name === wn));
-        const ovRows = ovTooltipRows(k => wardOvValue(wn, k), _wardRec);
+        const ovRows = ovTooltipRows(k => wardOvValue(wn, k), _wardRec, 'ward');
         lyr.bindTooltip(`<b style="font-size:var(--t-sm)">${wn}</b>${ovRows}`, { sticky:true, opacity:.94 }).openTooltip(e.latlng);
       });
       lyr.on('mouseout', () => { if (wn !== selW) lyr.setStyle(wstyle(wn, curOv, 'default')); });
@@ -9431,7 +9519,9 @@ function _applyBoroughSolo() {
           ' aria-pressed="' + (o.value === cur) + '">' +
           '<span class="nm">' + esc(o.name) + '</span>' +
           (descOf(o) ? '<span class="ds">' + esc(descOf(o)) + '</span>' : '') +
-          '<span class="mt">' + levelsHTML(o) + (o.native === 'borough' ? ' · one figure per council' : '') + '</span>' +
+          '<span class="mt">' + levelsHTML(o) + (o.native === 'borough' ? ' · one figure per council' : '') +
+            (ovAgeNote(o.value) ? ' · <span class="ov-old">' + esc(ovAgeNote(o.value)) + '</span>' : '') +
+            (ovCaution(o.value) ? ' · <span class="ov-old">Lockdown census</span>' : '') + '</span>' +
         '</button>').join('')).join('');
   }
   function openLib(theme) {
@@ -9479,7 +9569,8 @@ function _applyBoroughSolo() {
     curNm.textContent = curOpt ? curOpt.name : 'No indicator selected';
     curDesc.textContent = curOpt ? descOf(curOpt) : 'Pick one below to shade the map.';
     curMeta.innerHTML = curOpt ? [levelsHTML(curOpt), esc((curOpt.meta && curOpt.meta.src) || ''),
-      curOpt.native === 'borough' ? 'one figure per council' : ''].filter(Boolean).join(' · ') : '';
+      curOpt.native === 'borough' ? 'one figure per council' : '',
+      ovAgeNote(curOpt.value) ? '<span class="ov-old">' + esc(ovAgeNote(curOpt.value)) + '</span>' : ''].filter(Boolean).join(' · ') : '';
     curEl.classList.toggle('empty', !curOpt);
     curBtns.hidden = !curOpt;
 
@@ -9697,7 +9788,9 @@ const PH_PEEK = (function () {
     const row = k => {
       if (!k || k === 'none') return '';
       const v = lsoaOvValue(code, k);
-      return '<div class="ap-row"><span>' + esc(ovLabel(k)) + '</span><b>' +
+      const ctx = (v == null || v === '' || bivOn()) ? '' : ovContext('lsoa', k, v);
+      return '<div class="ap-row"><span>' + esc(ovLabel(k)) +
+        (ctx ? '<span class="ctx">' + esc(ctx) + '</span>' : '') + '</span><b>' +
         (v == null || v === '' ? 'no figure' : esc(fmtOv(v, k))) + '</b></div>';
     };
     el.innerHTML = '<div class="ap-hd"><div><div class="ap-nm">' + esc(props.name || code) + '</div>' +
@@ -10927,7 +11020,7 @@ function buildEmbeddedLSOALayer() {
         // fill/border untouched. The selected LSOA still keeps its selected
         // style from imdStyle(..., 'selected').
         const decStr = p.imd_decile ? `IMD decile ${p.imd_decile} of 10 (1 = most deprived)` : '';
-        const ovRows = ovTooltipRows(k => lsoaOvValue(p.code, k));
+        const ovRows = ovTooltipRows(k => lsoaOvValue(p.code, k), null, 'lsoa');
         lyr.bindTooltip(`<b style="font-size:var(--t-xs)">${p.name}</b><br><span style="font-size:var(--t-xs);color:var(--ink-3)">${p.ward}</span>${decStr ? '<br><span style="font-size:var(--t-xs)">'+decStr+'</span>' : ''}${ovRows}`, {sticky:true, opacity:.94}).openTooltip(e.latlng);
       });
       lyr.on('mouseout', () => {
@@ -11126,7 +11219,9 @@ function loadMsoaBoundaries() {
             const v = msoaOvValue(p.code, curOv);
             const shown = (curOv && curOv !== 'none' && ovHasLevel(curOv, 'msoa')
                            && v != null && !isNaN(parseFloat(v)))
-              ? `<br><span style="font-size:var(--t-xs)">${_esc(_ovLabel(curOv))}: <b>${fmtOv(parseFloat(v), curOv)}</b></span>`
+              ? `<br><span style="font-size:var(--t-xs)">${_esc(_ovLabel(curOv))}: <b>${fmtOv(parseFloat(v), curOv)}</b></span>` +
+                ovVsHTML(ovVsEngland('msoa', p.code, curOv)) +
+                (bivOn() ? '' : `<span class="ctx">${ovContext('msoa', curOv, v)}</span>`)
               : '';
             const v2 = bivOn() ? msoaOvValue(p.code, curOv2) : null;
             const shown2 = (v2 != null && !isNaN(parseFloat(v2)))
@@ -11747,8 +11842,14 @@ function _syncScaleNumbers() {
     const avgNote = (drawnLvl === 'ward' && (nativeG === 'lsoa' || nativeG === 'msoa'))
       ? ` · Ward values are population-weighted averages of ${nativeG === 'lsoa' ? 'LSOAs' : 'MSOAs'}`
       : '';
-    metaEl.textContent = meta
-      ? `${meta.g} · ${meta.src}${meta.yr ? ` (${meta.yr})` : ''}${avgNote}` : '';
+    const _e = t => String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+    const age = ovAgeNote(curOv), caution = ovCaution(curOv);
+    metaEl.innerHTML = meta
+      ? _e(`${meta.g} · ${meta.src}${meta.yr ? ` (${meta.yr})` : ''}${avgNote}`) +
+        (age ? ' · <span class="ov-old">' + _e(age) + '</span>' : '') +
+        (caution ? '<span class="ov-caution">' + _e(caution) + '</span>' : '') +
+        (nativeG === 'msoa' && drawnLvl === 'msoa' ? '<span class="ctx">Hover an MSOA to see whether it differs from England by OHID\'s test.</span>' : '')
+      : '';
   }
 }
 
