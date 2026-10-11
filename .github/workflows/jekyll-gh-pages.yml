@@ -31,8 +31,15 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # The smoke tests and accessibility checks first: a change that fails them
+  # is not published.
+  test:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    uses: ./.github/workflows/tests.yml
+
   # Build job
   build:
+    needs: test
     # From a refresh, only deploy if the refresh itself succeeded.
     if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest

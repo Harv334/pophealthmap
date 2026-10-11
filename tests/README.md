@@ -11,9 +11,27 @@ a failure says what broke rather than only that something did.
 
 ```
 tests/
+  smoke/      Playwright + axe-core; runs in GitHub Actions on every pull
+              request and before every deploy (.github/workflows/tests.yml)
   browser/    Selenium, against a served copy of the site
   pipeline/   Python, against fetch_all_data.py and the files it writes
 ```
+
+## smoke/
+
+The one suite that runs automatically. It loads London, the North East (when
+`data/regions/north-east/` exists), the England warning and the three text
+pages, exercises the indicator picker, cards, two-indicator map, ward sheet,
+phone drawer and tapped-area card, and runs axe-core (WCAG 2.1 A/AA and best
+practice) in each state. Any accessibility violation fails it.
+
+```bash
+npm install --no-save playwright axe-core
+python3 -m http.server 8792          # from the repo root
+node tests/smoke/smoke.cjs http://localhost:8792
+```
+
+`SMOKE_SETTLE_MS` sets how long the map is given to load (default 9000).
 
 ## browser/
 
