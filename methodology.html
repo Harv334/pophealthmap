@@ -113,6 +113,10 @@ on this site.</p>
       <td><code>LSOA21_WD25_LAD25_EW_LU_v2</code> (May 2025 boundaries)</td>
       <td>Every ward and local authority figure that is built up from
           LSOAs.</td></tr>
+  <tr><td>Output areas to wards (Census only)</td>
+      <td><code>OA21_WD25_LAD25_EW_LU</code> (May 2025 boundaries)</td>
+      <td>Census ward figures, built from output areas rather than LSOAs
+          because output areas follow ward lines far more closely.</td></tr>
   <tr><td>Output areas to small areas</td>
       <td><code>OA21_LAD23_LSOA21_MSOA21_LEP23_EN_LU</code></td>
       <td>Placing each Census 2021 output area in its LSOA and MSOA.</td></tr>
@@ -160,11 +164,15 @@ match, the refresh says so in the fetch log below.</p>
 2021 for output areas, the smallest census area of about 130 households, and
 for LSOAs and MSOAs. Output areas sit exactly inside LSOAs, and LSOAs exactly
 inside MSOAs, so these three levels need no matching at all: the map shows
-ONS's own figure for each. Wards and local authorities are then built up from
-LSOAs through the best-fit lookup above, like every other indicator. To see
-output areas, choose a Census indicator and <strong>OA</strong> on the level
-switch: the map draws the council under its centre, or the one you choose, or
-every council in view once you zoom in. The numbers are small, so a single
+ONS's own figure for each. Census wards are built up from output areas
+through ONS's output area to ward best-fit lookup
+(<code>OA21_WD25_LAD25_EW_LU</code>). Output areas are about a fifth the size
+of LSOAs, so a ward made from them follows the real ward boundary much more
+closely than one made from LSOAs; if ONS does not answer on a refresh, the
+LSOA lookup is used instead and the fetch log says so. Local authorities are
+then added up from wards. To see output areas, choose a Census indicator and
+<strong>OA</strong> on the level switch: all of them load at once, about 3 MB
+for London, and their borders appear as you zoom in. The numbers are small, so a single
 household can move a percentage noticeably; read them as a picture of a street
 or estate rather than a precise measure.</p>
 

@@ -915,6 +915,87 @@ def get_lsoa_to_ward() -> dict:
     """{LSOA21CD: WD25CD}: the mapping used by the ward-level aggregations."""
     return {lc: wd for lc, (wd, _lad) in get_lsoa_ward_lookup().items()}
 
+
+# The output area (2021) -> ward (May 2025) best-fit lookup. Output areas are
+# about a fifth the size of LSOAs, so a ward built from them follows the real
+# ward line far more closely: about four in ten LSOAs cross a ward boundary.
+# Only the census is published by output area, so only census ward figures use
+# it; everything else stays on the LSOA lookup above.
+ONS_SERVICES = "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services"
+OA_WARD_LAYERS = ["OA21_WD25_LAD25_EW_LU_v2", "OA21_WD25_LAD25_EW_LU",
+                  "OA21_WD25_LAD25_EW_LU_v3"]
+
+
+def _oa_ward_layer() -> str | None:
+    """The ONS OA21 -> WD25 lookup service, by known name or from the list."""
+    for name in OA_WARD_LAYERS:
+        try:
+            r = requests.get(f"{ONS_SERVICES}/{name}/FeatureServer/0?f=json", timeout=60)
+            if r.ok and "fields" in r.json():
+                return name
+        except Exception:
+            continue
+    try:
+        r = requests.get(f"{ONS_SERVICES}?f=json", timeout=120)
+        names = [x["name"] for x in r.json().get("services", [])]
+        cands = sorted(n for n in names if re.match(r"(?i)^OA21_WD25_LAD25.*_LU", n))
+        return cands[-1] if cands else None
+    except Exception as e:
+        warn(f"OA->ward lookup: could not list ONS services: {e}")
+        return None
+
+
+@lru_cache(maxsize=1)
+def get_oa_to_ward() -> dict:
+    """{OA21CD: WD25CD} for the in-scope authorities, or {} if ONS does not
+    answer, in which case census wards are built from LSOAs as before."""
+    cache = CACHE_DIR / "ons_lookup" / f"OA21_WD25_{SCOPE_KEY}.json"
+    if cache.exists():
+        try:
+            blob = json.loads(cache.read_text(encoding="utf-8"))
+            if blob:
+                return blob
+        except (OSError, ValueError):
+            pass
+    layer = _oa_ward_layer()
+    if not layer:
+        warn("OA->ward lookup: no ONS service found; census wards use the LSOA lookup")
+        return {}
+    url = f"{ONS_SERVICES}/{layer}/FeatureServer/0/query"
+    where = "LAD25CD IN (" + ",".join(f"'{c}'" for c in sorted(SCOPE_LADS)) + ")"
+    out: dict = {}
+    offset = 0
+    try:
+        while True:
+            payload = _http_json("GET", url, source="ONS OA->ward lookup", params={
+                "where": where, "outFields": "OA21CD,WD25CD",
+                "returnGeometry": "false", "orderByFields": "OA21CD",
+                "resultOffset": offset, "resultRecordCount": 2000, "f": "json",
+            }, timeout=120)
+            if payload is None or "features" not in payload:
+                raise RuntimeError(f"unexpected response from {layer}")
+            feats = payload["features"]
+            for f in feats:
+                a = f.get("attributes") or {}
+                if a.get("OA21CD") and a.get("WD25CD"):
+                    out[a["OA21CD"]] = a["WD25CD"]
+            if not feats or not payload.get("exceededTransferLimit"):
+                break
+            offset += len(feats)
+    except Exception as e:
+        warn(f"OA->ward lookup ({layer}): {e}; census wards use the LSOA lookup")
+        return {}
+    # A ward set that does not match the LSOA lookup's means the two products
+    # are on different vintages; mixing them would split wards.
+    wards = set(get_lsoa_to_ward().values())
+    if not out or len(set(out.values()) - wards) > len(wards) * 0.01:
+        warn(f"OA->ward lookup ({layer}): {len(out):,} rows, wards do not match "
+             f"the LSOA lookup; census wards use the LSOA lookup")
+        return {}
+    write_json_atomic(cache, out)
+    ok(f"ONS lookup: {len(out):,} output areas -> {len(set(out.values())):,} wards ({layer})")
+    return out
+
 # ============================================================================
 # Boundary / point-in-polygon helpers (lazy, only load when needed)
 # ============================================================================
@@ -2009,7 +2090,6 @@ def _census_frame(level: str = "lsoa") -> pd.DataFrame | None:
 # ============================================================================
 OA_BOUNDARY_SERVICES = ["Output_Areas_2021_EW_BGC_V2", "Output_Areas_2021_EW_BGC_V3",
                         "Output_Areas_December_2021_Boundaries_EW_BGC"]
-ONS_SERVICES = "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services"
 
 
 def _oa_boundary_service() -> str | None:
@@ -2042,6 +2122,13 @@ def run_census_oa() -> pd.DataFrame:
         return pd.DataFrame()
     frame = frame.rename(columns={"LSOA21CD": "OA21CD"}).set_index("OA21CD")
     keys = [c for c in frame.columns if c.startswith("census_")]
+    # Kept for the ward build, which adds census wards up from output areas
+    # (see get_oa_to_ward). Only output areas in scope.
+    oa_ward = get_oa_to_ward()
+    if oa_ward:
+        scoped = frame[frame.index.isin(set(oa_ward))].reset_index()
+        write_parquet_guarded(DATA_DIR / "demographics" / "census2021_oa.parquet",
+                              scoped, source="census_oa")
 
     svc = _oa_boundary_service()
     if not svc:
@@ -2089,12 +2176,17 @@ def run_census_oa() -> pd.DataFrame:
             continue
         lad = lsoa_lk[lsoa][1]
         row = frame.loc[oa]
-        v = {}
+        # One value per entry of index.json's "keys", in that order, null where
+        # missing: the key names repeated on every output area were most of
+        # the file.
+        v = []
         for k in keys:
             x = row.get(k)
             if x is not None and not pd.isna(x):
-                v[k] = round(float(x), 1) if k != "census_population" else int(x)
+                v.append(round(float(x), 1) if k != "census_population" else int(x))
                 vals_by_key[k].append(float(x))
+            else:
+                v.append(None)
         by_lad.setdefault(lad, []).append({"type": "Feature",
             "properties": {"c": oa, "l": lsoa, "v": v}, "geometry": f.get("geometry")})
 
@@ -4533,12 +4625,23 @@ def build_ward_data() -> dict:
                     n_filled += 1
         info(f"fingertips msoa -> {len(num):,} wards, {n_filled:,} values")
 
-    # --- Census 2021: per-LSOA -> per-ward via population-weighted mean ----
+    # --- Census 2021: per output area (or LSOA) -> per-ward, population-weighted
+    # Output areas when ONS's OA->ward best-fit lookup answers: they are a
+    # fifth the size of LSOAs, so the ward follows its real boundary much more
+    # closely. Otherwise LSOAs through the LSOA->ward lookup, as before.
     cen = _read_parquet_opt(DATA_DIR / "demographics" / "census2021.parquet")
+    cen_oa = _read_parquet_opt(DATA_DIR / "demographics" / "census2021_oa.parquet")
+    oa_to_ward = get_oa_to_ward() if cen_oa is not None and not cen_oa.empty else {}
+    if oa_to_ward and cen_oa is not None:
+        cen = cen_oa.rename(columns={"OA21CD": "LSOA21CD"})
+        lsoa_to_ward = oa_to_ward
+        info(f"census -> wards from {len(cen):,} output areas (ONS OA->ward best fit)")
     if cen is not None and not cen.empty:
         sources["census"] = "ONS Census 2021 (Nomis)"
-        # LSOA21CD -> WD25CD from the ONS best-fit lookup.
-        lsoa_to_ward = get_lsoa_to_ward()
+        # Area code -> WD25CD from the ONS best-fit lookup (LSOA unless the
+        # output area lookup was chosen above).
+        if not oa_to_ward:
+            lsoa_to_ward = get_lsoa_to_ward()
 
         pop_by_lsoa = dict(zip(
             cen["LSOA21CD"].astype(str),
@@ -4576,6 +4679,15 @@ def build_ward_data() -> dict:
                 den = ward_den[wd].get(pc, 0)
                 if den > 0:
                     w["indicators"][pc] = round(ward_num[wd][pc] / den, 2)
+
+    # The census block above may have worked on output areas; everything
+    # below is LSOA, so put the LSOA lookup and populations back.
+    if oa_to_ward:
+        lsoa_to_ward = get_lsoa_to_ward()
+        _cl = _read_parquet_opt(DATA_DIR / "demographics" / "census2021.parquet")
+        pop_by_lsoa = ({} if _cl is None or _cl.empty else dict(zip(
+            _cl["LSOA21CD"].astype(str),
+            pd.to_numeric(_cl["census_population"], errors="coerce").fillna(0))))
 
     # --- Fuel poverty + PTAL: per-LSOA -> per-ward (population weighted) ----
     # Reuses lsoa_to_ward + pop_by_lsoa built in the census block above. If

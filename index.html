@@ -9874,28 +9874,42 @@ const PH_PEEK = (function () {
 /* ═══════════════════════════════════════════════════════════════════════════
    OUTPUT AREAS
 
-   The smallest census geography, about 125 households, for census indicators
-   only. data/map/oa/<council>.json holds one council's output areas with
-   their census figures; this loads the councils being looked at, up to four
-   at a time: the focused council or board if one is chosen, otherwise the
-   councils in view once zoomed in. A whole region at once would be tens of
-   thousands of shapes.
+   The smallest census geography, about 130 households, for census indicators
+   only. data/map/oa/<council>.json holds one council's output areas; each
+   area's figures are an array in the order of index.json's "keys". Every
+   council loads at once, so the whole map is there to pan around: London is
+   about 26,000 shapes and 5 MB over the wire. They are drawn on a canvas,
+   which keeps that many shapes quick to pan and zoom, and their borders fade
+   out as you zoom out so the colours stay readable.
    ═══════════════════════════════════════════════════════════════════════════ */
 window.PH_OA = (function () {
   const loaded = {}, loading = {};
-  let group = null, on = false, lsoaName = null, lastHint = null;
-  const MAX_LADS = 4, MIN_ZOOM = 12;
+  let group = null, on = false, lsoaName = null, keyIdx = {}, rend = null, announced = false;
   const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
   fetch(dataUrl('data/map/oa/index.json')).then(r => r.ok ? r.json() : null).then(ix => {
     if (!ix || !ix.lads) return;
     OA_INDEX = ix;
+    ix.keys.forEach((k, i) => { keyIdx[k] = i; });
     const b = document.querySelector('#dl-seg button[data-dl="oa"]');
     if (b) b.hidden = false;
     // The picker listed each indicator's levels before this arrived.
     document.dispatchEvent(new Event('ph-levels-changed'));
   }).catch(() => {});
 
+  // An output area's figure for one indicator. Older files keep an object.
+  function val(p, k) {
+    const v = p.v;
+    if (!v) return null;
+    if (Array.isArray(v)) { const i = keyIdx[k]; return i == null ? null : v[i]; }
+    return v[k];
+  }
+  function valsObj(p) {
+    if (!Array.isArray(p.v)) return p.v || {};
+    const o = {};
+    OA_INDEX.keys.forEach((k, i) => { if (p.v[i] != null) o[k] = p.v[i]; });
+    return o;
+  }
   function nameOfLsoa(code) {
     if (!lsoaName && typeof LSOA_IMD !== 'undefined' && LSOA_IMD && LSOA_IMD.features) {
       lsoaName = {};
@@ -9903,97 +9917,81 @@ window.PH_OA = (function () {
     }
     return (lsoaName && lsoaName[code]) || code;
   }
+  // Borders by zoom: none across a whole region, where 26,000 outlines would
+  // be a grey smear, then firmer as each area gets big enough to see.
+  function edge() {
+    const z = (typeof map !== 'undefined' && map) ? map.getZoom() : 12;
+    if (z <= 11) return { stroke: false };
+    if (z === 12) return { stroke: true, color: '#33414b', weight: 0.3, opacity: 0.6 };
+    return { stroke: true, color: '#33414b', weight: 0.7, opacity: 0.8 };
+  }
   function style(feat) {
     const k = curOv, r = OA_INDEX && OA_INDEX.ranges[k];
-    const v = (feat.properties.v || {})[k];
-    // Borders strong enough to read each output area as a shape: they are
-    // small, and at 0.4px they vanished into the fill.
-    const base = { color: '#33414b', weight: 0.7, opacity: 0.8 };
+    const v = val(feat.properties, k);
+    const base = edge();
     if (v == null || !r || r.hi === r.lo) return Object.assign(base, { fillColor: '#ccc', fillOpacity: 0.25 });
     const t = Math.max(0, Math.min(1, (v - r.lo) / (r.hi - r.lo)));
     return Object.assign(base, { fillColor: ovRamp(k, t), fillOpacity: Math.max(0.55, fillOpacityMult) });
   }
   function build(gj) {
+    if (!rend) rend = L.canvas({ padding: 0.4, tolerance: 2 });
     return L.geoJSON(gj, {
+      renderer: rend,
       style,
       onEachFeature: (feat, lyr) => {
         const p = feat.properties;
         lyr.bindTooltip(() => {
-          const v = (p.v || {})[curOv];
+          const v = val(p, curOv);
           return '<b style="font-size:var(--t-xs)">Output area ' + esc(p.c) + '</b>' +
             '<br><span style="font-size:var(--t-xs);color:var(--ink-3)">in ' + esc(nameOfLsoa(p.l)) + '</span>' +
             (v != null ? '<br><span style="font-size:var(--t-xs)">' + esc(ovLabel(curOv)) + ': <b>' + esc(fmtOv(v, curOv)) + '</b></span>' : '');
         }, { sticky: true, opacity: 0.94 });
         lyr.on('click', () => {
           if (typeof PH_PEEK !== 'undefined') PH_PEEK.show({ code: p.c, name: 'Output area ' + p.c,
-            ward: 'in ' + nameOfLsoa(p.l), _v: p.v }, 'oa');
+            ward: 'in ' + nameOfLsoa(p.l), _v: valsObj(p) }, 'oa');
         });
       },
     });
   }
-  function wanted() {
-    if (!OA_INDEX || typeof map === 'undefined') return [];
-    const lads = OA_INDEX.lads;
-    if (typeof focusActive === 'function' && focusActive()) {
-      return Object.keys(lads).filter(c => ladInFocus(lads[c].n)).slice(0, MAX_LADS);
-    }
-    const b = map.getBounds();
-    // Zoomed out, the council under the middle of the map, so choosing output
-    // areas always draws something rather than an empty map and a hint.
-    if (map.getZoom() < MIN_ZOOM) {
-      const c = map.getCenter();
-      let best = null, area = Infinity;
-      Object.keys(lads).forEach(k => {
-        const x = lads[k].bbox;
-        if (c.lng < x[0] || c.lng > x[2] || c.lat < x[1] || c.lat > x[3]) return;
-        const a = (x[2] - x[0]) * (x[3] - x[1]);
-        if (a < area) { area = a; best = k; }
-      });
-      return best ? [best] : [];
-    }
-    return Object.keys(lads).filter(c => {
-      const x = lads[c].bbox;
-      return !(x[2] < b.getWest() || x[0] > b.getEast() || x[3] < b.getSouth() || x[1] > b.getNorth());
-    }).slice(0, MAX_LADS);
-  }
   function refresh() {
     if (!on || !OA_INDEX) return;
     if (!group) group = L.layerGroup().addTo(map);
-    const want = wanted();
-    const zoomedOut = !(typeof focusActive === 'function' && focusActive()) && map.getZoom() < MIN_ZOOM;
-    if (typeof _dlHint === 'function') {
-      if (!want.length) _dlHint('Zoom in, or choose a local authority, to see its output areas.', 4000);
-      else if (zoomedOut && want[0] !== lastHint) {
-        _dlHint('Output areas for ' + OA_INDEX.lads[want[0]].n + '. Zoom in or choose a local authority to see others.', 4000);
-      }
+    const all = Object.keys(OA_INDEX.lads);
+    const pending = all.filter(c => !loaded[c]);
+    if (pending.length && !announced && typeof _dlHint === 'function') {
+      const n = all.reduce((a, c) => a + (OA_INDEX.lads[c].count || 0), 0);
+      _dlHint('Loading ' + n.toLocaleString('en-GB') + ' output areas…', 4000);
     }
-    lastHint = zoomedOut ? want[0] : null;
-    Object.keys(loaded).forEach(c => {
-      if (want.indexOf(c) === -1 && group.hasLayer(loaded[c])) group.removeLayer(loaded[c]);
-    });
-    want.forEach(c => {
-      if (loaded[c]) { if (!group.hasLayer(loaded[c])) group.addLayer(loaded[c]); loaded[c].setStyle(style); return; }
+    announced = true;
+    all.forEach(c => {
+      if (loaded[c]) { if (!group.hasLayer(loaded[c])) group.addLayer(loaded[c]); return; }
       if (loading[c]) return;
       loading[c] = fetch(dataUrl('data/map/oa/' + c + '.json')).then(r => r.ok ? r.json() : null).then(gj => {
         delete loading[c];
         if (!gj) return;
         loaded[c] = build(gj);
-        if (on && wanted().indexOf(c) !== -1) group.addLayer(loaded[c]);
+        if (on) group.addLayer(loaded[c]);
+        if (!Object.keys(loading).length) {
+          const h = document.getElementById('dl-hint');
+          if (h && /^Loading/.test(h.textContent)) h.classList.remove('show');
+        }
       }).catch(() => { delete loading[c]; });
     });
+    restyle();
   }
   function restyle() { Object.keys(loaded).forEach(c => loaded[c].setStyle(style)); }
-  if (typeof map !== 'undefined' && map) map.on('moveend', () => { if (on) refresh(); });
+  let lastEdge = null;
+  if (typeof map !== 'undefined' && map) map.on('zoomend', () => {
+    const e = JSON.stringify(edge());
+    if (on && e !== lastEdge) { lastEdge = e; restyle(); }
+  });
   const ovSel = document.getElementById('ov');
   if (ovSel) ovSel.addEventListener('change', () => setTimeout(restyle, 0));
-  ['borough-focus', 'icb-focus'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.addEventListener('change', () => setTimeout(refresh, 50));
-  });
   return {
     show() { on = true; if (typeof ensureLsoaImd === 'function') ensureLsoaImd(); refresh(); },
-    hide() { on = false; lastHint = null; if (group) group.clearLayers(); },
+    hide() { on = false; if (group) group.clearLayers(); },
     restyle,
+    loadedCount() { return Object.keys(loaded).length; },
     shownCount() { let n = 0; if (group) group.eachLayer(l => l.eachLayer(() => n++)); return n; },
   };
 })();
