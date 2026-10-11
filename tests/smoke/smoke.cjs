@@ -126,6 +126,30 @@ const setOv = (page, k) => page.evaluate(k => {
     await page.close();
   }
 
+  // Phone: tapping a ward shows its figure; one tap opens the sheet, one puts it back.
+  {
+    const { page, errors } = await open(browser, 'index.html?ov=census_bad_health_pct&t=1', PHONE);
+    const m = await page.evaluate(() => { const r = document.getElementById('map').getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; });
+    await page.touchscreen.tap(m[0], m[1]);
+    await page.waitForTimeout(1200);
+    ok(await page.evaluate(() => /\d/.test(document.getElementById('ws-fig').innerText)), 'phone: tapped ward shows its figure');
+    const t = async () => { const h = await page.evaluate(() => { const r = document.querySelector('.ws-title').getBoundingClientRect(); return [r.left + 20, r.top + 10]; }); await page.touchscreen.tap(h[0], h[1]); await page.waitForTimeout(600); return page.evaluate(() => PH_SHEET.state()); };
+    const a = await t(), b2 = await t();
+    ok(a === 0 && b2 === 1, 'phone: one tap opens the ward sheet, one tap puts it back', a + ',' + b2);
+    await checkAxe(page, 'phone ward sheet');
+    ok(errors.length === 0, 'no page errors (phone ward)', errors.join(' | '));
+    await page.close();
+  }
+  {
+    const { page, errors } = await open(browser, 'index.html?ov=ft_93250&t=1', PHONE);
+    const m = await page.evaluate(() => { const r = document.getElementById('map').getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; });
+    await page.touchscreen.tap(m[0], m[1]);
+    await page.waitForTimeout(1200);
+    ok(await page.evaluate(() => { const e = document.getElementById('area-peek'); return !e.hidden && /\d/.test(e.innerText); }), 'phone: tapped MSOA shows its card');
+    ok(errors.length === 0, 'no page errors (phone MSOA)', errors.join(' | '));
+    await page.close();
+  }
+
   // A region
   if (HAS_NE) {
     const { page, errors } = await open(browser, 'index.html?r=north-east&t=1', DESK);

@@ -1339,6 +1339,12 @@
   .ws-title .ws-meta { font-size: var(--t-sm); color: var(--ink-2); margin-top: 1px; white-space: nowrap;
     overflow: hidden; text-overflow: ellipsis; }
   .ws-acts { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  /* The figure on the map for the selected ward, in the part of the sheet that
+     shows at peek: on a phone a tap is the only way to read a value. */
+  .ws-fig { margin-top: 3px; font-size: var(--t-sm); color: var(--ink-2); line-height: 1.35; }
+  .ws-fig:empty { display: none; }
+  .ws-fig b { color: var(--ink); }
+  .ws-fig .ctx { display: inline; margin-left: 4px; }
   .ws-btn { appearance: none; font: inherit; font-size: var(--t-sm); font-weight: 500; cursor: pointer;
     background: var(--paper); color: var(--ink); border: 1px solid var(--line);
     border-radius: 8px; padding: 6px 11px; white-space: nowrap;
@@ -1568,10 +1574,15 @@
   .ov-old { color: #8A5A00; font-weight: 600; }
   .ov-caution { display: block; margin-top: 4px; color: #8A5A00; }
   /* Tapped-area card, phones only (PH_PEEK) */
-  .area-peek { position: absolute; left: 8px; right: 8px; bottom: 42px; z-index: 2700;
+  /* Above the legend strip, so the key stays readable next to the figure. */
+  .area-peek { position: absolute; left: 8px; right: 8px; bottom: 76px; z-index: 2700;
     background: var(--paper); border: 1px solid var(--line); border-radius: 12px;
     box-shadow: 0 6px 20px rgba(0,0,0,.18); padding: 10px 12px 12px; font-size: 13px; color: var(--ink-2); }
   .area-peek[hidden] { display: none; }
+  .ap-row .vs { margin-left: 0; margin-top: 2px; }
+  /* One thing at a time in that corner: the notice and the Ask button come
+     back when the card is closed. */
+  .map-wrap.has-peek #fingertips-banner, .map-wrap.has-peek #ai-toggle { display: none !important; }
   .ap-hd { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 6px; }
   .ap-hd > div { flex: 1; min-width: 0; }
   .ap-nm { font-weight: 700; color: var(--ink); font-size: 15px; }
@@ -3184,6 +3195,7 @@
             <div class="ws-lbl">Selected ward</div>
             <h2 id="ws-name">&nbsp;</h2>
             <div class="ws-meta" id="ws-meta"></div>
+            <div class="ws-fig" id="ws-fig"></div>
           </div>
           <div class="ws-acts">
             <button type="button" class="ws-btn" id="ws-pin">+ Pin to compare</button>
@@ -9804,27 +9816,33 @@ const PH_PEEK = (function () {
   const host = document.querySelector('.map-wrap') || document.body;
   host.appendChild(el);
   const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  function hide() { el.hidden = true; }
-  function show(props) {
+  function hide() { el.hidden = true; host.classList && host.classList.remove('has-peek'); }
+  function show(props, level) {
     if (!(window.PH_DRAWER && PH_DRAWER.narrow())) return;
+    level = level || 'lsoa';
     const code = props.code;
+    const val = k => level === 'msoa' ? msoaOvValue(code, k) : lsoaOvValue(code, k);
     const row = k => {
       if (!k || k === 'none') return '';
-      const v = lsoaOvValue(code, k);
-      const ctx = (v == null || v === '' || bivOn()) ? '' : ovContext('lsoa', k, v);
+      const v = val(k);
+      const has = !(v == null || v === '' || isNaN(parseFloat(v)));
+      const ctx = (!has || bivOn()) ? '' : ovContext(level, k, v);
+      const vs = has ? ovVsHTML(ovVsEngland(level, code, k)) : '';
       return '<div class="ap-row"><span>' + esc(ovLabel(k)) +
-        (ctx ? '<span class="ctx">' + esc(ctx) + '</span>' : '') + '</span><b>' +
-        (v == null || v === '' ? 'no figure' : esc(fmtOv(v, k))) + '</b></div>';
+        (ctx ? '<span class="ctx">' + esc(ctx) + '</span>' : '') + (vs ? '<span class="ctx">' + vs + '</span>' : '') + '</span><b>' +
+        (has ? esc(fmtOv(v, k)) : 'no figure') + '</b></div>';
     };
     el.innerHTML = '<div class="ap-hd"><div><div class="ap-nm">' + esc(props.name || code) + '</div>' +
       '<div class="ap-sub">' + esc([props.ward, props.borough].filter(Boolean).join(', ')) + '</div></div>' +
       '<button type="button" class="ap-x" aria-label="Close">&times;</button></div>' +
       row(curOv) + (typeof bivOn === 'function' && bivOn() ? row(curOv2) : '') +
-      (props.imd_decile && curOv !== 'imd_decile' ? '<div class="ap-row"><span>IMD decile</span><b>' + esc(props.imd_decile) + ' of 10</b></div>' : '') +
-      '<button type="button" class="ov-btn ap-more">Full profile</button>';
+      (level === 'lsoa' && props.imd_decile && curOv !== 'imd_decile' ? '<div class="ap-row"><span>IMD decile</span><b>' + esc(props.imd_decile) + ' of 10</b></div>' : '') +
+      (level === 'lsoa' ? '<button type="button" class="ov-btn ap-more">Full profile</button>' : '');
     el.hidden = false;
+    if (host.classList) host.classList.add('has-peek');
     el.querySelector('.ap-x').addEventListener('click', hide);
-    el.querySelector('.ap-more').addEventListener('click', () => { hide(); if (window.PH_DRAWER) PH_DRAWER.open(); });
+    const more = el.querySelector('.ap-more');
+    if (more) more.addEventListener('click', () => { hide(); if (window.PH_DRAWER) PH_DRAWER.open(); });
   }
   return { show, hide };
 })();
@@ -11236,6 +11254,11 @@ function loadMsoaBoundaries() {
         style: msoaStyle,
         onEachFeature: (feat, lyr) => {
           const p = feat.properties || {};
+          // A tap on a phone shows the area card; hover tooltips need a mouse.
+          lyr.on('click', () => {
+            if (typeof PH_PEEK !== 'undefined') PH_PEEK.show({ code: p.code, name: p.name,
+              borough: (typeof msoaLad === 'function') ? msoaLad(feat) : '' }, 'msoa');
+          });
           // Bound once at load, so the value is read when the tooltip opens
           // rather than frozen at whatever overlay was active back then.
           lyr.bindTooltip(function () {
@@ -14957,7 +14980,13 @@ var PH_SHOW = {
     if (e.propertyName === 'max-height') lift();
   });
 
-  function cycle() { sheetState = (sheetState + 1) % 3; applyState(); }
+  // One tap opens the sheet fully and the next puts it back. It cycled through
+  // three sizes, so from peek the first tap only shrank it a little and the
+  // second opened it, which read as the first tap not working.
+  function cycle() {
+    sheetState = sheetState === 0 ? (isNarrow() ? 1 : 2) : 0;
+    applyState();
+  }
   function setSheetState(n) {
     n = Math.max(0, Math.min(2, n));
     if (n === sheetState) return;
@@ -15232,6 +15261,7 @@ var PH_SHOW = {
     if (pop !== null) meta.push(Math.round(pop).toLocaleString() + ' residents');
     if (dec !== null) meta.push('average IMD decile ' + dec.toFixed(1));
     metaEl.textContent = meta.join(' · ');
+    renderFig();
 
     syncPinBtn();
     renderBody(w);
@@ -15252,6 +15282,25 @@ var PH_SHOW = {
     }
     applyState();
   }
+
+  // The figure for the indicator on the map, and the second one when two are
+  // drawn, with where the ward sits. Redrawn when the indicator changes.
+  function renderFig() {
+    var el = $('ws-fig');
+    if (!el) return;
+    if (!currentWard || typeof curOv === 'undefined' || !curOv || curOv === 'none') { el.innerHTML = ''; return; }
+    var e = function (t) { return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;'); };
+    var line = function (k) {
+      var v = wardOvValue(currentWard, k);
+      if (v == null || v === '' || isNaN(parseFloat(v))) return '<div>' + e(ovLabel(k)) + ': <span style="color:var(--ink-3)">no figure</span></div>';
+      var ctx = (typeof bivOn === 'function' && bivOn()) ? '' : ovContext('ward', k, v);
+      return '<div>' + e(ovLabel(k)) + ': <b>' + e(fmtOv(v, k)) + '</b>' +
+        (ctx ? '<span class="ctx">' + e(ctx) + '</span>' : '') + '</div>';
+    };
+    el.innerHTML = line(curOv) + ((typeof bivOn === 'function' && bivOn()) ? line(curOv2) : '');
+  }
+  var _ovSelForFig = document.getElementById('ov');
+  if (_ovSelForFig) _ovSelForFig.addEventListener('change', function () { setTimeout(renderFig, 0); });
 
   function hide() {
     currentWard = null;
