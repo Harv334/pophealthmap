@@ -110,9 +110,9 @@ const setOv = (page, k) => page.evaluate(k => {
       await page.waitForTimeout(1000);
       ok(await page.evaluate(() => !document.querySelector('#dl-seg button[data-dl="oa"]').hidden), 'output area button shown for a census indicator');
       await page.click('#dl-seg button[data-dl="oa"]');
-      await page.evaluate(() => { const s = document.getElementById('borough-focus'); s.value = s.options[5].value; s.dispatchEvent(new Event('change')); });
-      await page.waitForTimeout(4000);
-      ok(await page.evaluate(() => _activeLevel() === 'oa' && PH_OA.shownCount() > 0), 'output areas drawn for a chosen borough',
+      await page.waitForFunction(() => PH_OA.loadedCount() === Object.keys(OA_INDEX.lads).length, null, { timeout: 30000 }).catch(() => {});
+      ok(await page.evaluate(() => _activeLevel() === 'oa' && PH_OA.shownCount() === Object.values(OA_INDEX.lads).reduce((a, l) => a + l.count, 0)),
+         'every output area drawn at once',
          await page.evaluate(() => _activeLevel() + ' ' + PH_OA.shownCount()));
       await checkAxe(page, 'output areas');
       await setOv(page, 'imd_decile');
