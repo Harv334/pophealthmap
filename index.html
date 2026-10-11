@@ -916,6 +916,7 @@
     .ml-short { display: inline; }
     .mode-btn { padding-left: 6px !important; padding-right: 6px !important; }
   }
+  .mode-tabs { display: flex; align-items: stretch; gap: 2px; flex: 0 0 auto; }
   .mode-rail { display: flex; align-items: stretch; gap: 2px; padding: 0 18px;
     background: var(--paper); border-bottom: 1px solid var(--line); flex-shrink: 0; }
   .mode-btn { appearance: none; background: none; border: 0; cursor: pointer;
@@ -2330,14 +2331,17 @@
   </header>
 
   <!-- Mode rail. Explore is the map below; the rest are scaffolding. -->
-  <nav class="mode-rail" role="tablist" aria-label="Tool mode">
+  <!-- The landmark is the nav; the tab list is inside it. role="tablist" on
+       the nav itself replaced its navigation role, so screen readers lost the
+       landmark and the tabs sat outside every region of the page. -->
+  <nav class="mode-rail" aria-label="Tool mode"><div class="mode-tabs" role="tablist" aria-label="Tool mode">
     <button type="button" class="mode-btn" role="tab" data-mode="explore" aria-selected="true">Explore</button>
     <button type="button" class="mode-btn" role="tab" data-mode="query" aria-selected="false">Query</button>
     <button type="button" class="mode-btn" role="tab" data-mode="compare" aria-selected="false">Compare</button>
     <button type="button" class="mode-btn" role="tab" data-mode="report" aria-selected="false" aria-label="Custom area"><span class="ml-long">Custom area</span><span class="ml-short" aria-hidden="true">Area</span></button>
     <button type="button" class="mode-btn" role="tab" data-mode="csv" aria-selected="false" aria-label="Data export"><span class="ml-long">Data export</span><span class="ml-short" aria-hidden="true">Export</span></button>
     <button type="button" class="mode-btn" role="tab" data-mode="directory" aria-selected="false">Directory</button>
-  </nav>
+  </div></nav>
 
   <div class="mode-panel" id="mode-panel" hidden>
     <div class="mode-card">
@@ -2494,7 +2498,7 @@
           <label class="lrow"><div style="width:9px;height:9px;border:2px solid #1a1a1a;border-radius:2px;flex-shrink:0"></div><span class="lname" id="tb-name">London boroughs</span><input type="checkbox" id="tb"></label>
           <div style="margin:4px 0 8px 0">
             <div style="font-size:var(--t-xs);color:var(--ink-2);margin-bottom:3px" id="borough-focus-label">Focus by borough</div>
-            <select id="borough-focus" style="width:100%;padding:4px 6px;border:1px solid var(--line);border-radius:5px;font-size:var(--t-xs);color:var(--ink);background:var(--paper)">
+            <select id="borough-focus" aria-labelledby="borough-focus-label" style="width:100%;padding:4px 6px;border:1px solid var(--line);border-radius:5px;font-size:var(--t-xs);color:var(--ink);background:var(--paper)">
               <option value="all">All London</option>
             </select>
           </div>
@@ -2629,15 +2633,15 @@
               <button type="button" class="ov-back" id="ov-back">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
                 All themes</button>
-              <h3 class="ov-tv-h" id="ov-tv-h"></h3>
+              <h2 class="ov-tv-h" id="ov-tv-h"></h2>
               <div class="ov-tv-key"><span class="ov-lv-nat">Boxed</span> level: as published by the source. Other levels are worked out from it.</div>
               </div>
-              <div class="ov-tv-list" id="ov-tv-list" role="list"></div>
+              <div class="ov-tv-list" id="ov-tv-list" role="group" aria-labelledby="ov-tv-h"></div>
             </div>
             <div id="ov-home">
-              <h3 class="ov-h">Key indicators</h3>
+              <h2 class="ov-h">Key indicators</h2>
               <div class="ov-chips" id="ov-chips"></div>
-              <h3 class="ov-h">Browse by theme</h3>
+              <h2 class="ov-h">Browse by theme</h2>
               <div class="ov-themes" id="ov-themes"></div>
             </div>
           </div>
@@ -3170,7 +3174,11 @@
            heights, so the buttons inside it stop their own clicks propagating. -->
       <div class="ws-sheet" id="ward-sheet" role="region" aria-label="Selected ward">
         <div class="ws-handle"></div>
-        <div class="ws-head" id="ws-head" tabindex="0" role="button" aria-expanded="true"
+        <!-- Clicking the header still resizes the sheet with a mouse or a thumb,
+             but it is not itself a button any more: it holds buttons, and a
+             button inside a button is unusable with a screen reader. The size
+             control for the keyboard is #ws-size. -->
+        <div class="ws-head" id="ws-head"
              title="Click to change how much of the panel is showing">
           <div class="ws-title">
             <div class="ws-lbl">Selected ward</div>
@@ -3181,6 +3189,8 @@
             <button type="button" class="ws-btn" id="ws-pin">+ Pin to compare</button>
             <button type="button" class="ws-btn" id="ws-pdf" title="Open the printable ward report, which you can save as a PDF">Ward report</button>
             <button type="button" class="ws-btn primary" id="ws-profile">Open profile</button>
+            <button type="button" class="ws-close" id="ws-size" aria-expanded="true"
+                    aria-label="Show less of this panel" title="Show more or less of this panel">&#8597;</button>
             <button type="button" class="ws-close" id="ws-close" title="Deselect this ward"
                     aria-label="Deselect this ward">&times;</button>
           </div>
@@ -5014,6 +5024,17 @@ function ramp(t) {
    in OV_CFG turns them round, which keeps "dark = more deprived" true on every
    IMD view. It is not polarity: the indicators that only say which end is
    worse still run light to dark with the figure. */
+/* White or near-black text, whichever reads at 4.5:1 or better on the given
+   background. Labels on coloured bar segments used white throughout, which
+   fell short on the mid teal and purple. */
+function _textOn(bg) {
+  const h = String(bg || '').replace('#', '');
+  if (!/^[0-9a-f]{6}$/i.test(h)) return '#fff';
+  const lum = [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16) / 255)
+    .map(c => c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+  const L = 0.2126 * lum[0] + 0.7152 * lum[1] + 0.0722 * lum[2];
+  return (1.05 / (L + 0.05)) >= 4.5 ? '#fff' : '#111';
+}
 function ovRamp(k, t) {
   const cfg = (typeof OV_CFG !== 'undefined') ? OV_CFG[k] : null;
   return ramp(cfg && cfg.rev ? 1 - t : t);
@@ -7079,7 +7100,7 @@ function stackedBar(parts) {
   if (!(total > 0)) return '';
   const segs = present.map(p => {
     const pct = (parseFloat(p.v) / total) * 100;
-    return `<div title="${p.l}: ${parseFloat(p.v).toFixed(1)}%" style="background:${p.c};width:${pct}%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:var(--t-xs);font-weight:600;overflow:hidden;white-space:nowrap">${pct >= 8 ? p.l.split(' ')[0] : ''}</div>`;
+    return `<div title="${p.l}: ${parseFloat(p.v).toFixed(1)}%" style="background:${p.c};width:${pct}%;display:flex;align-items:center;justify-content:center;color:${_textOn(p.c)};font-size:var(--t-xs);font-weight:600;overflow:hidden;white-space:nowrap">${pct >= 8 ? p.l.split(' ')[0] : ''}</div>`;
   }).join('');
   const legend = present.map(p =>
     `<span style="display:inline-flex;align-items:center;gap:4px;margin-right:8px;font-size:var(--t-xs)"><span style="width:8px;height:8px;background:${p.c};border-radius:2px;display:inline-block"></span>${p.l} ${parseFloat(p.v).toFixed(1)}%</span>`
@@ -9033,6 +9054,8 @@ function _applyBoroughSolo() {
   grip.setAttribute('aria-valuemax', String(MAX));
   grip.title = 'Drag to resize the panel · double-click to reset';
   sidebar.appendChild(grip);
+  // A separator that can be moved has to say where it is, from the start.
+  grip.setAttribute('aria-valuenow', String(Math.round(sidebar.getBoundingClientRect().width) || DEFAULT));
 
   function width() { return sidebar.getBoundingClientRect().width; }
 
@@ -9515,7 +9538,7 @@ function _applyBoroughSolo() {
     tvList.innerHTML = subgroupsOf(g).map(sg =>
       (sg.name ? '<div class="ov-tv-sub">' + esc(sg.name) + '</div>' : '') +
       sg.opts.map(o =>
-        '<button type="button" role="listitem" class="ov-tv-row' + (o.value === cur ? ' on' : '') + '" data-ov="' + esc(o.value) + '"' +
+        '<button type="button" class="ov-tv-row' + (o.value === cur ? ' on' : '') + '" data-ov="' + esc(o.value) + '"' +
           ' aria-pressed="' + (o.value === cur) + '">' +
           '<span class="nm">' + esc(o.name) + '</span>' +
           (descOf(o) ? '<span class="ds">' + esc(descOf(o)) + '</span>' : '') +
@@ -10290,7 +10313,7 @@ function showLSOA(feat) {
   const decile = props.imd_decile || '—';
   const rank = props.imd_rank ? props.imd_rank.toLocaleString() : '—';
   const depLabel = decile <= 3 ? '<span style="color:#c0392b;font-weight:600">High deprivation</span>' :
-                   decile <= 5 ? '<span style="color:#e67e22;font-weight:600">Moderate deprivation</span>' :
+                   decile <= 5 ? '<span style="color:#9A4A00;font-weight:600">Moderate deprivation</span>' :
                    decile >= 8 ? '<span style="color:#27ae60;font-weight:600">Low deprivation</span>' : 'Average';
 
   // Census data from LSOA_DATA (if loaded). lsoa_data.json stores fields at the top
@@ -10418,7 +10441,7 @@ function showLSOA(feat) {
   p.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:6px">
       <div>
-        <span class="gpill" style="background:#fdebd0;color:#e67e22;border:1px solid #e67e22">LSOA</span>
+        <span class="gpill" style="background:#fdebd0;color:#9A4A00;border:1px solid #e67e22">LSOA</span>
         <span style="font-size:var(--t-xs);color:var(--ink-2);margin-left:4px">in ${props.ward}</span>
       </div>
       <button class="deselect-btn" onclick="deselectLSOA()" title="Deselect this LSOA">Deselect &times;</button>
@@ -14920,7 +14943,11 @@ var PH_SHOW = {
   function applyState() {
     sheet.classList.toggle('peek', sheetState === 1);
     sheet.classList.toggle('collapsed', sheetState === 2);
-    headEl.setAttribute('aria-expanded', String(sheetState === 0));
+    var sizeBtn = $('ws-size');
+    if (sizeBtn) {
+      sizeBtn.setAttribute('aria-expanded', String(sheetState === 0));
+      sizeBtn.setAttribute('aria-label', sheetState === 2 ? 'Show more of this panel' : 'Show less of this panel');
+    }
     lift();
   }
   // The height animates, so the value read straight after the class change is
@@ -14989,9 +15016,8 @@ var PH_SHOW = {
       if (wardPane.classList.contains('active') && sheetState === 0) setSheetState(1);
     }).observe(wardPane, { attributes: true, attributeFilter: ['class'] });
   })();
-  headEl.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); cycle(); }
-  });
+  var _sizeBtn = $('ws-size');
+  if (_sizeBtn) _sizeBtn.addEventListener('click', function (e) { e.stopPropagation(); cycle(); });
 
   function kpi(label, value, sub, opts) {
     opts = opts || {};

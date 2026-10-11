@@ -92,14 +92,15 @@
 
 <header>
   <h1>Accessibility statement</h1>
-  <p><a href="index.html">← Back to the map</a> · PopHealth Map, London</p>
+  <p><a href="index.html">← Back to the map</a> · PopHealth Map</p>
 </header>
 
 <main id="content">
 
   <p class="lede">
     This statement applies to <strong>pophealth.uk</strong>, an interactive map of
-    population health across the 33 London boroughs. It covers the map itself, the
+    population health across England, by region, local authority, ward and
+    neighbourhood. It covers the map itself, the
     methodology and technical notes, and this page.
   </p>
 
@@ -125,6 +126,16 @@
     <li>Selecting a ward, focusing a borough or a board, and zooming to an area are
       each announced to a screen reader.</li>
     <li>There is a skip link to the main content on every page.</li>
+    <li>Every indicator has a written card (the <strong>About</strong> button):
+      what is counted, the level it is published at, its period, source and
+      method.</li>
+    <li>Where a figure sits is said in words when you point at or tap an area,
+      for example "higher than 82% of London's LSOAs", and whether a Local Health
+      figure differs from England is written out ("Worse than England,
+      statistically"), not shown by colour alone.</li>
+    <li>The two-indicator map uses colour to combine two figures, but both
+      figures are written out when you point at or tap an area, and the key
+      explains each colour in words.</li>
   </ul>
 
   <h2>What is not accessible</h2>
@@ -181,8 +192,8 @@
     <dt>Shading is described in words, not read out area by area</dt>
     <dd>
       When the map is coloured by a figure, a screen reader is told what the colours
-      mean and what the range is, but it will not read out all 704 wards. Use Query,
-      the Top and Bottom 20 lists, or Data export to get that as an ordered list.
+      mean and what the range is, but it will not read out every area. Use Query,
+      the Top and Bottom 10 lists, or Data export to get that as an ordered list.
     </dd>
 
     <dt>Some charts are images of their data</dt>
@@ -251,12 +262,23 @@
 
   <h3>How this was tested</h3>
   <p>
-    The site was checked by hand in a real browser. The contrast of the site's
-    text colours was measured against the WCAG formula, controls were checked for
-    a name a screen reader can announce, images for a text alternative, and the
-    page for one main heading, a main landmark and a language set. Keyboard order
-    and screen-reader behaviour were tried by hand. These checks are not automated:
-    there is no accessibility test that runs each time the site changes.
+    The site is checked with axe-core, an automated accessibility checker,
+    against WCAG 2.1 A and AA and its best-practice rules. On 11 October 2026 it
+    was run over the map on a desktop and on a phone in the states people use
+    most: on opening, with an indicator chosen and its card open, with a theme
+    list open, with a ward selected, with two indicators drawn together, with a
+    neighbourhood tapped on a phone, with the phone menu open, and with a primary
+    care network chosen, and over the methodology, privacy and accessibility
+    pages. Every failure it found was fixed that day. Those checks, apart from
+    the primary care network, now run automatically on every proposed change and
+    before every publish, and a change that fails them is not published.
+  </p>
+  <p>
+    Automated checks find about a third of accessibility problems. Keyboard order,
+    visible focus and the behaviour of the tab strips were also checked by hand:
+    every control on the main page can be reached, the one with focus is always
+    outlined, and an indicator can be chosen and a theme opened and closed with
+    the keyboard alone.
   </p>
   <p>
     The site has <strong>not</strong> been through a formal external audit. This
@@ -270,16 +292,12 @@
       shortlist of areas rather than all 1,400 shapes.</li>
     <li>Making the custom area builder usable without a mouse, by letting areas be
       added from a list as well as from the map.</li>
-    <li>Turning the checks above into automated tests that run on every change,
-      so a change that breaks one of them fails before it is published rather than
-      after.</li>
   </ul>
 
   <p class="updated">
-    This statement was prepared on 17 August 2026. It was last reviewed on
-    5 October 2026. The site was last tested on 17 August 2026 against WCAG 2.2 AA.
-    <br>Last updated: 7 October 2026 (the text of this statement; the site has not
-    been re-tested since 17 August 2026).
+    This statement was prepared on 17 August 2026. It was last reviewed and the
+    site last tested on 11 October 2026, against WCAG 2.2 AA.
+    <br>Last updated: 11 October 2026.
   </p>
 
 </main>

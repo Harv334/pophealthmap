@@ -1,0 +1,46 @@
+name: Site tests
+
+# Browser smoke tests and accessibility checks (tests/smoke/smoke.cjs) against
+# a served copy of the site. Runs on every pull request, and the Pages deploy
+# calls it first, so a change that fails is not published.
+on:
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # From a deploy, test what is about to be published.
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || 'main' }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Playwright and axe-core
+        run: |
+          npm install --no-save --no-package-lock playwright@1.56.1 axe-core@4.10.3
+          npx playwright install --with-deps chromium
+      # One region pack, so the regional code path is tested too.
+      - name: Add the North East pack
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p data/regions/north-east
+          if gh release download region-data --repo "${{ github.repository }}" \
+               --pattern 'region-north-east.tar.gz' --dir /tmp/rd; then
+            tar -xzf /tmp/rd/region-north-east.tar.gz -C data/regions/north-east
+          else
+            echo "No North East pack; its checks will be skipped."
+          fi
+      - name: Run the smoke tests
+        run: |
+          python3 -m http.server 8792 >/dev/null 2>&1 &
+          sleep 2
+          SMOKE_SETTLE_MS=12000 node tests/smoke/smoke.cjs http://localhost:8792
