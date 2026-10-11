@@ -78,8 +78,14 @@ const setOv = (page, k) => page.evaluate(k => {
     ok(await page.evaluate(() => Object.keys(MSOA_DATA).some(c => MSOA_DATA[c].ft_93250_vs)), 'England comparisons present in MSOA data');
     ok(await page.evaluate(() => /Figures end in/.test(ovAgeNote('ft_93227'))), 'old figures flagged');
     ok(await page.evaluate(() => /lockdown/i.test(ovCaution('census_public_transport_pct'))), 'Census travel caution');
-    // A ward clicked opens its sheet.
+    // Census figures open at LSOA, the level ONS publishes them at, with
+    // every level from output area to local authority on offer.
     await setOv(page, 'census_bad_health_pct');
+    await page.waitForTimeout(2000);
+    ok(await page.evaluate(() => _activeLevel() === 'lsoa' &&
+      ['borough', 'ward', 'msoa', 'lsoa'].every(l => ovHasLevel('census_bad_health_pct', l))), 'Census indicator offers every level');
+    // A ward clicked opens its sheet.
+    await setOv(page, 'crime_rate_per_1000');
     await page.waitForTimeout(2000);
     const wpt = await page.evaluate(() => { let c = null; wLyr.eachLayer(l => { if (!c && /Bethnal|Hoxton|Stratford|Peckham/.test(l.feature.properties.WD24NM)) c = l.getBounds().getCenter(); });
       if (!c) { wLyr.eachLayer(l => { if (!c) c = l.getBounds().getCenter(); }); } const p = map.latLngToContainerPoint(c); const r = document.getElementById('map').getBoundingClientRect(); return [r.left + p.x, r.top + p.y]; });
@@ -153,7 +159,7 @@ const setOv = (page, k) => page.evaluate(k => {
 
   // Phone: tapping a ward shows its figure; one tap opens the sheet, one puts it back.
   {
-    const { page, errors } = await open(browser, 'index.html?ov=census_bad_health_pct&t=1', PHONE);
+    const { page, errors } = await open(browser, 'index.html?ov=crime_rate_per_1000&t=1', PHONE);
     const m = await page.evaluate(() => { const r = document.getElementById('map').getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; });
     await page.touchscreen.tap(m[0], m[1]);
     await page.waitForTimeout(1200);

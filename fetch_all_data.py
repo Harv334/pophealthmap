@@ -1543,11 +1543,12 @@ def _nomis_urls(tab_id: str) -> list[str]:
 
 
 def _fetch_census_table(tab_id: str, level: str = "lsoa") -> pd.DataFrame | None:
-    """Cache-first download + return the LSOA (or OA) CSV as a DataFrame. None on failure.
+    """Cache-first download + return the LSOA (or OA, or MSOA) CSV as a
+    DataFrame. None on failure.
 
     The Nomis bulk zip for each table carries one CSV per geography; level
-    picks which. "oa" is matched on the file ending "-oa.csv" so it does not
-    pick up the LSOA or MSOA file."""
+    picks which. "oa" and "msoa" are matched on the file ending "-oa.csv" or
+    "-msoa.csv" so neither picks up the LSOA file."""
     cache_dir = CACHE_DIR / "census2021"
     cache_dir.mkdir(parents=True, exist_ok=True)
     cache_zip = cache_dir / f"{tab_id.lower()}.zip"
@@ -1580,8 +1581,8 @@ def _fetch_census_table(tab_id: str, level: str = "lsoa") -> pd.DataFrame | None
     try:
         with zipfile.ZipFile(cache_zip) as z:
             names = z.namelist()
-            if level == "oa":
-                lsoa_name = next((n for n in names if n.lower().endswith("-oa.csv")), None)
+            if level in ("oa", "msoa"):
+                lsoa_name = next((n for n in names if n.lower().endswith(f"-{level}.csv")), None)
             else:
                 lsoa_name = next(
                     (n for n in names if "lsoa" in n.lower() and n.endswith(".csv")),
@@ -1665,6 +1666,21 @@ def run_census2021() -> pd.DataFrame:
     out_path = DATA_DIR / "demographics" / "census2021.parquet"
     out = write_parquet_guarded(out_path, out, source="census")
     ok(f"census2021: {len(out):,} LSOAs x {len(out.columns)-1} indicators -> {out_path.relative_to(REPO_ROOT)}")
+
+    # The same figures as ONS publishes them for MSOAs, from the same zips.
+    # An MSOA is whole LSOAs, so these agree with the LSOA figures added up;
+    # taking ONS's own file means nothing is derived here.
+    msoa = _census_frame("msoa")
+    if msoa is not None and not msoa.empty:
+        msoa = msoa.rename(columns={"LSOA21CD": "MSOA21CD"})
+        want = set(get_lsoa_to_msoa().values())
+        msoa = msoa[msoa["MSOA21CD"].isin(want)]
+        if len(msoa):
+            m_path = DATA_DIR / "demographics" / "census2021_msoa.parquet"
+            msoa = write_parquet_guarded(m_path, msoa, source="census")
+            ok(f"census2021: {len(msoa):,} MSOAs -> {m_path.relative_to(REPO_ROOT)}")
+        else:
+            warn("census2021: no in-scope MSOAs in the MSOA files")
     return out
 
 
@@ -4815,10 +4831,20 @@ def build_msoa_data() -> dict:
     names come from LSOA_IMD.
     """
     out: dict = {}
+    # Census 2021 as ONS publishes it for MSOAs (see run_census2021).
+    cen = _read_parquet_opt(DATA_DIR / "demographics" / "census2021_msoa.parquet")
+    if cen is not None and not cen.empty:
+        cols = [c for c in cen.columns if c != "MSOA21CD"]
+        for _, row in cen.iterrows():
+            rec = out.setdefault(str(row["MSOA21CD"]), {})
+            for col in cols:
+                v = row[col]
+                if pd.notna(v):
+                    rec[col] = int(v) if col == "census_population" else round(float(v), 4)
     ftm = _read_parquet_opt(DATA_DIR / "outcomes" / "fingertips_msoa.parquet")
     if ftm is None or ftm.empty:
-        warn("msoa_data: no fingertips_msoa parquet, so nothing to write")
-        return out
+        warn("msoa_data: no fingertips_msoa parquet")
+        ftm = pd.DataFrame(columns=["MSOA21CD", "indicator_id", "value"])
 
     for _, row in ftm.iterrows():
         v = row["value"]
