@@ -3176,6 +3176,7 @@
           <button type="button" data-dl="ward" class="active" title="Ward-level data (704 wards)">Ward</button>
           <button type="button" data-dl="msoa" title="MSOA level. MSOAs sit between wards and LSOAs and do not nest into wards. The Local Health indicators are published at this level, so they shade here; anything published elsewhere draws the boundaries only.">MSOA</button>
           <button type="button" data-dl="lsoa" title="LSOA-level data (4,994 LSOAs, the most detailed level here)">LSOA</button>
+          <button type="button" data-dl="oa" hidden title="Output areas: the smallest census areas, about 125 households each. Census indicators only, shown for the councils in view once you zoom in or choose a local authority.">OA</button>
         </div>
         <div class="dl-hint" id="dl-hint"></div>
       </div>
@@ -4246,11 +4247,18 @@ function ovField(k) {
 function ovLevels(k) {
   const f = ovField(k);
   if (!f) return [];
-  const lv = (Array.isArray(f.lv) && f.lv.length) ? f.lv : (f.g ? [f.g] : []);
+  let lv = (Array.isArray(f.lv) && f.lv.length) ? f.lv : (f.g ? [f.g] : []);
   // Anything with ward figures can be shown per local authority too, worked
   // out from its wards (see laAggregate).
-  return (lv.indexOf('ward') !== -1 && lv.indexOf('borough') === -1) ? ['borough'].concat(lv) : lv;
+  if (lv.indexOf('ward') !== -1 && lv.indexOf('borough') === -1) lv = ['borough'].concat(lv);
+  // Census indicators also by output area, where this build has them.
+  if (typeof OA_INDEX !== 'undefined' && OA_INDEX && OA_INDEX.keys.indexOf(k) !== -1) lv = lv.concat(['oa']);
+  return lv;
 }
+// The output-area index (data/map/oa/index.json): which census keys, the
+// councils with their bounding boxes, and the legend ranges. Null until it
+// loads, and in builds without output areas (the England view).
+var OA_INDEX = null;
 function ovHasLevel(k, level) { return ovLevels(k).indexOf(level) !== -1; }
 
 // The native publication geography, for saying so on screen.
@@ -5077,6 +5085,14 @@ function ovVsEngland(level, id, k) {
   const d = MSOA_DATA[id];
   return (d && d[k + '_vs']) || '';
 }
+/* Figures carried from 2011 MSOA codes to a 2021 MSOA by the ONS lookup are
+   estimates for the 2021 area; the pipeline marks them ft_<id>_est. */
+function ovIsEstimated(level, id, k) {
+  if (level !== 'msoa' || typeof MSOA_DATA === 'undefined') return false;
+  const d = MSOA_DATA[id];
+  return !!(d && d[k + '_est']);
+}
+const EST_HTML = '<span class="vs vs-s" title="Carried from the 2011 area by the ONS 2011-to-2021 MSOA lookup">Estimated from 2011 areas</span>';
 function ovVsHTML(code) {
   if (!code || !VS_ENGLAND_TEXT[code]) return '';
   const cls = code === 'W' ? 'vs-w' : code === 'B' ? 'vs-b' : 'vs-s';
@@ -5282,11 +5298,12 @@ function indicatorCardHTML(k) {
   const f = indicatorFacts(k);
   const nat = (typeof ovNativeLevel === 'function') ? ovNativeLevel(k) : '';
   const lv = (typeof ovLevels === 'function') ? ovLevels(k) : [];
-  const LADDER = ['borough', 'ward', 'msoa', 'lsoa'];
-  const nm = l => ({ borough: 'Local authority', ward: 'Ward', msoa: 'MSOA', lsoa: 'LSOA' })[l] || l;
+  const LADDER = ['borough', 'ward', 'msoa', 'lsoa', 'oa'];
+  const nm = l => ({ borough: 'Local authority', ward: 'Ward', msoa: 'MSOA', lsoa: 'LSOA', oa: 'Output area' })[l] || l;
   const others = lv.filter(l => l !== nat);
   const how = others.map(l =>
     l === 'borough' ? 'local authority figures add counts up and weight rates by population'
+    : l === 'oa' ? 'output area figures are published by ONS for each output area (Census 2021)'
     : (LADDER.indexOf(l) > LADDER.indexOf(nat) ? nm(l) + ' figures share each area\'s value with the smaller areas inside it (an estimate, not a measurement)'
     : nm(l) + ' figures are built from the ' + nm(nat) + ' figures')).join('; ');
   const row = (t, v) => v ? '<dt>' + e(t) + '</dt><dd>' + v + '</dd>' : '';
@@ -9246,11 +9263,11 @@ function _applyBoroughSolo() {
   // _levelName reads as part of a sentence ("no ward figures"), so it is lower
   // case. A pill is a label, not a sentence, and 'ward' beside 'MSOA' looks
   // like a mistake rather than a choice.
-  const _LVL_TITLE = { borough: 'Local authority', ward: 'Ward', msoa: 'MSOA', lsoa: 'LSOA' };
+  const _LVL_TITLE = { borough: 'Local authority', ward: 'Ward', msoa: 'MSOA', lsoa: 'LSOA', oa: 'Output area' };
   function _levelTitle(lv) { return _LVL_TITLE[lv] || lv; }
   // Registries declare lv in whatever order was convenient. Pills always read
   // largest area first, so the same indicator looks the same everywhere.
-  const LADDER = ['borough', 'ward', 'msoa', 'lsoa'];
+  const LADDER = ['borough', 'ward', 'msoa', 'lsoa', 'oa'];
 
   /**
    * Who published it, in one or two words.
@@ -9669,6 +9686,11 @@ function _applyBoroughSolo() {
 
   // Anything else that changes the overlay re-syncs the picker.
   sel.addEventListener('change', () => setTimeout(() => { render(); if (libTheme) renderLib(); }, 0));
+  // Output areas load after the picker is built; refresh each indicator's levels.
+  document.addEventListener('ph-levels-changed', () => {
+    all.forEach(o => { o.levels = (typeof ovLevels === 'function') ? ovLevels(o.value) : o.levels; });
+    render(); if (libTheme) renderLib();
+  });
 
   render();
 })();
@@ -9821,13 +9843,15 @@ const PH_PEEK = (function () {
     if (!(window.PH_DRAWER && PH_DRAWER.narrow())) return;
     level = level || 'lsoa';
     const code = props.code;
-    const val = k => level === 'msoa' ? msoaOvValue(code, k) : lsoaOvValue(code, k);
+    const val = k => level === 'msoa' ? msoaOvValue(code, k)
+                   : level === 'oa' ? ((props._v || {})[k])
+                   : lsoaOvValue(code, k);
     const row = k => {
       if (!k || k === 'none') return '';
       const v = val(k);
       const has = !(v == null || v === '' || isNaN(parseFloat(v)));
-      const ctx = (!has || bivOn()) ? '' : ovContext(level, k, v);
-      const vs = has ? ovVsHTML(ovVsEngland(level, code, k)) : '';
+      const ctx = (!has || bivOn() || level === 'oa') ? '' : ovContext(level, k, v);
+      const vs = has ? ovVsHTML(ovVsEngland(level, code, k)) + (ovIsEstimated(level, code, k) ? EST_HTML : '') : '';
       return '<div class="ap-row"><span>' + esc(ovLabel(k)) +
         (ctx ? '<span class="ctx">' + esc(ctx) + '</span>' : '') + (vs ? '<span class="ctx">' + vs + '</span>' : '') + '</span><b>' +
         (has ? esc(fmtOv(v, k)) : 'no figure') + '</b></div>';
@@ -9845,6 +9869,114 @@ const PH_PEEK = (function () {
     if (more) more.addEventListener('click', () => { hide(); if (window.PH_DRAWER) PH_DRAWER.open(); });
   }
   return { show, hide };
+})();
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   OUTPUT AREAS
+
+   The smallest census geography, about 125 households, for census indicators
+   only. data/map/oa/<council>.json holds one council's output areas with
+   their census figures; this loads the councils being looked at, up to four
+   at a time: the focused council or board if one is chosen, otherwise the
+   councils in view once zoomed in. A whole region at once would be tens of
+   thousands of shapes.
+   ═══════════════════════════════════════════════════════════════════════════ */
+window.PH_OA = (function () {
+  const loaded = {}, loading = {};
+  let group = null, on = false, lsoaName = null;
+  const MAX_LADS = 4, MIN_ZOOM = 12;
+  const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  fetch(dataUrl('data/map/oa/index.json')).then(r => r.ok ? r.json() : null).then(ix => {
+    if (!ix || !ix.lads) return;
+    OA_INDEX = ix;
+    const b = document.querySelector('#dl-seg button[data-dl="oa"]');
+    if (b) b.hidden = false;
+    // The picker listed each indicator's levels before this arrived.
+    document.dispatchEvent(new Event('ph-levels-changed'));
+  }).catch(() => {});
+
+  function nameOfLsoa(code) {
+    if (!lsoaName && typeof LSOA_IMD !== 'undefined' && LSOA_IMD && LSOA_IMD.features) {
+      lsoaName = {};
+      LSOA_IMD.features.forEach(f => { lsoaName[f.properties.code] = f.properties.name; });
+    }
+    return (lsoaName && lsoaName[code]) || code;
+  }
+  function style(feat) {
+    const k = curOv, r = OA_INDEX && OA_INDEX.ranges[k];
+    const v = (feat.properties.v || {})[k];
+    const base = { color: '#555', weight: 0.4, opacity: 0.6 };
+    if (v == null || !r || r.hi === r.lo) return Object.assign(base, { fillColor: '#ccc', fillOpacity: 0.25 });
+    const t = Math.max(0, Math.min(1, (v - r.lo) / (r.hi - r.lo)));
+    return Object.assign(base, { fillColor: ovRamp(k, t), fillOpacity: Math.max(0.55, fillOpacityMult) });
+  }
+  function build(gj) {
+    return L.geoJSON(gj, {
+      style,
+      onEachFeature: (feat, lyr) => {
+        const p = feat.properties;
+        lyr.bindTooltip(() => {
+          const v = (p.v || {})[curOv];
+          return '<b style="font-size:var(--t-xs)">Output area ' + esc(p.c) + '</b>' +
+            '<br><span style="font-size:var(--t-xs);color:var(--ink-3)">in ' + esc(nameOfLsoa(p.l)) + '</span>' +
+            (v != null ? '<br><span style="font-size:var(--t-xs)">' + esc(ovLabel(curOv)) + ': <b>' + esc(fmtOv(v, curOv)) + '</b></span>' : '');
+        }, { sticky: true, opacity: 0.94 });
+        lyr.on('click', () => {
+          if (typeof PH_PEEK !== 'undefined') PH_PEEK.show({ code: p.c, name: 'Output area ' + p.c,
+            ward: 'in ' + nameOfLsoa(p.l), _v: p.v }, 'oa');
+        });
+      },
+    });
+  }
+  function wanted() {
+    if (!OA_INDEX || typeof map === 'undefined') return [];
+    const lads = OA_INDEX.lads;
+    if (typeof focusActive === 'function' && focusActive()) {
+      return Object.keys(lads).filter(c => ladInFocus(lads[c].n)).slice(0, MAX_LADS);
+    }
+    if (map.getZoom() < MIN_ZOOM) return [];
+    const b = map.getBounds();
+    return Object.keys(lads).filter(c => {
+      const x = lads[c].bbox;
+      return !(x[2] < b.getWest() || x[0] > b.getEast() || x[3] < b.getSouth() || x[1] > b.getNorth());
+    }).slice(0, MAX_LADS);
+  }
+  function refresh() {
+    if (!on || !OA_INDEX) return;
+    if (!group) group = L.layerGroup().addTo(map);
+    const want = wanted();
+    if (!want.length && typeof _dlHint === 'function') {
+      _dlHint('Zoom in, or choose a local authority, to see its output areas.', 4000);
+    }
+    Object.keys(loaded).forEach(c => {
+      if (want.indexOf(c) === -1 && group.hasLayer(loaded[c])) group.removeLayer(loaded[c]);
+    });
+    want.forEach(c => {
+      if (loaded[c]) { if (!group.hasLayer(loaded[c])) group.addLayer(loaded[c]); loaded[c].setStyle(style); return; }
+      if (loading[c]) return;
+      loading[c] = fetch(dataUrl('data/map/oa/' + c + '.json')).then(r => r.ok ? r.json() : null).then(gj => {
+        delete loading[c];
+        if (!gj) return;
+        loaded[c] = build(gj);
+        if (on && wanted().indexOf(c) !== -1) group.addLayer(loaded[c]);
+      }).catch(() => { delete loading[c]; });
+    });
+  }
+  function restyle() { Object.keys(loaded).forEach(c => loaded[c].setStyle(style)); }
+  if (typeof map !== 'undefined' && map) map.on('moveend', () => { if (on) refresh(); });
+  const ovSel = document.getElementById('ov');
+  if (ovSel) ovSel.addEventListener('change', () => setTimeout(restyle, 0));
+  ['borough-focus', 'icb-focus'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', () => setTimeout(refresh, 50));
+  });
+  return {
+    show() { on = true; if (typeof ensureLsoaImd === 'function') ensureLsoaImd(); refresh(); },
+    hide() { on = false; if (group) group.clearLayers(); },
+    restyle,
+    shownCount() { let n = 0; if (group) group.eachLayer(l => l.eachLayer(() => n++)); return n; },
+  };
 })();
 
 /* The two-variable map's controls and legend. The colouring itself is
@@ -11267,6 +11399,7 @@ function loadMsoaBoundaries() {
                            && v != null && !isNaN(parseFloat(v)))
               ? `<br><span style="font-size:var(--t-xs)">${_esc(_ovLabel(curOv))}: <b>${fmtOv(parseFloat(v), curOv)}</b></span>` +
                 ovVsHTML(ovVsEngland('msoa', p.code, curOv)) +
+                (ovIsEstimated('msoa', p.code, curOv) ? EST_HTML : '') +
                 (bivOn() ? '' : `<span class="ctx">${ovContext('msoa', curOv, v)}</span>`)
               : '';
             const v2 = bivOn() ? msoaOvValue(p.code, curOv2) : null;
@@ -11580,7 +11713,7 @@ function injectWardIMD() {
 function renderTopBottom() {
   const panel = document.getElementById('rank-panel');
   if (!panel) return;
-  if (!curOv || curOv === 'none' || bivOn()) {
+  if (!curOv || curOv === 'none' || bivOn() || _activeLevel() === 'oa') {
     panel.style.display = 'none';
     return;
   }
@@ -11767,6 +11900,7 @@ function ovRangeForDisplay(k) {
   if (level === 'lsoa') return getLsoaRange(k);
   if (level === 'msoa') return getMsoaRange(k);
   if (level === 'borough') return getBoroughRange(k);
+  if (level === 'oa') return (OA_INDEX && OA_INDEX.ranges[k]) || null;
   return getOvRange(k);
 }
 
@@ -11885,7 +12019,9 @@ function _syncScaleNumbers() {
     // currentDataLevel is a later `let`; read it guarded in case this runs first.
     let drawnLvl = 'ward';
     try { drawnLvl = currentDataLevel || 'ward'; } catch (e) { /* not declared yet */ }
-    const avgNote = (drawnLvl === 'ward' && (nativeG === 'lsoa' || nativeG === 'msoa'))
+    const avgNote = drawnLvl === 'oa'
+      ? ' · Shown by output area, as published by ONS'
+      : (drawnLvl === 'ward' && (nativeG === 'lsoa' || nativeG === 'msoa'))
       ? ` · Ward values are population-weighted averages of ${nativeG === 'lsoa' ? 'LSOAs' : 'MSOAs'}`
       : '';
     const _e = t => String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
@@ -12101,7 +12237,7 @@ let _dlDriving = false;
 
 // Level names as a reader would say them, for the toasts and the badges.
 function _levelName(level) {
-  return { borough: 'local authority', ward: 'ward', msoa: 'MSOA', lsoa: 'LSOA' }[level] || level;
+  return { borough: 'local authority', ward: 'ward', msoa: 'MSOA', lsoa: 'LSOA', oa: 'output area' }[level] || level;
 }
 
 function _dlHint(msg, ms) {
@@ -12119,7 +12255,7 @@ function _setDataLevel(level, opts) {
     _dlHint('LSOA-level data: in development');
     return;
   }
-  if (['borough', 'ward', 'msoa', 'lsoa'].indexOf(level) === -1) return;
+  if (['borough', 'ward', 'msoa', 'lsoa', 'oa'].indexOf(level) === -1) return;
 
   // ── Compatibility gate ───────────────────────────────────────────────
   // When the user clicks a Ward/LSOA badge button (i.e. not via the
@@ -12212,6 +12348,7 @@ function _setDataLevel(level, opts) {
     // for borough level and never switched off by this: turning someone's
     // borough outlines off because they looked at a ward would be a surprise.
     const want = { tnw: level === 'ward', tlsoa: level === 'lsoa', tmsoa: level === 'msoa' };
+    if (window.PH_OA) (level === 'oa' ? PH_OA.show() : PH_OA.hide());
     if (level === 'borough') {
       const tb = document.getElementById('tb');
       if (tb && !tb.checked) { tb.checked = true; tb.dispatchEvent(new Event('change')); }
@@ -12260,7 +12397,9 @@ document.querySelectorAll('#dl-seg button').forEach(b => {
     // it is the one the picker boxes. Life expectancy is an MSOA figure and
     // opened on a ward map that could only show it averaged across MSOAs.
     const nat = (typeof ovNativeLevel === 'function') ? ovNativeLevel(k) : '';
-    if (nat && typeof ovHasLevel === 'function' && ovHasLevel(k, nat)) {
+    if (cur === 'oa' && ovHasLevel(k, 'oa')) {
+      lv = 'oa';   // Stay on output areas while moving between census figures.
+    } else if (nat && typeof ovHasLevel === 'function' && ovHasLevel(k, nat)) {
       lv = nat;
     } else if (typeof ovHasLevel === 'function' && ovHasLevel(k, cur)) {
       lv = cur;
@@ -12851,7 +12990,7 @@ function _readUrlState() {
     // Level after the overlay, and past the compatibility gate: the link chose
     // an indicator and a level together, and they agreed when it was made.
     const lvl = p.get('lvl');
-    if (lvl && !_urlDone.lvl && ['borough', 'ward', 'msoa', 'lsoa'].indexOf(lvl) !== -1 &&
+    if (lvl && !_urlDone.lvl && ['borough', 'ward', 'msoa', 'lsoa', 'oa'].indexOf(lvl) !== -1 &&
         typeof _setDataLevel === 'function') {
       _setDataLevel(lvl, { fromOverlay: true });
       _urlDone.lvl = true;

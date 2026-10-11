@@ -22,7 +22,8 @@ tests/
 The one suite that runs automatically. It loads London, the North East (when
 `data/regions/north-east/` exists), the England warning and the three text
 pages, exercises the indicator picker, cards, two-indicator map, ward sheet,
-phone drawer and tapped-area card, and runs axe-core (WCAG 2.1 A/AA and best
+phone drawer and tapped-area card, census figures by output area (when
+`data/map/oa/` exists), and runs axe-core (WCAG 2.1 A/AA and best
 practice) in each state. Any accessibility violation fails it.
 
 ```bash
