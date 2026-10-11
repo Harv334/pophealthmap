@@ -92,13 +92,83 @@ map rather than instead of it.</p>
   figures as provisional.
 </div>
 
+<h2 id="matching">How places are matched</h2>
+
+<p>Figures arrive from many publishers, for different years and different
+kinds of area. Boundaries change: wards are redrawn, councils merge, and the
+small census areas were revised in 2021. This map follows one rule so that
+every figure is put on the map the same way, and every step can be checked
+against a published ONS file.</p>
+
+<p><strong>The rule.</strong> Every figure is first placed on the 2021 census
+building blocks, LSOAs and MSOAs. It is then added up to wards and local
+authorities using the official ONS lookup files listed below. Nothing is
+matched by name, and nothing is matched by drawing one boundary over another
+on this site.</p>
+
+<div class="wrap" tabindex="0" role="region" aria-label="Table 1 (scrolls sideways on a narrow screen)">
+<table>
+  <tr><th>Step</th><th>ONS product</th><th>Used for</th></tr>
+  <tr><td>Small areas to wards and councils</td>
+      <td><code>LSOA21_WD25_LAD25_EW_LU_v2</code> (May 2025 boundaries)</td>
+      <td>Every ward and local authority figure that is built up from
+          LSOAs.</td></tr>
+  <tr><td>Output areas to small areas</td>
+      <td><code>OA21_LAD23_LSOA21_MSOA21_LEP23_EN_LU</code></td>
+      <td>Placing each Census 2021 output area in its LSOA and MSOA.</td></tr>
+  <tr><td>2011 MSOAs to 2021 MSOAs</td>
+      <td><code>MSOA11_MSOA21_LAD22_EW_LU_v2</code>, weighted by the 2011
+          census population of each area (Nomis <code>KS101EW</code>)</td>
+      <td>Local Health figures still published on 2011 areas.</td></tr>
+  <tr><td>Places with an address or a location</td>
+      <td>ONS Postcode Directory, through postcodes.io</td>
+      <td>GP practices, pharmacies, stations, crimes and charities are
+          placed by where they are, then fall into whichever area contains
+          them.</td></tr>
+  <tr><td>Council codes</td>
+      <td>Current ONS council codes (May 2025), checked against the codes
+          each publisher uses; any mismatch is traced through the ONS Code
+          History Database</td>
+      <td>Council level figures, such as Fingertips.</td></tr>
+</table>
+</div>
+
+<p><strong>Best fit, not exact fit.</strong> The ONS lookups assign each LSOA
+to the single ward it mostly sits in, judged by where people live. About four
+in ten LSOAs cross a ward line, so a ward figure built up this way is a close
+estimate of the ward rather than an exact count for it. The same lookup is
+used for every indicator, so ward figures can still be compared fairly with
+one another.</p>
+
+<p><strong>Estimated figures are marked.</strong> Some Local Health figures
+are still published on 2011 MSOAs. When a 2011 area was split or merged to make
+a 2021 one, the figure for the 2021 area is worked out from the 2011 ones,
+weighted by how many people lived in each. Where that happens the map says
+<em>Estimated from 2011 areas</em> beside the figure, and does not compare it
+with England, because the publisher's own comparison applied to the old
+area.</p>
+
+<p><strong>Council codes are checked, not assumed.</strong> Each refresh
+checks that every council on the map was found under its current code in the
+publisher's data. Councils that have merged or changed code since the figures
+were published would otherwise be silently missing. If any council does not
+match, the refresh says so in the fetch log below.</p>
+
+<p><strong>Output areas.</strong> Census 2021 figures are also published for
+output areas, the smallest census area, of about 130 households. For census
+indicators the map can show these directly: choose <strong>OA</strong> on the
+level switch, then zoom in or pick a local authority. Output area figures are
+exactly as ONS published them; nothing is estimated. Because the numbers are
+small, a single household can move a percentage noticeably, so read them as a
+picture of a street or estate rather than a precise measure.</p>
+
 <h2>The words used on this map</h2>
 
 <p>Official statistics use short names for areas and measures. Where the map
 uses one, this says what it means. Where a plain word is clearer, the map uses
 that instead and this gives the official name for it.</p>
 
-<div class="wrap" tabindex="0" role="region" aria-label="Table 1 (scrolls sideways on a narrow screen)">
+<div class="wrap" tabindex="0" role="region" aria-label="Table 2 (scrolls sideways on a narrow screen)">
 <table>
   <tr><th>Plain word</th><th>Official name</th><th>What it is</th></tr>
   <tr><td>Local authority (borough, council)</td><td>Local authority district</td>
@@ -178,7 +248,7 @@ so it reports when this site last actually pulled that source and whether the
 pull worked. A source that has started failing says so here rather than quietly
 serving older figures with no sign of it.</p>
 
-<div class="wrap" tabindex="0" role="region" aria-label="Table 2 (scrolls sideways on a narrow screen)">
+<div class="wrap" tabindex="0" role="region" aria-label="Table 3 (scrolls sideways on a narrow screen)">
   <table id="src-table">
     <thead>
       <tr>
@@ -230,7 +300,7 @@ register from the Department for Transport, under the Open Government Licence v3
 reviews. They do not nest inside one another, and that has consequences worth
 understanding before comparing them.</p>
 
-<div class="wrap" tabindex="0" role="region" aria-label="Table 3 (scrolls sideways on a narrow screen)">
+<div class="wrap" tabindex="0" role="region" aria-label="Table 4 (scrolls sideways on a narrow screen)">
 <table>
   <tr><th>Level</th><th>Vintage</th><th>London</th><th>England</th><th>Source</th></tr>
   <tr><td>Local authority</td><td>May 2025</td><td>33</td><td>296</td>

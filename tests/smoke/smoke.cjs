@@ -7,7 +7,8 @@
    Needs the playwright and axe-core npm packages. Prints PASS/FAIL per check
    and exits non-zero if any check fails. The North East checks are skipped
    when data/regions/north-east/ is not present (it is unpacked from the
-   region-data release in CI). */
+   region-data release in CI). The output area checks are skipped when
+   data/map/oa/index.json is not present. */
 const { chromium } = require('playwright');
 const fs = require('fs');
 const path = require('path');
@@ -15,6 +16,7 @@ const AXE = fs.readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
 const BASE = (process.argv[2] || 'http://localhost:8792').replace(/\/$/, '');
 const ROOT = path.resolve(__dirname, '..', '..');
 const HAS_NE = fs.existsSync(path.join(ROOT, 'data/regions/north-east/ward_data.json'));
+const HAS_OA = fs.existsSync(path.join(ROOT, 'data/map/oa/index.json'));
 const SETTLE = +(process.env.SMOKE_SETTLE_MS || 9000);
 
 let failed = 0;
@@ -91,6 +93,29 @@ const setOv = (page, k) => page.evaluate(k => {
     ok(errors.length === 0, 'no page errors (London desktop)', errors.join(' | '));
     await page.close();
   }
+
+  // Output areas: census indicators can be shown by output area once a borough is chosen.
+  if (HAS_OA) {
+    const { page, errors } = await open(browser, 'index.html?t=1', DESK);
+    const k = await page.evaluate(() => OA_INDEX && OA_INDEX.keys.find(k => document.querySelector('#ov option[value="' + k + '"]')));
+    ok(!!k, 'output area index loaded');
+    if (k) {
+      await setOv(page, k);
+      await page.waitForTimeout(1000);
+      ok(await page.evaluate(() => !document.querySelector('#dl-seg button[data-dl="oa"]').hidden), 'output area button shown for a census indicator');
+      await page.click('#dl-seg button[data-dl="oa"]');
+      await page.evaluate(() => { const s = document.getElementById('borough-focus'); s.value = s.options[5].value; s.dispatchEvent(new Event('change')); });
+      await page.waitForTimeout(4000);
+      ok(await page.evaluate(() => _activeLevel() === 'oa' && PH_OA.shownCount() > 0), 'output areas drawn for a chosen borough',
+         await page.evaluate(() => _activeLevel() + ' ' + PH_OA.shownCount()));
+      await checkAxe(page, 'output areas');
+      await setOv(page, 'imd_decile');
+      await page.waitForTimeout(1500);
+      ok(await page.evaluate(() => _activeLevel() !== 'oa' && PH_OA.shownCount() === 0), 'output areas cleared for a non-census indicator');
+    }
+    ok(errors.length === 0, 'no page errors with output areas', errors.join(' | '));
+    await page.close();
+  } else console.log('SKIP output area checks (no data/map/oa)');
 
   // Two indicators
   {

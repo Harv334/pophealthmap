@@ -1542,8 +1542,12 @@ def _nomis_urls(tab_id: str) -> list[str]:
     ]
 
 
-def _fetch_census_table(tab_id: str) -> pd.DataFrame | None:
-    """Cache-first download + return the LSOA CSV as a DataFrame. None on failure."""
+def _fetch_census_table(tab_id: str, level: str = "lsoa") -> pd.DataFrame | None:
+    """Cache-first download + return the LSOA (or OA) CSV as a DataFrame. None on failure.
+
+    The Nomis bulk zip for each table carries one CSV per geography; level
+    picks which. "oa" is matched on the file ending "-oa.csv" so it does not
+    pick up the LSOA or MSOA file."""
     cache_dir = CACHE_DIR / "census2021"
     cache_dir.mkdir(parents=True, exist_ok=True)
     cache_zip = cache_dir / f"{tab_id.lower()}.zip"
@@ -1576,12 +1580,15 @@ def _fetch_census_table(tab_id: str) -> pd.DataFrame | None:
     try:
         with zipfile.ZipFile(cache_zip) as z:
             names = z.namelist()
-            lsoa_name = next(
-                (n for n in names if "lsoa" in n.lower() and n.endswith(".csv")),
-                None,
-            )
+            if level == "oa":
+                lsoa_name = next((n for n in names if n.lower().endswith("-oa.csv")), None)
+            else:
+                lsoa_name = next(
+                    (n for n in names if "lsoa" in n.lower() and n.endswith(".csv")),
+                    None,
+                )
             if not lsoa_name:
-                warn(f"  {tab_id}: no LSOA CSV inside zip ({names[:3]}...)")
+                warn(f"  {tab_id}: no {level.upper()} CSV inside zip ({names[:3]}...)")
                 return None
             with z.open(lsoa_name) as f:
                 return pd.read_csv(f, low_memory=False)
@@ -1652,9 +1659,23 @@ def _cen_pct(df: pd.DataFrame, num_cols: list[str], den_col: str) -> "pd.Series"
 
 def run_census2021() -> pd.DataFrame:
     rule("Census 2021 (Nomis bulk, LSOA)")
+    out = _census_frame("lsoa")
+    if out is None or out.empty:
+        return pd.DataFrame()
+    out_path = DATA_DIR / "demographics" / "census2021.parquet"
+    out = write_parquet_guarded(out_path, out, source="census")
+    ok(f"census2021: {len(out):,} LSOAs x {len(out.columns)-1} indicators -> {out_path.relative_to(REPO_ROOT)}")
+    return out
+
+
+def _census_frame(level: str = "lsoa") -> pd.DataFrame | None:
+    """Every census indicator for every area of one geography, keyed by a
+    column called LSOA21CD whatever the level (the OA build renames it).
+    One set of rules for both levels, so an output area and its LSOA are
+    computed the same way."""
     tables: dict[str, pd.DataFrame] = {}
     for tab in CENSUS_TABLES:
-        df = _fetch_census_table(tab)
+        df = _fetch_census_table(tab, level)
         if df is not None:
             tables[tab] = df
             info(f"  {tab}: {len(df):,} rows x {len(df.columns)} cols")
@@ -1956,11 +1977,138 @@ def run_census2021() -> pd.DataFrame:
             out[col] = pd.to_numeric(out[col], errors="coerce").round(2)
     if "census_population" in out.columns:
         out["census_population"] = pd.to_numeric(out["census_population"], errors="coerce").astype("Int64")
-
-    out_path = DATA_DIR / "demographics" / "census2021.parquet"
-    out = write_parquet_guarded(out_path, out, source="census")
-    ok(f"census2021: {len(out):,} LSOAs x {len(out.columns)-1} indicators -> {out_path.relative_to(REPO_ROOT)}")
     return out
+
+
+# ============================================================================
+# CENSUS 2021 BY OUTPUT AREA
+#
+# Output areas are the smallest census geography, about 125 households, and
+# nest exactly inside 2021 LSOAs. Only the census is published at this level,
+# so it is offered for census indicators alone. The figures come from the same
+# Nomis bulk zips as the LSOA ones (each zip carries an OA file) and go
+# through the same _census_frame rules. Boundaries are ONS Output Areas 2021
+# (BGC), written one file per local authority so the map loads only the
+# councils being looked at: London has about 26,000 output areas.
+# ============================================================================
+OA_BOUNDARY_SERVICES = ["Output_Areas_2021_EW_BGC_V2", "Output_Areas_2021_EW_BGC_V3",
+                        "Output_Areas_December_2021_Boundaries_EW_BGC"]
+ONS_SERVICES = "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services"
+
+
+def _oa_boundary_service() -> str | None:
+    """The first OA 2021 BGC feature service ONS has, discovered from its
+    service list if none of the known names answers."""
+    for name in OA_BOUNDARY_SERVICES:
+        try:
+            r = requests.get(f"{ONS_SERVICES}/{name}/FeatureServer/0?f=json", timeout=60)
+            if r.ok and "fields" in r.json():
+                return name
+        except Exception:
+            continue
+    try:
+        r = requests.get(f"{ONS_SERVICES}?f=json", timeout=120)
+        names = [x["name"] for x in r.json().get("services", [])]
+        cands = sorted(n for n in names if re.match(r"(?i)output_areas?_(december_)?2021.*bgc", n))
+        return cands[-1] if cands else None
+    except Exception as e:
+        warn(f"census_oa: could not list ONS services: {e}")
+        return None
+
+
+def run_census_oa() -> pd.DataFrame:
+    rule("Census 2021 by output area (Nomis bulk; ONS OA boundaries)")
+    lsoa_lk = get_lsoa_ward_lookup()               # {LSOA21CD: (WD25CD, LAD25CD)}
+    lsoas = sorted(lsoa_lk)
+    frame = _census_frame("oa")
+    if frame is None or frame.empty:
+        warn("census_oa: no OA census figures")
+        return pd.DataFrame()
+    frame = frame.rename(columns={"LSOA21CD": "OA21CD"}).set_index("OA21CD")
+    keys = [c for c in frame.columns if c.startswith("census_")]
+
+    svc = _oa_boundary_service()
+    if not svc:
+        warn("census_oa: no ONS output area boundary service found")
+        return pd.DataFrame()
+    cache = CACHE_DIR / "boundaries" / f"oa21_{SCOPE_KEY}.geojson"
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    if cache.exists():
+        feats = json.loads(cache.read_text(encoding="utf-8"))["features"]
+    else:
+        feats = []
+        url = f"{ONS_SERVICES}/{svc}/FeatureServer/0/query"
+        for i in range(0, len(lsoas), 60):
+            batch = lsoas[i:i + 60]
+            payload = {"where": "LSOA21CD IN (" + ",".join(f"'{c}'" for c in batch) + ")",
+                       "outFields": "OA21CD,LSOA21CD", "returnGeometry": "true",
+                       "outSR": "4326", "f": "geojson", "resultRecordCount": 2000}
+            for attempt in range(3):
+                try:
+                    r = requests.post(url, data=payload, timeout=180)
+                    r.raise_for_status()
+                    feats.extend(r.json().get("features", []))
+                    break
+                except Exception as e:
+                    if attempt == 2:
+                        warn(f"census_oa: boundary batch {i // 60} failed: {e}")
+                    time.sleep(3)
+        if len(feats) < len(lsoas) * 3:
+            warn(f"census_oa: only {len(feats):,} output areas for {len(lsoas):,} LSOAs; not caching")
+        else:
+            cache.write_text(json.dumps({"type": "FeatureCollection", "features": feats}), encoding="utf-8")
+    if not feats:
+        return pd.DataFrame()
+
+    out_dir = MAP_DIR / "oa"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for old in out_dir.glob("*.json"):
+        old.unlink()
+    by_lad: dict = {}
+    vals_by_key = {k: [] for k in keys}
+    for f in feats:
+        p = f.get("properties") or {}
+        oa, lsoa = p.get("OA21CD"), p.get("LSOA21CD")
+        if not oa or lsoa not in lsoa_lk or oa not in frame.index:
+            continue
+        lad = lsoa_lk[lsoa][1]
+        row = frame.loc[oa]
+        v = {}
+        for k in keys:
+            x = row.get(k)
+            if x is not None and not pd.isna(x):
+                v[k] = round(float(x), 1) if k != "census_population" else int(x)
+                vals_by_key[k].append(float(x))
+        by_lad.setdefault(lad, []).append({"type": "Feature",
+            "properties": {"c": oa, "l": lsoa, "v": v}, "geometry": f.get("geometry")})
+
+    index = {"lads": {}, "keys": keys, "ranges": {}}
+    for lad, fs in by_lad.items():
+        xs, ys = [], []
+        def walk(c):
+            if isinstance(c[0], (int, float)):
+                xs.append(c[0]); ys.append(c[1])
+            else:
+                for cc in c:
+                    walk(cc)
+        for f in fs:
+            if f["geometry"]:
+                walk(f["geometry"]["coordinates"])
+        index["lads"][lad] = {"n": LAD_NAMES.get(lad, lad), "count": len(fs),
+                              "bbox": [round(min(xs), 4), round(min(ys), 4), round(max(xs), 4), round(max(ys), 4)]}
+        write_atomic(out_dir / f"{lad}.json", json.dumps(_round_coords(
+            {"type": "FeatureCollection", "features": fs}), separators=(",", ":")))
+    for k, xs in vals_by_key.items():
+        if len(xs) > 10:
+            xs = sorted(xs)
+            index["ranges"][k] = {"lo": xs[int(len(xs) * 0.05)], "hi": xs[int(len(xs) * 0.95) - 1],
+                                  "min": xs[0], "max": xs[-1]}
+    write_atomic(out_dir / "index.json", json.dumps(index, separators=(",", ":")))
+    n = sum(len(fs) for fs in by_lad.values())
+    size = sum(p.stat().st_size for p in out_dir.glob("*.json")) / 1e6
+    ok(f"census_oa: {n:,} output areas in {len(by_lad)} {LA_WORD}s, {len(keys)} indicators, "
+       f"{size:.1f} MB -> {out_dir.relative_to(REPO_ROOT)}/")
+    return pd.DataFrame([{"lad": l, "oas": len(f)} for l, f in by_lad.items()])
 
 
 # ============================================================================
@@ -2490,6 +2638,22 @@ def run_fingertips() -> pd.DataFrame:
                              cache_file=lambda k: cache_dir / f"ind_{ft_id[k]}.csv")
     out = write_parquet_guarded(out_path, out, source="fingertips")
     ok(f"fingertips: {len(out):,} rows -> {out_path.relative_to(REPO_ROOT)}")
+    # Council codes are checked, not assumed. A council reorganised since the
+    # boundaries Fingertips uses (or the other way round) matches nothing and
+    # would otherwise just be blank. ONS's Code History Database records which
+    # codes replaced which; anything listed here needs looking up there.
+    if not out.empty and "LAD25CD" in out.columns:
+        have = set(out["LAD25CD"].astype(str))
+        parents = _ft_district_parents()
+        missing = sorted(l for l in SCOPE_LADS if l not in have and parents.get(l) not in have)
+        if missing:
+            names = ", ".join(f"{LAD_NAMES.get(l, l)} ({l})" for l in missing)
+            msg = (f"{len(missing)} {LA_WORD}(s) matched no Fingertips area code, directly or "
+                   f"through their county: {names}. Check the ONS Code History Database.")
+            warn(f"fingertips: {msg}")
+            _SOURCE_PARTIAL["fingertips"] = msg
+        else:
+            ok(f"fingertips: all {len(SCOPE_LADS)} {LA_WORD}s matched a Fingertips area code")
     return out
 
 # ============================================================================
@@ -2745,6 +2909,37 @@ def get_lsoa_to_msoa() -> dict:
 
 
 @lru_cache(maxsize=1)
+def get_msoa11_population() -> dict:
+    """MSOA11CD -> usual residents, Census 2011 (table KS101EW, ONS via Nomis).
+
+    The weight when 2011 MSOAs merged into one 2021 MSOA: their figures are
+    combined in proportion to the people living in each, the same rule every
+    other aggregation on the site follows. {} if Nomis does not answer, and
+    the merge then falls back to equal weights with a warning."""
+    cache = CACHE_DIR / "lookups" / "msoa11_population_ks101ew.json"
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    if cache.exists():
+        try:
+            return json.loads(cache.read_text(encoding="utf-8"))
+        except ValueError:
+            pass
+    url = ("https://www.nomisweb.co.uk/api/v01/dataset/NM_144_1.data.csv"
+           "?date=latest&geography=TYPE297&rural_urban=0&cell=0&measures=20100"
+           "&select=geography_code,obs_value")
+    try:
+        r = requests.get(url, timeout=180)
+        r.raise_for_status()
+        df = pd.read_csv(io.StringIO(r.text))
+        out = {str(c): float(v) for c, v in zip(df.iloc[:, 0], df.iloc[:, 1]) if str(c).startswith("E02")}
+    except Exception as e:
+        warn(f"msoa11 population (KS101EW): {e}; merged MSOAs use equal weights")
+        return {}
+    if len(out) > 6000:
+        cache.write_text(json.dumps(out), encoding="utf-8")
+    return out
+
+
+@lru_cache(maxsize=1)
 def get_msoa21_to_msoa11() -> dict:
     """MSOA21CD -> [MSOA11CD, ...] for the MSOAs in scope, cached on disk.
 
@@ -2808,18 +3003,24 @@ def _ft_msoa_variant(ind_id, df, name, want_msoa, rows, missing_codes) -> int:
     if "Time period Sortable" in df.columns:
         df = df.sort_values("Time period Sortable").groupby("Area Code", as_index=False).tail(1)
     # 2021 MSOAs with no figure under their own code take their 2011
-    # parent's (a split) or the mean of their parents' (a merge).
+    # parent's (a split) or their parents' combined in proportion to the people
+    # living in each in 2011 (a merge). Marked as estimated.
     lookup = get_msoa21_to_msoa11()
     have = set(df["Area Code"])
     by_code = df.set_index("Area Code")
     extra = []
     for m21 in want_msoa - have:
         parents = [p for p in lookup.get(m21, []) if p in by_code.index and p != m21]
-        vals = [_tofloat(by_code.at[p, "Value"]) for p in parents]
-        vals = [v for v in vals if v is not None and v == v]
-        if vals:
-            row = by_code.loc[parents[0]].copy()
-            row["Value"] = repr(sum(vals) / len(vals))
+        pairs = [(p, _tofloat(by_code.at[p, "Value"])) for p in parents]
+        pairs = [(p, v) for p, v in pairs if v is not None and v == v]
+        if pairs:
+            pops = get_msoa11_population() if len(pairs) > 1 else {}
+            w = [pops.get(p, 0.0) for p, _ in pairs] if pops else [1.0] * len(pairs)
+            if not sum(w):
+                w = [1.0] * len(pairs)
+            row = by_code.loc[pairs[0][0]].copy()
+            row["Value"] = repr(sum(v * wi for (_, v), wi in zip(pairs, w)) / sum(w))
+            row["_estimated"] = True
             row["Area Code"] = m21
             extra.append(row)
     if extra:
@@ -2848,6 +3049,7 @@ def _ft_msoa_variant(ind_id, df, name, want_msoa, rows, missing_codes) -> int:
             "value": _tofloat(row.get("Value")),
             "period": row.get("Time period", ""),
             "vs_england": FT_VS_CODES.get(str(row.get(FT_VS_ENGLAND_COL, "")).strip(), ""),
+            "estimated": bool(row.get("_estimated", False) is True),
         })
 
     return bridged
@@ -4629,6 +4831,9 @@ def build_msoa_data() -> dict:
         vs = row.get("vs_england") if hasattr(row, "get") else None
         if isinstance(vs, str) and vs:
             out[code][f"ft_{int(row['indicator_id'])}_vs"] = vs
+        # Carried from 2011 codes, so an estimate for the 2021 area.
+        if bool(row.get("estimated", False)) is True:
+            out[code][f"ft_{int(row['indicator_id'])}_est"] = 1
 
     n_vals = sum(len(v) for v in out.values())
     info(f"msoa_data: {len(out):,} MSOAs, {n_vals:,} published values, none derived")
@@ -6607,6 +6812,7 @@ SOURCES = {
     "pharmacies":  run_pharmacies,
     "imd":         run_imd2025,
     "census":      run_census2021,
+    "census_oa":   run_census_oa,
     "claimant":    run_claimant_count,
     "qof":         run_qof,
     "fingertips":  run_fingertips,
