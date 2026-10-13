@@ -625,21 +625,36 @@ var MODEL_LABEL = "Claude Sonnet 5";
   var UNREACHABLE = "The question service could not be reached from this network. "
     + "The rest of the map still works.";
 
+  // A request with no answer after 30 seconds is given up, rather than
+  // leaving "Reading the data..." on screen for as long as the network
+  // cares to hang, and the panel says so in words.
+  var ASK_TIMEOUT_MS = 30000;
+  var TIMED_OUT = "Sorry, that question took too long to answer. "
+    + "Please try again, or ask it a different way.";
+
   async function answerRounds() {
     for (var round = 0; round < MAX_TOOL_ROUNDS; round++) {
       var res;
+      var ctl = typeof AbortController === "function" ? new AbortController() : null;
+      var timer = ctl ? setTimeout(function () { ctl.abort(); }, ASK_TIMEOUT_MS) : 0;
       try {
         res = await fetch(ASSISTANT_ENDPOINT, {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ messages: history }),
+          signal: ctl ? ctl.signal : undefined,
         });
       } catch (e) {
-        throw new Error(UNREACHABLE);
+        clearTimeout(timer);
+        throw new Error(ctl && ctl.signal.aborted ? TIMED_OUT : UNREACHABLE);
       }
       // Not always JSON: a proxy or Cloudflare itself can answer with a page.
+      // The 30 seconds cover the body as well, which is where a slow reply
+      // spends most of its time.
       var data = null;
       try { data = await res.json(); } catch (e) { /* reported below */ }
+      clearTimeout(timer);
+      if (ctl && ctl.signal.aborted && !data) throw new Error(TIMED_OUT);
       // Refused for the day. The Worker says so in words; the badge should
       // agree rather than go on offering questions that will be refused.
       if (res.status === 429) {
@@ -899,7 +914,8 @@ var MODEL_LABEL = "Claude Sonnet 5";
     close.id = "ai-close";
     close.type = "button";
     close.setAttribute("aria-label", "Close");
-    close.textContent = "×";
+    // The cross from the page's icon set (the symbols at the top of index.html).
+    close.innerHTML = '<svg class="ic" aria-hidden="true" focusable="false"><use href="#i-x"/></svg>';
 
     // The remaining count, beside the panel's own name. Built here rather than
     // in mount() because the header outlives the body: mounting is a no-op the

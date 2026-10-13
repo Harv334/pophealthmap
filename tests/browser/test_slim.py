@@ -44,7 +44,7 @@ try:
     check("but the bar still names the ward the profile belongs to",
           d.execute_script("return document.getElementById('ws-name').textContent.trim()") == wd)
 
-    # border slider reaches every layer
+    # the Borders choice (Thin, Medium, Thick) reaches every layer
     def weights():
         return d.execute_script("""
           function w(sel){var p=document.querySelector(sel); return p? parseFloat(p.getAttribute('stroke-width')):null;}
@@ -55,25 +55,22 @@ try:
     time.sleep(9)
     before = weights()
     d.execute_script("""
-      var b = document.getElementById('border-weight');
-      b.value = 8; b.dispatchEvent(new Event('input', {bubbles:true}));
+      document.querySelector('#border-weight input[value="6"]').click();
     """)
     time.sleep(2)
     after = weights()
-    check("the border slider now emboldens MSOA when MSOA is the layer",
+    check("Thick borders embolden MSOA when MSOA is the layer",
           before["msoa"] and after["msoa"] and after["msoa"] > before["msoa"] + 1,
           f"{before['msoa']} -> {after['msoa']}")
 
     d.execute_script("""
-      var b = document.getElementById('border-weight');
-      b.value = 1; b.dispatchEvent(new Event('input', {bubbles:true}));
+      document.querySelector('#border-weight input[value="1"]').click();
       document.querySelector('#dl-seg button[data-dl="lsoa"]').click();
     """)
     time.sleep(10)
     lb = weights()
     d.execute_script("""
-      var b = document.getElementById('border-weight');
-      b.value = 8; b.dispatchEvent(new Event('input', {bubbles:true}));
+      document.querySelector('#border-weight input[value="6"]').click();
     """)
     time.sleep(2)
     la = weights()
@@ -82,15 +79,13 @@ try:
           f"{lb['lsoa']} -> {la['lsoa']}")
 
     d.execute_script("""
-      var b=document.getElementById('border-weight'); b.value=1;
-      b.dispatchEvent(new Event('input', {bubbles:true}));
+      document.querySelector('#border-weight input[value="1"]').click();
       document.querySelector('#dl-seg button[data-dl="ward"]').click();
     """)
     time.sleep(7)
     wb = weights()
     d.execute_script("""
-      var b=document.getElementById('border-weight'); b.value=8;
-      b.dispatchEvent(new Event('input', {bubbles:true}));
+      document.querySelector('#border-weight input[value="6"]').click();
     """)
     time.sleep(2)
     wa = weights()

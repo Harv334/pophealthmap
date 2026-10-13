@@ -32,11 +32,27 @@ pophealth.uk, so the suite answers those requests from the working copy.
 It also checks the names: every indicator is named from the one label table
 (`IND_NAMES`), Compare offers each measure once, and the old names (Soc rent,
 Boards, metric, VCSE, Borough or Local authority as the level) are gone.
-For the
-indicator cards it checks that one control opens a card and a button at its
+For the indicator cards it checks that one control opens a card and a button at its
 top closes it, that no card or description carries internal codes, "=",
 "i.e.", dashes or title-case categories, that every Census card describes
-the method the pipeline uses, and that periods and dates are written out.
+the method the pipeline uses, and that periods and dates are written out. For the Data
+export it checks the column headings (label, unit and period, and "(LA
+figure)"), the shared decimal places, the groups, the notes file, the folding
+steps, the pinned download bar and the in-panel preview. For charities, the
+Directory and the PCN list it checks that the Directory opens on a search
+prompt under a heading built from the live count, that "E1 6" finds no SE1
+postcodes, that names are in title case and sort past leading punctuation,
+that the Charities tab and the Directory agree on one charity count, the key
+to the charity dots and the ring style of their groups, that the PCN list has
+no placeholder and no "Gp", and that a postcode search lists the nearest GP
+practices, pharmacies and charities in the ward sheet. postcodes.io is
+answered locally in that block, so it needs no network. For failure and
+loading states it blocks files with `page.route`: with `data/ward_core.json`
+blocked the whole ward file stands in, with `lsoa_data.json` blocked a plain
+message appears and Try again recovers, with both ward files blocked the
+outlines show under a banner, with `data/map/wards.js` blocked the loading
+screen offers a reload, and an Ask request with no answer is given up after
+30 seconds (the clock is fast-forwarded, so the check does not wait).
 
 ```bash
 npm install --no-save playwright axe-core
