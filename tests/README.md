@@ -112,6 +112,10 @@ root from their own location, so they run from anywhere:
 .venv/Scripts/python.exe tests/pipeline/test_manifest.py
 ```
 
+`test_names_and_ci.py` checks the display-name and phone helpers, the rule that
+stores a Fingertips placeholder row as missing, and the DESNZ fuel poverty year,
+all offline, so they are tested before the next refresh runs them.
+
 `test_guards.py` and `test_guards_gp.py` copy real downloads out of `.cache/`
 to build their fixtures, so they need a populated cache. `.cache/` is not in the
 repo: run the relevant pipeline source once first, or skip them.

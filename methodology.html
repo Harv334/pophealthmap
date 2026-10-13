@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Methodology and technical notes | PopHealth Map</title>
 <link rel="canonical" href="https://pophealth.uk/methodology.html">
-<meta name="description" content="How PopHealth Map is built: every data source, how figures are added up from neighbourhoods to wards and LAs, and what to watch for when reading them.">
+<meta name="description" content="How PopHealth Map is built: every data source, how figures are worked out from small areas for wards and LAs, and what to watch for when reading them.">
 <!-- Same inline map-pin icon as index.html, so the tab matches. -->
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1a1a'/%3E%3Cpath d='M16 6c-3.9 0-7 3.1-7 7 0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7z' fill='%23fff'/%3E%3Ccircle cx='16' cy='13' r='2.6' fill='%231a1a1a'/%3E%3C/svg%3E">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
@@ -16,14 +16,14 @@
 <meta property="og:locale" content="en_GB">
 <meta property="og:url" content="https://pophealth.uk/methodology.html">
 <meta property="og:title" content="Methodology and technical notes | PopHealth Map">
-<meta property="og:description" content="How PopHealth Map is built: every data source, how figures are added up from neighbourhoods to wards and LAs, and what to watch for when reading them.">
+<meta property="og:description" content="How PopHealth Map is built: every data source, how figures are worked out from small areas for wards and LAs, and what to watch for when reading them.">
 <meta property="og:image" content="https://pophealth.uk/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="PopHealth Map: population health across England by ward and neighbourhood">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Methodology and technical notes | PopHealth Map">
-<meta name="twitter:description" content="How PopHealth Map is built: every data source, how figures are added up from neighbourhoods to wards and LAs, and what to watch for when reading them.">
+<meta name="twitter:description" content="How PopHealth Map is built: every data source, how figures are worked out from small areas for wards and LAs, and what to watch for when reading them.">
 <meta name="twitter:image" content="https://pophealth.uk/og.png">
 <meta name="color-scheme" content="light">
 <!-- Fonts from this origin like the map's, because the networks this is
@@ -124,8 +124,8 @@ map</a>.</p>
 
 <h4 id="indicator-card">Every indicator has a card</h4>
 
-<p>The <strong>About</strong> button under the chosen indicator, or the
-<strong>i</strong> beside its heading, opens a card that says what is counted
+<p>The <strong>About this indicator</strong> button under the chosen indicator,
+or the key along the bottom of the map, opens a card that says what is counted
 and out of what, the level its publisher releases it at and how it reaches the
 other levels, the period, the source and how often the source updates it. For
 the Local Health figures, the type of value, the unit, the kind of year and the
@@ -162,8 +162,8 @@ no figure for everyone together, so the map offers it as two indicators.</p>
 highest, whether a higher figure is good news or bad. The exception is the
 deprivation deciles and ranks, which count down from 1 for the most deprived,
 so on those maps the colours are turned round and darker still means more
-deprived. Whether a higher figure is better or worse is used in the top and
-bottom 10 list and in the printable reports, where we follow OHID's own
+deprived. Whether a higher figure is better or worse is used in the Highest
+and lowest 10 lists and in the printable reports, where we follow OHID's own
 published direction for the Local Health figures. Indicators that describe who
 lives in an area, such as the share of residents over 65, in social housing or
 of any ethnic group, have no better or worse end, so they are listed as highest
@@ -174,8 +174,8 @@ and lowest rather than best and worst.</p>
 <p>The colours run from the 5th to the 95th percentile of the areas drawn, so
 that one extreme area does not use up the whole scale, and every area beyond
 either end takes the end colour. Where any area does, the legend marks that end
-with ≤ or ≥, so "≥ 37.8" means 37.8 or more, and the top and bottom 10 list
-gives the real figures.</p>
+with ≤ or ≥, so "≥ 37.8" means 37.8 or more, and the Highest and lowest 10
+lists give the real figures.</p>
 
 <h4 id="position">Where a figure sits</h4>
 
@@ -539,9 +539,10 @@ follows one rule.</p>
 
 <h3 id="one-rule">One rule for every figure</h3>
 
-<p>Every figure is first placed on the 2021 Census building blocks, LSOAs and
-MSOAs, and is then added up to wards and LAs using the official ONS lookup files
-listed in the <a href="#appendix">technical appendix</a>. Nothing is matched by
+<p>Every figure is first placed on the 2021 Census building blocks, which are
+output areas, LSOAs and MSOAs, and is then combined into wards and LAs using the
+official ONS lookup files listed in the <a href="#appendix">technical appendix</a>,
+with counts added up and everything else averaged by population. Nothing is matched by
 name, and no boundary is laid over another to decide where a figure belongs.</p>
 
 <h3 id="best-fit">Best fit, not exact fit</h3>
@@ -556,10 +557,11 @@ be compared fairly with one another.</p>
 
 <p>ONS publishes Census 2021 figures for output areas, LSOAs and MSOAs, and the
 map shows ONS's own figure at each of those levels, so they need no matching at
-all. Census figures for wards are added up from output areas rather than from
-LSOAs, using ONS's output area to ward best fit lookup, because output areas
-are about a fifth the size of LSOAs and follow ward boundaries much more
-closely. LA figures are then added up from wards. To see output areas, choose a
+all. Census figures for wards are worked out from output areas rather than
+from LSOAs, by averaging their percentages weighted by the number of residents
+and using ONS's output area to ward best fit lookup, because output areas are
+about a fifth the size of LSOAs and follow ward boundaries much more closely.
+LA figures are then worked out from the wards in the same way. To see output areas, choose a
 Census indicator and <strong>OA</strong> on the level switch, and their borders
 appear as you zoom in. An output area holds about 125 households, so a single
 household can move a percentage noticeably, and these figures are best read as
@@ -599,7 +601,7 @@ right.</p>
 <p>The City of London has 25 wards, but its few LSOAs are each matched to one of
 just five of them, so the other 20 wards have no deprivation score, no Local
 Health figures and none of the other figures built from LSOAs. Census figures
-are added up from output areas instead, so some of those 20 wards do have them.
+are worked out from output areas instead, so some of those 20 wards do have them.
 This comes from the geography rather than from a missed update, and you can
 choose <strong>LA</strong> to see the figures for the City as a whole.</p>
 
@@ -808,7 +810,7 @@ var SOURCES = [
     pub: 'ONS, through Nomis',
     what: '32 indicators: health, disability, ethnicity, age, housing, tenure, ' +
           'qualifications, occupation, travel to work, household language and unpaid care.',
-    geo: 'Output area, LSOA and MSOA, as ONS publishes them, and added up here to wards and LAs',
+    geo: 'Output area, LSOA and MSOA, as ONS publishes them, and averaged here, weighted by population, into wards and LAs',
     period: 'Census day, 21 March 2021',
     cadence: 'Once every ten years, with the next in 2031.',
     manifest: 'census' },

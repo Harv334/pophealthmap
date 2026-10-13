@@ -155,6 +155,18 @@ const smallText = page => page.evaluate(() => {
       const badSize = (css.match(/font-size\s*:\s*[\d.]+px/g) || []).filter(d => parseFloat(d.split(':')[1]) < 11);
       ok(radiusTokens.length === 3 && !badRadius.length, 'the stylesheet uses three corner tokens and no other corners',
         radiusTokens.join(', ') + ' / ' + badRadius.slice(0, 5).join(' | '));
+      // The same for style attributes and style strings built in script,
+      // leaving out the printable reports' own stylesheets and the gate in
+      // the head, which is written before the stylesheet exists.
+      let rest = src.slice(src.indexOf('</style>'));
+      ['const REPORT_CSS = `', 'const WARD_ONEPAGE_CSS = `'].forEach(m => {
+        const i = rest.indexOf(m); if (i !== -1) rest = rest.slice(0, i) + rest.slice(rest.indexOf('`;', i + m.length));
+      });
+      const Rv = '(?:0|50%|var\\(--r-(?:sm|md|pill)(?:, ?\\d+px)?\\))';
+      const inlineOk = new RegExp('^' + Rv + '(?: ' + Rv + '){0,3}(?: !important)?$');
+      const badInline = (rest.match(/border-radius\s*:\s*[^;"'`}]+/g) || []).map(d => d.replace(/border-radius\s*:\s*/, '').trim())
+        .filter(v => !inlineOk.test(v) && !/\$\{/.test(v));
+      ok(!badInline.length, 'style attributes and script-built styles use the corner tokens too', badInline.slice(0, 5).join(' | '));
       ok(shadowTokens.length === 3 && !badShadow.length, 'the stylesheet uses three shadows and no others',
         shadowTokens.join(', ') + ' / ' + badShadow.slice(0, 5).join(' | '));
       ok(!badSize.length, 'no font size below 11px in the stylesheet', badSize.join(', '));
@@ -318,13 +330,13 @@ const smallText = page => page.evaluate(() => {
         helpIntro: (help.match(/local authority \(LA\)/g) || []).length,
         helpFive: /five sizes of area/.test(help),
         helpDash: /[\u2013\u2014]/.test(help),
-        cardIntro: (card.match(/local authority \(LA\)/gi) || []).length,
+        cardIntro: (card.match(/local authority \(LA, the council area\)/gi) || []).length,
         oldNames: (words.match(/Borough\/council|\bBoroughs?\b|Focus by borough|\bLocal authorit(y|ies)\b/g) || []),
       };
     });
     ok(la.button === 'LA' && la.name === 'LA' && la.focus === 'Focus by LA', 'the local authority level is called LA', JSON.stringify(la));
     ok(la.helpIntro === 1 && la.helpFive && !la.helpDash, 'Area level help introduces local authority (LA) once and counts five sizes', JSON.stringify(la));
-    ok(la.cardIntro === 1, 'indicator card introduces local authority (LA) once', JSON.stringify(la));
+    ok(la.cardIntro === 1, 'indicator card introduces local authority (LA, the council area) once, in plain words', JSON.stringify(la));
     ok(la.oldNames.length === 0, 'no control names the level Borough or Local authority', la.oldNames.join(', '));
     // One name for each thing (workplan 2.1): every indicator is named from
     // IND_NAMES wherever it appears, Compare and Query offer each measure
@@ -401,6 +413,16 @@ const smallText = page => page.evaluate(() => {
     });
     ok(!w22.helps.length, 'every help button is named for its topic', w22.helps.join(', '));
     ok(!w22.click.length, 'no shared text says "click"', w22.click.slice(0, 3).join(' | '));
+    // The Area profile's empty state is shown on phones too, before anything
+    // is selected and again after Deselect.
+    const w22ph = await page.evaluate(() => {
+      const txt = () => { const e = document.querySelector('#wpanel .ph'); return e ? e.textContent.trim() : ''; };
+      const before = txt();
+      deselectWard(); const afterWard = txt();
+      deselectLSOA(); const afterLsoa = txt();
+      return [before, afterWard, afterLsoa];
+    });
+    ok(w22ph.every(t => t && !/\bclick/i.test(t)), 'the Area profile empty state says "select", not "click"', w22ph.join(' | '));
     ok(w22.oneSentence && !w22.dashes.length, 'Query, Compare and Custom area each open with one sentence', w22.intros.join(' | '));
     ok(!w22.waiting.length, 'tool buttons wait until there is something to act on', 'enabled: ' + w22.waiting.join(', '));
     await page.click('.mode-btn[data-mode="explore"]');
@@ -471,7 +493,10 @@ const smallText = page => page.evaluate(() => {
       'Custom area shows LSOAs, and leaving it goes back to the level before', JSON.stringify(custom));
     ok(!/[–—]/.test([grey.title, gate.hint, forced.hint, cleared.hint].join(' ')), 'level hints and tooltips have no dashes');
     // Presentation view hides the header and the side panel, and Esc leaves it.
-    // It sits behind More in the header (workplan 2.11).
+    // It sits behind More in the header (workplan 2.11). A selected ward's
+    // sheet is hidden while it lasts and comes back afterwards.
+    await page.evaluate(() => { const l = wLyr.getLayers().find(l => l.feature.properties.WD24NM === 'Lansbury'); if (l) l.fire('click'); });
+    await page.waitForTimeout(800);
     await page.click('#tb-more');
     await page.waitForTimeout(200);
     await page.click('#tb-png');
@@ -480,13 +505,27 @@ const smallText = page => page.evaluate(() => {
     await page.waitForTimeout(800);
     const pres = await page.evaluate(() => ({ on: document.body.classList.contains('presenting'),
       hidden: ['.hdr', '#sidebar'].every(s => getComputedStyle(document.querySelector(s)).display === 'none'),
+      overlays: ['#ward-sheet', '#cmp-bar'].filter(s => document.querySelector(s).getClientRects().length),
       h: map.getSize().y }));
     await page.keyboard.press('Escape');
     await page.waitForTimeout(500);
     const after = await page.evaluate(() => ({ on: document.body.classList.contains('presenting'),
-      shown: getComputedStyle(document.getElementById('sidebar')).display !== 'none', banner: !!document.getElementById('screenshot-done') }));
-    ok(pres.on && pres.hidden && pres.h > 700 && !after.on && after.shown && !after.banner,
+      shown: getComputedStyle(document.getElementById('sidebar')).display !== 'none', banner: !!document.getElementById('screenshot-done'),
+      sheet: document.getElementById('ward-sheet').classList.contains('open') && document.getElementById('ward-sheet').getClientRects().length > 0 }));
+    ok(pres.on && pres.hidden && !pres.overlays.length && pres.h > 700 && !after.on && after.shown && !after.banner && after.sheet,
       'Presentation view hides the panels and Esc leaves it', JSON.stringify([pres, after]));
+    // A ward chosen while Compare has the map is the one the sheet shows on
+    // the way back to Explore, matching the profile, the link and the title.
+    await page.click('.mode-btn[data-mode="compare"]');
+    await page.waitForTimeout(800);
+    await page.evaluate(() => { const l = wLyr.getLayers().find(l => l.feature.properties.WD24NM === 'Stonebridge'); if (l) l.fire('click'); });
+    await page.waitForTimeout(600);
+    await page.click('.mode-btn[data-mode="explore"]');
+    await page.waitForTimeout(800);
+    const back = await page.evaluate(() => ({ name: document.getElementById('ws-name').textContent, selW, title: document.title }));
+    ok(back.name === back.selW && back.title.indexOf(back.selW) === 0, 'the ward sheet follows a ward chosen in Compare', JSON.stringify(back));
+    await page.evaluate(() => { const b = document.getElementById('ws-unpin-all'); if (b) b.click(); });
+    await page.waitForTimeout(300);
     const wpt = await page.evaluate(() => { let c = null; wLyr.eachLayer(l => { if (!c && /Bethnal|Hoxton|Stratford|Peckham/.test(l.feature.properties.WD24NM)) c = l.getBounds().getCenter(); });
       if (!c) { wLyr.eachLayer(l => { if (!c) c = l.getBounds().getCenter(); }); } const p = map.latLngToContainerPoint(c); const r = document.getElementById('map').getBoundingClientRect(); return [r.left + p.x, r.top + p.y]; });
     await page.mouse.click(wpt[0], wpt[1]);
@@ -513,7 +552,7 @@ const smallText = page => page.evaluate(() => {
     // leading with the ward's ranking, with a case for each kind of ward.
     const plain = await page.evaluate(async () => {
       const out = {};
-      for (const w of ['Stonebridge', 'Holloway', 'Barnes', 'Bishopsgate']) {
+      for (const w of ['Stonebridge', 'Holloway', 'Barnes', 'Walbrook', 'Bishopsgate']) {
         showWard(w);
         await new Promise(r => setTimeout(r, 400));
         const body = document.getElementById('ws-body'), prof = document.getElementById('wpanel');
@@ -524,6 +563,7 @@ const smallText = page => page.evaluate(() => {
             !!(profBlock.compareDocumentPosition(prof.querySelector('.keystats')) & Node.DOCUMENT_POSITION_FOLLOWING),
           sheet: sheetBlock.querySelector('p').textContent,
           prof: profBlock ? profBlock.querySelector('p').textContent : '',
+          profH: profBlock ? profBlock.querySelector('.ws-insight-h').tagName : '',
         };
       }
       const tiles = [...document.querySelectorAll('#ws-body .ws-kpi .ws-k-lbl')].map(e => e.textContent);
@@ -539,6 +579,9 @@ const smallText = page => page.evaluate(() => {
     ok(/^Barnes is less deprived than \d+% of London's wards/.test(P.Barnes.sheet), 'a Richmond ward says "less deprived than"', P.Barnes.sheet);
     ok(/^Bishopsgate is home to only 345 residents/.test(P.Bishopsgate.sheet) && !/median|deprived than/.test(P.Bishopsgate.sheet),
       'Bishopsgate opens with its residents and makes no comparison with the median', P.Bishopsgate.sheet);
+    ok(/^Walbrook\b/.test(P.Walbrook.sheet) && /no Census figures of its own/.test(P.Walbrook.sheet) && !/median|deprived than|can expect/.test(P.Walbrook.sheet) && P.Walbrook.prof === P.Walbrook.sheet,
+      'Walbrook, with no resident count, is neither ranked nor compared, in the sheet and the profile', P.Walbrook.sheet);
+    ok(Object.values(P).every(x => x.profH === 'H3'), 'the profile\'s "In plain English" is a sibling of its section headings (h3)', Object.values(P).map(x => x.profH).join(','));
     ok(!Object.values(P).some(x => /[–—]/.test(x.sheet)), 'no dashes in the ward summaries');
     ok(plain.tiles.length === 6 && plain.cols === 3 && !plain.tiles.some(t => /Population|Avg|\+|\(/.test(t)),
       'six spelled-out tiles, three to a row, without the population', plain.cols + ' columns: ' + plain.tiles.join(' | '));
@@ -586,8 +629,21 @@ const smallText = page => page.evaluate(() => {
         imd: rowsIn('pc-imd2025'), work: rowsIn('pc-economy'),
         cols: getComputedStyle(p.querySelector('.keystats')).gridTemplateColumns.split(' ').length,
         dashes: /[–—]/.test(p.innerText),
+        // Every row's figure, against the hover card's rounding of the same value.
+        // Only the number is compared: fmtOv adds % to any key ending _rate.
+        mism: [...p.querySelectorAll('.sr[data-k]')].map(r => {
+          const k = r.dataset.k, v = (WARD_DATA.Lansbury.indicators || {})[resolveOvField(k)];
+          const num = t => (String(t).match(/-?[\d,]*\.?\d+/) || [''])[0];
+          const a = num(r.querySelector('.sv').textContent), b = num(fmtOv(v, k));
+          return a === b ? '' : k + ' ' + a + ' vs ' + b;
+        }).filter(Boolean),
+        keyLbls: [...p.querySelectorAll('.keystat-lbl')].map(e => e.textContent),
+        popRows: p.querySelectorAll('.sr[data-k="census_population"]').length,
       };
     });
+    ok(!prof.mism.length, 'every Lansbury profile row is rounded as the hover card rounds it', prof.mism.slice(0, 5).join(' | '));
+    ok(prof.keyLbls.indexOf('Bad or very bad health') !== -1 && prof.keyLbls.indexOf('Good or very good health') !== -1 && prof.popRows === 0,
+      'the key figures use the indicators\' own names and the population appears once', prof.keyLbls.join(' | ') + ' / rows ' + prof.popRows);
     ok(!prof.mono && prof.green === 0 && prof.weight && prof.tnum, 'profile figures are Inter 600, tabular, in the ink colour', JSON.stringify(prof).slice(0, 200));
     ok(['Health and care', 'People and communities', 'Work, money and education', 'Housing and transport',
         'Environment and access', 'Crime and safety'].every(h => prof.heads.indexOf(h) !== -1) && !prof.heads.some(h => /&/.test(h)),
@@ -621,8 +677,12 @@ const smallText = page => page.evaluate(() => {
           counts: [...new Set((t.match(/\b\d[\d,]* (?:[A-Z]\w+ )?wards\b/g) || []).map(m => m.split(' ')[0]))],
           dashes: (t.match(/[–—]/g) || []).length,
           png: document.querySelectorAll('.chart-dl-wrap').length && [...document.querySelectorAll('.chart-dl-wrap')].every(w => /SVG/.test(w.textContent) && /PNG/.test(w.textContent)),
+          // The key figure and the bar for the same indicator show one value.
+          badKpi: (() => { const k = [...document.querySelectorAll('.kpi')].find(e => e.querySelector('.kpi-lbl').textContent === 'Bad or very bad health'); return k ? k.querySelector('.kpi-val').textContent.trim() : ''; })(),
+          badBar: (() => { const t = [...document.querySelectorAll('svg.ch-compare text')]; const i = t.findIndex(e => e.textContent === 'Bad or very bad health'); return i === -1 ? '' : (t.slice(i + 1).find(e => /\d/.test(e.textContent)) || {}).textContent || ''; })(),
         };
       });
+      ok(r2.badKpi && r2.badKpi === r2.badBar, 'the report\'s key figure and bar chart give the same value', r2.badKpi + ' / ' + r2.badBar);
       ok(r2.parks.some(p => /Bartlett Park/.test(p)) && r2.parks.every(p => / ha( in all)?$/.test(p)), 'the Lansbury report lists real parks', r2.parks.join(' | '));
       ok(r2.lang === 'en-GB' && r2.pcodes.length === 0 && r2.counts.length === 1 && r2.dashes === 0,
         'the report declares en-GB, has no "P95", gives one ward count and no dashes', JSON.stringify(r2));
@@ -768,6 +828,23 @@ const smallText = page => page.evaluate(() => {
         clear: !hit(ask, strip) && !hit(ask, cred) && ask.bottom <= Math.min(strip.top || 1e9, cred.top) };
     });
     ok(ward.title === 'Stonebridge, Brent | PopHealth Map', 'the tab title names the selected ward and its LA', ward.title);
+    // An LSOA picked from the search, with an indicator that has no LSOA
+    // figures, is outlined on its own; focusing a different LA afterwards
+    // lets go of it, so the profile and the title follow the map.
+    await setOv(page, 'crime_rate_per_1000');
+    await page.waitForTimeout(1500);
+    await page.evaluate(() => _searchPickResult({ type: 'lsoa', _code: 'E01000907', label: 'Camden 001A', sub: '' }));
+    await page.waitForFunction(() => typeof selLSOA !== 'undefined' && selLSOA === 'E01000907', null, { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(800);
+    const pick = await page.evaluate(() => ({ sel: selLSOA, outline: !!(_searchLsoaOutline && map.hasLayer(_searchLsoaOutline)) }));
+    ok(pick.sel === 'E01000907' && pick.outline, 'an LSOA picked from the search is outlined when the level stays at ward', JSON.stringify(pick));
+    await page.evaluate(() => _searchPickResult({ type: 'LA', label: 'Tower Hamlets', _key: 'Tower Hamlets' }));
+    await page.waitForTimeout(1200);
+    const foc = await page.evaluate(() => ({ sel: selLSOA, title: document.title, outline: !!_searchLsoaOutline }));
+    ok(foc.sel === null && foc.title === 'Tower Hamlets | PopHealth Map' && !foc.outline,
+      'focusing another LA lets go of an LSOA outside it', JSON.stringify(foc));
+    await page.evaluate(() => { const b = document.getElementById('borough-focus'); b.value = 'all'; b.dispatchEvent(new Event('change')); });
+    await page.waitForTimeout(800);
     ok(!ward.ask || ward.clear, 'the Ask button sits above the key and the map credits', JSON.stringify(ward));
 
     // Copy link writes the level whenever it is not the one the indicator
@@ -781,6 +858,18 @@ const smallText = page => page.evaluate(() => {
     await page.waitForTimeout(1500);
     const lvl2 = await page.evaluate(() => { _writeUrlState(); return new URLSearchParams(location.search).get('lvl'); });
     ok(lvl === 'ward' && lvl2 === null, 'Copy link writes the level only when it differs from where the indicator opens', lvl + ' / ' + lvl2);
+    // With an indicator drawn, no text people can see or hear says "overlay"
+    // or "choropleth" (workplan 2.1), and the MSOA note under the scale says
+    // "select" rather than "hover" or "click" (2.2).
+    const ovw = await page.evaluate(() => {
+      const t = [document.body.innerText, document.getElementById('sr-live') ? document.getElementById('sr-live').textContent : '']
+        .concat([...document.querySelectorAll('[title], [aria-label]')].map(e => (e.getAttribute('title') || '') + ' ' + (e.getAttribute('aria-label') || '')))
+        .concat([...document.querySelectorAll('[aria-live]')].map(e => e.textContent)).join(' ');
+      const meta = document.getElementById('sc-meta');
+      return { hits: (t.match(/[^.]{0,40}\b(overlay|choropleth)[^.]{0,40}/gi) || []).slice(0, 4), note: meta ? meta.textContent : '' };
+    });
+    ok(!ovw.hits.length, 'no visible or announced text says "overlay" or "choropleth"', ovw.hits.join(' | '));
+    ok(/Select an MSOA/.test(ovw.note) && !/\b(hover|click)/i.test(ovw.note), 'the MSOA note under the scale works on any device', ovw.note.slice(0, 160));
     await page.evaluate(() => ['tg', 'tph', 'ticb', 'tb'].forEach(id => { const e = document.getElementById(id); if (e) { e.checked = true; e.dispatchEvent(new Event('change')); } }));
     await page.waitForTimeout(1500);
     await page.click('#tb-reset');
@@ -793,7 +882,7 @@ const smallText = page => page.evaluate(() => {
     // indicator says where its figures are instead of finding nothing.
     await page.click('#sbtab-overlay');
     const ind = {};
-    for (const q of ['smoking', 'pollution', 'arson']) {
+    for (const q of ['smoking', 'pollution', 'arson', 'flu', 'no2', 'zzqx']) {
       await page.fill('#ov-search', q);
       await page.waitForTimeout(400);
       ind[q] = await page.evaluate(() => document.getElementById('ov-results').innerText.replace(/\s+/g, ' ').trim());
@@ -803,6 +892,10 @@ const smallText = page => page.evaluate(() => {
       'a council-only indicator says where its figures are', ind.smoking);
     ok(/Nitrogen dioxide/.test(ind.pollution), 'indicator search knows everyday words', ind.pollution.slice(0, 120));
     ok(/^1 match\b/.test(ind.arson), 'one result reads "1 match"', ind.arson.slice(0, 60));
+    ok(/only published for whole LAs/.test(ind.flu) && !/\bmatch(es)?\b/.test(ind.flu.replace(/No indicator matches/, '')),
+      '"flu" finds the council-only note and no word inside "fluent"', ind.flu.slice(0, 160));
+    ok(/Nitrogen dioxide/.test(ind.no2), '"no2" still finds nitrogen dioxide', ind.no2.slice(0, 120));
+    ok(/clear the search to browse/.test(ind.zzqx), 'a search with no matches says what to do next', ind.zzqx);
     const words = await page.evaluate(() => [...document.querySelectorAll('.hdr [title], .hdr [aria-label], .hdr [placeholder], #rank-panel')]
       .map(e => [e.getAttribute('title'), e.getAttribute('aria-label'), e.getAttribute('placeholder'), e.id === 'rank-panel' ? e.textContent : ''].join(' ')).join(' '));
     ok(!DASH.test(words + Object.values(ind).join(' ') + th.title + ward.title), 'the new header, list and search words have no dashes');
@@ -816,16 +909,18 @@ const smallText = page => page.evaluate(() => {
     await page.goto(BASE + '/index.html?t=1');
     await page.waitForTimeout(2500);
     const r = await page.evaluate(() => {
-      const els = [...document.querySelectorAll('.hdr button, .hdr input, .hdr h1, .hdr .dev-badge')].filter(e => e.offsetParent);
+      const els = [...document.querySelectorAll('.hdr button, .hdr input, .hdr h1, .hdr .dev-badge, .hdr .hdr-tag')].filter(e => e.offsetParent);
       const over = [];
       for (let i = 0; i < els.length; i++) for (let j = i + 1; j < els.length; j++) {
         if (els[i].contains(els[j]) || els[j].contains(els[i])) continue;
         const a = els[i].getBoundingClientRect(), b = els[j].getBoundingClientRect();
         if (a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1) over.push((els[i].id || els[i].className) + ' x ' + (els[j].id || els[j].className));
       }
-      return { over, wide: document.documentElement.scrollWidth > window.innerWidth, tall: document.querySelector('.hdr').offsetHeight > 60 };
+      const tag = document.querySelector('.hdr .hdr-tag');
+      return { over, wide: document.documentElement.scrollWidth > window.innerWidth, tall: document.querySelector('.hdr').offsetHeight > 60, tag: !!(tag && tag.offsetParent) };
     });
     ok(!r.over.length && !r.wide && !r.tall, 'nothing in the header overlaps at ' + w + 'px', JSON.stringify(r));
+    ok(r.tag === (w >= 1360), 'the header tagline is ' + (w >= 1360 ? 'shown' : 'hidden') + ' at ' + w + 'px');
     await page.close();
   }
 
@@ -856,7 +951,10 @@ const smallText = page => page.evaluate(() => {
     ok(await page.evaluate(() => !document.getElementById('cb-step-1').classList.contains('folded') &&
       document.activeElement === document.querySelector('#cb-level button.on')), 'export: Change opens the step again');
     const ex = await page.evaluate(() => {
-      PH_CSV.pick('ft_93283'); PH_CSV.pick('ft_smoking_prevalence_adults'); PH_CSV.pick('crime_total');
+      const before = PH_CSV.columns().length;
+      PH_CSV.pick('ft_93283');
+      const one = before === 0 ? PH_CSV.notes() : '';
+      PH_CSV.pick('ft_smoking_prevalence_adults'); PH_CSV.pick('crime_total');
       const o = PH_CSV.build();
       const col = i => o.table.slice(1).map(r => r[i]).filter(v => v !== '');
       const le = o.header.indexOf('Life expectancy at birth, women (years, 2019 to 2023)');
@@ -873,7 +971,7 @@ const smallText = page => page.evaluate(() => {
         crimeVals: col(o.header.findIndex(h => /^Total recorded crime/.test(h))),
         ptal: groupOf('ptal_score'), no2: groupOf('no2_ugm3'), sorted,
         shared: [fmtOv(81.0723, 'ft_93283'), PH_IND.decimals('ft_93283'), PH_IND.decimals('crime_total')],
-        notes: PH_CSV.notes(),
+        notes: PH_CSV.notes(), one, before,
         dashes: /[\u2013\u2014]/.test(o.header.join(' ') + PH_CSV.notes()),
       };
     });
@@ -890,6 +988,9 @@ const smallText = page => page.evaluate(() => {
        (ex.notes.match(/\n   Source: /g) || []).length === 3 && (ex.notes.match(/\n   Geography: /g) || []).length === 3 &&
        ex.notes.indexOf('Life expectancy at birth, women (years, 2019 to 2023)') !== -1 && !ex.dashes,
       'export: the notes give a citation and the source and geography of each column, with no dashes', ex.notes.slice(0, 200));
+    ok(ex.before !== 0 || (/one column for the indicator you chose/.test(ex.one) && !/each of the one/.test(ex.one)),
+      'export: the notes read naturally with one indicator chosen', (ex.one.match(/and (one|a) column[^.]*\./) || [''])[0]);
+    ok(/\. Source\n/.test(ex.notes), 'export: the notes name the Source column in sentence case');
     // The preview is built from the row arrays, inside the panel.
     await page.click('#cb-preview');
     await page.waitForTimeout(300);
@@ -1072,6 +1173,9 @@ const smallText = page => page.evaluate(() => {
     const cols = await page.evaluate(() => { const c = new Set(); lsoaLyr && lsoaLyr.eachLayer(l => c.add(l.options.fillColor)); return c.size; });
     ok(await page.evaluate(() => bivOn()), 'two-indicator map restores from link');
     ok(cols >= 8, 'two-indicator map uses the nine colours', cols + ' colours');
+    const bivName = await page.evaluate(() => { const m = document.getElementById('map-legend-strip'); return { l: m.getAttribute('aria-label'), d: m.getAttribute('aria-describedby') || '' }; });
+    ok(/Average deprivation decile|Deprivation decile/i.test(bivName.l) && /compared with .*nitrogen dioxide/i.test(bivName.l) && !/mls-min/.test(bivName.d),
+      'the two-indicator key is named for both indicators and not described by the hidden scale', JSON.stringify(bivName));
     await page.click('#sbtab-overlay');
     await checkAxe(page, 'two indicators');
     ok(errors.length === 0, 'no page errors (two indicators)', errors.join(' | '));
@@ -1107,6 +1211,17 @@ const smallText = page => page.evaluate(() => {
       await page.waitForTimeout(600);
       ok(await page.evaluate(() => PH_DRAWER.isOpen() && document.getElementById('tab-overlay').classList.contains('active')),
         'phone: "Colour the map" opens the Indicators tab');
+      // The search prompt fits its box in the drawer, measured in the box's
+      // own font (an input's scrollWidth ignores its placeholder).
+      const phFit = await page.evaluate(() => {
+        const i = document.getElementById('hdr-search-input'), cs = getComputedStyle(i);
+        const ctx = document.createElement('canvas').getContext('2d');
+        ctx.font = cs.fontStyle + ' ' + cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
+        const need = ctx.measureText(i.placeholder).width;
+        const room = i.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+        return { ph: i.placeholder, need: Math.round(need), room: Math.round(room), aria: i.getAttribute('aria-label') };
+      });
+      ok(phFit.room > 0 && phFit.need <= phFit.room && !!phFit.aria, 'phone: the search prompt fits its box', JSON.stringify(phFit));
       await page.evaluate(() => PH_DRAWER.close());
       await page.waitForTimeout(400);
       const lg = await rectOf(page, '#map-legend-strip');
@@ -1218,6 +1333,14 @@ const smallText = page => page.evaluate(() => {
       const attr = await rectOf(page, '.leaflet-control-attribution');
       ok(!!attr && attr.b <= sh.t && !overlaps(attr, await rectOf(page, '#map-legend-strip')) && !overlaps(attr, await rectOf(page, '#ai-toggle')),
         'phone: the credits sit on the sheet\'s edge, one line, covered by nothing', JSON.stringify({ attr, sh }));
+      // And at peek, where the sheet is as tall as its head, which wraps
+      // with a long indicator name.
+      await page.evaluate(() => { showWard('Stonebridge'); PH_SHEET.setState(1); });
+      await page.waitForTimeout(900);
+      const shP = await rectOf(page, '#ward-sheet'), attrP = await rectOf(page, '.leaflet-control-attribution');
+      ok(!!attrP && !!shP && attrP.b <= shP.t + 1, 'phone: the credits clear the sheet at peek too', JSON.stringify({ attrP, shP }));
+      await page.evaluate(() => { showWard('Lansbury'); PH_SHEET.setState(0); });
+      await page.waitForTimeout(700);
       await checkTargets(page, 'the open ward sheet');
       const sheetHits = await hitSizes(page, '#ws-size, #ws-close, #ws-pin, #ws-profile');
       ok(sheetHits.length === 4 && sheetHits.every(x => x.w >= 44 && x.h >= 44), 'phone: the sheet\'s buttons have 44px touch targets', JSON.stringify(sheetHits));
@@ -1395,6 +1518,20 @@ const smallText = page => page.evaluate(() => {
     await page.close();
   }
   {
+    // The same failure on a phone: the banner sits clear of the level badge
+    // and the zoom buttons.
+    const { isMobile, hasTouch, ...viewport } = PHONE;
+    const page = await browser.newPage({ viewport, isMobile, hasTouch });
+    await page.route(/ward_(core|data)\.json/, r => r.abort());
+    await page.goto(BASE + '/index.html?t=1');
+    await page.waitForFunction(() => !document.getElementById('load-note').hidden, null, { timeout: 20000 }).catch(() => {});
+    await page.waitForTimeout(500);
+    const note = await rectOf(page, '#load-note'), badge = await rectOf(page, '#dl-badge'), zoom = await rectOf(page, '.leaflet-control-zoom');
+    ok(!!note && (!badge || !overlaps(note, badge)) && (!zoom || !overlaps(note, zoom)),
+      'phone: the failure banner is clear of the level badge and the zoom buttons', JSON.stringify({ note, badge, zoom }));
+    await page.close();
+  }
+  {
     // wards.js blocked: the application cannot start, so the loading screen
     // says so and offers a reload, rather than breathing for ever.
     const page = await browser.newPage({ viewport: DESK });
@@ -1538,6 +1675,32 @@ const smallText = page => page.evaluate(() => {
   // first screen says what the map covers and how to cite it, every heading
   // can be linked to, no ONS product code comes before the appendix, the
   // source table is live, and on a phone it is a stack of cards.
+  // Each indicator card links to the row of the source table its figures
+  // come from (workplan 2.13), and every row it can link to exists.
+  {
+    const { page } = await open(browser, 'index.html?t=1', DESK);
+    const a = await page.evaluate(() => {
+      const href = k => { const d = document.createElement('div'); d.innerHTML = indicatorCardHTML(k); const l = d.querySelector('a.ic-more'); return l ? l.getAttribute('href') : ''; };
+      return { census: href('census_bad_health_pct'), crime: href('crime_score'), ptal: href('ptal_score'), core20: href('core20_lsoa_count'),
+        all: [...new Set(Object.keys(OV_META).map(_methAnchor))],
+        credits: [...document.querySelectorAll('a.credits-link')].map(l => l.getAttribute('href')) };
+    });
+    await page.close();
+    ok(a.census === 'methodology.html#src-census' && a.crime === 'methodology.html#src-imd' && a.ptal === 'methodology.html#src-ptal' && a.core20 === 'methodology.html#src-core20',
+      'indicator cards link to their source row', JSON.stringify(a).slice(0, 240));
+    ok(a.credits.length && a.credits.every(h => h === 'methodology.html#licences'), 'Data credits links open the licences section', a.credits.join(' '));
+    const { page: mp } = await open(browser, 'methodology.html', DESK);
+    await mp.waitForFunction(() => document.querySelectorAll('#src-rows tr[id^="src-"]').length > 15, null, { timeout: 10000 }).catch(() => {});
+    const missing = await mp.evaluate(ids => ids.filter(id => !document.getElementById(id)), a.all);
+    ok(!missing.length, 'every source row a card links to exists on the methodology page', missing.join(', ') + ' of ' + a.all.join(', '));
+    // The page describes the controls the map has, and how Census figures
+    // are combined (averaged by population, not added up).
+    const mt = await mp.evaluate(() => document.querySelector('main').innerHTML);
+    ok(/About this indicator/.test(mt) && !/<strong>i<\/strong>/.test(mt) && !/<strong>About<\/strong> button/.test(mt),
+      'methodology: names the About this indicator button, not controls that are gone');
+    ok(!/Census[^.<]{0,80}added up|added up[^.<]{0,40}Census/.test(mt), 'methodology: Census figures are not said to be added up');
+    await mp.close();
+  }
   {
     const { page } = await open(browser, 'methodology.html', DESK);
     const m = await page.evaluate(() => {
