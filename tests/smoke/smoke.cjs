@@ -67,10 +67,72 @@ const setOv = (page, k) => page.evaluate(k => {
     await page.click('#ov-about');
     ok(await page.evaluate(() => /Published at/.test(document.getElementById('ov-info-panel').innerText)), 'indicator card opens');
     await checkAxe(page, 'indicator and card');
+    // Indicator descriptions and cards (workplan 2.3): one control opens the
+    // card and a button at its top closes it; no card or description carries
+    // internal codes, "=", "i.e.", dashes or title-case categories; Census
+    // cards describe the method the pipeline uses; periods and dates are
+    // written out in words.
+    const c23 = await page.evaluate(() => {
+      const panel = document.getElementById('ov-info-panel');
+      const top = panel.firstElementChild;
+      const out = {
+        controls: !document.getElementById('ov-info') && document.getElementById('ov-about').textContent.trim() === 'About this indicator',
+        closeAtTop: !!(top && top.querySelector('.ic-x')),
+        bad: [], census: [], ft: [],
+        periods: [fmtPeriod('2019 - 23'), fmtPeriod('2016/17 - 20/21'), fmtPeriod('Aug 2025 to Jul 2026'), fmtPeriod('2024/25')].join(' | '),
+        ptal: PH_IND.label('ptal_score'),
+        vintage: !document.getElementById('data-vintage') && !!document.querySelector('#ov-theme-view #core20-toggle'),
+      };
+      const BAD = /File_7|LSOA bridge|CLA01|NOMIS|=|\bi\.e\.|\be\.g\.|[\u2013\u2014]|→|pop-weighted|Offences \(|Public Order|Criminal Damage|Against the Person|Against Society|Deprivation domain|Domain score|'(Very )?(Good|Bad)'/;
+      Object.keys(OV_META).forEach(k => {
+        const d = document.createElement('div');
+        d.innerHTML = indicatorCardHTML(k);
+        const t = d.querySelector('.ic-t');
+        if (t) t.remove();               // the publisher's own title, kept as published
+        const text = d.textContent;
+        [text, OV_META[k].desc || '', OV_PLAIN[k] || ''].forEach(x => {
+          const m = x.match(BAD);
+          if (m) out.bad.push(k + ': ' + m[0]);
+        });
+        const dd = name => { const dt = [...d.querySelectorAll('dt')].find(e => e.textContent === name); return dt ? dt.nextElementSibling.textContent : ''; };
+        if (/\(TS\d+A?\)/.test(OV_META[k].src)) {
+          const m = dd('Method');
+          const right = k === 'census_population' ? /add up the residents of the output areas/.test(m)
+            : /average their percentages, weighting each by its number of residents/.test(m);
+          if (!right || /add up the LSOAs/.test(m)) out.census.push(k);
+        }
+        if (/^ft_\d+$/.test(k) && FT_INFO[k.slice(3)]) {
+          const u = dd('Updates');
+          if (!/\b\d{1,2} (January|February|March|April|May|June|July|August|September|October|November|December) \d{4}\b/.test(u) ||
+              /\d{2}\/\d{2}\/\d{4}/.test(u) || (u.match(/\./g) || []).length !== 1) out.ft.push(k);
+        }
+      });
+      return out;
+    });
+    ok(c23.controls && c23.closeAtTop, 'one About this indicator control, and the card closes from its top', JSON.stringify(c23));
+    await page.click('#ov-info-panel .ic-x');
+    ok(await page.evaluate(() => document.getElementById('ov-info-panel').hidden &&
+      document.getElementById('ov-about').getAttribute('aria-expanded') === 'false'), 'the close button closes the card');
+    ok(!c23.bad.length, 'cards and descriptions carry no codes, "=", "i.e.", dashes or title-case categories', c23.bad.slice(0, 5).join(' | '));
+    ok(!c23.census.length, 'every Census card describes the method the pipeline uses', c23.census.join(', '));
+    ok(!c23.ft.length, 'Local Health cards say when OHID last updated them in one sentence, with the date in words', c23.ft.join(', '));
+    ok(c23.periods === '2019 to 2023 | 2016/17 to 2020/21 | August 2025 to July 2026 | 2024/25', 'periods are written out by one helper', c23.periods);
+    ok(c23.ptal === 'Public transport access (PTAL, 2014)', 'PTAL carries its year in its label', c23.ptal);
+    ok(c23.vintage, 'data periods and Core20 have left the Indicators home', JSON.stringify(c23.vintage));
     await page.click('#ov-themes .ov-theme');
     await page.waitForTimeout(300);
     ok(await page.evaluate(() => !document.getElementById('ov-theme-view').hidden), 'theme list opens');
     await checkAxe(page, 'theme list');
+    // Core20 sits in the Deprivation theme and nowhere else.
+    const c20 = await page.evaluate(() => {
+      const shown = () => !document.getElementById('ov-c20').hidden;
+      const first = shown();
+      document.getElementById('ov-back').click();
+      [...document.querySelectorAll('#ov-themes .ov-theme')].find(b => /Deprivation/.test(b.textContent)).click();
+      return [first, shown()];
+    });
+    ok(!c20[0] && c20[1], 'the Core20 control shows in the Deprivation theme only', JSON.stringify(c20));
+    await checkAxe(page, 'Deprivation theme with Core20');
     await page.keyboard.press('Escape');
     await setOv(page, 'ft_93283');
     await page.waitForTimeout(2500);
@@ -188,6 +250,9 @@ const setOv = (page, k) => page.evaluate(k => {
     // A ward clicked opens its sheet.
     await setOv(page, 'crime_rate_per_1000');
     await page.waitForTimeout(2000);
+    // The period beside the chosen indicator comes from the data.
+    const vint = await page.evaluate(() => [document.getElementById('ov-cur-meta').textContent, fmtPeriod(WARD_META.crime_period)]);
+    ok(!!vint[1] && vint[0].indexOf(vint[1]) !== -1, 'the indicator\'s period line is read from the data', vint.join(' / '));
     // The map's name follows the level and the indicator, and a level the
     // indicator lacks is refused in words that say which ones will work.
     ok(await page.evaluate(() => document.getElementById('map').getAttribute('aria-label')) ===
