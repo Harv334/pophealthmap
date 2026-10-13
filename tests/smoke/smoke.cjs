@@ -52,7 +52,8 @@ async function axeViolations(page) {
   r.violations.forEach(v => {
     if (v.id === 'target-size') v.nodes = v.nodes.filter(n => !/leaflet-marker-icon/.test(n.html.slice(0, 200)));
   });
-  return r.violations.filter(v => v.nodes.length).map(v => v.id + ' (' + v.nodes.length + ')');
+  // Name the first element for each rule, so a failure says what to fix.
+  return r.violations.filter(v => v.nodes.length).map(v => v.id + ' (' + v.nodes.length + ': ' + v.nodes[0].target.join(' ') + ')');
 }
 async function checkAxe(page, name) {
   const v = await axeViolations(page);

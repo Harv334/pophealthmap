@@ -1754,9 +1754,10 @@
   .ws-near-col h4 { margin: 0 0 4px; padding-bottom: 3px; border-bottom: 1px solid var(--line);
     font-size: var(--t-xs); font-weight: 600; color: var(--ink-2); letter-spacing: normal; }
   .ws-near-col ol { margin: 0; padding-left: 16px; font-size: var(--t-xs); color: var(--ink-3); }
-  .ws-near-col li { margin-bottom: 3px; line-height: 1.35; }
-  .ws-near-item { font: inherit; color: var(--ink); font-weight: 600; background: none; border: 0; padding: 0;
-    cursor: pointer; text-align: left; }
+  .ws-near-col li { margin-bottom: 1px; line-height: 1.35; }
+  /* At least 24px tall (WCAG 2.2 target size), whatever the font metrics. */
+  .ws-near-item { font: inherit; color: var(--ink); font-weight: 600; background: none; border: 0; padding: 4px 0;
+    min-height: 24px; display: inline-block; vertical-align: middle; cursor: pointer; text-align: left; }
   .ws-near-item:hover { color: var(--nhs-blue); text-decoration: underline; }
   .ws-near-d { margin-left: 6px; white-space: nowrap; font-variant-numeric: tabular-nums; }
   .ws-near-foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
