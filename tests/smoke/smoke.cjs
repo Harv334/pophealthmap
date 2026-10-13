@@ -94,6 +94,11 @@ const setOv = (page, k) => page.evaluate(k => {
     await page.waitForTimeout(2000);
     ok(await page.evaluate(() => _activeLevel() === 'lsoa' &&
       ['borough', 'ward', 'msoa', 'lsoa'].every(l => ovHasLevel('census_bad_health_pct', l))), 'Census indicator offers every level');
+    // Fuel poverty is published by LSOA, so it opens there, with wards on offer.
+    await setOv(page, 'fuel_poverty_pct');
+    await page.waitForTimeout(2000);
+    ok(await page.evaluate(() => _activeLevel() === 'lsoa' && ovHasLevel('fuel_poverty_pct', 'ward')), 'fuel poverty opens at LSOA level',
+       await page.evaluate(() => _activeLevel()));
     // A ward clicked opens its sheet.
     await setOv(page, 'crime_rate_per_1000');
     await page.waitForTimeout(2000);

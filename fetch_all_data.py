@@ -2650,6 +2650,23 @@ def _ft_in_scope(df: "pd.DataFrame") -> "pd.DataFrame":
     return pd.concat([own] + extra, ignore_index=True) if extra else own
 
 
+def _ft_value_with_ci(row) -> tuple:
+    """A Fingertips row's value and 95% confidence limits, as floats or None.
+
+    Where the upper limit is below the lower one the row is not a measurement
+    but a placeholder, and its value is stored as missing. The City of London's
+    adult smoking row comes as value 0 with limits 0 and -1: taken at face
+    value it put 0% smoking on the map for every City ward, where the honest
+    answer is that there is no published figure.
+    """
+    value = _tofloat(row.get("Value"))
+    lower = _tofloat(row.get("Lower CI 95.0 limit"))
+    upper = _tofloat(row.get("Upper CI 95.0 limit"))
+    if lower is not None and upper is not None and upper < lower:
+        return None, None, None
+    return value, lower, upper
+
+
 def run_fingertips() -> pd.DataFrame:
     rule("OHID Fingertips (public health outcomes)")
     cache_dir = CACHE_DIR / "fingertips"
@@ -2724,15 +2741,16 @@ def run_fingertips() -> pd.DataFrame:
             df = sub
         df = df.sort_values("Time period Sortable").groupby("Area Code", as_index=False).tail(1)
         for _, row in df.iterrows():
+            value, lower_ci, upper_ci = _ft_value_with_ci(row)
             rows.append({
                 "LAD25CD": row["Area Code"],
                 "lad_name": row.get("Area Name", ""),
                 "indicator_id": ind_id,
                 "indicator_short": short,
                 "indicator_name":  desc,
-                "value":    _tofloat(row.get("Value")),
-                "lower_ci": _tofloat(row.get("Lower CI 95.0 limit")),
-                "upper_ci": _tofloat(row.get("Upper CI 95.0 limit")),
+                "value":    value,
+                "lower_ci": lower_ci,
+                "upper_ci": upper_ci,
                 "period":   row.get("Time period", ""),
                 "sex":      row.get("Sex", ""),
                 "age":      row.get("Age", ""),
@@ -3275,10 +3293,17 @@ FUEL_POVERTY_COLLECTION = ("https://www.gov.uk/government/collections/"
 FUEL_POVERTY_URL_OVERRIDE = os.environ.get("FUEL_POVERTY_URL", "")
 
 
-def _fuel_poverty_discover_url() -> str | None:
-    """The newest DESNZ sub-regional spreadsheet, found rather than remembered."""
+def _fuel_poverty_discover() -> tuple[str | None, dict]:
+    """The newest DESNZ sub-regional spreadsheet, found rather than remembered,
+    and what its release calls itself.
+
+    The second item is {"slug", "title", "url"} for the release the file came
+    from. DESNZ name each release after the year it was published and the year
+    its figures describe, as in "Sub-regional fuel poverty data 2025 (2023
+    data)", and the second of those is the one the map has to show.
+    """
     if FUEL_POVERTY_URL_OVERRIDE:
-        return FUEL_POVERTY_URL_OVERRIDE
+        return FUEL_POVERTY_URL_OVERRIDE, {"url": FUEL_POVERTY_URL_OVERRIDE}
     sess = browser_session(referer="https://www.gov.uk/")
     try:
         r = sess.get(FUEL_POVERTY_COLLECTION, timeout=60)
@@ -3288,10 +3313,10 @@ def _fuel_poverty_discover_url() -> str | None:
             r.text)
     except Exception as e:
         warn(f"fuel_poverty: could not read the gov.uk collection ({e})")
-        return None
+        return None, {}
     if not slugs:
         warn("fuel_poverty: the collection listed no sub-regional releases")
-        return None
+        return None, {}
 
     # "data" releases carry the tables; "report" releases carry the commentary.
     #
@@ -3320,9 +3345,86 @@ def _fuel_poverty_discover_url() -> str | None:
             r'"(https://assets\.publishing\.service\.gov\.uk/[^"]+\.xlsx)"', rr.text)
         if xlsx:
             info(f"fuel_poverty: newest release is {slug}")
-            return xlsx[0]
+            try:
+                title = str(rr.json().get("title") or "")
+            except ValueError:
+                title = ""
+            return xlsx[0], {"slug": slug, "title": title, "url": xlsx[0]}
     warn("fuel_poverty: no release in the collection had an .xlsx attachment")
-    return None
+    return None, {}
+
+
+def _fuel_poverty_release_path(xlsx: Path) -> Path:
+    """Where the release details for a downloaded spreadsheet are kept."""
+    return xlsx.with_suffix(".release.json")
+
+
+def _xlsx_text(src: Path, sheet: str, nrows: int) -> list[str]:
+    """The non-empty cells in the first rows of a sheet, as text."""
+    try:
+        top = pd.read_excel(src, sheet_name=sheet, header=None, nrows=nrows, dtype=str)
+    except Exception:
+        return []
+    return [str(v).strip() for v in top.to_numpy().ravel()
+            if isinstance(v, str) and v.strip()]
+
+
+_FP_YEAR = r"(?:19|20)\d{2}"
+
+def _fuel_poverty_data_year(release: dict, front: list[str],
+                            title_rows: list[str]) -> str:
+    """
+    The year a DESNZ sub-regional release's figures describe, or "".
+
+    DESNZ publish each year's figures two years later, so a release carries two
+    years and the one wanted is easy to mistake for the other. They say which
+    is which in the release title, "Sub-regional fuel poverty data 2025 (2023
+    data)", and usually again on the spreadsheet's cover sheet. In order:
+
+      1. "(2023 data)" in the release title, the cover sheets or the LSOA
+         table's title rows
+      2. a release title or slug naming two different years, where the
+         earlier is the data year
+      3. "2023 data" without the brackets, in the same places as 1
+      4. the one year left in the LSOA table's title once any year that
+         belongs to the LSOA boundaries or the Census is set aside
+
+    Nothing is worked out from the publication year: if none of these finds a
+    year, the answer is "" and the map keeps the year it already states.
+    """
+    title = str((release or {}).get("title") or "")
+    slug = str((release or {}).get("slug") or "")
+    texts = [title] + list(front) + list(title_rows)
+
+    for t in texts:
+        m = re.search(rf"\(\s*({_FP_YEAR})\s+data\s*\)", t, re.I)
+        if m:
+            return m.group(1)
+    for t in (title, slug):
+        years = sorted({int(y) for y in re.findall(rf"(?<!\d)({_FP_YEAR})(?!\d)", t)})
+        if len(years) == 2:
+            return str(years[0])
+    for t in texts:
+        m = re.search(rf"(?<!\d)({_FP_YEAR})\s+data\b", t, re.I)
+        if m:
+            return m.group(1)
+    geo = (r"(?:LSOA|LSOAs|lower[\s-]+layer\s+super\s+output\s+areas?|"
+           r"super\s+output\s+areas?|census|boundar\w*)")
+    left: set[str] = set()
+    for t in title_rows:
+        t = re.sub(rf"{geo}[\s,(]*{_FP_YEAR}", " ", t, flags=re.I)
+        t = re.sub(rf"{_FP_YEAR}[\s)]*{geo}", " ", t, flags=re.I)
+        left |= set(re.findall(rf"(?<!\d)({_FP_YEAR})(?!\d)", t))
+    return left.pop() if len(left) == 1 else ""
+
+
+def _fuel_poverty_period(fp) -> str:
+    """The data year stored with the fuel poverty figures, or "" if none was."""
+    if fp is None or fp.empty or "period" not in fp.columns:
+        return ""
+    s = fp["period"].fillna("").astype(str).str.strip()
+    s = s[s != ""]
+    return str(s.mode().iloc[0]) if not s.empty else ""
 
 
 def run_fuel_poverty() -> pd.DataFrame | None:
@@ -3334,7 +3436,7 @@ def run_fuel_poverty() -> pd.DataFrame | None:
     candidates = sorted(cache_dir.glob("*.xlsx"),
                         key=lambda p: p.stat().st_size, reverse=True)
     if not candidates:
-        url = _fuel_poverty_discover_url()
+        url, release = _fuel_poverty_discover()
         src = cache_dir / "fuel_poverty_lsoa.xlsx"
         if url:
             info(f"No local cache — downloading {url}")
@@ -3344,6 +3446,11 @@ def run_fuel_poverty() -> pd.DataFrame | None:
             r = browser_session(referer="https://www.gov.uk/").get(url, timeout=120)
             r.raise_for_status()
             src.write_bytes(r.content)
+            # Kept beside the file, because a cached spreadsheet is read again
+            # on later runs without the release page being asked a second time.
+            if release:
+                _fuel_poverty_release_path(src).write_text(
+                    json.dumps(release), encoding="utf-8")
             candidates = [src]
         except Exception as e:
             warn(f"fuel_poverty download failed: {e}. "
@@ -3408,9 +3515,29 @@ def run_fuel_poverty() -> pd.DataFrame | None:
              f"pct={pct_col!r}). Columns seen: {list(df.columns)[:10]}")
         return None
 
+    # The year the figures describe, which is two years before the release
+    # that publishes them, read from the release rather than typed here.
+    release = {}
+    try:
+        release = json.loads(_fuel_poverty_release_path(src).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        pass
+    front = []
+    for name in xl.sheet_names:
+        if name != sheet and not name.lower().startswith("table"):
+            front += _xlsx_text(src, name, nrows=20)
+    title_rows = _xlsx_text(src, sheet, nrows=hdr) if hdr else []
+    period = _fuel_poverty_data_year(release, front, title_rows)
+    if period:
+        info(f"fuel_poverty: figures are for {period}")
+    else:
+        warn("fuel_poverty: could not read from the release which year the "
+             "figures describe, so none is recorded")
+
     out = pd.DataFrame({
         "LSOA21CD": df[code_col].astype(str).str.strip(),
         "fuel_poverty_pct": pd.to_numeric(df[pct_col], errors="coerce"),
+        "period": period,
     }).dropna(subset=["LSOA21CD"])
     # Many DESNZ releases use LSOA 2011 codes (E01xxxxxx) which still align
     # with most 2021 boundaries — keep as-is; mismatches will just be skipped
@@ -4739,6 +4866,7 @@ def build_ward_data() -> dict:
     _agg_to_wards(fp, "fuel_poverty_pct", "fuel_poverty_pct")
     if fp is not None:
         sources["fuel_poverty"] = "DESNZ sub-regional fuel poverty (LILEE)"
+        sources["_fuel_poverty_year"] = _fuel_poverty_period(fp)
 
     pt = _read_parquet_opt(DATA_DIR / "demographics" / "ptal.parquet")
     _agg_to_wards(pt, "ptal_score", "ptal_score")
@@ -4857,6 +4985,8 @@ def build_ward_data() -> dict:
             "claimant_period": _month_label(sources.get("_claimant_month", "")),
             "crime_period": _month_range_label(sources.get("_crime_first_month", ""),
                                                sources.get("_crime_last_month", "")),
+            # The year DESNZ say the fuel poverty figures describe.
+            "fuel_poverty_period": sources.get("_fuel_poverty_year", ""),
             # Provenance for the LSOA -> ward attribution behind every
             # LSOA-derived ward indicator above.
             "lsoa_to_ward_lookup":
@@ -5333,7 +5463,9 @@ def _indicator_periods() -> dict[str, str]:
     2020/21 while the borough QOF figures are 2024/25. Saying "latest" for all
     of them reads as current to anyone who does not go and check.
 
-    Each indicator takes the period most of its areas carry. A register has no
+    Each indicator takes the period most of its areas carry. Fuel poverty takes
+    the year its DESNZ release says the figures describe (run_fuel_poverty
+    stores it with the figures). A register has no
     period, only the date it was read, which comes from the manifest and only
     from a run that succeeded: a failed fetch leaves the previous file in
     place, and dating it today would be wrong.
@@ -5354,6 +5486,10 @@ def _indicator_periods() -> dict[str, str]:
     boro = _read_parquet_opt(DATA_DIR / "outcomes" / "fingertips.parquet")
     if boro is not None and "indicator_short" in boro.columns:
         _modal(boro, "indicator_short", "ft_")
+    fp_year = _fuel_poverty_period(
+        _read_parquet_opt(DATA_DIR / "demographics" / "fuel_poverty.parquet"))
+    if fp_year:
+        out["fuel_poverty_pct"] = fp_year
 
     try:
         sources = json.loads(MANIFEST_PATH.read_text(encoding="utf-8")).get("sources") or {}

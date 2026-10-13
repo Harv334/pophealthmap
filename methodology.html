@@ -896,6 +896,7 @@ var SOURCES = [
           'energy efficiency.',
     geo: 'LSOA',
     period: '2022',
+    ind: 'fuel_poverty_pct',
     cadence: 'Yearly.',
     manifest: 'fuel_poverty' },
 
@@ -1120,7 +1121,8 @@ Array.prototype.forEach.call(document.querySelectorAll('table.stack'), labelTabl
       var cells = [
         '<strong>' + esc(rec.name) + '</strong><br>' +
           '<span style="font-size:12.5px;color:var(--ink-3)">' + esc(rec.pub) + '</span>',
-        esc(rec.what), esc(rec.geo), esc(rec.period), esc(rec.cadence),
+        esc(rec.what), esc(rec.geo), esc((rec.ind && periods[rec.ind]) || rec.period),
+        esc(rec.cadence),
         statusCell(rec, sources)
       ];
       return '<tr id="src-' + esc(rec.id) + '">' + cells.map(function (c, i) {
@@ -1178,10 +1180,27 @@ Array.prototype.forEach.call(document.querySelectorAll('table.stack'), labelTabl
     }
   }
 
-  fetch('data/meta/manifest.json', { cache: 'no-cache' })
-    .then(function (r) { return r.ok ? r.json() : null; })
-    .catch(function () { return null; })
-    .then(draw);
+  // A row with an `ind` takes its period from the one the refresh records
+  // with the figures (data/map/indicators.js), so this table and the map
+  // cannot disagree after a refresh. The typed period is the fallback.
+  var periods = {};
+  function readPeriods(text) {
+    try {
+      var at = text.indexOf('var PH_IND_STATS = ');
+      var st = JSON.parse(text.slice(at + 19, text.lastIndexOf(';'))).stats || {};
+      Object.keys(st).forEach(function (k) { if (st[k].yr) periods[k] = String(st[k].yr); });
+    } catch (e) { /* keep the typed periods */ }
+  }
+
+  Promise.all([
+    fetch('data/meta/manifest.json', { cache: 'no-cache' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .catch(function () { return null; }),
+    fetch('data/map/indicators.js', { cache: 'no-cache' })
+      .then(function (r) { return r.ok ? r.text() : ''; })
+      .then(readPeriods)
+      .catch(function () {})
+  ]).then(function (got) { draw(got[0]); });
 })();
 </script>
 
