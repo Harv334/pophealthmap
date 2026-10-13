@@ -113,11 +113,14 @@ Rules that matter:
   unless the value is 1. Getting this wrong overstates deprivation, which is
   the worst direction to be wrong in for this data.
 - Rates and percentages are not counts. Do not add percentages together.
-- Some indicators are published at borough level and repeated for every ward in
-  that borough. Tool results mark these, with published_at, with
-  borough_level_indicators, or with a caveat. When one appears, say the figure
-  is a borough figure. Never present it as a difference between wards, and do
-  not rank wards by it: the ordering would be an artefact, not a finding.
+- The map calls the local authority level "LA" (London's 32 boroughs and the
+  City of London are its 33 LAs). Use "LA" in answers, introducing it once as
+  "local authority (LA)", rather than "borough" or "council area".
+- Some indicators are published for the whole LA and repeated for every ward in
+  it. Tool results mark these, with published_at, with la_level_indicators, or
+  with a caveat. When one appears, say the figure is an LA figure. Never
+  present it as a difference between wards, and do not rank wards by it: the
+  ordering would be an artefact, not a finding.
 - These are area statistics. They describe places, not individuals, and a
   ward-level figure says nothing about any particular person in it.
 - If asked something outside this data (medical advice, individual patients,
@@ -130,13 +133,13 @@ const TOOLS = [
   {
     name: "get_area",
     description:
-      "Look up every indicator held for one ward or borough by name. Use for " +
+      "Look up every indicator held for one ward or local authority (LA) by name. Use for " +
       "'tell me about X' or any question about a single place.",
     input_schema: {
       type: "object",
       properties: {
-        name: { type: "string", description: "Ward or borough name, e.g. 'Brent' or 'Church End'" },
-        level: { type: "string", enum: ["ward", "borough"], description: "Which geography to search" },
+        name: { type: "string", description: "Ward or LA name, e.g. 'Brent' or 'Church End'" },
+        level: { type: "string", enum: ["ward", "la"], description: "Which geography to search: a ward, or an LA (local authority)" },
       },
       required: ["name", "level"],
     },
@@ -144,13 +147,13 @@ const TOOLS = [
   {
     name: "compare_areas",
     description:
-      "Compare two or more wards or boroughs across the indicators given, or " +
+      "Compare two or more wards or LAs across the indicators given, or " +
       "across headline indicators if none are named.",
     input_schema: {
       type: "object",
       properties: {
         names: { type: "array", items: { type: "string" }, description: "2 to 6 area names" },
-        level: { type: "string", enum: ["ward", "borough"] },
+        level: { type: "string", enum: ["ward", "la"], description: "ward, or la for local authorities (LAs)" },
         indicators: {
           type: "array",
           items: { type: "string" },
@@ -171,8 +174,8 @@ const TOOLS = [
         indicator: { type: "string", description: "Indicator key to rank by" },
         direction: { type: "string", enum: ["highest", "lowest"] },
         n: { type: "integer", description: "How many to return, 1 to 20" },
-        level: { type: "string", enum: ["ward", "borough"] },
-        within_borough: { type: "string", description: "Optional: restrict to one borough" },
+        level: { type: "string", enum: ["ward", "la"], description: "ward, or la for local authorities (LAs)" },
+        within_la: { type: "string", description: "Optional: restrict to one LA (local authority)" },
       },
       required: ["indicator", "direction", "n", "level"],
     },
