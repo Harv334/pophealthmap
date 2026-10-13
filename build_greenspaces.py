@@ -1,193 +1,194 @@
-#\!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 build_greenspaces.py
 ====================
 
-One-shot builder: converts the OS Open Greenspace TQ tile shapefile into a
-NW-London-clipped, simplified GeoJSON that the map toggles on/off.
+One-shot builder: converts the OS Open Greenspace TQ tile into the
+greenspaces.geojson that the map's "Parks and green spaces" layer draws and
+the printable ward and LSOA reports list.
 
 Input:
     data/environment/opgrsp_essh_tq.zip  (OS Open Greenspace ESRI Shape, TQ tile)
+    data/boundaries/wards.geojson        (the region's wards, for the footprint)
 
 Clip:
-    Unions all 1,313 embedded LSOA polygons (extracted from index.html) to
-    build the true NW London footprint, then buffers by 200 m so parks that
-    straddle the borough boundary stay whole. Polygons outside are dropped.
+    The union of the region's ward boundaries, buffered by 200 m so parks
+    that straddle the edge stay whole. Sites outside are dropped. This used
+    to clip to the old North West London footprint, read out of index.html,
+    so the layer and the reports had no parks east of about Regent's Park.
 
 Output:
-    greenspaces.geojson (repo root). Features carry: id, function, name,
-    aliases. Simplified at 1.5 m in EPSG:27700 before reprojection.
+    greenspaces.geojson (repo root). Features carry: id, function, name and
+    aliases. Simplified at 1.5 m in EPSG:27700 before reprojection, with
+    coordinates to five decimal places (about a metre) and no height.
+
+Needs shapely and pyproj, which the main pipeline already uses
+(requirements.txt). The shapefile and its table are read directly, so
+geopandas is not needed.
+
+Run:
+    python3 build_greenspaces.py
 """
 from __future__ import annotations
 
 import json
 import os
-import re
+import struct
 import sys
-import tempfile
 import zipfile
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent
 ZIP_PATH = REPO / "data" / "environment" / "opgrsp_essh_tq.zip"
-HTML_PATH = REPO / "index.html"
+WARDS_PATH = REPO / "data" / "boundaries" / "wards.geojson"
 OUT_PATH = REPO / "greenspaces.geojson"
 
 FOOTPRINT_BUFFER_M = 200.0
 SIMPLIFY_M = 1.5
 DROP_FUNCTIONS = {"Tennis Court", "Bowling Green"}
+PLACES = 5
 
 
-def _extract_lsoa_imd(html: str) -> dict:
-    """Extract the embedded LSOA_IMD GeoJSON object from index.html."""
-    m = re.search(r"const\s+LSOA_IMD\s*=\s*(\{)", html)
-    if not m:
-        sys.exit("Could not find 'const LSOA_IMD = {' in index.html. " "Map data moved to data/map/*.js in Phase 3.1; read it with map_data.read_blob() instead of parsing index.html.")
-    start = m.end() - 1
-    depth = 0
-    i = start
-    in_str = False
-    esc = False
-    while i < len(html):
-        c = html[i]
-        if in_str:
-            if esc:
-                esc = False
-            elif c == "\\":
-                esc = True
-            elif c == '"':
-                in_str = False
-        else:
-            if c == '"':
-                in_str = True
-            elif c == "{":
-                depth += 1
-            elif c == "}":
-                depth -= 1
-                if depth == 0:
-                    return json.loads(html[start:i + 1])
-        i += 1
-    sys.exit("Failed to parse LSOA_IMD object (brace mismatch)")
+def _read_dbf(raw: bytes) -> list[dict]:
+    """Records of a dBase III table, as dicts of stripped strings."""
+    n = struct.unpack("<I", raw[4:8])[0]
+    hdr_len = struct.unpack("<H", raw[8:10])[0]
+    rec_len = struct.unpack("<H", raw[10:12])[0]
+    fields, pos = [], 32
+    while raw[pos] != 0x0D:
+        fd = raw[pos:pos + 32]
+        fields.append((fd[:11].split(b"\0")[0].decode("ascii"), fd[16]))
+        pos += 32
+    out = []
+    for i in range(n):
+        rec = raw[hdr_len + i * rec_len: hdr_len + (i + 1) * rec_len]
+        if rec[:1] == b"*":          # deleted
+            out.append(None)
+            continue
+        row, off = {}, 1
+        for name, size in fields:
+            row[name] = rec[off:off + size].decode("utf-8", "replace").strip()
+            off += size
+        out.append(row)
+    return out
+
+
+def _signed_area(ring) -> float:
+    a = 0.0
+    for (x1, y1), (x2, y2) in zip(ring, ring[1:]):
+        a += x1 * y2 - x2 * y1
+    return a / 2.0
+
+
+def _read_polygons(raw: bytes):
+    """Yield each record of a Polygon or PolygonZ shapefile as a list of
+    rings ([(x, y), ...]); None for a null shape."""
+    from shapely.geometry import Polygon, MultiPolygon
+    pos = 100
+    while pos < len(raw):
+        _num, clen = struct.unpack(">ii", raw[pos:pos + 8])
+        body = raw[pos + 8: pos + 8 + clen * 2]
+        pos += 8 + clen * 2
+        stype = struct.unpack("<i", body[:4])[0]
+        if stype == 0:
+            yield None
+            continue
+        if stype not in (5, 15, 25):
+            raise SystemExit(f"unexpected shape type {stype}")
+        nparts, npts = struct.unpack("<ii", body[36:44])
+        parts = list(struct.unpack(f"<{nparts}i", body[44:44 + 4 * nparts]))
+        p0 = 44 + 4 * nparts
+        xy = struct.unpack(f"<{2 * npts}d", body[p0:p0 + 16 * npts])
+        pts = list(zip(xy[0::2], xy[1::2]))
+        rings = [pts[a:b] for a, b in zip(parts, parts[1:] + [npts])]
+        # Outer rings run clockwise in a shapefile (negative signed area),
+        # holes anticlockwise. Each hole goes with the outer ring holding it.
+        outers = [r for r in rings if _signed_area(r) < 0] or rings[:1]
+        holes = [r for r in rings if r not in outers]
+        polys = []
+        for o in outers:
+            po = Polygon(o)
+            mine = [h for h in holes if po.contains(Polygon(h).representative_point())]
+            polys.append(Polygon(o, mine))
+        g = polys[0] if len(polys) == 1 else MultiPolygon(polys)
+        yield g if g.is_valid else g.buffer(0)
+
+
+def _round(coords):
+    if isinstance(coords[0], (int, float)):
+        return [round(coords[0], PLACES), round(coords[1], PLACES)]
+    return [_round(c) for c in coords]
 
 
 def main() -> None:
     try:
-        import geopandas as gpd
-        from shapely.geometry import shape
-        from shapely.ops import unary_union
+        from shapely.geometry import shape, mapping
+        from shapely.ops import unary_union, transform
+        from pyproj import Transformer
     except ImportError:
-        sys.exit(
-            "geopandas + shapely required. Install with:\n"
-            "  pip install geopandas shapely pyproj --break-system-packages"
-        )
+        sys.exit("shapely and pyproj are needed: pip install -r requirements.txt")
+    for p in (ZIP_PATH, WARDS_PATH):
+        if not p.exists():
+            sys.exit(f"{p} not found")
 
-    if not ZIP_PATH.exists():
-        sys.exit(f"{ZIP_PATH} not found")
-    if not HTML_PATH.exists():
-        sys.exit(f"{HTML_PATH} not found")
+    to_bng = Transformer.from_crs("EPSG:4326", "EPSG:27700", always_xy=True).transform
+    to_wgs = Transformer.from_crs("EPSG:27700", "EPSG:4326", always_xy=True).transform
 
-    print(f"Reading LSOA_IMD from {HTML_PATH.name} ...", flush=True)
-    html = HTML_PATH.read_text(encoding="utf-8")
-    gj = _extract_lsoa_imd(html)
-    lsoa_geoms = [shape(f["geometry"]) for f in gj.get("features", []) if f.get("geometry")]
-    print(f"  {len(lsoa_geoms):,} LSOA polygons loaded", flush=True)
+    wards = json.loads(WARDS_PATH.read_text(encoding="utf-8"))["features"]
+    print(f"Footprint from {len(wards):,} wards in {WARDS_PATH.name} ...", flush=True)
+    ward_geoms = [transform(to_bng, shape(f["geometry"])).buffer(0) for f in wards if f.get("geometry")]
+    footprint = unary_union(ward_geoms).buffer(FOOTPRINT_BUFFER_M)
+    print(f"  footprint area: {footprint.area / 1e6:,.1f} km2", flush=True)
 
-    # Reproject first (vectorised), then union in 27700. Faster + numerically
-    # stable. buffer(0) cleans tiny self-intersections that trip up unary_union.
-    lsoa_27700 = gpd.GeoSeries(lsoa_geoms, crs="EPSG:4326").to_crs("EPSG:27700").buffer(0)
-    print(f"  reprojected to EPSG:27700; dissolving ...", flush=True)
-    lsoa_union_27700 = unary_union(list(lsoa_27700.geometry))
-    footprint_27700 = lsoa_union_27700.buffer(FOOTPRINT_BUFFER_M)
-    bbox_27700 = footprint_27700.envelope
-    print(f"  footprint area: {footprint_27700.area / 1e6:.1f} km2", flush=True)
+    with zipfile.ZipFile(ZIP_PATH) as z:
+        shp_name = next(n for n in z.namelist() if n.endswith("GreenspaceSite.shp"))
+        dbf_name = shp_name[:-4] + ".dbf"
+        shp_raw, dbf_raw = z.read(shp_name), z.read(dbf_name)
+    rows = _read_dbf(dbf_raw)
+    print(f"  {len(rows):,} sites in {Path(shp_name).name}", flush=True)
 
-    with tempfile.TemporaryDirectory() as td:
-        tdp = Path(td)
-        print(f"Unzipping {ZIP_PATH.name} ...", flush=True)
-        with zipfile.ZipFile(ZIP_PATH) as z:
-            for name in z.namelist():
-                if "GreenspaceSite" in name:
-                    z.extract(name, tdp)
-        shp = next(tdp.rglob("TQ_GreenspaceSite.shp"), None)
-        if shp is None:
-            sys.exit("TQ_GreenspaceSite.shp not found in zip")
-        gdf = gpd.read_file(shp)
-    print(f"  Loaded {len(gdf):,} features, CRS={gdf.crs}", flush=True)
-
-    print(f"Clipping to NW London footprint (+{FOOTPRINT_BUFFER_M:.0f} m buffer) ...", flush=True)
-    before = len(gdf)
-    gdf = gdf[gdf.intersects(bbox_27700)].copy()
-    print(f"  {len(gdf):,} features pass bbox prefilter (from {before:,})", flush=True)
-    gdf = gdf[gdf.intersects(footprint_27700)].copy()
-    print(f"  {len(gdf):,} features intersect NW London footprint", flush=True)
-
-    if "function" in gdf.columns and DROP_FUNCTIONS:
-        before = len(gdf)
-        gdf = gdf[~gdf["function"].isin(DROP_FUNCTIONS)].copy()
-        print(f"  Dropped {before - len(gdf):,} features in {sorted(DROP_FUNCTIONS)}", flush=True)
-
-    print(f"Simplifying at {SIMPLIFY_M:.1f} m tolerance ...", flush=True)
-    gdf["geometry"] = gdf.geometry.simplify(SIMPLIFY_M, preserve_topology=True)
-    gdf = gdf[~gdf.geometry.is_empty & gdf.geometry.notna()].copy()
-
-    print("Reprojecting to EPSG:4326 ...", flush=True)
-    gdf = gdf.to_crs("EPSG:4326")
-
-    wanted = [c for c in ("id", "function", "distName1", "distName2", "distName3", "distName4") if c in gdf.columns]
-    gdf = gdf[wanted + ["geometry"]].copy()
-
-    def _primary(row):
-        for c in ("distName1", "distName2", "distName3", "distName4"):
-            v = row.get(c) if c in row else None
-            if v and str(v).strip():
-                return str(v).strip()
-        return ""
-
-    def _aliases(row):
-        seen = []
-        for c in ("distName1", "distName2", "distName3", "distName4"):
-            v = row.get(c) if c in row else None
-            if v and str(v).strip():
-                s = str(v).strip()
-                if s not in seen:
-                    seen.append(s)
-        return " / ".join(seen[1:]) if len(seen) > 1 else ""
-
-    gdf["name"] = gdf.apply(_primary, axis=1)
-    gdf["aliases"] = gdf.apply(_aliases, axis=1)
-    keep = ["id", "function", "name", "aliases", "geometry"]
-    gdf = gdf[[c for c in keep if c in gdf.columns]].copy()
-
-    if "function" in gdf.columns:
-        print("Category breakdown:", flush=True)
-        for cat, n in gdf["function"].value_counts().items():
-            print(f"  {n:>5}  {cat}", flush=True)
-
-    print(f"Building features ...", flush=True)
-    feats = []
-    for _, row in gdf.iterrows():
-        geom = row.geometry.__geo_interface__ if row.geometry is not None else None
-        if geom is None:
+    from shapely.prepared import prep
+    fp = prep(footprint)
+    feats, dropped = [], 0
+    for row, geom in zip(rows, _read_polygons(shp_raw)):
+        if row is None or geom is None or geom.is_empty:
             continue
-        props = {
-            "id": row.get("id", ""),
-            "function": row.get("function", ""),
-            "name": row.get("name", ""),
-        }
-        if row.get("aliases"):
-            props["aliases"] = row["aliases"]
-        feats.append({"type": "Feature", "properties": props, "geometry": geom})
+        if row.get("function") in DROP_FUNCTIONS:
+            dropped += 1
+            continue
+        if not fp.intersects(geom):
+            continue
+        g = geom.simplify(SIMPLIFY_M, preserve_topology=True)
+        if g.is_empty:
+            continue
+        names = []
+        for c in ("distName1", "distName2", "distName3", "distName4"):
+            v = (row.get(c) or "").strip()
+            if v and v not in names:
+                names.append(v)
+        props = {"id": row.get("id", ""), "function": row.get("function", ""),
+                 "name": names[0] if names else ""}
+        if len(names) > 1:
+            props["aliases"] = " / ".join(names[1:])
+        gj = mapping(transform(to_wgs, g))
+        feats.append({"type": "Feature", "properties": props,
+                      "geometry": {"type": gj["type"], "coordinates": _round(gj["coordinates"])}})
+    print(f"  {len(feats):,} sites inside the footprint ({dropped:,} tennis courts and bowling greens left out)", flush=True)
+
+    counts: dict = {}
+    for f in feats:
+        counts[f["properties"]["function"]] = counts.get(f["properties"]["function"], 0) + 1
+    for k, v in sorted(counts.items(), key=lambda kv: -kv[1]):
+        print(f"  {v:>6,}  {k}", flush=True)
 
     payload = json.dumps({"type": "FeatureCollection", "features": feats}, separators=(",", ":"))
-    print(f"  {len(feats):,} features; payload {len(payload):,} bytes", flush=True)
-
-    print(f"Writing {OUT_PATH} ...", flush=True)
-    with open(OUT_PATH, "wb") as fh:
+    tmp = OUT_PATH.with_suffix(".geojson.tmp")
+    with open(tmp, "wb") as fh:
         fh.write(payload.encode("utf-8"))
         fh.flush()
         os.fsync(fh.fileno())
-    size_kb = OUT_PATH.stat().st_size / 1024
-    print(f"  wrote {size_kb:,.0f} KB", flush=True)
+    os.replace(tmp, OUT_PATH)
+    print(f"Wrote {OUT_PATH.name}: {OUT_PATH.stat().st_size / 1024:,.0f} KB", flush=True)
 
 
 if __name__ == "__main__":

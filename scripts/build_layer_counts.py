@@ -16,7 +16,9 @@ be worse than no number at all:
   - the six point layers count records with a truthy lat and lng, which is the
     `if (!p.lat || !p.lng) return;` guard in each load function,
   - VCSE counts what it can pin, `sc === 'explicit' && hq && lat != null &&
-    lng != null`, and also reports the declared total,
+    lng != null`, the region-wide charities based in the region that only the
+    Directory lists (`sc === 'london_wide'`, same test otherwise), and the
+    declared total, which is vcseCountsOf in index.html,
   - CICs report every record, which is what wireCICs writes,
   - greenspaces and LSOAs are feature collections, so it is the feature count.
 
@@ -101,9 +103,20 @@ def main() -> int:
             and r.get("lat") is not None
             and r.get("lng") is not None
         )
+        wide = sum(
+            1
+            for r in vcse
+            if isinstance(r, dict)
+            and r.get("sc") == "london_wide"
+            and r.get("hq")
+            and r.get("lat") is not None
+            and r.get("lng") is not None
+        )
         counts["vcse"] = pinned
+        counts["vcse_wide"] = wide
         counts["vcse_total"] = len(vcse)
-        print(f"\nVCSE:      {pinned:>7,} mappable of {len(vcse):,} declared")
+        print(f"\nVCSE:      {pinned:>7,} mappable, {wide:,} region-wide in the Directory, "
+              f"of {len(vcse):,} declared")
 
     grn = load("greenspaces.geojson")
     if grn is not None:

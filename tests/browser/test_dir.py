@@ -40,10 +40,10 @@ try:
     # GP practices, pharmacies, hospitals, dental practices and charities.
     check("all five datasets are listed", st["types"] == 5, str(st["types"]))
     check("a substantial number of places loaded", st["total"] > 20000, str(st["total"]))
-    check("the count states matches out of the total",
-          "of" in st["count"] and "places" in st["count"], st["count"])
-    check("the list is capped rather than rendering 26,000 rows",
-          st["rows"] == 250, str(st["rows"]))
+    # It opens on a prompt and the type filters rather than on a list.
+    check("the first screen is a search prompt, not a list",
+          st["rows"] == 0 and d.execute_script("return !!document.querySelector('#dir-list .dir-prompt')"),
+          str(st["rows"]))
     # This asserted a flat 34, being the 33 boroughs plus All of London. The
     # filter gained the four ICB boards when ICB scope was added everywhere
     # borough scope was offered, so 34 stopped describing it. Counting the
@@ -67,7 +67,7 @@ try:
     check("every record resolved to a London borough",
           d.execute_script("return PH_DIR.records().every(r => r.lad)"))
     check("the header says how much data is behind it",
-          "datasets" in st["sub"], st["sub"])
+          st["sub"].startswith("Search ") and f"{st['total']:,}" in st["sub"] and "across London" in st["sub"], st["sub"])
 
     # search
     d.execute_script("""
@@ -85,6 +85,8 @@ try:
     """)
     check("search narrows the list", 0 < s["matched"] < s["total"], f"{s['matched']} of {s['total']}")
     check("and every row shown actually matches", s["allMatch"])
+    check("the count states matches out of the total",
+          "of" in s["count"] and "places" in s["count"], s["count"])
 
     # type filter
     d.execute_script("""
@@ -101,6 +103,8 @@ try:
     check("a type filter restricts to that type",
           t["rows"] and all("Dental" in r for r in t["rows"]),
           str(t["count"]) + " / " + (t["rows"][0][:60] if t["rows"] else "none"))
+    check("the list is capped rather than rendering every row",
+          len(t["rows"]) == min(250, d.execute_script("return PH_DIR.filtered().length")), str(len(t["rows"])))
 
     # clicking a row puts it on the map
     d.execute_script("document.querySelector('#dir-list .dir-item').click();")

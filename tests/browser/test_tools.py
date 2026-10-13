@@ -48,7 +48,7 @@ try:
                levels: [...document.querySelectorAll('#cb-level button')].map(b => b.dataset.lvl),
                groups: document.querySelectorAll('#cb-cols .cb-grp-hd').length,
                scopes: document.querySelectorAll('#cb-scope option').length,
-               note: document.getElementById('cb-note').textContent.trim() };
+               note: document.getElementById('cb-count').textContent.trim() };
     """)
     check("the CSV builder opens", st["pane"])
     check("all four levels are offered",
@@ -67,7 +67,7 @@ try:
           got["cols"] == 2 and got["rows"] > 600,
           f"{got['rows']} rows x {got['cols']} figures")
     check("the header names the area and then the figures",
-          got["header"][:2] == ["code", "name"] and len(got["header"]) == 5,
+          got["header"][:2] == ["Ward code", "Ward name"] and len(got["header"]) == 5,
           str(got["header"]))
     # The code column is what a file is joined on elsewhere, so it has to be
     # the GSS code and not the ward's name standing in for one.
@@ -106,7 +106,7 @@ try:
     # panel offered a file with no rows in it.
     d.execute_script("PH_CSV.setLevel('lsoa');")
     pending_note = d.execute_script(
-        "return document.getElementById('cb-note').textContent")
+        "return document.getElementById('cb-count').textContent")
     for _ in range(60):
         if d.execute_script("return PH_CSV.build().rows > 0"):
             break
@@ -132,7 +132,7 @@ try:
           lv["colsAfterBorough"] == 0 and "been removed" in lv["warned"],
           f"{lv['colsAfterBorough']} kept; note: {lv['warned'][:120]}")
     check("and it says what boroughs do hold",
-          "published at borough level only" in lv["warned"], lv["warned"][-80:])
+          "health figures published for each LA" in lv["warned"], lv["warned"][-80:])
 
     # scoping to one borough
     sc = d.execute_script("""

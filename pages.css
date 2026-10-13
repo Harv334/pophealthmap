@@ -1,0 +1,170 @@
+/* The frame shared by the pages around the map: methodology.html,
+   accessibility.html, privacy.html and 404.html. One header, one footer and
+   one set of text styles, so the four read as one site.
+
+   Light only. The map has one light colour scheme, these pages describe the
+   map, and a page that turned dark beside a map that does not would look like
+   another site. color-scheme keeps form controls and scrollbars light too
+   when the device is set to dark.
+
+   The tokens are the map's own (index.html :root), so a colour here is the
+   colour of the same thing on the map. */
+:root {
+  color-scheme: light;
+  --nhs-blue:#005EB8; --nhs-dark:#003087; --nhs-yellow:#FFB81C;
+  /* #5E6D78, as on the map: #768692 is 3.75:1 on white, under AA. */
+  --ink:#212B32; --ink-2:#4C6272; --ink-3:#5E6D78;
+  --line:#DDE1E4; --line-2:#E8EDEE;
+  --bg:#F4F7F9; --paper:#FFFFFF; --paper-2:#FBFCFD;
+  --tint-amber:#FFF8E6; --tint-amber-line:#E0C280; --tint-amber-ink:#5C4115;
+  --page-w:860px;
+}
+* { box-sizing:border-box; }
+html { background:var(--bg); }
+/* A column, so the footer sits at the foot of a short page such as the
+   page-not-found one rather than halfway up the screen. */
+body { margin:0; min-height:100vh; display:flex; flex-direction:column;
+  background:var(--bg); color:var(--ink);
+  font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif; font-size:15px; line-height:1.6; }
+
+/* ── Skip link ── as on the map: off screen until it has focus. */
+.skip { position:absolute; left:-9999px; top:0; z-index:10; background:var(--nhs-blue);
+  color:#fff; padding:10px 16px; border-radius:0 0 8px 0; font-size:14px; font-weight:600;
+  text-decoration:none; }
+.skip:focus { left:0; outline:3px solid var(--nhs-yellow); outline-offset:-3px; }
+
+/* ── Keyboard focus ── the map's ring: 2px of NHS blue just outside. */
+a:focus-visible, button:focus-visible, summary:focus-visible,
+[tabindex]:not([tabindex="-1"]):focus-visible {
+  outline:2px solid var(--nhs-blue); outline-offset:2px; border-radius:2px; }
+
+/* ── Header ── the mark and name lead back to the map, and the three pages
+   follow in the same order everywhere. Every link is at least 44px tall. */
+.site-hdr { background:var(--paper); border-top:4px solid var(--nhs-blue);
+  border-bottom:1px solid var(--line); }
+.site-hdr-in { max-width:var(--page-w); margin:0 auto; padding:6px 24px;
+  display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:0 24px; }
+.brand { display:inline-flex; align-items:center; gap:9px; min-height:44px;
+  font-family:'Inter Tight',Inter,system-ui,sans-serif; font-size:17px; font-weight:600;
+  letter-spacing:-.01em; color:var(--nhs-dark); text-decoration:none; }
+.brand svg { flex:none; display:block; }
+.brand:hover span { text-decoration:underline; text-underline-offset:3px; }
+.site-nav ul { list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:0 22px; }
+.site-nav li { margin:0; }
+.site-nav a { display:inline-flex; align-items:center; min-height:44px; font-size:14px;
+  font-weight:500; color:var(--ink-2); text-decoration:none; }
+.site-nav a:hover { color:var(--nhs-blue); text-decoration:underline; text-underline-offset:4px; }
+.site-nav a[aria-current="page"] { color:var(--nhs-dark); font-weight:600; text-decoration:underline;
+  text-decoration-thickness:2px; text-decoration-color:var(--nhs-blue); text-underline-offset:6px; }
+
+/* ── Footer ── */
+.site-ftr { background:var(--paper); border-top:1px solid var(--line); }
+.site-ftr-in { max-width:var(--page-w); margin:0 auto; padding:16px 24px 24px;
+  font-size:13.5px; line-height:1.55; }
+.site-ftr p { margin:0 0 4px; color:var(--ink-2); }
+.site-ftr p:last-child { margin-bottom:0; }
+
+/* ── Page body ── */
+main { flex:1 0 auto; width:100%; max-width:var(--page-w); margin:0 auto; padding:28px 24px 56px; }
+main:focus { outline:none; }
+h1, h2, h3, h4 { font-family:'Inter Tight',Inter,system-ui,sans-serif; }
+h1 { font-size:28px; line-height:1.25; color:var(--nhs-dark); margin:0 0 14px; letter-spacing:-.015em; }
+h2 { font-size:19px; color:var(--nhs-dark); margin:34px 0 10px; padding-bottom:6px;
+  border-bottom:1px solid var(--line); }
+h3 { font-size:16.5px; color:var(--nhs-dark); margin:24px 0 6px; }
+h4 { font-size:14.5px; color:var(--ink); margin:18px 0 4px; }
+p, li { color:var(--ink-2); }
+li { margin-bottom:6px; }
+strong { color:var(--ink); font-weight:600; }
+a { color:var(--nhs-blue); text-underline-offset:2px; }
+a:hover { color:var(--nhs-dark); }
+.lede { font-size:16.5px; color:var(--ink); max-width:62ch; }
+/* The date a page was last changed, which someone may need to quote, so
+   --ink-2 rather than the lighter --ink-3. */
+.updated { color:var(--ink-2); font-size:13.5px; margin-top:40px;
+  border-top:1px solid var(--line); padding-top:14px; }
+.small { font-size:12px; color:var(--ink-3); }
+
+/* Boxes: a plain panel, and an amber one for a warning. */
+.box { background:var(--paper); border:1px solid var(--line); border-radius:8px;
+  padding:14px 16px; margin:16px 0; }
+.box p:first-child, .box ul:first-child { margin-top:0; }
+.box p:last-child, .box ul:last-child { margin-bottom:0; }
+.box.warn, .caution { background:var(--tint-amber); border:1px solid var(--tint-amber-line);
+  border-radius:8px; }
+.box.warn p, .box.warn strong, .caution, .caution strong { color:var(--tint-amber-ink); }
+.caution { padding:12px 14px; margin:16px 0; font-size:14px; }
+
+dl { margin:0; }
+dt { font-weight:600; color:var(--ink); margin-top:12px; }
+dd { margin:2px 0 0; color:var(--ink-2); }
+
+/* Tables, with a wrapper that scrolls sideways rather than the page. */
+.wrap { overflow-x:auto; }
+table { width:100%; border-collapse:collapse; margin:12px 0 18px; font-size:13.5px;
+  background:var(--paper); border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+th, td { text-align:left; padding:8px 11px; border-bottom:1px solid var(--line);
+  vertical-align:top; color:var(--ink-2); }
+th { background:var(--paper-2); font-weight:600; color:var(--ink); font-size:12.5px;
+  text-transform:uppercase; letter-spacing:.04em; }
+tbody tr:last-child td { border-bottom:0; }
+td.term { font-weight:600; color:var(--ink); }
+code { font-family:'JetBrains Mono',ui-monospace,Menlo,monospace; font-size:12.5px;
+  background:var(--paper-2); border:1px solid var(--line); border-radius:4px; padding:1px 5px;
+  color:var(--ink); }
+/* Storage names on the privacy page are read as whole words, so a narrow
+   screen scrolls the table instead of breaking them. */
+td code.name { white-space:nowrap; }
+
+/* A link that is the one thing to do next, such as going back to the map. */
+.btn { display:inline-flex; align-items:center; min-height:44px; background:var(--nhs-blue);
+  color:#fff; text-decoration:none; padding:10px 18px; border-radius:8px; font-size:15px; font-weight:600; }
+.btn:hover { background:var(--nhs-dark); color:#fff; }
+
+/* ── Methodology ── */
+/* "On this page": two columns where there is room, so the citation section
+   is still on the first screen. */
+.toc { margin:20px 0 0; }
+.toc h2 { font-size:15px; margin:0 0 6px; padding:0; border:0; color:var(--ink); }
+.toc ol { margin:0; padding-left:22px; columns:2; column-gap:32px; }
+.toc li { margin:0 0 3px; break-inside:avoid; }
+.cite { background:var(--paper); border:1px solid var(--line); border-left:4px solid var(--nhs-blue);
+  border-radius:6px; padding:10px 14px; margin:10px 0 14px; color:var(--ink); }
+.status-bad { color:#A5341C; font-weight:600; }
+.status-part { color:#8A5A00; font-weight:600; }
+.credits p { font-size:13.5px; }
+
+/* ── Phones ── */
+@media (max-width: 699.98px) {
+  .site-hdr-in { padding:4px 16px 2px; }
+  .site-nav ul { gap:0 18px; }
+  .site-ftr-in { padding:14px 16px 22px; }
+  main { padding:22px 16px 48px; }
+  h1 { font-size:24px; }
+  th, td { padding:7px 8px; }
+  .toc ol { columns:1; }
+  /* Long addresses and ONS product names are wider than a phone. */
+  a, code { overflow-wrap:anywhere; }
+  td code.name { overflow-wrap:normal; }
+  /* Methodology tables become a stack of cards on a phone, one card per row,
+     each cell labelled with its column heading (data-label, set by the
+     script at the foot of that page). */
+  table.stack, table.stack tbody, table.stack tr, table.stack td { display:block; width:100%; }
+  table.stack { border:0; background:transparent; border-radius:0; overflow:visible; margin:8px 0 16px; }
+  table.stack thead { position:absolute; width:1px; height:1px; overflow:hidden;
+    clip:rect(0 0 0 0); white-space:nowrap; }
+  table.stack tr { background:var(--paper); border:1px solid var(--line); border-radius:8px;
+    margin:0 0 10px; padding:10px 12px; }
+  table.stack td { border:0; padding:3px 0; }
+  table.stack td[data-label]::before { content:attr(data-label); display:block; font-size:11px;
+    font-weight:600; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-3); }
+  table.stack td:first-child { font-size:14.5px; padding-bottom:6px; }
+  table.stack td:first-child::before { display:none; }
+}
+
+/* ── Printing ── the page, without the frame around it. */
+@media print {
+  .site-hdr, .site-ftr, .skip { display:none; }
+  body, html { background:#fff; }
+  main { max-width:none; padding:0; }
+}

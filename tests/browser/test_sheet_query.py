@@ -109,13 +109,13 @@ try:
     # ward click does not drag the sidebar onto the ward profile.
     check("a ward click leaves the sidebar where it was",
           not declutter["wardTab"], str(declutter))
-    check("but the profile is filled in, ready for Open profile", declutter["panelFilled"])
+    check("but the profile is filled in, ready for Open full profile", declutter["panelFilled"])
     check("only the first category starts expanded",
           declutter["openCats"] == 1 and declutter["totalCats"] > 2, str(declutter))
 
     d.execute_script("document.getElementById('ws-profile').click();")
     time.sleep(0.8)
-    check("Open profile is the way into the full panel",
+    check("Open full profile is the way into the full panel",
           d.execute_script("return document.getElementById('tab-ward').classList.contains('active')"))
     d.execute_script("""[...document.querySelectorAll('.sb-tab')].find(t=>t.dataset.tab==='layers').click();""")
     time.sleep(0.4)
@@ -357,7 +357,7 @@ try:
     check("example seeds two conditions", q["conds"] == 2, str(q["conds"]))
     check("indicator menu populated", q["indOpts"] > 80, str(q["indOpts"]))
     check("indicator menu grouped, ward and borough Fingertips kept apart",
-          "Local Health (ward)" in q["groups"] and "Fingertips (borough level)" in q["groups"],
+          "Local Health (ward)" in q["groups"] and "Fingertips (LA level)" in q["groups"],
           str(q["groups"]))
 
     d.execute_script("document.getElementById('q-run').click();")
@@ -373,7 +373,7 @@ try:
     """)
     check("query returns matching wards", r["rows"] > 0, f"{r['rows']} rows / bar: {r['bar']}")
     check("result bar counts wards and services",
-          "ward" in r["bar"] and "gp practices" in r["bar"] and "pharmacies" in r["bar"], r["bar"])
+          "ward" in r["bar"] and "GP practices" in r["bar"] and "pharmacies" in r["bar"], r["bar"])
     check("every result row is in Brent",
           d.execute_script("""
             return [...document.querySelectorAll('#q-results .q-row .q-nm small')]
@@ -401,7 +401,7 @@ try:
       return { key: opt.value, text: document.getElementById('q-caution').textContent.trim() };
     """)
     check("borough-level Fingertips key raises the caveat",
-          "borough level" in caution["text"], f"{caution['key']}: {caution['text'][:110]}")
+          "published for each LA" in caution["text"], f"{caution['key']}: {caution['text'][:110]}")
 
     ward_ft = d.execute_script("""
       var sel = document.querySelector('#q-conds [data-key="0"]');
@@ -411,7 +411,7 @@ try:
       return { key: opt.value, text: document.getElementById('q-caution').textContent.trim() };
     """)
     check("ward-level Fingertips key does not raise it",
-          "borough level" not in ward_ft["text"],
+          "published for each LA" not in ward_ft["text"],
           f"{ward_ft['key']}: {ward_ft['text'][:110] or '(no caution)'}")
 
     # the assistant's own test of the same thing

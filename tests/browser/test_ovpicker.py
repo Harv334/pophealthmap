@@ -78,7 +78,7 @@ try:
           one["curOv"] == "census_bad_health_pct", str(one["curOv"]))
     check("the legend appears, so the map actually redrew",
           one["legend"] != "none", one["legend"])
-    check("the picker names what is showing", "Bad/very bad health" in one["cur"], one["cur"])
+    check("the picker names what is showing", "Bad or very bad health" in one["cur"], one["cur"])
     check("exactly one box is ticked", one["ticked"] == 1, str(one["ticked"]))
     check("and a clear control appears", one["clearShown"])
 
