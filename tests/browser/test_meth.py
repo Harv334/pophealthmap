@@ -20,32 +20,40 @@ try:
           "not drawn" not in txt, "still says 'not drawn'")
     check("MSOA layer source named", "Middle_layer_Super_Output_Areas" in txt)
     check("a glossary defines the abbreviations",
-          d.execute_script("return document.body.innerHTML.includes('Plain word')")
-          and "LSOA" in txt)
+          any("Words used on this map" in h for h in heads)
+          and "local authority (LA)" in txt and "LSOA" in txt)
     # This page documents the DATA, not the tools. The walkthroughs of Query,
     # Compare, Custom area, Data export, Directory and the question panel were
     # removed deliberately: they described what the buttons do, which the
     # buttons already do, and they buried the two things a reader comes here
     # for. What survived from them is the part that changes how a number should
     # be read, and that is what is checked below.
-    check("the sources table is the centre of the page",
-          any("Every data source" in h for h in heads), str(heads))
+    check("the page opens with a contents list and how to cite",
+          heads[:2] == ["On this page", "How to cite this map"], str(heads[:3]))
+    check("the sources table is there, with its live column",
+          any("Where the data comes from" in h for h in heads)
+          and "Last updated here" in txt, str(heads))
     check("and every geography has a stated year",
-          any("which year" in h for h in heads), str(heads))
+          d.execute_script("return [...document.querySelectorAll('#levels ~ div th')]"
+                           ".some(th => /Boundaries from/i.test(th.textContent))"))
     check("service counting method documented",
-          "ward polygon" in txt and "stands in" in txt)
+          "Services are counted where they stand" in txt and "stands in" in txt)
     check("missing-is-not-zero documented", "Missing is not zero" in txt)
-    check("polarity of the colours explained",
-          "colour follows the" in txt.lower() and "least" in txt)
-    check("uncoloured rows explained", "no better or worse end" in txt)
-    check("borough-level repetition is flagged",
-          "repeated" in txt and "every ward in that borough" in txt)
+    check("direction of the colours explained",
+          "Darker means a higher figure" in txt and "most deprived" in txt)
+    check("indicators with no direction explained", "no better or worse end" in txt)
+    check("LA-only figures are flagged",
+          "published only for a whole LA" in txt and "labelled as the LA's figure" in txt)
     check("known gaps still listed",
           any("Known gaps" in h for h in heads)
-          and "City of London" in txt and "North West London" in txt)
+          and "City of London" in txt and "PCN catchments" in txt)
+    check("every heading can be linked to",
+          d.execute_script("return [...document.querySelectorAll('main h2, main h3, main h4')]"
+                           ".every(h => h.id)"))
 
     # house style
     check("no em dashes", "—" not in txt, txt[max(0,txt.find("—")-60):txt.find("—")+60] if "—" in txt else "")
+    check("no en dashes", "\u2013" not in txt)
     check("no US spellings of the words used here",
           not re.search(r"\bcolor\b|\bneighborhood", txt, re.I))
 
