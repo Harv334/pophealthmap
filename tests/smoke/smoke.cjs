@@ -46,6 +46,31 @@ async function checkAxe(page, name) {
   const v = await axeViolations(page);
   ok(v.length === 0, 'accessibility: ' + name, v.join(', '));
 }
+/* Touch targets on a phone (workplan 2.10): axe's target-size rule, and our
+   own floor of 44px for the controls people tap most, counting the
+   invisible ::after hit area that the small round and square ones carry. */
+async function checkTargets(page, name) {
+  if (!(await page.evaluate(() => typeof axe !== 'undefined'))) await page.addScriptTag({ content: AXE });
+  const r = await page.evaluate(() => axe.run(document, { runOnly: ['target-size'], resultTypes: ['violations'] }));
+  const v = r.violations.flatMap(x => x.nodes.map(n => n.target.join(' ')));
+  ok(v.length === 0, 'phone: touch targets big enough (axe target-size): ' + name, v.slice(0, 5).join(', '));
+}
+const hitSizes = (page, sel) => page.evaluate(sel => [...document.querySelectorAll(sel)].filter(el => el.getClientRects().length).map(el => {
+  const r = el.getBoundingClientRect(), a = getComputedStyle(el, '::after');
+  let w = r.width, h = r.height;
+  if (a.content !== 'none' && a.position === 'absolute') {
+    w -= (parseFloat(a.left) || 0) + (parseFloat(a.right) || 0);
+    h -= (parseFloat(a.top) || 0) + (parseFloat(a.bottom) || 0);
+  }
+  return { id: el.id || el.getAttribute('aria-label') || el.textContent.trim().slice(0, 12), w: Math.round(w), h: Math.round(h) };
+}), sel);
+const rectOf = (page, sel) => page.evaluate(sel => {
+  const e = document.querySelector(sel);
+  if (!e || !e.getClientRects().length) return null;
+  const r = e.getBoundingClientRect();
+  return { l: r.left, t: r.top, r: r.right, b: r.bottom, w: r.width, h: r.height };
+}, sel);
+const overlaps = (a, b) => !!(a && b && a.l < b.r && a.r > b.l && a.t < b.b && a.b > b.t);
 const setOv = (page, k) => page.evaluate(k => {
   const s = document.getElementById('ov'); s.value = k; s.dispatchEvent(new Event('change'));
 }, k);
@@ -264,6 +289,19 @@ const smallText = page => page.evaluate(() => {
     await page.mouse.click(wpt[0], wpt[1]);
     await page.waitForTimeout(1500);
     ok(await page.evaluate(() => !!selW), 'clicking a ward selects it');
+    // The hover card is drawn above the key, not under it (workplan 2.10).
+    {
+      const lg = await rectOf(page, '#map-legend-strip');
+      let tip = null;
+      for (const f of [0.5, 0.35, 0.65, 0.2, 0.8]) {
+        await page.mouse.move(lg.l + lg.w * f, lg.t - 8);
+        await page.mouse.move(lg.l + lg.w * f + 3, lg.t - 8);
+        await page.waitForTimeout(500);
+        if ((tip = await rectOf(page, '.leaflet-tooltip'))) break;
+      }
+      ok(!!tip && tip.b <= lg.t, 'a hover card just above the key is lifted clear of it', JSON.stringify({ tip, lg }));
+      await page.mouse.move(5, 5);
+    }
     await checkAxe(page, 'ward selected');
     await page.click('#sbtab-layers');
     const pcn = await page.evaluate(() => document.querySelectorAll('#pcn-focus option').length);
@@ -679,6 +717,44 @@ const smallText = page => page.evaluate(() => {
     });
     ok(!r.overlap, 'phone: legend clear of the map credits');
     ok(r.footer === 'sidebar', 'phone: footer in the drawer');
+    // Give the map room on phones (workplan 2.10): the credits on one line,
+    // nothing floating over them, and "Colour the map" over the map.
+    {
+      const cr = await page.evaluate(() => {
+        const a = document.querySelector('.leaflet-control-attribution');
+        return { text: a.innerText, h: a.getBoundingClientRect().height };
+      });
+      const attr = await rectOf(page, '.leaflet-control-attribution');
+      const covered = [];
+      for (const s of ['#map-legend-strip', '#ai-toggle', '#map-colour-chip', '#dl-badge']) if (overlaps(attr, await rectOf(page, s))) covered.push(s);
+      ok(cr.h <= 20 && /OpenStreetMap/.test(cr.text) && /Esri|CARTO/.test(cr.text) && !/Leaflet|Data credits/.test(cr.text) && !covered.length,
+        'phone: the map credits are one line, keep the tile and OpenStreetMap credit, and nothing covers them', JSON.stringify(cr) + ' ' + covered.join(','));
+      const chip = await rectOf(page, '#map-colour-chip');
+      ok(!!chip && chip.h >= 44 && !overlaps(chip, await rectOf(page, '#ai-toggle')) && !overlaps(chip, await rectOf(page, '#map-legend-strip')),
+        'phone: "Colour the map" floats over the map, clear of the Ask button and the key', JSON.stringify(chip));
+      await page.touchscreen.tap(chip.l + 20, chip.t + 20);
+      await page.waitForTimeout(600);
+      ok(await page.evaluate(() => PH_DRAWER.isOpen() && document.getElementById('tab-overlay').classList.contains('active')),
+        'phone: "Colour the map" opens the Indicators tab');
+      await page.evaluate(() => PH_DRAWER.close());
+      await page.waitForTimeout(400);
+      const lg = await rectOf(page, '#map-legend-strip');
+      const lgName = await page.evaluate(() => [document.getElementById('map-legend-strip').getAttribute('aria-label'),
+        document.getElementById('mls-label').firstChild.textContent.trim()]);
+      ok(lgName[0] === 'About this indicator: ' + lgName[1], 'phone: the key is a button named after its indicator', lgName.join(' / '));
+      await page.touchscreen.tap(lg.l + 30, lg.t + lg.h / 2);
+      await page.waitForTimeout(700);
+      ok(await page.evaluate(() => PH_DRAWER.isOpen() && document.getElementById('tab-overlay').classList.contains('active') &&
+          document.getElementById('ov-info-panel').style.display === 'block' &&
+          document.querySelector('#ov-info-panel dl.ic').getBoundingClientRect().height > 100),
+        'phone: a tap on the key opens the indicator card');
+      await page.evaluate(() => PH_DRAWER.close());
+      await page.waitForTimeout(400);
+      await checkTargets(page, 'the map');
+      const hits = await hitSizes(page, '.leaflet-control-zoom a, #dl-seg button, #dl-help, #hdr-menu, #hdr-search-btn, #ai-toggle, #map-colour-chip');
+      ok(hits.length >= 8 && hits.every(x => x.w >= 44 && x.h >= 44), 'phone: the map controls have 44px touch targets',
+        hits.filter(x => x.w < 44 || x.h < 44).map(x => x.id + ' ' + x.w + 'x' + x.h).join(', '));
+    }
     const box = await page.evaluate(() => { const r = document.getElementById('map').getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; });
     await page.touchscreen.tap(box[0], box[1]);
     await page.waitForTimeout(1200);
@@ -686,8 +762,32 @@ const smallText = page => page.evaluate(() => {
     await checkAxe(page, 'phone with area card');
     await page.click('#hdr-menu'); await page.waitForTimeout(400);
     await checkAxe(page, 'phone drawer');
+    await checkTargets(page, 'the drawer');
     g = await glyphCheck(page);
     ok(!g.length, 'phone: no glyph or emoji icons in the drawer', g.slice(0, 5).join(' | '));
+    // The four tools wait behind More, so the tabs and their content start
+    // straight under the search row. 650px for the content needs the drawer
+    // to scroll as one column (workplan 1.10); until then it is checked here
+    // against what the pinned footer leaves.
+    const dr = await page.evaluate(() => ({
+      tools: Math.round(document.getElementById('sb-tools').getBoundingClientRect().height),
+      pane: Math.round(document.querySelector('#sidebar > .tab-pane.active').getBoundingClientRect().height),
+      inMenu: ['tb-reset', 'tb-link', 'tb-cb', 'tb-png'].every(id => document.getElementById(id).parentNode.id === 'sb-more-menu'),
+      menuHidden: document.getElementById('sb-more-menu').hidden,
+    }));
+    ok(dr.tools <= 64 && dr.pane >= 540 && dr.inMenu && dr.menuHidden,
+      'phone: the drawer keeps the four tools behind More, so its content starts under one row', JSON.stringify(dr));
+    await page.click('#sb-more');
+    await page.waitForTimeout(200);
+    const menu = await hitSizes(page, '#sb-more-menu button');
+    ok(menu.length === 4 && menu.every(x => x.h >= 44) && await page.evaluate(() => document.getElementById('sb-more').getAttribute('aria-expanded') === 'true'),
+      'phone: More opens Reset, Copy link, Colour-blind palette and Screenshot, each 44px tall', JSON.stringify(menu));
+    await checkAxe(page, 'phone drawer with More open');
+    await page.keyboard.press('Escape');
+    ok(await page.evaluate(() => document.getElementById('sb-more-menu').hidden && PH_DRAWER.isOpen()),
+      'phone: Escape closes the More menu and leaves the panel open');
+    await page.click('#sb-more');
+    await page.waitForTimeout(200);
     await page.click('#tb-png');
     await page.waitForTimeout(500);
     const sheet = await page.evaluate(() => {
@@ -697,6 +797,21 @@ const smallText = page => page.evaluate(() => {
     ok(!!sheet && !sheet.drawer && sheet.bottom === sheet.vh && sheet.width === sheet.vw,
       'phone: the screenshot dialog closes the drawer and rises from the bottom of the screen', JSON.stringify(sheet));
     await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+    // Ask opens as a full-screen sheet on a phone (workplan 2.10).
+    if (await page.evaluate(() => !!document.getElementById('ai-toggle'))) {
+      // The tapped area's card is still up from earlier, and the button waits under it.
+      await page.evaluate(() => { if (typeof PH_PEEK !== 'undefined') PH_PEEK.hide(); });
+      await page.click('#ai-toggle');
+      await page.waitForTimeout(400);
+      const ask = await rectOf(page, '#ai-panel');
+      const vp = page.viewportSize();
+      ok(!!ask && ask.l === 0 && ask.t === 0 && Math.round(ask.w) === vp.width && Math.round(ask.h) === vp.height,
+        'phone: Ask opens as a full-screen sheet', JSON.stringify(ask));
+      await checkTargets(page, 'Ask');
+      await page.click('#ai-close');
+      await page.waitForTimeout(300);
+    }
     ok(errors.length === 0, 'no page errors (phone)', errors.join(' | '));
     await page.close();
   }
@@ -712,6 +827,66 @@ const smallText = page => page.evaluate(() => {
     const a = await t(), b2 = await t();
     ok(a === 0 && b2 === 1, 'phone: one tap opens the ward sheet, one tap puts it back', a + ',' + b2);
     await checkAxe(page, 'phone ward sheet');
+    // The open sheet stops at about 60% of the screen, a pin drops it to
+    // peek with a note, and the comparison opens at peek and then as a table
+    // with the areas as columns (workplan 2.10).
+    {
+      await page.evaluate(() => { showWard('Lansbury'); PH_SHEET.setState(0); });
+      await page.waitForTimeout(700);
+      const sh = await rectOf(page, '#ward-sheet');
+      const vh = page.viewportSize().height;
+      ok(!!sh && sh.h <= vh * 0.61, 'phone: the open ward sheet takes at most about 60% of the screen', JSON.stringify(sh));
+      const attr = await rectOf(page, '.leaflet-control-attribution');
+      ok(!!attr && attr.b <= sh.t && !overlaps(attr, await rectOf(page, '#map-legend-strip')) && !overlaps(attr, await rectOf(page, '#ai-toggle')),
+        'phone: the credits sit on the sheet\'s edge, one line, covered by nothing', JSON.stringify({ attr, sh }));
+      await checkTargets(page, 'the open ward sheet');
+      const sheetHits = await hitSizes(page, '#ws-size, #ws-close, #ws-pin, #ws-profile');
+      ok(sheetHits.length === 4 && sheetHits.every(x => x.w >= 44 && x.h >= 44), 'phone: the sheet\'s buttons have 44px touch targets', JSON.stringify(sheetHits));
+      await page.click('#ws-pin');
+      await page.waitForTimeout(600);
+      const p1 = await page.evaluate(() => ({ state: PH_SHEET.state(), note: document.getElementById('ws-pinnote').hidden ? '' : document.getElementById('ws-pinnote').textContent }));
+      ok(p1.state === 1 && p1.note === 'Pinned. Select another ward to add it.', 'phone: pinning drops the sheet to peek and says what to do next', JSON.stringify(p1));
+      await page.evaluate(() => showWard('Stonebridge'));
+      await page.waitForTimeout(500);
+      ok(await page.evaluate(() => document.getElementById('ws-pinnote').hidden && getComputedStyle(document.getElementById('ws-pin')).display !== 'none'),
+        'phone: the next ward opens at peek with its own Pin button');
+      await page.click('#ws-pin');
+      await page.waitForTimeout(500);
+      await page.click('#ws-see-cmp');
+      await page.waitForTimeout(800);
+      const tb = await page.evaluate(() => {
+        const bar = document.getElementById('cmp-bar');
+        return { open: bar.classList.contains('open'), peek: bar.classList.contains('peek'),
+          cols: [...bar.querySelectorAll('.cmp-table thead th')].map(t => t.textContent.trim()),
+          rows: bar.querySelectorAll('.cmp-table tbody tr').length,
+          cards: getComputedStyle(document.getElementById('cmp-cards')).display };
+      });
+      ok(tb.open && !tb.peek && tb.cols.length === 3 && /Lansbury/.test(tb.cols[1]) && /Stonebridge/.test(tb.cols[2]) && tb.rows >= 2 && tb.cards === 'none',
+        'phone: See comparison opens a table with the two wards as columns', JSON.stringify(tb));
+      ok((await rectOf(page, '#cmp-bar')).h <= vh * 0.61, 'phone: the comparison takes at most about 60% of the screen');
+      await checkAxe(page, 'phone comparison table');
+      await checkTargets(page, 'the comparison table');
+      await page.click('#cmp-bar-less');
+      await page.waitForTimeout(400);
+      const pk = await page.evaluate(() => ({ peek: document.getElementById('cmp-bar').classList.contains('peek'),
+        names: document.getElementById('cmp-peek').innerText.replace(/\s+/g, ' ').trim(),
+        see: getComputedStyle(document.getElementById('cmp-bar-see')).display !== 'none',
+        table: getComputedStyle(document.getElementById('cmp-tablewrap')).display }));
+      ok(pk.peek && /Lansbury/.test(pk.names) && /Stonebridge/.test(pk.names) && pk.see && pk.table === 'none',
+        'phone: the comparison peeks with only the names and See comparison', JSON.stringify(pk));
+      await page.evaluate(() => { document.getElementById('cmp-bar-close').click(); PH_COMPARE.clear(); document.querySelector('.mode-btn[data-mode="explore"]').click(); });
+      await page.waitForTimeout(400);
+    }
+    // GP practices are small dots with a 44px box to tap (workplan 2.10).
+    {
+      await page.evaluate(() => { PH_DRAWER.close(); const t = document.getElementById('tg'); if (!t.checked) t.click(); map.setView([51.515, -0.07], 16, { animate: false }); });
+      await page.waitForTimeout(1500);
+      const gp = await page.evaluate(() => [...document.querySelectorAll('.leaflet-marker-icon.mk-hit')].slice(0, 5).map(e => {
+        const r = e.getBoundingClientRect(), d = e.querySelector('.mk').getBoundingClientRect();
+        return [Math.round(r.width), Math.round(r.height), Math.round(d.width)];
+      }));
+      ok(gp.length > 0 && gp.every(x => x[0] >= 44 && x[1] >= 44 && x[2] <= 12), 'phone: a GP practice is a small dot with a 44px touch target', JSON.stringify(gp));
+    }
     ok(errors.length === 0, 'no page errors (phone ward)', errors.join(' | '));
     await page.close();
   }
@@ -722,6 +897,51 @@ const smallText = page => page.evaluate(() => {
     await page.waitForTimeout(1200);
     ok(await page.evaluate(() => { const e = document.getElementById('area-peek'); return !e.hidden && /\d/.test(e.innerText); }), 'phone: tapped MSOA shows its card');
     ok(errors.length === 0, 'no page errors (phone MSOA)', errors.join(' | '));
+    await page.close();
+  }
+
+  // A phone on its side (workplan 2.10): the sheet and the tour stand down
+  // the right of the map, and the key, the credits, the level switch and the
+  // Ask button move left of them rather than under them.
+  {
+    const LAND = { width: 844, height: 390, isMobile: true, hasTouch: true };
+    const { page, errors } = await open(browser, 'index.html?ov=crime_rate_per_1000&t=1', LAND);
+    const clear = async panel => {
+      const p = await rectOf(page, panel), hit = [];
+      for (const s of ['#map-legend-strip', '.leaflet-control-attribution', '#ai-toggle', '#dl-badge', '.leaflet-control-zoom'])
+        if (overlaps(p, await rectOf(page, s))) hit.push(s);
+      return hit;
+    };
+    await page.evaluate(() => showWard('Lansbury'));
+    await page.waitForTimeout(800);
+    const mp = await rectOf(page, '#map');
+    let sh = await rectOf(page, '#ward-sheet');
+    ok(!!sh && sh.r >= mp.r - 10 && sh.w <= 380 && sh.t <= mp.t + 10, 'landscape: the ward sheet stands at the right of the map', JSON.stringify({ sh, mp }));
+    let hit = await clear('#ward-sheet');
+    ok(!hit.length, 'landscape: nothing on the map sits under the ward sheet', hit.join(', '));
+    await page.evaluate(() => PH_SHEET.setState(0));
+    await page.waitForTimeout(600);
+    sh = await rectOf(page, '#ward-sheet');
+    ok(sh.b >= mp.b - 10 && sh.t <= mp.t + 10, 'landscape: the open sheet runs the full height of the map', JSON.stringify(sh));
+    await checkTargets(page, 'landscape with the sheet open');
+    await page.evaluate(() => { deselectWard(); PH_TOUR.start(); });
+    await page.waitForTimeout(800);
+    const tr = await rectOf(page, '#tour-strip');
+    ok(!!tr && tr.r >= mp.r - 10 && tr.h >= mp.h - 20 && tr.w <= 380, 'landscape: the tour stands down the right of the map', JSON.stringify({ tr, mp }));
+    hit = await clear('#tour-strip');
+    ok(!hit.length, 'landscape: nothing on the map sits under the tour', hit.join(', '));
+    await page.evaluate(() => PH_TOUR.end());
+    await page.waitForTimeout(600);
+    ok(await page.evaluate(() => document.getElementById('map-wrap').style.getPropertyValue('--side-r') === '0px'),
+      'landscape: the furniture goes back when the panels close');
+    if (await page.evaluate(() => !!document.getElementById('ai-toggle'))) {
+      await page.click('#ai-toggle');
+      await page.waitForTimeout(400);
+      const ask = await rectOf(page, '#ai-panel');
+      ok(!!ask && ask.t === 0 && Math.round(ask.w) === 844 && Math.round(ask.h) === 390, 'landscape: Ask opens as a full-screen sheet', JSON.stringify(ask));
+      await page.click('#ai-close');
+    }
+    ok(errors.length === 0, 'no page errors (landscape)', errors.join(' | '));
     await page.close();
   }
 
