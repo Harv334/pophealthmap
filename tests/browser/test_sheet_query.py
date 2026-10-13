@@ -373,7 +373,7 @@ try:
     """)
     check("query returns matching wards", r["rows"] > 0, f"{r['rows']} rows / bar: {r['bar']}")
     check("result bar counts wards and services",
-          "ward" in r["bar"] and "gp practices" in r["bar"] and "pharmacies" in r["bar"], r["bar"])
+          "ward" in r["bar"] and "GP practices" in r["bar"] and "pharmacies" in r["bar"], r["bar"])
     check("every result row is in Brent",
           d.execute_script("""
             return [...document.querySelectorAll('#q-results .q-row .q-nm small')]

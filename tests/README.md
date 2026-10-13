@@ -32,6 +32,11 @@ pophealth.uk, so the suite answers those requests from the working copy.
 It also checks the names: every indicator is named from the one label table
 (`IND_NAMES`), Compare offers each measure once, and the old names (Soc rent,
 Boards, metric, VCSE, Borough or Local authority as the level) are gone.
+For the
+indicator cards it checks that one control opens a card and a button at its
+top closes it, that no card or description carries internal codes, "=",
+"i.e.", dashes or title-case categories, that every Census card describes
+the method the pipeline uses, and that periods and dates are written out.
 
 ```bash
 npm install --no-save playwright axe-core

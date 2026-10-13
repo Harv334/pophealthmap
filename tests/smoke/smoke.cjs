@@ -69,6 +69,20 @@ const setOv = (page, k) => page.evaluate(k => {
     const { page, errors } = await open(browser, 'index.html?t=1', DESK);
     ok(await page.evaluate(() => { let n = 0; wLyr.eachLayer(() => n++); return n; }) > 600, 'London wards drawn');
     await checkAxe(page, 'London on open');
+    // The level hint says the boundaries are showing only once they are drawn.
+    await page.route('**/msoa_boundaries.json', async r => { await new Promise(x => setTimeout(x, 1500)); r.continue(); });
+    await page.click('#dl-seg button[data-dl="msoa"]');
+    await page.waitForTimeout(300);
+    const early = await page.evaluate(() => ({ drawn: !!(msoaLyr && map.hasLayer(msoaLyr)), hint: document.getElementById('dl-hint').classList.contains('show') }));
+    await page.waitForFunction(() => msoaLyr && map.hasLayer(msoaLyr), null, { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(400);
+    const late = await page.evaluate(() => document.getElementById('dl-hint').classList.contains('show') ? document.getElementById('dl-hint').textContent : '');
+    ok(!early.drawn && !early.hint && /^The MSOA boundaries are shown/.test(late), 'the level hint waits until the boundaries are drawn', JSON.stringify([early, late]));
+    await page.unroute('**/msoa_boundaries.json');
+    // Reset forgets the level the reader chose, so indicators open at their own again.
+    await page.click('#tb-reset');
+    await page.waitForTimeout(600);
+    ok(await page.evaluate(() => _readerLevel === null && currentDataLevel === 'ward'), 'Reset forgets the chosen level');
     await page.click('#sbtab-overlay');
     await page.click('#ov-chips button');
     await page.waitForTimeout(2500);
@@ -77,10 +91,72 @@ const setOv = (page, k) => page.evaluate(k => {
     await page.click('#ov-about');
     ok(await page.evaluate(() => /Published at/.test(document.getElementById('ov-info-panel').innerText)), 'indicator card opens');
     await checkAxe(page, 'indicator and card');
+    // Indicator descriptions and cards (workplan 2.3): one control opens the
+    // card and a button at its top closes it; no card or description carries
+    // internal codes, "=", "i.e.", dashes or title-case categories; Census
+    // cards describe the method the pipeline uses; periods and dates are
+    // written out in words.
+    const c23 = await page.evaluate(() => {
+      const panel = document.getElementById('ov-info-panel');
+      const top = panel.firstElementChild;
+      const out = {
+        controls: !document.getElementById('ov-info') && document.getElementById('ov-about').textContent.trim() === 'About this indicator',
+        closeAtTop: !!(top && top.querySelector('.ic-x')),
+        bad: [], census: [], ft: [],
+        periods: [fmtPeriod('2019 - 23'), fmtPeriod('2016/17 - 20/21'), fmtPeriod('Aug 2025 to Jul 2026'), fmtPeriod('2024/25')].join(' | '),
+        ptal: PH_IND.label('ptal_score'),
+        vintage: !document.getElementById('data-vintage') && !!document.querySelector('#ov-theme-view #core20-toggle'),
+      };
+      const BAD = /File_7|LSOA bridge|CLA01|NOMIS|=|\bi\.e\.|\be\.g\.|[\u2013\u2014]|→|pop-weighted|Offences \(|Public Order|Criminal Damage|Against the Person|Against Society|Deprivation domain|Domain score|'(Very )?(Good|Bad)'/;
+      Object.keys(OV_META).forEach(k => {
+        const d = document.createElement('div');
+        d.innerHTML = indicatorCardHTML(k);
+        const t = d.querySelector('.ic-t');
+        if (t) t.remove();               // the publisher's own title, kept as published
+        const text = d.textContent;
+        [text, OV_META[k].desc || '', OV_PLAIN[k] || ''].forEach(x => {
+          const m = x.match(BAD);
+          if (m) out.bad.push(k + ': ' + m[0]);
+        });
+        const dd = name => { const dt = [...d.querySelectorAll('dt')].find(e => e.textContent === name); return dt ? dt.nextElementSibling.textContent : ''; };
+        if (/\(TS\d+A?\)/.test(OV_META[k].src)) {
+          const m = dd('Method');
+          const right = k === 'census_population' ? /add up the residents of the output areas/.test(m)
+            : /average their percentages, weighting each by its number of residents/.test(m);
+          if (!right || /add up the LSOAs/.test(m)) out.census.push(k);
+        }
+        if (/^ft_\d+$/.test(k) && FT_INFO[k.slice(3)]) {
+          const u = dd('Updates');
+          if (!/\b\d{1,2} (January|February|March|April|May|June|July|August|September|October|November|December) \d{4}\b/.test(u) ||
+              /\d{2}\/\d{2}\/\d{4}/.test(u) || (u.match(/\./g) || []).length !== 1) out.ft.push(k);
+        }
+      });
+      return out;
+    });
+    ok(c23.controls && c23.closeAtTop, 'one About this indicator control, and the card closes from its top', JSON.stringify(c23));
+    await page.click('#ov-info-panel .ic-x');
+    ok(await page.evaluate(() => document.getElementById('ov-info-panel').hidden &&
+      document.getElementById('ov-about').getAttribute('aria-expanded') === 'false'), 'the close button closes the card');
+    ok(!c23.bad.length, 'cards and descriptions carry no codes, "=", "i.e.", dashes or title-case categories', c23.bad.slice(0, 5).join(' | '));
+    ok(!c23.census.length, 'every Census card describes the method the pipeline uses', c23.census.join(', '));
+    ok(!c23.ft.length, 'Local Health cards say when OHID last updated them in one sentence, with the date in words', c23.ft.join(', '));
+    ok(c23.periods === '2019 to 2023 | 2016/17 to 2020/21 | August 2025 to July 2026 | 2024/25', 'periods are written out by one helper', c23.periods);
+    ok(c23.ptal === 'Public transport access (PTAL, 2014)', 'PTAL carries its year in its label', c23.ptal);
+    ok(c23.vintage, 'data periods and Core20 have left the Indicators home', JSON.stringify(c23.vintage));
     await page.click('#ov-themes .ov-theme');
     await page.waitForTimeout(300);
     ok(await page.evaluate(() => !document.getElementById('ov-theme-view').hidden), 'theme list opens');
     await checkAxe(page, 'theme list');
+    // Core20 sits in the Deprivation theme and nowhere else.
+    const c20 = await page.evaluate(() => {
+      const shown = () => !document.getElementById('ov-c20').hidden;
+      const first = shown();
+      document.getElementById('ov-back').click();
+      [...document.querySelectorAll('#ov-themes .ov-theme')].find(b => /Deprivation/.test(b.textContent)).click();
+      return [first, shown()];
+    });
+    ok(!c20[0] && c20[1], 'the Core20 control shows in the Deprivation theme only', JSON.stringify(c20));
+    await checkAxe(page, 'Deprivation theme with Core20');
     await page.keyboard.press('Escape');
     await setOv(page, 'ft_93283');
     await page.waitForTimeout(2500);
@@ -165,6 +241,34 @@ const setOv = (page, k) => page.evaluate(k => {
       cmp.n + ' options; twins ' + cmp.twins.join(', ') + '; repeats ' + cmp.repeats.join(', '));
     ok(cmp.chips.indexOf('Social renting') !== -1 && !cmp.levels.some(l => /board/i.test(l)),
       'Compare names indicators and ICBs by their one name', cmp.chips.join(', ') + ' / ' + cmp.levels.join(', '));
+    // Help, hints, tool intros and messages (workplan 2.2): no alert boxes,
+    // no "click" in text both phones and desktops show, help buttons named
+    // for their topic, each tool opening with one sentence, and buttons that
+    // wait for something to act on rather than raising an alert.
+    const noAlert = f => !/\balert\s*\(/.test(fs.readFileSync(path.join(ROOT, f), 'utf8'));
+    ok(noAlert('index.html') && noAlert('data/map/assistant.js'), 'no alert boxes left');
+    const w22 = await page.evaluate(() => {
+      const sentences = t => (t.match(/[.!?](\s|$)/g) || []).length;
+      const shown = [...document.querySelectorAll('[title], [aria-label], [placeholder]')]
+        .filter(e => !e.closest('#wpanel, #tour-strip'))
+        .map(e => [e.getAttribute('title'), e.getAttribute('aria-label'), e.getAttribute('placeholder')].filter(Boolean).join(' '))
+        .concat(['tab-query', 'tab-compare', 'tab-report'].map(id => document.getElementById(id).textContent));
+      const intros = [document.querySelector('#tab-query .q-sub').firstChild.textContent,
+        document.getElementById('cmp-sub').textContent, document.querySelector('#tab-report .rb-hint').textContent]
+        .map(t => t.replace(/\s+/g, ' ').trim());
+      return {
+        helps: [...document.querySelectorAll('.lhelp')].map(b => b.getAttribute('aria-label') || b.textContent.trim())
+          .filter(n => !n || n === '?' || /^explain/i.test(n)),
+        click: shown.filter(t => /\bclick/i.test(t.replace(/double-click/gi, ''))),
+        intros, oneSentence: sentences(intros[0]) === 1 && sentences(intros[1]) === 1 && sentences(intros[2]) <= 2,
+        dashes: intros.filter(t => /[–—]/.test(t)),
+        waiting: ['cmp-open', 'cmp-csv', 'q-csv', 'rb-report', 'rb-csv'].filter(id => !document.getElementById(id).disabled),
+      };
+    });
+    ok(!w22.helps.length, 'every help button is named for its topic', w22.helps.join(', '));
+    ok(!w22.click.length, 'no shared text says "click"', w22.click.slice(0, 3).join(' | '));
+    ok(w22.oneSentence && !w22.dashes.length, 'Query, Compare and Custom area each open with one sentence', w22.intros.join(' | '));
+    ok(!w22.waiting.length, 'tool buttons wait until there is something to act on', 'enabled: ' + w22.waiting.join(', '));
     await page.click('.mode-btn[data-mode="explore"]');
     await page.waitForTimeout(500);
     // Fuel poverty is published by LSOA, so it opens there, with wards on offer.
@@ -175,6 +279,80 @@ const setOv = (page, k) => page.evaluate(k => {
     // A ward clicked opens its sheet.
     await setOv(page, 'crime_rate_per_1000');
     await page.waitForTimeout(2000);
+    // The period beside the chosen indicator comes from the data.
+    const vint = await page.evaluate(() => [document.getElementById('ov-cur-meta').textContent, fmtPeriod(WARD_META.crime_period)]);
+    ok(!!vint[1] && vint[0].indexOf(vint[1]) !== -1, 'the indicator\'s period line is read from the data', vint.join(' / '));
+    // The map's name follows the level and the indicator, and a level the
+    // indicator lacks is refused in words that say which ones will work.
+    ok(await page.evaluate(() => document.getElementById('map').getAttribute('aria-label')) ===
+      'Map of London by ward, coloured by Crime rate per 1,000 residents.', 'map name follows the level and indicator',
+      await page.evaluate(() => document.getElementById('map').getAttribute('aria-label')));
+    // Area levels respect the reader (workplan 2.4). A level the indicator has
+    // no figures for is greyed out but still focusable, its tooltip says why,
+    // and pressing it says which levels will work in the hint beside the
+    // buttons rather than in the middle of the map.
+    const grey = await page.evaluate(() => {
+      const b = document.querySelector('#dl-seg button[data-dl="msoa"]');
+      return { aria: b.getAttribute('aria-disabled'), disabled: b.disabled, tab: b.tabIndex, title: b.title,
+        others: [...document.querySelectorAll('#dl-seg button')].filter(x => x.getAttribute('aria-disabled') === 'true').map(x => x.dataset.dl).join(',') };
+    });
+    ok(grey.aria === 'true' && !grey.disabled && grey.tab >= 0 && /^msoa,lsoa(,oa)?$/.test(grey.others) &&
+      grey.title === 'Crime rate per 1,000 residents is only available for LAs and wards, so it cannot be shown by MSOA.',
+      'a level the indicator lacks is greyed out, focusable and says why', JSON.stringify(grey));
+    await page.focus('#dl-seg button[data-dl="lsoa"]');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(300);
+    const gate = await page.evaluate(() => ({ lv: currentDataLevel, hint: document.getElementById('dl-hint').textContent,
+      shown: document.getElementById('dl-hint').classList.contains('show'), role: document.getElementById('dl-hint').getAttribute('role') }));
+    ok(gate.lv === 'ward' && gate.shown && gate.role === 'status' &&
+      /^Crime rate per 1,000 residents is only available for LAs and wards, so it cannot be shown by LSOA\. Choose LA or Ward, or pick a different indicator\.$/.test(gate.hint),
+      'pressing a greyed level says which levels will work, beside the buttons', JSON.stringify(gate));
+    // Once the reader has chosen Ward, an indicator with ward figures stays at
+    // Ward; one without moves and says so; Clear and leaving Custom area both
+    // go back to the level the reader was at.
+    const lvState = () => page.evaluate(() => ({ lv: currentDataLevel,
+      hint: document.getElementById('dl-hint').classList.contains('show') ? document.getElementById('dl-hint').textContent : '' }));
+    await page.click('#dl-seg button[data-dl="ward"]');
+    await setOv(page, 'census_bad_health_pct');
+    await page.waitForTimeout(1500);
+    const kept = await lvState();
+    ok(kept.lv === 'ward', 'once Ward is chosen, Bad or very bad health stays at Ward', JSON.stringify(kept));
+    await setOv(page, 'imd_decile');
+    await page.waitForTimeout(3000);
+    const forced = await lvState();
+    ok(forced.lv === 'lsoa' && /^Deprivation decile \(IMD 2025\) has no figures for wards, so the map is showing it by LSOA\. It will go back to wards when you choose an indicator that has them\.$/.test(forced.hint),
+      'a forced move to another level is announced in the hint', JSON.stringify(forced));
+    await page.click('#ov-clear');
+    await page.waitForTimeout(800);
+    const cleared = await lvState();
+    ok(cleared.lv === 'ward' && /^The map is back to wards, the level you chose\.$/.test(cleared.hint), 'Clear goes back to the level the reader chose', JSON.stringify(cleared));
+    await setOv(page, 'crime_rate_per_1000');
+    await page.waitForTimeout(1000);
+    await page.click('.mode-btn[data-mode="report"]');
+    await page.waitForTimeout(2500);
+    const custom = await page.evaluate(() => ({ lv: currentDataLevel, drawn: !!(lsoaLyr && map.hasLayer(lsoaLyr)) }));
+    await page.click('.mode-btn[data-mode="explore"]');
+    await page.waitForTimeout(800);
+    ok(custom.lv === 'lsoa' && custom.drawn && await page.evaluate(() => currentDataLevel === 'ward' && curOv === 'crime_rate_per_1000'),
+      'Custom area shows LSOAs, and leaving it goes back to the level before', JSON.stringify(custom));
+    ok(!/[–—]/.test([grey.title, gate.hint, forced.hint, cleared.hint].join(' ')), 'level hints and tooltips have no dashes');
+    // Presentation view hides the header and the side panel, and Esc leaves it.
+    // It sits behind More in the header (workplan 2.11).
+    await page.click('#tb-more');
+    await page.waitForTimeout(200);
+    await page.click('#tb-png');
+    await page.waitForTimeout(400);
+    await page.click('text=This view');
+    await page.waitForTimeout(800);
+    const pres = await page.evaluate(() => ({ on: document.body.classList.contains('presenting'),
+      hidden: ['.hdr', '#sidebar'].every(s => getComputedStyle(document.querySelector(s)).display === 'none'),
+      h: map.getSize().y }));
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(500);
+    const after = await page.evaluate(() => ({ on: document.body.classList.contains('presenting'),
+      shown: getComputedStyle(document.getElementById('sidebar')).display !== 'none', banner: !!document.getElementById('screenshot-done') }));
+    ok(pres.on && pres.hidden && pres.h > 700 && !after.on && after.shown && !after.banner,
+      'Presentation view hides the panels and Esc leaves it', JSON.stringify([pres, after]));
     const wpt = await page.evaluate(() => { let c = null; wLyr.eachLayer(l => { if (!c && /Bethnal|Hoxton|Stratford|Peckham/.test(l.feature.properties.WD24NM)) c = l.getBounds().getCenter(); });
       if (!c) { wLyr.eachLayer(l => { if (!c) c = l.getBounds().getCenter(); }); } const p = map.latLngToContainerPoint(c); const r = document.getElementById('map').getBoundingClientRect(); return [r.left + p.x, r.top + p.y]; });
     await page.mouse.click(wpt[0], wpt[1]);
@@ -184,7 +362,172 @@ const setOv = (page, k) => page.evaluate(k => {
     await page.click('#sbtab-layers');
     const pcn = await page.evaluate(() => document.querySelectorAll('#pcn-focus option').length);
     ok(pcn > 50, 'PCN list loaded', pcn + ' options');
+    // A blocked report window gets a note beside the button, with a link that
+    // opens the report in this tab when the reader chooses to.
+    await page.evaluate(() => { window.open = () => null; });
+    await page.click('#ws-pdf');
+    await page.waitForTimeout(400);
+    const blocked = await page.evaluate(() => { const n = document.querySelector('#ward-sheet > .ph-note'); return n ? n.textContent : ''; });
+    ok(/Your browser blocked the report window\. Open the report in this tab instead\./.test(blocked), 'blocked report offers to open in this tab', blocked);
     ok(errors.length === 0, 'no page errors (London desktop)', errors.join(' | '));
+    if (blocked) {
+      await Promise.all([page.waitForNavigation({ timeout: 30000 }).catch(() => {}), page.click('#ward-sheet > .ph-note .ph-note-open')]);
+      await page.waitForTimeout(1000);
+      const rep = await page.evaluate(() => ({ title: document.title, back: [...document.querySelectorAll('button')].some(b => b.textContent === 'Back to the map') })).catch(e => ({ title: e.message }));
+      ok(/Ward report/.test(rep.title) && rep.back, 'the report opens in this tab with a way back to the map', JSON.stringify(rep));
+    }
+    await page.close();
+  }
+
+  // Search, the header and getting around (workplan 2.11).
+  {
+    const { page, errors } = await open(browser, 'index.html?t=1', DESK);
+    const DASH = /[–—]/;
+    // The header: Copy link in view, Presentation view and the palette
+    // behind More, the panel button saying what it will do in step with
+    // aria-expanded, and the wider search box.
+    const hdr = await page.evaluate(() => {
+      const vis = id => { const e = document.getElementById(id); return !!(e && e.offsetParent); };
+      const m = document.getElementById('hdr-menu');
+      const s = document.getElementById('hdr-search-input');
+      return { link: vis('tb-link'), more: vis('tb-more'), png: vis('tb-png'), cb: vis('tb-cb'),
+        name: m.getAttribute('aria-label'), exp: m.getAttribute('aria-expanded'), text: m.innerText.trim(),
+        width: s.offsetWidth, ph: s.placeholder };
+    });
+    ok(hdr.link && hdr.more && !hdr.png && !hdr.cb, 'Copy link is in the header, Presentation view and the palette are behind More', JSON.stringify(hdr));
+    ok(hdr.name === 'Hide panel' && hdr.exp === 'true' && hdr.text === 'Hide panel', 'the panel button says Hide panel while the panel shows', JSON.stringify(hdr));
+    ok(hdr.width >= 270 && hdr.ph === 'Postcode, ward, GP or charity', 'the header search is wide, with a plain placeholder', JSON.stringify(hdr));
+    await page.click('#hdr-menu');
+    await page.waitForTimeout(400);
+    const hid = await page.evaluate(() => { const m = document.getElementById('hdr-menu');
+      return [m.getAttribute('aria-label'), m.getAttribute('aria-expanded'), m.innerText.trim(), document.getElementById('sidebar').classList.contains('collapsed')].join('|'); });
+    await page.click('#hdr-menu');
+    await page.waitForTimeout(400);
+    ok(hid === 'Show panel|false|Show panel|true', 'hiding the panel turns the button into Show panel, with aria-expanded false', hid);
+    await page.click('#tb-more');
+    await page.waitForTimeout(200);
+    const more = await page.evaluate(() => ({ open: !document.getElementById('tb-more-menu').hidden,
+      exp: document.getElementById('tb-more').getAttribute('aria-expanded'), png: !!document.getElementById('tb-png').offsetParent }));
+    await checkAxe(page, 'More open');
+    await page.keyboard.press('Escape');
+    const moreShut = await page.evaluate(() => document.getElementById('tb-more-menu').hidden &&
+      document.getElementById('tb-more').getAttribute('aria-expanded') === 'false' && document.activeElement.id === 'tb-more');
+    ok(more.open && more.exp === 'true' && more.png && moreShut, 'More opens, and Esc closes it back to its button', JSON.stringify(more));
+
+    // Typing an LA offers it first, and choosing it focuses it, fits it
+    // tightly, names it in the tab title and takes the lists with it.
+    await page.click('#hdr-search-input');
+    await page.waitForFunction(() => typeof LSOA_IMD !== 'undefined' && LSOA_IMD && LSOA_IMD.features, null, { timeout: 20000 }).catch(() => {});
+    await page.fill('#hdr-search-input', 'Tower Hamlets');
+    await page.waitForTimeout(600);
+    const sr = await page.evaluate(() => {
+      const rows = [...document.querySelectorAll('#hdr-search-results .sr-row')];
+      const t = r => (r.querySelector('.sr-type') || {}).textContent || '';
+      return { first: rows.length ? t(rows[0]) + ':' + rows[0].querySelector('.sr-name').textContent : '',
+        lsoas: rows.filter(r => t(r) === 'lsoa').length, more: (document.querySelector('#hdr-search-results .sr-more') || {}).textContent || '',
+        wardsBeforeLsoas: rows.findIndex(r => t(r) === 'ward') < rows.findIndex(r => t(r) === 'lsoa') };
+    });
+    ok(sr.first === 'LA:Tower Hamlets', 'searching an LA offers the LA first', JSON.stringify(sr));
+    ok(sr.lsoas === 5 && /^Show all \d+ LSOAs$/.test(sr.more) && sr.wardsBeforeLsoas, 'at most five LSOAs, below the wards, with Show all', JSON.stringify(sr));
+    await checkAxe(page, 'search results');
+    await page.click('#hdr-search-results .sr-more');
+    await page.waitForTimeout(400);
+    const all = await page.evaluate(() => ({ shown: document.getElementById('hdr-search-results').classList.contains('show'),
+      lsoas: [...document.querySelectorAll('#hdr-search-results .sr-row .sr-type')].filter(e => e.textContent === 'lsoa').length }));
+    ok(all.shown && all.lsoas > 5, 'Show all lists every LSOA and keeps the list open', JSON.stringify(all));
+    await page.fill('#hdr-search-input', 'Tower Hamlets');
+    await page.waitForTimeout(500);
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(2500);
+    const th = await page.evaluate(() => {
+      const m = wLyr.getLayers().filter(l => ladInFocus(l.feature.properties.LAD));
+      const bb = L.featureGroup(m).getBounds();
+      const a = map.latLngToContainerPoint(bb.getSouthWest()), b = map.latLngToContainerPoint(bb.getNorthEast());
+      const sz = map.getSize();
+      return { focus: focusLabel(), title: document.title, fill: Math.max((b.x - a.x) / sz.x, (a.y - b.y) / sz.y) };
+    });
+    ok(th.focus === 'Tower Hamlets' && th.title === 'Tower Hamlets | PopHealth Map', 'choosing the LA focuses it and names it in the tab title', JSON.stringify(th));
+    ok(th.fill > 0.75, 'Focus by LA fits the LA tightly', JSON.stringify(th));
+    await setOv(page, 'imd_score_ward');
+    await page.waitForTimeout(2000);
+    const rank = await page.evaluate(() => ({ title: document.getElementById('rank-title').textContent, unit: document.getElementById('rank-unit').textContent,
+      out: [...document.querySelectorAll('#rank-best .rank-row, #rank-worst .rank-row')].filter(r => !wardInFocus(r.dataset.id)).length }));
+    ok(rank.title === 'Highest and lowest 10 wards in Tower Hamlets' && /^out of \d+$/.test(rank.unit) && rank.out === 0,
+      'the highest and lowest lists follow the focus and say so', JSON.stringify(rank));
+
+    // A ward names itself and its LA in the tab title, and the Ask button has
+    // its own space above the key and the map credits.
+    await page.evaluate(() => { const s = document.getElementById('borough-focus'); s.value = 'all'; s.dispatchEvent(new Event('change')); });
+    await page.waitForTimeout(800);
+    await page.evaluate(() => { const l = wLyr.getLayers().find(l => l.feature.properties.WD24NM === 'Stonebridge'); if (l) l.fire('click'); });
+    await page.waitForTimeout(1500);
+    const ward = await page.evaluate(() => {
+      const r = e => e.getBoundingClientRect();
+      const ask = r(document.getElementById('ai-toggle')), strip = r(document.getElementById('map-legend-strip')),
+        cred = r(document.querySelector('.leaflet-control-attribution'));
+      const hit = (a, b) => a.width && b.width && a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+      return { title: document.title, ask: !!document.getElementById('ai-toggle').offsetParent,
+        clear: !hit(ask, strip) && !hit(ask, cred) && ask.bottom <= Math.min(strip.top || 1e9, cred.top) };
+    });
+    ok(ward.title === 'Stonebridge, Brent | PopHealth Map', 'the tab title names the selected ward and its LA', ward.title);
+    ok(!ward.ask || ward.clear, 'the Ask button sits above the key and the map credits', JSON.stringify(ward));
+
+    // Copy link writes the level whenever it is not the one the indicator
+    // opens at, and Reset puts the layers back as the map opens.
+    await setOv(page, 'ft_93283');
+    await page.waitForTimeout(2500);
+    await page.click('#dl-seg button[data-dl="ward"]');
+    await page.waitForTimeout(800);
+    const lvl = await page.evaluate(() => { _writeUrlState(); return new URLSearchParams(location.search).get('lvl'); });
+    await page.click('#dl-seg button[data-dl="msoa"]');
+    await page.waitForTimeout(1500);
+    const lvl2 = await page.evaluate(() => { _writeUrlState(); return new URLSearchParams(location.search).get('lvl'); });
+    ok(lvl === 'ward' && lvl2 === null, 'Copy link writes the level only when it differs from where the indicator opens', lvl + ' / ' + lvl2);
+    await page.evaluate(() => ['tg', 'tph', 'ticb', 'tb'].forEach(id => { const e = document.getElementById(id); if (e) { e.checked = true; e.dispatchEvent(new Event('change')); } }));
+    await page.waitForTimeout(1500);
+    await page.click('#tb-reset');
+    await page.waitForTimeout(1500);
+    const reset = await page.evaluate(() => ({ on: ['tg', 'th', 'tgr', 'td', 'tph', 'vcse-tab-toggle', 'ticb', 'tb', 'tpcn'].filter(id => { const e = document.getElementById(id); return e && e.checked; }),
+      wards: document.getElementById('tnw').checked, title: document.title, gp: !!(typeof gpL !== 'undefined' && gpL && map.hasLayer(gpL)) }));
+    ok(!reset.on.length && reset.wards && !reset.gp && !/\|/.test(reset.title), 'Reset clears the point and boundary layers and the selection', JSON.stringify(reset));
+
+    // Indicator search: everyday words, "1 match", and a council-only
+    // indicator says where its figures are instead of finding nothing.
+    await page.click('#sbtab-overlay');
+    const ind = {};
+    for (const q of ['smoking', 'pollution', 'arson']) {
+      await page.fill('#ov-search', q);
+      await page.waitForTimeout(400);
+      ind[q] = await page.evaluate(() => document.getElementById('ov-results').innerText.replace(/\s+/g, ' ').trim());
+    }
+    await page.fill('#ov-search', '');
+    ok(!/No indicator matches/.test(ind.smoking) && /Adults who smoke is only published for whole LAs/.test(ind.smoking) && /full profile/.test(ind.smoking),
+      'a council-only indicator says where its figures are', ind.smoking);
+    ok(/Nitrogen dioxide/.test(ind.pollution), 'indicator search knows everyday words', ind.pollution.slice(0, 120));
+    ok(/^1 match\b/.test(ind.arson), 'one result reads "1 match"', ind.arson.slice(0, 60));
+    const words = await page.evaluate(() => [...document.querySelectorAll('.hdr [title], .hdr [aria-label], .hdr [placeholder], #rank-panel')]
+      .map(e => [e.getAttribute('title'), e.getAttribute('aria-label'), e.getAttribute('placeholder'), e.id === 'rank-panel' ? e.textContent : ''].join(' ')).join(' '));
+    ok(!DASH.test(words + Object.values(ind).join(' ') + th.title + ward.title), 'the new header, list and search words have no dashes');
+    ok(errors.length === 0, 'no page errors (search and header)', errors.join(' | '));
+    await page.close();
+  }
+  // Nothing in the header overlaps at the widths people use.
+  for (const w of [1200, 1360, 1400]) {
+    const { isMobile, hasTouch, ...vp } = DESK;
+    const page = await browser.newPage({ viewport: { ...vp, width: w } });
+    await page.goto(BASE + '/index.html?t=1');
+    await page.waitForTimeout(2500);
+    const r = await page.evaluate(() => {
+      const els = [...document.querySelectorAll('.hdr button, .hdr input, .hdr h1, .hdr .dev-badge')].filter(e => e.offsetParent);
+      const over = [];
+      for (let i = 0; i < els.length; i++) for (let j = i + 1; j < els.length; j++) {
+        if (els[i].contains(els[j]) || els[j].contains(els[i])) continue;
+        const a = els[i].getBoundingClientRect(), b = els[j].getBoundingClientRect();
+        if (a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1) over.push((els[i].id || els[i].className) + ' x ' + (els[j].id || els[j].className));
+      }
+      return { over, wide: document.documentElement.scrollWidth > window.innerWidth, tall: document.querySelector('.hdr').offsetHeight > 60 };
+    });
+    ok(!r.over.length && !r.wide && !r.tall, 'nothing in the header overlaps at ' + w + 'px', JSON.stringify(r));
     await page.close();
   }
 
@@ -248,6 +591,14 @@ const setOv = (page, k) => page.evaluate(k => {
     ok(await page.evaluate(() => !document.getElementById('area-peek').hidden), 'phone: tapping an area shows its card');
     await checkAxe(page, 'phone with area card');
     await page.click('#hdr-menu'); await page.waitForTimeout(400);
+    // The drawer: its button says it will hide the panel, and Reset, Copy
+    // link and More share one row under the search box.
+    const drawer = await page.evaluate(() => {
+      const m = document.getElementById('hdr-menu');
+      const tops = ['tb-reset', 'tb-link', 'tb-more'].map(id => Math.round(document.getElementById(id).getBoundingClientRect().top));
+      return { name: m.getAttribute('aria-label'), exp: m.getAttribute('aria-expanded'), row: tops.every(t => t === tops[0]) };
+    });
+    ok(drawer.name === 'Hide panel' && drawer.exp === 'true' && drawer.row, 'phone: the drawer button and the tools row', JSON.stringify(drawer));
     await checkAxe(page, 'phone drawer');
     ok(errors.length === 0, 'no page errors (phone)', errors.join(' | '));
     await page.close();
