@@ -62,6 +62,81 @@ than quietly serving old figures.
 
 One source failing does not stop the others.
 
+### Repair notes, source by source
+
+The methodology page used to carry these as panels that opened under a
+failed row. They are for whoever maintains the pipeline, not for readers of
+the page, so they live here. Each note says whether a person is needed at
+all, because "download this file" and "the query needs fixing" are jobs for
+different people. The key in brackets is the source's key in `SOURCES` at the
+bottom of `fetch_all_data.py` and in `data/meta/manifest.json`.
+
+**Fingertips, the other profiles** (`fingertips_profiles`). Fetched
+automatically, by profile rather than by a list of indicator ids. Both the ids
+and the names come from the API, so an indicator cannot end up on the map
+under the wrong label, which is what happened when that list was maintained by
+hand. To re-run: `python fetch_all_data.py --only fingertips_profiles`. Set
+`FINGERTIPS_PER_PROFILE` to change how many indicators are taken from each
+profile.
+
+**Fuel poverty** (`fuel_poverty`). Fetched automatically: the pipeline reads
+the gov.uk collection, picks the newest sub-regional release by the year in
+its name, and takes the spreadsheet from that release's own attachment list,
+so a new publication needs no edit. Only if the automatic route fails,
+download the newest sub-regional fuel poverty tables (.xlsx) from
+https://www.gov.uk/government/collections/fuel-poverty-sub-regional-statistics
+into `.cache/fuel_poverty/`, then run
+`python fetch_all_data.py --only fuel_poverty`.
+
+**Air quality** (`air_quality`). Fetched automatically: the pipeline reads the
+UK-AIR index and takes the most recent year listed for each pollutant rather
+than a pinned filename, because the filenames carry a version suffix that
+changes between releases. Only if the automatic route fails, download
+`mapno2<year>.csv`, `mappm25<year>g.csv` and `mappm10<year>g.csv` from
+https://uk-air.defra.gov.uk/data/pcm-data into `.cache/air_quality/` (named
+`pcm_no2_<year>.csv` and so on), then run
+`python fetch_all_data.py --only air_quality`.
+
+**TfL stations and bus stops** (`tfl`). Fetched automatically from the open
+Unified API, which needs no key. Unkeyed use is rate limited to roughly 50
+requests a minute and this takes 43, so the pipeline paces itself; set
+`TFL_APP_KEY` to use a free key and skip the pacing. If the API is
+unreachable the previous file is kept. Re-run with
+`python fetch_all_data.py --only tfl`.
+
+**PTAL** (`ptal`). Fetched automatically. The download URL carries a resource
+id that changes whenever the GLA republish, so the pipeline asks the Datastore
+API which file is current rather than remembering one. Only if the automatic
+route fails, download the LSOA Atlas CSV from
+https://data.london.gov.uk/dataset/lsoa-atlas to
+`.cache/ptal/lsoa_atlas.csv`, then run `python fetch_all_data.py --only ptal`.
+
+**PCN catchments** (`pcn`). NHS Digital's site refuses requests from cloud
+hosting, so the *Patients Registered at a GP Practice* file by LSOA has to be
+downloaded in a browser and attached to the build. Without it, PCNs show their
+practices but no catchment (`has_catchments` is false in
+`data/map/pcn.json`).
+
+**DWP benefits** (no source key; withdrawn). Retired rather than broken. The
+pipeline had been asking NOMIS for five dataset ids that turned out to be an
+occupation survey, a business register and an employment survey rather than
+benefits, which is why every request returned an empty body while still
+answering 200. Looking the real ones up by name settles it: PIP and Universal
+Credit are not on NOMIS in any form, and ESA, Pension Credit, Carer's
+Allowance, DLA and Attendance Allowance all stop at November 2018 on
+small-area geographies that predate LSOA 2021. The live figures are on DWP
+Stat-Xplore, which needs a registered API key and its own query language, so
+adding them back means writing a new client rather than repairing the old
+one. The claimant count (`claimant`, NOMIS CLA01) is unaffected.
+
+### Rebuilding every region and the England view
+
+`fetch_all_data.py` rebuilds the whole map with no manual downloads (apart
+from the PCN file above): once for London and once per region
+(`--scope north-east` and so on), with the England view merged from the
+results by `scripts/build_england.py`. Sources, licences and per-source notes
+are in `RAW_DATA_SOURCES.md` and `DATA_LICENCES.md`.
+
 ---
 
 ## What will go stale

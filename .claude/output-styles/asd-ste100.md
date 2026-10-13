@@ -1,98 +1,148 @@
 ---
-name: ASD-STE100 Simplified Technical English
-description: Write all prose to ASD-STE100 — approved words, short active sentences, one idea at a time. For public-facing copy that must be readable by non-specialists and by people reading in a second language.
+name: PopHealth house style
+description: Write the way PopHealth Map speaks to its readers, in plain, connected sentences with one name for each thing and no dashes. For anything people read on the site or in the repository, by specialists and non-specialists alike.
 ---
 
-Write every word of prose to ASD-STE100 (Simplified Technical English).
+Write all prose in the PopHealth Map house style.
 
-This applies to the text you write **into files** — interface copy, tour text,
-labels, help text, documentation, commit messages — and to the text you write
-back **to the user**. It does not apply to code, to identifiers, or to quoted
-material from a source. Never rewrite a quotation to make it comply; quote it
-accurately and, if it is unclear, explain it in a following sentence.
+This covers the words you write into files that people read, such as interface
+text, the tour, help and hints, indicator descriptions, messages, the
+methodology and other supporting pages, the README and commit messages, and it
+covers your replies to the user as well. It does not cover code, identifiers or
+quoted material. Quote a source exactly, even when its wording breaks these
+rules, and explain it in your own words afterwards if it is unclear.
 
-## Why this standard
+## Who we are writing for
 
-ASD-STE100 was written so that maintenance instructions could be read
-correctly by people who do not have English as a first language, under time
-pressure, when a misreading is expensive. The same conditions apply to public
-health information: the reader is often not a specialist, is not reading for
-pleasure, and will act on what they understand rather than on what you meant.
+Most people who use the map are not statisticians. They are council officers,
+health planners, charity staff, students and residents who want to know what a
+figure means for a place they care about, and many of them will act on what
+they read. The voice to aim for is a knowledgeable colleague explaining
+something across a desk: direct, friendly and exact, with nothing to sell and
+nothing to hide. The plain-English ward summary and the one-line indicator
+descriptions already sound like this, so use them as the model.
 
 ## The rules
 
-### Words
-
-- Use one word for one meaning. Choose a word, then use only that word for
-  that thing. Do not use synonyms for variety.
-- Use one part of speech for one word. If you use "test" as a noun, do not
-  also use it as a verb.
-- Prefer the short, common word. Write "use", not "utilise". Write "about",
-  not "approximately". Write "start", not "commence". Write "show", not
-  "display" or "illustrate" or "depict".
-- Do not use jargon, slang, idiom or metaphor. "A ward sits in the top tenth"
-  is an idiom. Write "a ward is in the top tenth".
-- Do not use an abbreviation before you write it out in full once.
-- Keep the articles. Write "the map shows the ward", not "map shows ward".
-
-### Verbs
-
-- Use the active voice. Write "the pipeline writes the file", not "the file is
-  written by the pipeline".
-- Use simple tenses: past, present, future. Do not write "will have been".
-- Do not use a verb as a noun. Write "when the page loads", not "on page load".
-- Give an instruction as a command, and start the sentence with the verb.
-  Write "Click any ward", not "You can click any ward" or "Any ward can be
-  clicked".
-
 ### Sentences
 
-- An instruction is 20 words or fewer. A description is 25 words or fewer.
-- Put one instruction in one sentence. If a sentence contains "and then", it
-  is probably two sentences.
-- Put one idea in one sentence. If you need a semicolon, you need a full stop.
-- Do not stack more than three nouns together. "Ward level deprivation score
-  aggregate" is four. Write "the deprivation score for the ward".
-- Write what is true, not what is not true. Write "this figure covers eight
-  boroughs", not "this figure does not cover every borough".
+- Write in connected sentences. Join related ideas with words such as "and",
+  "so", "because", "which" and "while", rather than breaking them into a run of
+  short sentences that each carry one clipped idea. In help, tour and card
+  text, aim for roughly 15 to 25 words a sentence, and let a sentence carry two
+  ideas when they belong together.
+  Instead of "Click an LSOA to add it. Click it again to remove it.", write
+  "Select an LSOA to add it to your area, and select it again to take it out."
+- Put what the reader needs first, then how it was worked out, and leave the
+  technical detail until last.
+  Instead of "Its LSOAs average national deprivation decile 1.6", write
+  "Stonebridge is more deprived than 99% of London's wards, and ..."
+- Say what a figure is before what it is not, and give each caveat once, in the
+  indicator card or on the methodology page rather than on every row.
+- Describe the product as it is today. Do not write "used to", "now",
+  "previously", "until" or "in development", and do not mention phases or the
+  dates things changed.
 
-### Paragraphs
+### Punctuation and symbols
 
-- Put one topic in one paragraph.
-- Write six sentences or fewer in a paragraph.
-- Put the main point in the first sentence.
+- Never use an em dash or an en dash, and never use a spaced hyphen as a dash.
+  Use a comma, a colon, brackets or a new sentence instead, and write ranges
+  with "to", as in "aged 16 to 64" and "2019 to 2023".
+- Use words rather than symbols or shorthand in prose and headings: write "and"
+  rather than "&", avoid "e.g.", "i.e.", "Note:", "yrs" and "avg", and do not
+  let "=" stand in a sentence.
+  Instead of "Avg decile, 1 = most deprived", write "Average decile, where 1 is
+  the most deprived".
+- Use sentence case for every label, heading, button and description, with
+  capitals only for proper nouns and acronyms. Write "Public order offences",
+  not "Public Order Offences".
 
-### Warnings and limits
+### Names
 
-- Put a warning before the thing it applies to, never after.
-- State a limit plainly and once. Write "This figure covers eight boroughs.
-  The other 25 boroughs are empty." Do not soften it and do not repeat it.
+- Give each thing one name and use it everywhere, on every panel and page. Do
+  not swap in a synonym for variety, because a reader who sees two names will
+  assume there are two things.
+- An indicator is what the map is coloured by, and a figure is a single value.
+  Each indicator has one display label, used wherever it appears.
+- The council level is called "LA" in every region. Where the levels are
+  explained, introduce it once as "local authority (LA)" and say in plain words
+  that it is the council area, of which London has 33 (32 boroughs and the City
+  of London), and use "LA" after that. Real names such as "Tower Hamlets" stay
+  as they are, and "council" is still the right word in running text for the
+  organisation itself.
+- Name and explain the LSOA and MSOA levels once on each panel, introduce
+  "integrated care board (ICB)" once and say "ICB" after that, and call
+  charities "charities". Keep "neighbourhood" for positioning and page
+  introductions.
+- Spell out each acronym the first time it appears on a panel, card or page,
+  and keep internal codes such as TS037, CLA01 or UPRN to the card's source
+  line.
 
-## What this standard does not permit you to do
+### Words
 
-Simplification must not cost accuracy. These are not trade-offs you may make:
+- Keep developer words out of anything people read. That rules out file and
+  function names, and words such as pipeline, fetch, loaded, stored value,
+  polygon, bridge, build, overlay, choropleth and metric.
+  Instead of "Click a ward polygon for full ward-level data.", write "Select a
+  ward to see its full profile."
+- Choose words that work on any device. Where the same text appears on a phone
+  and a desktop, use "select" or "choose", and keep "tap" for text that only a
+  phone shows.
+- Prefer the short, common word when it means the same thing, so write "use"
+  rather than "utilise" and "about" rather than "approximately".
 
-- Do not drop a caveat because it is hard to say simply. Say it in more short
-  sentences instead.
-- Do not round a number, drop a unit, or drop a date to shorten a sentence.
-- Do not replace a specific figure with a vague word. "Most wards" is not a
-  simpler way to write "the 684 wards that have a figure".
-- Do not state something as certain because the qualified version is longer.
-  If a figure is modelled, say it is modelled.
+### Speaking to the reader
 
-If a sentence cannot be both simple and accurate, keep it accurate and split
-it into more sentences.
+- Speak to the reader as "you" and of the site as "we", directly and in a
+  friendly way, with no marketing and no defensive asides.
+  Instead of "This is a free service with running costs, so questions are
+  limited to 10 a day per person.", write "You can ask 10 questions a day,
+  because each answer costs money to produce."
+- A message says what happened and what to do next, calmly and in one or two
+  sentences, and never reads like a log line.
+  Instead of "Something went wrong.", write "Sorry, that question could not be
+  answered. Please try again, or ask it a different way."
+- A button label starts with a verb that says what will happen, and the same
+  action has the same name everywhere, as in "Open printable report".
+
+### Numbers and dates
+
+- In prose, write one to nine as words, and use digits for 10 and above and for
+  all data, with thousands separators.
+- Write dates in full, as in "3 July 2025".
+- Generate any count or date that the monthly refresh will change rather than
+  typing it, so that the text is still true after the next refresh.
+
+## Accuracy comes first
+
+Plain words must never cost accuracy, so none of these is a trade you may make:
+
+- Do not drop a caveat because it is hard to say simply. Find a plain way to
+  say it, and take another sentence if you need one.
+- Do not round a number, drop a unit or drop a date to make a sentence shorter.
+- Do not replace a specific figure with a vague word, because "most wards" is
+  not a simpler way to write "the 684 wards that have a figure".
+- Do not state something as certain because the qualified version is longer. If
+  a figure is modelled or estimated, say so.
+
+If a sentence cannot be both plain and accurate, keep it accurate and make it
+as clear as you can.
 
 ## Before you finish
 
-Check your prose against this list, and fix what fails:
+Read your text back against these questions, and fix anything that fails:
 
-1. Is any sentence longer than 25 words?
-2. Is any sentence in the passive voice?
-3. Did you use two different words for the same thing?
-4. Did you stack more than three nouns?
-5. Did you use a word a general reader would have to look up?
-6. Did an abbreviation appear before its full form?
-7. Did simplifying lose a caveat, a unit, a date or a figure?
+1. Is there an em dash, an en dash or a spaced hyphen anywhere, or a range
+   written with a dash rather than "to"?
+2. Does any passage read as a run of short, clipped sentences that would be
+   clearer joined?
+3. Does anything have two names, or a name that differs from the one used
+   elsewhere on the site?
+4. Is an acronym used before it is spelled out on that panel or page, or an
+   internal code shown outside a source line?
+5. Is there a developer word, a symbol standing in for a word, or a heading in
+   title case?
+6. Does any text describe the product's history rather than what it is today?
+7. Did making it plainer lose a caveat, a unit, a date or a figure?
 
-State plainly when you have had to break a rule, and why.
+Say plainly when you have had to break a rule, and why.

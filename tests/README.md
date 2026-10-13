@@ -20,14 +20,18 @@ tests/
 ## smoke/
 
 The one suite that runs automatically. It loads London, the North East (when
-`data/regions/north-east/` exists), the England warning and the three text
-pages, exercises the indicator picker, cards, two-indicator map, ward sheet,
-phone drawer and tapped-area card, census figures by output area (when
-`data/map/oa/` exists), and runs axe-core (WCAG 2.1 A/AA and best
-practice) in each state. Any accessibility violation fails it. It also checks
-the names: every indicator is named from the one label table (`IND_NAMES`),
-Compare offers each measure once, and the old names (Soc rent, Boards,
-metric, VCSE, Borough or Local authority as the level) are gone.
+`data/regions/north-east/` exists), the England warning and the four pages
+around the map (methodology, accessibility, privacy and 404), exercises the
+indicator picker, cards, two-indicator map, ward sheet, phone drawer and
+tapped-area card, census figures by output area (when `data/map/oa/` exists),
+and runs axe-core (WCAG 2.2 A/AA and best practice) in each state. Any
+accessibility violation fails it. The four pages are opened with the device
+set to dark, and checked for the shared stylesheet (`pages.css`), the same
+header and footer, and a light page. The 404 page's links are absolute to
+pophealth.uk, so the suite answers those requests from the working copy.
+It also checks the names: every indicator is named from the one label table
+(`IND_NAMES`), Compare offers each measure once, and the old names (Soc rent,
+Boards, metric, VCSE, Borough or Local authority as the level) are gone.
 
 ```bash
 npm install --no-save playwright axe-core

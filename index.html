@@ -220,27 +220,17 @@
     --shadow:0 2px 4px rgba(33,43,50,.05), 0 8px 24px rgba(33,43,50,.06);
     --shadow-lg:0 8px 32px rgba(33,43,50,.10), 0 2px 8px rgba(33,43,50,.05);
 
-    /* Two roles a light-only palette never had to name, and that a dark one
-       cannot work without.
-
-       --on-accent is text sitting on a saturated fill: the blue of an active
-       toolbar button, a numbered step, a popup header. White here. In dark the
-       accent lifts to #4DA3E8 so it reads against a dark ground, and white on
-       that is 2.2:1, so the text has to go dark instead. Anything written as
-       color:#fff over an accent is wrong by construction; it wants this.
+    /* --on-accent is text sitting on a saturated fill: the blue of an active
+       toolbar button, a numbered step, a popup header.
 
        --invert-* is the handful of things deliberately inverted against the
        page: the development banner, the level-badge hint, the help popover,
-       the marker tooltips. In dark they do not invert again into white cards,
-       which would glare. They become a raised surface instead. */
+       the marker tooltips. */
     --on-accent:#FFFFFF;
     --invert-bg:#212B32; --invert-ink:#FFFFFF;
 
-    /* Status washes. These were literal tints scattered through the sheet:
-       the amber of the suppression notice, the red of a Core20 chip, the pink
-       of a VCSE one. A wash is the one thing that cannot survive a theme
-       change untouched, because it is defined by being barely lighter than
-       the page, and in dark it has to be barely lighter than a dark page. */
+    /* Status washes: the amber of the suppression notice, the red of a
+       Core20 chip, the pink of a VCSE one. */
     --tint-amber:#FFF8E6; --tint-amber-line:#E0C280; --tint-amber-ink:#5C4115;
     --tint-red:#FDF2F1;   --tint-red-line:#F2C4BF;
     --tint-pink:#F6E7F0;  --tint-pink-line:#E6C6D8;
@@ -723,15 +713,8 @@
      with an inline style rather than a fill attribute: a presentation
      attribute loses to any CSS rule, so setting fill="..." on the element left
      this declaration winning and the map never coloured in at all. */
-  /* The hairline is what makes this work in dark. The IMD ramp was chosen for
-     a light page: its deepest blue is 14.7:1 against the light ground and
-     1.16:1 against the dark one, so on dark the most deprived wards, which are
-     the whole point, would sink into the background and read as a hole in
-     London. A pale stroke round every ward restores the shape: 4.7:1 against
-     that deepest blue and 5.5:1 against the ground. The real map solves the
-     same problem the same way, which is why its choropleth survives the dark
-     basemap. In light the stroke stays the ground colour, so the wards read as
-     separated by white as before. */
+  /* The stroke is the ground colour, so the wards read as separated by
+     white. */
   .ldr-map path { fill: var(--line); stroke: var(--ldr-stroke); stroke-width: 1.1;
     stroke-linejoin: round; transition: fill .55s ease; }
   /* ── The wait after the sweep ─────────────────────────────────────────────
@@ -944,6 +927,9 @@
     .sidebar .sbar { flex-direction: column; gap: 6px; padding: 12px 14px 16px;
       border-top: 1px solid var(--line-2); }
     .sidebar .sbar-left, .sidebar .sbar-right { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
+    /* Links wrapped onto rows of their own here, so each is a 24px target
+       (WCAG 2.2 AA, 2.5.8) rather than a 14px line of text. */
+    .sidebar .sbar-link { display: inline-flex; align-items: center; min-height: 24px; }
     .sbar-left, .sbar-right { flex-wrap: wrap; min-width: 0; }
 
     /* Flex rather than grid: the named grid areas assume a fixed set of
@@ -1353,8 +1339,10 @@
   .ws-btn.primary { background: var(--nhs-blue); border-color: var(--nhs-blue); color: var(--on-accent); }
   .ws-btn.primary:hover { background: var(--nhs-dark); border-color: var(--nhs-dark); color: var(--on-accent); }
   .ws-btn.on { background: var(--nhs-light); border-color: var(--nhs-blue); color: var(--nhs-dark); }
+  /* At least 24px square, the smallest target WCAG 2.2 AA allows (2.5.8). */
   .ws-close { appearance: none; background: none; border: 0; cursor: pointer; color: var(--ink-3);
-    font-size: var(--t-xl); line-height: 1; padding: 2px 4px; border-radius: 6px; }
+    font-size: var(--t-xl); line-height: 1; padding: 2px 4px; border-radius: 6px;
+    min-width: 24px; min-height: 24px; }
   .ws-close:hover { color: var(--nhs-red); background: var(--nhs-light); }
   .ws-body { padding: 11px 14px 13px; overflow: auto; flex: 1; min-height: 0; }
   /* On a wide screen the sentence and the figures sit beside each other.
@@ -2131,13 +2119,9 @@
 
   /* ── Leaflet's own chrome ─────────────────────────────────────────────────
      The zoom buttons, the attribution strip and the popup shell come styled
-     by leaflet.css with literal white and near-black, which is correct on a
-     light page and a set of glowing white rectangles on a dark one. These are
-     the only rules in this stylesheet that reach into another library's
-     classes, and they exist because the alternative is forking its CSS.
-
-     Written against tokens, so they are right in both themes and there is
-     nothing theme-specific here to keep in step. */
+     by leaflet.css with literal white and near-black. These are the only
+     rules in this stylesheet that reach into another library's classes, and
+     they are written against tokens so they take the page's colours. */
   .leaflet-bar a, .leaflet-bar a:hover,
   .leaflet-control-attribution,
   .leaflet-popup-content-wrapper, .leaflet-popup-tip {
@@ -2148,9 +2132,6 @@
   .leaflet-bar a.leaflet-disabled { background: var(--paper-2); color: var(--ink-faint); }
   .leaflet-control-attribution a { color: var(--nhs-blue); }
   .leaflet-container { background: var(--bg); }
-  /* The tile layer itself. Carto's dark cut is already dark, so this is only
-     the colour that shows through before a tile has arrived and in the margin
-     beyond the last one. */
 
   /* ── Reduced motion ───────────────────────────────────────────────────────
      Last in the stylesheet so it beats every transition declared above it
@@ -4212,7 +4193,7 @@ const CATS = [
     { k: "bus_stops_800m",      l: "Bus stops within 800 m",           g: "lsoa", lv: ["ward","lsoa"] },
   ]},
   { key: "environment", label: "Environment & access", ico: "🌫️", fields: [
-    { k: "fuel_poverty_pct",                 l: "Fuel poverty % (DESNZ LILEE)",  g: "ward" },
+    { k: "fuel_poverty_pct",                 l: "Fuel poverty % (DESNZ LILEE)",  g: "lsoa", lv: ["ward","lsoa"] },
     { k: "no2_ugm3",            l: "Nitrogen dioxide NO₂ (µg/m³)",     g: "lsoa", lv: ["ward","lsoa"] },
     { k: "pm25_ugm3",           l: "Fine particulates PM2.5 (µg/m³)",  g: "lsoa", lv: ["ward","lsoa"] },
     { k: "pm10_ugm3",           l: "Particulates PM10 (µg/m³)",        g: "lsoa", lv: ["ward","lsoa"] },
@@ -6105,10 +6086,6 @@ if (_regionStartBounds) {
 // exporter, which needed to read tile pixels; it costs nothing now and keeps
 // the option open. Carto's CDN sends Access-Control-Allow-Origin:* so it works
 // without proxying. {r} resolves to '@2x' on retina.
-/* Carto Positron, added once. It used to be swapped between a light and a
-   dark cut as the theme changed, which is why it was a named layer with a
-   cross-fade and a fallback timer behind it. With one ground there is nothing
-   to swap to, so it is added and left alone. */
 /* Since September 2026 Carto stamps "API KEY REQUIRED" across every tile
    requested without a key. Keys are free (carto.com/basemaps/apikey) and are
    meant to sit in the page: restrict yours to pophealth.uk and
@@ -7637,7 +7614,7 @@ const REPORT_CREDITS = {
   census:       { meta: 'census',       use: 'Demographics, health and work' },
   imd:          { meta: 'imd',          use: 'Deprivation and Core20' },
   crime:        { meta: 'crime',        use: 'Recorded crime', period: 'crime_period' },
-  fuel_poverty: { meta: 'fuel_poverty', use: 'Fuel poverty' },
+  fuel_poverty: { meta: 'fuel_poverty', use: 'Fuel poverty', period: 'fuel_poverty_period' },
   claimant:     { meta: 'claimant',     use: 'Claimant rate' },
   health:       { meta: 'health_msoa',  use: 'Health outcomes' },
   greenblue:    { ov: 'gb_commitment_pct', use: 'Green and blue space' },
