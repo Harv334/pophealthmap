@@ -1545,6 +1545,32 @@ const smallText = page => page.evaluate(() => {
     await page.close();
   }
 
+  // Phone: with an LA focused the map still drags. The focus used to hold
+  // the map to the LA and a small margin, which on a phone screen left it
+  // nowhere to go, so it looked locked whichever indicator was chosen.
+  {
+    const { page, errors } = await open(browser, 'index.html?t=1', PHONE);
+    const cdp = await page.context().newCDPSession(page);
+    const swipe = async () => {
+      const st = await page.evaluate(() => { const r = document.getElementById('map').getBoundingClientRect(); const c = map.getCenter();
+        return { x: r.left + r.width / 2, y: r.top + r.height * 0.35, c: [c.lat, c.lng] }; });
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: st.x, y: st.y }] });
+      for (let i = 1; i <= 8; i++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: st.x - 12 * i, y: st.y - 8 * i }] });
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      await page.waitForTimeout(700);
+      const c2 = await page.evaluate(() => { const c = map.getCenter(); return [c.lat, c.lng]; });
+      return Math.abs(c2[0] - st.c[0]) + Math.abs(c2[1] - st.c[1]) > 1e-5;
+    };
+    await page.evaluate(() => { const s = document.getElementById('borough-focus'); s.value = s.options[5].value; s.dispatchEvent(new Event('change')); });
+    await page.waitForTimeout(3000);
+    ok(await swipe(), 'phone: the map drags with an LA focused');
+    await setOv(page, 'census_bad_health_pct');
+    await page.waitForTimeout(3000);
+    ok(await swipe(), 'phone: the map still drags after choosing an indicator with an LA focused');
+    ok(errors.length === 0, 'no page errors (phone LA focus)', errors.join(' | '));
+    await page.close();
+  }
+
   // A region
   if (HAS_NE) {
     const { page, errors } = await open(browser, 'index.html?r=north-east&t=1', DESK);

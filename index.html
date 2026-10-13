@@ -12802,14 +12802,30 @@ function applyBoroughLock() {
   const matched = wLyr.getLayers().filter(l =>
     ladInFocus((l.feature.properties || {}).LAD));
   if (!matched.length) { map.setMaxBounds(null); map.setMinZoom(0); return; }
-  // A margin, so the borough is not jammed against the edge of the frame and
-  // you can still see which way it faces.
-  const b = L.featureGroup(matched).getBounds().pad(0.25);
-  map.setMaxBounds(b);
+  // A margin, so the LA is not jammed against the edge of the frame and you
+  // can still see which way it faces.
+  const la = L.featureGroup(matched).getBounds();
+  let b = la.pad(0.25), minZ = null;
   try {
     const fit = map.getBoundsZoom(b);
-    if (isFinite(fit)) map.setMinZoom(Math.max(0, Math.floor(fit) - 1));
+    if (isFinite(fit)) minZ = Math.max(0, Math.floor(fit) - 1);
   } catch (e) { /* degenerate bounds: leave the zoom range alone */ }
+  // Room to move. When the screen at the furthest-out zoom is already wider
+  // than the LA and its margin, which is the usual case on a phone, bounds
+  // that tight leave the map nowhere to go and it will not drag at all. So
+  // the allowed area also reaches one full screen beyond the LA on every
+  // side: you stay near the LA but can always move the map.
+  if (minZ !== null) {
+    try {
+      const size = map.getSize();
+      const sw = map.project(la.getSouthWest(), minZ), ne = map.project(la.getNorthEast(), minZ);
+      b = b.extend(L.latLngBounds(
+        map.unproject(L.point(sw.x - size.x, sw.y + size.y), minZ),
+        map.unproject(L.point(ne.x + size.x, ne.y - size.y), minZ)));
+    } catch (e) { /* keep the margin alone */ }
+  }
+  map.setMaxBounds(b);
+  if (minZ !== null) map.setMinZoom(minZ);
 }
 // Ward boundaries turns the ward layer off, not just its outlines.
 //
