@@ -126,8 +126,17 @@ var MODEL_LABEL = "Claude Sonnet 5";
     return out;
   }
 
+  // The local authority level is "la" in the Worker's tool schema. Earlier
+  // versions of the Worker sent "borough", so both are accepted and mean the
+  // same thing.
+  function isLaLevel(level) {
+    var l = String(level || "").toLowerCase();
+    return l === "la" || l === "borough" || l === "local authority";
+  }
+  function levelWord(level) { return isLaLevel(level) ? "LA" : "ward"; }
+
   function areasFor(level) {
-    if (level === "borough") return boroughRollup();
+    if (isLaLevel(level)) return boroughRollup();
     var w = wards(), out = {};
     Object.keys(w).forEach(function (k) {
       out[k] = { name: w[k].name || k, lad: w[k].lad || "", indicators: w[k].indicators || {} };
@@ -208,10 +217,11 @@ var MODEL_LABEL = "Claude Sonnet 5";
     return /^ft_/.test(key) && !/^ft_\d+$/.test(key);
   }
 
-  var BOROUGH_CAVEAT = "This indicator is published at borough level and " +
-    "applied to every ward in the borough, so it is the same figure for all " +
-    "wards there. Report it as a borough figure, and do not describe it as a " +
-    "difference between wards.";
+  var BOROUGH_CAVEAT = "This indicator is published for the whole local " +
+    "authority (LA) and applied to every ward in it, so it is the same figure " +
+    "for all wards there. Report it as an LA figure, calling it an LA figure " +
+    "rather than a borough figure, and do not describe it as a difference " +
+    "between wards.";
 
   /**
    * Indicator metadata, from the same table the map's own legends read.
@@ -318,27 +328,29 @@ var MODEL_LABEL = "Claude Sonnet 5";
             source: m && m.src ? m.src : undefined,
             year: m && m.yr ? m.yr : undefined,
             aggregation: isAdditive(k) ? "summed across wards" : "population-weighted mean",
-            published_at: isBoroughLevel(k) ? "borough" : "ward",
+            published_at: isBoroughLevel(k) ? "LA" : "ward",
             higher_means: higherMeans(k),
           };
         }),
         note: "Deprivation deciles run 1 (most deprived) to 10 (least deprived). " +
-          "Indicators marked published_at 'borough' are the same value for every " +
-          "ward in a borough; do not rank wards by them.",
+          "Indicators marked published_at 'LA' are published for the whole " +
+          "local authority (LA), so they are the same value for every ward in " +
+          "it; do not rank wards by them. Call the local authority level 'LA' " +
+          "in answers, not 'borough'.",
       };
     },
 
     get_area: function (input) {
       var hit = findArea(input.name, input.level);
-      if (!hit) return { error: "No " + input.level + " found matching '" + input.name + "'." };
+      if (!hit) return { error: "No " + levelWord(input.level) + " found matching '" + input.name + "'." };
       if (hit.ambiguous) return { error: "Several areas match; be more specific.", candidates: hit.ambiguous };
       var boroughLevel = Object.keys(hit.area.indicators || {}).filter(isBoroughLevel);
       return {
-        name: hit.area.name, level: input.level, borough: hit.area.lad || undefined,
+        name: hit.area.name, level: levelWord(input.level), la: hit.area.lad || undefined,
         indicators: hit.area.indicators,
         // A ward profile mixes ward figures with borough ones. Name which are
         // which, so a borough figure is not reported as being about the ward.
-        borough_level_indicators: (input.level === "ward" && boroughLevel.length)
+        la_level_indicators: (input.level === "ward" && boroughLevel.length)
           ? boroughLevel : undefined,
         caveat: (input.level === "ward" && boroughLevel.length) ? BOROUGH_CAVEAT : undefined,
       };
@@ -367,11 +379,11 @@ var MODEL_LABEL = "Claude Sonnet 5";
       rows.forEach(function (r) { Object.keys(r.indicators).forEach(function (k) { shown[k] = 1; }); });
       var boroughLevel = Object.keys(shown).filter(isBoroughLevel);
       return {
-        level: input.level, areas: rows, not_found: missing.length ? missing : undefined,
+        level: levelWord(input.level), areas: rows, not_found: missing.length ? missing : undefined,
         // Comparing two wards in the same borough on a borough-level indicator
         // will show them as identical, which is an artefact of the geography
         // rather than a finding about the wards.
-        borough_level_indicators: (input.level === "ward" && boroughLevel.length)
+        la_level_indicators: (input.level === "ward" && boroughLevel.length)
           ? boroughLevel : undefined,
         caveat: (input.level === "ward" && boroughLevel.length) ? BOROUGH_CAVEAT : undefined,
       };
@@ -383,10 +395,11 @@ var MODEL_LABEL = "Claude Sonnet 5";
       var rows = [];
       Object.keys(areas).forEach(function (k) {
         var a = areas[k];
-        if (input.within_borough &&
-            (a.lad || "").toLowerCase().indexOf(String(input.within_borough).toLowerCase()) === -1) return;
+        var within = input.within_la || input.within_borough;
+        if (within &&
+            (a.lad || "").toLowerCase().indexOf(String(within).toLowerCase()) === -1) return;
         var v = parseFloat((a.indicators || {})[key]);
-        if (!isNaN(v)) rows.push({ name: a.name, borough: a.lad || undefined, value: v });
+        if (!isNaN(v)) rows.push({ name: a.name, la: a.lad || undefined, value: v });
       });
       if (!rows.length) {
         return { error: "No values for indicator '" + key + "'. Call list_indicators for valid keys." };
@@ -402,7 +415,7 @@ var MODEL_LABEL = "Claude Sonnet 5";
         results_are: hm ? "the " + input.direction + " values; higher = " + hm : undefined,
         unit: meta && meta.u ? meta.u : undefined,
         source: meta && meta.src ? meta.src : undefined,
-        level: input.level, of_total: rows.length, results: rows.slice(0, n),
+        level: levelWord(input.level), of_total: rows.length, results: rows.slice(0, n),
         // A ward ranking on a borough-level indicator is really a borough
         // ranking with the wards of each borough tied. Say so here rather
         // than let the ordering imply a distinction that is not in the data.
@@ -723,7 +736,7 @@ var MODEL_LABEL = "Claude Sonnet 5";
     "Compare deprivation in Brent and Bromley",
     "Which 5 wards have the highest over-65 population?",
     "Tell me about Notting Dale",
-    "Which borough has the most GP practices?",
+    "Which LA has the most GP practices?",
     "How deprived is Hackney?",
   ];
 
@@ -753,7 +766,7 @@ var MODEL_LABEL = "Claude Sonnet 5";
     // its own invites the belief that nothing leaves it.
     var intro = document.createElement("div");
     intro.className = "ai-msg ai-bot";
-    intro.textContent = "Ask about any ward or borough on the map. Every figure " +
+    intro.textContent = "Ask about any ward or local authority (LA) on the map. Every figure " +
       "in an answer is read from the data already loaded in your browser, so " +
       "no number is written from memory. Your question, and the figures looked " +
       "up to answer it, are sent through this site's server to Anthropic, " +
