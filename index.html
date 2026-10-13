@@ -325,6 +325,13 @@
   .tb-btn.primary:hover { background: var(--nhs-dark); color: var(--on-accent); border-color: var(--nhs-dark); }
   .tb-btn.danger:hover { background: var(--tint-red); border-color: var(--nhs-red); color: var(--nhs-red); }
   .tb-sep { width: 1px; height: 20px; background: var(--line); }
+  /* Presentation view: the map on its own, with the header, the tool tabs, the
+     side panel and the map's own controls out of the way until Done or Esc. */
+  body.presenting .hdr, body.presenting .mode-rail, body.presenting #sidebar,
+  body.presenting #sb-scrim, body.presenting #viewing-strip, body.presenting #ai-toggle,
+  body.presenting .ph-note-float { display: none !important; }
+  body.presenting .main { grid-template-columns: minmax(0, 1fr); }
+  body.presenting .map-wrap { grid-template-rows: minmax(0, 1fr); }
 
   /* ── Header search ── */
   .hdr-search { position: relative; }
@@ -787,7 +794,7 @@
   .dl-seg button.active { background: var(--nhs-blue); color: var(--on-accent); box-shadow: 0 1px 3px rgba(0,94,184,.3); }
   .dl-seg button.disabled { color: var(--ink-3); cursor: help; font-style: italic; }
   .dl-seg button.disabled:hover { color: var(--ink-3); background: transparent; }
-  .dl-hint { position: absolute; top: 100%; right: 0; margin-top: 4px; background: var(--invert-bg); color: var(--invert-ink); font-size: var(--t-xs); padding: 6px 9px; border-radius: 5px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .2s; box-shadow: 0 2px 6px rgba(0,0,0,.2); }
+  .dl-hint { position: absolute; top: 100%; right: 0; margin-top: 4px; background: var(--invert-bg); color: var(--invert-ink); font-size: var(--t-xs); line-height: 1.4; padding: 6px 9px; border-radius: 5px; width: max-content; max-width: min(320px, calc(100vw - 24px)); opacity: 0; pointer-events: none; transition: opacity .2s; box-shadow: 0 2px 6px rgba(0,0,0,.2); }
   .dl-hint.show { opacity: 1; }
 
   /* ── Status bar ── */
@@ -1353,6 +1360,21 @@
   .ws-btn.primary { background: var(--nhs-blue); border-color: var(--nhs-blue); color: var(--on-accent); }
   .ws-btn.primary:hover { background: var(--nhs-dark); border-color: var(--nhs-dark); color: var(--on-accent); }
   .ws-btn.on { background: var(--nhs-light); border-color: var(--nhs-blue); color: var(--nhs-dark); }
+  /* A button with nothing to act on yet waits, rather than answering a press
+     with an alert box, and a line beside it says what it is waiting for. */
+  .ws-btn:disabled, .ws-btn:disabled:hover, .ws-btn.primary:disabled, .ws-btn.primary:disabled:hover {
+    cursor: not-allowed; background: var(--paper-2); border-color: var(--line); color: var(--ink-3); }
+  /* Inline notes, in place of alert boxes: next to the control that raised them. */
+  .ph-note { display: flex; align-items: flex-start; gap: 8px; flex-basis: 100%; box-sizing: border-box;
+    font-size: var(--t-xs); line-height: 1.45; white-space: normal; text-align: left;
+    color: var(--tint-amber-ink); background: var(--tint-amber); border-radius: 6px; padding: 7px 9px; margin: 6px 0; }
+  .ph-note > span { flex: 1; min-width: 0; }
+  .ph-note a { color: inherit; font-weight: 600; text-decoration: underline; }
+  .ph-note-x { appearance: none; border: 0; background: none; color: inherit; cursor: pointer;
+    font: inherit; font-size: 15px; line-height: 1; padding: 0 2px; }
+  .ph-note.ph-note-float { position: absolute; top: 64px; left: 50%; transform: translateX(-50%);
+    z-index: 3000; width: max-content; max-width: min(420px, calc(100% - 24px)); box-shadow: 0 4px 14px rgba(0,0,0,.18); }
+  .ws-sheet > .ph-note { margin: 0 14px 6px; }
   .ws-close { appearance: none; background: none; border: 0; cursor: pointer; color: var(--ink-3);
     font-size: var(--t-xl); line-height: 1; padding: 2px 4px; border-radius: 6px; }
   .ws-close:hover { color: var(--nhs-red); background: var(--nhs-light); }
@@ -1615,6 +1637,16 @@
   .biv-legend { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; align-items: center;
     font-size: var(--t-xs); color: var(--ink-2); margin-bottom: 4px; }
   .biv-grid-lg { grid-template-columns: repeat(3, 20px) !important; grid-template-rows: repeat(3, 20px) !important; }
+  /* Plain words at the corners of the key: high on both, low on both. */
+  .biv-key { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr auto 1fr; grid-template-rows: auto auto;
+    column-gap: 8px; row-gap: 4px; align-items: start; font-size: var(--t-xs); line-height: 1.3; color: var(--ink-2); }
+  .biv-key .biv-grid { grid-column: 2; grid-row: 1 / span 2; }
+  .biv-c { max-width: 9em; }
+  .biv-tl { grid-column: 1; grid-row: 1; justify-self: end; text-align: right; }
+  .biv-tr { grid-column: 3; grid-row: 1; justify-self: start; }
+  .biv-bl { grid-column: 1; grid-row: 2; justify-self: end; align-self: end; text-align: right; }
+  .biv-br { grid-column: 3; grid-row: 2; justify-self: start; align-self: end; }
+  .biv-legend > .biv-axes { grid-column: 1 / -1; }
   .biv-axes { display: flex; flex-direction: column; gap: 6px; line-height: 1.3; }
   .biv-axes b { color: var(--ink); }
   .biv-grid { display: grid; grid-template-columns: repeat(3, 18px); grid-template-rows: repeat(3, 18px); gap: 1px; }
@@ -1913,8 +1945,8 @@
   .q-step-opt input { margin: 0; accent-color: var(--nhs-blue); cursor: pointer;
     width: 14px; height: 14px; flex: 0 0 auto; }
   /* Skipped: the chips stay visible so it is obvious what is being skipped,
-     but they are plainly out of play and cannot be clicked. */
-  .q-skip #q-services { opacity: .4; pointer-events: none; filter: grayscale(1); }
+     and dashed so they read as not in use. Choosing one switches the step on. */
+  .q-skip #q-services .q-chip { border-style: dashed; color: var(--ink-2); }
   .q-skip #q-services-hint { color: var(--ink-3); }
   .q-step { display: flex; align-items: baseline; gap: 6px; font-size: var(--t-sm); font-weight: 600;
     color: var(--ink); margin-bottom: 5px; }
@@ -1979,11 +2011,11 @@
     color: var(--ink-3); width: 20px; flex-shrink: 0; font-variant-numeric: tabular-nums; }
   .q-row .q-nm { flex: 1; min-width: 0; font-size: var(--t-sm); color: var(--ink); overflow: hidden;
     text-overflow: ellipsis; white-space: nowrap; }
-  .q-row .q-nm small { display: block; font-size: var(--t-xs); color: var(--ink-3); }
+  .q-row .q-nm small { display: block; font-size: var(--t-xs); color: var(--ink-3); white-space: normal; }
   .q-row .q-v { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: var(--t-xs);
     color: var(--ink-2); flex-shrink: 0; font-variant-numeric: tabular-nums; }
-  .q-acts { display: flex; gap: 5px; padding: 9px 12px; border-bottom: 1px solid var(--line); }
-  .q-acts .ws-btn { flex: 1; text-align: center; }
+  .q-acts { display: flex; flex-wrap: wrap; gap: 5px; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+  .q-acts .ws-btn { flex: 1 1 auto; text-align: center; }
   .q-sortrow { display: flex; align-items: center; gap: 6px; padding: 8px 12px;
     border-bottom: 1px solid var(--line); font-size: var(--t-xs); color: var(--ink-3); }
   .q-sortrow select { flex: 1; font: inherit; font-size: var(--t-xs); padding: 3px 5px;
@@ -2344,7 +2376,7 @@
       <button type="button" class="tb-btn" id="tb-link" title="Copy a link to exactly this view: the indicator, the area, the layers, the selected ward, and any query or custom area open">⧉ Copy link</button>
       <button type="button" class="tb-btn" id="tb-cb" title="Switch to a colour-blind safe palette (deuteranopia/protanopia friendly)" aria-pressed="false">◐ Colour-blind palette</button>
       
-      <button type="button" class="tb-btn" id="tb-png" title="Clear the screen for a screenshot: whitens everything outside the mapped area and hides the controls, then you capture it with your own screenshot tool.">⤓ Screenshot</button>
+      <button type="button" class="tb-btn" id="tb-png" title="Show the map on its own, without the panels and controls, ready for a screenshot or to present">⤓ Presentation view</button>
     </div>
   </header>
 
@@ -2491,7 +2523,7 @@
                is the larger geography, and because an NHS reader usually
                knows their ICB before they know which borough they are
                looking at. -->
-          <label class="lrow" id="icb-row"><div style="width:9px;height:9px;border:2px solid #8E44AD;border-radius:2px;flex-shrink:0"></div><span class="lname">Integrated care boards (ICBs) <span class="lcount" id="icb-count"></span><span class="lhelp" title="Integrated care boards (ICBs) are the NHS bodies that plan and pay for health services across an area. London has four (West and North, North East, South East and South West), each made up of whole local authorities (LAs), and you can switch this on and select an ICB to zoom to it.">?</span></span><input type="checkbox" id="ticb"></label>
+          <label class="lrow" id="icb-row"><div style="width:9px;height:9px;border:2px solid #8E44AD;border-radius:2px;flex-shrink:0"></div><span class="lname">Integrated care boards (ICBs) <span class="lcount" id="icb-count"></span><button type="button" class="lhelp" aria-label="About integrated care boards" aria-expanded="false" title="Integrated care boards (ICBs) are the NHS bodies that plan and pay for health services across an area. London has four (West and North, North East, South East and South West), each made up of whole local authorities (LAs), and you can switch this on and select an ICB to zoom to it.">?</button></span><input type="checkbox" id="ticb"></label>
           <!-- Its own control, under the layer it belongs to, rather than a
                group inside the borough dropdown. A board and a borough are two
                different sizes of thing, and one list offering both made the
@@ -2504,7 +2536,7 @@
           </div>
           <!-- Primary care networks. Shown once this region's pcn.json loads. -->
           <div id="pcn-block" hidden>
-            <label class="lrow" id="pcn-row"><div style="width:9px;height:9px;border:2px solid #0B7A75;border-radius:2px;flex-shrink:0"></div><span class="lname">PCN footprints <span class="lcount" id="pcn-count"></span><button type="button" class="lhelp" title="Primary care networks: groups of GP practices that plan services together. A footprint is the set of neighbourhoods (LSOAs) where most registered residents use that network's practices. PCNs are defined by their practices' patient lists, not by a boundary, so footprints overlap in reality: the shading after choosing one shows its full catchment.">?</button></span><input type="checkbox" id="tpcn"></label>
+            <label class="lrow" id="pcn-row"><div style="width:9px;height:9px;border:2px solid #0B7A75;border-radius:2px;flex-shrink:0"></div><span class="lname">PCN footprints <span class="lcount" id="pcn-count"></span><button type="button" class="lhelp" aria-label="About PCN footprints" aria-expanded="false" title="Primary care networks (PCNs) are groups of GP practices that plan services together. Each footprint covers the LSOAs where most registered residents use that network's practices, but PCNs are defined by their patient lists rather than by a boundary, so their real catchments overlap and choosing one shows all of its catchment.">?</button></span><input type="checkbox" id="tpcn"></label>
             <div style="margin:2px 0 8px 18px">
               <div style="font-size:var(--t-xs);color:var(--ink-2);margin-bottom:3px">Focus by PCN</div>
               <select id="pcn-focus" aria-label="Focus by primary care network" style="width:100%;padding:4px 6px;border:1px solid var(--line);border-radius:5px;font-size:var(--t-xs);color:var(--ink);background:var(--paper)">
@@ -2584,7 +2616,7 @@
                  from the CIC layer beside it, which carried no tags; that layer
                  is gone, but the word still says what the tags describe, which
                  is the organisation rather than anything the map draws. -->
-            <div class="sb-lbl" style="margin-bottom:0">Filter charities by tag<button type="button" class="lhelp" title="The tags are the Charity Commission's own classification of what a charity does, how it helps and whom it helps. They come from the register, not from this map." aria-label="Explain this" aria-expanded="false">?</button></div>
+            <div class="sb-lbl" style="margin-bottom:0">Filter charities by tag<button type="button" class="lhelp" title="The tags are the Charity Commission's own classification of what a charity does, how it helps and whom it helps. They come from the register, not from this map." aria-label="About the charity tags" aria-expanded="false">?</button></div>
             <button type="button" id="vcse-tag-clear" style="font-size:var(--t-xs);color:var(--ink-2);background:none;border:none;cursor:pointer;padding:0;text-decoration:underline;display:none">clear</button>
           </div>
           <details class="vcse-tag-group" data-fam="wt">
@@ -2634,11 +2666,11 @@
               <div class="ov-biv" id="ov-biv" hidden>
                 <button type="button" class="ov-biv-add" id="ov-biv-add">+ Compare with a second indicator</button>
                 <label class="ov-biv-pick" id="ov-biv-pick" hidden>
-                  <span>Second indicator, drawn against the first</span>
+                  <span>Second indicator, to compare with the first</span>
                   <select id="ov2"></select>
                 </label>
                 <div class="ov-biv-on" id="ov-biv-on" hidden>
-                  <span>Against <b id="ov-biv-nm"></b></span>
+                  <span>Compared with: <b id="ov-biv-nm"></b></span>
                   <button type="button" class="ov-btn quiet" id="ov-biv-x">Remove</button>
                 </div>
               </div>
@@ -2837,7 +2869,7 @@
               </div>
             </div>
             <div style="font-size:var(--t-xs);color:var(--ink-3);margin-top:6px;line-height:1.4">
-              Hidden in bivariate mode. Click a row to zoom.
+              Select a row to zoom to that area. These lists are hidden while a second indicator is being compared.
             </div>
           </div>
 
@@ -2846,7 +2878,7 @@
           <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line-2)">
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--t-sm);color:var(--ink);font-weight:500">
               <input type="checkbox" id="core20-toggle" style="cursor:pointer">
-              <span>Highlight Core20<button type="button" class="lhelp" title="Core20 = the 20% most deprived LSOAs (small areas) nationally (IMD deciles 1–2). NHS England's Core20PLUS5 framework prioritises them for targeted health action." aria-label="Explain this" aria-expanded="false">?</button> LSOAs</span>
+              <span>Highlight Core20<button type="button" class="lhelp" title="Core20 means the 20% most deprived LSOAs in England, the ones in deprivation deciles 1 and 2, which NHS England's Core20PLUS5 framework prioritises for targeted health action." aria-label="About Core20" aria-expanded="false">?</button> LSOAs</span>
             </label>
             <div style="font-size:var(--t-xs);color:var(--ink-3);margin-top:4px;line-height:1.45">
               NHS Core20PLUS5: LSOAs in IMD deciles 1-2 (most deprived 20% nationally).
@@ -2877,20 +2909,21 @@
                this file and "small area" thirteen, and the two sat next to each
                other in the Data export level picker, where one button read
                "Small areas" and the next read "MSOAs". -->
-          <div class="rb-hint">Click an LSOA on the map to add it. Click it again to
-            remove it. An LSOA holds about 1,500 people. It is the smallest area this
-            map has figures for.</div>
+          <div class="rb-hint">Build an area of your own from LSOAs, the small statistical
+            areas of about 1,500 people, and see its combined figures, with rates weighted by
+            population rather than added up. Select an LSOA on the map to add it, and select it
+            again to take it out.</div>
         </div>
         <div class="rb-count" id="rb-count">
-          <span>Nothing selected yet</span>
+          <span>No LSOAs added yet</span>
           <button type="button" class="rb-clear" id="rb-clear" hidden>Clear</button>
         </div>
         <div class="rb-acts">
-          <button type="button" class="ws-btn primary" id="rb-report">Open printable report</button>
-          <button type="button" class="ws-btn" id="rb-csv">CSV</button>
+          <button type="button" class="ws-btn primary" id="rb-report" disabled>Open printable report</button>
+          <button type="button" class="ws-btn" id="rb-csv" disabled>Download CSV</button>
           <!-- An area is built by hand, so it is the one thing here somebody
                would be sorry to lose or have to describe over the phone. -->
-          <button type="button" class="ws-btn" id="rb-link"
+          <button type="button" class="ws-btn" id="rb-link" disabled
                   title="Copy a link that reopens this area, with its name">Copy link</button>
         </div>
         <div class="rb-scroll">
@@ -2983,7 +3016,7 @@
             <h2>Compare</h2>
             
           </div>
-          <div class="cmp-sub" id="cmp-sub">Pin up to 4 wards, live on the map</div>
+          <div class="cmp-sub" id="cmp-sub">Pin up to four wards to see them side by side.</div>
         </div>
         <div class="cmp-scroll">
           <!-- Boards and boroughs are first-class everywhere else on this page:
@@ -3010,9 +3043,9 @@
             <h3>Quick view</h3>
             <div class="cmp-quick" id="cmp-quick"></div>
             <div id="cmp-caution"></div>
-            <button type="button" class="ws-btn primary" id="cmp-open"
+            <button type="button" class="ws-btn primary" id="cmp-open" aria-describedby="cmp-quick"
                     style="width:100%;justify-content:center;margin-top:11px">Open full comparison &rarr;</button>
-            <button type="button" class="ws-btn" id="cmp-csv"
+            <button type="button" class="ws-btn" id="cmp-csv" aria-describedby="cmp-quick"
                     style="width:100%;justify-content:center;margin-top:6px">Download CSV</button>
           </div>
         </div>
@@ -3029,7 +3062,7 @@
         </div>
         <div class="q-scroll">
           <div class="q-block">
-            <div class="q-sub">Build a filter across every metric on the map. Wards that match are listed below and highlighted on the map.
+            <div class="q-sub">Find every ward that matches what you are looking for, such as high deprivation and high disability in one LA, and see them listed below and highlighted on the map.
               <!-- The worked example used to be filled in on first open, so the
                    panel arrived holding somebody else's question about Brent.
                    It now opens empty and the example is one click away. -->
@@ -3048,17 +3081,17 @@
                 <span>Which services must the ward have?</span>
               </label>
             </div>
-            <div class="q-hint" id="q-services-hint">Optional. Tick the box to filter on services;
-              leave it clear and this step is skipped.</div>
+            <div class="q-hint" id="q-services-hint">This step is optional, so choose one or more
+              services to keep only the wards that have them, or leave it unticked to include every ward.</div>
             <div class="q-sentence" id="q-services"></div>
 
             <div class="q-step" style="margin-top:12px"><span class="q-step-n">2</span>Where should it be?</div>
-            <div class="q-hint" id="q-scope-hint">One LA, or all 33.</div>
+            <div class="q-hint" id="q-scope-hint">Choose one LA or ICB, or search all of London.</div>
             <div class="q-sentence" id="q-scope"></div>
 
             <div class="q-step" style="margin-top:12px"><span class="q-step-n">3</span>Which figures must it meet?</div>
-            <div class="q-hint">Every condition has to be true. A ward with no figure for one of
-              them is left out and counted, rather than quietly dropped.</div>
+            <div class="q-hint">A ward matches only if it meets every condition, and a ward with no
+              figure for one of them is left out and counted below the results.</div>
             <div id="q-conds"></div>
             <div class="q-sentence" style="margin-top:6px">
               <span class="q-chip add" id="q-add-cond">+ add a condition</span>
@@ -3069,17 +3102,17 @@
           <div class="q-acts">
             <button type="button" class="ws-btn primary" id="q-run">Run query</button>
             <button type="button" class="ws-btn" id="q-clear">Clear</button>
-            <button type="button" class="ws-btn" id="q-csv">CSV</button>
+            <button type="button" class="ws-btn" id="q-csv" disabled aria-describedby="q-csv-why">Download CSV</button>
           </div>
           <div class="q-sortrow">
             <span>Sort by</span>
-            <select id="q-sort"></select>
-            <select id="q-sortdir" style="flex:0 0 84px">
+            <select id="q-sort" aria-label="Sort the wards by"></select>
+            <select id="q-sortdir" aria-label="Sort order" style="flex:0 0 84px">
               <option value="desc">Highest</option>
               <option value="asc">Lowest</option>
             </select>
           </div>
-          <div class="q-resultbar" id="q-resultbar"><span class="q-empty">No query run yet.</span></div>
+          <div class="q-resultbar" id="q-resultbar"><span class="q-empty" id="q-csv-why">Run the query to see the wards that match.</span></div>
           <div id="q-results"></div>
         </div>
       </div>
@@ -3149,7 +3182,7 @@
            not a tab stop: Leaflet's own zoom buttons and the ward polygons
            are what a keyboard walks through inside it. -->
       <div id="map" tabindex="-1" role="application"
-           aria-label="Map of London. Wards are shaded by the selected indicator."></div>
+           aria-label="Map of London by ward, with no indicator chosen."></div>
       <!-- Fingertips suppression banner: shown when a Fingertips overlay is selected -->
       <!-- Top left, under the zoom control. It used to sit bottom right, where
            the Ask button covers it and the Ask panel hides it completely: the
@@ -3183,10 +3216,10 @@
                 title="The map can colour five sizes of area. The largest is the local authority (LA), the area run by one council, and London has 33 of them: the 32 boroughs and the City of London. These are divided into 704 wards, which are the areas councillors are elected for. MSOAs, of about 7,500 people, and LSOAs, of about 1,500 people, are statistical areas that fit inside LAs but do not follow ward boundaries. Output areas, of about 125 households, are the smallest and carry Census figures only. Each indicator opens at a level it is published for, and you can switch to any other level that has figures for it."><span class="dl-help-word">Area level</span><span class="dl-help-mark" aria-hidden="true">?</span></button>
         <div class="dl-seg" id="dl-seg">
           <button type="button" data-dl="borough" title="Colour the map by local authority (LA), the area run by one council. Where an indicator is not published for LAs, each LA's figure is worked out from its wards by adding up counts and weighting rates by population.">LA</button>
-          <button type="button" data-dl="ward" class="active" title="Ward-level data (704 wards)">Ward</button>
-          <button type="button" data-dl="msoa" title="MSOA level. MSOAs sit between wards and LSOAs and do not nest into wards. The Local Health indicators are published at this level, so they shade here; anything published elsewhere draws the boundaries only.">MSOA</button>
-          <button type="button" data-dl="lsoa" title="LSOA-level data (4,994 LSOAs, the most detailed level here)">LSOA</button>
-          <button type="button" data-dl="oa" hidden title="Output areas are the smallest Census areas, of about 125 households each, and carry Census figures only.">OA</button>
+          <button type="button" data-dl="ward" class="active" title="Colour the map by ward, the 704 areas councillors are elected for.">Ward</button>
+          <button type="button" data-dl="msoa" title="Colour the map by MSOA, the statistical areas of about 7,500 people that sit between wards and LSOAs and do not follow ward boundaries. OHID publishes its Local Health figures for MSOAs.">MSOA</button>
+          <button type="button" data-dl="lsoa" title="Colour the map by LSOA, the statistical areas of about 1,500 people that the deprivation figures are published for. London has 4,994 of them.">LSOA</button>
+          <button type="button" data-dl="oa" hidden title="Colour the map by output area (OA), the smallest Census areas of about 125 households, which carry Census figures only.">OA</button>
         </div>
         <div class="dl-hint" id="dl-hint"></div>
       </div>
@@ -3201,7 +3234,7 @@
              button inside a button is unusable with a screen reader. The size
              control for the keyboard is #ws-size. -->
         <div class="ws-head" id="ws-head"
-             title="Click to change how much of the panel is showing">
+             title="Select to change how much of the panel is showing">
           <div class="ws-title">
             <div class="ws-lbl">Selected ward</div>
             <h2 id="ws-name">&nbsp;</h2>
@@ -3732,8 +3765,8 @@ const PH_WHERE_ARIA = PH_IS_LONDON
     cbh.textContent = 'Choose all of ' + R.name + ', or one LA.';
   }
   setText('vs-digest', 'All of ' + R.name);
-  setText('q-scope-hint', nLads ? 'One LA, or all ' + nLads + '.' : 'One LA, or all of them.');
-  setAttr('map', 'aria-label', 'Map of ' + R.name + '. Wards are shaded by the selected indicator.');
+  setText('q-scope-hint', 'Choose one LA, or search all of ' + R.name + '.');
+  setAttr('map', 'aria-label', 'Map of ' + R.name + ' by ward, with no indicator chosen.');
   if (nWards) setText('ward-count', nWards.toLocaleString());
   // Four sizes of area, or five once this region's output areas arrive (the
   // OA button is unhidden then, and ph-levels-changed fires).
@@ -3755,8 +3788,8 @@ const PH_WHERE_ARIA = PH_IS_LONDON
   levelHelp();
   document.addEventListener('ph-levels-changed', levelHelp);
   const dlb = s => document.querySelector('#dl-seg button[data-dl="' + s + '"]');
-  if (dlb('ward') && nWards) dlb('ward').title = 'Ward-level data (' + nWards.toLocaleString() + ' wards)';
-  if (dlb('lsoa')) dlb('lsoa').title = 'LSOA-level data (the most detailed level here)';
+  if (dlb('ward') && nWards) dlb('ward').title = 'Colour the map by ward, the ' + nWards.toLocaleString() + ' areas councillors are elected for.';
+  if (dlb('lsoa')) dlb('lsoa').title = 'Colour the map by LSOA, the statistical areas of about 1,500 people that the deprivation figures are published for.';
 
   // Green space is a London build so far. Asked once, cheaply, so the layer
   // is only offered where its file exists.
@@ -4550,6 +4583,8 @@ function _levelToast(msg) {
     el = document.createElement('div');
     el.id = '_level-toast';
     el.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#1a1a1a;color:#fff;padding:14px 22px;border-radius:8px;font-size:13px;line-height:1.5;max-width:420px;text-align:center;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,.30);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;pointer-events:none;opacity:0;transition:opacity .2s';
+    // Read out as well as shown, since it answers a press that did nothing.
+    el.setAttribute('role', 'status');
     document.body.appendChild(el);
   }
   el.innerHTML = msg;
@@ -4558,7 +4593,112 @@ function _levelToast(msg) {
   void el.offsetWidth;
   el.style.opacity = '1';
   clearTimeout(el._t);
-  el._t = setTimeout(() => { el.style.opacity = '0'; }, 4000);
+  el._t = setTimeout(() => { el.style.opacity = '0'; }, 5000);
+}
+
+/* Inline notes, in place of alert boxes. A note sits beside the control
+   that was pressed, says what happened and what to do next, and stays until
+   it is dismissed or replaced (or for opts.ms). opts.after puts it straight
+   after a given element; otherwise it goes after the control, or after the
+   control's row when that row is a line of buttons, so it gets a line of its
+   own. With no control to sit beside, it floats over the top of the map. */
+function phNote(anchor, html, opts) {
+  opts = opts || {};
+  let after = opts.after || null;
+  if (!after && anchor && anchor.parentElement) {
+    after = anchor;
+    const row = anchor.parentElement;
+    if (/flex|grid/.test(getComputedStyle(row).display) && row.parentElement) after = row;
+  }
+  const make = () => {
+    const d = document.createElement('div');
+    d.className = 'ph-note';
+    d.setAttribute('role', 'status');
+    // Clicks inside the note are its own, not the panel's underneath it.
+    d.addEventListener('click', e => e.stopPropagation());
+    return d;
+  };
+  let el;
+  if (after) {
+    el = after.nextElementSibling;
+    if (!el || !el.classList.contains('ph-note')) {
+      el = make();
+      after.insertAdjacentElement('afterend', el);
+    }
+  } else {
+    const host = document.getElementById('map-wrap') || document.body;
+    el = host.querySelector(':scope > .ph-note-float');
+    if (!el) { el = make(); el.classList.add('ph-note-float'); host.appendChild(el); }
+  }
+  el.innerHTML = '<span>' + html + '</span>';
+  const x = document.createElement('button');
+  x.type = 'button';
+  x.className = 'ph-note-x';
+  x.setAttribute('aria-label', 'Dismiss this note');
+  x.textContent = '\u00d7';
+  x.addEventListener('click', e => { e.stopPropagation(); el.remove(); });
+  el.appendChild(x);
+  clearTimeout(el._t);
+  if (opts.ms) el._t = setTimeout(() => el.remove(), opts.ms);
+  return el;
+}
+// The control a press came from, for notes raised by inline handlers.
+function _noteAnchor() {
+  const ev = window.event;
+  const t = ev && ev.target && ev.target.closest ? ev.target.closest('button, a, [role="button"]') : null;
+  if (t) return t;
+  const a = document.activeElement;
+  return (a && a !== document.body && a.tagName === 'BUTTON') ? a : null;
+}
+
+/* A report opens in a new tab. When the browser blocks that tab, the reader
+   gets a note with a link that opens the report in this tab instead, so
+   leaving the map is their choice rather than something that just happens.
+   open() builds the report and hands its page to _openReportHere. */
+function _reportBlocked(anchor, after, open) {
+  const el = phNote(anchor, 'Your browser blocked the report window. ' +
+    '<a href="#" class="ph-note-open">Open the report in this tab instead</a>.', { after });
+  const a = el && el.querySelector('.ph-note-open');
+  if (!a) return;
+  a.addEventListener('click', e => {
+    e.preventDefault();
+    a.textContent = 'Opening the report\u2026';
+    Promise.resolve().then(open).catch(err => {
+      console.error('report failed', err);
+      phNote(anchor, 'Sorry, the report could not be built. Please try again in a moment.', { after });
+    });
+  });
+}
+function _openReportHere(html, autoPrint) {
+  let doc = String(html)
+    // Back, not Close: this tab was not opened by the map, so it cannot close.
+    .replace(/<button onclick="window\.close\(\)">Close<\/button>/g,
+             '<button onclick="history.back()">Back to the map</button>')
+    // Relative links still lead back to this site, as they do in a new tab.
+    .replace(/<head([^>]*)>/i, '<head$1><base href="' + location.href.replace(/"/g, '&quot;') + '">');
+  if (autoPrint) {
+    doc = doc.replace(/<\/body>/i,
+      '<script>addEventListener("load",function(){setTimeout(function(){print()},300)})<\/script></body>');
+  }
+  location.assign(URL.createObjectURL(new Blob([doc], { type: 'text/html;charset=utf-8' })));
+}
+
+/* What the level toast says when an indicator has no figures at the level
+   asked for, written from the reader's side: what they asked for, why the
+   map cannot show it, and which buttons will work instead. */
+const _LVL_BUTTON = { borough: 'LA', ward: 'Ward', msoa: 'MSOA', lsoa: 'LSOA', oa: 'OA' };
+function _andList(items, conj) {
+  if (items.length < 2) return items.join('');
+  return items.slice(0, -1).join(', ') + ' ' + (conj || 'and') + ' ' + items[items.length - 1];
+}
+function _levelGateMsg(label, k, level) {
+  const plural = lv => (lv === 'oa' ? 'output areas' : (_LEVEL_PLURAL[lv] || lv));
+  const have = ovLevels(k);
+  const name = '<b>' + String(label).replace(/[<>&]/g, '') + '</b>';
+  if (!have.length) return name + ' has no figures to colour the map with, so please pick a different indicator.';
+  return name + ' is only available for ' + _andList(have.map(plural)) +
+    ', so it cannot be shown by ' + _levelName(level) + '. Choose ' +
+    _andList(have.map(lv => _LVL_BUTTON[lv] || lv), 'or') + ', or pick a different indicator.';
 }
 
 // Metadata shown in the scale-bar footer and the overlay-info popover.
@@ -5357,7 +5497,7 @@ function ovIsEstimated(level, id, k) {
   const d = MSOA_DATA[id];
   return !!(d && d[k + '_est']);
 }
-const EST_HTML = '<span class="vs vs-s" title="Carried from the 2011 area by the ONS 2011-to-2021 MSOA lookup">Estimated from 2011 areas</span>';
+const EST_HTML = '<span class="vs vs-s" title="OHID published this figure for the MSOA as it was drawn in 2011, and we have carried it onto the 2021 boundary using the ONS lookup, so it is an estimate.">Estimated from the 2011 boundary</span>';
 function ovVsHTML(code) {
   if (!code || !VS_ENGLAND_TEXT[code]) return '';
   const cls = code === 'W' ? 'vs-w' : code === 'B' ? 'vs-b' : 'vs-s';
@@ -7977,8 +8117,21 @@ const WARD_ONEPAGE_CSS = `
    the tab opens immediately with a holding page, the data is fetched, and
    then the real report is written over the top. */
 window.generateWardReport = function(wn, opts) {
+  opts = opts || {};
+  // Everything the report reads; see the notes on the Promise.all below.
+  const ready = () => Promise.all([ensureAllLayerData(), ensureLsoaImd(), ensureLsoaData(), ensureWardDetail()]);
+  // The reader chose to leave the map for the report, so no new tab is
+  // needed: build it, then open it here.
+  if (opts.sameTab) {
+    return ready().then(() => _generateWardReport({ sink: html => _openReportHere(html, opts.autoPrint) }, wn, opts));
+  }
   const _w = window.open('', '_blank');
-  if (!_w) { alert('Please allow pop-ups to generate the ward report.'); return; }
+  if (!_w) {
+    if (typeof opts.onBlocked === 'function') opts.onBlocked();
+    _reportBlocked(opts.anchor || _noteAnchor(), opts.noteAfter,
+      () => window.generateWardReport(wn, Object.assign({}, opts, { sameTab: true })));
+    return;
+  }
   _w.document.write(
     '<!DOCTYPE html><html lang="en-GB"><head><meta charset="UTF-8">' +
     '<title>' + String(wn).replace(/[<>&]/g, '') + ' | PopHealth Map</title></head>' +
@@ -7996,7 +8149,7 @@ window.generateWardReport = function(wn, opts) {
      deprivation radar had boundaries to place but no figures to plot. */
   /* ensureWardDetail for the health outcomes, which are in the deferred half
      of the ward data; a report built before it lands would print dashes. */
-  Promise.all([ensureAllLayerData(), ensureLsoaImd(), ensureLsoaData(), ensureWardDetail()])
+  ready()
     .then(() => _generateWardReport(_w, wn, opts))
     .catch(err => {
       /* Nothing else was catching this, and the tab is already open and
@@ -8697,6 +8850,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
   // Already open, holding a "building the report" page. Opening it here would
   // be too late: the click that authorised it has long since finished.
   const w = _reportWindow;
+  if (w && typeof w.sink === 'function') { w.sink(html); return; }
   if (!w || w.closed) return;
   w.document.open();
   w.document.write(html);
@@ -9331,7 +9485,7 @@ function _applyBoroughSolo() {
   grip.setAttribute('aria-label', 'Panel width');
   grip.setAttribute('aria-valuemin', String(MIN));
   grip.setAttribute('aria-valuemax', String(MAX));
-  grip.title = 'Drag to resize the panel · double-click to reset';
+  grip.title = 'Drag to resize the panel, or double-click to put it back';
   sidebar.appendChild(grip);
   // A separator that can be moved has to say where it is, from the start.
   grip.setAttribute('aria-valuenow', String(Math.round(sidebar.getBoundingClientRect().width) || DEFAULT));
@@ -10001,7 +10155,7 @@ function _applyBoroughSolo() {
       fpLyr = L.geoJSON(gj, {
         style: { color: '#0B7A75', weight: 2, fill: true, fillOpacity: 0, opacity: 0.9 },
         onEachFeature: (f, l) => {
-          l.bindTooltip('<b>' + esc(f.properties.name) + '</b><br><span style="font-size:var(--t-xs)">Click to see its catchment</span>', { sticky: true });
+          l.bindTooltip('<b>' + esc(f.properties.name) + '</b><br><span style="font-size:var(--t-xs)">Select it to see its catchment</span>', { sticky: true });
           l.on('click', () => { sel.value = f.properties.code; sel.dispatchEvent(new Event('change')); });
         },
       }).addTo(map);
@@ -10049,14 +10203,15 @@ function _applyBoroughSolo() {
     focusLyr = grp.addTo(map);
     try { const b = grp.getBounds(); if (b.isValid()) map.fitBounds(b, { padding: [30, 30], maxZoom: 14 }); } catch (e) {}
     const nL = Object.keys(lsoas).length;
-    const outside = p.all_practices > p.practices.length ? ' ' + (p.all_practices - p.practices.length) + ' more of its practices are outside this region.' : '';
-    infoEl.innerHTML = '<b>' + esc(p.name) + '</b>: ' + p.practices.length + ' practice' + (p.practices.length === 1 ? '' : 's') +
-      (p.patients ? ', ' + p.patients.toLocaleString() + ' registered patients' : '') + '.' + outside +
+    const more = p.all_practices - p.practices.length;
+    const outside = more > 0 ? ' A further ' + more + ' of its practices ' + (more === 1 ? 'is' : 'are') + ' outside ' + esc(PH_AREA) + '.' : '';
+    infoEl.innerHTML = '<b>' + esc(p.name) + '</b> has ' + p.practices.length + ' GP practice' + (p.practices.length === 1 ? '' : 's') +
+      (p.patients ? ' and ' + p.patients.toLocaleString() + ' registered patients' : '') + '.' + outside +
       (DATA.has_catchments
-        ? '<div class="pcn-note" style="margin-top:6px">Shading: share of each area\'s registered residents who use its practices</div>' +
+        ? '<div class="pcn-note" style="margin-top:6px">The shading shows what share of each LSOA\'s registered residents use its practices.</div>' +
           '<div class="pcn-grad"></div><div class="pcn-ends"><span>0%</span><span>100%</span></div>' +
-          '<div class="pcn-note">' + nL.toLocaleString() + ' neighbourhoods with 5 or more of its patients. Registrations: ' + esc(DATA.registrations) + ', NHS Digital.</div>'
-        : '<div class="pcn-note">Catchments are not loaded for this build, so only its practices are shown.</div>') +
+          '<div class="pcn-note">It has 5 or more patients in ' + nL.toLocaleString() + ' LSOAs, according to NHS Digital\'s registrations for ' + esc(DATA.registrations) + '.</div>'
+        : '<div class="pcn-note">The map shows where its practices are, but we do not yet have the figures to show the area its patients come from.</div>') +
       '<button type="button" class="ov-btn quiet" id="pcn-clear" style="margin-top:6px">Clear</button>';
     infoEl.hidden = false;
     document.getElementById('pcn-clear').addEventListener('click', () => { sel.value = ''; clearFocus(); });
@@ -10220,7 +10375,7 @@ window.PH_OA = (function () {
     const pending = all.filter(c => !loaded[c]);
     if (pending.length && !announced && typeof _dlHint === 'function') {
       const n = all.reduce((a, c) => a + (OA_INDEX.lads[c].count || 0), 0);
-      _dlHint('Loading ' + n.toLocaleString('en-GB') + ' output areas…', 4000);
+      _dlHint('Drawing all ' + n.toLocaleString('en-GB') + ' output areas, which can take a few seconds…', 4000);
     }
     announced = true;
     all.forEach(c => {
@@ -10233,7 +10388,7 @@ window.PH_OA = (function () {
         if (on) group.addLayer(loaded[c]);
         if (!Object.keys(loading).length) {
           const h = document.getElementById('dl-hint');
-          if (h && /^Loading/.test(h.textContent)) h.classList.remove('show');
+          if (h && /^Drawing all/.test(h.textContent)) h.classList.remove('show');
         }
       }).catch(() => { delete loading[c]; });
     });
@@ -10314,16 +10469,20 @@ window.PH_OA = (function () {
       if (b) {
         const lv = level();
         const missing = !ovHasLevel(curOv2, lv);
-        leg.innerHTML = grid('biv-grid-lg') +
-          '<span class="biv-axes"><span><b>Across &rarr;</b> ' + esc(short(curOv)) + '</span>' +
-          '<span><b>Up &uarr;</b> ' + esc(short(curOv2)) + '</span></span>' +
-          '<span class="biv-note">Each indicator is split into thirds across the ' +
-          esc((typeof _levelName === 'function') ? _levelName(lv) : lv) + 's on the map. ' +
-          'Dark purple: high on both. Red: high on the first only. Blue: high on the second only. ' +
-          'Grey: a figure is missing.' +
+        // The key's corners say in words what each corner colour means.
+        const lvMany = (typeof _LEVEL_PLURAL === 'object' && _LEVEL_PLURAL[lv]) || (lv === 'oa' ? 'output areas' : lv + 's');
+        leg.innerHTML = '<span class="biv-key">' +
+          '<span class="biv-c biv-tl">High on second only</span>' + grid('biv-grid-lg') +
+          '<span class="biv-c biv-tr">High on both</span>' +
+          '<span class="biv-c biv-bl">Low on both</span>' +
+          '<span class="biv-c biv-br">High on first only</span></span>' +
+          '<span class="biv-axes"><span><b>First, across &rarr;</b> ' + esc(short(curOv)) + '</span>' +
+          '<span><b>Second, up &uarr;</b> ' + esc(short(curOv2)) + '</span></span>' +
+          '<span class="biv-note">Each indicator is split into thirds across the ' + esc(lvMany) +
+          ' on the map, and an area in mid grey is missing one of its two figures.' +
           ([curOv, curOv2].some(k => OV_CFG[k] && OV_CFG[k].rev)
-            ? ' For the IMD decile and rank, which count down from 1 = most deprived, high means more deprived.' : '') +
-          (missing ? ' <b>' + esc(short(curOv2)) + ' has no figures at this level.</b>' : '') + '</span>';
+            ? ' Deprivation deciles and ranks count down from 1 for the most deprived, so for them high means more deprived.' : '') +
+          (missing ? ' <b>' + esc(short(curOv2)) + ' has no figures for ' + esc(lvMany) + '.</b>' : '') + '</span>';
       }
     }
     if (mls && mlsBiv) {
@@ -10354,6 +10513,7 @@ window.PH_OA = (function () {
     if (typeof _restyleAll === 'function') _restyleAll();
     if (typeof renderTopBottom === 'function') renderTopBottom();
     sync();
+    if (typeof _syncMapAria === 'function') _syncMapAria();
     if (typeof _scheduleUrlWrite === 'function') _scheduleUrlWrite();
   }
 
@@ -11390,7 +11550,7 @@ window.generateLSOAReport = function(code) {
 </body></html>`;
 
   const w = window.open('', '_blank');
-  if (!w) { alert('Please allow pop-ups to generate the LSOA report.'); return; }
+  if (!w) { _reportBlocked(_noteAnchor(), null, () => _openReportHere(html)); return; }
   w.document.open();
   w.document.write(html);
   w.document.close();
@@ -11702,7 +11862,7 @@ function loadIcbRegions() {
             `<b style="font-size:var(--t-xs)">${_esc(p.label || p.name || 'ICB')}</b>` +
             `<br><span style="font-size:var(--t-xs);color:var(--ink-3)">` +
             `${p.n_boroughs} ${ladNoun(p.n_boroughs)}` +
-            `${p.partial ? ' in ' + _esc(PH_AREA) : ''} · click to zoom</span>`,
+            `${p.partial ? ' in ' + _esc(PH_AREA) : ''} · select to zoom in</span>`,
             { sticky: true, opacity: 0.94 });
           // Click zooms to the region. Deliberately not a filter: borough
           // focus filters the whole app by a single LAD name in a dozen
@@ -11786,12 +11946,10 @@ document.getElementById('tlsoa').addEventListener('change', e => {
         e.target.checked = !wantsLsoa;
         const lbl = ((document.getElementById('ov').selectedOptions[0] || {}).text || k)
                       .replace(/ · (Ward|MSOA|LSOA|Output area|LA|Borough|Local authority|Borough\/council)$/i, '');
-        const have = ovLevels(k).map(_levelName).join(' and ');
-        _levelToast(`<b>Not available at ${_levelName(target)} level</b><br>"${lbl}"<br>`
-          + (have ? `has figures at ${have} level only. ${wantsLsoa
-              ? 'Turning this on would leave the map unshaded.'
-              : 'Turn the overlay off first if you want to leave that level.'}`
-                  : 'has no figures to shade with.'));
+        _levelToast(wantsLsoa || !ovLevels(k).length
+          ? _levelGateMsg(lbl, k, target)
+          : '<b>' + lbl.replace(/[<>&]/g, '') + '</b> is only available for LSOAs, so the LSOA ' +
+            'boundaries stay on while it is chosen. Pick a different indicator to change level.');
         return;
       }
     }
@@ -12323,7 +12481,7 @@ function _markNativeLevel() {
     const on = !!nat && b.dataset.dl === nat;
     b.classList.toggle('native', on);
     if (b.dataset.baseTitle === undefined) b.dataset.baseTitle = b.title || '';
-    b.title = b.dataset.baseTitle + (on ? ' Boxed: this indicator is published at this level.' : '');
+    b.title = b.dataset.baseTitle + (on ? ' The box around this button shows that the indicator is published at this level.' : '');
   });
 }
 
@@ -12511,15 +12669,13 @@ function _setDataLevel(level, opts) {
     if (!ovHasLevel(curOv, level)) {
       const ovTxt = ((document.getElementById('ov').selectedOptions[0] || {}).text || curOv)
                       .replace(/ · (Ward|MSOA|LSOA|Output area|LA|Borough|Local authority|Borough\/council)$/i, '');
-      const have = ovLevels(curOv).map(_levelName).join(' and ');
-      _levelToast(`<b>Not available at ${_levelName(level)} level</b><br>"${ovTxt}"<br>`
-        + (have ? `has figures at ${have} level only. Switching would leave the map unshaded.`
-                : 'has no figures to shade with.'));
+      _levelToast(_levelGateMsg(ovTxt, curOv, level));
       return;
     }
   }
 
   currentDataLevel = level;
+  _syncMapAria();
   // The borough outlines only carry a choropleth at borough level, so both
   // arriving and leaving have to repaint them.
   if (typeof restyleBorough === 'function') restyleBorough();
@@ -12541,10 +12697,12 @@ function _setDataLevel(level, opts) {
   if (level === 'msoa' && !opts.fromMsoaToggle) {
     var _ovOn = typeof curOv !== 'undefined' && curOv && curOv !== 'none';
     _dlHint(!_ovOn
-      ? 'MSOA boundaries drawn. Pick an overlay to shade them.'
+      ? 'The MSOA boundaries are shown, so pick an indicator to colour them.'
       : (ovHasLevel(curOv, 'msoa')
-          ? 'Shaded at MSOA level, which is where these figures are published.'
-          : 'MSOA boundaries only. This indicator has no MSOA figures to shade with.'),
+          ? (ovNativeLevel(curOv) === 'msoa'
+              ? 'Each MSOA is coloured by its own figure, as published.'
+              : 'Each MSOA is coloured by its own figure.')
+          : 'The MSOA boundaries are shown, but this indicator has no MSOA figures to colour them by.'),
       3600);
   }
 
@@ -12676,7 +12834,8 @@ document.querySelectorAll('#dl-seg button').forEach(b => {
     // ward choropleth underneath is what you are actually reading.
     if (t.checked && typeof curOv !== 'undefined' && curOv && curOv !== 'none'
         && typeof ovHasLevel === 'function' && !ovHasLevel(curOv, 'msoa')) {
-      _dlHint('MSOA boundaries drawn. The shading is still ward-level: this indicator has no MSOA figures.', 4200);
+      _dlHint('The MSOA boundaries are shown, but the colours are still by ' +
+        _levelName(currentDataLevel) + ' because this indicator has no MSOA figures.', 4200);
       return;
     }
     _setDataLevel(t.checked ? 'msoa' : 'ward', { fromMsoaToggle: true });
@@ -12768,7 +12927,28 @@ function _announce(text) {
   setTimeout(() => { el.textContent = text; }, 60);
 }
 
+/* The map's accessible name says what it is showing: the place, the size of
+   area and the indicator, so it changes whenever any of those does. */
+function _syncMapAria() {
+  const el = document.getElementById('map');
+  if (!el) return;
+  try {
+    const where = (typeof focusActive === 'function' && focusActive() && focusLabel()) || PH_AREA;
+    const lv = _activeLevel();
+    const ov = _activeOv();
+    let t = 'Map of ' + where + ' by ' + _levelName(lv);
+    if (ov && ov !== 'none') {
+      t += ', coloured by ' + indLabel(ov);
+      if (typeof bivOn === 'function' && bivOn()) t += ' compared with ' + indLabel(curOv2);
+    } else {
+      t += ', with no indicator chosen';
+    }
+    el.setAttribute('aria-label', t + '.');
+  } catch (e) { /* keeps the last name it had */ }
+}
+
 function _refreshUI() {
+  _syncMapAria();
   try {
     // --- Digest line ---
     const dig = document.getElementById('vs-digest');
@@ -13872,7 +14052,7 @@ function _pngScopeBounds() {
 // ── Export dialog modal ─────────────────────────────────────────────────
 // Tiny modal helper: takes a title + array of options + fires the chosen
 // option's onClick. Used for both PNG and CSV export pickers.
-function _exportDialog(title, options, extras) {
+function _exportDialog(title, options, extras, sub) {
   return new Promise(resolve => {
     const back = document.createElement('div');
     back.style.cssText = 'position:fixed;inset:0;background:rgba(20,20,20,.45);z-index:99999;display:flex;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif';
@@ -13880,7 +14060,7 @@ function _exportDialog(title, options, extras) {
     modal.style.cssText = 'background:#fff;border-radius:8px;box-shadow:0 12px 36px rgba(0,0,0,.25);padding:18px 20px;min-width:340px;max-width:480px';
     modal.innerHTML = `
       <div style="font-size:var(--t-lg);font-weight:600;color:#1a1a1a;margin-bottom:4px">${title}</div>
-      <div style="font-size:var(--t-sm);color:var(--ink-2);margin-bottom:14px">Pick what you want in the file.</div>
+      <div style="font-size:var(--t-sm);color:var(--ink-2);margin-bottom:14px">${sub || 'Pick what you want in the file.'}</div>
       <div class="ed-options"></div>
       ${extras ? `<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--line-2)">${extras}</div>` : ''}
       <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">
@@ -13932,6 +14112,12 @@ async function _prepareScreenForScreenshot(opts) {
 
   const savedCenter = map.getCenter();
   const savedZoom = map.getZoom();
+  // The header and the side panel go first, so the map is framed at the size
+  // it will be shown at. On a phone the button is in the drawer, which is
+  // closed too, so Done comes back to the map rather than to the drawer.
+  if (window.PH_DRAWER && PH_DRAWER.isOpen && PH_DRAWER.isOpen()) PH_DRAWER.close();
+  document.body.classList.add('presenting');
+  try { map.invalidateSize({ animate: false }); } catch (e) { /* no-op */ }
   const dlBadge = document.getElementById('dl-badge');
   const dlPrevVis = dlBadge ? dlBadge.style.visibility : '';
   const ctrlCorners = Array.from(document.querySelectorAll(
@@ -14002,26 +14188,42 @@ async function _prepareScreenForScreenshot(opts) {
 
   // Show banner with instructions + Done button.
   const banner = document.createElement('div');
-  banner.style.cssText = 'position:fixed;top:14px;left:50%;transform:translateX(-50%);background:#1a2640;color:#fff;padding:10px 18px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.3);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;font-size:13px;z-index:99998;display:flex;align-items:center;gap:14px';
-  banner.innerHTML = `
-    <span><strong>Screen ready for screenshot</strong> — use <kbd style="background:#fff;color:#1a2640;padding:2px 6px;border-radius:3px;font-family:monospace;font-size:var(--t-xs)">Win + Shift + S</kbd> (Windows) or <kbd style="background:#fff;color:#1a2640;padding:2px 6px;border-radius:3px;font-family:monospace;font-size:var(--t-xs)">Cmd + Shift + 4</kbd> (Mac), then click Done.</span>
-    <button id="screenshot-done" style="padding:6px 14px;border:1px solid #fff;background:#fff;color:#1a2640;border-radius:5px;font-size:var(--t-sm);font-weight:600;cursor:pointer">Done</button>`;
+  banner.setAttribute('role', 'region');
+  banner.setAttribute('aria-label', 'Presentation view');
+  banner.style.cssText = 'position:fixed;top:14px;left:50%;transform:translateX(-50%);background:#1a2640;color:#fff;padding:10px 18px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.3);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;font-size:13px;z-index:99998;display:flex;align-items:center;gap:14px;width:max-content;max-width:calc(100vw - 32px);box-sizing:border-box';
+  const kbd = t => '<kbd style="background:#fff;color:#1a2640;padding:2px 6px;border-radius:3px;font-family:monospace;font-size:var(--t-xs);white-space:nowrap">' + t + '</kbd>';
+  // Keyboard shortcuts only where there is a keyboard to press them on.
+  const touch = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+  banner.innerHTML = '<span>' + (touch
+    ? 'The map is ready for your screenshot, so take one in the usual way on your device and then select Done.'
+    : 'The map is ready for your screenshot. Press ' + kbd('Win + Shift + S') + ' on Windows or ' +
+      kbd('Cmd + Shift + 4') + ' on a Mac, and then select Done or press ' + kbd('Esc') + '.') + '</span>' +
+    '<button type="button" id="screenshot-done" style="padding:6px 14px;border:1px solid #fff;background:#fff;color:#1a2640;border-radius:5px;font-size:var(--t-sm);font-weight:600;cursor:pointer">Done</button>';
   document.body.appendChild(banner);
 
+  const onKey = e => { if (e.key === 'Escape' && _screenshotState) { e.preventDefault(); _screenshotState.cleanup(); } };
+  document.addEventListener('keydown', onKey);
   _screenshotState = {
     cleanup: () => {
+      document.removeEventListener('keydown', onKey);
       try { if (whiteOverlay) map.removeLayer(whiteOverlay); } catch(e) {}
       if (tipStyle.parentNode) tipStyle.parentNode.removeChild(tipStyle);
       if (dlBadge) dlBadge.style.visibility = dlPrevVis;
       ctrlCorners.forEach((el, i) => { el.style.visibility = ctrlPrevVis[i] || ''; });
+      document.body.classList.remove('presenting');
+      try { map.invalidateSize({ animate: false }); } catch (e) {}
       if (movedMap) {
         try { map.setView(savedCenter, savedZoom, { animate: false }); } catch (e) {}
       }
       if (banner.parentNode) banner.parentNode.removeChild(banner);
       _screenshotState = null;
+      // Back to the button that started it, which is visible again.
+      const b = document.getElementById('tb-png');
+      if (b && b.offsetParent) b.focus();
     }
   };
   banner.querySelector('#screenshot-done').addEventListener('click', () => _screenshotState && _screenshotState.cleanup());
+  banner.querySelector('#screenshot-done').focus();
 }
 
 (function _wireExportButtons() {
@@ -14048,15 +14250,17 @@ async function _prepareScreenForScreenshot(opts) {
     const focused = (typeof focusLabel === 'function') ? focusLabel() : null;
     const opts = [
       { key: 'prepare-current', label: 'This view',
-        desc: 'Keeps your current pan and zoom, whitens everything outside ' + PH_AREA + ' and clears the controls out of the way.' },
+        desc: 'Keeps the map where it is now, with everything outside ' + PH_AREA + ' turned white.' },
       { key: 'prepare-london', label: 'All of ' + PH_AREA + ', framed',
-        desc: 'Refits to the whole ' + PH_AREA + ' footprint first, then whitens everything outside it.' },
+        desc: 'Fits the whole of ' + PH_AREA + ' to the screen, with everything outside it turned white.' },
     ];
     if (focused) opts.push({
       key: 'prepare-borough', label: `Just ${focused}, framed`,
-      desc: 'Refits to the area you have focused and whitens everything outside it.'
+      desc: 'Fits the area you have focused to the screen, with everything outside it turned white.'
     });
-    const choice = await _exportDialog('Prepare the map for a screenshot', opts);
+    const choice = await _exportDialog('Presentation view', opts, null,
+      'The panels and controls are hidden so the map can be shown on its own. Choose how to frame it, ' +
+      'and select Done or press Esc when you have finished.');
     if (!choice) return;
     const mode = choice.key === 'prepare-london' ? 'nwl'
                : choice.key === 'prepare-borough' ? 'borough'
@@ -14189,7 +14393,7 @@ document.querySelectorAll('.sb-tab').forEach(t => {
     const pop = document.createElement('div');
     pop.className = 'help-pop';
     pop.setAttribute('role', 'dialog');
-    pop.setAttribute('aria-label', 'Explanation');
+    pop.setAttribute('aria-label', btn.getAttribute('aria-label') || 'Explanation');
     const x = document.createElement('button');
     x.type = 'button';
     x.className = 'help-pop-x';
@@ -15191,16 +15395,23 @@ var PH_SHOW = {
      against the ward polygon.
      ───────────────────────────────────────────────────────────────────────── */
   // `one` is the singular for the readback sentence. Stripping a trailing s
-  // off the plural gets "pharmacie", so they are written out.
+  // off the plural gets "pharmacie", so they are written out. `many` is the
+  // plural for the middle of a sentence, so "GP" keeps its capitals where
+  // lower-casing the label would give "gp practices".
   var SERVICES = [
-    { id: 'gp',       label: 'GP practices',      one: 'GP practice',      mode: 'pip',       glob: 'GPS' },
-    { id: 'pharmacy', label: 'Pharmacies',        one: 'pharmacy',         mode: 'pip',       src: 'pharmacies.json' },
-    { id: 'hospital', label: 'Hospitals',         one: 'hospital',         mode: 'pip',       glob: 'HOSP' },
-    { id: 'dentist',  label: 'Dental practices',  one: 'dental practice',  mode: 'pip',       src: 'dental_practices.json' },
+    { id: 'gp',       label: 'GP practices',      one: 'GP practice',      many: 'GP practices',     mode: 'pip',       glob: 'GPS' },
+    { id: 'pharmacy', label: 'Pharmacies',        one: 'pharmacy',         many: 'pharmacies',       mode: 'pip',       src: 'pharmacies.json' },
+    { id: 'hospital', label: 'Hospitals',         one: 'hospital',         many: 'hospitals',        mode: 'pip',       glob: 'HOSP' },
+    { id: 'dentist',  label: 'Dental practices',  one: 'dental practice',  many: 'dental practices', mode: 'pip',       src: 'dental_practices.json' },
   ];
   function serviceById(id) {
     for (var i = 0; i < SERVICES.length; i++) if (SERVICES[i].id === id) return SERVICES[i];
     return null;
+  }
+  // "3 GP practices", "1 pharmacy".
+  function serviceCount(id, n) {
+    var s = serviceById(id) || { one: id, many: id };
+    return n + ' ' + (n === 1 ? s.one : s.many);
   }
 
   // Bounding box per ward, so a point is tested against the handful of wards
@@ -15634,6 +15845,9 @@ var PH_SHOW = {
     }
     var rec = wardRec(wn);
     var w = { name: wn, inds: (rec && rec.indicators) || {}, lad: (rec && rec.lad) || '' };
+    // A note left by the last ward (a blocked report, a full set of pins)
+    // was about that ward, not this one.
+    if (currentWard !== wn) sheet.querySelectorAll(':scope > .ph-note').forEach(function (n) { n.remove(); });
     currentWard = wn;
 
     nameEl.textContent = wn;
@@ -15832,7 +16046,9 @@ var PH_SHOW = {
     var at = pinned.indexOf(target);
     if (at !== -1) pinned.splice(at, 1);
     else if (pinned.length >= PIN_MAX) {
-      alert('Four ' + cmpLvl().many + ' is the most that fit side by side. Remove one before pinning another.');
+      if (sheetState !== 0) { sheetState = 0; applyState(); }
+      phNote(pinBtn, 'You have pinned four ' + cmpLvl().many + ', which is as many as fit side by side, ' +
+        'so please remove one in Compare before pinning another.', { after: headEl, ms: 8000 });
       return;
     } else pinned.push(target);
     if (sheetState !== 0) { sheetState = 0; applyState(); }
@@ -15842,7 +16058,11 @@ var PH_SHOW = {
   pdfBtn.addEventListener('click', function (e) {
     e.stopPropagation();
     if (!currentWard) return;
-    if (typeof generateWardReport === 'function') generateWardReport(currentWard, { autoPrint: true });
+    if (typeof generateWardReport === 'function') generateWardReport(currentWard, {
+      autoPrint: true, anchor: pdfBtn, noteAfter: headEl,
+      // The note sits under the header, so the sheet opens far enough to show it.
+      onBlocked: function () { if (sheetState !== 0) { sheetState = 0; applyState(); } },
+    });
   });
 
   profBtn.addEventListener('click', function (e) {
@@ -16164,22 +16384,24 @@ var PH_SHOW = {
       }).join('');
     }
     var subEl = $('cmp-sub');
+    var maxWord = { 2: 'two', 3: 'three', 4: 'four' }[PIN_MAX] || PIN_MAX;
     if (subEl) {
       subEl.textContent = (cmpLevel === 'ward' || cmpLevel === 'lsoa')
-        ? 'Pin up to ' + PIN_MAX + ' ' + lvl.many + ', live on the map'
-        : 'Up to ' + PIN_MAX + ' ' + lvl.many + ', added up from their wards';
+        ? 'Pin up to ' + maxWord + ' ' + lvl.many + ' to see them side by side.'
+        : 'Choose up to ' + maxWord + ' ' + lvl.many + ' to see them side by side, with each ' +
+          lvl.one + '\u2019s figures worked out from its wards.';
     }
     var pinLbl = $('cmp-pin-lbl');
     if (pinLbl) pinLbl.innerHTML = 'Pinned ' + capsPlural(lvl.many);
 
     if (!pinned.length) {
       cmpPinsEl.innerHTML = '<div class="cmp-empty">' + (cmpLevel === 'ward'
-        ? 'Nothing pinned yet. Click a ward on the map and it will be added here, or use ' +
-          '"Pin to compare" on the ward bar.'
+        ? 'Nothing is pinned yet, so select a ward on the map to add it here, or use ' +
+          'the Pin to compare button on the ward\u2019s panel.'
         : cmpLevel === 'lsoa'
-        ? 'Nothing pinned yet. Select an LSOA on the map and it will be added here.'
-        : 'Nothing pinned yet. Choose ' + lvl.a +
-          ' below, or click anywhere on the map and the one you clicked in is added.') +
+        ? 'Nothing is pinned yet, so select an LSOA on the map to add it here.'
+        : 'Nothing is pinned yet, so choose ' + lvl.a +
+          ' from the list below, or select anywhere on the map to add the ' + lvl.one + ' it falls in.') +
         '</div>';
     } else {
       cmpPinsEl.innerHTML = pinned.map(function (n, i) {
@@ -16193,7 +16415,7 @@ var PH_SHOW = {
           '</div>';
       }).join('') +
       (pinned.length < PIN_MAX && cmpLevel === 'ward'
-        ? '<div class="cmp-addhint">Click a ward on the map to add another</div>' : '');
+        ? '<div class="cmp-addhint">Select a ward on the map to add another.</div>' : '');
     }
 
     var pick = $('cmp-picker');
@@ -16219,7 +16441,7 @@ var PH_SHOW = {
     cmpMetricsEl.innerHTML = cmpMetrics.map(function (m, i) {
       var have = indicatorKeys().indexOf(m.k) !== -1;
       return '<span class="q-chip' + (m.on && have ? ' on' : '') + '" data-metric="' + i + '"' +
-        (have ? '' : ' style="opacity:.45;cursor:not-allowed" title="Not in the loaded data"') +
+        (have ? '' : ' style="opacity:.45;cursor:not-allowed" title="There are no figures for this indicator here"') +
         ' role="button" tabindex="0">' + esc(labelOf(m.k)) + '</span>';
     }).join('') +
       '<select class="q-chip outline" id="cmp-add-metric" aria-label="Add an indicator">' +
@@ -16227,6 +16449,11 @@ var PH_SHOW = {
 
     cmpQuickEl.innerHTML = quickView();
     renderCmpCaution();
+    // In place of alert boxes: the buttons wait until there is something to
+    // compare or download, and the quick view above them says what that takes.
+    var openBtn = $('cmp-open'), csvBtn = $('cmp-csv');
+    if (openBtn) openBtn.disabled = pinned.length < 2;
+    if (csvBtn) csvBtn.disabled = !pinned.length;
   }
 
   /**
@@ -16240,7 +16467,9 @@ var PH_SHOW = {
   function quickView() {
     var lvl = cmpLvl();
     if (pinned.length < 2) {
-      return 'Pin at least two ' + lvl.many + ' to compare them. Each one keeps its colour on the map.';
+      return pinned.length
+        ? 'Pin one more ' + lvl.one + ' to compare it with the first, and each one keeps its colour on the map.'
+        : 'Pin two or more ' + lvl.many + ' to compare them, and each one keeps its colour on the map.';
     }
     var bits = [];
     var decs = pinned.map(function (n) { return num(cmpIndsOf(n).imd_decile_mean); })
@@ -16401,8 +16630,9 @@ var PH_SHOW = {
         '<div class="cmp-c-nm">' + esc(n) + '</div>' + rows + '</div>';
     }).join('') +
       (pinned.length < PIN_MAX
-        ? '<div class="cmp-card add">Click ' + (cmpLevel === 'ward' ? 'a ward' : 'the map') +
-          ' to pin ' + (cmpLevel === 'ward' ? 'it' : 'the ' + lvl.one + ' you click in') + '</div>' : '');
+        ? '<div class="cmp-card add">' + ((cmpLevel === 'ward' || cmpLevel === 'lsoa')
+            ? 'Select ' + lvl.a + ' on the map to pin it'
+            : 'Select anywhere on the map to pin the ' + lvl.one + ' it falls in') + '</div>' : '');
 
     $('cmp-bar-title').textContent = pinned.length
       ? 'Comparing ' + pinned.length + ' ' + (pinned.length === 1 ? lvl.one : lvl.many)
@@ -16415,7 +16645,7 @@ var PH_SHOW = {
         'The arrows mark the highest and lowest of the ' +
         (pinned.length === 1 ? 'pinned area' : pinned.length + ' pinned areas') +
         ', not the best and worst: all of them can be high, or all of them low.'
-      : 'No indicators chosen.';
+      : 'No indicators are chosen yet, so pick one under Indicators in the Compare panel.';
   }
 
   function openCompareBar() {
@@ -16479,7 +16709,8 @@ var PH_SHOW = {
       renderComparePane(); renderCompareBar();
     });
     $('cmp-open').addEventListener('click', function () {
-      if (pinned.length < 2) { alert('Pin at least two wards to compare them.'); return; }
+      // Disabled below two pins; the quick view says so.
+      if (pinned.length < 2) return;
       renderCompareBar(); openCompareBar();
     });
     $('cmp-csv').addEventListener('click', cmpCsv);
@@ -16579,7 +16810,8 @@ var PH_SHOW = {
      uses the same geography. Units ride in the column headings. */
   function cmpCsv() {
     var lvl = cmpLvl();
-    if (!pinned.length) { alert('Pin at least one ' + lvl.one + ' first.'); return; }
+    // Disabled with nothing pinned; the quick view says so.
+    if (!pinned.length) return;
     var mets = cmpActive();
     var added = (cmpLevel === 'borough' || cmpLevel === 'icb');
     var head = ['code', 'name'];
@@ -16905,7 +17137,10 @@ var PH_SHOW = {
       dirShowOnMap(dirFiltered[+row.getAttribute('data-i')]);
     });
     $('dir-csv').addEventListener('click', function () {
-      if (!dirFiltered.length) { alert('Nothing to export.'); return; }
+      if (!dirFiltered.length) {
+        phNote($('dir-csv'), 'Nothing matches your search, so there is nothing to download yet.', { ms: 6000 });
+        return;
+      }
       var lines = [['name', 'type', 'address', 'postcode', 'LA', 'lat', 'lng']
         .map(csvCell).join(',')];
       dirFiltered.forEach(function (r) {
@@ -17866,14 +18101,19 @@ var PH_SHOW = {
     countEl.firstElementChild.innerHTML = rbSelected.length
       ? '<strong>' + agg.lsoas + '</strong> LSOA' + (agg.lsoas === 1 ? '' : 's') +
         ' · <strong>' + Math.round(agg.population).toLocaleString() + '</strong> residents'
-      : 'Nothing selected yet';
+      : 'No LSOAs added yet';
     clearBtn.hidden = !rbSelected.length;
+    // The buttons wait for an LSOA; the empty state below says how to add one.
+    ['rb-report', 'rb-csv', 'rb-link'].forEach(function (id) {
+      var b = $(id);
+      if (b) b.disabled = !rbSelected.length;
+    });
 
     var sumEl = $('rb-summary');
     if (!rbSelected.length) {
-      sumEl.innerHTML = '<div class="rb-empty">Switch on the LSOA (small area) layer and click the ' +
-        'areas you want. The figures for whatever you pick are totalled up here, and you can ' +
-        'open them as a report or take them away as a CSV.</div>';
+      sumEl.innerHTML = '<div class="rb-empty">Nothing is in your area yet. Once you select an LSOA ' +
+        'on the map, the combined figures appear here, ready to open as a printable report or ' +
+        'download as a spreadsheet.</div>';
     } else {
       var i = agg.indicators;
       sumEl.innerHTML = '<div class="rb-group"><h3>This area</h3><div class="rb-stats">' +
@@ -17996,7 +18236,8 @@ var PH_SHOW = {
   }
 
   function rbCsv() {
-    if (!rbSelected.length) { alert('Pick some LSOAs first.'); return; }
+    // Disabled until an LSOA is added (see renderReportPane).
+    if (!rbSelected.length) return;
     var agg = rbAggregate();
     var keys = Object.keys(agg.indicators).sort();
     var lines = [];
@@ -18022,7 +18263,7 @@ var PH_SHOW = {
   }
 
   function rbReport() {
-    if (!rbSelected.length) { alert('Pick some LSOAs first.'); return; }
+    if (!rbSelected.length) return;
     var agg = rbAggregate();
     var bs = rbBoroughs();
     var boroughLine = Object.keys(bs).sort().map(function (b) {
@@ -18095,7 +18336,7 @@ var PH_SHOW = {
       '<button onclick="window.close()">Close</button></div></body></html>';
 
     var w = window.open('', '_blank');
-    if (!w) { alert('Please allow pop-ups to open the report.'); return; }
+    if (!w) { _reportBlocked($('rb-report'), null, function () { _openReportHere(html); }); return; }
     w.document.open(); w.document.write(html); w.document.close();
   }
 
@@ -18411,20 +18652,32 @@ var PH_SHOW = {
         e.preventDefault(); e.target.click();
       }
     });
+    // Inline notes rather than alert boxes, under the two buttons.
+    function cbNotReady(btn) {
+      var msg = !Object.keys(cbCols).length
+        ? 'Tick at least one figure above, and each one becomes a column in the file.'
+        : _cbPending[cbLevel]
+        ? 'The ' + CB_LEVELS[cbLevel].label + ' figures are not ready yet, so please try again in a few seconds.'
+        : '';
+      if (msg) phNote(btn, msg, { ms: 6000 });
+      return !!msg;
+    }
     $('cb-download').addEventListener('click', function () {
-      if (!Object.keys(cbCols).length) { alert('Choose at least one figure first.'); return; }
-      if (_cbPending[cbLevel]) { alert('Still fetching the ' + CB_LEVELS[cbLevel].label + ' figures. Try again in a moment.'); return; }
+      if (cbNotReady($('cb-download'))) return;
       var out = cbBuild();
       var nm = 'pophealth-' + cbLevel + (cbScope ? '-' + cbScope.replace(/[^A-Za-z0-9]+/g, '-') : '');
       download(nm.toLowerCase() + '.csv', out.text, 'text/csv;charset=utf-8');
     });
     $('cb-preview').addEventListener('click', function () {
-      if (!Object.keys(cbCols).length) { alert('Choose at least one figure first.'); return; }
-      if (_cbPending[cbLevel]) { alert('Still fetching the ' + CB_LEVELS[cbLevel].label + ' figures. Try again in a moment.'); return; }
+      if (cbNotReady($('cb-preview'))) return;
       var out = cbBuild();
       var rows = out.text.split('\n').slice(0, 11);
       var w = window.open('', '_blank');
-      if (!w) { alert('Please allow pop-ups to see the preview.'); return; }
+      if (!w) {
+        phNote($('cb-preview'), 'Your browser blocked the preview window, so please allow pop-ups ' +
+          'for this site, or download the CSV and open it instead.');
+        return;
+      }
       var tbl = rows.map(function (r, ri) {
         var cells = r.split(',').map(function (c) {
           return '<' + (ri ? 'td' : 'th') + '>' + esc(c.replace(/^"|"$/g, '')) +
@@ -18473,8 +18726,8 @@ var PH_SHOW = {
       profTab.disabled = lock;
       profTab.setAttribute('aria-disabled', lock ? 'true' : 'false');
       profTab.title = lock
-        ? 'Not while Compare is open: clicking the map pins an area instead. '
-          + 'Leave Compare to read one area on its own.'
+        ? 'The Area profile is closed while Compare is open, because selecting the map pins '
+          + 'an area instead. Leave Compare to read one area on its own.'
         : '';
       if (lock && profTab.classList.contains('active')) sidebarTab('overlay');
     }
@@ -18631,7 +18884,7 @@ var PH_SHOW = {
   }
   function renderConds() {
     if (!q.conds.length) {
-      qCondsEl.innerHTML = '<div class="q-sub" style="margin:0">No conditions yet. Every ward in scope will match.</div>';
+      qCondsEl.innerHTML = '<div class="q-sub" style="margin:0">There are no conditions yet, so every ward in the area you chose will match.</div>';
       return;
     }
     qCondsEl.innerHTML = q.conds.map(function (c, idx) {
@@ -18745,6 +18998,12 @@ var PH_SHOW = {
   qServicesEl.addEventListener('click', function (e) {
     var chip = e.target.closest('[data-svc]');
     if (!chip) return;
+    // Choosing a service is a clear enough sign that the step is wanted, so a
+    // chip switches step 1 on rather than doing nothing while it is off.
+    if (qUseServices && !qUseServices.checked) {
+      qUseServices.checked = true;
+      applyServicesToggle(true, false);
+    }
     var id = chip.getAttribute('data-svc');
     var at = q.services.indexOf(id);
     if (at === -1) q.services.push(id); else q.services.splice(at, 1);
@@ -18838,13 +19097,18 @@ var PH_SHOW = {
     var unit = function (n, label) {
       return '<span style="white-space:nowrap"><strong>' + n + '</strong> ' + esc(label) + '</span>';
     };
-    var bits = [unit(rows.length, 'ward' + (rows.length === 1 ? '' : 's'))];
-    q.services.forEach(function (id) {
-      bits.push(unit(Math.round(svcTotals[id]), serviceById(id).label.toLowerCase()));
+    // "12 wards match, with 34 GP practices and 21 pharmacies between them."
+    var svcBits = q.services.map(function (id) {
+      var n = Math.round(svcTotals[id]);
+      var s = serviceById(id);
+      return unit(n, n === 1 ? s.one : s.many);
     });
     qBarEl.innerHTML = rows.length
-      ? bits.join(' <span style="color:var(--ink-3)">·</span> ')
-      : '<span class="q-empty">No ward matches every condition.</span>';
+      ? '<span>' + unit(rows.length, 'ward' + (rows.length === 1 ? '' : 's')) + ' match' + (rows.length === 1 ? 'es' : '') +
+        (svcBits.length ? ', with ' + _andList(svcBits) + ' between them' : '') + '.</span>'
+      : '<span class="q-empty" id="q-csv-why">No ward meets every condition, so try loosening one of them.</span>';
+    var csvBtn = $('q-csv');
+    if (csvBtn) csvBtn.disabled = !rows.length;
 
     var sortLbl = headerOf(q.sort);
     var html = rows.slice(0, 200).map(function (r, i) {
@@ -18852,20 +19116,23 @@ var PH_SHOW = {
       return '<div class="q-row" data-ward="' + esc(r.name) + '">' +
         '<span class="q-rank">' + String(i + 1).padStart(2, '0') + '</span>' +
         '<span class="q-nm">' + esc(r.name) + '<small>' + esc(r.lad) +
-          (r.counts.length ? ' · ' + r.counts.join(' / ') : '') + '</small></span>' +
+          (r.counts.length ? ' · ' + r.counts.map(function (n, si) {
+            return serviceCount(q.services[si], n);
+          }).join(', ') : '') + '</small></span>' +
         '<span class="q-v">' + v + '</span>' +
         '</div>';
     }).join('');
 
     if (rows.length > 200) {
       html += '<div class="ws-note" style="padding:8px 12px">Showing the first 200 of ' +
-        rows.length + ' matches. Narrow the query or export the CSV for the rest.</div>';
+        rows.length + ' matching wards, so narrow the query or download the CSV to see the rest.</div>';
     }
     if (rows.length) {
-      html += '<div class="ws-note" style="padding:8px 12px">Sorted by ' + esc(sortLbl) + '. ' +
-        (q.services.length ? 'Counts after each ward name are ' +
-          esc(q.services.map(function (id) { return serviceById(id).label.toLowerCase(); }).join(' / ')) + '. ' : '') +
-        'Service counts other than pharmacies are a spatial test against the ward polygon.</div>';
+      // Built from the services chosen, so it names only what is counted.
+      html += '<div class="ws-note" style="padding:8px 12px">Sorted by ' + esc(sortLbl) + '.' +
+        (q.services.length ? ' The numbers after each ward name show how many ' +
+          esc(_andList(q.services.map(function (id) { return serviceById(id).many; }))) +
+          ' are inside its boundary.' : '') + '</div>';
     }
     if (skipped) {
       html += '<div class="q-caution" style="margin:8px 12px">' + skipped +
@@ -18948,13 +19215,15 @@ var PH_SHOW = {
       applyServicesToggle(false, false);
     }
     renderBuilder();
-    qBarEl.innerHTML = '<span class="q-empty">No query run yet.</span>';
+    qBarEl.innerHTML = '<span class="q-empty" id="q-csv-why">Run the query to see the wards that match.</span>';
     qResEl.innerHTML = '';
+    $('q-csv').disabled = true;
     drawMatches([]);
   });
   $('q-csv').addEventListener('click', function () {
     var rows = q._rows;
-    if (!rows || !rows.length) { alert('Run a query first.'); return; }
+    // Disabled until a query has matched something; the result bar says why.
+    if (!rows || !rows.length) return;
     var condKeys = q.conds.filter(function (c) { return c.key && c.value != null; })
                           .map(function (c) { return c.key; });
     // The E05 code first: ward names repeat across boroughs, so the code is

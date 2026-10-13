@@ -155,11 +155,63 @@ const setOv = (page, k) => page.evaluate(k => {
       cmp.n + ' options; twins ' + cmp.twins.join(', ') + '; repeats ' + cmp.repeats.join(', '));
     ok(cmp.chips.indexOf('Social renting') !== -1 && !cmp.levels.some(l => /board/i.test(l)),
       'Compare names indicators and ICBs by their one name', cmp.chips.join(', ') + ' / ' + cmp.levels.join(', '));
+    // Help, hints, tool intros and messages (workplan 2.2): no alert boxes,
+    // no "click" in text both phones and desktops show, help buttons named
+    // for their topic, each tool opening with one sentence, and buttons that
+    // wait for something to act on rather than raising an alert.
+    const noAlert = f => !/\balert\s*\(/.test(fs.readFileSync(path.join(ROOT, f), 'utf8'));
+    ok(noAlert('index.html') && noAlert('data/map/assistant.js'), 'no alert boxes left');
+    const w22 = await page.evaluate(() => {
+      const sentences = t => (t.match(/[.!?](\s|$)/g) || []).length;
+      const shown = [...document.querySelectorAll('[title], [aria-label], [placeholder]')]
+        .filter(e => !e.closest('#wpanel, #tour-strip'))
+        .map(e => [e.getAttribute('title'), e.getAttribute('aria-label'), e.getAttribute('placeholder')].filter(Boolean).join(' '))
+        .concat(['tab-query', 'tab-compare', 'tab-report'].map(id => document.getElementById(id).textContent));
+      const intros = [document.querySelector('#tab-query .q-sub').firstChild.textContent,
+        document.getElementById('cmp-sub').textContent, document.querySelector('#tab-report .rb-hint').textContent]
+        .map(t => t.replace(/\s+/g, ' ').trim());
+      return {
+        helps: [...document.querySelectorAll('.lhelp')].map(b => b.getAttribute('aria-label') || b.textContent.trim())
+          .filter(n => !n || n === '?' || /^explain/i.test(n)),
+        click: shown.filter(t => /\bclick/i.test(t.replace(/double-click/gi, ''))),
+        intros, oneSentence: sentences(intros[0]) === 1 && sentences(intros[1]) === 1 && sentences(intros[2]) <= 2,
+        dashes: intros.filter(t => /[–—]/.test(t)),
+        waiting: ['cmp-open', 'cmp-csv', 'q-csv', 'rb-report', 'rb-csv'].filter(id => !document.getElementById(id).disabled),
+      };
+    });
+    ok(!w22.helps.length, 'every help button is named for its topic', w22.helps.join(', '));
+    ok(!w22.click.length, 'no shared text says "click"', w22.click.slice(0, 3).join(' | '));
+    ok(w22.oneSentence && !w22.dashes.length, 'Query, Compare and Custom area each open with one sentence', w22.intros.join(' | '));
+    ok(!w22.waiting.length, 'tool buttons wait until there is something to act on', 'enabled: ' + w22.waiting.join(', '));
     await page.click('.mode-btn[data-mode="explore"]');
     await page.waitForTimeout(500);
     // A ward clicked opens its sheet.
     await setOv(page, 'crime_rate_per_1000');
     await page.waitForTimeout(2000);
+    // The map's name follows the level and the indicator, and a level the
+    // indicator lacks is refused in words that say which ones will work.
+    ok(await page.evaluate(() => document.getElementById('map').getAttribute('aria-label')) ===
+      'Map of London by ward, coloured by Crime rate per 1,000 residents.', 'map name follows the level and indicator',
+      await page.evaluate(() => document.getElementById('map').getAttribute('aria-label')));
+    await page.click('#dl-seg button[data-dl="lsoa"]');
+    await page.waitForTimeout(300);
+    const toast = await page.evaluate(() => (document.getElementById('_level-toast') || {}).textContent || '');
+    ok(/^Crime rate per 1,000 residents is only available for LAs and wards, so it cannot be shown by LSOA\. Choose LA or Ward, or pick a different indicator\.$/.test(toast),
+      'level toast says which levels will work', toast);
+    // Presentation view hides the header and the side panel, and Esc leaves it.
+    await page.click('#tb-png');
+    await page.waitForTimeout(400);
+    await page.click('text=This view');
+    await page.waitForTimeout(800);
+    const pres = await page.evaluate(() => ({ on: document.body.classList.contains('presenting'),
+      hidden: ['.hdr', '#sidebar'].every(s => getComputedStyle(document.querySelector(s)).display === 'none'),
+      h: map.getSize().y }));
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(500);
+    const after = await page.evaluate(() => ({ on: document.body.classList.contains('presenting'),
+      shown: getComputedStyle(document.getElementById('sidebar')).display !== 'none', banner: !!document.getElementById('screenshot-done') }));
+    ok(pres.on && pres.hidden && pres.h > 700 && !after.on && after.shown && !after.banner,
+      'Presentation view hides the panels and Esc leaves it', JSON.stringify([pres, after]));
     const wpt = await page.evaluate(() => { let c = null; wLyr.eachLayer(l => { if (!c && /Bethnal|Hoxton|Stratford|Peckham/.test(l.feature.properties.WD24NM)) c = l.getBounds().getCenter(); });
       if (!c) { wLyr.eachLayer(l => { if (!c) c = l.getBounds().getCenter(); }); } const p = map.latLngToContainerPoint(c); const r = document.getElementById('map').getBoundingClientRect(); return [r.left + p.x, r.top + p.y]; });
     await page.mouse.click(wpt[0], wpt[1]);
@@ -169,7 +221,20 @@ const setOv = (page, k) => page.evaluate(k => {
     await page.click('#sbtab-layers');
     const pcn = await page.evaluate(() => document.querySelectorAll('#pcn-focus option').length);
     ok(pcn > 50, 'PCN list loaded', pcn + ' options');
+    // A blocked report window gets a note beside the button, with a link that
+    // opens the report in this tab when the reader chooses to.
+    await page.evaluate(() => { window.open = () => null; });
+    await page.click('#ws-pdf');
+    await page.waitForTimeout(400);
+    const blocked = await page.evaluate(() => { const n = document.querySelector('#ward-sheet > .ph-note'); return n ? n.textContent : ''; });
+    ok(/Your browser blocked the report window\. Open the report in this tab instead\./.test(blocked), 'blocked report offers to open in this tab', blocked);
     ok(errors.length === 0, 'no page errors (London desktop)', errors.join(' | '));
+    if (blocked) {
+      await Promise.all([page.waitForNavigation({ timeout: 30000 }).catch(() => {}), page.click('#ward-sheet > .ph-note .ph-note-open')]);
+      await page.waitForTimeout(1000);
+      const rep = await page.evaluate(() => ({ title: document.title, back: [...document.querySelectorAll('button')].some(b => b.textContent === 'Back to the map') })).catch(e => ({ title: e.message }));
+      ok(/Ward report/.test(rep.title) && rep.back, 'the report opens in this tab with a way back to the map', JSON.stringify(rep));
+    }
     await page.close();
   }
 
