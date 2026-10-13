@@ -345,6 +345,8 @@
   .hdr-region { font-size: var(--t-xs); font-weight: 600; color: var(--ink-2);
     margin-top: 1px; white-space: nowrap; }
   .hdr-region[hidden] { display: none; }
+  .hdr-tag { display: none; white-space: nowrap; color: var(--ink-3); font-size: var(--t-xs); }
+  @media (min-width: 1360px) { .hdr-tag { display: inline; } }
   .hdr-right { display: flex; align-items: center; gap: 8px; }
 
   /* ── Buttons ──
@@ -424,6 +426,12 @@
   body.presenting .hdr, body.presenting .mode-rail, body.presenting #sidebar,
   body.presenting #sb-scrim, body.presenting #viewing-strip, body.presenting #ai-toggle,
   body.presenting .ph-note-float { display: none !important; }
+  /* Everything else that sits on the map goes too, and the map's key drops
+     back to the bottom, since nothing is left for it to rise above. */
+  body.presenting .ws-sheet, body.presenting #cmp-bar, body.presenting .tour-strip,
+  body.presenting .area-peek, body.presenting #ai-panel, body.presenting #load-note,
+  body.presenting #fingertips-banner, body.presenting footer.sbar { display: none !important; }
+  body.presenting .map-wrap { --sheet-lift: 0px !important; }
   body.presenting .main { grid-template-columns: minmax(0, 1fr); }
   body.presenting .map-wrap { grid-template-rows: minmax(0, 1fr); }
 
@@ -518,14 +526,19 @@
   .load-note p { margin: 0; flex: 1 1 auto; min-width: 0; }
   .load-note .ws-btn { flex: 0 0 auto; white-space: nowrap; }
   .load-note-x { margin: -4px -4px 0 0; color: var(--tint-amber-ink); }
-  /* On a phone it spans the map beside the zoom buttons, with the close
-     button on the first line and Try again under the words. */
+  /* On a phone it spans the map right of the zoom buttons and below the
+     level badge, with the close button on the first line and Try again
+     under the words. A coarse pointer's taller badge ends 60px down, so the
+     note starts 8px below it there. */
   @media (max-width: 900px) {
-    .load-note { top: 52px; left: 54px; right: 8px; transform: none; width: auto; max-width: none;
+    .load-note { top: 52px; left: 66px; right: 8px; transform: none; width: auto; max-width: none;
       flex-wrap: wrap; }
     .load-note p { flex-basis: calc(100% - 30px); }
     .load-note-x { order: 1; }
     .load-note .ws-btn { order: 2; }
+  }
+  @media (max-width: 900px) and (pointer: coarse) {
+    .load-note { top: 68px; }
   }
 
   /* ── Persistent map legend strip ── */
@@ -2998,6 +3011,10 @@
         <!-- The region, shown only when it is not London (the default). -->
         <div class="hdr-region" id="hdr-region" hidden></div>
       </div>
+      <!-- A one-line description beside the name on wide screens, where the
+           header otherwise leaves a gap. Outside the h1 so the page's
+           heading stays the name alone. -->
+      <span class="hdr-tag">Free health map for every neighbourhood in England</span>
       <!-- Phones only. The search box lives in the drawer below 900px, which
            left the most-used control two taps away and invisible. This opens
            the drawer and puts the cursor straight in the box. -->
@@ -3320,7 +3337,7 @@
       <div class="tab-pane" id="tab-overlay" role="tabpanel" aria-labelledby="sbtab-overlay">
         <div class="sb-sec" style="flex:1;border-bottom:none;overflow-y:auto">
           <div class="sb-lbl" style="display:flex;align-items:center;gap:6px">
-            <span>Choropleth overlay</span>
+            <span>Colour the map by</span>
           </div>
 
           <!-- Tick-box picker. Built at run time from the options of the
@@ -3360,12 +3377,12 @@
               <button type="button" class="ov-back" id="ov-back">
                 <svg class="ic" aria-hidden="true"><use href="#i-chevron-left"/></svg>All themes</button>
               <h2 class="ov-tv-h" id="ov-tv-h"></h2>
-              <div class="ov-tv-key"><span class="ov-lv-nat">Boxed</span> level: as published by the source. Other levels are worked out from it.</div>
+              <div class="ov-tv-key">A <span class="ov-lv-nat">box</span> marks the level each indicator is published at, and figures at the other levels are worked out from it.</div>
               </div>
               <div class="ov-tv-list" id="ov-tv-list" role="group" aria-labelledby="ov-tv-h"></div>
               <!-- Core20 lives with the deprivation indicators it is built
                    from, and shows only in the Deprivation theme. -->
-              <div id="ov-c20" hidden style="margin-top:6px;padding:10px 10px 8px;border:1px solid var(--line-2);border-radius:8px">
+              <div id="ov-c20" hidden style="margin-top:6px;padding:10px 10px 8px;border:1px solid var(--line-2);border-radius:var(--r-md)">
                 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--t-sm);color:var(--ink);font-weight:500">
                   <input type="checkbox" id="core20-toggle" style="cursor:pointer">
                   <span>Highlight Core20<button type="button" class="lhelp" title="Core20 means the 20% most deprived LSOAs in England, the ones in deprivation deciles 1 and 2, which NHS England's Core20PLUS5 framework prioritises for targeted health action." aria-label="About Core20" aria-expanded="false">?</button> LSOAs</span>
@@ -3793,7 +3810,7 @@
               figure for one of them is left out and counted below the results.</div>
             <div id="q-conds"></div>
             <div class="q-sentence" style="margin-top:6px">
-              <span class="q-chip add" id="q-add-cond"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg>add a condition</span>
+              <span class="q-chip add" id="q-add-cond"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg>Add a condition</span>
             </div>
             <div id="q-caution"></div>
             <div class="q-readback" id="q-readback"></div>
@@ -3821,7 +3838,7 @@
         <div class="ward-scroll" id="wpanel">
           <div class="ph">
             <div class="ph-icon"><svg class="ic" aria-hidden="true"><use href="#i-pointer"/></svg></div>
-            Click any ward on the map to explore its health, crime, deprivation and service data
+            Select any area on the map to see its health, deprivation, crime and local services.
           </div>
         </div>
       </div>
@@ -3910,8 +3927,7 @@
            in this corner below the zoom buttons. -->
       <div id="fingertips-banner">
         <span class="ft-i">i</span>
-        <strong>Fingertips overlay active.</strong>
-        Some wards may show no fill — OHID Fingertips suppresses MSOA values where small counts could risk identifying individuals.
+        Some areas have no colour because OHID withholds small-area figures where small numbers could identify someone, so a blank area means the figure is missing rather than zero.
         <button id="fingertips-banner-close" title="Dismiss this notice for this session" aria-label="Dismiss this notice"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button>
       </div>
       <!-- "Area level", not "Viewing". The strip in the top-left corner of the
@@ -4036,7 +4052,7 @@
       <a class="sbar-link" id="meth-link" href="methodology.html">Methodology</a>
       <!-- On a phone the map's credits line is one line long, and this is
            where its "Data credits" link goes (workplan 2.10). -->
-      <a class="sbar-link credits-link sbar-credits" href="methodology.html">Data credits</a>
+      <a class="sbar-link credits-link sbar-credits" href="methodology.html#licences">Data credits</a>
       <a class="sbar-link" href="mailto:contact@pophealth.uk">contact@pophealth.uk</a>
       <span id="src-lbl"></span>
     </span>
@@ -4448,7 +4464,7 @@ var LOADER_MAP = {w:1000,h:771,n:704,d:'IAAAAAAAAAAAAAJAAIAAFAAAIDFEECDGGCFDCCIC
     '<p style="margin:0 0 16px;color:var(--ink-2,#4C6272)">The map for ' + esc(R.name) +
     ' has not been published. London is available now.</p>' +
     '<a href="' + esc(location.pathname) + '" style="display:inline-block;padding:8px 16px;' +
-    'border-radius:6px;background:var(--nhs-blue,#005EB8);color:#fff;text-decoration:none;' +
+    'border-radius:var(--r-sm, 6px);background:var(--nhs-blue,#005EB8);color:#fff;text-decoration:none;' +
     'font-weight:600">Open the London map</a></div>';
   document.body.appendChild(box);
 })();
@@ -5419,12 +5435,11 @@ function indTitle(k) {
 }
 function indUnit(k) {
   const m = (typeof OV_META === 'object' && OV_META) ? OV_META[k] : null;
-  const u = String((m && m.u) || '').trim();
-  return u === 'Years' ? 'years' : u;
+  return String((m && m.u) || '').trim();
 }
 /* A column heading: the label, then the unit in brackets unless the label
-   already says it. A unit with brackets of its own, "ratio (England = 100)",
-   follows a comma rather than nesting. */
+   already says it. A unit with brackets of its own follows a comma rather than
+   nesting. */
 function indHeader(k) {
   const l = indLabel(k), u = indUnit(k);
   if (!u || l.toLowerCase().indexOf(u.toLowerCase()) !== -1) return l;
@@ -5466,6 +5481,16 @@ function indDecimals(k) {
   if (/_score$/.test(key)) return 2;
   if (/_pct$|_rate$|_ugm3$|_1km$|_800m$|_mean$|^ft_/.test(key)) return 1;
   return 0;
+}
+/* A figure as a downloaded file writes it: the indicator's own decimal
+   places, no thousands separators, and an empty cell when it is missing.
+   Shared by every CSV the page writes, so a file and the map agree. */
+function indCsvValue(v, k) {
+  if (v === null || v === undefined || v === '') return '';
+  const n = typeof v === 'number' ? v : parseFloat(v);
+  if (!isFinite(n)) return String(v);
+  const s = n.toFixed(indDecimals(k));
+  return /^-0(\.0+)?$/.test(s) ? s.slice(1) : s;
 }
 /* The unit printed after a figure in a list of rows, now that labels do not
    carry it: "%" straight on, a measurement after a space, and nothing for
@@ -5686,7 +5711,21 @@ function _levelLackText(k, level) {
   const have = ovLevels(k);
   if (!have.length) return indLabel(k) + ' has no figures to colour the map with.';
   return indLabel(k) + ' is only available for ' + _andList(have.map(_levelPlural)) +
-    ', so it cannot be shown by ' + _levelName(level) + '.';
+    ', so it cannot be shown by ' + _levelName(level) + '.' + _levelTwinText(k, level);
+}
+/* Indicators listed twice in the picker under one label, once per level
+   (the ward score worked out from LSOAs, and the LSOA score itself). When
+   one cannot be drawn at a level, the message points to the other. */
+const _LEVEL_TWIN = {
+  imd_score_ward: { lsoa: ['imd_score', 'Deprivation'] },
+  imd_score:      { ward: ['imd_score_ward', 'Deprivation'] },
+};
+function _levelTwinText(k, level) {
+  const t = _LEVEL_TWIN[k] && _LEVEL_TWIN[k][level];
+  if (!t) return '';
+  const th = (window.PH_THEMES || []).find(g => g.keys.indexOf(t[0]) !== -1);
+  return ' To colour ' + _levelPlural(level) + ', choose ' + indLabel(t[0]) + ' at ' + _levelName(level) +
+    ' level in the ' + ((th && th.label) || t[1]) + ' theme.';
 }
 // The whole message as plain text, for the hint beside the level buttons.
 function _levelGateText(k, level) {
@@ -5796,7 +5835,7 @@ const OV_META = {
   // whenever it is six characters or fewer, so "0–8" rendered as if it were a
   // unit: "Better (6.8 0–8)". The scale belongs in the label and the
   // description, where it already is.
-  ptal_score:                     { src: "GLA LSOA Atlas (TfL PTAL)", yr: "2014", g: "LSOA", u: "", desc: "How well connected the area is by public transport, using the Public Transport Accessibility Level that Transport for London works out from walking times to stops and how often services run. Its nine levels, from 0 through 1a, 1b and 2 to 5 up to 6a and 6b, are numbered 0 to 8 here, so a higher figure means better access, and the figures date from 2014, before the Elizabeth line and the Northern line extension opened." },
+  ptal_score:                     { src: "GLA LSOA Atlas (TfL PTAL)", yr: "2014", g: "LSOA", u: "", desc: "How well connected the area is by public transport, using the Public Transport Accessibility Level that Transport for London works out from walking times to stops and how often services run. The nine levels (0, 1a, 1b, 2 to 5, 6a and 6b) are numbered 0 to 8 here, so a higher figure means better access. The figures date from 2014, before the Elizabeth line and the Northern line extension opened." },
   rail_station_dist_m:            { src: "TfL Unified API (London); DfT NaPTAN (elsewhere)",      yr: "as at Sep 2026", g: "LSOA", u: "m", desc: "The straight-line distance from the middle of the LSOA to the nearest railway, metro or tram station, including Underground, Overground, DLR and Elizabeth line stations in London. A real walk is longer wherever a river, a railway or a park is in the way, and stations just outside the area count, because for an LSOA near the edge the nearest one often is." },
   rail_stations_1km:              { src: "TfL Unified API (London); DfT NaPTAN (elsewhere)",      yr: "as at Sep 2026", g: "LSOA", u: "stations", desc: "The number of railway, metro and tram stations within 1 kilometre of the middle of the LSOA." },
   bus_stop_dist_m:                { src: "TfL Unified API (London); DfT NaPTAN (elsewhere)",      yr: "as at Sep 2026", g: "LSOA", u: "m", desc: "The straight-line distance from the middle of the LSOA to the nearest bus stop, where the stops on each side of a road count separately, as the stop registers list them." },
@@ -5834,27 +5873,27 @@ const OV_META = {
   ft_93114                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2016/17 - 20/21", g: "MSOA", u: "per 10,000", desc: "Emergency hospital admissions of children under 5 for injuries, whether accidental or deliberate, per 10,000 children of that age, so a lower figure is better." },
   ft_93219                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2016/17 - 20/21", g: "MSOA", u: "per 10,000", desc: "Hospital admissions of children under 15 for injuries, whether accidental or deliberate, per 10,000 children of that age, so a lower figure is better." },
   ft_93224                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2016/17 - 20/21", g: "MSOA", u: "per 10,000", desc: "Hospital admissions of young people aged 15 to 24 for injuries, whether accidental or deliberate, per 10,000 people of that age, so a lower figure is better." },
-  ft_93227                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2016/17 - 20/21", g: "MSOA", u: "ratio (England = 100)", desc: "Emergency hospital admissions for any reason, compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many admissions as expected, 120 means 20% more and 80 means 20% fewer, so a lower figure is better." },
-  ft_93229                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2016/17 - 20/21", g: "MSOA", u: "ratio (England = 100)", desc: "Emergency hospital admissions for coronary heart disease, compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many admissions as expected, 120 means 20% more and 80 means 20% fewer, so a lower figure is better." },
-  ft_93231                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2016/17 - 20/21", g: "MSOA", u: "ratio (England = 100)", desc: "Emergency hospital admissions for stroke, compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many admissions as expected, 120 means 20% more and 80 means 20% fewer, so a lower figure is better." },
-  ft_93232                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2016/17 - 20/21", g: "MSOA", u: "ratio (England = 100)", desc: "Emergency hospital admissions for heart attack (myocardial infarction), compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many admissions as expected, 120 means 20% more and 80 means 20% fewer, so a lower figure is better." },
-  ft_93233                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2016/17 - 20/21", g: "MSOA", u: "ratio (England = 100)", desc: "Emergency hospital admissions for chronic obstructive pulmonary disease (COPD), a long-term lung disease, compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many admissions as expected, 120 means 20% more and 80 means 20% fewer, so a lower figure is better." },
-  ft_93239                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2016/17 - 20/21", g: "MSOA", u: "ratio (England = 100)", desc: "Emergency hospital admissions for intentional self-harm, compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many admissions as expected, 120 means 20% more and 80 means 20% fewer, so a lower figure is better." },
-  ft_93241                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2016/17 - 20/21", g: "MSOA", u: "ratio (England = 100)", desc: "Emergency hospital admissions for hip fracture in people aged 65 and over, compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many admissions as expected, 120 means 20% more and 80 means 20% fewer, so a lower figure is better." },
-  ft_93465                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2016/17 - 20/21", g: "MSOA", u: "ratio (England = 100)", desc: "Hospital admissions where an alcohol-related condition was the main reason or a secondary diagnosis, compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many admissions as expected, 120 means 20% more and 80 means 20% fewer, so a lower figure is better." },
-  ft_93240                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2016/17 - 20/21", g: "MSOA", u: "ratio (England = 100)", desc: "Hospital admissions where the main reason was a condition caused by alcohol, which OHID calls the narrow definition, compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many admissions as expected, 120 means 20% more and 80 means 20% fewer, so a lower figure is better." },
-  ft_93283                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2019 - 23", g: "MSOA", u: "Years", desc: "The number of years a girl born in the area could expect to live, on average, if death rates at each age stayed as they were over the period, so a higher figure is better." },
-  ft_932831                     : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2019 - 23", g: "MSOA", u: "Years", desc: "The number of years a boy born in the area could expect to live, on average, if death rates at each age stayed as they were over the period, so a higher figure is better." },
-  ft_93250                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2019 - 23", g: "MSOA", u: "ratio (England = 100)", desc: "Deaths from any cause, compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many deaths as expected, 120 means 20% more and 80 means 20% fewer, so a lower figure is better." },
-  ft_93252                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2019 - 23", g: "MSOA", u: "ratio (England = 100)", desc: "Deaths from any cause among people under 75, compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many deaths as expected, 120 means 20% more and 80 means 20% fewer, so a lower figure is better." },
-  ft_93253                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2019 - 23", g: "MSOA", u: "ratio (England = 100)", desc: "Deaths from cancer, compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many deaths as expected, 120 means 20% more and 80 means 20% fewer, so a lower figure is better." },
-  ft_93254                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2019 - 23", g: "MSOA", u: "ratio (England = 100)", desc: "Deaths from cancer among people under 75, compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many deaths as expected, 120 means 20% more and 80 means 20% fewer, so a lower figure is better." },
-  ft_93255                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2019 - 23", g: "MSOA", u: "ratio (England = 100)", desc: "Deaths from cardiovascular disease, which includes heart disease and stroke, compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many deaths as expected, 120 means 20% more and 80 means 20% fewer, so a lower figure is better." },
-  ft_93256                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2019 - 23", g: "MSOA", u: "ratio (England = 100)", desc: "Deaths from cardiovascular disease among people under 75, compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many deaths as expected, 120 means 20% more and 80 means 20% fewer, so a lower figure is better." },
-  ft_93257                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2019 - 23", g: "MSOA", u: "ratio (England = 100)", desc: "Deaths from coronary heart disease, compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many deaths as expected, 120 means 20% more and 80 means 20% fewer, so a lower figure is better." },
-  ft_93259                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2019 - 23", g: "MSOA", u: "ratio (England = 100)", desc: "Deaths from stroke, compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many deaths as expected, 120 means 20% more and 80 means 20% fewer, so a lower figure is better." },
-  ft_93260                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2019 - 23", g: "MSOA", u: "ratio (England = 100)", desc: "Deaths from respiratory diseases, such as pneumonia and long-term lung disease, compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many deaths as expected, 120 means 20% more and 80 means 20% fewer, so a lower figure is better." },
-  ft_93480                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2019 - 23", g: "MSOA", u: "ratio (England = 100)", desc: "Deaths under 75 from causes that good public health and timely care could largely prevent, compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many deaths as expected, 120 means 20% more and 80 means 20% fewer, so a lower figure is better." },
+  ft_93227                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2016/17 - 20/21", g: "MSOA", u: "ratio, where England is 100", desc: "Emergency hospital admissions for any reason, compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many admissions as expected, 120 means 20% more and 80 means 20% fewer, so a lower figure is better." },
+  ft_93229                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2016/17 - 20/21", g: "MSOA", u: "ratio, where England is 100", desc: "Emergency hospital admissions for coronary heart disease, compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many admissions as expected, 120 means 20% more and 80 means 20% fewer, so a lower figure is better." },
+  ft_93231                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2016/17 - 20/21", g: "MSOA", u: "ratio, where England is 100", desc: "Emergency hospital admissions for stroke, compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many admissions as expected, 120 means 20% more and 80 means 20% fewer, so a lower figure is better." },
+  ft_93232                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2016/17 - 20/21", g: "MSOA", u: "ratio, where England is 100", desc: "Emergency hospital admissions for heart attack (myocardial infarction), compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many admissions as expected, 120 means 20% more and 80 means 20% fewer, so a lower figure is better." },
+  ft_93233                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2016/17 - 20/21", g: "MSOA", u: "ratio, where England is 100", desc: "Emergency hospital admissions for chronic obstructive pulmonary disease (COPD), a long-term lung disease, compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many admissions as expected, 120 means 20% more and 80 means 20% fewer, so a lower figure is better." },
+  ft_93239                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2016/17 - 20/21", g: "MSOA", u: "ratio, where England is 100", desc: "Emergency hospital admissions for intentional self-harm, compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many admissions as expected, 120 means 20% more and 80 means 20% fewer, so a lower figure is better." },
+  ft_93241                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2016/17 - 20/21", g: "MSOA", u: "ratio, where England is 100", desc: "Emergency hospital admissions for hip fracture in people aged 65 and over, compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many admissions as expected, 120 means 20% more and 80 means 20% fewer, so a lower figure is better." },
+  ft_93465                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2016/17 - 20/21", g: "MSOA", u: "ratio, where England is 100", desc: "Hospital admissions where an alcohol-related condition was the main reason or a secondary diagnosis, compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many admissions as expected, 120 means 20% more and 80 means 20% fewer, so a lower figure is better." },
+  ft_93240                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2016/17 - 20/21", g: "MSOA", u: "ratio, where England is 100", desc: "Hospital admissions where the main reason was a condition caused by alcohol, which OHID calls the narrow definition, compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many admissions as expected, 120 means 20% more and 80 means 20% fewer, so a lower figure is better." },
+  ft_93283                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2019 - 23", g: "MSOA", u: "years", desc: "The number of years a girl born in the area could expect to live, on average, if death rates at each age stayed as they were over the period, so a higher figure is better." },
+  ft_932831                     : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2019 - 23", g: "MSOA", u: "years", desc: "The number of years a boy born in the area could expect to live, on average, if death rates at each age stayed as they were over the period, so a higher figure is better." },
+  ft_93250                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2019 - 23", g: "MSOA", u: "ratio, where England is 100", desc: "Deaths from any cause, compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many deaths as expected, 120 means 20% more and 80 means 20% fewer, so a lower figure is better." },
+  ft_93252                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2019 - 23", g: "MSOA", u: "ratio, where England is 100", desc: "Deaths from any cause among people under 75, compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many deaths as expected, 120 means 20% more and 80 means 20% fewer, so a lower figure is better." },
+  ft_93253                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2019 - 23", g: "MSOA", u: "ratio, where England is 100", desc: "Deaths from cancer, compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many deaths as expected, 120 means 20% more and 80 means 20% fewer, so a lower figure is better." },
+  ft_93254                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2019 - 23", g: "MSOA", u: "ratio, where England is 100", desc: "Deaths from cancer among people under 75, compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many deaths as expected, 120 means 20% more and 80 means 20% fewer, so a lower figure is better." },
+  ft_93255                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2019 - 23", g: "MSOA", u: "ratio, where England is 100", desc: "Deaths from cardiovascular disease, which includes heart disease and stroke, compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many deaths as expected, 120 means 20% more and 80 means 20% fewer, so a lower figure is better." },
+  ft_93256                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2019 - 23", g: "MSOA", u: "ratio, where England is 100", desc: "Deaths from cardiovascular disease among people under 75, compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many deaths as expected, 120 means 20% more and 80 means 20% fewer, so a lower figure is better." },
+  ft_93257                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2019 - 23", g: "MSOA", u: "ratio, where England is 100", desc: "Deaths from coronary heart disease, compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many deaths as expected, 120 means 20% more and 80 means 20% fewer, so a lower figure is better." },
+  ft_93259                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2019 - 23", g: "MSOA", u: "ratio, where England is 100", desc: "Deaths from stroke, compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many deaths as expected, 120 means 20% more and 80 means 20% fewer, so a lower figure is better." },
+  ft_93260                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2019 - 23", g: "MSOA", u: "ratio, where England is 100", desc: "Deaths from respiratory diseases, such as pneumonia and long-term lung disease, compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many deaths as expected, 120 means 20% more and 80 means 20% fewer, so a lower figure is better." },
+  ft_93480                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2019 - 23", g: "MSOA", u: "ratio, where England is 100", desc: "Deaths under 75 from causes that good public health and timely care could largely prevent, compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many deaths as expected, 120 means 20% more and 80 means 20% fewer, so a lower figure is better." },
 
 };
 
@@ -6823,17 +6862,37 @@ function _cardSource(k) {
   if (/NaPTAN|TfL Unified/.test(src)) return PH_IS_LONDON ? 'TfL, register of stops and stations' : 'DfT, national register of stops (NaPTAN)';
   return src;
 }
+/* The row of the methodology page's source table that an indicator's figures
+   come from (methodology.html#src-<id>). Worked out from the publisher
+   _cardSource names, which already sorts every key, rather than from key
+   prefixes: crime_score is an IMD domain, not police data. */
+function _methAnchor(k) {
+  if (k === 'core20_lsoa_count') return 'src-core20';
+  const s = _cardSource(k) || '';
+  if (/^ONS, Census/.test(s) || /Census 2021/.test(s) && !/police/.test(s)) return 'src-census';
+  if (/^MHCLG/.test(s)) return 'src-imd';
+  if (/Local Health/.test(s)) return 'src-local-health';
+  if (/^OHID, Fingertips/.test(s)) return 'src-fingertips';
+  if (/police/.test(s)) return 'src-crime';
+  if (/claimant/.test(s)) return 'src-claimant';
+  if (/^DESNZ/.test(s)) return 'src-fuel-poverty';
+  if (/green and blue/.test(s)) return 'src-green-space';
+  if (/UK-AIR/.test(s)) return 'src-air-quality';
+  if (/PTAL|LSOA Atlas/.test(s)) return 'src-ptal';
+  if (/stops/.test(s)) return 'src-transport';
+  return 'sources';
+}
 function _cardUnit(k) {
-  if (typeof ovIsStdRatio === 'function' && ovIsStdRatio(k)) return 'A ratio, where 100 is the England level';
-  if (k === 'income_score') return 'A proportion of residents, from 0 to 1';
-  if (k === 'employment_score') return 'A proportion of working-age residents, from 0 to 1';
+  if (typeof ovIsStdRatio === 'function' && ovIsStdRatio(k)) return 'ratio, where England is 100';
+  if (k === 'income_score') return 'proportion of residents, from 0 to 1';
+  if (k === 'employment_score') return 'proportion of working-age residents, from 0 to 1';
   return indUnit(k);
 }
 /* Each acronym is spelled out the first time a card uses it, and only then.
    Written for text that names the body without "the" ("ONS publishes"), so
    the article comes with the full name. */
 const CARD_ACRONYMS = [
-  ['LA', 'local authority (LA)'],
+  ['LA', 'local authority (LA, the council area)'],
   ['OHID', 'the Office for Health Improvement and Disparities (OHID)'],
   ['ONS', 'the Office for National Statistics (ONS)'],
   ['MHCLG', 'the Ministry of Housing, Communities and Local Government (MHCLG)'],
@@ -6903,7 +6962,7 @@ function indicatorCardHTML(k) {
     row('Updates', e(updates)) +
     row('Method', e(method)) +
     '</dl>' +
-    '<a class="ic-more" href="methodology.html">Read the full methodology</a>';
+    '<a class="ic-more" href="methodology.html#' + _methAnchor(k) + '">See where these figures come from</a>';
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -6979,7 +7038,12 @@ function fmtNum(v, decimals=0) {
   if (v === null || v === undefined || v === '') return '—';
   const n = parseFloat(v);
   if (isNaN(n)) return '—';
-  return decimals > 0 ? n.toFixed(decimals) : Math.round(n).toLocaleString();
+  // Rounded once, by toFixed, and only then grouped with thousands
+  // separators, so every view shows the same digits as the hover card and
+  // the downloads (which are written without separators, see indCsvValue).
+  return decimals > 0
+    ? Number(n.toFixed(decimals)).toLocaleString('en-GB', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
+    : Math.round(n).toLocaleString('en-GB');
 }
 // ---- Overlay tooltip helpers (hover values) ----
 // The display label, from IND_NAMES (see "One name for each indicator").
@@ -7185,6 +7249,8 @@ function phSortKey(name) {
 function phWhere() {
   return /^(London|England|Yorkshire)/.test(PH_AREA) ? PH_AREA : 'the ' + PH_AREA;
 }
+// An LA's name inside a sentence: "the City of London", but "Brent".
+function ladPhrase(lad) { return (/^City of /.test(lad || '') ? 'the ' : '') + (lad || ''); }
 // Sorts in place by name, working out each sort key once rather than on
 // every comparison (the Directory sorts twenty thousand names).
 function phSortByName(arr, nameOf) {
@@ -7607,7 +7673,7 @@ if (CARTO_KEY) {
 /* The data licences need their attribution lines shown with the map. The full
    set is too long for the corner, so the corner carries a "Data credits" link
    that opens them in a dialog (#credits-dlg, beside the footer). */
-map.attributionControl.addAttribution('<a href="methodology.html" class="credits-link">Data credits</a>');
+map.attributionControl.addAttribution('<a href="methodology.html#licences" class="credits-link">Data credits</a>');
 /* The hover card is drawn above the key, the sheet and the other panels
    along the bottom of the map, never under them (workplan 2.10). Leaflet's
    tooltips live inside the map's own stacking layer, which every panel over
@@ -9182,7 +9248,7 @@ function profileCaption(key, has, lad) {
       return 'How residents described their health, disability and unpaid care at the 2021 Census' +
         (has.msoa ? ', then health outcomes estimated by the Office for Health Improvement and Disparities (OHID)' : '') +
         (has.borough ? ', and figures ' + (has.msoa ? 'OHID' : 'the Office for Health Improvement and Disparities (OHID)') +
-          ' publishes only for the whole of ' + la : '') + '.';
+          ' publishes only for the whole of ' + ladPhrase(la) : '') + '.';
     case 'imd2025':
       return 'The English Indices of Deprivation 2025, worked out for this ward from the LSOAs inside it, ' +
         'each weighted by the number of people living there.';
@@ -9226,6 +9292,7 @@ function stackedBar(parts) {
 }
 
 function showWard(wn) {
+  if (typeof _clearSearchLsoaOutline === 'function') _clearSearchLsoaOutline();
   const n = norm(wn);
   // Find by name match
   const wdata = Object.values(WARD_DATA).find(w => norm(w.name) === n) ||
@@ -9272,9 +9339,9 @@ function showWard(wn) {
   // figure in the sheet and it makes the announcement worth listening to.
   if (typeof _announce === 'function') {
     const _pop = wdata && wdata.indicators && wdata.indicators.population;
-    _announce(`${wn} selected.` +
-      (_pop ? ` Population ${Number(_pop).toLocaleString()}.` : '') +
-      ' Details are in the Area profile tab.');
+    _announce(`${wn} is selected` +
+      (_pop ? `, with ${Number(_pop).toLocaleString('en-GB')} residents,` : '') +
+      ' and its figures are in the Area profile tab.');
   }
 
 
@@ -9323,9 +9390,10 @@ function showWard(wn) {
     const val = profVal(f);
     if (val === null || val === undefined || val === '') return '';
     const isNum = !isNaN(parseFloat(val));
-    // Years keep their decimal, so 74.0 does not print as 74 beside 78.5.
-    const dp1 = isNum && indUnit(f.k) === 'years';
-    const display = isNum ? parseFloat(val).toLocaleString('en-GB', {maximumFractionDigits:1, minimumFractionDigits: dp1 ? 1 : 0}) : _esc(val);
+    // The indicator's own decimal places, rounded the way the hover card,
+    // the key figures and the downloads round them, so one figure never
+    // shows two values on the same screen.
+    const display = isNum ? fmtNum(val, indDecimals(f.k)) : _esc(val);
     let unit = '';
     if (f.k.startsWith('ft_')) {
       const u = String((ovMeta(f.k) || {}).u || '').trim();
@@ -9344,7 +9412,7 @@ function showWard(wn) {
     const meta = (per || pill)
       ? `<span class="sr-meta">${per ? `<span class="sr-per">${_esc(per)}</span>` : ''}` +
         `${pill ? `<span class="${pill[0]}">${pill[1]}</span>` : ''}</span>` : '';
-    return `<div class="sr"><span class="sl">${_esc(f.l)}${meta}</span>` +
+    return `<div class="sr" data-k="${_esc(f.k)}"><span class="sl">${_esc(f.l)}${meta}</span>` +
       `<span class="${svCls}">${display}${unit}</span></div>`;
   };
   const leadRank = f => {
@@ -9363,7 +9431,9 @@ function showWard(wn) {
   const lePer = periodWords(ovPeriodOf('ft_93283'));
   const cats = sections.map(({ cat, fields }, catIdx) => {
     const wardFields = fields.filter(onWard);
-    const ownF  = wardFields.filter(f => f.g !== 'msoa' && profRow(f));
+    // The population is the first key figure above, so it is not repeated
+    // as a row (the picker and other lists still have it).
+    const ownF  = wardFields.filter(f => f.g !== 'msoa' && profRow(f) && !(f.k === 'census_population' && !isNaN(parseFloat(inds.census_population))));
     const msoaF = wardFields.filter(f => f.g === 'msoa' && profRow(f)).sort((a, b) => leadRank(a) - leadRank(b));
     const ctxF  = fields.filter(f => f.g === 'borough' && profRow(f));
     const total = ownF.length + msoaF.length + ctxF.length;
@@ -9374,7 +9444,7 @@ function showWard(wn) {
     const rowsOf = list => list.map(f => {
       const h = profRow(f), hide = clip && n >= PROFILE_SHOW;
       n++;
-      return hide ? h.replace('<div class="sr">', '<div class="sr sr-x">') : h;
+      return hide ? h.replace('<div class="sr"', '<div class="sr sr-x"') : h;
     }).join('');
     const own = rowsOf(ownF);
     const msoaStart = n, msoaRows = rowsOf(msoaF);
@@ -9389,11 +9459,11 @@ function showWard(wn) {
         msoaF.some(f => ovIsStdRatio(f.k))
           ? ' A figure with no unit is a ratio where 100 is the England level once age is allowed for.' : ''}${
         twoLE ? ' Life expectancy appears twice: here as OHID’s estimate for this ward' + (lePer ? ' over ' + _esc(lePer) : '') +
-          ', and further down as the official figure for the whole of ' + _esc(bor) + '.' : ''}</div></div>
+          ', and further down as the official figure for the whole of ' + _esc(ladPhrase(bor)) + '.' : ''}</div></div>
       ${msoaRows}` : '';
     const ctx = ctxRows ? `<div class="sr-ctx${hideFrom(ctxStart)}">
-      <div class="sr-sub">Figures for the whole of ${_esc(bor)}</div>
-      <div class="sr-sub-note">OHID publishes these only for the LA, so every ward in ${_esc(bor)} shows the same figure and they cannot tell this ward apart from its neighbours.</div>
+      <div class="sr-sub">Figures for the whole of ${_esc(ladPhrase(bor))}</div>
+      <div class="sr-sub-note">OHID publishes these only for the LA, so every ward in ${_esc(ladPhrase(bor))} shows the same figure and they cannot tell this ward apart from its neighbours.</div>
       ${ctxRows}</div>` : '';
     const has = { lsoa: ownF.some(f => f.g === 'lsoa'), msoa: msoaF.length > 0, borough: ctxF.length > 0 };
     const cap = profileCaption(cat.key, has, wdata.lad);
@@ -9429,14 +9499,14 @@ function showWard(wn) {
   const keyStats = `
     <div class="keystats">
       ${stat('Population', popN !== null ? Math.round(popN).toLocaleString('en-GB') : null, 'Census 2021')}
-      ${stat('Good health', goodHlt !== null ? goodHlt.toFixed(indDecimals('census_good_health_pct')) + '%' : null, 'of residents')}
-      ${stat('Bad health', badHlt !== null ? badHlt.toFixed(indDecimals('census_bad_health_pct')) + '%' : null, 'of residents')}
-      ${stat('Core20 LSOAs', (c20L !== null && totL !== null) ? c20L.toFixed(0) + ' of ' + totL.toFixed(0) : null, 'in England’s most deprived fifth')}
+      ${stat(_esc(indLabel('census_good_health_pct')), goodHlt !== null ? fmtNum(goodHlt, indDecimals('census_good_health_pct')) + '%' : null, 'of residents')}
+      ${stat(_esc(indLabel('census_bad_health_pct')), badHlt !== null ? fmtNum(badHlt, indDecimals('census_bad_health_pct')) + '%' : null, 'of residents')}
+      ${stat(_esc(indLabel('core20_lsoa_count')), (c20L !== null && totL !== null) ? c20L.toFixed(0) + ' of ' + totL.toFixed(0) : null, 'in England’s most deprived fifth')}
     </div>`;
 
   // "In plain English" comes first, the same summary the ward sheet opens
   // with, written by the sheet's code so the two cannot disagree.
-  const plain = (window.PH_SHEET && PH_SHEET.summaryBlock) ? PH_SHEET.summaryBlock(wdata.name, 'h2') : '';
+  const plain = (window.PH_SHEET && PH_SHEET.summaryBlock) ? PH_SHEET.summaryBlock(wdata.name) : '';
 
   // The LA beside the name rather than the population, which is the first
   // key figure just below (and was shown here as "~21,711").
@@ -9452,11 +9522,11 @@ function showWard(wn) {
          second button with a different name for the same thing is not needed. -->
     ${cats || '<div class="data-note">We do not have any figures for this ward.</div>'}
     <div class="data-note prof-key">
-      A figure with no label is the ward’s own: Census figures are added up from its output areas, the smallest
+      A figure with no label is the ward’s own: Census figures are worked out from its output areas, the smallest
       Census areas of about 125 households, and crimes are counted inside its boundary.
       <span class="gpill gpill-lsoa">estimated from LSOAs</span> and <span class="gpill gpill-msoa">estimated from MSOAs</span>
       mark figures published for those larger areas and weighted onto this ward by where its residents live, and a
-      <span class="gpill gpill-la">whole-LA figure</span> is the same for every ward in ${_esc(bor)}.
+      <span class="gpill gpill-la">whole-LA figure</span> is the same for every ward in ${_esc(ladPhrase(bor))}.
       Crime figures come from police.uk, benefit claimants from the Department for Work and Pensions, and health figures from OHID.
     </div>`;
 }
@@ -9492,18 +9562,19 @@ window.deselectWard = function() {
     try { wardBoundaryLyr.setStyle(_wardBoundaryStyle); } catch (e) {}
   }
   const p = document.getElementById('wpanel');
-  if (p) p.innerHTML = `<div class="ph"><div class="ph-icon">${ico('pointer')}</div>Click any ward on the map to explore its health, crime, deprivation and service data</div>`;
+  if (p) p.innerHTML = `<div class="ph"><div class="ph-icon">${ico('pointer')}</div>Select any area on the map to see its health, deprivation, crime and local services.</div>`;
   const vsd = document.getElementById('vs-digest');
   if (vsd) vsd.textContent = 'All of ' + PH_AREA;
   if (window.PH_URL) window.PH_URL.write();
 };
 window.deselectLSOA = function() {
   selLSOA = null;
+  if (typeof _clearSearchLsoaOutline === 'function') _clearSearchLsoaOutline();
   if (typeof _syncDocTitle === 'function') _syncDocTitle();
   if (typeof PH_PEEK !== 'undefined') PH_PEEK.hide();
   if (typeof _restyleAll === 'function') _restyleAll();
   const p = document.getElementById('wpanel');
-  if (p) p.innerHTML = `<div class="ph"><div class="ph-icon">${ico('pointer')}</div>Click any ward on the map to explore its health, crime, deprivation and service data</div>`;
+  if (p) p.innerHTML = `<div class="ph"><div class="ph-icon">${ico('pointer')}</div>Select any area on the map to see its health, deprivation, crime and local services.</div>`;
   const vsd = document.getElementById('vs-digest');
   if (vsd) vsd.textContent = 'All of ' + PH_AREA;
 };
@@ -9519,17 +9590,17 @@ window.deselectLSOA = function() {
    The point layers have no entry in that metadata. Each comes from a single
    register, named here as its layer in the sidebar names it. */
 const REPORT_CREDITS = {
-  census:       { meta: 'census',       use: 'Demographics, health and work' },
-  imd:          { meta: 'imd',          use: 'Deprivation and Core20' },
-  crime:        { meta: 'crime',        use: 'Recorded crime', period: 'crime_period' },
-  fuel_poverty: { meta: 'fuel_poverty', use: 'Fuel poverty', period: 'fuel_poverty_period' },
-  claimant:     { meta: 'claimant',     use: 'Claimant rate' },
-  health:       { meta: 'health_msoa',  use: 'Health outcomes' },
+  census:       { meta: 'census',       use: 'Demographics, health and work', label: 'Office for National Statistics (ONS), Census 2021, from Nomis' },
+  imd:          { meta: 'imd',          use: 'Deprivation and Core20', label: 'Ministry of Housing, Communities and Local Government, English Indices of Deprivation 2025' },
+  crime:        { meta: 'crime',        use: 'Recorded crime', period: 'crime_period', label: 'data.police.uk' },
+  fuel_poverty: { meta: 'fuel_poverty', use: 'Fuel poverty', period: 'fuel_poverty_period', label: 'Department for Energy Security and Net Zero, sub-regional fuel poverty statistics' },
+  claimant:     { meta: 'claimant',     use: 'Claimant rate', period: 'claimant_period', label: 'Office for National Statistics, claimant count, from Nomis' },
+  health:       { meta: 'health_msoa',  use: 'Health outcomes', label: 'Office for Health Improvement and Disparities, Local Health' },
   greenblue:    { ov: 'gb_commitment_pct', use: 'Green and blue space' },
-  gp:           { meta: 'gp',           use: 'GP practices' },
-  pharmacy:     { meta: 'pharmacy',     use: 'Pharmacies' },
-  dental:       { meta: 'dental',       use: 'Dental practices' },
-  hospitals:    { name: 'NHS ODS trust sites register',     use: 'Hospitals' },
+  gp:           { meta: 'gp',           use: 'GP practices', label: 'NHS Organisation Data Service, register of GP practices' },
+  pharmacy:     { meta: 'pharmacy',     use: 'Pharmacies', label: 'NHS Organisation Data Service, register of pharmacies' },
+  dental:       { meta: 'dental',       use: 'Dental practices', label: 'NHS Organisation Data Service, NHS dental practices' },
+  hospitals:    { name: 'NHS Organisation Data Service, register of NHS trust sites', use: 'Hospitals' },
   vcse:         { name: 'Charity Commission register',      use: 'Charities' },
   greenspace:   { name: 'OS Open Greenspace, contains OS data \u00a9 Crown copyright and database right 2025', use: 'Parks and green spaces' },
 };
@@ -9538,10 +9609,13 @@ function reportCredits(keys) {
   return keys.map(k => {
     const c = REPORT_CREDITS[k];
     if (!c) return '';
-    let who = c.name || (c.meta ? src[c.meta] : '') || '';
+    // The publisher in plain words: the metadata's own string carries table
+    // codes and file names, so it only decides whether there is a source to
+    // credit, and the label says who it is.
+    let who = c.name || (c.meta && src[c.meta] ? (c.label || src[c.meta]) : '') || '';
     let when = c.period ? monthWords(WARD_META[c.period] || '') : '';
     if (c.ov && OV_META[c.ov]) {
-      who = OV_META[c.ov].src || who;
+      who = (typeof _cardSource === 'function' ? _cardSource(c.ov) : '') || OV_META[c.ov].src || who;
       when = OV_META[c.ov].yr || when;
     }
     // A figure the pipeline recorded no source for is not credited to a guess.
@@ -10101,7 +10175,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
       const tickX = (r.ref != null && !isNaN(r.ref)) ? padL + (Math.max(0, r.ref) / dmax) * barW : null;
       if (r.v != null) {
         svg += `<rect x="${padL}" y="${y - 6}" width="${w}" height="11" fill="${c}" rx="2"/>`;
-        const valTxt = _fmtN(r.v, dp) + (u ? ' ' + u : '');
+        const valTxt = (r.k ? fmtNum(r.v, indDecimals(r.k)) : _fmtN(r.v, dp)) + (u ? ' ' + u : '');
         svg += `<text x="${_reportLabelX(padL + Math.max(w, 6) + 4, tickX, valTxt)}" y="${y + 3.5}" font-size="10" fill="#0B1F33" font-variant-numeric="tabular-nums">${valTxt}</text>`;
       } else {
         svg += `<text x="${_reportLabelX(padL + 4, tickX, 'no figure')}" y="${y + 3.5}" font-size="10" fill="#64748B">no figure</text>`;
@@ -10146,7 +10220,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
       svg += `<rect x="${padL}" y="${y - 6}" width="${barW}" height="11" fill="#EDF1F5" rx="2"/>`;
       if (r.v != null) {
         svg += `<rect x="${padL}" y="${y - 6}" width="${wv}" height="11" fill="${c}" rx="2"/>`;
-        const valTxt = _fmtN(r.v, dp) + u;
+        const valTxt = (r.k ? fmtNum(r.v, indDecimals(r.k)) : _fmtN(r.v, dp)) + u;
         svg += `<text x="${_reportLabelX(padL + Math.max(wv, 6) + 4, wr != null ? padL + wr : null, valTxt)}" y="${y + 3.5}" font-size="10" fill="#0B1F33" font-variant-numeric="tabular-nums">${valTxt}</text>`;
       } else {
         svg += `<text x="${_reportLabelX(padL + 4, wr != null ? padL + wr : null, 'no figure')}" y="${y + 3.5}" font-size="10" fill="#64748B">no figure</text>`;
@@ -10320,12 +10394,12 @@ function _generateWardReport(_reportWindow, wn, opts) {
 
   // descriptive as in OV_CFG: these describe who lives here, so no direction.
   const compareCensus = _chartCompare([
-    { l: indLabel('census_born_outside_uk_pct'),   v: inds.census_born_outside_uk_pct,    ref: _median(_wardVals('census_born_outside_uk_pct')),    descriptive: true, dp: 0 },
-    { l: indLabel('census_no_qual_pct'), v: inds.census_no_qual_pct,            ref: _median(_wardVals('census_no_qual_pct')),            wh: true,  dp: 0 },
-    { l: indLabel('census_level4_qual_pct'),     v: inds.census_level4_qual_pct,        ref: _median(_wardVals('census_level4_qual_pct')),        wh: false, dp: 0 },
-    { l: indLabel('census_higher_managerial_pct'), v: inds.census_higher_managerial_pct,  ref: _median(_wardVals('census_higher_managerial_pct')),  descriptive: true, dp: 0 },
-    { l: indLabel('census_routine_semi_routine_pct'),      v: inds.census_routine_semi_routine_pct, ref: _median(_wardVals('census_routine_semi_routine_pct')), descriptive: true, dp: 0 },
-    { l: indLabel('census_english_hh_none_pct'), v: inds.census_english_hh_none_pct, ref: _median(_wardVals('census_english_hh_none_pct')), descriptive: true, dp: 0 },
+    { k: 'census_born_outside_uk_pct', l: indLabel('census_born_outside_uk_pct'),   v: inds.census_born_outside_uk_pct,    ref: _median(_wardVals('census_born_outside_uk_pct')),    descriptive: true, dp: 0 },
+    { k: 'census_no_qual_pct', l: indLabel('census_no_qual_pct'), v: inds.census_no_qual_pct,            ref: _median(_wardVals('census_no_qual_pct')),            wh: true,  dp: 0 },
+    { k: 'census_level4_qual_pct', l: indLabel('census_level4_qual_pct'),     v: inds.census_level4_qual_pct,        ref: _median(_wardVals('census_level4_qual_pct')),        wh: false, dp: 0 },
+    { k: 'census_higher_managerial_pct', l: indLabel('census_higher_managerial_pct'), v: inds.census_higher_managerial_pct,  ref: _median(_wardVals('census_higher_managerial_pct')),  descriptive: true, dp: 0 },
+    { k: 'census_routine_semi_routine_pct', l: indLabel('census_routine_semi_routine_pct'),      v: inds.census_routine_semi_routine_pct, ref: _median(_wardVals('census_routine_semi_routine_pct')), descriptive: true, dp: 0 },
+    { k: 'census_english_hh_none_pct', l: indLabel('census_english_hh_none_pct'), v: inds.census_english_hh_none_pct, ref: _median(_wardVals('census_english_hh_none_pct')), descriptive: true, dp: 0 },
   ], { width: 376, padL: 196, rowH: 18 });   // room for the display labels
 
   // ── Health & deprivation: IMD-domain radar + ward-level health bars ──
@@ -10371,14 +10445,14 @@ function _generateWardReport(_reportWindow, wn, opts) {
   const domainSVG = _domainRows.some(r => r.p != null) ? _reportDotPlot(_domainRows, { rowH: 19 }) : '';
 
   const healthBars = _chartCompare([
-    { l: indLabel('census_good_health_pct'), v: inds.census_good_health_pct,        ref: _median(_wardVals('census_good_health_pct')),        wh: false, dp: 0 },
-    { l: indLabel('census_bad_health_pct'),   v: inds.census_bad_health_pct,         ref: _median(_wardVals('census_bad_health_pct')),         wh: true,  dp: 1 },
-    { l: indLabel('census_disability_any_pct'),      v: inds.census_disability_any_pct,     ref: _median(_wardVals('census_disability_any_pct')),     wh: true,  dp: 1 },
-    { l: indLabel('census_disability_lot_pct'), v: inds.census_disability_lot_pct, ref: _median(_wardVals('census_disability_lot_pct')),    wh: true,  dp: 1 },
-    { l: indLabel('census_provides_unpaid_care_pct'),  v: inds.census_provides_unpaid_care_pct, ref: _median(_wardVals('census_provides_unpaid_care_pct')), wh: false, dp: 1 },
-    { l: indLabel('fuel_poverty_pct'),          v: inds.fuel_poverty_pct,              ref: _median(_wardVals('fuel_poverty_pct')),              wh: true,  dp: 1 },
-    { l: indLabel('census_unemployed_pct'),            v: inds.census_unemployed_pct,         ref: _median(_wardVals('census_unemployed_pct')),         wh: true,  dp: 1 },
-    { l: indLabel('claimant_rate_pct'), v: inds.claimant_rate_pct,             ref: _median(_wardVals('claimant_rate_pct')),             wh: true,  dp: 1 },
+    { k: 'census_good_health_pct', l: indLabel('census_good_health_pct'), v: inds.census_good_health_pct,        ref: _median(_wardVals('census_good_health_pct')),        wh: false, dp: 0 },
+    { k: 'census_bad_health_pct', l: indLabel('census_bad_health_pct'),   v: inds.census_bad_health_pct,         ref: _median(_wardVals('census_bad_health_pct')),         wh: true,  dp: 1 },
+    { k: 'census_disability_any_pct', l: indLabel('census_disability_any_pct'),      v: inds.census_disability_any_pct,     ref: _median(_wardVals('census_disability_any_pct')),     wh: true,  dp: 1 },
+    { k: 'census_disability_lot_pct', l: indLabel('census_disability_lot_pct'), v: inds.census_disability_lot_pct, ref: _median(_wardVals('census_disability_lot_pct')),    wh: true,  dp: 1 },
+    { k: 'census_provides_unpaid_care_pct', l: indLabel('census_provides_unpaid_care_pct'),  v: inds.census_provides_unpaid_care_pct, ref: _median(_wardVals('census_provides_unpaid_care_pct')), wh: false, dp: 1 },
+    { k: 'fuel_poverty_pct', l: indLabel('fuel_poverty_pct'),          v: inds.fuel_poverty_pct,              ref: _median(_wardVals('fuel_poverty_pct')),              wh: true,  dp: 1 },
+    { k: 'census_unemployed_pct', l: indLabel('census_unemployed_pct'),            v: inds.census_unemployed_pct,         ref: _median(_wardVals('census_unemployed_pct')),         wh: true,  dp: 1 },
+    { k: 'claimant_rate_pct', l: indLabel('claimant_rate_pct'), v: inds.claimant_rate_pct,             ref: _median(_wardVals('claimant_rate_pct')),             wh: true,  dp: 1 },
   ], { width: 376, padL: 164, rowH: 16 });   // room for the display labels
 
   // ── Health outcomes: Local Health estimates, as a table ──
@@ -10395,8 +10469,9 @@ function _generateWardReport(_reportWindow, wn, opts) {
     const v = _fmt(inds[k]);
     if (v == null) return null;
     const ratio = ovIsStdRatio(k);
-    // Fixed places, so a median of 84.0 years does not print as "84".
-    const fx = x => (x == null ? 'n/a' : x.toFixed(ratio ? 0 : 1));
+    // The indicator's own places, as on the sheet, so 84.0 years does not
+    // print as "84" and a ratio of 140.2 does not print as 140.
+    const fx = x => (x == null ? 'n/a' : fmtNum(x, indDecimals(k)));
     return {
       l: indLabel(k),
       u: ratio ? 'ratio, where England is 100' : String((ovMeta(k) || {}).u || '').toLowerCase(),
@@ -10421,6 +10496,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
     'crime_burglary_12mo', 'crime_robbery_12mo', 'crime_vehicle_12mo', 'crime_drug_offences_12mo',
     'crime_public_order_12mo', 'crime_arson_12mo', 'crime_weapons_12mo', 'crime_misc_society_12mo'];
   const crimeRows = crimeCats.map(k => ({
+    k: k,
     l: indLabel(k),
     v: _fmt(inds[k]),
     ref: _median(_wardVals(k)),
@@ -10580,10 +10656,10 @@ function _generateWardReport(_reportWindow, wn, opts) {
   <div class="kpis">
     ${_kpi('Population',     popN  != null ? Math.round(popN).toLocaleString('en-GB') : null, 'Census 2021')}
     ${_kpi('Deprivation score', imdW != null ? imdW.toFixed(indDecimals('imd_score_ward')) : null, 'IMD 2025, higher is more deprived', _ctxBar(imdPct, 'lower-better'))}
-    ${_kpi('Good health',    goodHlt != null ? goodHlt.toFixed(indDecimals('census_good_health_pct')) + '%' : null, 'of residents', _ctxBar(goodHpct, 'higher-better'))}
-    ${_kpi('Bad health',     badHlt  != null ? badHlt.toFixed(indDecimals('census_bad_health_pct')) + '%' : null, 'of residents', _ctxBar(badHpct, 'lower-better'))}
+    ${_kpi(indLabel('census_good_health_pct'), goodHlt != null ? goodHlt.toFixed(indDecimals('census_good_health_pct')) + '%' : null, 'of residents', _ctxBar(goodHpct, 'higher-better'))}
+    ${_kpi(indLabel('census_bad_health_pct'), badHlt  != null ? badHlt.toFixed(indDecimals('census_bad_health_pct')) + '%' : null, 'of residents', _ctxBar(badHpct, 'lower-better'))}
     ${_kpi('Disabled residents', disAny != null ? disAny.toFixed(indDecimals('census_disability_any_pct')) + '%' : null, 'of residents', _ctxBar(disAnyPct, 'lower-better'))}
-    ${_kpi('Core20 LSOAs',   (c20L != null && totL != null) ? c20L.toFixed(0) + ' of ' + totL.toFixed(0) : null, 'in England\u2019s most deprived fifth')}
+    ${_kpi(indLabel('core20_lsoa_count'), (c20L != null && totL != null) ? c20L.toFixed(0) + ' of ' + totL.toFixed(0) : null, 'in England\u2019s most deprived fifth')}
   </div>
 
   <div class="content cols">
@@ -10716,7 +10792,7 @@ function buildWardLayer() {
         if (wn !== selW) lyr.setStyle(wstyle(wn, curOv, 'hover'));
         const _wardRec = WARD_DATA[wn] || (typeof WARD_DATA === 'object' && Object.values(WARD_DATA).find(w => w && w.name === wn));
         const ovRows = ovTooltipRows(k => wardOvValue(wn, k), _wardRec, 'ward');
-        const wLad = _wardRec && _wardRec.lad ? ' in ' + _esc(_wardRec.lad) : '';
+        const wLad = _wardRec && _wardRec.lad ? ' in ' + _esc(ladPhrase(_wardRec.lad)) : '';
         lyr.bindTooltip(`<b class="tip-nm">${wn}</b><span class="tip-meta">Ward${wLad}</span>${ovRows}`, { sticky:true, opacity:.94 }).openTooltip(e.latlng);
       });
       lyr.on('mouseout', () => { if (wn !== selW) lyr.setStyle(wstyle(wn, curOv, 'default')); });
@@ -10982,6 +11058,15 @@ function _fitFocus(bounds) {
         if (typeof deselectWard === 'function') deselectWard();
       }
     }
+    // The same for a selected LSOA, whose profile would otherwise describe an
+    // area the map no longer shows.
+    if (focusActive() && typeof selLSOA !== 'undefined' && selLSOA) {
+      const f = (typeof LSOA_IMD !== 'undefined' && LSOA_IMD && LSOA_IMD.features)
+        ? LSOA_IMD.features.find(x => x.properties && x.properties.code === selLSOA) : null;
+      if (!f || !ladInFocus(f.properties.borough)) {
+        if (typeof deselectLSOA === 'function') deselectLSOA();
+      }
+    }
 
     // Fit to whatever is in focus: one borough's wards, or a board's.
     if (focusActive() && wLyr) {
@@ -11082,6 +11167,15 @@ function _fitFocus(bounds) {
       const rec = (typeof WARD_DATA !== 'undefined' && WARD_DATA) ? WARD_DATA[selW] : null;
       if (!rec || !ladInFocus(rec.lad)) {
         if (typeof deselectWard === 'function') deselectWard();
+      }
+    }
+    // The same for a selected LSOA, whose profile would otherwise describe an
+    // area the map no longer shows.
+    if (focusActive() && typeof selLSOA !== 'undefined' && selLSOA) {
+      const f = (typeof LSOA_IMD !== 'undefined' && LSOA_IMD && LSOA_IMD.features)
+        ? LSOA_IMD.features.find(x => x.properties && x.properties.code === selLSOA) : null;
+      if (!f || !ladInFocus(f.properties.borough)) {
+        if (typeof deselectLSOA === 'function') deselectLSOA();
       }
     }
 
@@ -11348,9 +11442,24 @@ function _fitFocus(bounds) {
     // The button's name follows the indicator it is the key to.
     // The label holds the unit on a line of its own (.mls-unit), which is
     // left out of the name.
-    const name = () => strip.setAttribute('aria-label', 'About this indicator: ' + (lbl ? [...lbl.childNodes]
-      .filter(n => !(n.classList && n.classList.contains('mls-unit'))).map(n => n.textContent).join('').trim() : ''));
+    // With two indicators the key shows both, while selecting it still opens
+    // the first one's card, so the name says so, and the one-indicator scale
+    // (hidden in that mode) is no longer read out as its description.
+    const biv = document.getElementById('mls-biv');
+    const name = () => {
+      const pair = strip.classList.contains('is-biv') && biv ? [...biv.querySelectorAll('b')].map(b => b.textContent.trim()) : [];
+      if (pair.length === 2) {
+        strip.setAttribute('aria-label', 'About this indicator: ' + pair[0] + ', compared with ' + pair[1]);
+        strip.removeAttribute('aria-describedby');
+        return;
+      }
+      strip.setAttribute('aria-describedby', 'mls-min mls-max');
+      strip.setAttribute('aria-label', 'About this indicator: ' + (lbl ? [...lbl.childNodes]
+        .filter(n => !(n.classList && n.classList.contains('mls-unit'))).map(n => n.textContent).join('').trim() : ''));
+    };
     if (lbl) new MutationObserver(name).observe(lbl, { childList: true, characterData: true, subtree: true });
+    new MutationObserver(name).observe(strip, { attributes: true, attributeFilter: ['class'] });
+    if (biv) new MutationObserver(name).observe(biv, { childList: true, subtree: true });
     name();
   }
 
@@ -11361,7 +11470,7 @@ function _fitFocus(bounds) {
   if (typeof map === 'undefined' || !map || !map.attributionControl) return;
   const ctl = map.attributionControl;
   const prefix = ctl.options.prefix;
-  const CREDITS = '<a href="methodology.html" class="credits-link">Data credits</a>';
+  const CREDITS = '<a href="methodology.html#licences" class="credits-link">Data credits</a>';
   const mq = window.matchMedia('(max-width: 900px)');
   function credits() {
     ctl.setPrefix(mq.matches ? false : prefix);
@@ -12065,7 +12174,15 @@ function _fitFocus(bounds) {
     if (nm.indexOf(q) !== -1) return 60;
     if ((o.levels || []).some(lv => lv.indexOf(q) === 0)) return 40;
     if ((o.theme || '').toLowerCase().indexOf(q) !== -1) return 30;
-    if (o.hay && o.hay.indexOf(q) !== -1) return 20;
+    // The longer text (description, source, unit, key) only matches at the
+    // start of a word, and a short query only as a whole word, so "flu" does
+    // not find "fluent". Anything that is not a letter or digit separates
+    // words, which keeps "no2" finding the key no2_ugm3.
+    if (o.hay) {
+      const eq = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const re = q.length < 4 ? new RegExp('(^|[^a-z0-9])' + eq + '([^a-z0-9]|$)') : new RegExp('(^|[^a-z0-9])' + eq);
+      if (re.test(o.hay)) return 20;
+    }
     return 0;
   }
   function scoreHits(q, list) {
@@ -12119,7 +12236,7 @@ function _fitFocus(bounds) {
           hits.map(o => '<button type="button" class="ov-res' + (o.value === cur ? ' on' : '') + '" data-ov="' + esc(o.value) + '">' +
             '<span class="ov-res-nm">' + esc(o.name) + '</span>' +
             '<span class="ov-res-sub">' + esc(o.theme) + ' · ' + levelsHTML(o) + '</span></button>').join('')
-        : (council ? '' : '<div class="ov-empty">No indicator matches that.</div>')) + council;
+        : (council ? '' : '<div class="ov-empty">No indicator matches that, so try another word, or clear the search to browse the indicators by theme.</div>')) + council;
     }
     resultsEl.hidden = !q;
     homeEl.hidden = !!q || !!libTheme;
@@ -13006,6 +13123,7 @@ function profSectionHead(label, icon, open, id) {
 }
 
 function showLSOA(feat) {
+  if (typeof _clearSearchLsoaOutline === 'function') _clearSearchLsoaOutline();
   const p = document.getElementById('wpanel');
   const props = feat.properties;
   const code = props.code;
@@ -13043,7 +13161,7 @@ function showLSOA(feat) {
     const row = (k) => {
       const val = inds[k];
       if (val == null) return '';
-      return `<div class="sr"><span class="sl">${_esc(indLabel(k))}</span><span class="sv">${parseFloat(val).toLocaleString('en-GB',{maximumFractionDigits:1})}${indValueUnit(k)}</span></div>`;
+      return `<div class="sr"><span class="sl">${_esc(indLabel(k))}</span><span class="sv">${fmtNum(val, indDecimals(k))}${indValueUnit(k)}</span></div>`;
     };
 
     // General census block (excludes ethnicity/age/environment — those get
@@ -13195,7 +13313,7 @@ window.generateLSOAReport = function(code) {
       svg += `<rect x="${padL}" y="${y - 6}" width="${barW}" height="11" fill="#EDF1F5" rx="2"/>`;
       if (r.v != null) {
         svg += `<rect x="${padL}" y="${y - 6}" width="${w}" height="11" fill="${c}" rx="2"/>`;
-        const valTxt = _fmtN(r.v, dp) + (u ? (u === '%' ? u : ' ' + u) : '');
+        const valTxt = (r.k ? fmtNum(r.v, indDecimals(r.k)) : _fmtN(r.v, dp)) + (u ? (u === '%' ? u : ' ' + u) : '');
         const tickX = (r.ref != null && !isNaN(r.ref)) ? padL + (Math.max(0, r.ref) / dmax) * barW : null;
         svg += `<text x="${_reportLabelX(padL + Math.max(w, 6) + 4, tickX, valTxt)}" y="${y + 3.5}" font-size="10" fill="#0B1F33" font-variant-numeric="tabular-nums">${valTxt}</text>`;
       } else {
@@ -13232,7 +13350,7 @@ window.generateLSOAReport = function(code) {
       svg += `<rect x="${padL}" y="${y - 6}" width="${barW}" height="11" fill="#EDF1F5" rx="2"/>`;
       if (r.v != null) {
         svg += `<rect x="${padL}" y="${y - 6}" width="${wv}" height="11" fill="${c}" rx="2"/>`;
-        const valTxt = _fmtN(r.v, dp) + u;
+        const valTxt = (r.k ? fmtNum(r.v, indDecimals(r.k)) : _fmtN(r.v, dp)) + u;
         svg += `<text x="${_reportLabelX(padL + Math.max(wv, 6) + 4, wr != null ? padL + wr : null, valTxt)}" y="${y + 3.5}" font-size="10" fill="#0B1F33" font-variant-numeric="tabular-nums">${valTxt}</text>`;
       } else {
         svg += `<text x="${_reportLabelX(padL + 4, wr != null ? padL + wr : null, 'no figure')}" y="${y + 3.5}" font-size="10" fill="#64748B">no figure</text>`;
@@ -13348,23 +13466,23 @@ window.generateLSOAReport = function(code) {
   ], { width: 360 });
   // descriptive as in OV_CFG: these describe who lives here, so no direction.
   const compareCensus = _chartCompare([
-    { l: indLabel('census_born_outside_uk_pct'),     v: inds.census_born_outside_uk_pct,    ref: _median(_lsoaVals('census_born_outside_uk_pct')),    descriptive: true, dp: 0 },
-    { l: indLabel('census_no_qual_pct'),   v: inds.census_no_qual_pct,            ref: _median(_lsoaVals('census_no_qual_pct')),            wh: true,  dp: 0 },
-    { l: indLabel('census_level4_qual_pct'),       v: inds.census_level4_qual_pct,        ref: _median(_lsoaVals('census_level4_qual_pct')),        wh: false, dp: 0 },
-    { l: indLabel('census_higher_managerial_pct'),   v: inds.census_higher_managerial_pct,  ref: _median(_lsoaVals('census_higher_managerial_pct')),  descriptive: true, dp: 0 },
-    { l: indLabel('census_routine_semi_routine_pct'),        v: inds.census_routine_semi_routine_pct, ref: _median(_lsoaVals('census_routine_semi_routine_pct')), descriptive: true, dp: 0 },
+    { k: 'census_born_outside_uk_pct', l: indLabel('census_born_outside_uk_pct'),     v: inds.census_born_outside_uk_pct,    ref: _median(_lsoaVals('census_born_outside_uk_pct')),    descriptive: true, dp: 0 },
+    { k: 'census_no_qual_pct', l: indLabel('census_no_qual_pct'),   v: inds.census_no_qual_pct,            ref: _median(_lsoaVals('census_no_qual_pct')),            wh: true,  dp: 0 },
+    { k: 'census_level4_qual_pct', l: indLabel('census_level4_qual_pct'),       v: inds.census_level4_qual_pct,        ref: _median(_lsoaVals('census_level4_qual_pct')),        wh: false, dp: 0 },
+    { k: 'census_higher_managerial_pct', l: indLabel('census_higher_managerial_pct'),   v: inds.census_higher_managerial_pct,  ref: _median(_lsoaVals('census_higher_managerial_pct')),  descriptive: true, dp: 0 },
+    { k: 'census_routine_semi_routine_pct', l: indLabel('census_routine_semi_routine_pct'),        v: inds.census_routine_semi_routine_pct, ref: _median(_lsoaVals('census_routine_semi_routine_pct')), descriptive: true, dp: 0 },
   ], { width: 780, padL: 240 });
 
   // ── Charts: health & deprivation ──
   const healthBars = _chartCompare([
-    { l: indLabel('census_good_health_pct'),       v: inds.census_good_health_pct,           ref: _median(_lsoaVals('census_good_health_pct')),           wh: false, dp: 0 },
-    { l: indLabel('census_bad_health_pct'),         v: inds.census_bad_health_pct,            ref: _median(_lsoaVals('census_bad_health_pct')),            wh: true,  dp: 1 },
-    { l: indLabel('census_disability_any_pct'),            v: inds.census_disability_any_pct,        ref: _median(_lsoaVals('census_disability_any_pct')),        wh: true,  dp: 1 },
-    { l: indLabel('census_disability_lot_pct'),  v: inds.census_disability_lot_pct,        ref: _median(_lsoaVals('census_disability_lot_pct')),        wh: true,  dp: 1 },
-    { l: indLabel('census_provides_unpaid_care_pct'),        v: inds.census_provides_unpaid_care_pct,  ref: _median(_lsoaVals('census_provides_unpaid_care_pct')),  wh: false, dp: 1 },
-    { l: indLabel('fuel_poverty_pct'),                v: inds.fuel_poverty_pct,                 ref: _median(_lsoaVals('fuel_poverty_pct')),                 wh: true,  dp: 1 },
-    { l: indLabel('census_unemployed_pct'),                  v: inds.census_unemployed_pct,            ref: _median(_lsoaVals('census_unemployed_pct')),            wh: true,  dp: 1 },
-    { l: indLabel('claimant_rate_pct'),       v: inds.claimant_rate_pct,                ref: _median(_lsoaVals('claimant_rate_pct')),                wh: true,  dp: 1 },
+    { k: 'census_good_health_pct', l: indLabel('census_good_health_pct'),       v: inds.census_good_health_pct,           ref: _median(_lsoaVals('census_good_health_pct')),           wh: false, dp: 0 },
+    { k: 'census_bad_health_pct', l: indLabel('census_bad_health_pct'),         v: inds.census_bad_health_pct,            ref: _median(_lsoaVals('census_bad_health_pct')),            wh: true,  dp: 1 },
+    { k: 'census_disability_any_pct', l: indLabel('census_disability_any_pct'),            v: inds.census_disability_any_pct,        ref: _median(_lsoaVals('census_disability_any_pct')),        wh: true,  dp: 1 },
+    { k: 'census_disability_lot_pct', l: indLabel('census_disability_lot_pct'),  v: inds.census_disability_lot_pct,        ref: _median(_lsoaVals('census_disability_lot_pct')),        wh: true,  dp: 1 },
+    { k: 'census_provides_unpaid_care_pct', l: indLabel('census_provides_unpaid_care_pct'),        v: inds.census_provides_unpaid_care_pct,  ref: _median(_lsoaVals('census_provides_unpaid_care_pct')),  wh: false, dp: 1 },
+    { k: 'fuel_poverty_pct', l: indLabel('fuel_poverty_pct'),                v: inds.fuel_poverty_pct,                 ref: _median(_lsoaVals('fuel_poverty_pct')),                 wh: true,  dp: 1 },
+    { k: 'census_unemployed_pct', l: indLabel('census_unemployed_pct'),                  v: inds.census_unemployed_pct,            ref: _median(_lsoaVals('census_unemployed_pct')),            wh: true,  dp: 1 },
+    { k: 'claimant_rate_pct', l: indLabel('claimant_rate_pct'),       v: inds.claimant_rate_pct,                ref: _median(_lsoaVals('claimant_rate_pct')),                wh: true,  dp: 1 },
   ], { width: 408, padL: 164 });   // room for the display labels
 
   // IMD domains as a dot plot: where this LSOA sits among London's LSOAs.
@@ -13377,6 +13495,7 @@ window.generateLSOAReport = function(code) {
     'crime_robbery_12mo', 'crime_vehicle_12mo', 'crime_drug_offences_12mo', 'crime_public_order_12mo',
     'crime_arson_12mo', 'crime_weapons_12mo', 'crime_misc_society_12mo'];
   const crimeRows = crimeCats.map(k => ({
+    k: k,
     l: indLabel(k),
     v: _fmt(inds[k]),
     ref: _median(_lsoaVals(k)),
@@ -13393,7 +13512,7 @@ window.generateLSOAReport = function(code) {
     ['green_local_pct',         '#5FB3B0'],
     ['green_neighbourhood_pct', '#5FB3B0'],
     ['blue_commitment_pct',     '#1F4E8C'],
-  ].map(([k, c]) => ({ l: indLabel(k), v: _fmt(inds[k]), c }));
+  ].map(([k, c]) => ({ k: k, l: indLabel(k), v: _fmt(inds[k]), c }));
   const greenSVG = _chartHbar(greenRows, { width: 780, padL: 300, max: 100, dp: 0, unit: '%' });
   // Named from the indicator's own metadata, the same entry the map's info
   // panel reads, so the chart and the map credit one publisher.
@@ -13538,8 +13657,8 @@ window.generateLSOAReport = function(code) {
     ${_kpi('Population',     popN  != null ? Math.round(popN).toLocaleString('en-GB') : null, 'Census 2021')}
     ${_kpi('Deprivation score', score != null ? score.toFixed(indDecimals('imd_score')) : null, 'IMD 2025, higher is more deprived', _ctxBar(imdPct, 'lower-better'))}
     ${_kpi('Deprivation decile', decile != null ? decile + ' of 10' : null, 'where 1 is the most deprived tenth')}
-    ${_kpi('Good health',    goodH != null ? goodH.toFixed(indDecimals('census_good_health_pct')) + '%' : null, 'of residents', _ctxBar(goodHpct, 'higher-better'))}
-    ${_kpi('Bad health',     badH  != null ? badH.toFixed(indDecimals('census_bad_health_pct')) + '%' : null, 'of residents', _ctxBar(badHpct, 'lower-better'))}
+    ${_kpi(indLabel('census_good_health_pct'), goodH != null ? goodH.toFixed(indDecimals('census_good_health_pct')) + '%' : null, 'of residents', _ctxBar(goodHpct, 'higher-better'))}
+    ${_kpi(indLabel('census_bad_health_pct'), badH  != null ? badH.toFixed(indDecimals('census_bad_health_pct')) + '%' : null, 'of residents', _ctxBar(badHpct, 'lower-better'))}
     ${_kpi('Disabled residents', disAny != null ? disAny.toFixed(indDecimals('census_disability_any_pct')) + '%' : null, 'of residents', _ctxBar(disAnyPct, 'lower-better'))}
   </div>
 
@@ -14287,7 +14406,7 @@ function renderTopBottom() {
   let where = PH_AREA;
   if (typeof focusActive === 'function' && focusActive()) {
     const inFocus = rows.filter(r => ladInFocus(r.lad));
-    if (inFocus.length >= 6) { rows = inFocus; where = focusLabel(); }
+    if (inFocus.length >= 6) { rows = inFocus; where = focusedIcb ? focusLabel() : ladPhrase(focusLabel()); }
   }
   if (rows.length < 3) { panel.style.display = 'none'; return; }
   rows.sort((a, b) => a.v - b.v);
@@ -14561,7 +14680,7 @@ function _syncScaleNumbers() {
       ? _e(`${meta.g} · ${meta.src}${fmtPeriod(meta.yr) ? ` (${fmtPeriod(meta.yr)})` : ''}${avgNote}`) +
         (age ? ' · <span class="ov-old">' + _e(age) + '</span>' : '') +
         (caution ? '<span class="ov-caution">' + _e(caution) + '</span>' : '') +
-        (nativeG === 'msoa' && drawnLvl === 'msoa' ? '<span class="ctx">Hover an MSOA to see whether it differs from England by OHID\'s test.</span>' : '')
+        (nativeG === 'msoa' && drawnLvl === 'msoa' ? '<span class="ctx">Select an MSOA to see whether its figure differs from England\'s, by OHID\'s test.</span>' : '')
       : '';
   }
 }
@@ -15244,7 +15363,7 @@ function _refreshUI() {
       // fact twice, in the two places most likely to be read together.
       // The strip's job is the scope: where you are and what is drawn on it.
       if (typeof curOv !== 'undefined' && curOv && curOv !== 'none') {
-        parts.push(`overlay <b>${_ovLabel(curOv)}</b>`);
+        parts.push(`coloured by <b>${_ovLabel(curOv)}</b>`);
       }
       if (typeof showCore20Overlay !== 'undefined' && showCore20Overlay) {
         parts.push('<b>Core20</b> only');
@@ -15261,7 +15380,7 @@ function _refreshUI() {
     const box = document.getElementById('filter-chips');
     if (box) {
       box.innerHTML = '';
-      const addChip = (cls, label, onClear) => {
+      const addChip = (cls, label, onClear, xLabel) => {
         const c = document.createElement('span');
         c.className = 'chip ' + (cls || '');
         c.innerHTML = `<span>${label}</span>`;
@@ -15269,8 +15388,8 @@ function _refreshUI() {
         x.type = 'button';
         x.className = 'chip-x';
         x.innerHTML = ico('x', 'ic-sm');
-        x.title = 'Clear this filter';
-        x.setAttribute('aria-label', 'Clear this filter');
+        x.title = xLabel || 'Clear this filter';
+        x.setAttribute('aria-label', xLabel || 'Clear this filter');
         x.addEventListener('click', () => { try { onClear(); } catch(e){} _refreshUI(); });
         c.appendChild(x);
         box.appendChild(c);
@@ -15290,10 +15409,10 @@ function _refreshUI() {
         });
       }
       if (typeof curOv !== 'undefined' && curOv && curOv !== 'none') {
-        addChip('overlay', 'Overlay: ' + _ovLabel(curOv), () => {
+        addChip('overlay', _ovLabel(curOv), () => {
           const sel = document.getElementById('ov');
           if (sel) { sel.value = 'none'; sel.dispatchEvent(new Event('change')); }
-        });
+        }, 'Remove this indicator');
       }
       if (typeof showCore20Overlay !== 'undefined' && showCore20Overlay) {
         addChip('core20', 'Core20 only', () => {
@@ -16062,7 +16181,20 @@ function _dropSearchPin(item) {
     if (a) a.addEventListener('click', ev => { ev.preventDefault(); _clearSearchPin(); });
   });
 }
+/* On a phone the search box sits beside the More button in the drawer and
+   is too narrow for the full prompt, which was cut to "...GP or charit".
+   The shorter one fits; the box's accessible name stays the same. */
+(function () {
+  const inp = document.getElementById('hdr-search-input');
+  if (!inp || !window.matchMedia) return;
+  const full = inp.getAttribute('placeholder') || '';
+  const mq = window.matchMedia('(max-width: 899px)');
+  const set = () => inp.setAttribute('placeholder', mq.matches ? 'Postcode, ward or GP' : full);
+  set();
+  if (mq.addEventListener) mq.addEventListener('change', set); else if (mq.addListener) mq.addListener(set);
+})();
 function _searchPickResult(item) {
+  _clearSearchLsoaOutline();
   const input = document.getElementById('hdr-search-input');
   const results = document.getElementById('hdr-search-results');
   if (input) input.value = item.label;
@@ -16099,6 +16231,10 @@ function _searchPickResult(item) {
    loaded first, then the map moves to the LSOA level and the LSOA is selected
    as if it had been clicked. An indicator with no LSOA figures keeps its own
    level, so the LSOA's profile opens and a pin marks where it is instead. */
+var _searchLsoaOutline = null;
+function _clearSearchLsoaOutline() {
+  if (_searchLsoaOutline) { try { map.removeLayer(_searchLsoaOutline); } catch (e) {} _searchLsoaOutline = null; }
+}
 function _searchPickLsoa(item) {
   if (typeof ensureLsoaLayer !== 'function') return;
   ensureLsoaLayer().then(lyrs => {
@@ -16116,6 +16252,14 @@ function _searchPickLsoa(item) {
     } else {
       selLSOA = item._code;
       showLSOA(lyr.feature);
+      // The LSOA layer is not on the map at this level, so draw the picked
+      // LSOA's edge on its own, without a fill, so the reader can see its
+      // extent over the ward colours.
+      _clearSearchLsoaOutline();
+      _searchLsoaOutline = L.geoJSON(lyr.feature, {
+        style: { color: LSOA_EDGE.selected.color, weight: LSOA_EDGE.selected.weight, opacity: 1, fillOpacity: 0 },
+        interactive: false,
+      }).addTo(map);
       const c = lyr.getBounds().getCenter();
       _dropSearchPin({ type: 'LSOA', label: item.label, sub: item.sub, _lat: c.lat, _lng: c.lng });
     }
@@ -16255,7 +16399,7 @@ function _renderPostcodeRow(results, pq, q) {
   }, () => {
     if (!current()) return;
     const sub = row.querySelector('.sr-sub');
-    sub.textContent = 'Could not reach the postcode lookup. Select to try again.';
+    sub.textContent = 'We could not reach the postcode lookup, so select this to try again.';
     row.style.cursor = '';
     row.onclick = () => {
       sub.textContent = 'Looking up…';
@@ -18012,6 +18156,7 @@ var PH_SHOW = {
      panels down the right-hand side instead (workplan 2.10), nothing is
      lifted, and the map's furniture moves left of them. */
   var shortMq = window.matchMedia('(max-height: 500px)');
+  var narrowMq = window.matchMedia('(max-width: 900px)');
   function isShort() { return shortMq.matches; }
   function sideSync() {
     if (!mapWrap) return;
@@ -18050,6 +18195,10 @@ var PH_SHOW = {
     sideSync();
     var cap = stateHeights()[sheetState];
     var h = open ? Math.min(sheet.offsetHeight || cap, cap) : 0;
+    // On a phone the peek sheet has no max-height and is as tall as its
+    // head, which grows when the indicator line wraps, so it is lifted by
+    // its rendered height rather than capped at the nominal peek height.
+    if (open && sheetState === 1 && narrowMq.matches) h = Math.ceil(sheet.getBoundingClientRect().height) || h;
     var px = liftPx(open ? h : -1) + 'px';
     mapWrap.style.setProperty('--sheet-lift', px);
     // Also on the root, for the development banner, which is position:fixed
@@ -18073,6 +18222,15 @@ var PH_SHOW = {
   // The height animates, so the value read straight after the class change is
   // mid-transition. Set the optimistic one now and correct it when the
   // transition lands.
+  // Moving between a capped height and none starts no transition, and the
+  // head's height changes as its text fills in, so a change of size lifts too.
+  if (typeof ResizeObserver === 'function') {
+    var _liftH = -1;
+    new ResizeObserver(function () {
+      var hh = Math.round(sheet.getBoundingClientRect().height);
+      if (hh !== _liftH) { _liftH = hh; lift(); }
+    }).observe(sheet);
+  }
   sheet.addEventListener('transitionend', function (e) {
     if (e.propertyName === 'max-height') lift();
   });
@@ -18233,8 +18391,6 @@ var PH_SHOW = {
       .map(function (x) { return (x[0] ? x[0].toLocaleString() : 'no') + ' ' + (x[0] === 1 ? x[1] : x[2]); });
     return parts.join(' and ');
   }
-  // "the City of London", but "Brent".
-  function ladPhrase(lad) { return (/^City of /.test(lad) ? 'the ' : '') + lad; }
   // Why a ward has no deprivation score, counted from its LA's own wards.
   function noScoreReason(w) {
     var withScore = 0, lsoas = 0, all = 0;
@@ -18246,16 +18402,22 @@ var PH_SHOW = {
     if (!withScore || lsoas < 2) {
       return 'because deprivation is measured for LSOAs and none of them is counted in this ward';
     }
+    // One to nine in words, as everywhere else in prose.
+    var nw = function (n) { return n >= 0 && n < 10 ? ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'][n] : n.toLocaleString('en-GB'); };
     return 'because deprivation is measured for LSOAs and each of ' + esc(ladPhrase(w.lad)) + "'s " +
-      lsoas + ' LSOAs is counted in one of ' + (withScore * 2 < all ? 'just ' : '') +
-      withScore + ' of its ' + all + ' wards';
+      nw(lsoas) + ' LSOAs is counted in one of ' + (withScore * 2 < all ? 'just ' : '') +
+      nw(withScore) + ' of its ' + nw(all) + ' wards';
   }
 
   function summaryText(w) {
     var bits = [], i = w.inds, name = esc(w.name);
     var pop = num(i.census_population), score = num(i.imd_score);
     var small = pop !== null && pop < SMALL_WARD;
-    var share = (score !== null && !small) ? (function () {
+    // A ward with no resident count (Walbrook, whose one LSOA gives it a
+    // deprivation score) is not ranked or compared either: it has only a
+    // handful of residents, and nothing here says how many.
+    var unranked = small || pop === null;
+    var share = (score !== null && !unranked) ? (function () {
       var s = values('imd_score'), below = 0, above = 0;
       for (var j = 0; j < s.length; j++) { if (s[j] < score) below++; else if (s[j] > score) above++; }
       return s.length ? { below: below, above: above, n: s.length } : null;
@@ -18289,6 +18451,11 @@ var PH_SHOW = {
             'so this summary does not compare them with other wards.');
         }
         if (score === null) bits.push('It has no deprivation score of its own, ' + noScoreReason(w) + '.');
+      } else if (score !== null) {
+        // Census figures missing but a deprivation score present.
+        if (svc) bits.push(name + ' has ' + svc + ' within its boundary.');
+        bits.push(name + ' has no Census figures of its own, because the small areas they are counted in ' +
+          'are each matched to a neighbouring ward, so this summary does not rank it or compare it with other wards.');
       } else {
         // "has 2 pharmacies ..., but no Census figures", unless it has
         // neither, when the services follow as a sentence of their own.
@@ -18301,7 +18468,7 @@ var PH_SHOW = {
     }
     // Comparisons with the medians, which a ward of a few hundred people does
     // not get: its figures are a handful of residents either way.
-    if (small) return bits.join(' ');
+    if (unranked) return bits.join(' ');
     // The medians are compared at the precision they are shown at, so a ward
     // is never "above" a median printed as the same number.
     var vs = function (v, m, dp) {
@@ -18393,7 +18560,7 @@ var PH_SHOW = {
         // nothing and fills the table with dashes.
         var v = num(cmpIndsOf(n)[r.k]);
         return '<td>' + (v == null ? '—' :
-          v.toLocaleString(undefined, { maximumFractionDigits: r.dp }) + (r.pct ? '%' : '')) + '</td>';
+          fmtNum(v, indDecimals(r.k)) + (r.pct ? '%' : '')) + '</td>';
       }).join('');
       return '<tr><td>' + esc(labelOf(r.k)) + '</td>' + cells + '</tr>';
     }).join('');
@@ -18406,8 +18573,8 @@ var PH_SHOW = {
       '<div class="ws-note">Deprivation deciles run 1 (the most deprived tenth nationally) to 10 (the least). ' +
       'The ward figure is a population-weighted mean of the deciles of the LSOAs inside it, so it is not itself a decile.' +
       (cmpLevel === 'ward' ? ''
-        : ' Figures for ' + esc(cmpLvl().a) + ' are added up from its wards: counts summed, ' +
-          'everything else weighted by population.') + '</div>' +
+        : ' These figures are worked out from the wards in each ' + esc(cmpLvl().one) + ', adding up counts and ' +
+          'weighting everything else by population, so they are not published ' + esc(cmpLvl().one) + ' statistics.') + '</div>' +
       '</div>';
   }
 
@@ -18611,6 +18778,16 @@ var PH_SHOW = {
     lift();
   }
   function resumeSheet() {
+    // A ward selected while Compare had the map is the one now in the
+    // profile, the link and the tab title, so the sheet shows that one.
+    // The Compare pane is switched off just after this runs, and show() pins
+    // rather than opens while it is on, so it waits for the switch.
+    if (sheetSuspended && typeof selW !== 'undefined' && selW && selW !== currentWard) {
+      sheetSuspended = false;
+      var wn = selW;
+      setTimeout(function () { if (!inCompareMode() && selW === wn) show(wn); }, 0);
+      return;
+    }
     if (sheetSuspended && currentWard) {
       sheet.classList.add('open');
       applyState();
@@ -18852,15 +19029,15 @@ var PH_SHOW = {
     // CSV exists for, while an extra column is ignored by anything that does
     // not ask for it. Line ends inside quoted cells are respected.
     if (/^text\/csv/.test(mime || '')) {
-      var src = csvCell('PopHealth Map (pophealth.uk), independent project, not an NHS service' +
-        (DATA_DATE ? '; data updated ' + DATA_DATE : ''));
+      var src = csvCell('PopHealth Map (pophealth.uk), an independent project and not an NHS service' +
+        (DATA_DATE ? ', with figures updated on ' + fmtDate(DATA_DATE) : ''));
       var out = '', q = false, row = 0, start = 0, body = String(text).replace(/\n+$/, '');
       for (var ci = 0; ci <= body.length; ci++) {
         var ch = body[ci];
         if (ch === '"') q = !q;
         if ((ch === '\n' && !q) || ci === body.length) {
           var line = body.slice(start, ci).replace(/\r$/, '');
-          out += line + (line ? ',' + (row ? src : 'source') : '') + '\n';
+          out += line + (line ? ',' + (row ? src : 'Source') : '') + '\n';
           row++; start = ci + 1;
         }
       }
@@ -19160,7 +19337,7 @@ var PH_SHOW = {
       if (!pick.hidden) {
         pick.innerHTML = '<select class="q-chip outline" id="cmp-add-area" style="width:100%" ' +
           'aria-label="Add ' + esc(lvl.a) + '">' +
-          '<option value="">+ add ' + esc(lvl.a) + '</option>' +
+          '<option value="">Add ' + esc(lvl.a) + '</option>' +
           left.map(function (n) {
             return '<option value="' + esc(n) + '">' + esc(cmpAreaLabel(n)) + '</option>';
           }).join('') + '</select>' +
@@ -19180,7 +19357,7 @@ var PH_SHOW = {
         ' role="button" tabindex="0">' + esc(labelOf(m.k)) + '</span>';
     }).join('') +
       '<select class="q-chip outline" id="cmp-add-metric" aria-label="Add an indicator">' +
-      '<option value="">+ add</option>' + indicatorOptions(null) + '</select>';
+      '<option value="">Add an indicator</option>' + indicatorOptions(null) + '</select>';
 
     cmpQuickEl.innerHTML = quickView();
     renderCmpCaution();
@@ -19206,7 +19383,7 @@ var PH_SHOW = {
         ? 'Pin one more ' + lvl.one + ' to compare it with the first, and each one keeps its colour on the map.'
         : 'Pin two or more ' + lvl.many + ' to compare them, and each one keeps its colour on the map.';
     }
-    var bits = [];
+    var bits = [], byDec = esc(phraseFor('imd_decile_mean'));
     var decs = pinned.map(function (n) { return num(cmpIndsOf(n).imd_decile_mean); })
                      .filter(function (v) { return v !== null; });
     if (decs.length === pinned.length) {
@@ -19216,22 +19393,27 @@ var PH_SHOW = {
       // wards around decile 9 came out as "the most deprived 90% of England".
       var leastDep = Math.max.apply(null, decs);
       var mostDep  = Math.min.apply(null, decs);
+      var allOf = pinned.length === 2 ? 'Both pinned ' : 'All ' + cbNum(pinned.length) + ' pinned ';
       if (leastDep <= 5.5) {
-        bits.push('All ' + pinned.length + ' pinned ' + lvl.many + ' sit in the most deprived <strong>' +
-          decileBand(leastDep).pct + '%</strong> of England on the mean decile of their LSOAs.');
+        bits.push(allOf + lvl.many + ' are in the most deprived <strong>' +
+          decileBand(leastDep).pct + '%</strong> of England by ' + byDec + '.');
       } else if (mostDep > 5.5) {
-        bits.push('All ' + pinned.length + ' pinned ' + lvl.many + ' sit in the least deprived <strong>' +
-          decileBand(mostDep).pct + '%</strong> of England on the mean decile of their LSOAs.');
+        bits.push(allOf + lvl.many + ' are in the least deprived <strong>' +
+          decileBand(mostDep).pct + '%</strong> of England by ' + byDec + '.');
       } else {
         // Straddling the middle, where neither framing says anything: one of
         // these wards is in the more deprived half and another is not, and any
         // single band wide enough to hold both is too wide to be worth stating.
-        bits.push('These ' + pinned.length + ' ' + lvl.many + ' sit either side of the national middle, from decile <strong>' +
+        bits.push((pinned.length === 2 ? 'These two ' : 'These ' + cbNum(pinned.length) + ' ') + lvl.many +
+          ' sit either side of the national middle, from <strong>' +
           mostDep.toFixed(1) + '</strong> to <strong>' + leastDep.toFixed(1) +
-          '</strong> on the mean decile of their LSOAs.');
+          '</strong> by ' + byDec + '.');
       }
     }
-    // Name the outlier on each active metric that actually separates them.
+    // Name the outlier on each active indicator that actually separates them.
+    // Several outliers for the same area are joined into one sentence, so
+    // the view does not read as a run of near-identical lines.
+    var tops = {}, topOrder = [];
     cmpActive().slice(0, 3).forEach(function (m) {
       var rows = pinned.map(function (n) { return { n: n, v: num(cmpIndsOf(n)[m.k]) }; })
                        .filter(function (r) { return r.v !== null; });
@@ -19252,20 +19434,31 @@ var PH_SHOW = {
       // means the least deprived, which reads as the opposite. The direction
       // is spelled out for those two rather than left to the word "highest".
       if (m.k === 'imd_decile_mean') {
-        bits.push('<strong>' + esc(cmpAreaLabel(top.n)) + '</strong> is the least deprived of them on the mean ' +
-          'decile of its LSOAs (' + vs + ')' + context + '.');
+        bits.push('<strong>' + esc(cmpAreaLabel(top.n)) + '</strong> is the least deprived of them by ' + byDec +
+          ' (' + vs + ')' + context + '.');
         return;
       }
       if (m.k === 'imd_score') {
-        bits.push('<strong>' + esc(cmpAreaLabel(top.n)) + '</strong> is the most deprived of them by IMD score (' +
-          vs + ')' + context + '.');
+        bits.push('<strong>' + esc(cmpAreaLabel(top.n)) + '</strong> is the most deprived of them by ' +
+          esc(phraseFor('imd_score').replace(/\s*\([^)]*\)$/, '')) + ' (' + vs + ')' + context + '.');
         return;
       }
       // The display label, not the long description: lowercasing that gave
       // "the highest mean imd decile of the lsoas in", truncated mid-phrase.
-      var lbl = phraseFor(m.k);
-      bits.push('<strong>' + esc(cmpAreaLabel(top.n)) + '</strong> has the highest figure for ' + esc(lbl) +
-        ', at ' + vs + context + '.');
+      if (!tops[top.n]) { tops[top.n] = []; topOrder.push(top.n); }
+      tops[top.n].push({ lbl: phraseFor(m.k), vs: vs, med: med !== null ? fmtVal(med, m.k) : null });
+    });
+    topOrder.forEach(function (n) {
+      var t = tops[n], who = '<strong>' + esc(cmpAreaLabel(n)) + '</strong>';
+      if (t.length === 1) {
+        bits.push(who + ' has the highest figure for ' + esc(t[0].lbl) + ', at ' + t[0].vs +
+          (t[0].med !== null ? ' against a ' + PH_AREA + ' ward median of ' + t[0].med : '') + '.');
+        return;
+      }
+      var parts = t.map(function (x, i) {
+        return esc(x.lbl) + ' (' + x.vs + (x.med !== null ? (i === 0 ? ', against a ' + PH_AREA + ' ward median of ' : ', against ') + x.med : '') + ')';
+      });
+      bits.push(who + ' has the highest figures for ' + parts.slice(0, -1).join(', ') + ' and ' + parts[parts.length - 1] + '.');
     });
     if (bits.length === 0) {
       return 'The pinned ' + lvl.many + ' do not differ on the indicators chosen, or those figures are missing for them.';
@@ -19311,8 +19504,8 @@ var PH_SHOW = {
     // Said once, where the figures are, rather than only in the drawer that
     // has to be opened to see them.
     if (cmpLevel !== 'ward' && pinned.length) {
-      notes.push('These figures are added up from the wards in each ' + esc(cmpLvl().one) +
-        ': counts summed, everything else weighted by population. They are not published ' +
+      notes.push('These figures are worked out from the wards in each ' + esc(cmpLvl().one) +
+        ', adding up counts and weighting everything else by population, so they are not published ' +
         esc(cmpLvl().one) + ' statistics.');
     }
     cmpCautionEl.innerHTML = notes.map(function (n) {
@@ -19379,8 +19572,9 @@ var PH_SHOW = {
     cmpLegendEl.innerHTML = mets.length
       ? '<span class="cmp-key">' + ico('arrow-up', 'ic-sm') + ' highest ' + ico('arrow-down', 'ic-sm') + ' lowest</span>' +
         ((cmpLevel === 'ward' || cmpLevel === 'lsoa') ? ''
-          : 'Every figure here is added up from the wards in the ' + esc(lvl.one) +
-            ': counts are summed, everything else is weighted by population. ') +
+          : 'These figures are worked out from the wards in each ' + esc(lvl.one) +
+            ', adding up counts and weighting everything else by population, so they are not published ' +
+            esc(lvl.one) + ' statistics. ') +
         'The arrows mark the highest and lowest of the ' +
         (pinned.length === 1 ? 'pinned area' : pinned.length + ' pinned areas') +
         ', not the best and worst: all of them can be high, or all of them low.'
@@ -19591,14 +19785,16 @@ var PH_SHOW = {
     if (!pinned.length) return;
     var mets = cmpActive();
     var added = (cmpLevel === 'borough' || cmpLevel === 'icb');
-    var head = ['code', 'name'];
-    if (cmpLevel === 'lsoa') head.push('ward');
+    // The same identifier headings as the Data export, for the level chosen.
+    var idName = { ward: 'Ward', lsoa: 'LSOA', borough: 'LA', icb: 'ICB' }[cmpLevel] || 'Area';
+    var head = [idName + ' code', idName + ' name'];
+    if (cmpLevel === 'lsoa') head.push('Ward');
     if (!added) head.push('LA');
     // Above a ward the figures are added up, and the file says from how many
     // wards and by what rule, which a spreadsheet away from this page has no
     // other way of recording.
-    if (added) head.push('wards counted', 'method');
-    // The display label and its unit, as the "+ add" menu shows them.
+    if (added) head.push('Wards counted', 'Method');
+    // The display label and its unit, as the "Add an indicator" menu shows them.
     head = head.concat(mets.map(function (m) { return headerOf(m.k); }));
     var lines = [head.map(csvCell).join(',')];
     pinned.forEach(function (n) {
@@ -19613,8 +19809,7 @@ var PH_SHOW = {
       }
       var inds = cmpIndsOf(n);
       mets.forEach(function (m) {
-        var v = num(inds[m.k]);
-        row.push(v === null ? '' : v);
+        row.push(indCsvValue(num(inds[m.k]), m.k));
       });
       lines.push(row.map(csvCell).join(','));
     });
@@ -21171,17 +21366,17 @@ var PH_SHOW = {
     var agg = rbAggregate();
     var keys = Object.keys(agg.indicators).sort();
     var lines = [];
-    lines.push(['area', rbAreaName()].map(csvCell).join(','));
+    lines.push(['Area', rbAreaName()].map(csvCell).join(','));
     lines.push(['LSOAs', agg.lsoas].map(csvCell).join(','));
     lines.push([]);
-    lines.push(['indicator', 'value', 'method'].map(csvCell).join(','));
+    lines.push(['Indicator', 'Value', 'Method'].map(csvCell).join(','));
     keys.forEach(function (k) {
-      lines.push([headerOf(k), agg.indicators[k],
+      lines.push([headerOf(k), indCsvValue(agg.indicators[k], k),
                   rbIsAdditive(k) ? 'summed' : 'population-weighted mean']
                  .map(csvCell).join(','));
     });
     lines.push([]);
-    lines.push(['lsoa_code', 'lsoa_name', 'ward', 'LA', 'population'].map(csvCell).join(','));
+    lines.push(['LSOA code', 'LSOA name', 'Ward', 'LA', 'Population'].map(csvCell).join(','));
     rbSelected.forEach(function (code) {
       var pr = rbProps(code);
       var i = rbRecord(code) || {};
@@ -21205,8 +21400,8 @@ var PH_SHOW = {
       var v = agg.indicators[k];
       return '<tr><td>' + esc(labelOf(k)) + '</td>' +
         '<td class="n">' + (rbIsAdditive(k)
-          ? Math.round(v).toLocaleString()
-          : (Math.round(v * 100) / 100).toLocaleString()) +
+          ? Math.round(v).toLocaleString('en-GB')
+          : fmtNum(v, indDecimals(k))) +
         // The unit on the figure, as in the profile: "%", " m", " µg/m³".
         indValueUnit(k) + '</td>' +
         '<td class="m">' + (rbIsAdditive(k) ? 'summed' : 'population-weighted') + '</td></tr>';
@@ -21477,9 +21672,9 @@ var PH_SHOW = {
   // The unit as a column heading gives it: symbols that are standard in a
   // table stay, metres are spelled out, and a standardised ratio says so.
   function cbUnit(k) {
-    if (typeof ovIsStdRatio === 'function' && ovIsStdRatio(k)) return 'ratio where England is 100';
+    if (typeof ovIsStdRatio === 'function' && ovIsStdRatio(k)) return 'ratio, where England is 100';
     var u = String(cbMeta(k).u || '').trim();
-    return u === 'Years' ? 'years' : u === 'm' ? 'metres' : u;
+    return u === 'm' ? 'metres' : u;
   }
   function cbLaWide(k) { return cbLevel !== 'borough' && isBoroughLevelKey(k); }
   // Does the label already say it? Matched as whole words, singular or plural.
@@ -21500,13 +21695,7 @@ var PH_SHOW = {
   }
   // A figure as the file writes it: to the indicator's own decimal places
   // (IND_DECIMALS, shared with the map), and blank where there is none.
-  function cbCell(v, k) {
-    if (v === null || v === undefined || v === '') return '';
-    var n = typeof v === 'number' ? v : parseFloat(v);
-    if (!isFinite(n)) return String(v);
-    var s = n.toFixed(indDecimals(k));
-    return /^-0(\.0+)?$/.test(s) ? s.slice(1) : s;
-  }
+  function cbCell(v, k) { return indCsvValue(v, k); }
 
   // Steps 1 and 2 fold to one line once answered; Change opens them again.
   var cbFold = { 1: false, 2: false };
@@ -21837,8 +22026,9 @@ var PH_SHOW = {
 
     L.push('What the file holds');
     para('The file has ' + cbNum(out.rows) + ' row' + (out.rows === 1 ? '' : 's') + ', one for each ' + lv.label +
-      ' in ' + (cbScope ? where : 'all of ' + PH_AREA) + ' in alphabetical order, and a column for each of the ' +
-      cbNum(out.cols) + ' indicator' + (out.cols === 1 ? '' : 's') + ' you chose. Each figure is the one the map ' +
+      ' in ' + (cbScope ? where : 'all of ' + PH_AREA) + ' in alphabetical order, and ' +
+      (out.cols === 1 ? 'one column for the indicator you chose' : 'a column for each of the ' + cbNum(out.cols) + ' indicators you chose') +
+      '. Each figure is the one the map ' +
       'shows for that area, and the file never adds areas together, which is what Custom area is for. ' +
       'A blank cell means there is no figure for that area, often because the publisher withheld it to ' +
       'protect privacy, so please do not read it as zero.' +
@@ -21894,7 +22084,7 @@ var PH_SHOW = {
       row('Source', cbSourceText(k));
       L.push('');
     });
-    L.push((out.columns.length + 1) + '. source');
+    L.push((out.columns.length + 1) + '. Source');
     L.push('   Names this site and the date of the figures on every row, so the file still says where it came ' +
       'from if it is passed on.', '');
 
@@ -22079,7 +22269,8 @@ var PH_SHOW = {
         var ovNow = _activeOv();
         if (ovNow && ovNow !== 'none' && !ovHasLevel(ovNow, 'lsoa') && !_touring()) {
           _dlHintWhenDrawn('lsoa', 'Custom area is built from LSOAs, so the map is showing LSOAs while ' +
-            'it is open. They are not coloured, because ' + indLabel(ovNow) + ' has no LSOA figures.', 6000);
+            'it is open. They are not coloured, because ' + indLabel(ovNow) + ' has no LSOA figures.' +
+            _levelTwinText(ovNow, 'lsoa'), 6000);
         }
       }
       renderReportPane();
@@ -22583,7 +22774,7 @@ var PH_SHOW = {
                           .map(function (c) { return c.key; });
     // The E05 code first: ward names repeat across boroughs, so the code is
     // the only column another dataset can be joined on.
-    var header = ['code', 'ward', 'LA']
+    var header = ['Ward code', 'Ward name', 'LA']
       .concat(q.services.map(function (id) { return serviceById(id).label; }))
       .concat([headerOf(q.sort)])
       .concat(condKeys.map(headerOf));
@@ -22591,8 +22782,8 @@ var PH_SHOW = {
     rows.forEach(function (r) {
       var inds = indsOf(r.name);
       lines.push([r.code || '', r.name, r.lad].concat(r.counts)
-        .concat([r.sortVal == null ? '' : r.sortVal])
-        .concat(condKeys.map(function (k) { var v = num(inds[k]); return v == null ? '' : v; }))
+        .concat([indCsvValue(r.sortVal, q.sort)])
+        .concat(condKeys.map(function (k) { return indCsvValue(num(inds[k]), k); }))
         .map(csvCell).join(','));
     });
     download('pophealth-query.csv', lines.join('\n'), 'text/csv;charset=utf-8');
