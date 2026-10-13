@@ -403,6 +403,150 @@ def postcode_area(pc: str) -> str:
     m = re.match(r"^[A-Z]+", normalise_postcode(pc))
     return m.group(0) if m else ""
 
+# Names and addresses in the NHS registers arrive in capitals. str.title() gets
+# three things wrong in them: it capitalises after an apostrophe ("St Mary'S"),
+# it lower-cases acronyms ("Nhs", "Gp") and it capitalises ordinals ("1St
+# Floor"). title_case() is str.title() with those put right.
+TITLE_ACRONYMS = {w: w for w in (
+    "NHS", "GP", "UK", "CIC", "CIO", "YMCA", "YWCA", "PCN", "ICB", "CCG", "PCT",
+    "PMS", "APMS", "LLP", "PLC", "HMP", "UCL", "UCLH", "ENT", "NE", "NW", "SE", "SW",
+    "II", "III", "IV",
+)}
+TITLE_ACRONYMS.update({"GPS": "GPs", "PCNS": "PCNs", "ICBS": "ICBs"})
+# Short words with no vowel are usually initials ("RJ's Pharmacy", "Brent
+# Central KWH"), except these, which are ordinary abbreviations.
+_TITLE_NOT_INITIALS = {
+    "DR", "DRS", "MR", "MRS", "MS", "MX", "ST", "STS", "LTD", "RD", "CTR", "HTH",
+    "HLTH", "CT", "CL", "STN", "FL", "FLR", "PL", "SQ", "PH", "WM", "GDNS", "GRN",
+    "LN", "PK", "YD", "BLVD", "BLDG", "CRT", "WHF", "HWY", "MT", "MKT", "MDDX",
+}
+_TITLE_PERSON = {"DR", "DRS", "MR", "MRS", "MS", "MISS", "PROF"}
+_TITLE_MINOR = {"and", "of", "for", "in", "on", "at", "upon", "with", "to"}
+_TITLE_APOS_TAIL = {"s", "t", "d", "ll", "re", "ve", "m"}
+_OUTWARD_CODE = re.compile(r"^[A-Z]{1,2}\d{1,2}[A-Z]?$")
+_INWARD_CODE = re.compile(r"^\d[A-Z]{2}$")
+_ORDINAL = re.compile(r"^(\d+)(ST|ND|RD|TH)$", re.I)
+
+
+def _title_part(p: str, fixed: dict, *, first: bool, initials: bool,
+                after_person: bool, after_minor: bool = False,
+                last: bool = False) -> str:
+    """One word, or one piece of a hyphenated word, in title case."""
+    up = p.upper()
+    if up in fixed:
+        return fixed[up]
+    m = re.match(r"^(.+?)(['’])[Ss]$", p)
+    if m:                                   # possessive: recase the stem alone
+        return _title_part(m.group(1), fixed, first=first, initials=initials,
+                           after_person=after_person, after_minor=after_minor,
+                           last=last) + m.group(2) + "s"
+    m = _ORDINAL.match(p)
+    if m:
+        return m.group(1) + m.group(2).lower()
+    if initials and p.isalpha() and up not in _TITLE_NOT_INITIALS and (
+            (2 <= len(p) <= 4 and not re.search(r"[AEIOUY]", up))
+            or (after_person and len(p) == 2)):
+        return up
+    if not first and not last and (p.lower() in _TITLE_MINOR
+                                   or (after_minor and p.lower() == "the")):
+        return p.lower()          # "Centre for Health", "Health on the Hill"
+    w = p.title()
+    # "O'Brien" keeps its capital, "Can'T" does not.
+    w = re.sub(r"(['’])([A-Za-z]+)",
+               lambda m: m.group(1) + (m.group(2).lower()
+                                       if m.group(2).lower() in _TITLE_APOS_TAIL
+                                       else m.group(2)), w)
+    if re.match(r"^Mc[a-z]{2,}$", w):
+        w = "Mc" + w[2].upper() + w[3:]
+    return w
+
+
+def title_case(text: str, *, initials: bool = False, acronyms: dict | None = None) -> str:
+    """
+    A register name or address line in title case, as a person would write it.
+
+        "ST MARY'S SURGERY"          -> "St Mary's Surgery"
+        "NHS WALK-IN CENTRE"         -> "NHS Walk-in Centre"
+        "4TH FLOOR, 75 OLIVER ROAD"  -> "4th Floor, 75 Oliver Road"
+        "SOHO CENTRE FOR HEALTH"     -> "Soho Centre for Health"
+        "MCCARTHY & O'BRIEN"         -> "McCarthy & O'Brien"
+
+    Acronyms keep their capitals, and so does a postcode. With initials=True,
+    which suits names but not addresses, a short word with no vowel is taken
+    to be initials ("RJ'S PHARMACY" -> "RJ's Pharmacy"), as is a two-letter
+    word after Dr, Mr, Mrs or Ms ("DR AA ANSARI" -> "Dr AA Ansari").
+    """
+    fixed = {**TITLE_ACRONYMS, **(acronyms or {})}
+    tokens = str(text or "").split()
+    out: list[str] = []
+    starts = True               # the next word begins a name or a new phrase
+    after_minor = False         # the last word was "at", "for", "on" and so on
+    prev = ""
+    for n, tok in enumerate(tokens):
+        lead, core, trail = re.match(r"^([^A-Za-z0-9]*)(.*?)([^A-Za-z0-9]*)$",
+                                     tok).groups()
+        up = core.upper()
+        if not core:
+            out.append(tok)
+            after_minor = False
+            if tok in ("-", "\u2013", ":", "|"):
+                starts = True
+            continue
+        if re.match(r"^(?:www\.|https?://)", core, re.I) or re.search(
+                r"\.(?:com|net|org|co\.uk|org\.uk|nhs\.uk)$", core, re.I):
+            word = core.lower()
+        elif _OUTWARD_CODE.match(up) or (_INWARD_CODE.match(up)
+                                        and _OUTWARD_CODE.match(prev.upper())):
+            word = up
+        else:
+            first = starts or "(" in lead
+            after_person = (prev.upper() in _TITLE_PERSON and n + 1 < len(tokens))
+            parts = re.split(r"([-/])", core)
+            word = "".join(
+                p if p in ("-", "/") else
+                _title_part(p, fixed, first=first and i == 0, initials=initials,
+                            after_person=after_person and len(parts) == 1,
+                            after_minor=after_minor and i == 0,
+                            last=n + 1 == len(tokens) and len(parts) == 1)
+                for i, p in enumerate(parts))
+        out.append(lead + word + trail)
+        starts = bool(trail) and trail[-1] in ",:;("
+        after_minor = not trail and word in _TITLE_MINOR
+        prev = core
+    return " ".join(out)
+
+
+def format_uk_phone(raw: str) -> str:
+    """
+    A UK phone number grouped the usual way, or the input tidied if it is not one.
+
+        "02089852795", "020 89852795"  -> "020 8985 2795"
+        "01134960000"                  -> "0113 496 0000"
+        "01708797649"                  -> "01708 797649"
+        "03001234567"                  -> "0300 123 4567"
+        "+44 7700 900123"              -> "07700 900123"
+    """
+    s = " ".join(str(raw or "").split())
+    digits = re.sub(r"[\s().-]", "", s.replace("(0)", ""))
+    if digits.startswith("+44"):
+        digits = "0" + digits[3:]
+    elif digits.startswith("0044"):
+        digits = "0" + digits[4:]
+    if not re.fullmatch(r"0\d{9,10}", digits):
+        return s
+    n = digits
+    if len(n) == 11:
+        if n[1] in "25" or n.startswith("070"):         # 020 7946 0018, 070 personal
+            return f"{n[:3]} {n[3:7]} {n[7:]}"
+        if n[1] == "1" and "1" in (n[2], n[3]):         # 0113 and 0121 areas
+            return f"{n[:4]} {n[4:7]} {n[7:]}"
+        if n[1] in "389":                               # 0300, 0800, 0870, 0900
+            return f"{n[:4]} {n[4:7]} {n[7:]}"
+        return f"{n[:5]} {n[5:]}"                       # 01632 960000, 07700 900123
+    if n[1] in "58":                                    # 0800 123456, 0500 123456
+        return f"{n[:4]} {n[4:]}"
+    return f"{n[:5]} {n[5:]}"                           # 01xxx xxxxx
+
 def _http_json(method: str, url: str, *, source: str, session=None,
                json_body=None, form_body=None, params=None, timeout: int = 60,
                attempts: int = 4):
@@ -1111,7 +1255,7 @@ def run_gp_practices() -> pd.DataFrame:
             & (setting.str.contains("RO76", na=False))
         ]
 
-    owners = {normalise_postcode(r["Postcode"]): (r["Name"] or "").title()
+    owners = {normalise_postcode(r["Postcode"]): title_case(r["Name"], initials=True)
               for _, r in df.iterrows() if normalise_postcode(r["Postcode"])}
     lookup = lookup_postcodes(owners.keys(), source="gp_practices", owners=owners)
 
@@ -1126,14 +1270,14 @@ def run_gp_practices() -> pd.DataFrame:
             continue
         rows.append({
             "code": r["OrganisationCode"],
-            "name": (r["Name"] or "").title(),
+            "name": title_case(r["Name"], initials=True),
             "addr": ", ".join(filter(None, [
-                (r["AddressLine1"] or "").title(),
-                (r["AddressLine2"] or "").title(),
-                (r["AddressLine3"] or "").title(),
+                title_case(r["AddressLine1"]),
+                title_case(r["AddressLine2"]),
+                title_case(r["AddressLine3"]),
             ])),
             "postcode": r["Postcode"],
-            "tel": r["ContactTelephoneNumber"],
+            "tel": format_uk_phone(r["ContactTelephoneNumber"]),
             "lat": lat, "lng": lng,
             "LSOA21CD": lsoa, "WD25CD": wd, "LAD25CD": lad,
             "lad": LAD_NAMES.get(lad, ""),
@@ -1171,7 +1315,7 @@ def run_pharmacies() -> pd.DataFrame:
     )
     df = df[df["StatusCode"].isin(["A", "ACTIVE"])]
 
-    owners = {normalise_postcode(r.get("Postcode", "")): (r.get("Name") or "").title()
+    owners = {normalise_postcode(r.get("Postcode", "")): title_case(r.get("Name"), initials=True)
               for _, r in df.iterrows() if normalise_postcode(r.get("Postcode", ""))}
     lookup = lookup_postcodes(owners.keys(), source="pharmacies", owners=owners)
 
@@ -1186,14 +1330,14 @@ def run_pharmacies() -> pd.DataFrame:
             continue
         rows.append({
             "code": r.get("OrganisationCode", ""),
-            "name": (r.get("Name") or "").title(),
+            "name": title_case(r.get("Name"), initials=True),
             "addr": ", ".join(filter(None, [
-                (r.get("AddressLine1") or "").title(),
-                (r.get("AddressLine2") or "").title(),
-                (r.get("AddressLine4") or "").title(),
+                title_case(r.get("AddressLine1")),
+                title_case(r.get("AddressLine2")),
+                title_case(r.get("AddressLine4")),
             ])),
             "postcode": r.get("Postcode", ""),
-            "tel": r.get("ContactTelephoneNumber", ""),
+            "tel": format_uk_phone(r.get("ContactTelephoneNumber", "")),
             "lat": lat, "lng": lng,
             "LSOA21CD": lsoa, "WD25CD": wd, "LAD25CD": lad,
         })
@@ -1383,7 +1527,7 @@ def run_dentists() -> pd.DataFrame:
                      dtype=str, keep_default_na=False, encoding="latin-1")
     df = df[df["StatusCode"].isin(["A", "ACTIVE"])]
 
-    owners = {normalise_postcode(r["Postcode"]): (r["Name"] or "").title()
+    owners = {normalise_postcode(r["Postcode"]): title_case(r["Name"], initials=True)
               for _, r in df.iterrows() if normalise_postcode(r["Postcode"])}
     lookup = lookup_postcodes(owners.keys(), source="dentists", owners=owners)
 
@@ -1397,7 +1541,7 @@ def run_dentists() -> pd.DataFrame:
         if lad not in SCOPE_LADS:
             continue
         by_pc[pc] = {
-            "name": (r["Name"] or "").title(),
+            "name": title_case(r["Name"], initials=True),
             "postcode": r["Postcode"],
             "lat": lat, "lng": lng,
             "nhs_contracted": True,          # presence in ODS means an NHS contract
@@ -4130,15 +4274,7 @@ HOSP_ACRONYMS = {"NHS", "BMI", "UCLH", "GOSH", "CDC", "UTC", "HMP", "RNOH",
                  "PTS", "II", "III"}
 
 def _hosp_title(name: str) -> str:
-    out = []
-    for word in name.split():
-        if word.upper().strip(".,-") in HOSP_ACRONYMS:
-            out.append(word.upper())
-        else:
-            out.append(word.title())
-    s = " ".join(out)
-    s = re.sub(r"\b(\d+)(St|Nd|Rd|Th)\b", lambda m: m.group(1) + m.group(2).lower(), s)
-    return s.replace("'S", "'s")
+    return title_case(name, initials=True, acronyms={a: a for a in HOSP_ACRONYMS})
 
 def run_hospitals() -> pd.DataFrame | None:
     rule("Hospitals (ODS NHS trust sites)")
