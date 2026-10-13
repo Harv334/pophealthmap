@@ -50,6 +50,41 @@ const setOv = (page, k) => page.evaluate(k => {
   const s = document.getElementById('ov'); s.value = k; s.dispatchEvent(new Event('change'));
 }, k);
 
+/* One icon set (workplan 2.9). Text that people read may hold arrows and
+   symbols in a sentence, but nothing drawn as an icon: no emoji, no carets,
+   crosses, ticks or glyph arrows, in the page or in ::before and ::after.
+   Buttons carry no arrow characters at all, because their icons are SVG. */
+const glyphCheck = page => page.evaluate(() => {
+  const ICON = /[\u00D7\u2190-\u2191\u2193-\u21FF\u2300-\u23FF\u25A0-\u25FF\u2600-\u27BF\u2900-\u297F\u29C9\u2B00-\u2BFF]|[\u{1F300}-\u{1FAFF}]/u;
+  const found = [];
+  const walk = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  for (let n; (n = walk.nextNode());) {
+    const el = n.parentElement;
+    if (!el || el.closest('script, style, noscript, svg')) continue;
+    const t = n.nodeValue;
+    if (ICON.test(t) || (el.closest('button, [role="button"]') && /[\u2190-\u21FF]/.test(t))) found.push(t.trim().slice(0, 40));
+  }
+  document.querySelectorAll('body *').forEach(el => {
+    ['::before', '::after'].forEach(p => {
+      const c = getComputedStyle(el, p).content;
+      if (c && c !== 'none' && c !== 'normal' && ICON.test(c)) found.push(p + ' ' + c);
+    });
+  });
+  return found;
+});
+/* Nothing on screen below 11px (workplan 2.9). The printable reports are
+   separate documents, set for paper, and are not checked here. */
+const smallText = page => page.evaluate(() => {
+  const out = [];
+  document.querySelectorAll('body *').forEach(el => {
+    if (el.closest('svg, script, style, noscript') || !el.getClientRects().length) return;
+    if (![...el.childNodes].some(n => n.nodeType === 3 && n.nodeValue.trim())) return;
+    const px = parseFloat(getComputedStyle(el).fontSize);
+    if (px < 11) out.push((el.id || el.className || el.tagName) + ' ' + px + 'px');
+  });
+  return out;
+});
+
 (async () => {
   const opts = process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {};
   const browser = await chromium.launch(opts);
@@ -59,11 +94,75 @@ const setOv = (page, k) => page.evaluate(k => {
     const { page, errors } = await open(browser, 'index.html?t=1', DESK);
     ok(await page.evaluate(() => { let n = 0; wLyr.eachLayer(() => n++); return n; }) > 600, 'London wards drawn');
     await checkAxe(page, 'London on open');
+    // One icon set and fewer component styles (workplan 2.9).
+    {
+      const src = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+      const css = src.slice(src.indexOf('<style>'), src.indexOf('</style>'));
+      const root = css.slice(css.indexOf(':root {'), css.indexOf('}', css.indexOf(':root {')));
+      const radiusTokens = root.match(/--r-[\w-]+(?=\s*:)/g) || [];
+      const shadowTokens = root.match(/--shadow[\w-]*(?=\s*:)/g) || [];
+      const R = '(?:0|50%|var\\(--r-(?:sm|md|pill)\\))';
+      const radiusOk = new RegExp('^' + R + '(?: ' + R + '){0,3}(?: !important)?$');
+      const badRadius = (css.match(/border-radius\s*:\s*[^;}]+/g) || []).map(d => d.replace(/border-radius\s*:\s*/, '').trim())
+        .filter(v => !radiusOk.test(v) && v !== '50% 50% 50% 0');
+      const badShadow = (css.match(/box-shadow\s*:\s*[^;}]+/g) || []).map(d => d.replace(/box-shadow\s*:\s*/, '').trim())
+        .filter(v => !/^(none|var\(--shadow(-sm|-lg)?\))( !important)?$/.test(v));
+      const badSize = (css.match(/font-size\s*:\s*[\d.]+px/g) || []).filter(d => parseFloat(d.split(':')[1]) < 11);
+      ok(radiusTokens.length === 3 && !badRadius.length, 'the stylesheet uses three corner tokens and no other corners',
+        radiusTokens.join(', ') + ' / ' + badRadius.slice(0, 5).join(' | '));
+      ok(shadowTokens.length === 3 && !badShadow.length, 'the stylesheet uses three shadows and no others',
+        shadowTokens.join(', ') + ' / ' + badShadow.slice(0, 5).join(' | '));
+      ok(!badSize.length, 'no font size below 11px in the stylesheet', badSize.join(', '));
+    }
+    const ui = await page.evaluate(() => {
+      const tabs = [...document.querySelectorAll('.sb-tab')];
+      const ms = document.getElementById('map-controls-sec');
+      return {
+        tabs: tabs.map(t => getComputedStyle(t).fontSize + (t.scrollWidth > t.clientWidth ? ' cut' : '')),
+        icons: [...document.querySelectorAll('#tb-reset, #tb-link, #tb-cb, #tb-png')].map(b => {
+          const u = b.querySelector('svg.ic use'); return u ? u.getAttribute('href') : 'none'; }),
+        style: ms.querySelector('.sb-lbl').textContent.trim(),
+        borders: [...ms.querySelectorAll('#border-weight label')].map(l => l.textContent.trim()).join(','),
+        zoom: !!document.getElementById('zoom-slider'),
+      };
+    });
+    ok(ui.tabs.every(t => t === '13px'), 'sidebar tabs are 13px and sized to their words', ui.tabs.join(', '));
+    ok(ui.icons.every(h => /^#i-/.test(h)), 'the header buttons draw their icons from the one set', ui.icons.join(', '));
+    ok(ui.style === 'Map style' && ui.borders === 'Thin,Medium,Thick' && !ui.zoom,
+      'Map style offers Thin, Medium and Thick borders, and no zoom slider', JSON.stringify(ui));
+    const bw = await page.evaluate(() => {
+      const w = () => { let x = null; wLyr.eachLayer(l => { if (x == null && l.feature.properties.WD24NM !== selW) x = l.options.weight; }); return x; };
+      const thin = w();
+      document.querySelector('#border-weight input[value="6"]').click();
+      const thick = w();
+      document.querySelector('#border-weight input[value="1"]').click();
+      return { thin, thick, back: w() };
+    });
+    ok(bw.thick > bw.thin && bw.back === bw.thin, 'Thick borders draw heavier ward outlines, and Thin puts them back', JSON.stringify(bw));
+    let g = await glyphCheck(page);
+    ok(!g.length, 'no glyph or emoji icons on the opening screen', g.slice(0, 5).join(' | '));
+    g = await smallText(page);
+    ok(!g.length, 'nothing on the opening screen is smaller than 11px', g.slice(0, 5).join(' | '));
     await page.click('#sbtab-overlay');
     await page.click('#ov-chips button');
     await page.waitForTimeout(2500);
     ok(await page.evaluate(() => curOv && curOv !== 'none'), 'key indicator chip sets an indicator');
     ok(await page.evaluate(() => /\d/.test(document.getElementById('sc-lo').textContent)), 'legend shows numbers');
+    // One hover card, and the LSOA's decile given once when the map is
+    // coloured by the decile (workplan 2.9).
+    const tip = await page.evaluate(() => {
+      if (document.getElementById('ov').value !== 'imd_decile' || !lsoaLyr) return null;
+      let l = null; lsoaLyr.eachLayer(x => { if (!l && x.feature.properties.imd_decile) l = x; });
+      l.fire('mouseover', { latlng: l.getBounds().getCenter() });
+      const el = l.getTooltip().getElement();
+      const cs = el ? getComputedStyle(el) : null;
+      const out = { text: el ? el.innerText : '', n: (el ? el.innerText.match(/Deprivation decile/g) || [] : []).length,
+        bg: cs && cs.backgroundColor, radius: cs && cs.borderRadius, name: !!(el && el.querySelector('.tip-nm')) };
+      l.closeTooltip();
+      return out;
+    });
+    ok(!!tip && tip.n === 1 && tip.name && tip.bg === 'rgb(255, 255, 255)' && tip.radius === '10px',
+      'the LSOA hover card is the one card style and gives the decile once', JSON.stringify(tip));
     await page.click('#ov-about');
     ok(await page.evaluate(() => /Published at/.test(document.getElementById('ov-info-panel').innerText)), 'indicator card opens');
     await checkAxe(page, 'indicator and card');
@@ -262,6 +361,12 @@ const setOv = (page, k) => page.evaluate(k => {
       'profile shows the IMD score, and the claimant rate and unemployment measures under Work', prof.imd.join(', ') + ' / ' + prof.work.join(', '));
     ok(prof.cols === 2 && !prof.dashes, 'profile key figures two by two, and no dashes in the profile');
     await checkAxe(page, 'Area profile sections');
+    g = await glyphCheck(page);
+    ok(!g.length, 'no glyph or emoji icons in the ward sheet and the Area profile', g.slice(0, 5).join(' | '));
+    ok(await page.evaluate(() => [...document.querySelectorAll('#wpanel .cat-hdr .cat-ico')].every(i => i.tagName === 'svg' && /^#i-/.test(i.querySelector('use').getAttribute('href')))),
+      'the Area profile sections take their icons from the one set');
+    g = await smallText(page);
+    ok(!g.length, 'nothing in the ward sheet or the Area profile is smaller than 11px', g.slice(0, 5).join(' | '));
     const [rep2] = await Promise.all([page.waitForEvent('popup', { timeout: 20000 }).catch(() => null), page.click('#ws-pdf')]);
     if (rep2) {
       await rep2.waitForFunction(() => !!document.querySelector('.report'), null, { timeout: 30000 }).catch(() => {});
@@ -293,6 +398,24 @@ const setOv = (page, k) => page.evaluate(k => {
     });
     ok(!lp.assess && lp.band && lp.pills === 0 && !lp.amp, 'LSOA profile gives the decile band, no level pills and no "&"', JSON.stringify(lp));
     await checkAxe(page, 'LSOA profile');
+    // The screenshot dialog and the level toast are built on the Data
+    // credits dialog's frame and the page's own tokens (workplan 2.9).
+    await page.click('#tb-png');
+    await page.waitForTimeout(300);
+    const dlg = await page.evaluate(() => {
+      const d = document.querySelector('dialog.ed-dlg');
+      return d ? { open: d.open, credits: d.classList.contains('credits-dlg'), font: getComputedStyle(d).fontFamily,
+        opts: d.querySelectorAll('.ed-opt').length, name: d.querySelector('#ed-h').textContent } : null;
+    });
+    ok(!!dlg && dlg.open && dlg.credits && /Inter/.test(dlg.font) && dlg.opts >= 2,
+      'the screenshot dialog is a native dialog on the Data credits frame', JSON.stringify(dlg));
+    await checkAxe(page, 'screenshot dialog');
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
+    ok(await page.evaluate(() => !document.querySelector('dialog.ed-dlg') && !_screenshotState), 'Escape closes the screenshot dialog');
+    ok(await page.evaluate(() => { _levelToast('<b>Test</b>'); const t = document.getElementById('_level-toast');
+      return t.classList.contains('toast') && t.getAttribute('role') === 'status' && !t.getAttribute('style'); }),
+      'the level toast is the page\'s own card, and is read out');
     ok(errors.length === 0, 'no page errors (London desktop)', errors.join(' | '));
     await page.close();
   }
@@ -563,6 +686,17 @@ const setOv = (page, k) => page.evaluate(k => {
     await checkAxe(page, 'phone with area card');
     await page.click('#hdr-menu'); await page.waitForTimeout(400);
     await checkAxe(page, 'phone drawer');
+    g = await glyphCheck(page);
+    ok(!g.length, 'phone: no glyph or emoji icons in the drawer', g.slice(0, 5).join(' | '));
+    await page.click('#tb-png');
+    await page.waitForTimeout(500);
+    const sheet = await page.evaluate(() => {
+      const d = document.querySelector('dialog.ed-dlg'); const r = d && d.getBoundingClientRect();
+      return d ? { drawer: PH_DRAWER.isOpen(), bottom: Math.round(r.bottom), width: Math.round(r.width), vh: innerHeight, vw: innerWidth } : null;
+    });
+    ok(!!sheet && !sheet.drawer && sheet.bottom === sheet.vh && sheet.width === sheet.vw,
+      'phone: the screenshot dialog closes the drawer and rises from the bottom of the screen', JSON.stringify(sheet));
+    await page.keyboard.press('Escape');
     ok(errors.length === 0, 'no page errors (phone)', errors.join(' | '));
     await page.close();
   }

@@ -914,7 +914,8 @@ var MODEL_LABEL = "Claude Sonnet 5";
     close.id = "ai-close";
     close.type = "button";
     close.setAttribute("aria-label", "Close");
-    close.textContent = "×";
+    // The cross from the page's icon set (the symbols at the top of index.html).
+    close.innerHTML = '<svg class="ic" aria-hidden="true" focusable="false"><use href="#i-x"/></svg>';
 
     // The remaining count, beside the panel's own name. Built here rather than
     // in mount() because the header outlives the body: mounting is a no-op the
