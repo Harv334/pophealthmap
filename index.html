@@ -1357,6 +1357,8 @@
     font-size: var(--t-xl); line-height: 1; padding: 2px 4px; border-radius: 6px; }
   .ws-close:hover { color: var(--nhs-red); background: var(--nhs-light); }
   .ws-body { padding: 11px 14px 13px; overflow: auto; flex: 1; min-height: 0; }
+  .ws-body:focus { outline: none; }
+  .ws-body:focus-visible { outline: 2px solid var(--nhs-blue); outline-offset: -2px; }
   /* On a wide screen the sentence and the figures sit beside each other.
      Stacked, they made a 1,400px bar 250px tall, a third of the map, to hold
      one paragraph and one row of numbers with the whole right-hand half of it
@@ -1364,30 +1366,39 @@
   @media (min-width: 1100px) {
     .ws-body { display: flex; align-items: flex-start; gap: 14px; }
     .ws-body .ws-insight { flex: 1 1 44%; min-width: 0; }
-    /* Eight figures as two rows of four. Auto-fit would pack five into a row
-       at 1366px with the rest hanging beneath, and cut labels to
-       "GP PRACTIC…" to make the five fit. */
+    /* Six figures as two rows of three. Four across left two hanging in a
+       second row, and auto-fit would pack five into a row at 1366px and cut
+       the labels short to make them fit. */
     .ws-body .ws-strip { flex: 1 1 56%; margin-top: 0; min-width: 0;
-      grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .ws-body .ws-pins { flex: 1 1 100%; margin-top: 4px; }
   }
   .ws-insight { border-left: 3px solid var(--nhs-blue); background: var(--nhs-light);
     border-radius: 6px; padding: 8px 11px; font-size: var(--t-sm); line-height: 1.5; color: var(--ink-2); }
   .ws-insight strong { color: var(--ink); font-weight: 600; }
-  .ws-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+  /* "In plain English": the summary is the feature, so it is named. */
+  .ws-insight .ws-insight-h { margin: 0 0 2px; font-size: var(--t-sm); font-weight: 700;
+    line-height: 1.35; color: var(--nhs-dark); }
+  .ws-insight p { margin: 0; }
+  #wpanel .ws-insight { margin: 0 0 12px; }
+  .ws-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 7px; margin-top: 10px; }
+  /* A column, so a label that wraps to two lines pushes the figure down in
+     step with its neighbours rather than leaving the row's figures at
+     different heights. */
   .ws-kpi { background: var(--paper); border: 1px solid var(--line); border-radius: 10px;
-    padding: 7px 10px; min-width: 0; }
-  .ws-kpi .ws-k-lbl { font-size: var(--t-xs); text-transform: uppercase; letter-spacing: .05em;
-    color: var(--ink-3); font-weight: 600; white-space: nowrap; overflow: hidden;
-    text-overflow: ellipsis; }
+    padding: 7px 10px; min-width: 0; display: flex; flex-direction: column; }
+  /* Labels are written out in full ("Life expectancy at birth, women"), so
+     they wrap rather than being cut to an ellipsis. */
+  .ws-kpi .ws-k-lbl { font-size: var(--t-xs); line-height: 1.3; color: var(--ink-2);
+    font-weight: 600; flex: 1 0 auto; overflow-wrap: anywhere; }
   .ws-kpi .ws-k-num { font-family: 'Inter Tight', Inter, sans-serif; font-size: var(--t-2xl);
     font-weight: 600; letter-spacing: -.02em; line-height: 1.15; margin-top: 2px;
     font-variant-numeric: tabular-nums; }
   .ws-kpi .ws-k-num span { font-size: var(--t-md); font-weight: 500; margin-left: 1px; }
-  .ws-kpi .ws-k-num.dim { color: var(--ink-3); font-weight: 400; }
-  .ws-kpi .ws-k-sub { font-size: var(--t-xs); color: var(--ink-3); margin-top: 1px; white-space: nowrap;
-    overflow: hidden; text-overflow: ellipsis; }
+  .ws-kpi .ws-k-num.dim { color: var(--ink-3); font-weight: 400; font-size: var(--t-md);
+    line-height: calc(var(--t-2xl) * 1.15); }
+  .ws-kpi .ws-k-sub { font-size: var(--t-xs); line-height: 1.3; color: var(--ink-3); margin-top: 1px; }
   .ws-kpi.emphasis { background: var(--nhs-dark); border-color: var(--nhs-dark); }
   .ws-kpi.emphasis .ws-k-lbl, .ws-kpi.emphasis .ws-k-sub { color: rgba(255,255,255,.72); }
   .ws-kpi.emphasis .ws-k-num { color: var(--on-accent); }
@@ -3218,7 +3229,11 @@
                     aria-label="Deselect this ward">&times;</button>
           </div>
         </div>
-        <div class="ws-body" id="ws-body"></div>
+        <!-- Focusable because it scrolls: at peek height on a wide screen the
+             summary and the figures run past the bottom of the sheet, and a
+             scrolling area with nothing to focus cannot be scrolled from the
+             keyboard. -->
+        <div class="ws-body" id="ws-body" tabindex="0"></div>
       </div>
 
       <!-- Guided tour, the design file's story strip. -->
@@ -7575,11 +7590,16 @@ function showWard(wn) {
       ${stat('Core20 LSOAs', (c20L !== null && totL !== null) ? c20L.toFixed(0) + '/' + totL.toFixed(0) : null, 'most deprived')}
     </div>`;
 
+  // "In plain English" comes first, the same summary the ward sheet opens
+  // with, written by the sheet's code so the two cannot disagree.
+  const plain = (window.PH_SHEET && PH_SHEET.summaryBlock) ? PH_SHEET.summaryBlock(wdata.name, 'h2') : '';
+
   p.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:8px">
       <button class="deselect-btn" onclick="deselectWard()" title="Deselect this ward">Deselect &times;</button>
     </div>
     <div class="wname">${wdata.name} <span class="wpop">${pop}</span></div>
+    ${plain}
     ${keyStats}
     <!-- No report button here: the ward sheet's "Open printable report" button stays on
          screen beside this profile and is the one route to the report, so a
@@ -7836,6 +7856,8 @@ const REPORT_CSS = `
   .keypoints li { margin: 0 0 5px; font-size: 12px; line-height: 1.5; color: var(--ink); }
   .keypoints li::marker { color: var(--accent); }
   .keypoints b { font-weight: 700; }
+  .keypoints p { margin: 0; font-size: 12px; line-height: 1.55; color: var(--ink); }
+  .keypoints p strong { font-weight: 700; }
 
   .services-wrap { padding: 22px 40px 0; }
   .services-title { font-size: 9.5px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 8px; }
@@ -7925,6 +7947,9 @@ const WARD_ONEPAGE_CSS = `
   .onepage .hero-map { flex: 0 0 150px; }
   .onepage .minimap { width: 150px; height: 88px; }
   .onepage .minimap-cap { display: none; }
+  .onepage .keypoints.plain { margin: 12px 32px 2px; padding: 9px 14px 9px 16px; }
+  .onepage .keypoints.plain h2 { margin-bottom: 4px; }
+  .onepage .keypoints.plain p { font-size: 11px; line-height: 1.5; }
   .onepage .kpis { padding: 0 32px; }
   .onepage .kpi { padding: 8px 10px 8px 0; }
   .onepage .kpi-sub { margin-top: 2px; }
@@ -8539,6 +8564,9 @@ function _generateWardReport(_reportWindow, wn, opts) {
   const disAnyPct = _pctile('census_disability_any_pct', disAny);
   const unempPctR = _pctile('census_unemployed_pct',  unempPct);
   const imdPct    = _pctile('imd_score', imdW);
+  // "In plain English" opens the report, the same summary as the ward sheet
+  // and the Area profile, from the same code.
+  const plainSummary = (window.PH_SHEET && PH_SHEET.summary) ? PH_SHEET.summary(wdata ? wdata.name : wn) : '';
 
 
   const html = `<!doctype html>
@@ -8559,6 +8587,8 @@ function _generateWardReport(_reportWindow, wn, opts) {
     </div>
     ${miniMapSVG ? `<div class="hero-map">${miniMapSVG}</div>` : ''}
   </div>
+
+  ${plainSummary ? `<section class="keypoints plain"><h2>In plain English</h2><p>${plainSummary}</p></section>` : ''}
 
   <div class="kpis">
     ${_kpi('Population',     popN  != null ? Math.round(popN).toLocaleString() : null, 'Census 2021')}
@@ -15172,14 +15202,6 @@ var PH_SHOW = {
     var m = Math.floor(s.length / 2);
     return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
   }
-  function percentile(k, v) {
-    if (v == null) return null;
-    var s = values(k);
-    if (!s.length) return null;
-    var below = 0;
-    for (var i = 0; i < s.length; i++) { if (s[i] < v) below++; else break; }
-    return Math.round(100 * below / s.length);
-  }
 
   /* ─────────────────────────────────────────────────────────────────────────
      SERVICE COUNTS
@@ -15434,7 +15456,7 @@ var PH_SHOW = {
     opts = opts || {};
     var cls = 'ws-kpi' + (opts.emphasis ? ' emphasis' : '');
     var numCls = 'ws-k-num' + (value == null ? ' dim' : '');
-    var shown = value == null ? '—' : value;
+    var shown = value == null ? 'No figure' : value;
     // The label and the note are cut short with an ellipsis in a narrow
     // column, so each carries its full text as a title. opts.title explains
     // a figure whose label cannot.
@@ -15445,14 +15467,6 @@ var PH_SHOW = {
       '</div>';
   }
 
-  /**
-   * The sentence above the figures.
-   *
-   * Built only from fields this ward actually has, and each clause states the
-   * comparison it is making. imd_decile_mean is a mean of the LSOA deciles in
-   * the ward, not a decile of the ward, so it is described as where the
-   * typical LSOA sits rather than as a decile the ward is in.
-   */
   /**
    * Where a mean decile actually places somewhere, in words that do not
    * overstate it.
@@ -15479,42 +15493,132 @@ var PH_SHOW = {
       : { dir: 'most',  pct: pct(dec * 10) };
   }
 
-  function insight(w) {
-    var bits = [], i = w.inds;
-    var dec = num(i.imd_decile_mean);
-    if (dec !== null) {
-      var band = decileBand(dec);
-      // An average of deciles is not itself a decile, so it is named as an
-      // average. The share of the ward's LSOAs in deciles 1-2 is the figure
-      // that is actually a count.
-      bits.push('Its LSOAs (small areas) average national deprivation decile <strong>' +
-        dec.toFixed(1) + '</strong>, roughly among the ' + band.dir + ' deprived <strong>' +
-        band.pct + '%</strong> of England.');
+  /**
+   * "In plain English": the summary that opens the ward sheet, the Area
+   * profile and the printable report. It is written here once, so the three
+   * cannot say different things about the same ward.
+   *
+   * It leads with where the ward ranks on the deprivation score among the
+   * region's wards, told from whichever side is informative. Above the median
+   * a ward is "more deprived than 99%", and below it "less deprived than 80%",
+   * because "more deprived than 3%" says almost nothing about a Richmond ward
+   * and reads as a description of somewhere deprived. The Core20 count follows
+   * only when the ward has any.
+   *
+   * Two kinds of ward are not ranked. A ward of a few hundred people has
+   * figures that move with a handful of residents, so it is compared with
+   * nothing. A ward that no LSOA is matched to (most of the City of London's)
+   * has no deprivation score at all. Both open with what is known instead:
+   * their residents and the services inside them.
+   */
+  var SMALL_WARD = 1000;
+  // Service counts for the opening of an unranked ward. serviceCounts is a
+  // promise, so the first summary that needs them asks, and every summary on
+  // screen is rewritten when they land.
+  var _svc = {};
+  function svcIn(id, wn) {
+    if (!_svc[id]) {
+      var slot = _svc[id] = { map: null };
+      serviceCounts(id).then(function (m) { slot.map = m || {}; refreshSummaries(); });
+    }
+    return _svc[id].map ? (_svc[id].map[wn] || 0) : null;
+  }
+  // "3 GP practices and 2 pharmacies", with any that are missing last:
+  // "2 pharmacies and no GP practices".
+  function servicesPhrase(wn) {
+    var gp = svcIn('gp', wn), ph = svcIn('pharmacy', wn);
+    if (gp === null || ph === null) return '';
+    if (!gp && !ph) return 'no GP practices or pharmacies';
+    var parts = [[gp, 'GP practice', 'GP practices'], [ph, 'pharmacy', 'pharmacies']]
+      .sort(function (a, b) { return (b[0] ? 1 : 0) - (a[0] ? 1 : 0); })
+      .map(function (x) { return (x[0] ? x[0].toLocaleString() : 'no') + ' ' + (x[0] === 1 ? x[1] : x[2]); });
+    return parts.join(' and ');
+  }
+  // "the City of London", but "Brent".
+  function ladPhrase(lad) { return (/^City of /.test(lad) ? 'the ' : '') + lad; }
+  // Why a ward has no deprivation score, counted from its LA's own wards.
+  function noScoreReason(w) {
+    var withScore = 0, lsoas = 0, all = 0;
+    allWards().forEach(function (o) {
+      if (!w.lad || o.lad !== w.lad) return;
+      all++;
+      if (num(o.inds.imd_score) !== null) { withScore++; lsoas += num(o.inds.total_lsoa_count) || 0; }
+    });
+    if (!withScore || lsoas < 2) {
+      return 'because deprivation is measured for LSOAs and none of them is counted in this ward';
+    }
+    return 'because deprivation is measured for LSOAs and each of ' + esc(ladPhrase(w.lad)) + "'s " +
+      lsoas + ' LSOAs is counted in one of ' + (withScore * 2 < all ? 'just ' : '') +
+      withScore + ' of its ' + all + ' wards';
+  }
+
+  function summaryText(w) {
+    var bits = [], i = w.inds, name = esc(w.name);
+    var pop = num(i.census_population), score = num(i.imd_score);
+    var small = pop !== null && pop < SMALL_WARD;
+    var share = (score !== null && !small) ? (function () {
+      var s = values('imd_score'), below = 0, above = 0;
+      for (var j = 0; j < s.length; j++) { if (s[j] < score) below++; else if (s[j] > score) above++; }
+      return s.length ? { below: below, above: above, n: s.length } : null;
+    })() : null;
+
+    if (share) {
+      // Held to 1 to 99: the most deprived ward is more deprived than 683 of
+      // 684, which rounds to a "100%" that would have to include itself.
+      var pc = function (c) { return Math.min(99, Math.max(1, Math.round(100 * c / share.n))); };
+      var more = share.below >= share.above;
+      var lead = name + ' is ' + (more ? 'more' : 'less') + ' deprived than <strong>' +
+        pc(more ? share.below : share.above) + '%</strong> of ' + esc(PH_AREA) + "'s wards";
       var c20 = num(i.core20_lsoa_count), nl = num(i.total_lsoa_count);
-      if (c20 !== null && nl) {
-        bits.push(c20 === 0
-          ? 'None of its ' + nl + ' LSOAs is in the most deprived 20% nationally.'
-          : '<strong>' + c20 + ' of its ' + nl + '</strong> LSOAs ' + (c20 === 1 ? 'is' : 'are') +
-            ' in the most deprived 20% nationally (deciles 1 and 2).');
+      if (c20 && nl) {
+        lead += (more ? ', and ' : ', although ') + (c20 >= nl
+          ? (nl === 1 ? 'its one LSOA is' : '<strong>all ' + nl + '</strong> of its LSOAs are')
+          : '<strong>' + c20 + ' of its ' + nl + '</strong> LSOAs ' + (c20 === 1 ? 'is' : 'are')) +
+          ' among the most deprived fifth of England';
+      }
+      bits.push(lead + '.');
+    } else {
+      // Not ranked, so it opens with what is known: who lives there and
+      // what is there for them.
+      var svc = servicesPhrase(w.name);
+      if (pop !== null) {
+        bits.push(name + ' is home to ' + (small ? 'only ' : '') + '<strong>' +
+          Math.round(pop).toLocaleString() + '</strong> residents' +
+          (svc ? ', with ' + svc + ' within its boundary' : '') + '.');
+        if (small) {
+          bits.push('With so few residents, its figures can change a lot from one year to the next, ' +
+            'so this summary does not compare them with other wards.');
+        }
+        if (score === null) bits.push('It has no deprivation score of its own, ' + noScoreReason(w) + '.');
+      } else {
+        // "has 2 pharmacies ..., but no Census figures", unless it has
+        // neither, when the services follow as a sentence of their own.
+        var some = svc && !/^no /.test(svc);
+        bits.push(name + ' has ' + (some ? svc + ' within its boundary, but ' : '') +
+          'no Census figures or deprivation score of its own, because the small areas these are ' +
+          'counted in are each matched to a neighbouring ward.');
+        if (svc && !some) bits.push('It has ' + svc + ' within its boundary.');
       }
     }
-    var score = num(i.imd_score);
-    if (score !== null) {
-      var pc = percentile('imd_score', score);
-      if (pc !== null) {
-        bits.push('On the IMD score it is more deprived than <strong>' + pc +
-          '%</strong> of ' + PH_AREA + ' wards.');
-      }
-    }
+    // Comparisons with the medians, which a ward of a few hundred people does
+    // not get: its figures are a handful of residents either way.
+    if (small) return bits.join(' ');
+    // The medians are compared at the precision they are shown at, so a ward
+    // is never "above" a median printed as the same number.
+    var vs = function (v, m, dp) {
+      var a = +v.toFixed(dp), b = +m.toFixed(dp);
+      return a > b ? 'above' : (a < b ? 'below' : 'level with');
+    };
     var bad = num(i.census_bad_health_pct), badMed = median('census_bad_health_pct');
     if (bad !== null && badMed !== null) {
-      var dir = bad > badMed ? 'above' : (bad < badMed ? 'below' : 'level with');
-      // The borough as well as London: someone looking at a ward in Barking
+      // The LA as well as the region: someone looking at a ward in Barking
       // usually wants to know how it sits among its neighbours too.
       var badBor = boroughMedian('census_bad_health_pct', w.lad);
-      bits.push('Bad or very bad self-reported health is <strong>' + bad.toFixed(1) +
-        '%</strong>, ' + dir + ' the ' + PH_AREA + ' ward median of ' + badMed.toFixed(1) + '%' +
-        (badBor !== null ? ' (' + esc(w.lad) + ' ward median ' + badBor.toFixed(1) + '%)' : '') + '.');
+      var dL = vs(bad, badMed, 1), dB = badBor !== null ? vs(bad, badBor, 1) : '';
+      bits.push('In the 2021 Census, <strong>' + bad.toFixed(1) + '%</strong> of residents described ' +
+        'their health as bad or very bad, ' + dL + ' the ' + esc(PH_AREA) + ' ward median of ' +
+        badMed.toFixed(1) + '%' + (dB ? (dB === dL ? ' and ' : ' but ' + dB + ' ') + 'the ' + esc(w.lad) +
+        ' ward median of ' + badBor.toFixed(1) + '%' : '') + '.');
     }
     // Life expectancy is the one outcome measure here, so it is compared with
     // both medians by how many years it differs. "Estimated" because it is an
@@ -15522,17 +15626,41 @@ var PH_SHOW = {
     var le = num(i.ft_93283), leMed = median('ft_93283');
     if (le !== null && leMed !== null) {
       var gap = function (ref, what) {
-        var d = le - ref;
+        var d = +le.toFixed(1) - +ref.toFixed(1);
         return (Math.abs(d) < 0.05 ? 'level with ' : Math.abs(d).toFixed(1) +
-          (d > 0 ? ' years above ' : ' years below ')) + what + ' of ' + ref.toFixed(1);
+          (d > 0 ? ' years more than ' : ' years less than ')) + what + ' of ' + ref.toFixed(1);
       };
       var leBor = boroughMedian('ft_93283', w.lad);
-      bits.push('Estimated life expectancy at birth for women is <strong>' + le.toFixed(1) + ' years</strong>, ' +
-        gap(leMed, 'the ' + PH_AREA + ' ward median') +
+      bits.push('A girl born here can expect to live an estimated <strong>' + le.toFixed(1) + ' years</strong>, ' +
+        gap(leMed, 'the ' + esc(PH_AREA) + ' ward median') +
         (leBor !== null ? ' and ' + gap(leBor, 'the ' + esc(w.lad) + ' ward median') : '') + '.');
     }
-    if (!bits.length) return '<div class="ws-insight">No indicator data has loaded for this ward yet.</div>';
-    return '<div class="ws-insight">' + bits.join(' ') + '</div>';
+    return bits.join(' ');
+  }
+  // The summary for a ward by name, as the profile and the report ask for it.
+  function summaryOf(wn) {
+    var rec = wardRec(wn);
+    return summaryText({ name: (rec && rec.name) || wn, inds: (rec && rec.indicators) || {}, lad: (rec && rec.lad) || '' });
+  }
+  // The block itself: a heading and the paragraph, which carries its ward so
+  // refreshSummaries can rewrite it when the service counts arrive.
+  // h is the heading level: h3 under the sheet's h2, and h2 in the Area
+  // profile, where nothing above it is a heading.
+  function summaryBlock(w, h) {
+    var text = summaryText(w);
+    h = h || 'h3';
+    // A plain block rather than a named section: the sheet and the profile
+    // can both be on screen, and two landmarks with one name is a fault.
+    return '<div class="ws-insight">' +
+      '<' + h + ' class="ws-insight-h">In plain English</' + h + '>' +
+      '<p data-plain-ward="' + esc(w.name) + '">' +
+      (text || 'There are no figures for this ward yet.') + '</p></div>';
+  }
+  function refreshSummaries() {
+    document.querySelectorAll('[data-plain-ward]').forEach(function (el) {
+      var t = summaryOf(el.getAttribute('data-plain-ward'));
+      if (t) el.innerHTML = t;
+    });
   }
 
   /* The pinned comparison, inside the ward sheet.
@@ -15586,34 +15714,36 @@ var PH_SHOW = {
 
   function renderBody(w) {
     var i = w.inds;
-    var pop = num(i.census_population);
     var dec = num(i.imd_decile_mean);
     var o65 = num(i.census_over65_pct);
     var dis = num(i.census_disability_any_pct);
+    var bad = num(i.census_bad_health_pct);
     // Health outcomes, from the Local Health set: they arrive with the
     // deferred half of the ward data, and the sheet is redrawn when it lands.
     var le  = num(i.ft_93283);
     var mr  = num(i.ft_93250);
-    var lePer = typeof ovPeriodOf === 'function' ? ovPeriodOf('ft_93283') : '';
+    // "2019 - 23" as "2019 to 2023".
+    var lePer = (typeof ovPeriodOf === 'function' ? ovPeriodOf('ft_93283') : '')
+      .replace(/^(\d{4})\s*[-\u2013]\s*(\d{2})$/, function (m, a, b) { return a + ' to ' + a.slice(0, 2) + b; })
+      .replace(/\s*[-\u2013]\s*/g, ' to ');
 
+    // Six figures, three to a row, each under its full name. The population
+    // is not one of them: it is in the line under the ward's name already.
     var strip = '<div class="ws-strip">' +
-      kpi('Avg decile', dec == null ? null : dec.toFixed(1),
-          '1 = most deprived', { emphasis: true }) +
-      kpi('Population', pop == null ? null : (pop >= 10000
-            ? (pop / 1000).toFixed(1) + '<span>k</span>'
-            : Math.round(pop).toLocaleString()), 'Census 2021') +
-      kpi('Life expectancy', le == null ? null : le.toFixed(1) + '<span>yrs</span>',
-          'women, at birth' + (lePer ? ', ' + lePer : '')) +
-      // All causes, as a standardised ratio. The sub-line is short because a
-      // quarter of the strip is all it has at 1366px.
-      kpi('Mortality ratio', mr == null ? null : mr.toFixed(0), 'England = 100',
-          { title: 'Deaths from all causes against the England rate for the same ages. ' +
-                   '100 is the England level; 120 is a fifth more deaths than expected.' }) +
-      kpi('Aged 65+', o65 == null ? null : o65.toFixed(0) + '<span>%</span>', 'of residents') +
-      kpi('Disability (any)', dis == null ? null : dis.toFixed(0) + '<span>%</span>', 'Equality Act') +
+      kpi(labelOf('imd_decile_mean'), dec == null ? null : dec.toFixed(1),
+          'where 1 is the most deprived', { emphasis: true }) +
+      kpi(labelOf('ft_93283'), le == null ? null : le.toFixed(1) + '<span> years</span>', lePer) +
+      // All causes, as a standardised ratio.
+      kpi(labelOf('ft_93250'), mr == null ? null : mr.toFixed(0), 'where England is 100',
+          { title: 'Deaths from all causes compared with England, allowing for age, where 100 is the ' +
+                   'England level and 120 means a fifth more deaths than expected.' }) +
+      kpi(labelOf('census_bad_health_pct'), bad == null ? null : bad.toFixed(1) + '<span>%</span>', 'of residents') +
+      kpi(labelOf('census_over65_pct'), o65 == null ? null : o65.toFixed(0) + '<span>%</span>', 'of residents') +
+      kpi(labelOf('census_disability_any_pct'), dis == null ? null : dis.toFixed(0) + '<span>%</span>',
+          'under the Equality Act') +
       '</div>';
 
-    bodyEl.innerHTML = insight(w) + strip + pinTable();
+    bodyEl.innerHTML = summaryBlock(w) + strip + pinTable();
   }
 
   function show(wn) {
@@ -15642,7 +15772,7 @@ var PH_SHOW = {
     var meta = [];
     if (w.lad) meta.push(w.lad);
     if (pop !== null) meta.push(Math.round(pop).toLocaleString() + ' residents');
-    if (dec !== null) meta.push('average IMD decile ' + dec.toFixed(1));
+    if (dec !== null) meta.push('average deprivation decile ' + dec.toFixed(1));
     metaEl.textContent = meta.join(' · ');
     renderFig();
 
@@ -15930,6 +16060,13 @@ var PH_SHOW = {
   // own idea of what is selected rather than keeping a second one.
   window.PH_SHEET = {
     show: show, hide: hide,
+    // "In plain English", for the Area profile and the printable report, so
+    // all three say the same thing about a ward.
+    summary: summaryOf,
+    summaryBlock: function (wn, h) {
+      var rec = wardRec(wn);
+      return summaryBlock({ name: (rec && rec.name) || wn, inds: (rec && rec.indicators) || {}, lad: (rec && rec.lad) || '' }, h);
+    },
     // Used by the drawer to get the sheet out of its way without losing the
     // selection, and by the tests to read the state without inferring it.
     shrink: function () { if (sheetState === 0) setSheetState(1); },

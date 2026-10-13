@@ -169,6 +169,54 @@ const setOv = (page, k) => page.evaluate(k => {
     await page.click('#sbtab-layers');
     const pcn = await page.evaluate(() => document.querySelectorAll('#pcn-focus option').length);
     ok(pcn > 50, 'PCN list loaded', pcn + ' options');
+    // "In plain English" (workplan 2.5): first in the sheet and the profile,
+    // leading with the ward's ranking, with a case for each kind of ward.
+    const plain = await page.evaluate(async () => {
+      const out = {};
+      for (const w of ['Stonebridge', 'Holloway', 'Barnes', 'Bishopsgate']) {
+        showWard(w);
+        await new Promise(r => setTimeout(r, 400));
+        const body = document.getElementById('ws-body'), prof = document.getElementById('wpanel');
+        const sheetBlock = body.firstElementChild, profBlock = prof.querySelector('.ws-insight');
+        out[w] = {
+          sheetFirst: !!sheetBlock && !!sheetBlock.querySelector('.ws-insight-h') && sheetBlock.querySelector('.ws-insight-h').textContent === 'In plain English',
+          profFirst: !!profBlock && profBlock.querySelector('.ws-insight-h').textContent === 'In plain English' &&
+            !!(profBlock.compareDocumentPosition(prof.querySelector('.keystats')) & Node.DOCUMENT_POSITION_FOLLOWING),
+          sheet: sheetBlock.querySelector('p').textContent,
+          prof: profBlock ? profBlock.querySelector('p').textContent : '',
+        };
+      }
+      const tiles = [...document.querySelectorAll('#ws-body .ws-kpi .ws-k-lbl')].map(e => e.textContent);
+      return { out, tiles, cols: getComputedStyle(document.querySelector('#ws-body .ws-strip')).gridTemplateColumns.split(' ').length };
+    });
+    const P = plain.out;
+    ok(Object.values(P).every(x => x.sheetFirst && x.profFirst && x.sheet === x.prof),
+      '"In plain English" comes first in the ward sheet and the profile, and they match', JSON.stringify(P).slice(0, 300));
+    ok(/^Stonebridge is more deprived than 99% of London's wards, and \d+ of its \d+ LSOAs are among the most deprived fifth of England\./.test(P.Stonebridge.sheet),
+      'Stonebridge leads with its ranking and its Core20 count', P.Stonebridge.sheet);
+    ok(/^Holloway is (more|less) deprived than \d+% of London's wards\./.test(P.Holloway.sheet) && !/deprived fifth/.test(P.Holloway.sheet),
+      'Holloway, with no Core20 LSOAs, has no Core20 clause', P.Holloway.sheet);
+    ok(/^Barnes is less deprived than \d+% of London's wards/.test(P.Barnes.sheet), 'a Richmond ward says "less deprived than"', P.Barnes.sheet);
+    ok(/^Bishopsgate is home to only 345 residents/.test(P.Bishopsgate.sheet) && !/median|deprived than/.test(P.Bishopsgate.sheet),
+      'Bishopsgate opens with its residents and makes no comparison with the median', P.Bishopsgate.sheet);
+    ok(!Object.values(P).some(x => /[–—]/.test(x.sheet)), 'no dashes in the ward summaries');
+    ok(plain.tiles.length === 6 && plain.cols === 3 && !plain.tiles.some(t => /Population|Avg|\+|\(/.test(t)),
+      'six spelled-out tiles, three to a row, without the population', plain.cols + ' columns: ' + plain.tiles.join(' | '));
+    await page.click('#ws-profile');
+    await page.waitForTimeout(500);
+    await checkAxe(page, 'Area profile with its summary');
+    const [rep] = await Promise.all([page.waitForEvent('popup', { timeout: 20000 }).catch(() => null), page.click('#ws-pdf')]);
+    if (rep) {
+      await rep.waitForFunction(() => !!document.querySelector('.report'), null, { timeout: 30000 }).catch(() => {});
+      const r = await rep.evaluate(() => {
+        const s = document.querySelector('.report .keypoints.plain');
+        return { h: s ? s.querySelector('h2').textContent : '', beforeKpis: !!s && s.nextElementSibling === document.querySelector('.report .kpis'),
+          text: s ? s.querySelector('p').textContent : '' };
+      });
+      ok(r.h === 'In plain English' && r.beforeKpis && r.text === P.Bishopsgate.sheet,
+        'the printable report opens with the same "In plain English" summary', JSON.stringify(r).slice(0, 300));
+      await rep.close();
+    } else ok(false, 'the printable report opens');
     ok(errors.length === 0, 'no page errors (London desktop)', errors.join(' | '));
     await page.close();
   }
