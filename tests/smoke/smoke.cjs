@@ -36,16 +36,26 @@ async function open(browser, url, vp) {
   await page.waitForTimeout(url.startsWith('index') ? SETTLE : 1500);
   return { page, errors };
 }
+// WCAG 2.2 AA, the standard the accessibility statement claims, plus axe's
+// best-practice rules.
+const AXE_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice'];
 async function axeViolations(page) {
   await page.addScriptTag({ content: AXE });
-  const r = await page.evaluate(() => axe.run(document, {
-    runOnly: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'best-practice'], resultTypes: ['violations'] }));
+  const r = await page.evaluate(tags => axe.run(document, {
+    runOnly: tags, resultTypes: ['violations'] }), AXE_TAGS);
   return r.violations.map(v => v.id + ' (' + v.nodes.length + ')');
 }
 async function checkAxe(page, name) {
   const v = await axeViolations(page);
   ok(v.length === 0, 'accessibility: ' + name, v.join(', '));
 }
+// The 404 page asks for its files from https://pophealth.uk/ (see the page),
+// so those requests are answered from the working copy being tested.
+const routeSite = page => page.route('https://pophealth.uk/**', r => {
+  const u = new URL(r.request().url());
+  const f = path.join(ROOT, u.pathname === '/' ? 'index.html' : decodeURIComponent(u.pathname));
+  return fs.existsSync(f) ? r.fulfill({ path: f }) : r.fulfill({ status: 404, body: '' });
+});
 const setOv = (page, k) => page.evaluate(k => {
   const s = document.getElementById('ov'); s.value = k; s.dispatchEvent(new Event('change'));
 }, k);
@@ -199,12 +209,109 @@ const setOv = (page, k) => page.evaluate(k => {
     await page.close();
   }
 
-  // Other pages
-  for (const p of ['methodology.html', 'privacy.html', 'accessibility.html']) {
-    const { page, errors } = await open(browser, p, { width: 1200, height: 900 });
-    await checkAxe(page, p);
-    ok(errors.length === 0, 'no page errors (' + p + ')', errors.join(' | '));
-    await page.close();
+  // The pages around the map share one frame (workplan 2.14): one stylesheet,
+  // light even when the device is set to dark, the same header and footer,
+  // titles in the form "Page | PopHealth Map", and no dashes.
+  const FRAME = ['methodology.html', 'accessibility.html', 'privacy.html', '404.html'];
+  const frames = {};
+  for (const p of FRAME) {
+    for (const [vpName, vp] of [['desktop', { viewport: { width: 1200, height: 900 } }],
+                                ['phone', { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }]]) {
+      const page = await browser.newPage({ ...vp, colorScheme: 'dark' });
+      const errors = [];
+      page.on('pageerror', e => errors.push(e.message));
+      page.on('requestfailed', r => errors.push('failed to load ' + r.url()));
+      await routeSite(page);
+      await page.goto(BASE + '/' + p);
+      await page.waitForTimeout(1500);
+      const f = await page.evaluate(() => {
+        const hdr = document.querySelector('header.site-hdr');
+        const links = hdr ? [...hdr.querySelectorAll('a')] : [];
+        return {
+          title: document.title,
+          bg: getComputedStyle(document.body).backgroundColor,
+          sheets: [...document.querySelectorAll('link[rel="stylesheet"]')].map(l => l.getAttribute('href').replace(/^https:\/\/pophealth\.uk\//, '')),
+          inlineStyle: document.querySelectorAll('style').length,
+          hdrText: hdr ? hdr.innerText.replace(/\s+/g, ' ').trim() : '',
+          hdrLinks: links.map(a => (a.getAttribute('href').replace(/^https:\/\/pophealth\.uk\//, '') || 'index.html')).join(' '),
+          current: (hdr && hdr.querySelector('[aria-current="page"]') || {}).textContent || '',
+          ftr: (document.querySelector('footer.site-ftr') || {}).innerText || '',
+          skip: (document.querySelector('a.skip') || { getAttribute: () => '' }).getAttribute('href'),
+          h1: document.querySelectorAll('main h1').length,
+          dashes: /[–—]/.test(document.title + document.body.innerText),
+          over: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+          relative: [...document.querySelectorAll('a[href], link[href]')].map(e => e.getAttribute('href'))
+            .filter(h => !/^(https:\/\/|mailto:|#|data:)/.test(h)),
+        };
+      });
+      if (vpName === 'desktop') {
+        frames[p] = f;
+        ok(/^\S.* \| PopHealth Map$/.test(f.title), p + ': title in the form "Page | PopHealth Map"', f.title);
+        ok(f.bg === 'rgb(244, 247, 249)', p + ': light under a dark device setting', f.bg);
+        ok(f.sheets.join(' ') === 'vendor/fonts.css pages.css' && f.inlineStyle === 0, p + ': the shared stylesheet only',
+          f.sheets.join(' ') + ' / ' + f.inlineStyle + ' style blocks');
+        ok(f.skip === '#main' && f.h1 === 1, p + ': skip link and one heading');
+        ok(!f.dashes, p + ': no em or en dashes');
+        await checkAxe(page, p);
+      } else {
+        ok(f.over <= 0, p + ': no sideways scroll on a phone', f.over + 'px');
+      }
+      ok(errors.length === 0, 'no page errors (' + p + ', ' + vpName + ')', errors.join(' | '));
+      await page.close();
+    }
+  }
+  {
+    const ref = frames['methodology.html'];
+    ok(ref.hdrText === 'PopHealth Map Methodology Accessibility About and privacy' &&
+       ref.hdrLinks === 'index.html methodology.html accessibility.html privacy.html',
+       'pages: header has the mark and the three pages', ref.hdrText + ' / ' + ref.hdrLinks);
+    ok(FRAME.every(p => frames[p].hdrText === ref.hdrText && frames[p].hdrLinks === ref.hdrLinks && frames[p].ftr === ref.ftr),
+       'pages: the same header and footer on all four',
+       FRAME.map(p => p + ': ' + frames[p].hdrLinks).join(' | '));
+    ok(frames['methodology.html'].current === 'Methodology' && frames['accessibility.html'].current === 'Accessibility' &&
+       frames['privacy.html'].current === 'About and privacy' && frames['404.html'].current === '',
+       'pages: the header marks the page you are on');
+    ok(/contact@pophealth\.uk/.test(ref.ftr) && /not an NHS service/.test(ref.ftr), 'pages: footer gives the contact address',
+       ref.ftr);
+    ok(frames['404.html'].relative.length === 0, '404: every link is absolute', frames['404.html'].relative.join(' '));
+  }
+  // What each page says.
+  {
+    const texts = {};
+    for (const p of ['accessibility.html', 'privacy.html', '404.html']) {
+      const page = await browser.newPage();
+      await routeSite(page);
+      await page.goto(BASE + '/' + p);
+      texts[p] = await page.evaluate(() => ({
+        main: document.querySelector('main').innerText,
+        storage: [...document.querySelectorAll('main table code')].map(c => c.textContent),
+        contactParas: [...document.querySelectorAll('main p')].filter(e => /correction/.test(e.textContent)).length,
+        ask: [...document.querySelectorAll('#ask ~ ul li')].map(li => li.textContent).join(' '),
+        home: (document.querySelector('main a.btn') || {}).href || '',
+      }));
+      await page.close();
+    }
+    const a = texts['accessibility.html'].main;
+    ok(AXE_TAGS.includes('wcag22aa') && /WCAG 2\.2 AA/.test(a) && !/WCAG 2\.[01]\b|version 2\.[01]\b/.test(a),
+      'accessibility: WCAG 2.2 AA stated and tested');
+    ok(/one light colour scheme/.test(a) && !/dark (mode|theme|scheme|colour scheme)/i.test(a),
+      'accessibility: one light colour scheme, no dark scheme claimed');
+    ok(!/\b1,400\b|\d+ shapes/.test(a), 'accessibility: no fixed shape counts');
+    ok(/prepared on \d{1,2} \w+ 20\d\d and last reviewed on \d{1,2} \w+ 20\d\d/.test(a) &&
+       (a.match(/\d{1,2} \w+ 20\d\d/g) || []).length === 2 && !/Last updated:/.test(a),
+      'accessibility: dates merged into one sentence');
+    ok(/local authority \(LA\)/.test(a) && !/borough/i.test(a), 'accessibility: the level is called LA');
+    for (const crit of ['2.1.1', '1.1.1', '1.3.1']) {
+      ok(a.includes(crit), 'accessibility: known failure against ' + crit + ' listed');
+    }
+    const pr = texts['privacy.html'];
+    ok(pr.storage.includes('ph-england-ok'), 'privacy: ph-england-ok storage row');
+    ok(pr.contactParas === 1, 'privacy: contact paragraph given once', pr.contactParas + ' paragraphs');
+    ok(!/\bWorker\b/.test(pr.ask) && /Anthropic/.test(pr.ask) && /48 hours/.test(pr.ask) && /IP address/.test(pr.ask),
+      'privacy: Ask bullets in plain terms, same claims');
+    const nf = texts['404.html'];
+    ok(/We could not find a page at this address/.test(nf.main) && nf.home === 'https://pophealth.uk/',
+      '404: new copy, and the way back to the map is absolute');
   }
 
   // The methodology page is built around the reader (workplan 2.13): the

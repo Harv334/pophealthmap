@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Methodology and technical notes · PopHealth Map</title>
+<title>Methodology and technical notes | PopHealth Map</title>
 <link rel="canonical" href="https://pophealth.uk/methodology.html">
-<meta name="description" content="How PopHealth Map is built: every data source, how figures are added up across wards, neighbourhoods and councils, and what to watch for when reading them.">
+<meta name="description" content="How PopHealth Map is built: every data source, how figures are added up from neighbourhoods to wards and LAs, and what to watch for when reading them.">
 <!-- Same inline map-pin icon as index.html, so the tab matches. -->
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1a1a'/%3E%3Cpath d='M16 6c-3.9 0-7 3.1-7 7 0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7z' fill='%23fff'/%3E%3Ccircle cx='16' cy='13' r='2.6' fill='%231a1a1a'/%3E%3C/svg%3E">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
@@ -15,121 +15,45 @@
 <meta property="og:site_name" content="PopHealth Map">
 <meta property="og:locale" content="en_GB">
 <meta property="og:url" content="https://pophealth.uk/methodology.html">
-<meta property="og:title" content="Methodology and technical notes · PopHealth Map">
-<meta property="og:description" content="How PopHealth Map is built: every data source, how figures are added up across wards, neighbourhoods and councils, and what to watch for when reading them.">
+<meta property="og:title" content="Methodology and technical notes | PopHealth Map">
+<meta property="og:description" content="How PopHealth Map is built: every data source, how figures are added up from neighbourhoods to wards and LAs, and what to watch for when reading them.">
 <meta property="og:image" content="https://pophealth.uk/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="PopHealth Map: population health across England by ward and neighbourhood">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Methodology and technical notes · PopHealth Map">
-<meta name="twitter:description" content="How PopHealth Map is built: every data source, how figures are added up across wards, neighbourhoods and councils, and what to watch for when reading them.">
+<meta name="twitter:title" content="Methodology and technical notes | PopHealth Map">
+<meta name="twitter:description" content="How PopHealth Map is built: every data source, how figures are added up from neighbourhoods to wards and LAs, and what to watch for when reading them.">
 <meta name="twitter:image" content="https://pophealth.uk/og.png">
-<!-- Served from this origin like the map's, because the networks this is
-     read on block Google Fonts often enough to matter. -->
+<meta name="color-scheme" content="light">
+<!-- Fonts from this origin like the map's, because the networks this is
+     read on block Google Fonts often enough to matter. The frame and text
+     styles are shared with the other pages around the map. -->
 <link rel="stylesheet" href="vendor/fonts.css">
-<style>
-  :root {
-    --nhs-blue:#005EB8; --nhs-dark:#003087; --nhs-yellow:#FFB81C;
-    /* #5E6D78 as in index.html: #768692 is 3.75:1 on white, under AA. */
-    --ink:#212B32; --ink-2:#4C6272; --ink-3:#5E6D78;
-    --line:#DDE1E4; --bg:#F4F7F9; --paper:#FFFFFF;
-  }
-  * { box-sizing: border-box; }
-  body { margin:0; background:var(--bg); color:var(--ink);
-    font-family:Inter,system-ui,-apple-system,sans-serif; font-size:15px; line-height:1.6; }
-  header { background:var(--paper); border-top:4px solid var(--nhs-blue);
-    border-bottom:1px solid var(--line); padding:18px 24px; }
-  header h1 { font-family:'Inter Tight',Inter,sans-serif; font-size:21px; color:var(--nhs-dark);
-    margin:0 0 3px; letter-spacing:-.01em; }
-  header p { margin:0; color:var(--ink-2); font-size:13.5px; }
-  header a { color:var(--nhs-blue); }
-  main { max-width:860px; margin:0 auto; padding:28px 24px 64px; }
-  main:focus { outline:none; }
-  h2 { font-family:'Inter Tight',Inter,sans-serif; font-size:19px; color:var(--nhs-dark);
-    margin:34px 0 10px; padding-bottom:6px; border-bottom:1px solid var(--line); }
-  h3 { font-family:'Inter Tight',Inter,sans-serif; font-size:16.5px; color:var(--nhs-dark);
-    margin:24px 0 6px; }
-  h4 { font-family:'Inter Tight',Inter,sans-serif; font-size:14.5px; color:var(--ink);
-    margin:18px 0 4px; }
-  p, li { color:var(--ink-2); }
-  a { color:var(--nhs-blue); }
-  /* Skip link: off screen until it has focus. */
-  .skip { position:absolute; left:8px; top:-60px; z-index:10; background:var(--paper);
-    color:var(--nhs-blue); border:2px solid var(--nhs-blue); border-radius:6px;
-    padding:8px 12px; font-weight:600; }
-  .skip:focus { top:8px; }
-  /* "On this page": two columns where there is room, so the citation
-     section is still on the first screen. */
-  .toc { margin:20px 0 0; }
-  .toc h2 { font-size:15px; margin:0 0 6px; padding:0; border:0; color:var(--ink); }
-  .toc ol { margin:0; padding-left:22px; columns:2; column-gap:32px; }
-  .toc li { margin:0 0 3px; break-inside:avoid; }
-  .cite { background:var(--paper); border:1px solid var(--line); border-left:4px solid var(--nhs-blue);
-    border-radius:6px; padding:10px 14px; margin:10px 0 14px; color:var(--ink); }
-  table { width:100%; border-collapse:collapse; margin:12px 0 18px; font-size:13.5px;
-    background:var(--paper); border:1px solid var(--line); border-radius:8px; overflow:hidden; }
-  th, td { text-align:left; padding:8px 11px; border-bottom:1px solid var(--line);
-    vertical-align:top; }
-  th { background:#FBFCFD; font-weight:600; color:var(--ink); font-size:12.5px;
-    text-transform:uppercase; letter-spacing:.04em; }
-  tbody tr:last-child td { border-bottom:0; }
-  td.term { font-weight:600; color:var(--ink); }
-  code { font-family:ui-monospace,"JetBrains Mono",Menlo,monospace; font-size:12.5px;
-    background:#FBFCFD; border:1px solid var(--line); border-radius:4px; padding:1px 5px; }
-  .caution { background:#FDF0D5; border:1px solid #E8D3A3; color:#8A5A00;
-    border-radius:8px; padding:12px 14px; margin:16px 0; font-size:14px; }
-  .wrap { overflow-x:auto; }
-  .small { font-size:12px; color:var(--ink-3); }
-  .status-bad { color:#A5341C; font-weight:600; }
-  .status-part { color:#8A5A00; font-weight:600; }
-  .credits p { font-size:13.5px; }
-  footer { border-top:1px solid var(--line); margin-top:40px; padding-top:16px;
-    font-size:12.5px; color:var(--ink-3); }
-  @media (max-width: 699.98px) {
-    main { padding:22px 16px 48px; }
-    header { padding:16px; }
-    .toc ol { columns:1; }
-    /* Tables become a stack of cards on a phone, one card per row, each
-       cell labelled with its column heading (data-label, set by the script
-       at the foot of the page). */
-    table.stack, table.stack tbody, table.stack tr, table.stack td { display:block; width:100%; }
-    table.stack { border:0; background:transparent; border-radius:0; overflow:visible; margin:8px 0 16px; }
-    table.stack thead { position:absolute; width:1px; height:1px; overflow:hidden;
-      clip:rect(0 0 0 0); white-space:nowrap; }
-    table.stack tr { background:var(--paper); border:1px solid var(--line); border-radius:8px;
-      margin:0 0 10px; padding:10px 12px; }
-    table.stack td { border:0; padding:3px 0; }
-    table.stack td[data-label]::before { content:attr(data-label); display:block; font-size:11px;
-      font-weight:600; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-3); }
-    table.stack td:first-child { font-size:14.5px; padding-bottom:6px; }
-    table.stack td:first-child::before { display:none; }
-    /* The longest ONS product names are wider than a phone. */
-    code { overflow-wrap:anywhere; }
-  }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg:#1B2227; --paper:#232C33; --ink:#E8EDEE; --ink-2:#BFC9CE;
-            --ink-3:#8FA0A8; --line:#3A464E; --nhs-dark:#8FC3F0;
-            /* NHS blue is 2.5:1 on these backgrounds, so links go lighter. */
-            --nhs-blue:#8FC3F0; }
-    th { background:#1F272D; }
-    code { background:#1F272D; }
-    .caution { background:#3A2F1B; border-color:#6B5730; color:#F0D9A8; }
-    .status-bad { color:#F2A08C; }
-    .status-part { color:#F0D9A8; }
-  }
-</style>
+<link rel="stylesheet" href="pages.css">
 </head>
 <body>
 
 <a class="skip" href="#main">Skip to main content</a>
 
-<header>
-  <h1>Methodology and technical notes</h1>
-  <p><a href="index.html">← Back to the map</a> · <a href="accessibility.html">Accessibility</a> · PopHealth Map, England</p>
+<!-- The same header on every page around the map (pages.css): the mark
+     and name lead back to the map, then the three pages in one order. -->
+<header class="site-hdr">
+  <div class="site-hdr-in">
+    <a class="brand" href="index.html"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><rect width="9" height="9" fill="#0B1F33"/><rect x="11" width="9" height="9" fill="#0B1F33" opacity=".35"/><rect y="11" width="9" height="9" fill="#0B1F33" opacity=".6"/><rect x="11" y="11" width="9" height="9" fill="#0E7C7B"/></svg><span>PopHealth Map</span></a>
+    <nav class="site-nav" aria-label="Site">
+      <ul>
+        <li><a href="methodology.html" aria-current="page">Methodology</a></li>
+        <li><a href="accessibility.html">Accessibility</a></li>
+        <li><a href="privacy.html">About and privacy</a></li>
+      </ul>
+    </nav>
+  </div>
 </header>
 
 <main id="main" tabindex="-1">
+
+<h1>Methodology and technical notes</h1>
 
 <p>PopHealth Map puts more than 100 published indicators on one map of England,
 from the Census, the NHS, the Index of Multiple Deprivation and other official
@@ -842,11 +766,16 @@ licences file</a>.</p>
 <p>The code behind this map is open, and you can read it on
 <a href="https://github.com/Harv334/pophealthmap">GitHub</a>.</p>
 
-<footer>
-  Questions or corrections: <a href="mailto:contact@pophealth.uk">contact@pophealth.uk</a>.
-</footer>
-
 </main>
+
+<footer class="site-ftr">
+  <div class="site-ftr-in">
+    <p>PopHealth Map is a free map of health and deprivation for every neighbourhood
+    in England, and you can get in touch at
+    <a href="mailto:contact@pophealth.uk">contact@pophealth.uk</a>.</p>
+    <p>Independent project, not an NHS service.</p>
+  </div>
+</footer>
 
 <script>
 /* ═══════════════════════════════════════════════════════════════════════════
