@@ -794,6 +794,10 @@
   .dl-seg button.active { background: var(--nhs-blue); color: var(--on-accent); box-shadow: 0 1px 3px rgba(0,94,184,.3); }
   .dl-seg button.disabled { color: var(--ink-3); cursor: help; font-style: italic; }
   .dl-seg button.disabled:hover { color: var(--ink-3); background: transparent; }
+  /* A level the chosen indicator has no figures at. Still focusable, and its
+     tooltip and the hint say why. */
+  .dl-seg button[aria-disabled="true"]:not(.active) { color: var(--ink-3); opacity: .5; cursor: not-allowed; }
+  .dl-seg button[aria-disabled="true"]:not(.active):hover { color: var(--ink-3); background: transparent; }
   .dl-hint { position: absolute; top: 100%; right: 0; margin-top: 4px; background: var(--invert-bg); color: var(--invert-ink); font-size: var(--t-xs); line-height: 1.4; padding: 6px 9px; border-radius: 5px; width: max-content; max-width: min(320px, calc(100vw - 24px)); opacity: 0; pointer-events: none; transition: opacity .2s; box-shadow: 0 2px 6px rgba(0,0,0,.2); }
   .dl-hint.show { opacity: 1; }
 
@@ -3221,7 +3225,7 @@
              there is no room for it and it becomes that dot instead. -->
         <button type="button" class="lhelp dl-help" id="dl-help"
                 aria-label="What these area levels mean" aria-expanded="false"
-                title="The map can colour five sizes of area. The largest is the local authority (LA), the area run by one council, and London has 33 of them: the 32 boroughs and the City of London. These are divided into 704 wards, which are the areas councillors are elected for. MSOAs, of about 7,500 people, and LSOAs, of about 1,500 people, are statistical areas that fit inside LAs but do not follow ward boundaries. Output areas, of about 125 households, are the smallest and carry Census figures only. Each indicator opens at a level it is published for, and you can switch to any other level that has figures for it."><span class="dl-help-word">Area level</span><span class="dl-help-mark" aria-hidden="true">?</span></button>
+                title="The map can colour five sizes of area. The largest is the local authority (LA), the area run by one council, and London has 33 of them: the 32 boroughs and the City of London. These are divided into 704 wards, which are the areas councillors are elected for. MSOAs, of about 7,500 people, and LSOAs, of about 1,500 people, are statistical areas that fit inside LAs but do not follow ward boundaries. Output areas, of about 125 households, are the smallest and carry Census figures only. Until you choose a level yourself, each indicator opens at a level it is published for. After that the map stays at the level you chose whenever the indicator has figures for it, and greys out any level it has none for."><span class="dl-help-word">Area level</span><span class="dl-help-mark" aria-hidden="true">?</span></button>
         <div class="dl-seg" id="dl-seg">
           <button type="button" data-dl="borough" title="Colour the map by local authority (LA), the area run by one council. Where an indicator is not published for LAs, each LA's figure is worked out from its wards by adding up counts and weighting rates by population.">LA</button>
           <button type="button" data-dl="ward" class="active" title="Colour the map by ward, the 704 areas councillors are elected for.">Ward</button>
@@ -3229,7 +3233,7 @@
           <button type="button" data-dl="lsoa" title="Colour the map by LSOA, the statistical areas of about 1,500 people that the deprivation figures are published for. London has 4,994 of them.">LSOA</button>
           <button type="button" data-dl="oa" hidden title="Colour the map by output area (OA), the smallest Census areas of about 125 households, which carry Census figures only.">OA</button>
         </div>
-        <div class="dl-hint" id="dl-hint"></div>
+        <div class="dl-hint" id="dl-hint" role="status"></div>
       </div>
 
       <!-- Selected-ward sheet. Hidden until a ward is clicked; showWard() fills
@@ -3790,8 +3794,9 @@ const PH_WHERE_ARIA = PH_IS_LONDON
       (oa ? 'of about 1,500 people' : 'the smallest here at about 1,500 people') +
       ', are statistical areas that fit inside LAs but do not follow ward boundaries.' +
       (oa ? ' Output areas, of about 125 households, are the smallest and carry Census figures only.' : '') +
-      ' Each indicator opens at a level it is published for, and you can switch to any other ' +
-      'level that has figures for it.');
+      ' Until you choose a level yourself, each indicator opens at a level it is published for. ' +
+      'After that the map stays at the level you chose whenever the indicator has figures for it, ' +
+      'and greys out any level it has none for.');
   };
   levelHelp();
   document.addEventListener('ph-levels-changed', levelHelp);
@@ -4694,16 +4699,33 @@ function _openReportHere(html, autoPrint) {
   location.assign(URL.createObjectURL(new Blob([doc], { type: 'text/html;charset=utf-8' })));
 }
 
-/* What the level toast says when an indicator has no figures at the level
-   asked for, written from the reader's side: what they asked for, why the
-   map cannot show it, and which buttons will work instead. */
+/* What the level hint (and the LSOA box's toast) says when an indicator has
+   no figures at the level asked for, written from the reader's side: what
+   they asked for, why the map cannot show it, and which buttons will work
+   instead. */
 const _LVL_BUTTON = { borough: 'LA', ward: 'Ward', msoa: 'MSOA', lsoa: 'LSOA', oa: 'OA' };
 function _andList(items, conj) {
   if (items.length < 2) return items.join('');
   return items.slice(0, -1).join(', ') + ' ' + (conj || 'and') + ' ' + items[items.length - 1];
 }
+function _levelPlural(lv) { return lv === 'oa' ? 'output areas' : (_LEVEL_PLURAL[lv] || lv); }
+/* Why a level button is greyed out, for its tooltip: the first half of the
+   message above, as plain text. */
+function _levelLackText(k, level) {
+  const have = ovLevels(k);
+  if (!have.length) return indLabel(k) + ' has no figures to colour the map with.';
+  return indLabel(k) + ' is only available for ' + _andList(have.map(_levelPlural)) +
+    ', so it cannot be shown by ' + _levelName(level) + '.';
+}
+// The whole message as plain text, for the hint beside the level buttons.
+function _levelGateText(k, level) {
+  const have = ovLevels(k);
+  if (!have.length) return indLabel(k) + ' has no figures to colour the map with, so please pick a different indicator.';
+  return _levelLackText(k, level) + ' Choose ' + _andList(have.map(lv => _LVL_BUTTON[lv] || lv), 'or') +
+    ', or pick a different indicator.';
+}
 function _levelGateMsg(label, k, level) {
-  const plural = lv => (lv === 'oa' ? 'output areas' : (_LEVEL_PLURAL[lv] || lv));
+  const plural = _levelPlural;
   const have = ovLevels(k);
   const name = '<b>' + String(label).replace(/[<>&]/g, '') + '</b>';
   if (!have.length) return name + ' has no figures to colour the map with, so please pick a different indicator.';
@@ -12706,19 +12728,30 @@ function _legendEnds(range, inline) {
    that overlay was already chosen. Restyling the layers alone would repaint
    the map and leave the scale and the legend strip stating the range that was
    computed while there was nothing to compute it over. */
-function _markNativeLevel() {
-  const nat = (curOv && curOv !== 'none' && typeof ovNativeLevel === 'function') ? ovNativeLevel(curOv) : '';
+/* The level buttons follow the indicator: the level it is published at gets a
+   box, and a level it has no figures at is greyed out with a tooltip saying
+   why. Greyed rather than disabled, so it stays focusable and pressing it
+   still explains itself in the hint beside it. */
+function _markLevelButtons() {
+  const ov = _activeOv();
+  const on = !!ov && ov !== 'none';
+  const nat = (on && typeof ovNativeLevel === 'function') ? ovNativeLevel(ov) : '';
   document.querySelectorAll('#dl-seg button').forEach(b => {
-    const on = !!nat && b.dataset.dl === nat;
-    b.classList.toggle('native', on);
+    const isNat = !!nat && b.dataset.dl === nat;
+    const lacks = on && typeof ovHasLevel === 'function' && !ovHasLevel(ov, b.dataset.dl);
+    b.classList.toggle('native', isNat);
+    if (lacks) b.setAttribute('aria-disabled', 'true'); else b.removeAttribute('aria-disabled');
     if (b.dataset.baseTitle === undefined) b.dataset.baseTitle = b.title || '';
-    b.title = b.dataset.baseTitle + (on ? ' The box around this button shows that the indicator is published at this level.' : '');
+    b.title = lacks ? _levelLackText(ov, b.dataset.dl)
+      : b.dataset.baseTitle + (isNat ? ' The box around this button shows that the indicator is published at this level.' : '');
   });
 }
+// Output areas arrive after the buttons are first marked, and add a level.
+document.addEventListener('ph-levels-changed', () => _markLevelButtons());
 
 function _applyOverlayChange(key) {
   curOv = key;
-  _markNativeLevel();
+  _markLevelButtons();
   const cfg = OV_CFG[curOv];
   const sc  = document.getElementById('scale');
   sc.style.display = curOv !== 'none' ? 'block' : 'none';
@@ -12877,6 +12910,43 @@ function _dlHint(msg, ms) {
   _setDataLevel._t = setTimeout(() => hintEl.classList.remove('show'), ms || 2400);
 }
 
+/* The level the reader chose themselves, with a level button or the LSOA or
+   MSOA box in Layers, or null until they have. Until then each indicator
+   opens at the level it is published for; after it, the map keeps their level
+   whenever the indicator has figures there and says so when it cannot. Reset
+   forgets it. */
+let _readerLevel = null;
+
+/* Resolves once a level's areas are on the map, so a hint that says the
+   boundaries are showing waits until they are, rather than appearing while a
+   few megabytes of them are still on their way. Gives up quietly after half a
+   minute, since a failed load is not something this hint can explain. */
+function _whenLevelDrawn(level) {
+  const drawn = () => {
+    if (typeof map === 'undefined' || !map) return false;
+    if (level === 'msoa') return !!(msoaLyr && map.hasLayer(msoaLyr));
+    if (level === 'lsoa') return !!(lsoaLyr && map.hasLayer(lsoaLyr));
+    if (level === 'borough') return !!(boroughL && map.hasLayer(boroughL));
+    if (level === 'oa') return !!(window.PH_OA && OA_INDEX && PH_OA.loadedCount() === Object.keys(OA_INDEX.lads).length);
+    return true;
+  };
+  return new Promise(resolve => {
+    const t0 = Date.now();
+    (function check() {
+      if (drawn()) return resolve(true);
+      if (Date.now() - t0 > 30000) return resolve(false);
+      setTimeout(check, 120);
+    })();
+  });
+}
+// The hint for a level, shown once that level is drawn and only if the map is
+// still at it by then.
+function _dlHintWhenDrawn(level, msg, ms) {
+  _whenLevelDrawn(level).then(ok => { if (ok && currentDataLevel === level) _dlHint(msg, ms); });
+}
+// The tour narrates every change it makes, so the level hints stay out of it.
+function _touring() { return !!document.querySelector('.map-wrap.touring'); }
+
 function _setDataLevel(level, opts) {
   opts = opts || {};
   if (level === 'nbhd') {
@@ -12888,20 +12958,22 @@ function _setDataLevel(level, opts) {
   // ── Compatibility gate ───────────────────────────────────────────────
   // When the user clicks a Ward/LSOA badge button (i.e. not via the
   // automatic sync paths), block the change if the current overlay isn't
-  // available at that level. Show a toast and bail before mutating any
-  // state. Auto-sync paths (fromOverlay / fromLsoaToggle) skip the gate
-  // because they reflect a level switch the system has already validated.
-  if (!opts.fromOverlay && !opts.fromLsoaToggle && !opts.fromMsoaToggle
+  // available at that level. Say why in the hint beside the buttons and bail
+  // before mutating any state. Auto-sync paths (fromOverlay / fromLsoaToggle)
+  // skip the gate because they reflect a level switch the system has already
+  // validated, and so does Custom area (fromMode), which needs its LSOAs on
+  // the map whatever they can be coloured by.
+  if (!opts.fromOverlay && !opts.fromLsoaToggle && !opts.fromMsoaToggle && !opts.fromMode
       && level !== currentDataLevel
       && typeof curOv !== 'undefined' && curOv && curOv !== 'none'
       && typeof ovLevel === 'function') {
     // Refuse a level the active indicator has no figures at, and say where it
     // does have them. This used to be two hardcoded ward-or-LSOA cases, so a
     // third level would have slipped straight through and shaded nothing.
+    // Next to the button that was pressed, not in the middle of the map: that
+    // button is greyed out with the same reason as its tooltip.
     if (!ovHasLevel(curOv, level)) {
-      const ovTxt = ((document.getElementById('ov').selectedOptions[0] || {}).text || curOv)
-                      .replace(/ · (Ward|MSOA|LSOA|Output area|LA|Borough|Local authority|Borough\/council)$/i, '');
-      _levelToast(_levelGateMsg(ovTxt, curOv, level));
+      _dlHint(_levelGateText(curOv, level), 6000);
       return;
     }
   }
@@ -12925,10 +12997,12 @@ function _setDataLevel(level, opts) {
   // the geography and nothing shades it. Now that the badge is exclusive and
   // the ward layer goes off with it, that means the choropleth goes too, and
   // it is better to say so than to let someone watch for a recolour that is
-  // never coming.
-  if (level === 'msoa' && !opts.fromMsoaToggle) {
+  // never coming. Said once the areas are drawn, not while they are loading.
+  // A quiet call (an indicator change, Clear, leaving Custom area) says what
+  // happened in its own words instead.
+  if (level === 'msoa' && !opts.fromMsoaToggle && !opts.quiet) {
     var _ovOn = typeof curOv !== 'undefined' && curOv && curOv !== 'none';
-    _dlHint(!_ovOn
+    _dlHintWhenDrawn('msoa', !_ovOn
       ? 'The MSOA boundaries are shown, so pick an indicator to colour them.'
       : (ovHasLevel(curOv, 'msoa')
           ? (ovNativeLevel(curOv) === 'msoa'
@@ -12938,9 +13012,9 @@ function _setDataLevel(level, opts) {
       3600);
   }
 
-  if (level === 'borough') {
+  if (level === 'borough' && !opts.quiet) {
     var _ovOnB = typeof curOv !== 'undefined' && curOv && curOv !== 'none';
-    _dlHint(!_ovOnB
+    _dlHintWhenDrawn('borough', !_ovOnB
       ? 'The LA boundaries are shown, so pick an indicator to colour them.'
       : (ovHasLevel(curOv, 'borough')
           ? (ovNativeLevel(curOv) === 'borough'
@@ -12998,56 +13072,122 @@ function _setDataLevel(level, opts) {
   // function with an LSOA-only overlay active and level === 'ward'.)
 }
 document.querySelectorAll('#dl-seg button').forEach(b => {
-  b.addEventListener('click', () => _setDataLevel(b.dataset.dl));
+  // A level the reader picks is theirs, and later indicators keep it whenever
+  // they have figures there. A press the gate refuses changes nothing.
+  b.addEventListener('click', () => {
+    _setDataLevel(b.dataset.dl);
+    if (currentDataLevel === b.dataset.dl && b.getAttribute('aria-disabled') !== 'true') {
+      _readerLevel = b.dataset.dl;
+    }
+  });
 });
+// A shared link is still being applied: its level follows its indicator, so
+// nothing is announced on the way.
+function _urlBusy() { try { return _urlApplying; } catch (e) { return false; } }
+
+/* What the hint says when choosing an indicator moves the map to another
+   level. why is 'kept' (back to the level the reader chose), 'forced' (the
+   indicator has no figures at the reader's level) or 'opened' (the reader has
+   not chosen a level, so the indicator opens at the level it is published
+   for). */
+function _levelMoveText(k, lv, why) {
+  const name = indLabel(k);
+  const at = _levelName(lv);
+  if (why === 'kept') return name + ' is shown by ' + at + ', the level you chose.';
+  if (why === 'forced') {
+    const mine = _levelPlural(_readerLevel);
+    return name + ' has no figures for ' + mine + ', so the map is showing it by ' + at +
+      '. It will go back to ' + mine + ' when you choose an indicator that has them.';
+  }
+  const more = ovLevels(k).length > 1;
+  const nat = ovNativeLevel(k);
+  if (nat === lv) return name + ' is shown by ' + at + ', the level it is published for' +
+    (more ? ', and you can choose another level above.' : '.');
+  if (nat === 'oa' && ovHasLevel(k, 'oa')) return name + ' is shown by ' + at +
+    ', and you can see it for the smaller output areas with the OA button.';
+  return name + ' is shown by ' + at + (more ? ', and you can choose another level above.' : '.');
+}
+
+// The level the map was at before the indicator changed, for saying whether
+// it moved. Caught on the way down, before the handlers on #ov itself start
+// ticking and unticking the LSOA and MSOA boxes, which move the level too.
+let _levelBeforeOv = 'ward';
+document.addEventListener('change', e => {
+  if (e.target && e.target.id === 'ov') _levelBeforeOv = _activeLevel();
+}, true);
+
 // Auto-sync badge when user picks an overlay in the Overlay sidebar tab.
 (function _wireDlBadgeFromOverlay() {
   const ovSel = document.getElementById('ov');
   if (!ovSel) return;
   ovSel.addEventListener('change', () => {
     const k = ovSel.value;
-    if (!k || k === 'none') return;
-    // Land the badge on a level this indicator has figures at. Ward stays the
-    // default because it is the view people expect and almost everything
-    // reaches it; anything that does not opens at the level it is published at,
-    // rather than on a ward map it cannot shade.
+    const from = _levelBeforeOv;
+    const quiet = _urlBusy() || _touring();
+    if (!k || k === 'none') {
+      // Clear: back to the level the reader chose, or to wards if they never
+      // chose one, rather than staying wherever the last indicator took the
+      // map. Reset puts the level back itself, and Custom area keeps its
+      // LSOAs until it closes.
+      if (window._ovDefaulting || _urlBusy()) return;
+      if (window.PH_REPORT && PH_REPORT.active()) return;
+      const back = _readerLevel || 'ward';
+      if (currentDataLevel !== back) {
+        _setDataLevel(back, { fromOverlay: true, quiet: true });
+        if (!quiet) _dlHintWhenDrawn(back, 'The map is back to ' + _levelPlural(back) +
+          (_readerLevel ? ', the level you chose.' : '.'), 3600);
+      }
+      return;
+    }
+    // Land the badge on a level this indicator has figures at.
     //
-    // Staying put comes first. The air quality and transport indicators are
-    // the first here to carry figures at BOTH ward and LSOA, and the #ov
-    // handler deliberately leaves the LSOA layer up for those. Defaulting to
-    // 'ward' regardless would then flip the badge to Ward without moving the
-    // map, so the legend would describe the ward spread while the polygons on
-    // screen are LSOAs — the badge contradicting what is being looked at.
+    // Output areas come first: moving between census figures stays on them.
+    // Then the level the reader chose, whenever the indicator has figures
+    // there. Until they have chosen one, the level the indicator opens at
+    // (ovOpenLevel, the one it is published for) comes next, because that map
+    // shows the figures as published rather than shared out or added up: life
+    // expectancy is an MSOA figure, and on a ward map it could only be shown
+    // averaged across MSOAs.
+    //
+    // After that, staying put. The air quality and transport indicators carry
+    // figures at BOTH ward and LSOA, and the #ov handler deliberately leaves
+    // the LSOA layer up for those. Defaulting to 'ward' regardless would then
+    // flip the badge to Ward without moving the map, so the legend would
+    // describe the ward spread while the polygons on screen are LSOAs.
     const cur = (typeof currentDataLevel !== 'undefined') ? currentDataLevel : 'ward';
-    let lv = 'ward';
-    // The level the source publishes at comes first: that is the map that
-    // shows the figures as published rather than shared out or added up, and
-    // it is the one the picker boxes. Life expectancy is an MSOA figure and
-    // opened on a ward map that could only show it averaged across MSOAs.
+    const has = l => typeof ovHasLevel === 'function' && ovHasLevel(k, l);
     const nat = (typeof ovOpenLevel === 'function') ? ovOpenLevel(k) : '';
-    if (cur === 'oa' && ovHasLevel(k, 'oa')) {
-      lv = 'oa';   // Stay on output areas while moving between census figures.
-    } else if (nat && typeof ovHasLevel === 'function' && ovHasLevel(k, nat)) {
+    let lv = 'ward', why = _readerLevel ? 'forced' : 'opened';
+    if (cur === 'oa' && has('oa')) {
+      lv = 'oa'; why = 'kept';
+    } else if (_readerLevel && has(_readerLevel)) {
+      lv = _readerLevel; why = 'kept';
+    } else if (nat && has(nat)) {
       lv = nat;
-    } else if (typeof ovHasLevel === 'function' && ovHasLevel(k, cur)) {
+    } else if (has(cur)) {
       lv = cur;
-    } else if (typeof ovHasLevel === 'function' && !ovHasLevel(k, 'ward')) {
+    } else if (!has('ward')) {
       lv = (typeof ovNativeLevel === 'function' && ovNativeLevel(k))
         || (typeof ovLevels === 'function' && ovLevels(k)[0])
         || 'ward';
     } else if (typeof isLsoaOnlyOv === 'function' && isLsoaOnlyOv(k)) {
       lv = 'lsoa';
     }
-    _setDataLevel(lv, { fromOverlay: true });
+    _setDataLevel(lv, { fromOverlay: true, quiet: true });
+    // Any move is said in the hint, once the new areas are drawn.
+    if (lv !== from && !quiet) _dlHintWhenDrawn(lv, _levelMoveText(k, lv, why), why === 'kept' ? 3600 : 6000);
   });
 })();
 // Auto-sync badge when LSOA layer toggle is clicked independently.
 (function _wireDlBadgeFromLsoaToggle() {
   const t = document.getElementById('tlsoa');
   if (!t) return;
-  t.addEventListener('change', () => {
+  t.addEventListener('change', e => {
     if (_dlDriving) return;  // the badge is already setting the level
+    const before = currentDataLevel;
     _setDataLevel(t.checked ? 'lsoa' : 'ward', { fromLsoaToggle: true });
+    // Ticked or unticked by the reader, the box is their choice of level.
+    if (e.isTrusted && currentDataLevel !== before) _readerLevel = currentDataLevel;
     _refreshUI();
   });
 })();
@@ -13057,20 +13197,25 @@ document.querySelectorAll('#dl-seg button').forEach(b => {
 (function _wireDlBadgeFromMsoaToggle() {
   const t = document.getElementById('tmsoa');
   if (!t) return;
-  t.addEventListener('change', () => {
+  t.addEventListener('change', e => {
     if (_dlDriving) return;
     // The MSOA box draws boundaries, which is fair to want over any overlay,
     // so this does not refuse the tick the way the LSOA gate does. What it
     // refuses is the claim: if the active indicator has no MSOA figures, the
     // badge would say you are viewing MSOA data that is not there, while the
-    // ward choropleth underneath is what you are actually reading.
+    // ward choropleth underneath is what you are actually reading. Said once
+    // the boundaries are drawn, and only if the box is still ticked by then.
     if (t.checked && typeof curOv !== 'undefined' && curOv && curOv !== 'none'
         && typeof ovHasLevel === 'function' && !ovHasLevel(curOv, 'msoa')) {
-      _dlHint('The MSOA boundaries are shown, but the colours are still by ' +
-        _levelName(currentDataLevel) + ' because this indicator has no MSOA figures.', 4200);
+      _whenLevelDrawn('msoa').then(ok => {
+        if (ok && t.checked) _dlHint('The MSOA boundaries are shown, but the colours are still by ' +
+          _levelName(currentDataLevel) + ' because this indicator has no MSOA figures.', 4200);
+      });
       return;
     }
+    const before = currentDataLevel;
     _setDataLevel(t.checked ? 'msoa' : 'ward', { fromMsoaToggle: true });
+    if (e.isTrusted && currentDataLevel !== before) _readerLevel = currentDataLevel;
   });
 })();
 
@@ -13310,7 +13455,9 @@ function _resetAll() {
     if (typeof map !== 'undefined' && map && map.closePopup) map.closePopup();
     const _explore = document.querySelector('.mode-btn[data-mode="explore"]');
     if (_explore) _explore.click();
-    // Data level back to Ward
+    // Data level back to Ward, and forget the level the reader chose: the next
+    // indicator opens at its own level again, as it did on arrival.
+    _readerLevel = null;
     _setDataLevel('ward');
     // Apply borough-solo clear + fit bounds
     if (typeof _applyBoroughSolo === 'function') _applyBoroughSolo();
@@ -13630,10 +13777,13 @@ function _readUrlState() {
 
     // Level after the overlay, and past the compatibility gate: the link chose
     // an indicator and a level together, and they agreed when it was made.
+    // Re-applied on every pass, like the indicator: each pass re-applies the
+    // indicator, which opens it at its own level again, so a level applied
+    // only once was lost to the next pass and the link opened at the wrong one.
     const lvl = p.get('lvl');
-    if (lvl && !_urlDone.lvl && ['borough', 'ward', 'msoa', 'lsoa', 'oa'].indexOf(lvl) !== -1 &&
+    if (lvl && !_urlReaderTook && ['borough', 'ward', 'msoa', 'lsoa', 'oa'].indexOf(lvl) !== -1 &&
         typeof _setDataLevel === 'function') {
-      _setDataLevel(lvl, { fromOverlay: true });
+      _setDataLevel(lvl, { fromOverlay: true, quiet: _urlDone.lvl });
       _urlDone.lvl = true;
     }
 
@@ -18943,7 +19093,12 @@ var PH_SHOW = {
     pick: function (k) { cbCols[k] = true; renderCsvPane(); },
   };
 
+  // The level the map was at before Custom area moved it to LSOAs, put back
+  // when Custom area closes.
+  var levelBeforeCustom = null;
+
   function applyMode(mode) {
+    var wasMode = currentMode;
     currentMode = (mode === 'query' || mode === 'compare' || mode === 'report')
       ? mode : 'explore';
 
@@ -18973,8 +19128,17 @@ var PH_SHOW = {
     // nothing at all.
     if (mode === 'csv') renderCsvPane();
     if (mode === 'report') {
+      if (wasMode !== 'report') levelBeforeCustom = currentDataLevel;
       if (typeof _setDataLevel === 'function' && currentDataLevel !== 'lsoa') {
-        _setDataLevel('lsoa');
+        // Past the level gate, which would otherwise refuse LSOAs for an
+        // indicator without LSOA figures and leave nothing to pick from. The
+        // LSOAs are uncoloured then, and the hint says why.
+        _setDataLevel('lsoa', { fromMode: true, quiet: true });
+        var ovNow = _activeOv();
+        if (ovNow && ovNow !== 'none' && !ovHasLevel(ovNow, 'lsoa') && !_touring()) {
+          _dlHintWhenDrawn('lsoa', 'Custom area is built from LSOAs, so the map is showing LSOAs while ' +
+            'it is open. They are not coloured, because ' + indLabel(ovNow) + ' has no LSOA figures.', 6000);
+        }
       }
       renderReportPane();
       // The area is built by picking LSOAs off the map, so the boundaries have
@@ -18985,6 +19149,18 @@ var PH_SHOW = {
           renderReportPane();
           drawReportSelection();
         });
+      }
+    }
+    // Leaving Custom area puts the map back at the level it was at before,
+    // when the indicator has figures there, rather than leaving it on LSOAs
+    // in the tools that follow.
+    if (wasMode === 'report' && currentMode !== 'report') {
+      var back = levelBeforeCustom, ovBack = _activeOv();
+      levelBeforeCustom = null;
+      if (back && back !== 'lsoa' && currentDataLevel === 'lsoa' && typeof _setDataLevel === 'function' &&
+          (!ovBack || ovBack === 'none' || ovHasLevel(ovBack, back))) {
+        _setDataLevel(back, { fromMode: true, quiet: true });
+        if (!_touring()) _dlHintWhenDrawn(back, 'The map is back to ' + _levelPlural(back) + '.', 3600);
       }
     }
     drawReportSelection();

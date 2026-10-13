@@ -59,6 +59,20 @@ const setOv = (page, k) => page.evaluate(k => {
     const { page, errors } = await open(browser, 'index.html?t=1', DESK);
     ok(await page.evaluate(() => { let n = 0; wLyr.eachLayer(() => n++); return n; }) > 600, 'London wards drawn');
     await checkAxe(page, 'London on open');
+    // The level hint says the boundaries are showing only once they are drawn.
+    await page.route('**/msoa_boundaries.json', async r => { await new Promise(x => setTimeout(x, 1500)); r.continue(); });
+    await page.click('#dl-seg button[data-dl="msoa"]');
+    await page.waitForTimeout(300);
+    const early = await page.evaluate(() => ({ drawn: !!(msoaLyr && map.hasLayer(msoaLyr)), hint: document.getElementById('dl-hint').classList.contains('show') }));
+    await page.waitForFunction(() => msoaLyr && map.hasLayer(msoaLyr), null, { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(400);
+    const late = await page.evaluate(() => document.getElementById('dl-hint').classList.contains('show') ? document.getElementById('dl-hint').textContent : '');
+    ok(!early.drawn && !early.hint && /^The MSOA boundaries are shown/.test(late), 'the level hint waits until the boundaries are drawn', JSON.stringify([early, late]));
+    await page.unroute('**/msoa_boundaries.json');
+    // Reset forgets the level the reader chose, so indicators open at their own again.
+    await page.click('#tb-reset');
+    await page.waitForTimeout(600);
+    ok(await page.evaluate(() => _readerLevel === null && currentDataLevel === 'ward'), 'Reset forgets the chosen level');
     await page.click('#sbtab-overlay');
     await page.click('#ov-chips button');
     await page.waitForTimeout(2500);
@@ -258,11 +272,55 @@ const setOv = (page, k) => page.evaluate(k => {
     ok(await page.evaluate(() => document.getElementById('map').getAttribute('aria-label')) ===
       'Map of London by ward, coloured by Crime rate per 1,000 residents.', 'map name follows the level and indicator',
       await page.evaluate(() => document.getElementById('map').getAttribute('aria-label')));
-    await page.click('#dl-seg button[data-dl="lsoa"]');
+    // Area levels respect the reader (workplan 2.4). A level the indicator has
+    // no figures for is greyed out but still focusable, its tooltip says why,
+    // and pressing it says which levels will work in the hint beside the
+    // buttons rather than in the middle of the map.
+    const grey = await page.evaluate(() => {
+      const b = document.querySelector('#dl-seg button[data-dl="msoa"]');
+      return { aria: b.getAttribute('aria-disabled'), disabled: b.disabled, tab: b.tabIndex, title: b.title,
+        others: [...document.querySelectorAll('#dl-seg button')].filter(x => x.getAttribute('aria-disabled') === 'true').map(x => x.dataset.dl).join(',') };
+    });
+    ok(grey.aria === 'true' && !grey.disabled && grey.tab >= 0 && /^msoa,lsoa(,oa)?$/.test(grey.others) &&
+      grey.title === 'Crime rate per 1,000 residents is only available for LAs and wards, so it cannot be shown by MSOA.',
+      'a level the indicator lacks is greyed out, focusable and says why', JSON.stringify(grey));
+    await page.focus('#dl-seg button[data-dl="lsoa"]');
+    await page.keyboard.press('Enter');
     await page.waitForTimeout(300);
-    const toast = await page.evaluate(() => (document.getElementById('_level-toast') || {}).textContent || '');
-    ok(/^Crime rate per 1,000 residents is only available for LAs and wards, so it cannot be shown by LSOA\. Choose LA or Ward, or pick a different indicator\.$/.test(toast),
-      'level toast says which levels will work', toast);
+    const gate = await page.evaluate(() => ({ lv: currentDataLevel, hint: document.getElementById('dl-hint').textContent,
+      shown: document.getElementById('dl-hint').classList.contains('show'), role: document.getElementById('dl-hint').getAttribute('role') }));
+    ok(gate.lv === 'ward' && gate.shown && gate.role === 'status' &&
+      /^Crime rate per 1,000 residents is only available for LAs and wards, so it cannot be shown by LSOA\. Choose LA or Ward, or pick a different indicator\.$/.test(gate.hint),
+      'pressing a greyed level says which levels will work, beside the buttons', JSON.stringify(gate));
+    // Once the reader has chosen Ward, an indicator with ward figures stays at
+    // Ward; one without moves and says so; Clear and leaving Custom area both
+    // go back to the level the reader was at.
+    const lvState = () => page.evaluate(() => ({ lv: currentDataLevel,
+      hint: document.getElementById('dl-hint').classList.contains('show') ? document.getElementById('dl-hint').textContent : '' }));
+    await page.click('#dl-seg button[data-dl="ward"]');
+    await setOv(page, 'census_bad_health_pct');
+    await page.waitForTimeout(1500);
+    const kept = await lvState();
+    ok(kept.lv === 'ward', 'once Ward is chosen, Bad or very bad health stays at Ward', JSON.stringify(kept));
+    await setOv(page, 'imd_decile');
+    await page.waitForTimeout(3000);
+    const forced = await lvState();
+    ok(forced.lv === 'lsoa' && /^Deprivation decile \(IMD 2025\) has no figures for wards, so the map is showing it by LSOA\. It will go back to wards when you choose an indicator that has them\.$/.test(forced.hint),
+      'a forced move to another level is announced in the hint', JSON.stringify(forced));
+    await page.click('#ov-clear');
+    await page.waitForTimeout(800);
+    const cleared = await lvState();
+    ok(cleared.lv === 'ward' && /^The map is back to wards, the level you chose\.$/.test(cleared.hint), 'Clear goes back to the level the reader chose', JSON.stringify(cleared));
+    await setOv(page, 'crime_rate_per_1000');
+    await page.waitForTimeout(1000);
+    await page.click('.mode-btn[data-mode="report"]');
+    await page.waitForTimeout(2500);
+    const custom = await page.evaluate(() => ({ lv: currentDataLevel, drawn: !!(lsoaLyr && map.hasLayer(lsoaLyr)) }));
+    await page.click('.mode-btn[data-mode="explore"]');
+    await page.waitForTimeout(800);
+    ok(custom.lv === 'lsoa' && custom.drawn && await page.evaluate(() => currentDataLevel === 'ward' && curOv === 'crime_rate_per_1000'),
+      'Custom area shows LSOAs, and leaving it goes back to the level before', JSON.stringify(custom));
+    ok(!/[–—]/.test([grey.title, gate.hint, forced.hint, cleared.hint].join(' ')), 'level hints and tooltips have no dashes');
     // Presentation view hides the header and the side panel, and Esc leaves it.
     await page.click('#tb-png');
     await page.waitForTimeout(400);
