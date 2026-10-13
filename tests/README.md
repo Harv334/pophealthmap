@@ -38,7 +38,13 @@ that the Charities tab and the Directory agree on one charity count, the key
 to the charity dots and the ring style of their groups, that the PCN list has
 no placeholder and no "Gp", and that a postcode search lists the nearest GP
 practices, pharmacies and charities in the ward sheet. postcodes.io is
-answered locally in that block, so it needs no network.
+answered locally in that block, so it needs no network. For failure and
+loading states it blocks files with `page.route`: with `data/ward_core.json`
+blocked the whole ward file stands in, with `lsoa_data.json` blocked a plain
+message appears and Try again recovers, with both ward files blocked the
+outlines show under a banner, with `data/map/wards.js` blocked the loading
+screen offers a reload, and an Ask request with no answer is given up after
+30 seconds (the clock is fast-forwarded, so the check does not wait).
 
 ```bash
 npm install --no-save playwright axe-core

@@ -591,6 +591,90 @@ const setOv = (page, k) => page.evaluate(k => {
     await page.close();
   }
 
+  // Failure and loading states (workplan 2.8). Files are blocked with
+  // page.route; each case has to end in a plain message, never an endless
+  // loader, a blank map or a developer's note.
+  const DASH = /[\u2013\u2014]/;
+  const noteText = page => page.evaluate(() => document.getElementById('load-note').hidden ? '' : document.getElementById('load-note-text').textContent);
+  {
+    // The core half of the ward figures blocked: the whole file stands in, so
+    // the map opens with every figure and nothing to apologise for. Then the
+    // LSOA figures blocked: one retry, the shared message, and Try again.
+    const browserCtx = await browser.newContext({ viewport: DESK });
+    const page = await browserCtx.newPage();
+    const errors = [];
+    page.on('pageerror', e => errors.push(e.message));
+    let blockLsoa = true;
+    await page.route(/data\/ward_core\.json/, r => r.abort());
+    await page.route(/lsoa_data\.json/, r => blockLsoa ? r.abort() : r.continue());
+    await page.route(/workers\.dev/, () => {});   // the Ask service never answers
+    await page.goto(BASE + '/index.html?t=1');
+    await page.waitForTimeout(SETTLE);
+    const ld = await page.evaluate(() => ({
+      name: document.querySelector('#ldr .ldr-name').textContent,
+      line: document.querySelector('#ldr .ldr-line').textContent,
+      gone: document.getElementById('ldr').classList.contains('hidden'),
+      wards: Object.keys(WARD_DATA_BY_CODE).length,
+    }));
+    ok(ld.name === 'PopHealth Map' && /^Free map of health/.test(ld.line) && !DASH.test(ld.line),
+      'loading screen: the site name and one sentence', JSON.stringify(ld));
+    ok(ld.gone && ld.wards > 600 && (await noteText(page)) === '',
+      'ward_core.json blocked: the whole ward file stands in and nothing is reported', JSON.stringify(ld));
+    await setOv(page, 'census_bad_health_pct');
+    await page.waitForFunction(() => !document.getElementById('load-note').hidden, null, { timeout: 20000 }).catch(() => {});
+    const t = await noteText(page);
+    ok(/the LSOA figures could not be loaded/.test(t) && /try again/.test(t) && !DASH.test(t),
+      'lsoa_data.json blocked: a plain message within 20 seconds', t);
+    await checkAxe(page, 'a file that could not be loaded');
+    blockLsoa = false;
+    await page.click('#load-note-retry');
+    await page.waitForFunction(() => Object.keys(LSOA_DATA).length > 1000, null, { timeout: 20000 }).catch(() => {});
+    ok(await page.evaluate(() => Object.keys(LSOA_DATA).length > 1000 && document.getElementById('load-note').hidden),
+      'Try again loads the LSOA figures and puts the message away');
+    // An Ask request with no answer is given up after 30 seconds.
+    await page.click('#ai-toggle');
+    await page.waitForTimeout(300);
+    await page.clock.install();
+    await page.fill('#ai-input', 'Which ward is most deprived?');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(800);
+    await page.clock.fastForward(31000);
+    await page.waitForTimeout(800);
+    const ask = await page.evaluate(() => { const m = document.querySelector('.ai-msg.ai-error'); return m ? m.textContent : ''; });
+    ok(/took too long/.test(ask) && !DASH.test(ask), 'an Ask request is given up after 30 seconds with a plain message', ask);
+    ok(errors.length === 0, 'no page errors (blocked files)', errors.join(' | '));
+    await browserCtx.close();
+  }
+  {
+    // Both ward files blocked: the outlines, and a banner with Try again.
+    const page = await browser.newPage({ viewport: DESK });
+    const errors = [];
+    page.on('pageerror', e => errors.push(e.message));
+    await page.route(/ward_(core|data)\.json/, r => r.abort());
+    await page.goto(BASE + '/index.html?t=1');
+    await page.waitForFunction(() => !document.getElementById('load-note').hidden, null, { timeout: 20000 }).catch(() => {});
+    const t = await noteText(page);
+    ok(/could not be loaded, so only the area outlines are showing/.test(t) && !DASH.test(t) &&
+       await page.evaluate(() => document.getElementById('ldr').classList.contains('fading') && wLyr.getLayers().length > 600 &&
+         !document.getElementById('load-note-retry').hidden),
+      'ward figures blocked: outlines drawn, with a banner and Try again', t);
+    ok(errors.length === 0, 'no page errors (ward figures blocked)', errors.join(' | '));
+    await page.close();
+  }
+  {
+    // wards.js blocked: the application cannot start, so the loading screen
+    // says so and offers a reload, rather than breathing for ever.
+    const page = await browser.newPage({ viewport: DESK });
+    await page.route(/data\/map\/wards\.js/, r => r.abort());
+    await page.goto(BASE + '/index.html?t=1');
+    await page.waitForFunction(() => !document.getElementById('ldr-msg').hidden, null, { timeout: 20000 }).catch(() => {});
+    const m = await page.evaluate(() => ({ text: document.getElementById('ldr-msg').hidden ? '' : document.getElementById('ldr-msg-text').textContent,
+      btn: document.getElementById('ldr-reload').textContent, focus: document.activeElement && document.activeElement.id }));
+    ok(/could not be loaded/.test(m.text) && /reload the page/.test(m.text) && !DASH.test(m.text) && m.btn === 'Reload the page' && m.focus === 'ldr-reload',
+      'wards.js blocked: the loading screen says so within 20 seconds and offers a reload', JSON.stringify(m));
+    await page.close();
+  }
+
   // A region
   if (HAS_NE) {
     const { page, errors } = await open(browser, 'index.html?r=north-east&t=1', DESK);

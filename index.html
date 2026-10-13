@@ -399,6 +399,32 @@
     color: var(--tint-amber-ink); font-size: var(--t-xl); cursor: pointer; padding: 0 0 0 8px;
     margin: -4px 0 0 0; line-height: 1; pointer-events: auto; }
 
+  /* ── Something failed to load (see PH_LOAD) ───────────────────────────────
+     On the map, not only in the status bar, where a failure used to be
+     reported in 11px type beside the email address and nobody would see it.
+     Centred under the area level badge, clear of the zoom buttons, the badge
+     and the sheet. */
+  .load-note { grid-row: 2; grid-column: 1; position: absolute; top: 60px; left: 50%;
+    transform: translateX(-50%); width: max-content; max-width: min(520px, calc(100% - 24px));
+    z-index: 2600; display: flex; align-items: flex-start; gap: 10px;
+    background: var(--tint-amber); border: 1px solid var(--tint-amber-line); color: var(--tint-amber-ink);
+    padding: 10px 12px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,.12);
+    font-size: var(--t-md); line-height: 1.45; }
+  .load-note[hidden] { display: none; }
+  .load-note p { margin: 0; flex: 1 1 auto; min-width: 0; }
+  .load-note .ws-btn { flex: 0 0 auto; white-space: nowrap; }
+  .load-note-x { flex: 0 0 auto; appearance: none; background: none; border: 0; color: var(--tint-amber-ink);
+    font-size: var(--t-xl); line-height: 1; cursor: pointer; padding: 2px 2px 0 0; }
+  /* On a phone it spans the map beside the zoom buttons, with the close
+     button on the first line and Try again under the words. */
+  @media (max-width: 900px) {
+    .load-note { top: 52px; left: 54px; right: 8px; transform: none; width: auto; max-width: none;
+      flex-wrap: wrap; }
+    .load-note p { flex-basis: calc(100% - 30px); }
+    .load-note-x { order: 1; }
+    .load-note .ws-btn { order: 2; }
+  }
+
   /* ── Persistent map legend strip ── */
   .map-legend-strip { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); background: color-mix(in srgb, var(--paper) 94%, transparent); border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px; box-shadow: 0 2px 8px rgba(0,0,0,.10); font-size: var(--t-xs); color: var(--ink-2); display: flex; align-items: center; gap: 10px; z-index: 540; pointer-events: none; max-width: 90%; }
   .map-legend-strip .mls-label { font-weight: 600; color: var(--ink); max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -801,11 +827,23 @@
      prefers-reduced-motion rule further down would stop it regardless. */
   @keyframes ldr-breathe { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
   .ldr-map.waiting { animation: ldr-breathe 1.6s ease-in-out infinite; }
-  /* One word, above the map, and nothing under it. The map is the thing worth
-     looking at while you wait, and a headline, a running commentary and a key
-     stacked beneath it were three things competing with it. */
-  .ldr-label { font-size: var(--t-xs); font-weight: 600; color: var(--ink-3);
-    text-transform: uppercase; letter-spacing: .16em; margin: 0 0 18px; }
+  /* The site's name and one sentence about it above the map, and nothing
+     under it unless something has gone wrong. The map is the thing worth
+     looking at while you wait; the two lines say what it is a map of. */
+  .ldr-name { font-family: 'Inter Tight', 'Inter', sans-serif; font-size: var(--t-xl);
+    font-weight: 600; letter-spacing: -0.01em; color: var(--nhs-dark); margin: 0 0 4px;
+    text-align: center; }
+  .ldr-line { font-size: var(--t-md); line-height: 1.5; color: var(--ink-2); margin: 0 0 18px;
+    max-width: 34em; text-align: center; }
+  /* The watchdog's message: shown under the map when the page is slow to
+     arrive or something it needs has failed, with a way to reload. */
+  .ldr-msg { margin: 18px 0 0; max-width: 30em; text-align: center; }
+  .ldr-msg[hidden] { display: none; }
+  .ldr-msg p { font-size: var(--t-md); line-height: 1.5; color: var(--ink); margin: 0 0 10px; }
+  .ldr-msg button { appearance: none; border: 0; border-radius: 6px; padding: 8px 16px;
+    background: var(--nhs-blue); color: var(--on-accent); font: inherit; font-size: var(--t-md);
+    font-weight: 600; cursor: pointer; }
+  .ldr-msg button:hover { background: var(--nhs-dark); }
 
   /* ── Data-level badge (floating overlay, top-right of map) ── */
   /* grid-row 2 makes the map's own cell the containing block, so the badge
@@ -2418,8 +2456,29 @@
   ]
 }
 </script>
+<!-- Without JavaScript nothing below can draw, and the loading screen would
+     sit there for ever. It is hidden, and a plain message covers the page. -->
+<noscript><style>
+  .loading-overlay { display: none !important; }
+  .nojs { position: fixed; inset: 0; z-index: 7000; display: flex; align-items: center;
+    justify-content: center; padding: 16px; background: #F4F7F9; color: #212B32;
+    font: 15px/1.55 Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; text-align: center; }
+  .nojs div { max-width: 32em; }
+  .nojs h2 { margin: 0 0 4px; font-size: 21px; color: #003087; }
+  .nojs p { margin: 0 0 12px; color: #4C6272; }
+  .nojs a { color: #005EB8; }
+</style></noscript>
 </head>
 <body>
+<noscript>
+  <div class="nojs" role="alert">
+    <div>
+      <h2>PopHealth Map</h2>
+      <p>The map needs JavaScript to draw the areas and their figures, so please turn it on in your browser's settings and reload the page.</p>
+      <p>You can still read the <a href="methodology.html">methodology page</a>, which explains how the figures are made.</p>
+    </div>
+  </div>
+</noscript>
 
 <!-- The header, the toolbar and a six-button mode rail sit between the top of
      the document and the map, and the map is what somebody came for. Visible
@@ -3328,12 +3387,18 @@
       <!-- Loading screen. A map rather than a spinner: see _paintLoaderMap
            below for why, and for where the geometry comes from. The copy used
            to read "Fetching ward_data.json", which told a first-time visitor
-           nothing except that they were looking at a filename. -->
+           nothing except that they were looking at a filename. #ldr-msg is the
+           watchdog's: empty and hidden unless the page is slow or fails. -->
       <div class="loading-overlay" id="ldr" role="status" aria-live="polite">
         <div class="ldr-card">
-          <p class="ldr-label">Loading</p>
+          <p class="ldr-name">PopHealth Map</p>
+          <p class="ldr-line">Free map of health, deprivation and local services for every neighbourhood in England, with no sign-in.</p>
           <svg class="ldr-map" id="ldr-map" role="img"
                aria-label="A map of London's wards, filling in with deprivation colour while the page loads"></svg>
+          <div class="ldr-msg" id="ldr-msg" hidden>
+            <p id="ldr-msg-text"></p>
+            <button type="button" id="ldr-reload">Reload the page</button>
+          </div>
         </div>
       </div>
       <!-- tabindex="-1" so the skip link above has somewhere to land. It is
@@ -3341,6 +3406,14 @@
            are what a keyboard walks through inside it. -->
       <div id="map" tabindex="-1" role="application"
            aria-label="Map of London. Wards are shaded by the selected indicator."></div>
+      <!-- Shown by PH_LOAD when the figures, or a file fetched later, could
+           not be loaded. Hidden and empty otherwise. -->
+      <div class="load-note" id="load-note" role="alert" hidden>
+        <p id="load-note-text"></p>
+        <button type="button" class="ws-btn primary" id="load-note-retry">Try again</button>
+        <button type="button" class="load-note-x" id="load-note-close"
+                aria-label="Dismiss this message" title="Dismiss this message">&times;</button>
+      </div>
       <!-- Fingertips suppression banner: shown when a Fingertips overlay is selected -->
       <!-- Top left, under the zoom control. It used to sit bottom right, where
            the Ask button covers it and the Ask panel hides it completely: the
@@ -3627,6 +3700,15 @@ var LOADER_MAP = {w:1000,h:771,n:704,d:'IAAAAAAAAAAAAAJAAIAAFAAAIDFEECDGGCFDCCIC
   var still = window.matchMedia &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+  // The sweep plays once a session. On the second page of a visit the map is
+  // simply there, coloured, until the figures arrive. Storage that throws
+  // (private windows, blocked site data) just means the sweep plays again.
+  var SWEPT = 'ph-ldr-swept', swept = false;
+  try {
+    swept = sessionStorage.getItem(SWEPT) === '1';
+    if (!swept) sessionStorage.setItem(SWEPT, '1');
+  } catch (e) { /* no session storage: the sweep plays */ }
+
   function paintTo(fraction) {
     if (!ok) return;
     var target = Math.round(Math.max(0, Math.min(1, fraction)) * paths.length);
@@ -3648,18 +3730,17 @@ var LOADER_MAP = {w:1000,h:771,n:704,d:'IAAAAAAAAAAAAAJAAIAAFAAAIDFEECDGGCFDCCIC
      while London was about a third filled, and the screen cut away mid-sweep.
      That reads as an interruption, not as a page arriving.
 
-     So the fill is an animation of its own, and the screen waits for both it
-     and the data. A quick load waits for the sweep to finish; a slow one sees
-     the sweep finish and the map sit whole until the figures arrive. Either
-     way what you see is a complete picture of London, and never a partial one.
-
-     The cost is honest: on a fast connection this holds the page back by up to
-     LDR_MS. That is the trade the completed animation asks for. */
+     So the fill is an animation of its own, played once a session. The screen
+     goes as soon as the figures are ready and never waits for the animation:
+     if they land mid-sweep, the rest of London is filled in at once and the
+     whole map fades, so what you see is still a complete picture of London
+     and never a partial one, without holding the page back to finish a show. */
   var LDR_MS = 1500;
   var started = 0, dataReady = false, sweepDone = false;
 
   function reveal() {
-    if (!dataReady || !sweepDone) return;
+    if (!dataReady) return;
+    if (!sweepDone) { paintTo(1); sweepDone = true; }
     var el = document.getElementById('ldr');
     if (!el || el.classList.contains('fading')) return;
     // Stop the pulse before the fade, or the two compound and the screen
@@ -3705,10 +3786,78 @@ var LOADER_MAP = {w:1000,h:771,n:704,d:'IAAAAAAAAAAAAAJAAIAAFAAAIDFEECDGGCFDCCIC
   }
 
   /* Called once by loadData when the map behind this is ready to be looked
-     at. The screen does not go until the sweep has finished as well. */
-  window._ldrReady = function () { dataReady = true; reveal(); };
+     at. The screen goes at once, filling in whatever the sweep had left. */
+  window._ldrReady = function () {
+    dataReady = true;
+    clearTimeout(slowTimer);
+    reveal();
+  };
 
-  if (still || !ok) {
+  /* ── The watchdog ─────────────────────────────────────────────────────────
+     Without it a failed load left this screen up for ever: a map breathing
+     over a page that was never going to arrive, with nothing to say so and
+     nothing to press. Two things bring up a message under the map.
+
+     Slow: the figures are not ready after 20 seconds. The screen stays and
+     keeps waiting, because a slow connection is not a broken one, and offers
+     a reload alongside. If the figures then land, the screen goes as usual.
+
+     Failed: the application never started, because one of the scripts it
+     needs did not arrive or stopped with an error (checked once the page has
+     been read, when every one of them has had its turn), or the first load
+     itself threw. Waiting longer cannot help, so the map stops breathing and
+     the reload button takes the focus. */
+  var WATCH_MS = 20000;
+  var msg = document.getElementById('ldr-msg');
+  var failed = false;
+
+  function say(text, urgent) {
+    if (!msg || dataReady) return;
+    document.getElementById('ldr-msg-text').textContent = text;
+    msg.hidden = false;
+    if (urgent) {
+      if (svg) svg.classList.remove('waiting');
+      try { document.getElementById('ldr-reload').focus(); } catch (e) {}
+    }
+  }
+  var reloadBtn = document.getElementById('ldr-reload');
+  if (reloadBtn) reloadBtn.addEventListener('click', function () { location.reload(); });
+
+  var slowTimer = setTimeout(function () {
+    if (failed) return;
+    // England was warned about before it started, so it is not "unusual".
+    say((R0 && R0.isEngland
+          ? 'The England map is large, so it can take a minute or two to arrive. '
+          : 'This is taking longer than usual, which can happen on a slow connection. ') +
+        'You can keep waiting, or reload the page to try again.', false);
+  }, WATCH_MS);
+
+  window._ldrFail = function () {
+    if (dataReady || failed) return;
+    // A region whose data has not been published says so in its own box,
+    // which sits over this one; this message would be hidden behind it.
+    if (document.getElementById('region-missing')) return;
+    failed = true;
+    clearTimeout(slowTimer);
+    say('The map could not be loaded, which usually means the connection dropped ' +
+        'for a moment. Please reload the page to try again.', true);
+  };
+
+  // Scripts the page needed that did not arrive, named for the console only.
+  window.PH_FAILED_SCRIPTS = [];
+  window._ldrScriptFailed = function (el) {
+    var src = (el && el.getAttribute && el.getAttribute('src')) || '';
+    window.PH_FAILED_SCRIPTS.push(src);
+    console.warn('A script the map needs could not be loaded: ' + src);
+  };
+  // The main application block sets PH_APP_STARTED just before it starts
+  // the first load. By DOMContentLoaded every classic script has run, so if
+  // that flag is still missing, one of them failed and nothing will follow.
+  document.addEventListener('DOMContentLoaded', function () {
+    if (!window.PH_APP_STARTED) window._ldrFail();
+  });
+
+  if (still || swept || !ok) {
     paintTo(1);
     sweepDone = true;
   } else {
@@ -3734,8 +3883,8 @@ var LOADER_MAP = {w:1000,h:771,n:704,d:'IAAAAAAAAAAAAAJAAIAAFAAAIDFEECDGGCFDCCIC
      library it needs would break the map outright. The way to make the first
      load cheaper here is to serve less, not to reorder it, which is what the
      lazy layer loading below does. -->
-<script src="vendor/leaflet-1.9.4/leaflet.js"></script>
-<script src="vendor/leaflet.markercluster-1.5.3/leaflet.markercluster.js"></script>
+<script src="vendor/leaflet-1.9.4/leaflet.js" onerror="_ldrScriptFailed(this)"></script>
+<script src="vendor/leaflet.markercluster-1.5.3/leaflet.markercluster.js" onerror="_ldrScriptFailed(this)"></script>
 <!-- html2canvas is gone. It was 200 KB on every page load for an exporter
      that nothing called any more. See the note where that code used to be. -->
 
@@ -3762,9 +3911,12 @@ var LOADER_MAP = {w:1000,h:771,n:704,d:'IAAAAAAAAAAAAAJAAIAAFAAAIDFEECDGGCFDCCIC
 (function () {
   var files = window.PH_HEAD_DATA;
   for (var i = 0; i < files.length; i++) {
-    // onerror marks a region whose folder is not there; checked just below.
+    // A region's onerror marks a folder that is not there; checked just
+    // below. London's files are always there, so one that fails is a
+    // dropped connection: it is noted for the loading screen's watchdog,
+    // which offers a reload once the page has been read.
     document.write('<script src="' + window.regionPath(files[i]) + '"' +
-      (window.PH_REGION.isLondon ? '' : ' onerror="PH_REGION.missing=true"') +
+      (window.PH_REGION.isLondon ? ' onerror="_ldrScriptFailed(this)"' : ' onerror="PH_REGION.missing=true"') +
       '><\/script>');
   }
 })();
@@ -3849,6 +4001,131 @@ function dataUrl(path) {
   path = regionPath(path);
   return DATA_VERSION ? path + '?v=' + DATA_VERSION : path;
 }
+
+// ── Files that fail to load ─────────────────────────────────────────────────
+/* A file's JSON, or a rejection that says why not. err.status carries the
+   HTTP status when there was an answer, and is 0 when there was none. */
+function _getJson(url) {
+  return fetch(url).then(r => {
+    if (!r.ok) { const e = new Error('HTTP ' + r.status); e.status = r.status; throw e; }
+    return r.json();
+  });
+}
+
+/* Every file the map fetches after the first paint goes through here: the
+   LSOA, MSOA and output area figures and boundaries, the primary care
+   networks, the charities, dental practices and pharmacies.
+
+   It resolves to the parsed file, or to null, never rejecting, so each caller
+   keeps the "nothing arrived" path it already had. A file that is not there
+   at all (404) is a file this map does not publish, which the caller already
+   copes with by leaving that feature out, so that is said in the console and
+   nowhere else. Anything else (no connection, a server error, a file cut off
+   half way) is tried once more after a moment, and if it fails again PH_LOAD
+   says so on the map, naming the label ("the LSOA figures"), and offers to
+   try again by calling retry, which is whatever the caller needs to do to
+   load it and put it on the map. */
+function loadJson(url, label, retry) {
+  return _getJson(url)
+    .catch(err => {
+      if (err && err.status === 404) throw err;
+      return new Promise(res => setTimeout(res, 1200)).then(() => _getJson(url));
+    })
+    .catch(err => {
+      if (err && err.status === 404) {
+        console.info(url + ' is not published for this map');
+      } else {
+        console.warn(url + ' could not be loaded: ' + (err && err.message));
+        PH_LOAD.failed(label, retry);
+      }
+      return null;
+    });
+}
+
+/* The one message for anything that could not be loaded, in #load-note on
+   the map, with a Try again button and a way to put it away.
+
+   Two kinds. The ward figures failing is the serious one: the map has drawn
+   its outlines but has nothing to colour them with, so that message stays
+   until it is dealt with and wins over the other. Its Try again checks the
+   figures can be reached now before reloading the page, because a reload
+   while still offline would swap the outlines for the browser's own error
+   page.
+
+   Everything else collects here by label, so thirty-three output area files
+   failing together are one sentence, and Try again runs each failed load's
+   retry and puts the message away. Anything that fails again says so again. */
+const PH_LOAD = (function () {
+  const pending = new Map();    // label -> Set of retries, for files after the first paint
+  let main = null;              // the ward figures' retry, when they failed
+  const $ = id => document.getElementById(id);
+
+  function list(labels) {
+    return labels.length < 2 ? labels.join('')
+      : labels.slice(0, -1).join(', ') + ' and ' + labels[labels.length - 1];
+  }
+  function show(text) {
+    const box = $('load-note');
+    if (!box) return;
+    const was = !box.hidden && $('load-note-text').textContent;
+    box.hidden = false;
+    // Set after the box is showing, so the alert is read out.
+    if (was !== text) $('load-note-text').textContent = text;
+  }
+  function hide() {
+    const box = $('load-note');
+    if (box) box.hidden = true;
+  }
+  function render() {
+    if (main) {
+      show('The figures for this map could not be loaded, so only the area outlines are showing. ' +
+           'Please check your connection and try again.');
+    } else if (pending.size) {
+      show('Sorry, ' + list([...pending.keys()]) + ' could not be loaded. ' +
+           'Please check your connection and try again.');
+    } else hide();
+  }
+
+  function retry() {
+    const btn = $('load-note-retry');
+    if (main) {
+      btn.disabled = true;
+      main().then(ok => {
+        if (ok) { location.reload(); return; }
+        btn.disabled = false;
+        show('The figures still could not be loaded. Please check your connection ' +
+             'and try again in a moment.');
+      });
+      return;
+    }
+    const again = [];
+    pending.forEach(fns => fns.forEach(fn => again.push(fn)));
+    pending.clear();
+    hide();
+    again.forEach(fn => { try { fn(); } catch (e) { console.warn(e); } });
+  }
+
+  // The markup is above this script, so it is already there to wire.
+  if ($('load-note-retry')) $('load-note-retry').addEventListener('click', retry);
+  if ($('load-note-close')) $('load-note-close').addEventListener('click', () => { pending.clear(); hide(); });
+
+  return {
+    // A file after the first paint could not be loaded. retry is optional;
+    // two loads of the same file under one label each keep their own.
+    failed(label, retryFn) {
+      if (!label) return;
+      if (!pending.has(label)) pending.set(label, new Set());
+      if (typeof retryFn === 'function') pending.get(label).add(retryFn);
+      render();
+    },
+    // The ward figures could not be loaded. check resolves true when they can
+    // be reached now.
+    mainFailed(check) { main = check; render(); },
+    // Whether a load under this label failed and has not been tried again.
+    hasFailed(label) { return pending.has(label); },
+    isShowing() { const b = $('load-note'); return !!b && !b.hidden; },
+  };
+})();
 
 // ── The area this page covers ───────────────────────────────────────────────
 // Every sentence that says "London" meaning "the whole area on this map" reads
@@ -6303,9 +6580,7 @@ function ensureLsoaData() {
     return Promise.resolve(LSOA_DATA);
   }
   if (_lsoaDataLoading) return _lsoaDataLoading;
-  _lsoaDataLoading = fetch(dataUrl('lsoa_data.json'))
-    .then(r => (r.ok ? r.json() : null))
-    .catch(() => null)
+  _lsoaDataLoading = loadJson(dataUrl('lsoa_data.json'), 'the LSOA figures', ensureLsoaData)
     .then(ld => {
       if (!ld) { _lsoaDataLoading = null; return null; }
       LSOA_DATA = ld;
@@ -6332,36 +6607,46 @@ function ensureLsoaImd() {
   if (_lsoaImdLoading) return _lsoaImdLoading;
 
   _lsoaImdLoading = new Promise((resolve) => {
-    const s = document.createElement('script');
-    s.src = regionPath('data/map/lsoa_imd.js');
-    s.onload = () => {
-      if (typeof LSOA_IMD === 'undefined' || !LSOA_IMD || !LSOA_IMD.features) {
-        _lsoaImdLoading = null;
-        resolve(null);
-        return;
-      }
-      // The ward to LSOA index this file used to build at parse time.
-      WARD_LSOA_IMD = {};
-      LSOA_IMD.features.forEach(f => {
-        const p = f.properties;
-        if (!WARD_LSOA_IMD[p.ward]) WARD_LSOA_IMD[p.ward] = [];
-        WARD_LSOA_IMD[p.ward].push({
-          code: p.code, name: p.name, decile: p.imd_decile, rank: p.imd_rank,
+    let tries = 0;
+    const add = () => {
+      const s = document.createElement('script');
+      s.src = regionPath('data/map/lsoa_imd.js');
+      s.onload = () => {
+        if (typeof LSOA_IMD === 'undefined' || !LSOA_IMD || !LSOA_IMD.features) {
+          _lsoaImdLoading = null;
+          resolve(null);
+          return;
+        }
+        // The ward to LSOA index this file used to build at parse time.
+        WARD_LSOA_IMD = {};
+        LSOA_IMD.features.forEach(f => {
+          const p = f.properties;
+          if (!WARD_LSOA_IMD[p.ward]) WARD_LSOA_IMD[p.ward] = [];
+          WARD_LSOA_IMD[p.ward].push({
+            code: p.code, name: p.name, decile: p.imd_decile, rank: p.imd_rank,
+          });
         });
-      });
-      // Anything that rendered an empty answer while this was missing gets a
-      // second chance now that it is not.
-      try { if (typeof _onLsoaImdReady === 'function') _onLsoaImdReady(); } catch (e) {
-        console.warn('post-LSOA refresh failed:', e);
-      }
-      resolve(LSOA_IMD);
+        // Anything that rendered an empty answer while this was missing gets a
+        // second chance now that it is not.
+        try { if (typeof _onLsoaImdReady === 'function') _onLsoaImdReady(); } catch (e) {
+          console.warn('post-LSOA refresh failed:', e);
+        }
+        resolve(LSOA_IMD);
+      };
+      s.onerror = () => {
+        s.remove();
+        // A script rather than a JSON file, so not through loadJson, but the
+        // same rule: once more after a moment, then the shared message, since
+        // the LSOA level shows nothing without it.
+        if (++tries < 2) { setTimeout(add, 1200); return; }
+        _lsoaImdLoading = null;
+        console.warn('data/map/lsoa_imd.js could not be loaded');
+        PH_LOAD.failed('the LSOA boundaries', _retryLsoaLevel);
+        resolve(null);
+      };
+      document.head.appendChild(s);
     };
-    s.onerror = () => {
-      _lsoaImdLoading = null;
-      console.warn('data/map/lsoa_imd.js could not be loaded');
-      resolve(null);
-    };
-    document.head.appendChild(s);
+    add();
   });
   return _lsoaImdLoading;
 }
@@ -7309,10 +7594,16 @@ function wireVCSE(records) {
    Repeat calls are free: the promise is kept. A failed one is not, so a
    second attempt at the toggle retries rather than being stuck with the
    first failure for the rest of the session. */
+/* label names the file in the shared failure message (see loadJson), and
+   show puts the layer back on the map after Try again, if its box is still
+   ticked, as the toggle would have done had the file arrived first time. */
 const LAYER_SOURCES = {
-  vcse:      { url: 'vcse_data.json',        apply: d => wireVCSE(d) },
-  dental:    { url: 'dental_practices.json', apply: d => loadDentalLayer(d) },
-  pharmacy:  { url: 'pharmacies.json',       apply: d => loadPharmacyLayer(d) },
+  vcse:      { url: 'vcse_data.json',        apply: d => wireVCSE(d), label: 'the charities',
+               show: () => { if (['tv', 'vcse-tab-toggle'].some(id => (document.getElementById(id) || {}).checked)) _setVcseLayerVisible(true); } },
+  dental:    { url: 'dental_practices.json', apply: d => loadDentalLayer(d), label: 'the dental practices',
+               show: () => { if ((document.getElementById('td') || {}).checked) dentalCluster.addTo(map); } },
+  pharmacy:  { url: 'pharmacies.json',       apply: d => loadPharmacyLayer(d), label: 'the pharmacies',
+               show: () => { if ((document.getElementById('tph') || {}).checked) pharmCluster.addTo(map); } },
 };
 const _layerLoads = {};
 
@@ -7321,10 +7612,10 @@ function ensureLayerData(key) {
   const src = LAYER_SOURCES[key];
   if (!src) return Promise.resolve(null);
 
-  _layerLoads[key] = fetch(regionPath(src.url))
-    .then(r => (r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))))
+  const retry = () => ensureLayerData(key).then(d => { if (d && src.show) src.show(); });
+  _layerLoads[key] = loadJson(regionPath(src.url), src.label, retry)
     .then(data => {
-      if (!data || !data.length) throw new Error('empty');
+      if (!data || !data.length) throw new Error(data ? 'empty' : 'not loaded');
       src.apply(data);
       return data;
     })
@@ -10785,8 +11076,9 @@ function _applyBoroughSolo() {
     return 'rgb(' + a.map((v, j) => Math.round(v + (b[j] - v) * f)).join(',') + ')';
   };
 
-  fetch(dataUrl('data/map/pcn.json')).then(r => r.ok ? r.json() : null).then(d => {
-    if (!d || !d.pcns || !d.pcns.length) return;
+  // A map with no PCN file (a 404) just leaves the block hidden.
+  const loadList = () => loadJson(dataUrl('data/map/pcn.json'), 'the list of primary care networks', loadList).then(d => {
+    if (!d || !d.pcns || !d.pcns.length || DATA) return;
     // NHS England files practices that belong to no network under a
     // placeholder code, U99999 ("GPs not allocated to a PCN"). It is not a
     // network and has no footprint, so it is not offered as one. Names are
@@ -10804,6 +11096,7 @@ function _applyBoroughSolo() {
     row.hidden = !d.has_catchments;
     block.hidden = false;
   }).catch(() => {});
+  loadList();
 
   function practiceIndex() {
     const idx = {};
@@ -10811,11 +11104,13 @@ function _applyBoroughSolo() {
     return idx;
   }
 
+  // Try again after the footprints failed is the same as ticking the box.
+  const retryFootprints = () => { if (tog.checked) tog.dispatchEvent(new Event('change')); };
   tog && tog.addEventListener('change', () => {
     if (!tog.checked) { if (fpLyr) map.removeLayer(fpLyr); return; }
     if (fpLyr) { fpLyr.addTo(map); return; }
-    fetch(dataUrl('data/map/pcn_footprints.json')).then(r => r.ok ? r.json() : null).then(gj => {
-      if (!gj || !tog.checked) return;
+    loadJson(dataUrl('data/map/pcn_footprints.json'), 'the primary care network boundaries', retryFootprints).then(gj => {
+      if (!gj || !tog.checked || fpLyr) return;
       fpLyr = L.geoJSON(gj, {
         style: { color: '#0B7A75', weight: 2, fill: true, fillOpacity: 0, opacity: 0.9 },
         onEachFeature: (f, l) => {
@@ -10956,15 +11251,20 @@ window.PH_OA = (function () {
   let group = null, on = false, lsoaName = null, keyIdx = {}, rend = null, announced = false;
   const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-  fetch(dataUrl('data/map/oa/index.json')).then(r => r.ok ? r.json() : null).then(ix => {
-    if (!ix || !ix.lads) return;
-    OA_INDEX = ix;
-    ix.keys.forEach((k, i) => { keyIdx[k] = i; });
-    const b = document.querySelector('#dl-seg button[data-dl="oa"]');
-    if (b) b.hidden = false;
-    // The picker listed each indicator's levels before this arrived.
-    document.dispatchEvent(new Event('ph-levels-changed'));
-  }).catch(() => {});
+  // A map without output areas has no index.json, and loadJson says nothing
+  // about a file that is not published; the OA button just stays hidden.
+  function loadIndex() {
+    loadJson(dataUrl('data/map/oa/index.json'), 'the output areas', loadIndex).then(ix => {
+      if (!ix || !ix.lads) return;
+      OA_INDEX = ix;
+      ix.keys.forEach((k, i) => { keyIdx[k] = i; });
+      const b = document.querySelector('#dl-seg button[data-dl="oa"]');
+      if (b) b.hidden = false;
+      // The picker listed each indicator's levels before this arrived.
+      document.dispatchEvent(new Event('ph-levels-changed'));
+    }).catch(() => {});
+  }
+  loadIndex();
 
   // An output area's figure for one indicator. Older files keep an object.
   function val(p, k) {
@@ -11044,7 +11344,9 @@ window.PH_OA = (function () {
     all.forEach(c => {
       if (loaded[c]) { if (!group.hasLayer(loaded[c])) group.addLayer(loaded[c]); return; }
       if (loading[c]) return;
-      loading[c] = fetch(dataUrl('data/map/oa/' + c + '.json')).then(r => r.ok ? r.json() : null).then(gj => {
+      // One label for every council's file, so any number failing together
+      // is one sentence, and Try again fetches whichever are still missing.
+      loading[c] = loadJson(dataUrl('data/map/oa/' + c + '.json'), 'the output areas', refresh).then(gj => {
         delete loading[c];
         if (!gj) return;
         loaded[c] = build(gj);
@@ -11490,8 +11792,7 @@ let _msoaDataLoading = null;
 function ensureMsoaData() {
   if (Object.keys(MSOA_DATA).length) return Promise.resolve(MSOA_DATA);
   if (_msoaDataLoading) return _msoaDataLoading;
-  _msoaDataLoading = fetch(dataUrl('msoa_data.json'))
-    .then(r => r.ok ? r.json() : null).catch(() => null)
+  _msoaDataLoading = loadJson(dataUrl('msoa_data.json'), 'the MSOA figures', ensureMsoaData)
     .then(md => {
       _msoaDataLoading = null;
       if (!md) return MSOA_DATA;
@@ -12244,6 +12545,19 @@ function ensureLsoaLayer() {
   return _lsoaLayerReady;
 }
 
+/* Try again, from the message on the map, after the LSOA boundaries failed:
+   load them, and put the layer on the map if it is meant to be showing, as
+   the LSOA toggle would have done had they arrived the first time. */
+function _retryLsoaLevel() {
+  ensureLsoaLayer().then(lyr => {
+    if (!lyr || !lsoaActive) return;
+    lyr.addTo(map);
+    lyr.bringToFront();
+    applyLSOAFilter();
+    if (boroughL._map) boroughL.bringToFront();
+  });
+}
+
 /* Called once the boundaries land. Anything that had to answer "no LSOAs" in
    the meantime is asked again here, so a feature that was opened early does
    not stay empty for the rest of the session. */
@@ -12395,8 +12709,7 @@ function loadMsoaBoundaries() {
   ensureMsoaData();
   if (msoaLyr) return Promise.resolve(msoaLyr);
   if (_msoaLoading) return _msoaLoading;
-  _msoaLoading = fetch(regionPath('data/map/msoa_boundaries.json'))
-    .then(r => (r.ok ? r.json() : null))
+  _msoaLoading = loadJson(regionPath('data/map/msoa_boundaries.json'), 'the MSOA boundaries', _retryMsoaLevel)
     .then(gj => {
       if (!gj || !gj.features) { _msoaLoading = null; return null; }
       msoaLyr = L.geoJSON(gj, {
@@ -12440,6 +12753,19 @@ function loadMsoaBoundaries() {
     })
     .catch(() => { _msoaLoading = null; return null; });
   return _msoaLoading;
+}
+
+/* Try again, from the message on the map, after the MSOA boundaries failed.
+   A failed load unticks the MSOA box, so it is ticked again here if the map
+   is at MSOA level or the box was on, which draws them as it would have. */
+function _retryMsoaLevel() {
+  const cb = document.getElementById('tmsoa');
+  const want = _activeLevel() === 'msoa' || (cb && cb.checked);
+  loadMsoaBoundaries().then(lyr => {
+    if (!lyr || !want || !cb) return;
+    cb.checked = true;
+    cb.dispatchEvent(new Event('change'));
+  });
 }
 
 /* ── Integrated Care Board regions ─────────────────────────────────────────
@@ -12537,10 +12863,13 @@ document.getElementById('tmsoa').addEventListener('change', e => {
     if (msoaLyr && map.hasLayer(msoaLyr)) map.removeLayer(msoaLyr);
     return;
   }
+  const before = el ? el.textContent : '';
   if (el && !msoaLyr) el.textContent = '...';
   loadMsoaBoundaries().then(lyr => {
     if (!lyr) {
-      if (el) el.textContent = '0';
+      // Not "0": there are MSOAs, they just did not arrive, and the message
+      // on the map says so.
+      if (el) el.textContent = before === '...' ? '' : before;
       e.target.checked = false;
       return;
     }
@@ -15112,47 +15441,57 @@ function _restyleAll() {
 // ═══════════════════════════════════════════════════════════════════════════
 // DATA LOADING — fetches ward_data.json from the same folder
 // ═══════════════════════════════════════════════════════════════════════════
-async function loadData() {
-  const ldr = document.getElementById('ldr');
+/* The core half, not the whole file.
 
+   ward_data.json is 419.5 KB gz and the map cannot draw a single ward
+   until all of it has arrived, which is what the loading screen is waiting
+   through. 125.9 KB of that is the Fingertips block, fifty-one ft_* series
+   per ward, and the opening view reads none of it.
+   scripts/split_ward_data.py cuts it on that seam, and ensureWardDetail
+   above fetches the far side once the map is up.
+
+   Falls back to the whole file whenever the core half cannot be had: not
+   generated (a 404), a server error, no answer at all, or a file cut off half
+   way. Resolves { json, whole }, or rejects when neither file can be read. */
+function _fetchWardFigures() {
+  return _getJson(dataUrl('data/ward_core.json'))
+    .then(json => ({ json, whole: false }))
+    .catch(err => {
+      console.info('data/ward_core.json not loaded (' + err.message + '), so reading ward_data.json');
+      return _getJson(dataUrl('ward_data.json')).then(json => ({ json, whole: true }));
+    });
+}
+
+async function loadData() {
   // The loading screen owns its own animation and its own dismissal now. All
   // this has to say is that the map behind it is worth looking at; the screen
-  // goes when that is true and the sweep has finished, whichever is later.
+  // goes as soon as that is true.
   const done = () => {
     if (typeof window._ldrReady === 'function') window._ldrReady();
   };
 
+  // The manifest first, uncached and small. It gives the data version every
+  // other payload is stamped with, so a refreshed dataset is picked up
+  // immediately while an unchanged one is served from cache. Never rejects.
+  const manifest = await loadManifest();
+
+  /* Only the fetching and parsing are caught here. A mistake in the code
+     below them used to land in the same catch and be reported as missing
+     data, which sent anyone looking for it after the wrong thing. */
+  let got = null;
   try {
+    got = await _fetchWardFigures();
+  } catch (err) {
+    console.warn('The ward figures could not be loaded:', err.message);
+  }
 
-    // The manifest first, uncached and small. It gives the data version every
-    // other payload is stamped with, so a refreshed dataset is picked up
-    // immediately while an unchanged one is served from cache.
-    const manifest = await loadManifest();
-
-    /* The core half, not the whole file.
-
-       ward_data.json is 419.5 KB gz and the map cannot draw a single ward
-       until all of it has arrived, which is what the loading screen is waiting
-       through. 125.9 KB of that is the Fingertips block, fifty-one ft_* series
-       per ward, and the opening view reads none of it.
-       scripts/split_ward_data.py cuts it on that seam, and ensureWardDetail
-       above fetches the far side once the map is up.
-
-       Falls back to the whole file if the split has not been generated, so a
-       checkout that has not run the script still works rather than opening on
-       an empty map. */
-    let response = await fetch(dataUrl('data/ward_core.json'));
-    if (!response.ok) {
-      response = await fetch(dataUrl('ward_data.json'));
-      /* The whole file carries the Fingertips series already, so there is no
-         far side to go and get. Recorded here rather than left for
-         ensureWardDetail to discover, which would spend a 404 on every load of
-         a deployment that has not run the split. */
-      _wardDetailDone = true;
-    }
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-    const json = await response.json();
+  if (got) {
+    const json = got.json || {};
+    /* The whole file carries the Fingertips series already, so there is no
+       far side to go and get. Recorded here rather than left for
+       ensureWardDetail to discover, which would spend a 404 on every load of
+       a deployment that has not run the split. */
+    if (got.whole) _wardDetailDone = true;
     let wards = json.wards || {};
     /* A region build's ward_data.json can carry records for ward codes that
        are not on its map: no name, no authority, only service counts (87 of
@@ -15291,13 +15630,10 @@ async function loadData() {
        Fingertips figure before then wait for it themselves. */
     ensureWardDetail();
 
-  } catch (err) {
-    // ward_data.json missing or not yet generated — show map with sample data
-    console.warn('ward_data.json not found or invalid:', err.message);
+  } else {
+    // Neither ward file could be read: the map runs with boundaries only.
     document.getElementById('src-lbl').textContent =
       'ward_data.json not found — map running with boundaries only. Run fetch_all_data.py to populate data.';
-    // The loading screen carries one word now, so the explanation goes where
-    // it can stay on screen: src-lbl in the status bar, set just above.
     buildWardLayer();
     injectWardIMD();
     setTimeout(initVCSEFilters, 100);
@@ -15305,6 +15641,9 @@ async function loadData() {
     // layer toggles, even though there are no figures to shade with.
     if (typeof _applyUrlStateOnce === 'function') _applyUrlStateOnce();
     done();
+    // And says so on the map, with a way to try again, rather than leaving
+    // a grey map to look like a map of nothing.
+    PH_LOAD.mainFailed(() => _fetchWardFigures().then(() => true, () => false));
   }
 }
 
@@ -15312,7 +15651,15 @@ async function loadData() {
 // INIT
 // ═══════════════════════════════════════════════════════════════════════════
 setTimeout(() => map.invalidateSize(), 200);
-loadData();
+// Read by the loading screen's watchdog: everything above ran, so the page
+// did start. If this line is never reached, a script it needed failed.
+window.PH_APP_STARTED = true;
+// A mistake in turning the figures into a map, rather than in fetching them,
+// leaves nothing to show; the loading screen says so instead of waiting.
+loadData().catch(err => {
+  console.error('The map could not be built:', err);
+  if (typeof window._ldrFail === 'function') window._ldrFail();
+});
 </script>
 
 <script>
@@ -16034,12 +16381,24 @@ var PH_SHOW = {
     return _codeToName[code] || '';
   }
 
+  /* The point files the summaries and the Directory read, through the page's
+     loadJson so a failure is retried and reported the same way as anywhere
+     else. Resolves the rows, [] when the file is not published, or null when
+     it could not be loaded; a failure is not kept, so the next use asks again. */
   var _json = {};
-  function loadJson(path) {
+  var ROW_LABELS = { 'pharmacies.json': 'the pharmacies', 'dental_practices.json': 'the dental practices',
+                     'vcse_data.json': 'the charities' };
+  function loadRows(path) {
     if (!_json[path]) {
-      _json[path] = fetch(regionPath(path))
-        .then(function (r) { return r.ok ? r.json() : []; })
-        .catch(function () { return []; });
+      var label = ROW_LABELS[path] || 'some of the places';
+      _json[path] = loadJson(regionPath(path), label, dirRetry).then(function (d) {
+        if (d) return d;
+        // Null both for a file this map does not publish, which is an empty
+        // list, and for one that failed, which is not kept, so the next use
+        // asks for it again.
+        if (PH_LOAD.hasFailed(label)) { delete _json[path]; return null; }
+        return [];
+      });
     }
     return _json[path];
   }
@@ -16062,9 +16421,12 @@ var PH_SHOW = {
 
     var rows = s.glob
       ? Promise.resolve((typeof window[s.glob] !== 'undefined' && window[s.glob]) || [])
-      : loadJson(s.src);
+      : loadRows(s.src);
 
     _counts[id] = rows.then(function (data) {
+      // Not loaded is not none: no counts, rather than a zero for every ward,
+      // and nothing kept, so the next summary asks again.
+      if (data === null) { delete _counts[id]; return null; }
       var out = {};
       (data || []).forEach(function (r) {
         var wn = '';
@@ -16281,7 +16643,13 @@ var PH_SHOW = {
   function svcIn(id, wn) {
     if (!_svc[id]) {
       var slot = _svc[id] = { map: null };
-      serviceCounts(id).then(function (m) { slot.map = m || {}; refreshSummaries(); });
+      serviceCounts(id).then(function (m) {
+        // A file that could not be loaded leaves the counts out of the
+        // sentence rather than saying the ward has none.
+        if (m === null) { delete _svc[id]; return; }
+        slot.map = m || {};
+        refreshSummaries();
+      });
     }
     return _svc[id].map ? (_svc[id].map[wn] || 0) : null;
   }
@@ -17626,6 +17994,7 @@ var PH_SHOW = {
   var dirRecords = null;
   var dirOutOfScope = 0;
   var dirLoading = null;
+  var dirPartial = false;   // the last load was missing a file that failed
   // near: { label, lat, lng, from } while the list is sorted by distance
   // from a postcode or a ward (see dirOpenNear), otherwise null.
   var dirState = { q: '', types: {}, borough: '', near: null };
@@ -17741,13 +18110,15 @@ var PH_SHOW = {
   }
 
   function loadDirectory() {
-    if (dirRecords) return Promise.resolve(dirRecords);
+    if (dirRecords && !dirPartial) return Promise.resolve(dirRecords);
     if (dirLoading) return dirLoading;
+    var partial = false;
     dirLoading = Promise.all(DIR_SOURCES.map(function (s) {
       var rows = s.glob
         ? Promise.resolve((typeof window[s.glob] !== 'undefined' && window[s.glob]) || [])
-        : loadJson(s.src);
+        : loadRows(s.src);
       return rows.then(function (data) {
+        if (data === null) partial = true;
         return (data || [])
           // A charity is listed where it is based, so one based outside the
           // region is left out here even when it works inside it (the
@@ -17778,10 +18149,25 @@ var PH_SHOW = {
       // A to Z by the name's first letter or digit, so names the register
       // starts with quote marks or brackets file where a reader would look.
       phSortByName(dirRecords, function (r) { return r.n; });
+      // A list missing a file that failed is shown, since the rest is real,
+      // but not kept: the message on the map says what is missing, and the
+      // next time the Directory is opened it asks for that file again.
+      dirPartial = partial;
       dirLoading = null;
       return dirRecords;
     });
     return dirLoading;
+  }
+
+  // Try again, from the message on the map, after a file the Directory or a
+  // ward summary reads failed: load the Directory again and redraw it if it
+  // is on screen. The summaries ask again on their own.
+  function dirRetry() {
+    dirPartial = true;
+    loadDirectory().then(function () {
+      var list = $('dir-list');
+      if (list && list.offsetParent !== null) { renderDirControls(); renderDirectory(); }
+    });
   }
 
   function dirFilter() {
