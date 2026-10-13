@@ -1845,6 +1845,17 @@
   .cb-step { padding: 11px 14px; border-bottom: 1px solid var(--line); }
   .cb-step > h3 { display: flex; align-items: baseline; gap: 6px; font-size: var(--t-sm);
     font-weight: 600; color: var(--ink); margin: 0 0 4px; }
+  /* A step that has been answered folds to one line: the question, the
+     answer and a Change button, so the list of indicators gets the room. */
+  .cb-step.folded { padding: 8px 14px; }
+  .cb-step.folded > h3 { margin: 0; color: var(--ink-2); font-weight: 500; }
+  .cb-step.folded .cb-step-body { display: none; }
+  .cb-ans { color: var(--nhs-dark); font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+  .cb-ans:empty { display: none; }
+  .cb-chg { margin-left: auto; flex-shrink: 0; appearance: none; background: none; border: 0;
+    padding: 0; font: inherit; font-size: var(--t-xs); font-weight: 500; color: var(--nhs-blue);
+    text-decoration: underline; cursor: pointer; }
+  .cb-chg:hover { color: var(--nhs-dark); }
   .cb-n { flex: 0 0 auto; width: 15px; height: 15px; border-radius: 50%; background: var(--nhs-blue);
     color: var(--on-accent); font-size: var(--t-xs); font-weight: 700; display: inline-flex; align-items: center;
     justify-content: center; font-family: 'JetBrains Mono', ui-monospace, monospace; }
@@ -1860,16 +1871,20 @@
   .cb-picked strong { color: var(--nhs-dark); font-variant-numeric: tabular-nums; }
   .cb-picked .cb-none { margin-left: auto; appearance: none; background: none; border: 0;
     font: inherit; font-size: var(--t-xs); color: var(--ink-3); cursor: pointer; text-decoration: underline; }
-  .cb-cols { max-height: 300px; overflow-y: auto; overflow-x: hidden; }
+  /* No height of its own: the whole of .cb-scroll scrolls as one, so a long
+     list is not a box inside a box. */
+  .cb-cols { overflow-x: hidden; }
   .cb-grp-hd { display: flex; align-items: center; gap: 6px; padding: 7px 14px; cursor: pointer;
-    background: var(--paper-2); border-bottom: 1px solid var(--line); font-size: var(--t-xs);
+    background: var(--paper-2); border: 0; border-bottom: 1px solid var(--line); font: inherit;
+    font-size: var(--t-xs); width: 100%; text-align: left; appearance: none;
     font-weight: 600; color: var(--ink-2); user-select: none; }
+  .cb-grp-hd:hover { background: var(--nhs-light); }
   .cb-grp-hd .a { color: var(--ink-3); font-size: 8px; transition: transform .12s; }
   .cb-grp-hd.open .a { transform: rotate(90deg); }
   .cb-grp-hd .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
     white-space: nowrap; }
   .cb-grp-hd .n { color: var(--ink-3); font-weight: 500; font-size: var(--t-xs);
-    font-family: 'JetBrains Mono', ui-monospace, monospace; }
+    font-variant-numeric: tabular-nums; flex-shrink: 0; }
   .cb-grp-body { display: none; }
   .cb-grp-body.open { display: block; }
   .cb-col { display: flex; align-items: flex-start; gap: 7px; padding: 5px 14px 5px 20px;
@@ -1879,10 +1894,48 @@
   .cb-col input { margin: 2px 0 0; flex-shrink: 0; accent-color: var(--nhs-blue); cursor: pointer; }
   .cb-col .l { flex: 1; min-width: 0; line-height: 1.35; }
   .cb-col.on .l { font-weight: 600; color: var(--nhs-dark); }
-  .cb-acts { display: flex; gap: 5px; padding: 10px 14px; border-top: 1px solid var(--line);
+  /* The download bar, pinned at the foot of the panel: what the file will
+     hold, the preview switch and the two downloads. */
+  .cb-acts { padding: 9px 14px 10px; border-top: 1px solid var(--line);
     flex-shrink: 0; background: var(--paper-2); }
-  .cb-acts .ws-btn { flex: 1; justify-content: center; }
-  .cb-note { font-size: var(--t-xs); line-height: 1.45; color: var(--ink-3); padding: 0 14px 11px; }
+  .cb-sumrow { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
+  .cb-count { flex: 1; min-width: 0; font-size: var(--t-xs); line-height: 1.45; color: var(--ink-2); }
+  .cb-count strong { color: var(--nhs-dark); font-variant-numeric: tabular-nums; }
+  .cb-prevbtn { flex-shrink: 0; appearance: none; background: none; border: 0; padding: 0;
+    font: inherit; font-size: var(--t-xs); font-weight: 600; color: var(--nhs-blue);
+    text-decoration: underline; cursor: pointer; }
+  .cb-prevbtn:hover { color: var(--nhs-dark); }
+  .cb-btns { display: flex; gap: 6px; }
+  .cb-btns .ws-btn { flex: 1 1 0; min-width: 0; justify-content: center; padding: 6px 8px; }
+  .cb-btns .ws-btn:disabled, .cb-prevbtn:disabled { opacity: .5; cursor: not-allowed; pointer-events: none; }
+  .cb-note { font-size: var(--t-xs); line-height: 1.45; color: var(--ink-3); padding: 9px 14px 11px; }
+  .cb-dropped { display: block; color: var(--tint-amber-ink); background: var(--tint-amber);
+    border: 1px solid var(--tint-amber-line); border-radius: 6px; padding: 7px 9px; margin-bottom: 7px; }
+  /* The preview takes the place of the choices while it is open. */
+  .cb-prev { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; }
+  .cb-prev[hidden], .cb-scroll[hidden] { display: none; }
+  .cb-prev-hd { padding: 11px 14px 8px; flex-shrink: 0; }
+  .cb-prev-hd h3 { font-size: var(--t-sm); font-weight: 600; color: var(--ink); margin: 0 0 3px; }
+  .cb-prev-hd p { font-size: var(--t-xs); line-height: 1.45; color: var(--ink-3); margin: 0; }
+  /* Shadows at the edges while there is more of the table to scroll to. */
+  .cb-tbl-wrap { overflow: auto; margin: 0 14px 12px; border: 1px solid var(--line); border-radius: 6px;
+    min-height: 0; flex: 0 1 auto;
+    background:
+      linear-gradient(to right, var(--paper) 30%, rgba(255,255,255,0)) left center / 24px 100% no-repeat local,
+      linear-gradient(to left, var(--paper) 30%, rgba(255,255,255,0)) right center / 24px 100% no-repeat local,
+      radial-gradient(farthest-side at 0 50%, rgba(0,0,0,.16), rgba(0,0,0,0)) left center / 10px 100% no-repeat scroll,
+      radial-gradient(farthest-side at 100% 50%, rgba(0,0,0,.16), rgba(0,0,0,0)) right center / 10px 100% no-repeat scroll,
+      var(--paper); }
+  .cb-tbl { border-collapse: collapse; font-size: var(--t-xs); font-variant-numeric: tabular-nums; }
+  .cb-tbl th, .cb-tbl td { padding: 4px 7px; border-bottom: 1px solid var(--line); text-align: left; }
+  .cb-tbl th { position: sticky; top: 0; background: var(--paper-2); font-weight: 600; color: var(--ink-2);
+    vertical-align: bottom; line-height: 1.3; white-space: nowrap; }
+  /* Indicator headings are long, so they wrap; wide enough that they take
+     three lines rather than eight above a column of short numbers. */
+  .cb-tbl th.num { white-space: normal; min-width: 10em; max-width: 14em; }
+  .cb-tbl td { white-space: nowrap; color: var(--ink); }
+  .cb-tbl .num { text-align: right; }
+  .cb-tbl tbody tr:last-child td { border-bottom: 0; }
 
   /* ── Directory ────────────────────────────────────────────────────────────
      Every point dataset on the map as one searchable list. The map answers
@@ -2939,51 +2992,75 @@
         </div>
       </div>
 
-      <!-- Data export: a CSV with the columns you chose.
+      <!-- Data export: a CSV with the columns you chose, and a notes file
+           that says where each column comes from, so the figures can be cited.
            The toolbar CSV hands over what the map is drawing. This asks three
-           questions instead: which areas, which level, which figures. -->
+           questions instead: which areas, which level, which indicators.
+           Steps 1 and 2 fold to one line once answered, everything above the
+           download bar scrolls as one, and the bar stays pinned at the foot. -->
       <div class="tab-pane cb-pane" id="tab-csv">
         <div class="cb-head">
           <div class="cmp-row">
             <h2>Data export</h2>
             
           </div>
-          <div class="cb-sub">Build a spreadsheet. Choose the areas, then the figures. The file
-            downloads to your computer.</div>
+          <div class="cb-sub">Build a spreadsheet of the figures you need by choosing the areas and
+            then the indicators, and a CSV file will download to your device.</div>
         </div>
 
-        <div class="cb-step">
-          <h3><span class="cb-n">1</span>Which areas?</h3>
-          <div class="cb-help">Each row in the file is one area.</div>
-          <div class="cb-seg" id="cb-level">
-            <button type="button" data-lvl="ward" class="on">Wards</button>
-            <button type="button" data-lvl="lsoa">LSOAs</button>
-            <button type="button" data-lvl="msoa">MSOAs</button>
-            <button type="button" data-lvl="borough">LAs</button>
+        <div class="cb-scroll" id="cb-scroll">
+          <div class="cb-step" id="cb-step-1">
+            <h3><span class="cb-n">1</span>Which areas?<span class="cb-ans" id="cb-ans-1"></span><button
+              type="button" class="cb-chg" data-step="1" aria-label="Change which areas" hidden>Change</button></h3>
+            <div class="cb-step-body">
+              <div class="cb-help">Each row in the file is one area.</div>
+              <div class="cb-seg" id="cb-level">
+                <button type="button" data-lvl="ward" class="on">Wards</button>
+                <button type="button" data-lvl="lsoa">LSOAs</button>
+                <button type="button" data-lvl="msoa">MSOAs</button>
+                <button type="button" data-lvl="borough">LAs</button>
+              </div>
+            </div>
           </div>
+
+          <div class="cb-step" id="cb-step-2">
+            <h3><span class="cb-n">2</span>Where?<span class="cb-ans" id="cb-ans-2"></span><button
+              type="button" class="cb-chg" data-step="2" aria-label="Change where" hidden>Change</button></h3>
+            <div class="cb-step-body">
+              <div class="cb-help">Choose all of London, one ICB, or one LA.</div>
+              <select class="q-f" id="cb-scope" aria-label="Which places to include">
+                <option value="">All of London</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="cb-step" style="border-bottom:none;padding-bottom:4px">
+            <h3><span class="cb-n">3</span>Which indicators?</h3>
+            <div class="cb-help">Each indicator you tick becomes one column in the file.</div>
+          </div>
+          <div class="cb-picked" id="cb-picked">
+            <span>No indicators chosen yet</span>
+            <button type="button" class="cb-none" id="cb-clear" hidden>Clear</button>
+          </div>
+          <div class="cb-cols" id="cb-cols"></div>
+          <div class="cb-note" id="cb-note"></div>
         </div>
 
-        <div class="cb-step">
-          <h3><span class="cb-n">2</span>Where?</h3>
-          <div class="cb-help">Choose all of London, one ICB, or one LA.</div>
-          <select class="q-f" id="cb-scope" aria-label="Which places to include">
-            <option value="">All of London</option>
-          </select>
-        </div>
+        <!-- The first rows of the file, built from the same rows the CSV is
+             written from, shown in place of the choices until it is hidden. -->
+        <div class="cb-prev" id="cb-prev" hidden></div>
 
-        <div class="cb-step" style="border-bottom:none;padding-bottom:4px">
-          <h3><span class="cb-n">3</span>Which figures?</h3>
-          <div class="cb-help">Each figure you tick becomes one column.</div>
-        </div>
-        <div class="cb-picked" id="cb-picked">
-          <span>No figures chosen</span>
-          <button type="button" class="cb-none" id="cb-clear" hidden>Clear</button>
-        </div>
-        <div class="cb-cols" id="cb-cols"></div>
-        <div class="cb-note" id="cb-note"></div>
         <div class="cb-acts">
-          <button type="button" class="ws-btn primary" id="cb-download">Download CSV</button>
-          <button type="button" class="ws-btn" id="cb-preview">Preview</button>
+          <div class="cb-sumrow">
+            <div class="cb-count" id="cb-count" role="status"></div>
+            <button type="button" class="cb-prevbtn" id="cb-preview" aria-expanded="false"
+                    aria-controls="cb-prev">Preview</button>
+          </div>
+          <div class="cb-btns">
+            <button type="button" class="ws-btn primary" id="cb-download">Download CSV</button>
+            <button type="button" class="ws-btn" id="cb-notes"
+                    title="A text file giving the source, period, geography and method of each column, and a suggested citation">Download notes</button>
+          </div>
         </div>
       </div>
 
@@ -4491,6 +4568,42 @@ function indHeader(k) {
   return l + (u.indexOf('(') === -1 ? ' (' + u + ')' : ', ' + u);
 }
 function indSameAs(k) { return IND_SAME_AS[k] || ''; }
+
+/* How many decimal places each indicator is written to, wherever one of its
+   figures is shown: the hover cards (fmtOv), the rankings, the key figures in
+   the profile, sheet and reports, and the columns of the Data export. One
+   setting per indicator, so a downloaded file and the map never disagree about
+   a figure, and nothing is written to nine places.
+
+   Most indicators take one place: percentages, rates, ratios, years and
+   concentrations. PM2.5 across the whole of London runs 7.0 to 11.3, so whole
+   numbers would put every LSOA on four values. Counts within a radius take one
+   too, because a ward's figure is a population-weighted mean and "0 stations"
+   would hide 0.4. Whole numbers are for people, crimes, places, ranks, deciles
+   and distances in metres; two places for the IMD domain scores (several are
+   proportions from 0 to 1) and PTAL. An indicator missing from IND_NAMES (a
+   custom one) is decided by indDecimals from the shape of its key. */
+const IND_DECIMALS = {};
+(function () {
+  const whole = ['census_population', 'crime_total', 'crime_violence_12mo', 'crime_asb_12mo',
+    'crime_theft_12mo', 'crime_burglary_12mo', 'crime_robbery_12mo', 'crime_vehicle_12mo',
+    'crime_drug_offences_12mo', 'crime_public_order_12mo', 'crime_arson_12mo', 'crime_weapons_12mo',
+    'crime_misc_society_12mo', 'core20_lsoa_count', 'total_lsoa_count', 'claimant_count',
+    'gb_total_uprn', 'imd_decile', 'imd_rank', 'rail_station_dist_m', 'bus_stop_dist_m'];
+  const two = ['income_score', 'employment_score', 'education_score', 'health_score', 'crime_score',
+    'barriers_score', 'environment_score', 'ptal_score'];
+  Object.keys(IND_NAMES).forEach(k => { IND_DECIMALS[k] = 1; });
+  whole.forEach(k => { IND_DECIMALS[k] = 0; });
+  two.forEach(k => { IND_DECIMALS[k] = 2; });
+})();
+function indDecimals(k) {
+  const key = String(k || '');
+  if (Object.prototype.hasOwnProperty.call(IND_DECIMALS, key)) return IND_DECIMALS[key];
+  if (/_dist_m$/.test(key)) return 0;
+  if (/_score$/.test(key)) return 2;
+  if (/_pct$|_rate$|_ugm3$|_1km$|_800m$|_mean$|^ft_/.test(key)) return 1;
+  return 0;
+}
 /* The unit printed after a figure in a list of rows, now that labels do not
    carry it: "%" straight on, a measurement after a space, and nothing for
    counts, scores and deciles, whose label already says what they are. */
@@ -4516,7 +4629,8 @@ function indValueUnit(k) {
     o.textContent = IND_NAMES[o.value][0] + (at === -1 ? '' : t.slice(at));
   });
 })();
-window.PH_IND = { label: indLabel, title: indTitle, unit: indUnit, header: indHeader, sameAs: indSameAs };
+window.PH_IND = { label: indLabel, title: indTitle, unit: indUnit, header: indHeader, sameAs: indSameAs,
+                  decimals: indDecimals };
 
 /**
  * Two different questions about an indicator's geography, kept apart.
@@ -5739,23 +5853,10 @@ function fmtOv(v, k) {
   if (v === null || v === undefined || v === '') return '—';
   if (typeof v === 'number' && isNaN(v)) return '—';
   const key = k || '';
-  if (/_pct$|_rate$/.test(key))  return fmtNum(v, 1) + '%';
-  // Concentrations, µg/m³. These need a decimal: PM2.5 across the whole of
-  // London runs 7.0 to 11.3, so rounding to whole numbers collapses every
-  // LSOA onto four distinct values and the map stops distinguishing anything.
-  if (/_ugm3$/.test(key))        return fmtNum(v, 1);
-  // Distances in metres are whole numbers; a walk of 618.55 m is 619 m.
-  if (/_dist_m$/.test(key))      return fmtNum(v, 0);
-  // Counts within a radius. Integers at LSOA level, but at ward level they are
-  // population-weighted means, and rounding those to whole numbers reported
-  // "0 stations within 1 km" for wards whose residents average 0.4 — which
-  // reads as "none" rather than "few". One decimal keeps the distinction.
-  if (/_1km$|_800m$/.test(key))  return fmtNum(v, 1);
-  if (/_score$/.test(key))       return fmtNum(v, 2);           // IMD domain scores
-  // Fingertips ft_* keys (numeric IDs and named) — published as %/rate/years.
-  // Default to 1dp so values like life expectancy 80.6 don't render as "81".
-  if (key.startsWith('ft_')) return fmtNum(v, 1);
-  return fmtNum(v, 0);                                          // decile / rank / count
+  // The decimal places are the indicator's own (IND_DECIMALS), shared with
+  // the rankings, the key figures and the Data export.
+  const s = fmtNum(v, indDecimals(key));
+  return /_pct$|_rate$/.test(key) ? s + '%' : s;
 }
 function ovTooltipRows(valueForKey, ward, level) {
   // valueForKey: function(k) -> raw value
@@ -7817,8 +7918,8 @@ function showWard(wn) {
   const keyStats = `
     <div class="keystats">
       ${stat('Population', popN !== null ? Math.round(popN).toLocaleString('en-GB') : null, 'Census 2021')}
-      ${stat('Good health', goodHlt !== null ? goodHlt.toFixed(0) + '%' : null, 'of residents')}
-      ${stat('Bad health', badHlt !== null ? badHlt.toFixed(1) + '%' : null, 'of residents')}
+      ${stat('Good health', goodHlt !== null ? goodHlt.toFixed(indDecimals('census_good_health_pct')) + '%' : null, 'of residents')}
+      ${stat('Bad health', badHlt !== null ? badHlt.toFixed(indDecimals('census_bad_health_pct')) + '%' : null, 'of residents')}
       ${stat('Core20 LSOAs', (c20L !== null && totL !== null) ? c20L.toFixed(0) + ' of ' + totL.toFixed(0) : null, 'in England’s most deprived fifth')}
     </div>`;
 
@@ -8947,10 +9048,10 @@ function _generateWardReport(_reportWindow, wn, opts) {
 
   <div class="kpis">
     ${_kpi('Population',     popN  != null ? Math.round(popN).toLocaleString('en-GB') : null, 'Census 2021')}
-    ${_kpi('Deprivation score', imdW != null ? imdW.toFixed(1) : null, 'IMD 2025, higher is more deprived', _ctxBar(imdPct, 'lower-better'))}
-    ${_kpi('Good health',    goodHlt != null ? goodHlt.toFixed(0) + '%' : null, 'of residents', _ctxBar(goodHpct, 'higher-better'))}
-    ${_kpi('Bad health',     badHlt  != null ? badHlt.toFixed(1) + '%' : null, 'of residents', _ctxBar(badHpct, 'lower-better'))}
-    ${_kpi('Disabled residents', disAny != null ? disAny.toFixed(1) + '%' : null, 'of residents', _ctxBar(disAnyPct, 'lower-better'))}
+    ${_kpi('Deprivation score', imdW != null ? imdW.toFixed(indDecimals('imd_score_ward')) : null, 'IMD 2025, higher is more deprived', _ctxBar(imdPct, 'lower-better'))}
+    ${_kpi('Good health',    goodHlt != null ? goodHlt.toFixed(indDecimals('census_good_health_pct')) + '%' : null, 'of residents', _ctxBar(goodHpct, 'higher-better'))}
+    ${_kpi('Bad health',     badHlt  != null ? badHlt.toFixed(indDecimals('census_bad_health_pct')) + '%' : null, 'of residents', _ctxBar(badHpct, 'lower-better'))}
+    ${_kpi('Disabled residents', disAny != null ? disAny.toFixed(indDecimals('census_disability_any_pct')) + '%' : null, 'of residents', _ctxBar(disAnyPct, 'lower-better'))}
     ${_kpi('Core20 LSOAs',   (c20L != null && totL != null) ? c20L.toFixed(0) + ' of ' + totL.toFixed(0) : null, 'in England\u2019s most deprived fifth')}
   </div>
 
@@ -10038,6 +10139,8 @@ function _applyBoroughSolo() {
     model.length = 0;
     labels.forEach(l => model.push({ label: l, opts: out[l] }));
     if (sel.value && !sel.querySelector('option[value="' + sel.value + '"]')) sel.value = 'none';
+    // The same themes, in the same order, group the Data export's list.
+    window.PH_THEMES = model.map(g => ({ label: g.label, keys: g.opts.map(o => o.value) }));
   })();
 
   const all = [].concat.apply([], model.map(g => g.opts));
@@ -11614,11 +11717,11 @@ window.generateLSOAReport = function(code) {
 
   <div class="kpis">
     ${_kpi('Population',     popN  != null ? Math.round(popN).toLocaleString('en-GB') : null, 'Census 2021')}
-    ${_kpi('Deprivation score', score != null ? score.toFixed(1) : null, 'IMD 2025, higher is more deprived', _ctxBar(imdPct, 'lower-better'))}
+    ${_kpi('Deprivation score', score != null ? score.toFixed(indDecimals('imd_score')) : null, 'IMD 2025, higher is more deprived', _ctxBar(imdPct, 'lower-better'))}
     ${_kpi('Deprivation decile', decile != null ? decile + ' of 10' : null, 'where 1 is the most deprived tenth')}
-    ${_kpi('Good health',    goodH != null ? goodH.toFixed(0) + '%' : null, 'of residents', _ctxBar(goodHpct, 'higher-better'))}
-    ${_kpi('Bad health',     badH  != null ? badH.toFixed(1) + '%' : null, 'of residents', _ctxBar(badHpct, 'lower-better'))}
-    ${_kpi('Disabled residents', disAny != null ? disAny.toFixed(1) + '%' : null, 'of residents', _ctxBar(disAnyPct, 'lower-better'))}
+    ${_kpi('Good health',    goodH != null ? goodH.toFixed(indDecimals('census_good_health_pct')) + '%' : null, 'of residents', _ctxBar(goodHpct, 'higher-better'))}
+    ${_kpi('Bad health',     badH  != null ? badH.toFixed(indDecimals('census_bad_health_pct')) + '%' : null, 'of residents', _ctxBar(badHpct, 'lower-better'))}
+    ${_kpi('Disabled residents', disAny != null ? disAny.toFixed(indDecimals('census_disability_any_pct')) + '%' : null, 'of residents', _ctxBar(disAnyPct, 'lower-better'))}
   </div>
 
   ${keyPoints}
@@ -12345,11 +12448,10 @@ function renderTopBottom() {
   bestHdr.style.color  = descriptive ? 'var(--ink)' : '#0F6E56';
   worstHdr.style.color = descriptive ? 'var(--ink)' : '#A32D2D';
 
-  const fmt = v => {
-    if (Math.abs(v) >= 100) return v.toFixed(0);
-    if (Math.abs(v) >= 10)  return v.toFixed(1);
-    return v.toFixed(2);
-  };
+  // To the indicator's own decimal places, as on the hover card and in the
+  // Data export, rather than by the size of the number.
+  const rankDp = indDecimals(curOv);
+  const fmt = v => fmtNum(v, rankDp);
   // Each row's tooltip names the indicator (from IND_NAMES) and its unit,
   // which the narrow columns have no room for.
   const unitSfx = indValueUnit(curOv);
@@ -15439,10 +15541,8 @@ var PH_SHOW = {
 
   function fmtVal(v, k) {
     if (v == null) return '—';
-    // fmtOv rounds anything it does not recognise to whole numbers, and the
-    // mean decile is neither a percentage nor a score nor a count, so 3.3 came
-    // out as "3". A tenth of a decile is most of the signal in that field.
-    if (/_decile_mean$/.test(k)) return parseFloat(v).toFixed(1);
+    // To the indicator's own decimal places (IND_DECIMALS), which give the
+    // mean decile its one place: a tenth of a decile is most of its signal.
     if (typeof fmtOv === 'function') return fmtOv(v, k);
     return String(v);
   }
@@ -16011,16 +16111,16 @@ var PH_SHOW = {
     // Six figures, three to a row, each under its full name. The population
     // is not one of them: it is in the line under the ward's name already.
     var strip = '<div class="ws-strip">' +
-      kpi(labelOf('imd_decile_mean'), dec == null ? null : dec.toFixed(1),
+      kpi(labelOf('imd_decile_mean'), dec == null ? null : dec.toFixed(indDecimals('imd_decile_mean')),
           'where 1 is the most deprived', { emphasis: true }) +
-      kpi(labelOf('ft_93283'), le == null ? null : le.toFixed(1) + '<span> years</span>', lePer) +
+      kpi(labelOf('ft_93283'), le == null ? null : le.toFixed(indDecimals('ft_93283')) + '<span> years</span>', lePer) +
       // All causes, as a standardised ratio.
-      kpi(labelOf('ft_93250'), mr == null ? null : mr.toFixed(0), 'where England is 100',
+      kpi(labelOf('ft_93250'), mr == null ? null : mr.toFixed(indDecimals('ft_93250')), 'where England is 100',
           { title: 'Deaths from all causes compared with England, allowing for age, where 100 is the ' +
                    'England level and 120 means a fifth more deaths than expected.' }) +
-      kpi(labelOf('census_bad_health_pct'), bad == null ? null : bad.toFixed(1) + '<span>%</span>', 'of residents') +
-      kpi(labelOf('census_over65_pct'), o65 == null ? null : o65.toFixed(0) + '<span>%</span>', 'of residents') +
-      kpi(labelOf('census_disability_any_pct'), dis == null ? null : dis.toFixed(0) + '<span>%</span>',
+      kpi(labelOf('census_bad_health_pct'), bad == null ? null : bad.toFixed(indDecimals('census_bad_health_pct')) + '<span>%</span>', 'of residents') +
+      kpi(labelOf('census_over65_pct'), o65 == null ? null : o65.toFixed(indDecimals('census_over65_pct')) + '<span>%</span>', 'of residents') +
+      kpi(labelOf('census_disability_any_pct'), dis == null ? null : dis.toFixed(indDecimals('census_disability_any_pct')) + '<span>%</span>',
           'under the Equality Act') +
       '</div>';
 
@@ -18265,15 +18365,16 @@ var PH_SHOW = {
 
   // Named from IND_NAMES. The area's IMD decile is a population-weighted mean
   // of its LSOAs' deciles, which is what "Average deprivation decile" names.
+  // Each is written to its indicator's own decimal places (IND_DECIMALS).
   var RB_HEADLINE = [
-    { k: 'census_population',         dp: 0, wide: false },
-    { k: 'imd_decile',                dp: 1, as: 'imd_decile_mean' },
-    { k: 'imd_score',                 dp: 1 },
-    { k: 'census_bad_health_pct',     dp: 1, pct: true },
-    { k: 'census_disability_any_pct', dp: 1, pct: true },
-    { k: 'census_over65_pct',         dp: 1, pct: true },
-    { k: 'census_unemployed_pct',     dp: 1, pct: true },
-    { k: 'green_commitment_pct',      dp: 1, pct: true },
+    { k: 'census_population',         wide: false },
+    { k: 'imd_decile',                as: 'imd_decile_mean' },
+    { k: 'imd_score' },
+    { k: 'census_bad_health_pct',     pct: true },
+    { k: 'census_disability_any_pct', pct: true },
+    { k: 'census_over65_pct',         pct: true },
+    { k: 'census_unemployed_pct',     pct: true },
+    { k: 'green_commitment_pct',      pct: true },
   ];
 
   function renderReportPane() {
@@ -18300,7 +18401,7 @@ var PH_SHOW = {
           var shown = (v === undefined || v === null) ? '—'
             : (m.k === 'census_population'
                 ? Math.round(v).toLocaleString()
-                : v.toFixed(m.dp) + (m.pct ? '<span>%</span>' : ''));
+                : v.toFixed(indDecimals(m.as || m.k)) + (m.pct ? '<span>%</span>' : ''));
           return '<div class="rb-stat' + (m.wide ? ' wide' : '') + '">' +
             '<div class="k">' + esc(labelOf(m.as || m.k)) + '</div><div class="v">' + shown + '</div></div>';
         }).join('') + '</div></div>';
@@ -18640,26 +18741,134 @@ var PH_SHOW = {
         if (typeof cbInds(src[c])[k] !== 'object') seen[k] = 1;
       });
     });
+    // OHID's England comparison (_vs) and the estimated-from-2011 flag (_est)
+    // are not indicators: they ride along beside the figure they describe.
     return Object.keys(seen).filter(function (k) {
-      return k !== 'name' && k !== 'lad' && k !== 'code';
+      return k !== 'name' && k !== 'lad' && k !== 'code' && !/_(vs|est)$/.test(k);
     }).sort();
   }
 
+  /* The list is grouped by the indicator picker's own themes, in its order,
+     so PTAL sits under Transport and air quality under Environment here as
+     there, and each group is sorted by name. The figures OHID publishes only
+     for each LA have a group of their own, because every area in an LA shares
+     one value. The rules below are for indicators the picker does not offer. */
+  var CB_LA_GROUP = 'Health figures for each LA';
+  var CB_GROUP_ORDER = ['Health', 'Life expectancy and deaths', 'Hospital admissions', CB_LA_GROUP,
+    'Deprivation', 'People and communities', 'Work, money and education', 'Housing', 'Transport',
+    'Environment and access', 'Crime and safety'];
   function cbGroupOf(k) {
-    if (/^imd_|_score$/.test(k)) return 'Deprivation (IMD 2025)';
-    if (/^census_/.test(k)) return 'Census 2021';
-    if (/^ft_\d+$/.test(k)) return 'Health (published at MSOA)';
-    if (/^ft_/.test(k)) return 'Health (published at LA)';
-    if (/^crime/.test(k)) return 'Crime';
-    if (/^claimant/.test(k)) return 'Benefits';
-    if (/^(gb_|green_|blue_|fuel_)/.test(k)) return 'Environment and access';
+    if (isBoroughLevelKey(k)) return CB_LA_GROUP;
+    var th = window.PH_THEMES || [];
+    for (var i = 0; i < th.length; i++) if (th[i].keys.indexOf(k) !== -1) return th[i].label;
+    if (/^ft_\d+$/.test(k)) {
+      var t = (labelOf(k) + ' ' + indTitle(k)).toLowerCase();
+      return /fuel poverty/.test(t) ? 'Environment and access'
+        : /benefit|unemployment/.test(t) ? 'Work, money and education'
+        : /fertility/.test(t) ? 'People and communities'
+        : /life expectancy|mortality/.test(t) ? 'Life expectancy and deaths'
+        : /admission|injur/.test(t) ? 'Hospital admissions' : 'Health';
+    }
+    if (/^(ptal_|rail_|bus_)|^census_(no_car|active_travel|public_transport|car_to_work)_/.test(k)) return 'Transport';
+    if (/^(fuel_|gb_|green_|blue_|no2_|pm25_|pm10_)/.test(k)) return 'Environment and access';
+    if (/^census_(owned|social_rented|private_rented)_/.test(k)) return 'Housing';
+    if (/^(imd_|core20_|total_lsoa)|_score$/.test(k)) return 'Deprivation';
+    if (/^crime/.test(k)) return 'Crime and safety';
+    if (/^claimant|^census_(unemployed|higher_managerial|routine|level4|no_qual)/.test(k)) return 'Work, money and education';
+    if (/^census_(good_health|bad_health|disability|provides_unpaid)/.test(k)) return 'Health';
+    if (/^census_/.test(k)) return 'People and communities';
     return 'Other';
   }
+  function cbGroups(keys) {
+    var by = {};
+    keys.forEach(function (k) { var g = cbGroupOf(k); (by[g] = by[g] || []).push(k); });
+    var order = CB_GROUP_ORDER.slice();
+    (window.PH_THEMES || []).forEach(function (t) { if (order.indexOf(t.label) === -1) order.push(t.label); });
+    Object.keys(by).sort().forEach(function (g) { if (order.indexOf(g) === -1) order.push(g); });
+    return order.filter(function (g) { return by[g]; }).map(function (g) {
+      return { label: g, keys: by[g].sort(function (a, b) {
+        return labelOf(a).localeCompare(labelOf(b), 'en-GB', { numeric: true, sensitivity: 'base' });
+      }) };
+    });
+  }
+
+  /* ── What each column is, for its heading and the notes file ──────────────
+     The heading is the display label (IND_NAMES), then in brackets its unit
+     and the period it covers, each left out when the label already says it,
+     then "(LA figure)" when the figure is published only for the whole LA
+     and repeated across the smaller areas inside it. */
+  // Columns with no OV_META entry of their own borrow the source and period
+  // of the indicator they come with.
+  var CB_EXTRA = {
+    claimant_count: { from: 'claimant_rate_pct', u: 'people',
+      desc: 'People claiming Universal Credit or Jobseeker’s Allowance mainly because they are out of work.' },
+    gb_total_uprn: { from: 'gb_commitment_pct', u: 'addresses',
+      desc: 'The homes (residential addresses) Defra counted in the LSOA, which its green and blue space shares are worked out from.' },
+    imd_rank: { from: 'imd_score', u: '', nat: 'lsoa',
+      desc: 'Where the LSOA ranks among all 33,755 in England for deprivation, where 1 is the most deprived.' },
+    total_lsoa_count: { src: '', yr: '', u: 'LSOAs',
+      desc: 'The LSOAs that best fit the ward under the ONS lookup.' },
+  };
+  function cbMeta(k) {
+    var m = metaOf(k);
+    var x = CB_EXTRA[k];
+    if (!x) return m || {};
+    var base = x.from ? (metaOf(x.from) || {}) : {};
+    return { src: x.src != null ? x.src : (base.src || ''), yr: x.yr != null ? x.yr : (base.yr || ''),
+             u: x.u != null ? x.u : (base.u || ''), desc: x.desc || '', nat: x.nat || '' };
+  }
+  function cbPeriod(k) {
+    var p = String(cbMeta(k).yr || '').trim();
+    if (/^(latest|live|current)\b/i.test(p)) return '';
+    return monthWords(periodWords(p));
+  }
+  // The unit as a column heading gives it: symbols that are standard in a
+  // table stay, metres are spelled out, and a standardised ratio says so.
+  function cbUnit(k) {
+    if (typeof ovIsStdRatio === 'function' && ovIsStdRatio(k)) return 'ratio where England is 100';
+    var u = String(cbMeta(k).u || '').trim();
+    return u === 'Years' ? 'years' : u === 'm' ? 'metres' : u;
+  }
+  function cbLaWide(k) { return cbLevel !== 'borough' && isBoroughLevelKey(k); }
+  // Does the label already say it? Matched as whole words, singular or plural.
+  function cbSays(label, s) {
+    if (!s) return true;
+    if (!/\w/.test(s)) return label.indexOf(s) !== -1;
+    var stem = s.replace(/s$/, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp('(^|\\W)' + stem + 's?(\\W|$)', 'i').test(label);
+  }
+  function cbHeader(k) {
+    var label = labelOf(k), la = cbLaWide(k);
+    // "(LA figure)" says what the label's own "(LA)" says.
+    if (la) label = label.replace(/\s*\(LA\)$/, '');
+    var parts = [], u = cbUnit(k), per = cbPeriod(k);
+    if (!cbSays(label, u)) parts.push(u);
+    if (per && label.indexOf(per) === -1) parts.push(per);
+    return label + (parts.length ? ' (' + parts.join(', ') + ')' : '') + (la ? ' (LA figure)' : '');
+  }
+  // A figure as the file writes it: to the indicator's own decimal places
+  // (IND_DECIMALS, shared with the map), and blank where there is none.
+  function cbCell(v, k) {
+    if (v === null || v === undefined || v === '') return '';
+    var n = typeof v === 'number' ? v : parseFloat(v);
+    if (!isFinite(n)) return String(v);
+    var s = n.toFixed(indDecimals(k));
+    return /^-0(\.0+)?$/.test(s) ? s.slice(1) : s;
+  }
+
+  // Steps 1 and 2 fold to one line once answered; Change opens them again.
+  var cbFold = { 1: false, 2: false };
+  var cbPrevOpen = false;
+  var CB_NUM = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
+  function cbNum(n) { return n >= 0 && n < 10 ? CB_NUM[n] : n.toLocaleString('en-GB'); }
+  function cbCap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+  function cbWhere() { return cbScope ? scopeLabel(cbScope) : 'All of ' + PH_AREA; }
 
   function renderCsvPane() {
     if (!cbPane) return;
     $('cb-level').querySelectorAll('button').forEach(function (b) {
       b.classList.toggle('on', b.dataset.lvl === cbLevel);
+      b.setAttribute('aria-pressed', String(b.dataset.lvl === cbLevel));
     });
 
     var scopeEl = $('cb-scope');
@@ -18667,98 +18876,389 @@ var PH_SHOW = {
       scopeEl.innerHTML = scopeOptionsHtml(cbScope, esc);
     }
 
+    // The two answered steps, folded to a line each.
+    [1, 2].forEach(function (n) {
+      var st = $('cb-step-' + n);
+      if (!st) return;
+      st.classList.toggle('folded', !!cbFold[n]);
+      st.querySelector('.cb-chg').hidden = !cbFold[n];
+      $('cb-ans-' + n).textContent = !cbFold[n] ? ''
+        : n === 1 ? cbCap(CB_LEVELS[cbLevel].plural) : cbWhere();
+    });
+
     var avail = cbAvailable();
     // Drop any column the previous level had and this one does not, so the
     // count cannot promise a column the file will not contain. Dropping it
-    // quietly would be worse than not offering it: boroughs here hold only the
-    // 18 health figures published at borough level, with no census and no
-    // deprivation, so switching to Boroughs after picking population takes the
+    // quietly would be worse than not offering it: LAs here hold only the
+    // 18 health figures published for each LA, with no census and no
+    // deprivation, so switching to LAs after picking population takes the
     // population away. Say which ones went.
     var dropped = [];
     Object.keys(cbCols).forEach(function (k) {
       if (avail.indexOf(k) === -1) { dropped.push(k); delete cbCols[k]; }
     });
 
-    var groups = {};
-    avail.forEach(function (k) {
-      var g = cbGroupOf(k);
-      (groups[g] = groups[g] || []).push(k);
-    });
-
     var chosen = Object.keys(cbCols).length;
     $('cb-picked').firstElementChild.innerHTML = chosen
-      ? '<strong>' + chosen + '</strong> figure' + (chosen === 1 ? '' : 's') + ' chosen'
-      : 'No figures chosen';
+      ? '<strong>' + chosen + '</strong> indicator' + (chosen === 1 ? '' : 's') + ' chosen'
+      : 'No indicators chosen yet';
     $('cb-clear').hidden = !chosen;
 
-    $('cb-cols').innerHTML = Object.keys(groups).sort().map(function (g, gi) {
-      var open = cbOpenGroups[g] || false;
-      var hit = groups[g].filter(function (k) { return cbCols[k]; }).length;
-      return '<div><div class="cb-grp-hd' + (open ? ' open' : '') + '" data-grp="' + esc(g) +
-        '" role="button" tabindex="0" aria-expanded="' + open + '">' +
-        '<span class="a">&#9654;</span><span class="nm">' + esc(g) + '</span>' +
-        '<span class="n">' + (hit ? hit + '/' : '') + groups[g].length + '</span></div>' +
+    // Repainting the list replaces the box or heading that was just pressed,
+    // so the keyboard focus is put back on its replacement.
+    var colsEl = $('cb-cols'), act = document.activeElement, again = null;
+    if (act && colsEl.contains(act)) {
+      again = act.getAttribute('data-col') ? ['data-col', act.getAttribute('data-col')]
+        : act.getAttribute('data-grp') ? ['data-grp', act.getAttribute('data-grp')] : null;
+    }
+    colsEl.innerHTML = cbGroups(avail).map(function (g) {
+      var open = cbOpenGroups[g.label] || false;
+      var hit = g.keys.filter(function (k) { return cbCols[k]; }).length;
+      return '<div><button type="button" class="cb-grp-hd' + (open ? ' open' : '') + '" data-grp="' + esc(g.label) +
+        '" aria-expanded="' + open + '">' +
+        '<span class="a" aria-hidden="true">&#9654;</span><span class="nm">' + esc(g.label) + '</span>' +
+        '<span class="n">' + (hit ? hit + ' of ' : '') + g.keys.length + '</span></button>' +
         '<div class="cb-grp-body' + (open ? ' open' : '') + '">' +
-        groups[g].map(function (k) {
+        g.keys.map(function (k) {
           return '<label class="cb-col' + (cbCols[k] ? ' on' : '') + '">' +
             '<input type="checkbox" data-col="' + esc(k) + '"' + (cbCols[k] ? ' checked' : '') + '>' +
             '<span class="l">' + esc(labelOf(k)) + '</span></label>';
         }).join('') + '</div></div>';
     }).join('');
+    if (again) {
+      var back = colsEl.querySelector('[' + again[0] + '="' + CSS.escape(again[1]) + '"]');
+      if (back) back.focus();
+    }
 
     var n = cbRows().length;
     var lv = CB_LEVELS[cbLevel];
+    var pending = !!_cbPending[cbLevel];
     $('cb-note').innerHTML =
       (dropped.length
-        ? '<span id="cb-dropped" style="display:block;color:#8a5a00;background:#FFF8E6;' +
-          'border:1px solid #E0C280;border-radius:6px;padding:7px 9px;margin-bottom:7px">' +
+        ? '<span class="cb-dropped" id="cb-dropped">' +
           esc(dropped.map(labelOf).join(', ')) +
           (dropped.length > 1 ? ' are' : ' is') + ' not published for ' + esc(lv.plural) +
           ', so ' + (dropped.length > 1 ? 'they have' : 'it has') + ' been removed.</span>'
         : '') +
-      (_cbPending[cbLevel]
-        /* There is no honest count to give yet. cbRows would say nought, of
-           4,994, and it said exactly that: "The file will have 0 LSOAs and 0
-           figures". Say what is happening instead of stating a figure that is
-           only true for as long as the fetch takes. */
-        ? (cbLevel === 'lsoa'
-            ? 'Fetching the LSOA figures and boundaries. The figures are 7.8 MB and ' +
-              'are not loaded until something asks for them, so this fills in when they land.'
-            : 'Fetching the MSOA figures and names. They are not loaded until ' +
-              'something asks for them, so this fills in when they land.')
-        : 'The file will have <strong>' + n.toLocaleString() + '</strong> ' +
-          esc(n === 1 ? lv.label : lv.plural) + ' and <strong>' + chosen + '</strong> figure' +
-          (chosen === 1 ? '' : 's') + '. Each figure is a stored value for that area. ' +
-          'Nothing is averaged or combined here. Use Custom area to join areas together.' +
-          (cbLevel === 'borough'
-            ? ' LAs hold only the health figures that are published for each LA.'
-            : ''));
+      'Each figure is the one the map shows for that area, and the file never adds areas ' +
+      'together, which is what Custom area is for. Each column heading says what the figure ' +
+      'measures and when it is from, and Download notes gives the source, geography and method ' +
+      'of every column with a suggested citation.' +
+      (cbLevel === 'borough'
+        ? ' At LA level the file can hold only the health figures published for each LA.'
+        : '');
+
+    // The pinned bar: what the file will hold, or why it cannot be made yet.
+    var count = pending
+      // There is no honest count to give until the figures arrive, so say what
+      // is happening rather than "0 LSOAs".
+      ? 'Loading the ' + lv.label + ' figures, which can take a few seconds the first time. ' +
+        'The row count will appear here as soon as they are ready.'
+      : !n
+      ? 'There are no ' + lv.plural + ' to put in the file yet, which usually means their figures ' +
+        'could not be loaded, so please check your connection and try again.'
+      : 'The file will have <strong>' + cbNum(n) + '</strong> ' + esc(n === 1 ? lv.label : lv.plural) +
+        (chosen
+          ? ' and <strong>' + cbNum(chosen) + '</strong> indicator' + (chosen === 1 ? '' : 's') + '.'
+          : '. Choose at least one indicator to make the file.');
+    var countEl = $('cb-count');
+    if (countEl.innerHTML !== count) countEl.innerHTML = count;
+    var ready = chosen > 0 && n > 0 && !pending;
+    $('cb-download').disabled = !ready;
+    $('cb-notes').disabled = !ready;
+    $('cb-preview').disabled = !ready;
+    if (!ready) cbPrevOpen = false;
+
+    // The preview takes the place of the choices while it is open.
+    $('cb-scroll').hidden = cbPrevOpen;
+    $('cb-prev').hidden = !cbPrevOpen;
+    $('cb-preview').textContent = cbPrevOpen ? 'Hide preview' : 'Preview';
+    $('cb-preview').setAttribute('aria-expanded', String(cbPrevOpen));
+    if (cbPrevOpen) renderCsvPreview(cbBuild());
   }
 
+  /* The preview: the first ten rows, from the same arrays the file is written
+     from, so every value sits under its own heading whatever commas the names
+     and headings hold. */
+  function renderCsvPreview(out) {
+    var head = out.table[0], body = out.table.slice(1, 11);
+    $('cb-prev').innerHTML = '<div class="cb-prev-hd"><h3>Preview of the file</h3>' +
+      '<p>' + (body.length < out.rows
+        ? 'The first ' + cbNum(body.length) + ' of ' + out.rows.toLocaleString('en-GB') + ' rows'
+        : 'All ' + cbNum(out.rows) + ' row' + (out.rows === 1 ? '' : 's')) +
+      ', with every column the file will have. A blank cell means there is no figure.</p></div>' +
+      '<div class="cb-tbl-wrap" tabindex="0" role="region" aria-label="Preview of the file">' +
+      '<table class="cb-tbl"><thead><tr>' +
+      head.map(function (h, i) {
+        return '<th scope="col"' + (out.columns[i].kind === 'ind' ? ' class="num"' : '') + '>' + esc(h) + '</th>';
+      }).join('') + '</tr></thead><tbody>' +
+      body.map(function (r) {
+        return '<tr>' + r.map(function (c, i) {
+          return '<td' + (out.columns[i].kind === 'ind' ? ' class="num"' : '') + '>' + esc(c) + '</td>';
+        }).join('') + '</tr>';
+      }).join('') + '</tbody></table></div>';
+    // Said only when the table is wider than the panel, which it usually is.
+    var wrap = $('cb-prev').querySelector('.cb-tbl-wrap');
+    if (wrap && wrap.scrollWidth > wrap.clientWidth + 2) {
+      var cap = $('cb-prev').querySelector('.cb-prev-hd p');
+      cap.textContent = cap.textContent.replace(' will have.', ' will have, so scroll sideways to see them all.');
+    }
+  }
+
+  // The columns that name each row, at each level.
+  var CB_ID_COLS = {
+    ward:    [['Ward code', 'code'], ['Ward name', 'name'], ['LA', 'parent']],
+    lsoa:    [['LSOA code', 'code'], ['LSOA name', 'name'], ['Ward', 'ward'], ['LA', 'parent']],
+    msoa:    [['MSOA code', 'code'], ['MSOA name', 'name'], ['LA', 'parent']],
+    borough: [['LA code', 'code'], ['LA name', 'name']],
+  };
+
+  /* The file as rows of cells, and as CSV text. columns says what each column
+     is, for the preview and the notes: kind is 'id' for the area's code and
+     names, 'ind' for an indicator, and 'vs' or 'est' for the OHID England
+     comparison or the estimated-from-2011 flag that follows an indicator. */
   function cbBuild() {
     var src = cbSource();
     var codes = cbRows();
-    var cols = Object.keys(cbCols).sort(function (a, b) {
-      return labelOf(a).localeCompare(labelOf(b));
+    var keys = Object.keys(cbCols).sort(function (a, b) {
+      return labelOf(a).localeCompare(labelOf(b), 'en-GB', { numeric: true, sensitivity: 'base' });
     });
-    var head = ['code', 'name'];
-    if (cbLevel === 'lsoa') head.push('ward');
-    if (cbLevel !== 'borough') head.push('LA');
-    // The display label and its unit, from IND_NAMES through headerOf.
-    head = head.concat(cols.map(headerOf));
-    var lines = [head.map(csvCell).join(',')];
-    codes.forEach(function (c) {
-      var rec = src[c], l = cbLabels(c, rec), i = cbInds(rec);
-      var row = [l.code, l.name];
-      if (cbLevel === 'lsoa') row.push(l.ward || '');
-      if (cbLevel !== 'borough') row.push(l.parent || '');
-      cols.forEach(function (k) {
-        var v = i[k];
-        row.push(v === null || v === undefined ? '' : v);
-      });
-      lines.push(row.map(csvCell).join(','));
+    var has = function (suffix, k) {
+      return codes.some(function (c) { var v = cbInds(src[c])[k + suffix]; return v !== undefined && v !== null && v !== '' && v !== false; });
+    };
+    var columns = CB_ID_COLS[cbLevel].map(function (c) { return { kind: 'id', header: c[0], field: c[1] }; });
+    keys.forEach(function (k) {
+      columns.push({ kind: 'ind', key: k, header: cbHeader(k) });
+      if (has('_vs', k)) {
+        var per = cbPeriod(k);
+        columns.push({ kind: 'vs', key: k, header: labelOf(k) + ', compared with England' + (per ? ' (' + per + ')' : '') });
+      }
+      if (has('_est', k)) columns.push({ kind: 'est', key: k, header: labelOf(k) + ', estimated from 2011 areas' });
     });
-    return { text: lines.join('\n'), rows: codes.length, cols: cols.length, header: head };
+    var table = [columns.map(function (c) { return c.header; })];
+    codes.forEach(function (code) {
+      var rec = src[code], l = cbLabels(code, rec), i = cbInds(rec);
+      table.push(columns.map(function (c) {
+        if (c.kind === 'id') return String(l[c.field] || '');
+        if (c.kind === 'vs') return VS_ENGLAND_TEXT[i[c.key + '_vs']] || '';
+        if (c.kind === 'est') return i[c.key + '_est'] ? 'Yes' : '';
+        return cbCell(i[c.key], c.key);
+      }));
+    });
+    return {
+      text: table.map(function (r) { return r.map(csvCell).join(','); }).join('\n'),
+      rows: codes.length, cols: keys.length, header: table[0], table: table, columns: columns, keys: keys,
+    };
+  }
+
+  /* ── The notes file ───────────────────────────────────────────────────────
+     A plain text file to keep beside the CSV: what the file holds, how to
+     cite it, and for each column what it measures, its unit and period, the
+     geography it is published for and how this level's figure is made, the
+     method and the source. Notes rows inside the CSV would break Excel,
+     pandas and Power BI, so they live here instead. */
+  // Fingertips' own ids for the series OHID publishes per LA, as
+  // fetch_all_data.py's FINGERTIPS_INDICATORS records them.
+  var FT_LA_IDS = {
+    life_expectancy_male: 90366, life_expectancy_female: 90366,
+    healthy_life_expectancy_male: 90362, healthy_life_expectancy_female: 90362,
+    smoking_prevalence_adults: 92443, obesity_adults: 93088, obesity_year6: 90323,
+    physical_activity_adults: 93014, hypertension_qof: 219, depression_qof: 848,
+    mental_health_qof: 90581, suicide_rate: 41001, child_poverty_low_income: 93700,
+    self_harm_admissions_10_24: 90813, a_e_attendance_under_5: 93930, mmr_2_doses_age5: 30311,
+    flu_vaccination_65plus: 30314, cervical_screening_25_49: 93560,
+  };
+  function cbSourceText(k) {
+    var src = String(cbMeta(k).src || '');
+    var ts = (src.match(/\((TS\d+A?)\)/) || [])[1];
+    if (ts) return 'Office for National Statistics (ONS), Census 2021, table ' + ts;
+    var id = (k.match(/^ft_(\d+)$/) || [])[1];
+    if (id) return 'Office for Health Improvement and Disparities (OHID), Local Health, Fingertips indicator ' +
+      (id === '932831' ? '93283 (men)' : id);
+    if (/^ft_/.test(k)) {
+      var fid = FT_LA_IDS[k.slice(3)];
+      return 'Office for Health Improvement and Disparities (OHID), Fingertips' + (fid ? ' indicator ' + fid : '');
+    }
+    if (k === 'crime_rate_per_1000') return 'Police recorded crime from data.police.uk, with residents from the Office for National Statistics (ONS) Census 2021';
+    if (/police/i.test(src)) return 'Police recorded crime and anti-social behaviour from data.police.uk';
+    if (k === 'core20_lsoa_count') return 'NHS England’s Core20PLUS5 definition, applied to the English Indices of Deprivation 2025 from the Ministry of Housing, Communities and Local Government (MHCLG)';
+    if (/IMD/.test(src)) return 'Ministry of Housing, Communities and Local Government (MHCLG), English Indices of Deprivation 2025';
+    if (/CLA01/.test(src)) return 'Claimant count from the Office for National Statistics (ONS), published on Nomis (dataset CLA01)';
+    if (/DESNZ/.test(src)) return 'Department for Energy Security and Net Zero (DESNZ), sub-regional fuel poverty statistics (Low Income Low Energy Efficiency)';
+    if (/Green\/Blue/.test(src)) return 'Department for Environment, Food and Rural Affairs (Defra), access to green and blue space in England';
+    if (/UK-AIR|PCM/.test(src)) return 'Department for Environment, Food and Rural Affairs (Defra), UK-AIR modelled background pollution maps';
+    if (/PTAL/.test(src)) return 'Greater London Authority (GLA) LSOA Atlas, from Transport for London (TfL) public transport accessibility levels';
+    if (/NaPTAN|TfL Unified/.test(src)) return PH_IS_LONDON
+      ? 'Transport for London (TfL) register of stops and stations, from its Unified API'
+      : 'Department for Transport (DfT), National Public Transport Access Nodes (NaPTAN)';
+    if (k === 'total_lsoa_count') return 'Office for National Statistics (ONS) LSOA to ward lookup (May 2025 wards)';
+    return cbPlain(src);
+  }
+  // Whether a ward or LA figure adds up its parts rather than averaging them.
+  function cbSums(k) {
+    var u = String(cbMeta(k).u || '');
+    return /^(people|crimes|LSOAs|addresses)$/.test(u) || /_12mo$|^crime_total$|_count$/.test(k);
+  }
+  // Where the figure is published, and how this file's level gets its figure.
+  function cbGeoText(k) {
+    var L = cbLevel, one = CB_LEVELS[L].label;
+    var src = String(cbMeta(k).src || '');
+    var nat = cbMeta(k).nat || ((typeof ovNativeLevel === 'function') ? ovNativeLevel(k) : '');
+    if (isBoroughLevelKey(k)) {
+      return L === 'borough' ? 'OHID publishes this figure for each LA.'
+        : 'OHID publishes this figure only for each LA, so every ' + one + ' in an LA has the same ' +
+          'figure, which describes the whole LA rather than the ' + one + '.';
+    }
+    if (nat === 'oa') {
+      // How a ward's figure is made from them is the card's Method line.
+      return L === 'ward'
+        ? 'ONS publishes Census 2021 figures for output areas, and each ward figure is worked out ' +
+          'from the output areas that best fit the ward under the ONS output area to ward lookup.'
+        : 'ONS publishes Census 2021 figures for output areas, LSOAs and MSOAs, so these are its own ' + one + ' figures.';
+    }
+    if (nat === 'msoa') {
+      return L === 'msoa' ? 'OHID publishes this figure for each MSOA.'
+        : 'OHID publishes this figure for each MSOA, and each ward figure blends the MSOAs the ward ' +
+          'overlaps, in proportion to where its residents live.';
+    }
+    if (nat === 'lsoa') {
+      var first = /UK-AIR|PCM/.test(src) ? 'Defra models this on a 1 kilometre grid, and each LSOA figure is the average of the grid squares it covers'
+        : /Green\/Blue/.test(src) ? 'Defra publishes this for output areas, and each LSOA figure combines the output areas inside it'
+        : /NaPTAN|TfL Unified/.test(src) ? 'This is measured here for each LSOA, from the middle of the LSOA, using the register of stops and stations'
+        : /PTAL/.test(src) ? 'The GLA publishes this for each LSOA'
+        : /DESNZ/.test(src) ? 'DESNZ publishes this for each LSOA'
+        : /CLA01/.test(src) ? 'ONS publishes the claimant count for each LSOA'
+        : /IMD/.test(src) ? 'MHCLG publishes this for each LSOA'
+        : 'This is published for each LSOA';
+      return first + '.' + (L === 'ward'
+        ? ' Each ward figure ' + (cbSums(k) ? 'adds up' : 'is an average, weighted by population, of') +
+          ' the LSOAs that best fit the ward under the ONS lookup.'
+        : '');
+    }
+    if (nat === 'ward') {
+      if (/police/i.test(src)) {
+        return 'Counted here for each ward from the street-level crime locations the police publish' +
+          (k === 'crime_rate_per_1000' ? ', then divided by the ward’s residents at the 2021 Census' : '') + '.';
+      }
+      if (k === 'imd_decile_mean') return 'Worked out here for each ward as the average of its LSOAs’ deprivation deciles, weighted by population.';
+      return 'Counted here for each ward from the LSOAs that best fit it under the ONS lookup.';
+    }
+    return '';
+  }
+  // The house style for words in the notes: no dashes, and "is" for "=".
+  function cbPlain(s) {
+    return String(s == null ? '' : s)
+      .replace(/\s*\(100 = average\)/g, ', where England is 100')
+      .replace(/\bEngland = 100\b/g, 'England is 100')
+      .replace(/(\d)\s*[\u2013\u2014]\s*(\d)/g, '$1 to $2')
+      .replace(/\s*[\u2013\u2014]\s*/g, ', ')
+      .replace(/\s+/g, ' ').trim();
+  }
+  function cbDate(d) {
+    var M = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August',
+             'September', 'October', 'November', 'December'];
+    if (typeof d === 'string') {
+      var m = d.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      return m ? (+m[3]) + ' ' + M[+m[2] - 1] + ' ' + m[1] : d;
+    }
+    return d.getDate() + ' ' + M[d.getMonth()] + ' ' + d.getFullYear();
+  }
+  var CB_UNIT_WORDS = { '%': 'per cent', 'µg/m³': 'micrograms per cubic metre (µg/m³)' };
+  var CB_DP_WORDS = ['given as whole numbers', 'given to one decimal place', 'given to two decimal places'];
+  // The file's name, without the date that download() adds.
+  function cbFileBase() {
+    return ('pophealth-' + (cbLevel === 'borough' ? 'la' : cbLevel) +
+      (cbScope ? '-' + cbScope.replace(/[^A-Za-z0-9]+/g, '-') : '')).toLowerCase().replace(/-+$/, '');
+  }
+  function cbNotes(out) {
+    var lv = CB_LEVELS[cbLevel], today = new Date();
+    var dataDate = DATA_DATE ? cbDate(DATA_DATE) : '';
+    var where = cbScope ? scopeLabel(cbScope) : PH_AREA;
+    var csvName = cbFileBase() + (DATA_DATE ? '-' + DATA_DATE : '') + '.csv';
+    var year = DATA_DATE ? DATA_DATE.slice(0, 4) : String(today.getFullYear());
+    var laCols = out.keys.filter(cbLaWide).length;
+    var L = [];
+    var para = function (s) { L.push(s, ''); };
+    L.push('PopHealth Map: notes for your data export', '');
+    para('These notes go with ' + csvName + ', a data export made from PopHealth Map ' +
+      '(https://pophealth.uk) on ' + cbDate(today) + (dataDate ? ' from the figures updated on ' + dataDate : '') + '.');
+
+    L.push('What the file holds');
+    para('The file has ' + cbNum(out.rows) + ' row' + (out.rows === 1 ? '' : 's') + ', one for each ' + lv.label +
+      ' in ' + (cbScope ? where : 'all of ' + PH_AREA) + ' in alphabetical order, and a column for each of the ' +
+      cbNum(out.cols) + ' indicator' + (out.cols === 1 ? '' : 's') + ' you chose. Each figure is the one the map ' +
+      'shows for that area, and the file never adds areas together, which is what Custom area is for. ' +
+      'A blank cell means there is no figure for that area, often because the publisher withheld it to ' +
+      'protect privacy, so please do not read it as zero.' +
+      (laCols ? ' A column marked (LA figure) holds a figure published only for the whole LA, so every ' +
+        lv.label + ' in an LA has the same value.' : ''));
+
+    L.push('How to cite it');
+    para('PopHealth Map (' + year + ') Data export: ' + lv.label + ' figures for ' + where +
+      (dataDate ? ', figures updated on ' + dataDate : '') + '. Available at: https://pophealth.uk ' +
+      '(accessed ' + cbDate(today) + ').');
+    para('Please also cite the original source of each indicator, which is given with its column below.');
+
+    L.push('The columns');
+    var ID_TEXT = {
+      'Ward code': 'The ONS code for each ward (May 2025 wards), which you can use to join this file to others.',
+      'Ward name': 'The ward’s name.',
+      'LSOA code': 'The ONS code for each LSOA (2021 Census areas), which you can use to join this file to others.',
+      'LSOA name': 'The ONS name for each LSOA, which is its LA’s name and a number.',
+      'MSOA code': 'The ONS code for each MSOA (2021 Census areas), which you can use to join this file to others.',
+      'MSOA name': 'The name of each MSOA.',
+      'Ward': 'The ward each LSOA best fits under the ONS lookup.',
+      'LA': 'The local authority (LA), or council area, that each ' + lv.label + ' is in.',
+      'LA code': 'The ONS code for each local authority (LA), or council area (May 2025), which you can use to join this file to others.',
+      'LA name': 'The LA’s name.',
+    };
+    out.columns.forEach(function (c, i) {
+      L.push((i + 1) + '. ' + c.header);
+      if (c.kind === 'id') { L.push('   ' + ID_TEXT[c.header], ''); return; }
+      if (c.kind === 'vs') {
+        L.push('   OHID’s test of each MSOA’s figure against England’s, at 95% confidence: better, worse or ' +
+          'similar, or higher or lower where neither end is better. It is blank where OHID gives no result.', '');
+        return;
+      }
+      if (c.kind === 'est') {
+        L.push('   Yes where OHID published this figure for an older 2011 MSOA, and the figure for the 2021 MSOA was ' +
+          'worked out from it, weighted by how many people lived in each part.', '');
+        return;
+      }
+      var k = c.key, m = cbMeta(k), f = indicatorFacts(k) || {};
+      var plain = (typeof OV_PLAIN === 'object' && OV_PLAIN[k]) || m.desc || '';
+      var u = cbUnit(k), uw = CB_UNIT_WORDS[u] || u, dp = CB_DP_WORDS[indDecimals(k)] || '';
+      var per = cbPeriod(k);
+      var row = function (t, v) { v = cbPlain(v); if (v) L.push('   ' + t + ': ' + v.replace(/([^.])$/, '$1.')); };
+      row('What it measures', plain);
+      if (indTitle(k)) row('Official title', indTitle(k));
+      if (uw) row('Unit', uw + ', ' + dp); else row('Rounding', cbCap(dp));
+      row('Period', per ? cbCap(per) : '');
+      row('Geography', cbGeoText(k));
+      row('Counted', f.num);
+      row('Out of', f.den);
+      row('Method', f.method);
+      row('Caution', typeof ovCaution === 'function' ? ovCaution(k) : '');
+      row('Source', cbSourceText(k));
+      L.push('');
+    });
+    L.push((out.columns.length + 1) + '. source');
+    L.push('   Names this site and the date of the figures on every row, so the file still says where it came ' +
+      'from if it is passed on.', '');
+
+    L.push('Licences');
+    var lic = ['Contains public sector information licensed under the Open Government Licence v3.0.'];
+    var srcs = out.keys.map(function (k) { return String(cbMeta(k).src || ''); }).join(' | ');
+    if (/UK-AIR|PCM/.test(srcs)) lic.push('Air quality: © Crown copyright Defra via uk-air.defra.gov.uk, licenced under the Open Government Licence (OGL).');
+    if (/TfL Unified/.test(srcs) && PH_IS_LONDON) lic.push('Station and bus stop measures: Powered by TfL Open Data. Contains OS data © Crown copyright and database rights 2016. Geomni UK Map data © and database rights 2019.');
+    para(lic.join(' '));
+
+    L.push('Opening the file');
+    para('The file is plain text in UTF-8, with commas between the columns and one heading row. If a symbol ' +
+      'such as µg/m³ looks wrong in Excel, open the file from the Data tab with From Text/CSV instead.');
+    para('PopHealth Map is an independent project, not an NHS service. If something in the figures looks wrong, ' +
+      'please tell us at contact@pophealth.uk.');
+    return L.join('\n');
   }
 
   /* Every route to a new export level goes through here, so a level that
@@ -18801,13 +19301,44 @@ var PH_SHOW = {
   }
 
   if (cbPane) {
+    // Answering a step folds it. Focus moves to its Change button, because
+    // the control that was pressed has just been folded away.
+    var cbFoldStep = function (n) {
+      var st = $('cb-step-' + n), had = st && st.contains(document.activeElement);
+      cbFold[n] = true;
+      renderCsvPane();
+      if (had) st.querySelector('.cb-chg').focus();
+    };
     $('cb-level').addEventListener('click', function (e) {
       var b = e.target.closest('[data-lvl]');
       if (!b) return;
       setCsvLevel(b.dataset.lvl);
+      cbFoldStep(1);
+    });
+    /* A choice made with the keyboard fires change on every arrow press, so
+       step 2 folds when the list is left rather than mid-choice. */
+    var cbScopeKeys = false, cbScopeMoved = false;
+    $('cb-scope').addEventListener('keydown', function (e) {
+      if (e.key !== 'Tab' && e.key !== 'Shift') cbScopeKeys = true;
     });
     $('cb-scope').addEventListener('change', function (e) {
-      cbScope = e.target.value; renderCsvPane();
+      cbScope = e.target.value;
+      if (cbScopeKeys) { cbScopeMoved = true; renderCsvPane(); }
+      else cbFoldStep(2);
+    });
+    $('cb-scope').addEventListener('blur', function () {
+      var fold = cbScopeMoved;
+      cbScopeKeys = cbScopeMoved = false;
+      if (fold) { cbFold[2] = true; renderCsvPane(); }
+    });
+    cbPane.addEventListener('click', function (e) {
+      var chg = e.target.closest('.cb-chg');
+      if (!chg) return;
+      var n = +chg.getAttribute('data-step');
+      cbFold[n] = false;
+      renderCsvPane();
+      var to = n === 1 ? $('cb-level').querySelector('button.on') : $('cb-scope');
+      if (to) to.focus();
     });
     $('cb-clear').addEventListener('click', function () { cbCols = {}; renderCsvPane(); });
     $('cb-cols').addEventListener('click', function (e) {
@@ -18824,43 +19355,21 @@ var PH_SHOW = {
       if (box.checked) cbCols[k] = true; else delete cbCols[k];
       renderCsvPane();
     });
-    $('cb-cols').addEventListener('keydown', function (e) {
-      if ((e.key === 'Enter' || e.key === ' ') && e.target.closest('[data-grp]')) {
-        e.preventDefault(); e.target.click();
-      }
-    });
+    // The buttons are switched off until there is a file to make, and the
+    // line above them says why, so these only run when they can succeed.
     $('cb-download').addEventListener('click', function () {
-      if (!Object.keys(cbCols).length) { alert('Choose at least one figure first.'); return; }
-      if (_cbPending[cbLevel]) { alert('Still fetching the ' + CB_LEVELS[cbLevel].label + ' figures. Try again in a moment.'); return; }
       var out = cbBuild();
-      var nm = 'pophealth-' + cbLevel + (cbScope ? '-' + cbScope.replace(/[^A-Za-z0-9]+/g, '-') : '');
-      download(nm.toLowerCase() + '.csv', out.text, 'text/csv;charset=utf-8');
+      if (!out.rows || !out.cols) return;
+      download(cbFileBase() + '.csv', out.text, 'text/csv;charset=utf-8');
+    });
+    $('cb-notes').addEventListener('click', function () {
+      var out = cbBuild();
+      if (!out.rows || !out.cols) return;
+      download(cbFileBase() + '-notes.txt', cbNotes(out), 'text/plain;charset=utf-8');
     });
     $('cb-preview').addEventListener('click', function () {
-      if (!Object.keys(cbCols).length) { alert('Choose at least one figure first.'); return; }
-      if (_cbPending[cbLevel]) { alert('Still fetching the ' + CB_LEVELS[cbLevel].label + ' figures. Try again in a moment.'); return; }
-      var out = cbBuild();
-      var rows = out.text.split('\n').slice(0, 11);
-      var w = window.open('', '_blank');
-      if (!w) { alert('Please allow pop-ups to see the preview.'); return; }
-      var tbl = rows.map(function (r, ri) {
-        var cells = r.split(',').map(function (c) {
-          return '<' + (ri ? 'td' : 'th') + '>' + esc(c.replace(/^"|"$/g, '')) +
-                 '</' + (ri ? 'td' : 'th') + '>';
-        }).join('');
-        return '<tr>' + cells + '</tr>';
-      }).join('');
-      w.document.open();
-      w.document.write('<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">' +
-        '<title>Preview</title><style>body{font-family:system-ui,sans-serif;padding:20px;' +
-        'font-size:12px;color:#212b32}table{border-collapse:collapse}' +
-        'th,td{border:1px solid #dde1e4;padding:4px 7px;text-align:left;white-space:nowrap}' +
-        'th{background:#f4f7f9;font-size:10px;text-transform:uppercase;color:#768692}' +
-        'p{color:#4c6272}</style></head><body>' +
-        '<p>First 10 rows of ' + out.rows.toLocaleString() + '. The file has ' +
-        out.cols + ' figure column' + (out.cols === 1 ? '' : 's') + '.</p>' +
-        '<table>' + tbl + '</table></body></html>');
-      w.document.close();
+      cbPrevOpen = !cbPrevOpen;
+      renderCsvPane();
     });
   }
 
@@ -18868,6 +19377,8 @@ var PH_SHOW = {
     level: function () { return cbLevel; },
     columns: function () { return Object.keys(cbCols); },
     build: cbBuild,
+    notes: function () { return cbNotes(cbBuild()); },
+    fileName: function () { return cbFileBase() + (DATA_DATE ? '-' + DATA_DATE : '') + '.csv'; },
     setLevel: function (l) { setCsvLevel(l); },
     pick: function (k) { cbCols[k] = true; renderCsvPane(); },
   };

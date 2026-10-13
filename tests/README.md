@@ -27,7 +27,10 @@ phone drawer and tapped-area card, census figures by output area (when
 practice) in each state. Any accessibility violation fails it. It also checks
 the names: every indicator is named from the one label table (`IND_NAMES`),
 Compare offers each measure once, and the old names (Soc rent, Boards,
-metric, VCSE, Borough or Local authority as the level) are gone.
+metric, VCSE, Borough or Local authority as the level) are gone. For the Data
+export it checks the column headings (label, unit and period, and "(LA
+figure)"), the shared decimal places, the groups, the notes file, the folding
+steps, the pinned download bar and the in-panel preview.
 
 ```bash
 npm install --no-save playwright axe-core

@@ -297,6 +297,96 @@ const setOv = (page, k) => page.evaluate(k => {
     await page.close();
   }
 
+  // Data export (workplan 2.7): headings with label, unit and period, figures
+  // to each indicator's own decimal places, a notes file to cite, and a
+  // preview built from the rows inside the panel.
+  {
+    const { page, errors } = await open(browser, 'index.html?t=1', DESK);
+    await page.click('.mode-btn[data-mode="csv"]');
+    await page.waitForTimeout(600);
+    const empty = await page.evaluate(() => ({
+      off: ['cb-download', 'cb-notes', 'cb-preview'].every(id => document.getElementById(id).disabled),
+      count: document.getElementById('cb-count').textContent,
+    }));
+    ok(empty.off && /Choose at least one indicator/.test(empty.count),
+      'export: the buttons wait for an indicator and the bar says why', JSON.stringify(empty));
+    // Answering steps 1 and 2 folds them to a line each; Change opens them again.
+    await page.click('#cb-level button[data-lvl="ward"]');
+    await page.selectOption('#cb-scope', 'Tower Hamlets');
+    await page.waitForTimeout(300);
+    const fold = await page.evaluate(() => [1, 2].map(n => {
+      const st = document.getElementById('cb-step-' + n);
+      return st.classList.contains('folded') && !st.querySelector('.cb-chg').hidden &&
+        getComputedStyle(st.querySelector('.cb-step-body')).display === 'none' ? st.querySelector('h3').textContent : '';
+    }));
+    ok(/Wards/.test(fold[0]) && /Tower Hamlets/.test(fold[1]), 'export: steps 1 and 2 fold once answered', JSON.stringify(fold));
+    await page.click('#cb-step-1 .cb-chg');
+    ok(await page.evaluate(() => !document.getElementById('cb-step-1').classList.contains('folded') &&
+      document.activeElement === document.querySelector('#cb-level button.on')), 'export: Change opens the step again');
+    const ex = await page.evaluate(() => {
+      PH_CSV.pick('ft_93283'); PH_CSV.pick('ft_smoking_prevalence_adults'); PH_CSV.pick('crime_total');
+      const o = PH_CSV.build();
+      const col = i => o.table.slice(1).map(r => r[i]).filter(v => v !== '');
+      const le = o.header.indexOf('Life expectancy at birth, women (years, 2019 to 2023)');
+      const groupOf = k => { const b = document.querySelector('#cb-cols input[data-col="' + k + '"]');
+        return b ? b.closest('.cb-grp-body').previousElementSibling.getAttribute('data-grp') : ''; };
+      const sorted = [...document.querySelectorAll('#cb-cols .cb-grp-body')].every(g => {
+        const l = [...g.querySelectorAll('.l')].map(e => e.textContent);
+        return l.every((t, i) => !i || l[i - 1].localeCompare(t, 'en-GB', { numeric: true, sensitivity: 'base' }) <= 0);
+      });
+      return {
+        header: o.header, le, leVals: le === -1 ? [] : col(le),
+        smoke: o.header.find(h => /^Adults who smoke/.test(h)) || '',
+        crime: o.header.find(h => /^Total recorded crime/.test(h)) || '',
+        crimeVals: col(o.header.findIndex(h => /^Total recorded crime/.test(h))),
+        ptal: groupOf('ptal_score'), no2: groupOf('no2_ugm3'), sorted,
+        shared: [fmtOv(81.0723, 'ft_93283'), PH_IND.decimals('ft_93283'), PH_IND.decimals('crime_total')],
+        notes: PH_CSV.notes(),
+        dashes: /[\u2013\u2014]/.test(o.header.join(' ') + PH_CSV.notes()),
+      };
+    });
+    ok(ex.le !== -1 && ex.leVals.length > 10 && ex.leVals.every(v => /^\d+\.\d$/.test(v)),
+      'export: life expectancy is headed "Life expectancy at birth, women (years, 2019 to 2023)" with one decimal place',
+      ex.header.join(' | ') + ' / ' + ex.leVals.slice(0, 3).join(', '));
+    ok(/\(LA figure\)$/.test(ex.smoke) && /\(\w+ \d{4} to \w+ \d{4}\)$/.test(ex.crime) && ex.crimeVals.every(v => /^\d+$/.test(v)),
+      'export: an LA-wide column says "(LA figure)", and counts are whole numbers', ex.smoke + ' / ' + ex.crime);
+    ok(ex.shared[0] === '81.1' && ex.shared[1] === 1 && ex.shared[2] === 0,
+      'export: decimal places are shared with the hover card', JSON.stringify(ex.shared));
+    ok(ex.ptal === 'Transport' && ex.no2 === 'Environment and access' && ex.sorted,
+      'export: PTAL under Transport, air quality under Environment, each group in alphabetical order', ex.ptal + ' / ' + ex.no2);
+    ok(/How to cite it/.test(ex.notes) && /PopHealth Map \(\d{4}\) Data export: ward figures for Tower Hamlets/.test(ex.notes) &&
+       (ex.notes.match(/\n   Source: /g) || []).length === 3 && (ex.notes.match(/\n   Geography: /g) || []).length === 3 &&
+       ex.notes.indexOf('Life expectancy at birth, women (years, 2019 to 2023)') !== -1 && !ex.dashes,
+      'export: the notes give a citation and the source and geography of each column, with no dashes', ex.notes.slice(0, 200));
+    // The preview is built from the row arrays, inside the panel.
+    await page.click('#cb-preview');
+    await page.waitForTimeout(300);
+    const pv = await page.evaluate(() => {
+      const o = PH_CSV.build();
+      const th = [...document.querySelectorAll('#cb-prev thead th')].map(e => e.textContent);
+      const rows = [...document.querySelectorAll('#cb-prev tbody tr')].map(r => [...r.children].map(c => c.textContent));
+      return { shown: !document.getElementById('cb-prev').hidden && document.getElementById('cb-scroll').hidden,
+        same: JSON.stringify(th) === JSON.stringify(o.header) && rows.length === Math.min(10, o.rows) &&
+          rows.every((r, i) => JSON.stringify(r) === JSON.stringify(o.table[i + 1])),
+        expanded: document.getElementById('cb-preview').getAttribute('aria-expanded') };
+    });
+    ok(pv.shown && pv.same && pv.expanded === 'true', 'export: the preview shows inside the panel and its columns line up with the file', JSON.stringify(pv));
+    await checkAxe(page, 'Data export with its preview');
+    await page.click('#cb-preview');
+    // The download bar stays at the foot of the panel while the list scrolls.
+    const bar = await page.evaluate(() => {
+      // Each click repaints the list, so open the groups one at a time.
+      for (let h, n = 0; n < 30 && (h = document.querySelector('#cb-cols .cb-grp-hd:not(.open)')); n++) h.click();
+      const sc = document.getElementById('cb-scroll'); sc.scrollTop = sc.scrollHeight;
+      const a = document.querySelector('#tab-csv .cb-acts').getBoundingClientRect(), p = document.getElementById('tab-csv').getBoundingClientRect();
+      return { scrolls: sc.scrollHeight > sc.clientHeight, pinned: Math.abs(a.bottom - p.bottom) < 2 && a.top > 0 && !sc.contains(document.getElementById('cb-download')) };
+    });
+    ok(bar.scrolls && bar.pinned, 'export: the download bar is pinned below the scrolling list', JSON.stringify(bar));
+    await checkAxe(page, 'Data export with every group open');
+    ok(errors.length === 0, 'no page errors (Data export)', errors.join(' | '));
+    await page.close();
+  }
+
   // Output areas: census indicators can be shown by output area once a borough is chosen.
   if (HAS_OA) {
     const { page, errors } = await open(browser, 'index.html?t=1', DESK);
