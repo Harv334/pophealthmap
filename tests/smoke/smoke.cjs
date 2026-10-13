@@ -387,6 +387,121 @@ const setOv = (page, k) => page.evaluate(k => {
     await page.close();
   }
 
+  // Charities, the Directory and the PCN list (workplan 2.12). postcodes.io is
+  // answered locally, so the "Near E1 6AN" list does not depend on the network.
+  {
+    const PC = { postcode: 'E1 6AN', latitude: 51.520014, longitude: -0.072097, admin_ward: 'Spitalfields & Banglatown',
+      admin_district: 'Tower Hamlets', region: 'London', codes: { admin_ward: 'E05009333' } };
+    const { isMobile, hasTouch, ...viewport } = DESK;
+    const page = await browser.newPage({ viewport });
+    const errors = [];
+    page.on('pageerror', e => errors.push(e.message));
+    await page.route('https://api.postcodes.io/**', r => r.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({ status: 200, result: PC }) }));
+    await page.goto(BASE + '/index.html?t=1');
+    await page.waitForTimeout(SETTLE);
+    await page.click('.mode-btn[data-mode="directory"]');
+    await page.waitForFunction(() => document.querySelectorAll('#dir-types [data-dtype]').length > 3, null, { timeout: 30000 }).catch(() => {});
+    const first = await page.evaluate(() => ({
+      prompt: !!document.querySelector('#dir-list .dir-prompt'), rows: document.querySelectorAll('#dir-list .dir-item').length,
+      sub: document.getElementById('dir-sub').textContent,
+      chips: [...document.querySelectorAll('#dir-types [data-dtype]')].map(c => c.getAttribute('data-dtype')),
+    }));
+    ok(first.prompt && first.rows === 0 && first.chips.length >= 5, 'directory: opens on a search prompt with type filters', JSON.stringify(first));
+    ok(/^Search [\d,]+ GP practices, pharmacies, hospitals, dental practices and charities across London by name, address or postcode\.$/.test(first.sub),
+      'directory: the heading is built from the live count and the region', first.sub);
+    await checkAxe(page, 'Directory first screen');
+    await page.fill('#dir-q', 'E1 6');
+    await page.waitForTimeout(700);
+    const e16 = await page.evaluate(() => [...document.querySelectorAll('#dir-list .dir-item .dir-sub')].map(e => e.textContent));
+    ok(e16.length > 3 && !e16.some(t => /\bSE1\b/.test(t)) && e16.every(t => /\bE1 6/.test(t)),
+      'directory: "E1 6" finds E1 6 postcodes and no SE1 ones', e16.slice(0, 4).join(' / '));
+    await page.fill('#dir-q', 'E1 6AN');
+    await page.waitForTimeout(700);
+    await page.click('#dir-near-go');
+    await page.waitForTimeout(1000);
+    const dnear = await page.evaluate(() => ({
+      head: document.getElementById('dir-count').innerText,
+      d: [...document.querySelectorAll('#dir-list .dir-item .dir-sub')].slice(0, 30).map(e => e.textContent.split(' · ')[0]),
+    }));
+    const metres = t => /km$/.test(t) ? parseFloat(t) * 1000 : /^under/.test(t) ? 0 : parseFloat(t);
+    ok(/^Near E1 6AN, nearest first/.test(dnear.head) && dnear.d.length === 30 && dnear.d.every((t, i) => !i || metres(t) >= metres(dnear.d[i - 1])),
+      'directory: a full postcode lists the places nearest to it, nearest first', JSON.stringify(dnear).slice(0, 200));
+    await checkAxe(page, 'Directory near a postcode');
+    await page.click('#dir-near-x');
+    await page.fill('#dir-q', '');
+    await page.click('#dir-types [data-dtype="vcse"]');
+    await page.waitForTimeout(700);
+    const az = await page.evaluate(() => {
+      const names = [...document.querySelectorAll('#dir-list .dir-nm')].map(e => e.textContent);
+      return {
+        names, n: +document.querySelector('#dir-types [data-dtype="vcse"] .dir-chip-n').textContent.replace(/,/g, ''),
+        first: /^[^\p{L}\p{N}]/u.test(names[0] || ''),
+        order: names.every((x, i) => !i || phCompareNames(names[i - 1], x) <= 0),
+        // A whole word of six or more capitals is the register's shouting, not an acronym.
+        caps: names.filter(x => /(^|[\s(])\p{Lu}{6,}(?=[\s),.]|$)/u.test(x)),
+      };
+    });
+    ok(az.names.length > 100 && !az.first && az.order && !az.caps.length,
+      'directory: names sort past leading punctuation and are shown in title case', az.names.slice(0, 3).join(' | ') + ' / ' + az.caps.slice(0, 3).join(' | '));
+    const tc = await page.evaluate(() => [phTitle('BRICK LANE YMCA CIC'), phTitle('Croydon Gp Super Network PCN'),
+      phTitle("ST MARY'S NHS SURGERY"), phTitle('UK GP TRUST')]);
+    ok(tc.join(' | ') === "Brick Lane YMCA CIC | Croydon GP Super Network PCN | St Mary's NHS Surgery | UK GP Trust",
+      'title case keeps acronyms and lower-cases after an apostrophe', tc.join(' | '));
+    // One charity count: the Charities tab explains it, and the Directory's
+    // charities are the ones on the map plus the London-wide ones.
+    await page.click('.mode-btn[data-mode="explore"]');
+    await page.click('#sbtab-vcse');
+    await page.check('#vcse-tab-toggle');
+    await page.waitForFunction(() => document.querySelectorAll('.vcse-ring').length > 3, null, { timeout: 30000 }).catch(() => {});
+    const ch = await page.evaluate(() => {
+      const t = document.getElementById('vcse-about').textContent;
+      const num = re => { const m = t.match(re); return m ? +m[1].replace(/,/g, '') : NaN; };
+      const ring = document.querySelector('.leaflet-marker-icon.vcse-cluster .vcse-ring');
+      return { t, pinned: num(/([\d,]+) charities are shown on the map/), wide: num(/The Directory also lists ([\d,]+)/),
+        tab: +document.getElementById('vcse-tab-count').textContent.replace(/,/g, ''),
+        key: !document.getElementById('vcse-key').hidden && document.querySelectorAll('#vcse-key li').length,
+        ring: ring ? getComputedStyle(ring).backgroundImage : '' };
+    });
+    ok(ch.pinned === ch.tab && ch.pinned + ch.wide === az.n && !/[–—]/.test(ch.t),
+      'charities: the tab and the Directory agree on one count, explained once', ch.t + ' / Directory ' + az.n);
+    ok(ch.key === 11 && /conic-gradient/.test(ch.ring), 'charities: a key to the dots, and groups drawn as a ring of causes',
+      ch.key + ' / ' + ch.ring.slice(0, 40));
+    await checkAxe(page, 'Charities tab with its key');
+    const tour = await page.evaluate(async () => {
+      const src = await (await fetch('index.html')).text();
+      const m = src.match(/t: 'Directory: find one place',[\s\S]*?go: function/);
+      return m ? m[0] : '';
+    });
+    ok(tour && !/\d/.test(tour.replace(/^t: '[^']*',/, '')), 'the tour gives no charity or Directory count of its own');
+    // The PCN list has no placeholder and no "Gp".
+    await page.click('#sbtab-layers');
+    const pcn = await page.evaluate(() => [...document.querySelectorAll('#pcn-focus option')].map(o => o.textContent));
+    ok(pcn.length > 50 && !pcn.some(t => /not allocated|\bGp\b|\bKwh\b/.test(t)),
+      'PCN list: no placeholder and no "Gp"', pcn.filter(t => /alloc|Gp|Kwh/.test(t)).join(', '));
+    // A postcode search lists what is near it in the ward sheet.
+    await page.click('#sbtab-overlay');
+    await page.fill('#hdr-search-input', 'E1 6AN');
+    await page.waitForTimeout(1200);
+    await page.click('#sr-pc-row');
+    await page.waitForFunction(() => document.querySelectorAll('#ws-body .ws-near-item').length >= 6, null, { timeout: 30000 }).catch(() => {});
+    const near = await page.evaluate(() => {
+      const n = document.querySelector('#ws-body .ws-near');
+      return n ? { h: n.querySelector('.ws-near-h').textContent,
+        cols: [...n.querySelectorAll('.ws-near-col h4')].map(e => e.textContent),
+        d: [...n.querySelectorAll('.ws-near-col')].map(c => [...c.querySelectorAll('.ws-near-d')].map(e => e.textContent)) } : null;
+    });
+    ok(!!near && near.h === 'Near E1 6AN' && near.cols.join() === 'GP practices,Pharmacies,Charities' &&
+       near.d.every(l => l.length === 3 && l.every((t, i) => !i || metres(t) >= metres(l[i - 1]))),
+      'a postcode search lists the nearest GP practices, pharmacies and charities by distance', JSON.stringify(near));
+    await checkAxe(page, 'ward sheet with its near list');
+    await page.evaluate(() => showWard('Lansbury'));
+    await page.waitForTimeout(500);
+    ok(await page.evaluate(() => !document.querySelector('#ws-body .ws-near')), 'the near list goes when another ward is chosen');
+    ok(errors.length === 0, 'no page errors (charities, Directory, PCN)', errors.join(' | '));
+    await page.close();
+  }
+
   // Output areas: census indicators can be shown by output area once a borough is chosen.
   if (HAS_OA) {
     const { page, errors } = await open(browser, 'index.html?t=1', DESK);

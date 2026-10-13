@@ -594,13 +594,33 @@
   .vcse-tag-list input { margin: 0; }
   .vcse-tag-list .vcse-tag-n { margin-left: auto; color: var(--ink-3); font-size: var(--t-xs); }
 
+  /* ── Charities: what is counted, and the key to the dots ── */
+  .vcse-ldot { background: #7A7A75; }   /* the causes' colours, set by buildVcseKey */
+  .vcse-about { font-size: var(--t-xs); color: var(--ink-3); margin: 4px 0 2px 24px; line-height: 1.45; }
+  .vcse-key { margin: 8px 0 2px 24px; font-size: var(--t-xs); color: var(--ink-2); line-height: 1.4; }
+  .vcse-key > summary { cursor: pointer; font-weight: 600; color: var(--ink); padding: 2px 0; }
+  .vcse-key .vk-body { padding-top: 4px; }
+  .vcse-key .vk-h { color: var(--ink-3); margin: 8px 0 3px; }
+  .vcse-key .vk-h:first-child { margin-top: 0; }
+  .vcse-key ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  .vcse-key li { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .vcse-key .vk-sw { flex: 0 0 auto; border-radius: 50%; box-sizing: border-box; }
+  .vcse-key .vk-size { display: inline-flex; width: 28px; justify-content: center; flex: 0 0 auto; }
+  .vcse-key li > .vk-sw:first-child { margin: 0 9px; }
+  .vcse-key .vk-grp { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+  .vcse-key .vk-grp .vcse-ring { flex: 0 0 auto; }
+  .vcse-key .vk-grp .vcse-ring span { font-size: 11px; }
+
   /* ── VCSE list ── */
   .vcse-count { font-size: var(--t-xs); color: var(--ink-3); padding: 6px 13px; border-bottom: 1px solid var(--line-2); flex-shrink: 0; background: var(--paper-2); }
-  .vcse-list { flex: 1; overflow-y: auto; min-height: 0; }
-  .vcse-item { padding: 8px 13px; border-bottom: 1px solid var(--line-2); cursor: pointer; transition: background .1s; }
+  /* Never squeezed out of sight by the key and the filters above it: the
+     tab scrolls instead, and the list keeps room for several names. */
+  .vcse-list { flex: 1 0 220px; overflow-y: auto; min-height: 0; }
+  .vcse-item { display: block; width: 100%; padding: 8px 13px; border: 0; border-bottom: 1px solid var(--line-2);
+    background: none; font: inherit; text-align: left; color: inherit; cursor: pointer; transition: background .1s; }
   .vcse-item:hover { background: var(--paper-2); }
-  .vcse-name { font-size: var(--t-sm); font-weight: 500; color: var(--ink); line-height: 1.3; }
-  .vcse-addr { font-size: var(--t-xs); color: var(--ink-3); margin-top: 2px; }
+  .vcse-name { display: block; font-size: var(--t-sm); font-weight: 500; color: var(--ink); line-height: 1.3; }
+  .vcse-addr { display: block; font-size: var(--t-xs); color: var(--ink-3); margin-top: 2px; }
   .vcse-more { padding: 8px 13px; font-size: var(--t-xs); color: var(--ink-3); text-align: center; font-style: italic; }
 
   /* ── Ward detail panel ── */
@@ -852,6 +872,12 @@
   .pop-addr { color: var(--ink-3); margin-bottom: 5px; line-height: 1.4; }
   .pop-row { display: flex; gap: 8px; margin-bottom: 3px; }
   .pop-key { color: var(--ink-3); width: 54px; flex-shrink: 0; }
+
+  /* ── Charity groups: a ring of the causes inside, round a dark centre ── */
+  .vcse-ring { border-radius: 50%; padding: 5px; box-sizing: border-box; display: flex;
+    border: 1.5px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
+  .vcse-ring span { flex: 1; border-radius: 50%; background: #212B32; color: #fff; font-weight: 600;
+    display: flex; align-items: center; justify-content: center; font-variant-numeric: tabular-nums; }
 
   /* ── VCSE cluster colours ── */
   .marker-cluster-small div,
@@ -1399,7 +1425,28 @@
     .ws-body .ws-strip { flex: 1 1 56%; margin-top: 0; min-width: 0;
       grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .ws-body .ws-pins { flex: 1 1 100%; margin-top: 4px; }
+    /* With a "Near ..." list the row wraps, so the list sits under the
+       summary and the figures, which keep their shares of the first row. */
+    .ws-body.has-near { flex-wrap: wrap; }
+    .ws-body.has-near .ws-insight { flex-basis: calc(44% - 7px); }
+    .ws-body.has-near .ws-strip { flex-basis: calc(56% - 7px); }
+    .ws-body .ws-near { flex: 1 1 100%; margin-top: 2px; }
   }
+  /* "Near E1 6AN", laid out like the report's services block. */
+  .ws-near { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
+  .ws-near-h { margin: 0 0 6px; font-size: var(--t-sm); font-weight: 700; color: var(--nhs-dark); letter-spacing: normal; }
+  .ws-near-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px 18px; }
+  .ws-near-col h4 { margin: 0 0 4px; padding-bottom: 3px; border-bottom: 1px solid var(--line);
+    font-size: var(--t-xs); font-weight: 600; color: var(--ink-2); letter-spacing: normal; }
+  .ws-near-col ol { margin: 0; padding-left: 16px; font-size: var(--t-xs); color: var(--ink-3); }
+  .ws-near-col li { margin-bottom: 3px; line-height: 1.35; }
+  .ws-near-item { font: inherit; color: var(--ink); font-weight: 600; background: none; border: 0; padding: 0;
+    cursor: pointer; text-align: left; }
+  .ws-near-item:hover { color: var(--nhs-blue); text-decoration: underline; }
+  .ws-near-d { margin-left: 6px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .ws-near-foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+  .ws-near-foot .ws-note { margin: 0; flex: 1 1 200px; }
+  @media (max-width: 600px) { .ws-near-grid { grid-template-columns: 1fr; } }
   .ws-insight { border-left: 3px solid var(--nhs-blue); background: var(--nhs-light);
     border-radius: 6px; padding: 8px 11px; font-size: var(--t-sm); line-height: 1.5; color: var(--ink-2); }
   .ws-insight strong { color: var(--ink); font-weight: 600; }
@@ -1947,6 +1994,7 @@
   .dir-head .cmp-row { display: flex; align-items: baseline; gap: 8px; }
   .dir-head h2 { font-family: 'Inter Tight', Inter, sans-serif; font-size: var(--t-xl); font-weight: 600;
     margin: 0; letter-spacing: -.01em; color: var(--nhs-dark); flex: 1; min-width: 0; }
+  .dir-head .cmp-sub { font-size: var(--t-sm); color: var(--ink-2); margin-top: 3px; line-height: 1.45; }
   .dir-controls { padding: 10px 14px; border-bottom: 1px solid var(--line);
     background: var(--paper-2); flex-shrink: 0; }
   .dir-search { width: 100%; font: inherit; font-size: var(--t-sm); padding: 7px 9px 7px 28px;
@@ -1960,8 +2008,10 @@
     border-bottom: 1px solid var(--line); flex-shrink: 0; }
   .dir-count strong { color: var(--nhs-dark); font-variant-numeric: tabular-nums; }
   .dir-list { overflow-y: auto; overflow-x: hidden; min-height: 0; flex: 1; }
-  .dir-item { display: flex; gap: 8px; padding: 7px 14px; cursor: pointer;
-    border-bottom: 1px solid var(--paper-2); align-items: flex-start; }
+  /* Buttons, so a place can be reached and chosen from the keyboard. */
+  .dir-item { display: flex; gap: 8px; padding: 7px 14px; cursor: pointer; width: 100%;
+    border: 0; border-bottom: 1px solid var(--paper-2); align-items: flex-start; background: none;
+    font: inherit; text-align: left; color: inherit; }
   .dir-item:hover, .dir-item.sel { background: var(--nhs-light); }
   .dir-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
   .dir-txt { flex: 1; min-width: 0; }
@@ -1972,6 +2022,22 @@
   .dir-sub { display: block; font-size: var(--t-xs); color: var(--ink-3); overflow: hidden;
     text-overflow: ellipsis; white-space: nowrap; }
   .dir-more { padding: 10px 14px; font-size: var(--t-xs); color: var(--ink-3); line-height: 1.45; }
+  .dir-types .q-chip { font-family: inherit; }
+  .dir-chip-n { color: var(--ink-3); font-weight: 400; font-variant-numeric: tabular-nums; }
+  .q-chip.on .dir-chip-n { color: inherit; }
+  .dir-count[hidden] { display: none; }
+  .dir-count { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .dir-near-x { margin-left: auto; font: inherit; font-size: var(--t-xs); font-weight: 500; color: var(--nhs-blue);
+    background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; }
+  /* The first screen: what to type, before anything is listed. */
+  .dir-prompt { padding: 16px 14px; font-size: var(--t-sm); color: var(--ink-2); line-height: 1.5; }
+  .dir-prompt p { margin: 0 0 8px; }
+  .dir-prompt strong { color: var(--ink); font-weight: 600; }
+  .dir-offer { padding: 8px 14px; border-bottom: 1px solid var(--line); background: var(--nhs-light); }
+  .dir-near-go { font: inherit; font-size: var(--t-sm); font-weight: 600; color: var(--nhs-blue);
+    background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-align: left; }
+  .dir-offer-msg { display: block; font-size: var(--t-xs); color: var(--ink-2); margin-top: 3px; }
+  .dir-offer-msg:empty { display: none; }
 
   /* ── Query builder ────────────────────────────────────────────────────────
      The filter sentence from the design file: services, then a borough, then
@@ -2644,17 +2710,27 @@
       <div class="tab-pane" id="tab-vcse" role="tabpanel" aria-labelledby="sbtab-vcse">
         <div class="sb-sec" style="padding-bottom:6px">
           <label class="lrow" style="padding:2px 0;border:none">
-            <div class="ldot" style="background:#854F0B"></div>
+            <div class="ldot vcse-ldot"></div>
             <span class="lname">Show charities <span class="lcount" id="vcse-tab-count"></span></span>
             <input type="checkbox" id="vcse-tab-toggle">
           </label>
-          <div style="font-size:var(--t-xs);color:var(--ink-3);margin:4px 0 2px 24px;line-height:1.4">
+          <!-- What is counted, said once, here. The numbers are filled in from
+               layer_counts.json and then from the records themselves; see
+               vcseAboutText. The Directory and the tour do not repeat them. -->
+          <div class="vcse-about" id="vcse-about">
             These are registered charities, taken from the Charity Commission's register.
           </div>
+          <!-- The key to the dots, shown while they are on the map. Built from
+               VCSE_BUCKET_COLORS and the income bands, so it cannot drift from
+               what is drawn. -->
+          <details class="vcse-key" id="vcse-key" open hidden>
+            <summary>Key to the dots</summary>
+            <div class="vk-body" id="vcse-key-body"></div>
+          </details>
         </div>
         <div class="sb-sec" style="padding-bottom:8px">
           <div class="sb-lbl">Filter by area</div>
-          <select id="vcse-area-filter" style="width:100%;padding:5px 8px;border:1px solid var(--line);border-radius:6px;font-size:var(--t-sm);color:var(--ink);background:var(--paper);margin-bottom:8px">
+          <select id="vcse-area-filter" aria-label="Filter charities by area" style="width:100%;padding:5px 8px;border:1px solid var(--line);border-radius:6px;font-size:var(--t-sm);color:var(--ink);background:var(--paper);margin-bottom:8px">
             <!-- One "All London", not two. There were two options with that
                  label, 'london' and 'all', and every branch that read them
                  treated them identically, so the dropdown offered the same
@@ -5893,6 +5969,160 @@ function ovTooltipRows(valueForKey, ward, level) {
 function mkicon(color, label) {
   return L.divIcon({ html: `<div style="background:${color};width:28px;height:28px;border-radius:50%;border:2.5px solid #fff;display:flex;align-items:center;justify-content:center;font-size:var(--t-xs);font-weight:600;color:#fff;box-shadow:0 1px 4px rgba(0,0,0,.25)">${label}</div>`, iconSize:[28,28], iconAnchor:[14,14], className:'' });
 }
+/* Register names in the case a person would write them.
+
+   The Charity Commission sends every name in capitals ("THE D'OYLY CARTE
+   OPERA TRUST LIMITED") and the NHS registers come through str.title(), which
+   gets acronyms and apostrophes wrong ("Croydon Gp Super Network",
+   "St Mary'S"). phTitle puts both right for display, and follows the same
+   rules as title_case() in fetch_all_data.py, so a name reads the same
+   whichever of the two cased it:
+
+     "THE D'OYLY CARTE OPERA TRUST LIMITED" -> "The D'Oyly Carte Opera Trust Limited"
+     "BRICK LANE YMCA CIC"                  -> "Brick Lane YMCA CIC"
+     "Croydon Gp Super Network PCN"         -> "Croydon GP Super Network PCN"
+     "Brent Central Kwh PCN"                -> "Brent Central KWH PCN"
+     "SOHO CENTRE FOR HEALTH"               -> "Soho Centre for Health"
+
+   A name already written in mixed case is trusted: only its .title()
+   mistakes are mended, and a word in capitals inside it ("APL Bexley") is
+   taken to be meant. With { address: true } short words without vowels are
+   not read as initials, which suits street addresses but not names, and with
+   { keepCaps: true } a name sent wholly in capitals is left as it is, for
+   lists such as the PCNs where that is deliberate ("GPNET5 PCN"). */
+const PH_TITLE_FIXED = {};
+['NHS', 'GP', 'UK', 'CIC', 'CIO', 'YMCA', 'YWCA', 'PCN', 'ICB', 'CCG', 'PCT', 'PMS', 'APMS',
+ 'LLP', 'PLC', 'HMP', 'UCL', 'UCLH', 'ENT', 'NE', 'NW', 'SE', 'SW', 'II', 'III', 'IV',
+ // Ones that turn up in charity names and have a vowel, so the initials rule
+ // below would not catch them.
+ 'PTA', 'PFA', 'PTFA', 'NSPCC', 'RSPCA', 'RNIB', 'RNID', 'LGBTQ', 'LGBTQI', 'HIV', 'ADHD', 'BAME',
+ 'ESOL', 'USA', 'EU', 'SOS', 'UCLA', 'KCL', 'LSE', 'SOAS', 'BBC', 'RAF', 'NATO', 'UNICEF',
+ 'UNESCO', 'CAMHS', 'SENCO', 'YOI'].forEach(w => { PH_TITLE_FIXED[w] = w; });
+Object.assign(PH_TITLE_FIXED, { GPS: 'GPs', PCNS: 'PCNs', ICBS: 'ICBs' });
+// Short words with no vowel are usually initials ("RJ's Pharmacy", "Brent
+// Central KWH"), except these, which are ordinary abbreviations.
+const PH_TITLE_NOT_INITIALS = new Set(['DR', 'DRS', 'MR', 'MRS', 'MS', 'MX', 'ST', 'STS', 'LTD', 'RD',
+  'CTR', 'HTH', 'HLTH', 'CT', 'CL', 'STN', 'FL', 'FLR', 'PL', 'SQ', 'PH', 'WM', 'GDNS', 'GRN', 'LN',
+  'PK', 'YD', 'BLVD', 'BLDG', 'CRT', 'WHF', 'HWY', 'MT', 'MKT', 'MDDX']);
+const PH_TITLE_PERSON = new Set(['DR', 'DRS', 'MR', 'MRS', 'MS', 'MISS', 'PROF']);
+const PH_TITLE_MINOR = new Set(['and', 'of', 'for', 'in', 'on', 'at', 'upon', 'with', 'to']);
+const PH_TITLE_APOS = new Set(['s', 't', 'd', 'll', 're', 've', 'm']);
+const PH_PC_OUT = /^[A-Z]{1,2}\d{1,2}[A-Z]?$/;
+const PH_PC_IN = /^\d[A-Z]{2}$/;
+const PH_ORDINAL = /^(\d+)(ST|ND|RD|TH)$/i;
+
+// Python's str.title(): a letter after a letter is lower case, any other
+// letter upper case. So "o'brien" is "O'Brien" and "2a" is "2A".
+function _pyTitle(w) {
+  return w.toLowerCase().replace(/(^|[^\p{L}])(\p{L})/gu, (m, a, b) => a + b.toUpperCase());
+}
+function _titlePart(p, o) {
+  const up = p.toUpperCase();
+  if (PH_TITLE_FIXED[up]) return PH_TITLE_FIXED[up];
+  let m = p.match(/^(.+?)(['’])[Ss]$/);
+  if (m) return _titlePart(m[1], o) + m[2] + 's';          // possessive: recase the stem
+  m = p.match(PH_ORDINAL);
+  if (m) return m[1] + m[2].toLowerCase();
+  if (o.initials && /^\p{L}+$/u.test(p) && !PH_TITLE_NOT_INITIALS.has(up) &&
+      ((p.length >= 2 && p.length <= 4 && !/[AEIOUY]/.test(up)) || (o.afterPerson && p.length === 2))) {
+    return up;
+  }
+  const lo = p.toLowerCase();
+  if (!o.first && !o.last && (PH_TITLE_MINOR.has(lo) || (o.afterMinor && lo === 'the'))) return lo;
+  let w = _pyTitle(p).replace(/(['’])(\p{L}+)/gu,
+    (m2, a, b) => a + (PH_TITLE_APOS.has(b.toLowerCase()) ? b.toLowerCase() : b));
+  if (/^Mc\p{Ll}{2,}$/u.test(w)) w = 'Mc' + w[2].toUpperCase() + w.slice(3);
+  return w;
+}
+function phTitle(text, opts) {
+  const s = String(text == null ? '' : text).trim();
+  if (!s) return s;
+  // An address is cased a line at a time: the register often has a line
+  // typed in mixed case beside a town in capitals ("2A Charing Cross Road,
+  // LONDON").
+  if (opts && opts.address && s.indexOf(',') !== -1) {
+    return s.split(/\s*,\s*/).map(l => phTitle(l, opts)).join(', ');
+  }
+  const initials = !(opts && opts.address);
+  // Mixed case already: trust it, and mend only the words str.title() makes,
+  // a capital followed by small letters ("Gp", "Kwh", "Mary'S", "For"). A
+  // name that is nearly all capitals is not mixed for the odd small letter
+  // ("1st HARLINGTON SCOUT GROUP").
+  const lower = (s.match(/\p{Ll}/gu) || []).length, upper = (s.match(/\p{Lu}/gu) || []).length;
+  const mixed = lower > 0 && upper < 0.8 * (upper + lower);
+  if (!mixed && opts && opts.keepCaps) return s;
+  const tokens = s.split(/\s+/);
+  const out = [];
+  let starts = true, afterMinor = false, prev = '';
+  tokens.forEach((tok, n) => {
+    const mm = tok.match(/^([^\p{L}\p{N}]*)(.*?)([^\p{L}\p{N}]*)$/u);
+    const lead = mm[1], core = mm[2], trail = mm[3];
+    if (!core) {
+      out.push(tok);
+      afterMinor = false;
+      if (['-', '–', ':', '|'].indexOf(tok) !== -1) starts = true;
+      return;
+    }
+    const up = core.toUpperCase();
+    const last = n + 1 === tokens.length;
+    let word;
+    if (/^(?:www\.|https?:\/\/)/i.test(core) || /\.(?:com|net|org|co\.uk|org\.uk|nhs\.uk)$/i.test(core)) {
+      word = core.toLowerCase();
+    } else if (PH_PC_OUT.test(up) || (PH_PC_IN.test(up) && PH_PC_OUT.test(prev.toUpperCase()))) {
+      word = up;                                   // a postcode keeps its capitals
+    } else if (/\p{N}/u.test(core) && /\p{L}/u.test(core) && !PH_ORDINAL.test(core)) {
+      // "2A" and "B12" keep their capitals; a word in it does not
+      // ("4WARD4YOUTH" is "4Ward4Youth").
+      word = mixed ? core : (/\p{L}{4,}/u.test(core) ? _pyTitle(core) : up);
+    } else {
+      const first = starts || lead.indexOf('(') !== -1;
+      const afterPerson = PH_TITLE_PERSON.has(prev.toUpperCase()) && !last;
+      const parts = core.split(/([-/])/);
+      word = parts.map((p, i) => {
+        if (p === '-' || p === '/' || !p) return p;
+        // In a mixed-case name only the str.title() shapes are touched,
+        // and ordinals ("4Th").
+        if (mixed && !/^\p{Lu}\p{Ll}*(?:['’]\p{L}+)?$/u.test(p) && !PH_ORDINAL.test(p)) return p;
+        return _titlePart(p, {
+          first: first && i === 0, initials,
+          afterPerson: afterPerson && parts.length === 1,
+          afterMinor: afterMinor && i === 0,
+          last: last && parts.length === 1,
+        });
+      }).join('');
+    }
+    out.push(lead + word + trail);
+    starts = !!trail && ',:;('.indexOf(trail[trail.length - 1]) !== -1;
+    afterMinor = !trail && PH_TITLE_MINOR.has(word);
+    prev = core;
+  });
+  return out.join(' ');
+}
+// Sorting ignores what a name starts with if it is not a letter or a number,
+// so "'City of London Police..." files under C rather than above A.
+const _PH_COLLATOR = (typeof Intl !== 'undefined' && Intl.Collator)
+  ? new Intl.Collator('en-GB', { sensitivity: 'base', numeric: true }) : null;
+function phSortKey(name) {
+  return String(name == null ? '' : name).replace(/^[^\p{L}\p{N}]+/u, '');
+}
+// The region as it reads after "in" or "across": "London", "the North
+// East", "Yorkshire and The Humber".
+function phWhere() {
+  return /^(London|England|Yorkshire)/.test(PH_AREA) ? PH_AREA : 'the ' + PH_AREA;
+}
+// Sorts in place by name, working out each sort key once rather than on
+// every comparison (the Directory sorts twenty thousand names).
+function phSortByName(arr, nameOf) {
+  const keyed = arr.map(x => [phSortKey(nameOf(x)), x]);
+  keyed.sort((a, b) => _PH_COLLATOR ? _PH_COLLATOR.compare(a[0], b[0])
+    : (a[0].toLowerCase() < b[0].toLowerCase() ? -1 : a[0].toLowerCase() > b[0].toLowerCase() ? 1 : 0));
+  for (let i = 0; i < keyed.length; i++) arr[i] = keyed[i][1];
+  return arr;
+}
+function phCompareNames(a, b) {
+  const x = phSortKey(a), y = phSortKey(b);
+  return _PH_COLLATOR ? _PH_COLLATOR.compare(x, y) : (x.toLowerCase() < y.toLowerCase() ? -1 : x.toLowerCase() > y.toLowerCase() ? 1 : 0);
+}
 // VCSE marker helpers (cause -> colour, income band -> radius)
 const VCSE_BUCKET_COLORS = {
   health_disability:   '#A32D2D',
@@ -5902,13 +6132,15 @@ const VCSE_BUCKET_COLORS = {
   community_faith:     '#185FA5',
   other:               '#7A7A75',
 };
+// Named for what the Charity Commission's tags in each group say, and shown
+// in the key on the Charities tab, the popups and the tooltips.
 const VCSE_BUCKET_LABELS = {
-  health_disability:   'Health & disability',
-  social_determinants: 'Social determinants',
-  education:           'Children & education',
-  arts_sport_rec:      'Arts, sport, recreation',
-  community_faith:     'Community & faith',
-  other:               'Other',
+  health_disability:   'Health and disability',
+  social_determinants: 'Poverty, housing and employment',
+  education:           'Education and training',
+  arts_sport_rec:      'Arts, sport and recreation',
+  community_faith:     'Faith and human rights',
+  other:               'Other causes',
 };
 const VCSE_BUCKET_RULES = [
   ['health_disability',   ['health','disability']],
@@ -5956,9 +6188,12 @@ function _mkVCSEIcon(r, color) {
     className: 'vcse-icon'
   });
 }
+// The income bands, smallest first, as the key and the popups word them.
+const VCSE_INCOME_BANDS = { zero: 'No income', micro: 'Under £10,000', small: '£10,000 to £100,000',
+                            medium: '£100,000 to £1 million', large: 'Over £1 million',
+                            unknown: 'Income not reported' };
 function vcseIncomeLabel(r) {
-  const bands = { zero:'Nil income', micro:'Under £10k', small:'£10k-£100k',
-                  medium:'£100k-£1M', large:'Over £1M', unknown:'Income not reported' };
+  const bands = VCSE_INCOME_BANDS;
   let out = bands[r.ib] || '-';
   if (r.inc && r.inc > 0) out += ` (£${Math.round(r.inc).toLocaleString()})`;
   return out;
@@ -5989,13 +6224,20 @@ function vcseArea(r) {
 }
 function vcseWhereText(r) {
   const area = vcseArea(r);
-  return r.a || (area ? area + ' (area only)' : '');
+  return r.a ? phTitle(r.a, { address: true }) : (area ? area + ' (area only)' : '');
+}
+// The register's own words for a tag, which come in title case ("The
+// Prevention Or Relief Of Poverty"), in sentence case. The codes beside them
+// (wt, ht, ot) are for filtering and are never shown.
+function vcseTagText(d) {
+  const t = String(d || '').toLowerCase();
+  return t.charAt(0).toUpperCase() + t.slice(1);
 }
 function vcsePopupHtml(r) {
   const bucket = vcseCauseBucket(r);
   const color  = VCSE_BUCKET_COLORS[bucket];
-  const tags = (r.wt || []).slice(0, 4).join(' · ') || '-';
-  const who  = (r.ot || []).slice(0, 3).join(' · ');
+  const tags = (r.wd || r.wt || []).slice(0, 4).map(vcseTagText).join(', ') || '-';
+  const who  = (r.od || r.ot || []).slice(0, 3).map(vcseTagText).join(', ');
   const href = _safeWebUrl(r.w);
   const web  = !r.w ? ''
     : href ? `<div class="pop-row"><div class="pop-key">Web</div><a href="${_esc(href)}" target="_blank" rel="noopener" style="color:#185FA5;text-decoration:none;word-break:break-all">${_esc(r.w)}</a></div>`
@@ -6004,8 +6246,8 @@ function vcsePopupHtml(r) {
   const area = vcseArea(r);
   const where = area
     ? `<div class="pop-addr">${_esc(area)}</div><div class="pop-row" style="color:var(--ink-3)">Area only. Small charities are often run from a trustee's home, so the street address is not shown.</div>`
-    : `<div class="pop-addr">${_esc(r.a||'Address not listed')}</div>`;
-  return `<div class="pop-hdr" style="background:${color}">${_esc(r.n||'-')}</div>
+    : `<div class="pop-addr">${_esc(r.a ? phTitle(r.a, { address: true }) : 'Address not listed')}</div>`;
+  return `<div class="pop-hdr" style="background:${color}">${_esc(phTitle(r.n) || '-')}</div>
     <div class="pop-body">
       ${where}
       <div class="pop-row"><div class="pop-key">Cause</div>${VCSE_BUCKET_LABELS[bucket]}</div>
@@ -6014,7 +6256,7 @@ function vcsePopupHtml(r) {
       <div class="pop-row"><div class="pop-key">Tags</div>${_esc(tags)}</div>
       ${cov}
       ${web}
-      <div class="pop-row"><div class="pop-key">No.</div>${_esc(r.num||'-')}</div>
+      <div class="pop-row"><div class="pop-key">Number</div>${_esc(r.num||'-')}</div>
     </div>`;
 }
 
@@ -6626,12 +6868,10 @@ function applyPrefetchedCounts() {
       setIf('lsoa-count', c.lsoa);
       setIf('msoa-count', c.msoa);
       setIf('vcse-tab-count', c.vcse);
-      // The same sentence wireVCSE writes, so the panel does not change its
-      // wording when the records actually arrive.
-      const vc = document.getElementById('vcse-count');
-      if (vc && Number.isFinite(c.vcse) && Number.isFinite(c.vcse_total)) {
-        vc.textContent = `${c.vcse.toLocaleString()} mappable ` +
-                         `(of ${c.vcse_total.toLocaleString()} declared)`;
+      // The same sentences wireVCSE writes, so the panel does not change its
+      // wording when the records actually arrive. Not over them, if they have.
+      if (!_vcseLoadedOnce && Number.isFinite(c.vcse) && Number.isFinite(c.vcse_total)) {
+        setVcseAbout({ pinned: c.vcse, wide: c.vcse_wide, total: c.vcse_total });
       }
       // Likewise the caption under Highlight Core20, which can only be counted
       // from the IMD deciles and so went blank for anyone who never opened an
@@ -6864,15 +7104,40 @@ const vcseCluster = L.markerClusterGroup({
     _vcseFeeding = done < total;
     if (!_vcseFeeding && _vcseRefilter) { _vcseRefilter = false; applyVCSEFilter(); }
   },
+  // A group of charities is drawn as a ring of the causes inside it, around a
+  // dark centre. It was a grey disc, and next to the GP practices' groups
+  // (white with a slate ring) the two could be told apart only by reading
+  // the numbers' colour; the ring also carries the same colours as the dots
+  // it stands for, which the key on the Charities tab explains.
   iconCreateFunction: cluster => {
     const c = cluster.getChildCount();
-    const sz = c > 50 ? 36 : c > 20 ? 30 : 26;
+    const sz = c > 50 ? 38 : c > 20 ? 32 : 28;
     return L.divIcon({
-      html:`<div style="background:rgba(60,60,55,.78);width:${sz}px;height:${sz}px;border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:600;font-size:${sz>32?13:12}px;box-shadow:0 2px 6px rgba(0,0,0,.2)">${c}</div>`,
+      html: `<div class="vcse-ring" style="width:${sz}px;height:${sz}px;background:${_vcseClusterRing(cluster)}"><span style="font-size:${sz > 34 ? 12 : 11}px">${c}<span class="sr-only"> charities</span></span></div>`,
       className: 'vcse-cluster', iconSize: [sz, sz]
     });
   }
 });
+// The causes in a group as a conic-gradient, in the key's order. Each
+// marker's cause is worked out once and kept on it.
+const VCSE_BUCKET_ORDER = Object.keys(VCSE_BUCKET_COLORS);
+function _vcseClusterRing(cluster) {
+  const n = {};
+  let tot = 0;
+  cluster.getAllChildMarkers().forEach(m => {
+    const b = m._vb || (m._vb = m._vcse ? vcseCauseBucket(m._vcse) : 'other');
+    n[b] = (n[b] || 0) + 1;
+    tot++;
+  });
+  if (!tot) return VCSE_BUCKET_COLORS.other;
+  let at = 0;
+  const stops = VCSE_BUCKET_ORDER.filter(b => n[b]).map(b => {
+    const from = at;
+    at += 100 * n[b] / tot;
+    return VCSE_BUCKET_COLORS[b] + ' ' + from.toFixed(1) + '% ' + at.toFixed(1) + '%';
+  });
+  return 'conic-gradient(' + stops.join(', ') + ')';
+}
 
 /* Popups and tooltips are bound to a marker the first time it is pointed at,
    clicked or opened from the list. Binding all eleven thousand up front was a
@@ -6884,7 +7149,8 @@ function _vcseBind(m) {
   const r = m._vcse;
   m.bindPopup(() => vcsePopupHtml(r), { maxWidth: 300 });
   const bucketLbl = VCSE_BUCKET_LABELS[vcseCauseBucket(r)] || '';
-  m.bindTooltip(_esc(bucketLbl ? `${r.n} · ${bucketLbl}` : r.n), { direction: 'top', className: 'marker-tip' });
+  const nm = phTitle(r.n);
+  m.bindTooltip(_esc(bucketLbl ? `${nm} · ${bucketLbl}` : nm), { direction: 'top', className: 'marker-tip' });
   return m;
 }
 vcseCluster.on('mouseover', e => {
@@ -6895,6 +7161,88 @@ vcseCluster.on('click keypress', e => {
   if (e.type === 'keypress' && e.originalEvent && e.originalEvent.key !== 'Enter') return;
   _vcseBind(e.layer).openPopup();
 });
+
+/* What the charity count covers, said once, on the Charities tab.
+
+   The register lists every charity that names somewhere in the region as an
+   area it works in. The map can pin only those based in the region that name
+   the LAs they work in. Those that say they work across the whole region from
+   a base inside it have no LA to be pinned to, so the Directory lists them
+   instead, and the rest are based outside the region or have no address that
+   can be placed. The three numbers come from layer_counts.json until the
+   records arrive and from the records after that, by the same rule as
+   scripts/build_layer_counts.py, so they always add up to the register's
+   total and agree with the Directory's count of charities. */
+function vcseCountsOf(records) {
+  let pinned = 0, wide = 0;
+  records.forEach(r => {
+    if (!r || !r.hq || r.lat == null || r.lng == null) return;
+    if (r.sc === 'explicit') pinned++;
+    else if (r.sc === 'london_wide') wide++;
+  });
+  return { pinned, wide, total: records.length };
+}
+function vcseAboutText(c) {
+  const where = phWhere();
+  const fmt = n => n.toLocaleString('en-GB');
+  const bits = ["These are registered charities, taken from the Charity Commission's register."];
+  if (c && Number.isFinite(c.pinned)) {
+    bits.push(fmt(c.pinned) + ' charit' + (c.pinned === 1 ? 'y is' : 'ies are') + ' shown on the map: those based in ' +
+      where + ' that name the LAs they work in.');
+    if (Number.isFinite(c.wide) && c.wide > 0) {
+      bits.push('The Directory also lists ' + fmt(c.wide) + ' that work across the whole of ' + where +
+        (PH_IS_LONDON ? ' from a London base.' : ' from a base in the region.'));
+    }
+    const rest = Number.isFinite(c.total) && Number.isFinite(c.wide) ? c.total - c.pinned - c.wide : 0;
+    if (rest > 0) {
+      bits.push('A further ' + fmt(rest) + ' work in ' + where + ' but are based elsewhere or have no address ' +
+        'we can place, so they are not included.');
+    }
+  }
+  return bits.join(' ');
+}
+function setVcseAbout(c) {
+  const el = document.getElementById('vcse-about');
+  if (el) el.textContent = vcseAboutText(c);
+}
+/* The key to the dots: colour for the main cause, size for yearly income, and
+   the ring that stands for a group of them. Built from the same tables the
+   markers are drawn from. */
+function buildVcseKey() {
+  const key = document.getElementById('vcse-key-body');
+  const all = VCSE_BUCKET_ORDER.map((b, i, a) => VCSE_BUCKET_COLORS[b] + ' ' +
+    (100 * i / a.length).toFixed(1) + '% ' + (100 * (i + 1) / a.length).toFixed(1) + '%').join(', ');
+  document.querySelectorAll('.vcse-ldot').forEach(d => { d.style.background = 'conic-gradient(' + all + ')'; });
+  if (!key || key.childElementCount) return;
+  const grey = VCSE_BUCKET_COLORS.other;
+  const dot = (ib, colour) => {
+    const r = vcseMarkerRadius({ ib });
+    const hollow = ib === 'zero';
+    return '<span class="vk-size"><span class="vk-sw" style="width:' + (2 * r) + 'px;height:' + (2 * r) + 'px;' +
+      (hollow ? 'border:2px solid ' + colour : 'background:' + colour) + '"></span></span>';
+  };
+  key.innerHTML =
+    '<div class="vk-h">Colour shows the main cause</div><ul>' +
+    VCSE_BUCKET_ORDER.map(b => '<li><span class="vk-sw" style="width:10px;height:10px;background:' +
+      VCSE_BUCKET_COLORS[b] + '"></span>' + _esc(VCSE_BUCKET_LABELS[b]) + '</li>').join('') + '</ul>' +
+    '<div class="vk-h">Size shows yearly income</div><ul>' +
+    ['large', 'medium', 'small', 'micro', 'zero'].map(ib => '<li>' + dot(ib, grey) +
+      _esc(VCSE_INCOME_BANDS[ib]) + '</li>').join('') + '</ul>' +
+    '<div class="vk-grp"><span class="vcse-ring" style="width:28px;height:28px;background:conic-gradient(' + all +
+    ')" aria-hidden="true"><span>12</span></span><span>A ring is a group of charities close together, coloured by ' +
+    'the causes in it. Zoom in, or select it, to see each one.</span></div>';
+}
+try { buildVcseKey(); } catch (e) { console.warn('buildVcseKey failed', e); }
+
+// Each dot is a button to the keyboard and a screen reader, so it carries the
+// charity's name and cause. Its element is made afresh each time the cluster
+// puts it on the map, so the name is written then.
+function _vcseNameMarker(e) {
+  const el = e.target.getElement && e.target.getElement();
+  const r = e.target._vcse;
+  if (!el || !r || el.hasAttribute('aria-label')) return;
+  el.setAttribute('aria-label', phTitle(r.n) + ', charity, ' + (VCSE_BUCKET_LABELS[vcseCauseBucket(r)] || '').toLowerCase());
+}
 
 let VCSE_ALL = [];
 let VCSE_PINNED = [];
@@ -6909,8 +7257,9 @@ function wireVCSE(records) {
   VCSE_PINNED.forEach(r => {
     const marker = L.marker([r.lat, r.lng], { icon: mkVCSEIcon(r) });
     marker._vcse = r;   // popup and tooltip are bound on first use, see _vcseBind
+    marker.on('add', _vcseNameMarker);
     vcseCluster.addLayer(marker);
-    vcseData.push({ name: r.n, addr: vcseWhereText(r), lat: r.lat, lng: r.lng, marker, record: r });
+    vcseData.push({ name: phTitle(r.n), addr: vcseWhereText(r), lat: r.lat, lng: r.lng, marker, record: r });
   });
   const n = VCSE_PINNED.length;
   const tot = VCSE_ALL.length;
@@ -6921,10 +7270,14 @@ function wireVCSE(records) {
   // "VCSE" in the label, which now says "charities".
   const tabCount = document.getElementById('vcse-tab-count');
   if (tabCount) tabCount.textContent = n.toLocaleString();
-  const cnt = document.getElementById('vcse-count');
-  if (cnt) cnt.textContent = `${n.toLocaleString()} mappable (of ${tot.toLocaleString()} declared)`;
-  // (subtitle is now a static how-it-works hint set in HTML — don't overwrite)
+  setVcseAbout(vcseCountsOf(VCSE_ALL));
+  // The list under the filters, in the order the Directory uses.
+  phSortByName(vcseData, o => o.name);
   _vcseLoadedOnce = true;
+  // Fill the list and its count now. The filters were wired before the
+  // records arrived, so without this the list stayed empty until something
+  // was typed or ticked.
+  try { applyVCSEFilter(); } catch (e) { console.error('applyVCSEFilter failed:', e); }
   console.log(`VCSE loaded: ${n} pinned / ${tot} total`);
   // Populate the tag-filter checkboxes now that VCSE_ALL is ready.
   try { buildVCSETagFilters(); } catch(e) { console.error('buildVCSETagFilters failed:', e); }
@@ -7166,7 +7519,7 @@ function buildVCSETagFilters() {
     // Sort by count desc, then label asc
     const entries = Object.entries(counts[fam]).sort((a,b) => b[1]-a[1] || (VCSE_TAG_LABELS[fam][a[0]]||a[0]).localeCompare(VCSE_TAG_LABELS[fam][b[0]]||b[0]));
     for (const [code, n] of entries) {
-      const label = VCSE_TAG_LABELS[fam][code] || code;
+      const label = VCSE_TAG_LABELS[fam][code] ? vcseTagText(VCSE_TAG_LABELS[fam][code]) : code;
       const row = document.createElement('label');
       row.innerHTML = `<input type="checkbox" data-fam="${fam}" data-tag="${_esc(code)}"><span>${_esc(label)}</span><span class="vcse-tag-n">${n.toLocaleString()}</span>`;
       list.appendChild(row);
@@ -7290,22 +7643,29 @@ function applyVCSEFilter() {
   });
 
   const countEl = document.getElementById('vcse-count');
-  if (countEl) countEl.textContent = `${visible.length} organisation${visible.length!==1?'s':''}`;
+  if (countEl) {
+    const all = vcseData.length;
+    countEl.textContent = !_vcseLoadedOnce ? ''
+      : visible.length === all ? all.toLocaleString() + ' charities on the map'
+      : visible.length.toLocaleString() + ' of the ' + all.toLocaleString() + ' charities on the map match';
+  }
 
   const list = document.getElementById('vcse-list');
   if (!list) return;
   list.innerHTML = '';
   visible.slice(0, 150).forEach(o => {
-    const div = document.createElement('div');
+    const div = document.createElement('button');
+    div.type = 'button';
     div.className = 'vcse-item';
-    div.innerHTML = `<div class="vcse-name">${_esc(o.name)}</div><div class="vcse-addr">${_esc(o.addr||'—')}</div>`;
+    div.innerHTML = `<span class="vcse-name">${_esc(o.name)}</span><span class="vcse-addr">${_esc(o.addr || 'Address not listed')}</span>`;
     div.onclick = () => { map.setView([o.lat, o.lng], 16); _vcseBind(o.marker).openPopup(); };
     list.appendChild(div);
   });
   if (visible.length > 150) {
     const more = document.createElement('div');
     more.className = 'vcse-more';
-    more.textContent = `+${visible.length - 150} more — refine search`;
+    more.textContent = 'Showing the first 150 of ' + visible.length.toLocaleString() +
+      ', so narrow the search or choose a tag to find the rest.';
     list.appendChild(more);
   }
 }
@@ -10427,6 +10787,15 @@ function _applyBoroughSolo() {
 
   fetch(dataUrl('data/map/pcn.json')).then(r => r.ok ? r.json() : null).then(d => {
     if (!d || !d.pcns || !d.pcns.length) return;
+    // NHS England files practices that belong to no network under a
+    // placeholder code, U99999 ("GPs not allocated to a PCN"). It is not a
+    // network and has no footprint, so it is not offered as one. Names are
+    // put right for display ("Croydon Gp Super Network" is "Croydon GP Super
+    // Network") by the same helper as the Directory's.
+    d.pcns = d.pcns.filter(p => p && p.code !== 'U99999' && !/not allocated/i.test(p.name || ''))
+      .map(p => Object.assign({}, p, { name: phTitle(p.name, { keepCaps: true }) }));
+    if (!d.pcns.length) return;
+    phSortByName(d.pcns, p => p.name);
     DATA = d;
     d.pcns.forEach(p => { byCode[p.code] = p; });
     sel.insertAdjacentHTML('beforeend', d.pcns.map(p =>
@@ -10944,6 +11313,9 @@ function _setVcseLayerVisible(on) {
   } else {
     if (vcseCluster._map) map.removeLayer(vcseCluster);
   }
+  // The key to the dots, while there are dots.
+  const key = document.getElementById('vcse-key');
+  if (key) key.hidden = !on;
   const a = document.getElementById('tv');
   const b = document.getElementById('vcse-tab-toggle');
   if (a && a.checked !== !!on) a.checked = !!on;
@@ -13929,7 +14301,13 @@ function _searchPickResult(item) {
     // Trigger the ward's click handler via wLyr
     if (typeof wLyr !== 'undefined' && wLyr) {
       const lyr = wLyr.getLayers().find(l => l.feature.properties.WD24NM === item._key);
-      if (lyr) { lyr.fire('click'); _fitVisible(lyr.getBounds(), 14); }
+      if (lyr) {
+        // The ward sheet lists what is near the middle of the ward.
+        const c = lyr.getBounds().getCenter();
+        window._phNear = { label: item._key, lat: c.lat, lng: c.lng, ward: item._key, from: 'ward' };
+        lyr.fire('click');
+        _fitVisible(lyr.getBounds(), 14);
+      }
     }
   } else if (item.type === 'lsoa') {
     if (typeof lsoaLyr !== 'undefined' && lsoaLyr) {
@@ -14019,6 +14397,9 @@ function _pickPostcode(pq, res) {
   const codes = res.codes || {};
   const lyr = _wardLayerFor(codes.admin_ward, res.admin_ward);
   if (lyr) {
+    // The ward sheet lists what is near the postcode itself.
+    window._phNear = { label: res.postcode || pq.text, lat: res.latitude, lng: res.longitude,
+                       ward: lyr.feature.properties.WD24NM, from: 'postcode' };
     lyr.fire('click');
     _fitVisible(lyr.getBounds(), 14);
   } else {
@@ -16124,8 +16505,77 @@ var PH_SHOW = {
           'under the Equality Act') +
       '</div>';
 
-    bodyEl.innerHTML = summaryBlock(w) + strip + pinTable();
+    var near = nearCtxFor(w);
+    bodyEl.innerHTML = summaryBlock(w) + strip + pinTable() + (near ? nearBlockHtml(near) : '');
+    // The near block takes a row of its own under the summary and figures.
+    bodyEl.classList.toggle('has-near', !!near);
+    if (near) fillNear(near);
   }
+
+  /* "Near E1 6AN": after a postcode or ward search, the GP practices,
+     pharmacies and charities closest to it, laid out like the services
+     block of the printable report and drawn from the Directory's records, so
+     the names, the order and the counts are the Directory's own.
+
+     The search sets window._phNear ({ label, lat, lng, ward, from }) before
+     it opens the ward, and the block belongs to that ward only: choosing
+     another ward on the map, or closing the sheet, puts it away. The
+     Directory's lists load on first use, so the block says what it is doing
+     until they arrive. */
+  var NEAR_TYPES = [['gp', 'GP practices'], ['pharmacy', 'Pharmacies'], ['vcse', 'Charities']];
+  var NEAR_EACH = 3;
+  var nearShown = {};
+  function nearCtxFor(w) {
+    var c = window._phNear;
+    return (c && w && c.ward === w.name) ? c : null;
+  }
+  function nearBlockHtml(c) {
+    return '<div class="ws-near">' +
+      '<h3 class="ws-near-h">Near ' + esc(c.label) + '</h3>' +
+      '<div class="ws-near-body" id="ws-near-body" aria-live="polite">' +
+      '<p class="ws-note">Finding the nearest GP practices, pharmacies and charities...</p></div></div>';
+  }
+  function fillNear(c) {
+    loadDirectory().then(function () {
+      var body = $('ws-near-body');
+      if (!body || window._phNear !== c) return;
+      nearShown = {};
+      // A type this region's Directory has none of (England has no
+      // charities) is left out rather than listed as empty.
+      var has = {};
+      (dirRecords || []).forEach(function (r) { has[r.t] = 1; });
+      var cols = NEAR_TYPES.filter(function (t) { return has[t[0]]; }).map(function (t) {
+        var list = nearShown[t[0]] = dirNearest(c.lat, c.lng, t[0], NEAR_EACH);
+        return '<div class="ws-near-col"><h4>' + esc(t[1]) + '</h4>' + (list.length
+          ? '<ol>' + list.map(function (r, i) {
+              return '<li><button type="button" class="ws-near-item" data-near-t="' + t[0] + '" data-near-i="' + i +
+                '" title="Show ' + esc(r.n) + ' on the map">' + esc(r.n) + '</button>' +
+                '<span class="ws-near-d">' + dirFmtDist(r._d) + '</span></li>';
+            }).join('') + '</ol>'
+          : '<p class="ws-note">None listed in ' + esc(phWhere()) + '.</p>') + '</div>';
+      }).join('');
+      body.innerHTML = '<div class="ws-near-grid">' + cols + '</div>' +
+        '<div class="ws-near-foot"><span class="ws-note">Distances are in a straight line from ' +
+        (c.from === 'ward' ? 'the middle of ' : '') + esc(c.label) + '.</span>' +
+        '<button type="button" class="ws-btn" id="ws-near-more">See more near ' + esc(c.label) +
+        ' in the Directory</button></div>';
+    }, function () {
+      var body = $('ws-near-body');
+      if (body && window._phNear === c) {
+        body.innerHTML = '<p class="ws-note">The lists of nearby places could not be loaded. ' +
+          'Please check your connection and search again.</p>';
+      }
+    });
+  }
+  bodyEl.addEventListener('click', function (e) {
+    var it = e.target.closest('.ws-near-item');
+    if (it) {
+      var rec = (nearShown[it.getAttribute('data-near-t')] || [])[+it.getAttribute('data-near-i')];
+      if (rec) dirShowOnMap(rec);
+      return;
+    }
+    if (e.target.closest('#ws-near-more') && window._phNear) dirOpenNear(window._phNear);
+  });
 
   function show(wn) {
     buildOnce();          // the ward data has clearly arrived if a ward was clicked
@@ -16146,6 +16596,8 @@ var PH_SHOW = {
     var rec = wardRec(wn);
     var w = { name: wn, inds: (rec && rec.indicators) || {}, lad: (rec && rec.lad) || '' };
     currentWard = wn;
+    // A "Near ..." list from a search belongs to the ward the search opened.
+    if (window._phNear && window._phNear.ward !== wn) window._phNear = null;
 
     nameEl.textContent = wn;
     var pop = num(w.inds.census_population);
@@ -16198,6 +16650,7 @@ var PH_SHOW = {
 
   function hide() {
     currentWard = null;
+    window._phNear = null;
     sheet.classList.remove('open');
     lift();
   }
@@ -17160,18 +17613,22 @@ var PH_SHOW = {
      and a directory that had to remember which is which per source would get
      one wrong the first time a source changed.
      ───────────────────────────────────────────────────────────────────────── */
+  // noun is how the heading's sentence names each ("Search 20,315 GP
+  // practices, pharmacies, ... and charities"), and one is a single record.
   var DIR_SOURCES = [
-    { id: 'gp',       label: 'GP practices',      colour: '#185FA5', glob: 'GPS' },
-    { id: 'pharmacy', label: 'Pharmacies',        colour: '#E89B1B', src: 'pharmacies.json' },
-    { id: 'hospital', label: 'Hospitals',         colour: '#A32D2D', glob: 'HOSP' },
-    { id: 'dentist',  label: 'Dental practices',  colour: '#7B2D8E', src: 'dental_practices.json' },
-    { id: 'vcse',     label: 'Charities',         colour: '#AE2573', src: 'vcse_data.json' },
+    { id: 'gp',       label: 'GP practices',      noun: 'GP practices',     one: 'GP practice',     colour: '#185FA5', glob: 'GPS' },
+    { id: 'pharmacy', label: 'Pharmacies',        noun: 'pharmacies',       one: 'Pharmacy',        colour: '#E89B1B', src: 'pharmacies.json' },
+    { id: 'hospital', label: 'Hospitals',         noun: 'hospitals',        one: 'Hospital',        colour: '#A32D2D', glob: 'HOSP' },
+    { id: 'dentist',  label: 'Dental practices',  noun: 'dental practices', one: 'Dental practice', colour: '#7B2D8E', src: 'dental_practices.json' },
+    { id: 'vcse',     label: 'Charities',         noun: 'charities',        one: 'Charity',         colour: '#AE2573', src: 'vcse_data.json' },
   ];
   var DIR_CAP = 250;               // rows rendered; the count and the CSV are complete
   var dirRecords = null;
   var dirOutOfScope = 0;
   var dirLoading = null;
-  var dirState = { q: '', types: {}, borough: '' };
+  // near: { label, lat, lng, from } while the list is sorted by distance
+  // from a postcode or a ward (see dirOpenNear), otherwise null.
+  var dirState = { q: '', types: {}, borough: '', near: null };
   var dirMarker = null;
   var dirFiltered = [];
 
@@ -17245,21 +17702,41 @@ var PH_SHOW = {
     return '';
   }
 
+  // A postcode, or the start of one, split into its two halves: "E1 6AN" is
+  // E1 and 6AN, "E16AN" the same, "E1 6" is E1 and the start of 6.., and "E1"
+  // or "SW1A" is the outward half alone. Matching the halves rather than the
+  // text is what keeps "E1 6" from finding SE1 6AD.
+  var DIR_PC = /^([A-Z]{1,2}\d[A-Z\d]?)(?:\s*(\d[A-Z]{0,2}))?$/;
+  function dirPostcodeParts(s) {
+    var m = String(s || '').toUpperCase().replace(/\s+/g, ' ').trim().match(DIR_PC);
+    return m ? { out: m[1], inw: m[2] || '' } : null;
+  }
+
   function dirNorm(r, src) {
     // One shape out of ten. Field names differ per source and the fallbacks
     // are ordered most-specific first so a source that has both wins sensibly.
     var addr = r.a || r.address ||
       [r.street, r.town].filter(Boolean).join(', ') || '';
+    // Names and addresses as a person would write them: the charity register
+    // is all capitals and the NHS registers come through str.title().
+    var n = phTitle(r.n || r.name || '') || 'Name not listed';
+    var a = phTitle(addr, { address: true });
+    var pc = String(r.pc || r.postcode || '').toUpperCase().replace(/\s+/g, ' ').trim();
+    var pp = dirPostcodeParts(pc);
     return {
       t: src.id,
       label: src.label,
+      one: src.one,
       colour: src.colour,
-      n: r.n || r.name || '(unnamed)',
-      a: addr,
-      pc: r.pc || r.postcode || '',
+      n: n,
+      a: a,
+      pc: pc,
       lad: ladNameOf(r.lad || r.borough || r.lad_code || ''),
       lat: r.lat, lng: r.lng,
       sub: r.type || r.phase || r.t || '',
+      // Worked out once here rather than on every keystroke.
+      _n: n.toLowerCase(), _a: a.toLowerCase(),
+      _po: pp ? pp.out : '', _pi: pp ? pp.inw : '',
     };
   }
 
@@ -17272,7 +17749,10 @@ var PH_SHOW = {
         : loadJson(s.src);
       return rows.then(function (data) {
         return (data || [])
-          .filter(function (r) { return r && (r.lat || r.lng); })
+          // A charity is listed where it is based, so one based outside the
+          // region is left out here even when it works inside it (the
+          // Charities tab says how many). Same rule as vcseCountsOf.
+          .filter(function (r) { return r && (r.lat || r.lng) && (s.id !== 'vcse' || r.hq); })
           .map(function (r) { return dirNorm(r, s); });
       }).catch(function () { return []; });
     })).then(function (lists) {
@@ -17295,7 +17775,9 @@ var PH_SHOW = {
       // unusable. The number dropped is reported rather than hidden.
       dirRecords = all.filter(function (r) { return r.lad; });
       dirOutOfScope = all.length - dirRecords.length;
-      dirRecords.sort(function (a, b) { return a.n.localeCompare(b.n); });
+      // A to Z by the name's first letter or digit, so names the register
+      // starts with quote marks or brackets file where a reader would look.
+      phSortByName(dirRecords, function (r) { return r.n; });
       dirLoading = null;
       return dirRecords;
     });
@@ -17303,44 +17785,125 @@ var PH_SHOW = {
   }
 
   function dirFilter() {
-    var q = dirState.q.trim().toLowerCase();
+    var q = dirState.q.trim().toLowerCase().replace(/\s+/g, ' ');
+    var pq = dirPostcodeParts(q);
+    var near = dirState.near;
     var anyType = Object.keys(dirState.types).some(function (k) { return dirState.types[k]; });
-    return (dirRecords || []).filter(function (r) {
+    var out = (dirRecords || []).filter(function (r) {
       if (anyType && !dirState.types[r.t]) return false;
       if (!scopeMatchesLad(dirState.borough, r.lad)) return false;
-      if (!q) return true;
-      return r.n.toLowerCase().indexOf(q) !== -1 ||
-             r.a.toLowerCase().indexOf(q) !== -1 ||
-             r.pc.toLowerCase().indexOf(q) !== -1;
+      if (near || !q) return true;
+      // A postcode, or the start of one, is matched from the beginning, a
+      // half at a time, so "E1 6" finds E1 6AN and never SE1 6AD.
+      if (pq) return (r._po === pq.out && r._pi.indexOf(pq.inw) === 0) || r._n.indexOf(q) === 0;
+      return r._n.indexOf(q) !== -1 || r._a.indexOf(q) !== -1 || r.pc.toLowerCase().indexOf(q) === 0;
     });
+    if (near) {
+      out.forEach(function (r) { r._d = dirDistM(near.lat, near.lng, r.lat, r.lng); });
+      out.sort(function (a, b) { return a._d - b._d; });
+    }
+    return out;
+  }
+
+  // Straight-line distance in metres, and how it is written.
+  function dirDistM(lat1, lng1, lat2, lng2) {
+    var k = Math.PI / 180;
+    var dLat = (lat2 - lat1) * k, dLng = (lng2 - lng1) * k;
+    var h = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * k) * Math.cos(lat2 * k) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    return 2 * 6371000 * Math.asin(Math.min(1, Math.sqrt(h)));
+  }
+  function dirFmtDist(m) {
+    if (m < 50) return 'under 50 m';
+    if (m < 1000) return (Math.round(m / 10) * 10) + ' m';
+    return (m / 1000).toFixed(m < 10000 ? 1 : 0) + ' km';
+  }
+  // The k records of one type nearest a point, each carrying its distance.
+  function dirNearest(lat, lng, type, k) {
+    return (dirRecords || []).filter(function (r) { return r.t === type; })
+      .map(function (r) { return { r: r, d: dirDistM(lat, lng, r.lat, r.lng) }; })
+      .sort(function (a, b) { return a.d - b.d; })
+      .slice(0, k)
+      .map(function (x) { return Object.assign({}, x.r, { _d: x.d }); });
+  }
+
+  /* The Directory sorted by distance from a postcode or a ward.
+
+     Reached from the "Near E1 6AN" block in the ward sheet after a search,
+     and from the offer the Directory makes when a full postcode is typed into
+     it. ctx is { label, lat, lng, from: 'postcode' | 'ward' }. Typing a new
+     search, or "Back to the full list", puts the list back in A to Z order. */
+  function dirOpenNear(ctx) {
+    if (!ctx || !Number.isFinite(ctx.lat) || !Number.isFinite(ctx.lng)) return;
+    dirState.near = ctx;
+    dirState.q = '';
+    var qEl = $('dir-q');
+    if (qEl) qEl.value = '';
+    railClick('directory');
+    loadDirectory().then(function () { renderDirControls(); renderDirectory(); });
+  }
+
+  // The first screen is the search box and the types rather than twenty
+  // thousand names starting with quote marks.
+  function dirIsBlank() {
+    return !dirState.near && !dirState.q.trim() && !dirState.borough &&
+      !Object.keys(dirState.types).some(function (k) { return dirState.types[k]; });
   }
 
   function renderDirectory() {
     var listEl = $('dir-list'), countEl = $('dir-count');
     if (!listEl) return;
-    if (!dirRecords) { countEl.textContent = 'Loading...'; listEl.innerHTML = ''; return; }
+    if (!dirRecords) { countEl.hidden = false; countEl.textContent = 'Loading the lists...'; listEl.innerHTML = ''; return; }
 
+    // Filtered even on the first screen, so CSV still downloads everything
+    // when nothing has been chosen.
     dirFiltered = dirFilter();
+    if (dirIsBlank()) {
+      countEl.hidden = true;
+      countEl.innerHTML = '';
+      listEl.innerHTML = '<div class="dir-prompt">' +
+        '<p><strong>Type a name, a street or a postcode</strong> to find a place, or choose a type ' +
+        'above to list all of them from A to Z.</p>' +
+        '<p>A full postcode' + (PH_IS_LONDON ? ', such as E1 6AN,' : '') +
+        ' can also list the places nearest to it.</p></div>';
+      return;
+    }
+    countEl.hidden = false;
+    var near = dirState.near;
     var shown = dirFiltered.slice(0, DIR_CAP);
-    countEl.innerHTML = '<strong>' + dirFiltered.length.toLocaleString() + '</strong> of ' +
-      dirRecords.length.toLocaleString() + ' places';
+    countEl.innerHTML = near
+      ? '<span>Near <strong>' + esc(near.label) + '</strong>, nearest first</span>' +
+        '<button type="button" class="dir-near-x" id="dir-near-x">Back to the full list</button>'
+      : '<strong>' + dirFiltered.length.toLocaleString() + '</strong> of ' +
+        dirRecords.length.toLocaleString() + ' places';
 
-    listEl.innerHTML = shown.map(function (r, i) {
+    // A full postcode typed in: offer the places nearest to it as well as
+    // the ones that share it.
+    var pq = !near && dirPostcodeParts(dirState.q);
+    var offer = (pq && pq.inw.length === 3)
+      ? '<div class="dir-offer"><button type="button" class="dir-near-go" id="dir-near-go" data-pc="' +
+        esc(pq.out + ' ' + pq.inw) + '">List the places nearest to ' + esc(pq.out + ' ' + pq.inw) + '</button>' +
+        '<span class="dir-offer-msg" id="dir-offer-msg" role="status"></span></div>'
+      : '';
+
+    listEl.innerHTML = offer + (shown.map(function (r, i) {
       // The address is shown because it is searched. Without it, a search for
       // "wembley" returned rows with no "wembley" anywhere on them, which reads
       // as a broken filter rather than as a match on a field being hidden.
-      var meta = [r.label, r.sub, r.a, r.pc].filter(Boolean).join(' · ');
-      var full = [r.n, r.label, r.sub, r.a, r.pc, r.lad].filter(Boolean).join(' · ');
-      return '<div class="dir-item" data-i="' + i + '" title="' + esc(full) + '">' +
+      var meta = [near ? dirFmtDist(r._d) : '', r.one, r.sub, r.a, r.pc].filter(Boolean).join(' · ');
+      var full = [r.n, r.one, r.sub, r.a, r.pc, r.lad].filter(Boolean).join(' · ');
+      return '<button type="button" class="dir-item" data-i="' + i + '" title="' + esc(full) + '">' +
         '<span class="dir-dot" style="background:' + r.colour + '"></span>' +
         '<span class="dir-txt"><span class="dir-nm">' + esc(r.n) + '</span>' +
-        '<span class="dir-sub">' + esc(meta) + '</span></span></div>';
-    }).join('') || '<div class="dir-more">Nothing matches that search.</div>';
+        '<span class="dir-sub">' + esc(meta) + '</span></span></button>';
+    }).join('') || '<div class="dir-more">Nothing matches that search. Try part of a name, a street, ' +
+      'or the start of a postcode.</div>');
 
     if (dirFiltered.length > DIR_CAP) {
       listEl.insertAdjacentHTML('beforeend',
-        '<div class="dir-more">Showing the first ' + DIR_CAP + '. Narrow the search, ' +
-        'or use CSV to export all ' + dirFiltered.length.toLocaleString() + '.</div>');
+        '<div class="dir-more">Showing the ' + (near ? 'nearest ' : 'first ') + DIR_CAP + ' of ' +
+        dirFiltered.length.toLocaleString() + (near ? ', and CSV downloads them all in order of distance.'
+          : ', so narrow the search to see the rest, or download them all with CSV.') + '</div>');
     }
   }
 
@@ -17351,21 +17914,24 @@ var PH_SHOW = {
     dirRecords.forEach(function (r) { counts[r.t] = (counts[r.t] || 0) + 1; });
     typesEl.innerHTML = DIR_SOURCES.map(function (s) {
       if (!counts[s.id]) return '';
-      return '<span class="q-chip' + (dirState.types[s.id] ? ' on' : '') + '" data-dtype="' + s.id +
-        '" role="button" tabindex="0">' + esc(s.label) + ' ' +
-        '<span style="opacity:.7">' + counts[s.id].toLocaleString() + '</span></span>';
+      return '<button type="button" class="q-chip' + (dirState.types[s.id] ? ' on' : '') + '" data-dtype="' + s.id +
+        '" aria-pressed="' + (dirState.types[s.id] ? 'true' : 'false') + '">' + esc(s.label) + ' ' +
+        '<span class="dir-chip-n">' + counts[s.id].toLocaleString() + '</span></button>';
     }).join('');
 
     var bEl = $('dir-borough');
     if (bEl && bEl.options.length <= 1) {
       bEl.innerHTML = scopeOptionsHtml(dirState.borough, esc);
     }
+    // The heading, from the live count and the region: "Search 20,315 GP
+    // practices, pharmacies, hospitals, dental practices and charities
+    // across London by name, address or postcode."
     var sub = $('dir-sub');
     if (sub) {
-      sub.textContent = dirRecords.length.toLocaleString() + ' places across ' +
-        DIR_SOURCES.length + ' datasets' +
-        (dirOutOfScope ? ', with ' + dirOutOfScope.toLocaleString() +
-          ' outside ' + PH_AREA + ' left out' : '');
+      var nouns = DIR_SOURCES.filter(function (s) { return counts[s.id]; }).map(function (s) { return s.noun; });
+      var list = nouns.length > 1 ? nouns.slice(0, -1).join(', ') + ' and ' + nouns[nouns.length - 1] : nouns.join('');
+      sub.textContent = 'Search ' + dirRecords.length.toLocaleString() + ' ' + list + ' across ' +
+        phWhere() + ' by name, address or postcode.';
     }
   }
 
@@ -17379,7 +17945,7 @@ var PH_SHOW = {
       '<div class="pop-hdr" style="background:' + rec.colour + '">' + _esc(rec.n) + '</div>' +
       '<div class="pop-body"><div class="pop-addr">' +
       _esc([rec.a, rec.pc].filter(Boolean).join(', ')) + '</div>' +
-      '<div class="pop-row"><span class="pop-key">Type</span><span>' + _esc(rec.label) + '</span></div>' +
+      '<div class="pop-row"><span class="pop-key">Type</span><span>' + _esc(rec.one || rec.label) + '</span></div>' +
       (rec.lad ? '<div class="pop-row"><span class="pop-key">LA</span><span>' +
         _esc(rec.lad) + '</span></div>' : '') + '</div>'
     ).openPopup();
@@ -17396,9 +17962,16 @@ var PH_SHOW = {
     var t = null;
     qEl.addEventListener('input', function () {
       // Debounced: 26,000 records filtered on every keystroke is wasted work,
-      // and the list flickering under the cursor reads as lag.
+      // and the list flickering under the cursor reads as lag. A new search
+      // also ends a list sorted by distance.
       clearTimeout(t);
-      t = setTimeout(function () { dirState.q = qEl.value; renderDirectory(); }, 140);
+      t = setTimeout(function () { dirState.q = qEl.value; dirState.near = null; renderDirectory(); }, 140);
+    });
+    $('dir-count').addEventListener('click', function (e) {
+      if (!e.target.closest('#dir-near-x')) return;
+      dirState.near = null;
+      renderDirectory();
+      qEl.focus();
     });
     $('dir-borough').addEventListener('change', function (e) {
       dirState.borough = e.target.value; renderDirectory();
@@ -17409,13 +17982,26 @@ var PH_SHOW = {
       var id = c.getAttribute('data-dtype');
       dirState.types[id] = !dirState.types[id];
       renderDirControls(); renderDirectory();
-    });
-    typesEl.addEventListener('keydown', function (e) {
-      if ((e.key === 'Enter' || e.key === ' ') && e.target.closest('[data-dtype]')) {
-        e.preventDefault(); e.target.click();
-      }
+      // The chips are drawn again, so the focus goes back to the same one.
+      var again = typesEl.querySelector('[data-dtype="' + id + '"]');
+      if (again) again.focus();
     });
     listEl.addEventListener('click', function (e) {
+      var go = e.target.closest('#dir-near-go');
+      if (go) {
+        var msg = $('dir-offer-msg'), pc = go.getAttribute('data-pc');
+        if (msg) msg.textContent = 'Looking up ' + pc + '...';
+        _lookupPostcode({ kind: 'postcode', text: pc }).then(function (res) {
+          if (!res || !Number.isFinite(res.latitude)) {
+            if (msg) msg.textContent = 'We could not find the postcode ' + pc + ', so please check it.';
+            return;
+          }
+          dirOpenNear({ label: res.postcode || pc, lat: res.latitude, lng: res.longitude, from: 'postcode' });
+        }, function () {
+          if (msg) msg.textContent = 'The postcode lookup could not be reached, so please check your connection and try again.';
+        });
+        return;
+      }
       var row = e.target.closest('[data-i]');
       if (!row) return;
       listEl.querySelectorAll('.dir-item').forEach(function (r) { r.classList.remove('sel'); });
@@ -17898,8 +18484,10 @@ var PH_SHOW = {
     },
     {
       t: 'Directory: find one place',
+      // No count here: the Directory's heading gives the live one, and the
+      // Charities tab says once what the charity count covers.
       n: '<strong>Directory</strong> lists every service and organisation on the map. ' +
-         'That is about 23,000 places across ten sets of data. Search by name, by ' +
+         'Search by name, by ' +
          'address or by postcode. Filter by type or by LA. Click a result and the ' +
          'map marks it. The export button saves what you have filtered.',
       go: function () {
@@ -19468,6 +20056,7 @@ var PH_SHOW = {
     records: function () { return dirRecords; },
     filtered: function () { return dirFiltered; },
     marked: function () { return !!dirMarker; },
+    near: function () { return dirState.near; },
   };
 
   /* ─────────────────────────────────────────────────────────────────────────

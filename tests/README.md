@@ -30,7 +30,15 @@ Compare offers each measure once, and the old names (Soc rent, Boards,
 metric, VCSE, Borough or Local authority as the level) are gone. For the Data
 export it checks the column headings (label, unit and period, and "(LA
 figure)"), the shared decimal places, the groups, the notes file, the folding
-steps, the pinned download bar and the in-panel preview.
+steps, the pinned download bar and the in-panel preview. For charities, the
+Directory and the PCN list it checks that the Directory opens on a search
+prompt under a heading built from the live count, that "E1 6" finds no SE1
+postcodes, that names are in title case and sort past leading punctuation,
+that the Charities tab and the Directory agree on one charity count, the key
+to the charity dots and the ring style of their groups, that the PCN list has
+no placeholder and no "Gp", and that a postcode search lists the nearest GP
+practices, pharmacies and charities in the ward sheet. postcodes.io is
+answered locally in that block, so it needs no network.
 
 ```bash
 npm install --no-save playwright axe-core
