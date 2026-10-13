@@ -217,6 +217,82 @@ const setOv = (page, k) => page.evaluate(k => {
         'the printable report opens with the same "In plain English" summary', JSON.stringify(r).slice(0, 300));
       await rep.close();
     } else ok(false, 'the printable report opens');
+    // The Area profile and the printable reports look finished (workplan 2.6).
+    await page.evaluate(() => showWard('Lansbury'));
+    await page.waitForTimeout(800);
+    const prof = await page.evaluate(() => {
+      const p = document.getElementById('wpanel');
+      const ink = getComputedStyle(document.documentElement).getPropertyValue('--ink').trim();
+      const probe = document.createElement('span'); probe.style.color = ink; document.body.appendChild(probe);
+      const inkRgb = getComputedStyle(probe).color; probe.remove();
+      const sv = [...p.querySelectorAll('.sv')].map(e => getComputedStyle(e));
+      // The heading's words, without its icon and arrow.
+      const heads = [...p.querySelectorAll('h3.cat-h .cat-hdr-l')].map(h => h.lastChild.textContent.trim());
+      const pills = [...p.querySelectorAll('.sr-meta .gpill')].map(e => e.textContent.trim());
+      const health = document.getElementById('pc-health');
+      const visible = el => [...el.querySelectorAll('.sr')].filter(r => getComputedStyle(r).display !== 'none').length;
+      const shownBefore = visible(health), btn = health.querySelector('.sr-all');
+      btn.click();
+      const shownAfter = visible(health), total = health.querySelectorAll('.sr').length;
+      btn.click();
+      const rowsIn = id => [...document.getElementById(id).querySelectorAll('.sr .sl')].map(e => e.firstChild.textContent);
+      return {
+        mono: sv.some(c => /mono/i.test(c.fontFamily)), green: sv.filter(c => c.color !== inkRgb).length,
+        weight: sv.every(c => c.fontWeight === '600'), tnum: sv.every(c => /tabular-nums/.test(c.fontVariantNumeric)),
+        heads, pills: [...new Set(pills)], oldPills: pills.filter(t => /^(ward|lsoa|msoa|oa|LA)$/.test(t)),
+        name: p.querySelector('.wname').textContent, key: p.querySelector('.prof-key').textContent,
+        captions: p.querySelectorAll('.cat-cap').length,
+        shownBefore, shownAfter, total, expanded: btn.getAttribute('aria-expanded'),
+        imd: rowsIn('pc-imd2025'), work: rowsIn('pc-economy'),
+        cols: getComputedStyle(p.querySelector('.keystats')).gridTemplateColumns.split(' ').length,
+        dashes: /[–—]/.test(p.innerText),
+      };
+    });
+    ok(!prof.mono && prof.green === 0 && prof.weight && prof.tnum, 'profile figures are Inter 600, tabular, in the ink colour', JSON.stringify(prof).slice(0, 200));
+    ok(['Health and care', 'People and communities', 'Work, money and education', 'Housing and transport',
+        'Environment and access', 'Crime and safety'].every(h => prof.heads.indexOf(h) !== -1) && !prof.heads.some(h => /&/.test(h)),
+      'profile section headings say "and"', prof.heads.join(' | '));
+    ok(prof.oldPills.length === 0 && ['estimated from MSOAs', 'estimated from LSOAs', 'whole-LA figure'].every(t => prof.pills.indexOf(t) !== -1),
+      'profile marks estimates with worded pills, not level codes', prof.pills.join(', ') + ' / ' + prof.oldPills.join(', '));
+    ok(prof.captions >= 6 && /output areas/.test(prof.key) && !/~/.test(prof.name), 'each section has a caption, the key covers output areas, no "~"', prof.name);
+    ok(prof.shownBefore === 8 && prof.shownAfter === prof.total && prof.total > 10, 'a long section shows eight rows and then all of them',
+      prof.shownBefore + ' then ' + prof.shownAfter + ' of ' + prof.total);
+    ok(prof.imd.indexOf('Deprivation score (IMD 2025)') !== -1 && prof.work.indexOf('Claimant rate, working age') !== -1 &&
+       prof.work.indexOf('Out-of-work benefit claimants') !== -1 && prof.work.indexOf('Unemployment (Census 2021)') !== -1,
+      'profile shows the IMD score, and the claimant rate and unemployment measures under Work', prof.imd.join(', ') + ' / ' + prof.work.join(', '));
+    ok(prof.cols === 2 && !prof.dashes, 'profile key figures two by two, and no dashes in the profile');
+    await checkAxe(page, 'Area profile sections');
+    const [rep2] = await Promise.all([page.waitForEvent('popup', { timeout: 20000 }).catch(() => null), page.click('#ws-pdf')]);
+    if (rep2) {
+      await rep2.waitForFunction(() => !!document.querySelector('.report'), null, { timeout: 30000 }).catch(() => {});
+      const r2 = await rep2.evaluate(() => {
+        const t = document.body.innerText;
+        const blk = [...document.querySelectorAll('.locblock')].find(b => /Parks and green spaces/i.test(b.querySelector('h4').textContent));
+        return {
+          lang: document.documentElement.lang,
+          parks: blk ? [...blk.querySelectorAll('li:not(.more)')].map(l => l.textContent) : [],
+          pcodes: t.match(/\bP\d{1,2}\b/g) || [],
+          counts: [...new Set((t.match(/\b\d[\d,]* (?:[A-Z]\w+ )?wards\b/g) || []).map(m => m.split(' ')[0]))],
+          dashes: (t.match(/[–—]/g) || []).length,
+          png: document.querySelectorAll('.chart-dl-wrap').length && [...document.querySelectorAll('.chart-dl-wrap')].every(w => /SVG/.test(w.textContent) && /PNG/.test(w.textContent)),
+        };
+      });
+      ok(r2.parks.some(p => /Bartlett Park/.test(p)) && r2.parks.every(p => / ha( in all)?$/.test(p)), 'the Lansbury report lists real parks', r2.parks.join(' | '));
+      ok(r2.lang === 'en-GB' && r2.pcodes.length === 0 && r2.counts.length === 1 && r2.dashes === 0,
+        'the report declares en-GB, has no "P95", gives one ward count and no dashes', JSON.stringify(r2));
+      ok(r2.png, 'every report chart offers SVG and PNG');
+      await rep2.close();
+    } else ok(false, 'the Lansbury report opens');
+    // The LSOA profile gives the published decile band rather than "Assessment".
+    const lp = await page.evaluate(async () => {
+      await ensureLsoaImd();
+      showLSOA(LSOA_IMD.features.find(f => f.properties.ward === 'Lansbury'));
+      const t = document.getElementById('wpanel').innerText;
+      return { assess: /Assessment/.test(t), band: /(most|least) deprived LSOAs in England/.test(t),
+        pills: document.querySelectorAll('#wpanel .sr .gpill').length, amp: /&/.test([...document.querySelectorAll('#wpanel h3')].map(h => h.textContent).join(' ')) };
+    });
+    ok(!lp.assess && lp.band && lp.pills === 0 && !lp.amp, 'LSOA profile gives the decile band, no level pills and no "&"', JSON.stringify(lp));
+    await checkAxe(page, 'LSOA profile');
     ok(errors.length === 0, 'no page errors (London desktop)', errors.join(' | '));
     await page.close();
   }
