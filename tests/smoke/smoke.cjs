@@ -43,7 +43,16 @@ async function axeViolations(page) {
   await page.addScriptTag({ content: AXE });
   const r = await page.evaluate(tags => axe.run(document, {
     runOnly: tags, resultTypes: ['violations'] }), AXE_TAGS);
-  return r.violations.map(v => v.id + ' (' + v.nodes.length + ')');
+  // Map markers (GP practices, charities and their groups) sit where the
+  // places are, so they crowd and overlap wherever places do. WCAG 2.2 lets a
+  // target be smaller when the same thing can be done with another control
+  // that is big enough (2.5.8, Equivalent), and every marker's place can be
+  // found in the Directory, the charity list and the search box. So
+  // target-size is not counted for map markers here; it is for everything else.
+  r.violations.forEach(v => {
+    if (v.id === 'target-size') v.nodes = v.nodes.filter(n => !/leaflet-marker-icon/.test(n.html.slice(0, 200)));
+  });
+  return r.violations.filter(v => v.nodes.length).map(v => v.id + ' (' + v.nodes.length + ')');
 }
 async function checkAxe(page, name) {
   const v = await axeViolations(page);
@@ -1106,7 +1115,7 @@ const smallText = page => page.evaluate(() => {
       await page.touchscreen.tap(lg.l + 30, lg.t + lg.h / 2);
       await page.waitForTimeout(700);
       ok(await page.evaluate(() => PH_DRAWER.isOpen() && document.getElementById('tab-overlay').classList.contains('active') &&
-          document.getElementById('ov-info-panel').style.display === 'block' &&
+          !document.getElementById('ov-info-panel').hidden &&
           document.querySelector('#ov-info-panel dl.ic').getBoundingClientRect().height > 100),
         'phone: a tap on the key opens the indicator card');
       await page.evaluate(() => PH_DRAWER.close());
