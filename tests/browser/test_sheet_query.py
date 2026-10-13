@@ -109,13 +109,13 @@ try:
     # ward click does not drag the sidebar onto the ward profile.
     check("a ward click leaves the sidebar where it was",
           not declutter["wardTab"], str(declutter))
-    check("but the profile is filled in, ready for Open profile", declutter["panelFilled"])
+    check("but the profile is filled in, ready for Open full profile", declutter["panelFilled"])
     check("only the first category starts expanded",
           declutter["openCats"] == 1 and declutter["totalCats"] > 2, str(declutter))
 
     d.execute_script("document.getElementById('ws-profile').click();")
     time.sleep(0.8)
-    check("Open profile is the way into the full panel",
+    check("Open full profile is the way into the full panel",
           d.execute_script("return document.getElementById('tab-ward').classList.contains('active')"))
     d.execute_script("""[...document.querySelectorAll('.sb-tab')].find(t=>t.dataset.tab==='layers').click();""")
     time.sleep(0.4)

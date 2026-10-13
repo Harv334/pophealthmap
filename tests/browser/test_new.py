@@ -86,7 +86,7 @@ try:
                    colour: getComputedStyle(v).color };
         }).filter(Boolean);
       }
-      return { imd: rows('IMD'), bad: rows('Bad health'), soc: rows('Soc rent'),
+      return { imd: rows('Average deprivation decile'), bad: rows('Bad or very bad health'), soc: rows('Social renting'),
                legend: document.getElementById('cmp-legend').textContent.trim() };
     """)
     RED, GREEN = "rgb(212, 53, 28)", "rgb(0, 112, 60)"

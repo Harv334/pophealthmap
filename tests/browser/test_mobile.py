@@ -225,11 +225,11 @@ try:
     d.execute_script("document.getElementById('sb-close').click();")
     time.sleep(1)
 
-    # Open profile has to bring the drawer up: switching the tab inside a
+    # Open full profile has to bring the drawer up: switching the tab inside a
     # closed drawer shows a phone nothing at all.
     d.execute_script("document.getElementById('ws-profile').click();")
     time.sleep(1.2)
-    check("Open profile opens the drawer on the Area profile",
+    check("Open full profile opens the drawer on the Area profile",
           d.execute_script("""
             return PH_DRAWER.isOpen()
               && document.getElementById('tab-ward').classList.contains('active')

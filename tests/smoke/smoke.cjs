@@ -106,6 +106,57 @@ const setOv = (page, k) => page.evaluate(k => {
     ok(la.helpIntro === 1 && la.helpFive && !la.helpDash, 'Area level help introduces local authority (LA) once and counts five sizes', JSON.stringify(la));
     ok(la.cardIntro === 1, 'indicator card introduces local authority (LA) once', JSON.stringify(la));
     ok(la.oldNames.length === 0, 'no control names the level Borough or Local authority', la.oldNames.join(', '));
+    // One name for each thing (workplan 2.1): every indicator is named from
+    // IND_NAMES wherever it appears, Compare and Query offer each measure
+    // once, and the renamed controls say what they now say.
+    const names = await page.evaluate(() => {
+      const bad = [];
+      document.querySelectorAll('#ov option').forEach(o => {
+        if (o.value !== 'none' && o.textContent.split(' · ')[0] !== PH_IND.label(o.value)) bad.push('option ' + o.value);
+      });
+      CATS.forEach(c => c.fields.forEach(f => { if (f.l !== PH_IND.label(f.k)) bad.push('CATS ' + f.k); }));
+      const words = [...document.querySelectorAll('[title], [aria-label], [placeholder], option, optgroup, button, label, h1, h2, h3, h4, .sb-lbl, .ov-theme')]
+        .filter(e => !e.closest('#wpanel'))
+        .map(e => [e.getAttribute('title'), e.getAttribute('aria-label'), e.getAttribute('placeholder'), e.getAttribute('label'), e.textContent].filter(Boolean).join(' ')).join(' | ');
+      const heads = [...document.querySelectorAll('h1, h2, h3, h4, .sb-lbl, optgroup, .ov-theme')]
+        .filter(e => !e.closest('#wpanel'))
+        .map(e => (e.getAttribute('label') || '') + ' ' + (e.getAttribute('title') || '') + ' ' + e.textContent)
+        .filter(t => /&/.test(t.replace(/A&E/g, '')));
+      const card = (() => { const d = document.createElement('div'); d.innerHTML = indicatorCardHTML('ft_93250'); return d.textContent; })();
+      return {
+        bad, heads,
+        old: (words.match(/Soc rent|Borough\/council|\bBoards?\b|\b[Mm]etrics?\b|VCSE|Point layers|Top & bottom/g) || []),
+        card: /^Deaths from all causes\s*Official title: Mortality from all causes/.test(card),
+        controls: [document.getElementById('ws-profile').textContent, document.getElementById('ws-pdf').textContent,
+          document.getElementById('sbtab-vcse').textContent, document.querySelector('.mode-btn[data-mode="report"] .ml-short').textContent,
+          document.querySelector('#icb-row .lname').firstChild.textContent.trim()].join(' | '),
+      };
+    });
+    ok(names.bad.length === 0, 'every indicator is named from the one label table', names.bad.slice(0, 5).join(', '));
+    ok(names.old.length === 0, 'no old names (Soc rent, Boards, metric, VCSE, Borough/council)', names.old.join(', '));
+    ok(names.heads.length === 0, 'no heading outside the Area profile uses "&"', names.heads.slice(0, 3).join(' / '));
+    ok(names.card, 'indicator card leads with the display label, then the official title');
+    ok(names.controls === 'Open full profile | Open printable report | Charities | Custom | Integrated care boards (ICBs)',
+      'profile, report, Charities, Custom and ICB names', names.controls);
+    await page.click('.mode-btn[data-mode="compare"]');
+    await page.waitForTimeout(800);
+    const cmp = await page.evaluate(() => {
+      const opts = [...document.querySelectorAll('#cmp-add-metric option')].filter(o => o.value);
+      const vals = opts.map(o => o.value), texts = opts.map(o => o.textContent);
+      return {
+        n: opts.length,
+        twins: vals.filter(k => PH_IND.sameAs(k) && vals.indexOf(PH_IND.sameAs(k)) !== -1),
+        repeats: texts.filter((t, i) => texts.indexOf(t) !== i),
+        chips: [...document.querySelectorAll('#cmp-metrics span.q-chip')].map(c => c.textContent),
+        levels: [...document.querySelectorAll('#cmp-levels .q-chip')].map(c => c.textContent),
+      };
+    });
+    ok(cmp.n > 50 && !cmp.twins.length && !cmp.repeats.length, 'no indicator appears twice in Compare',
+      cmp.n + ' options; twins ' + cmp.twins.join(', ') + '; repeats ' + cmp.repeats.join(', '));
+    ok(cmp.chips.indexOf('Social renting') !== -1 && !cmp.levels.some(l => /board/i.test(l)),
+      'Compare names indicators and ICBs by their one name', cmp.chips.join(', ') + ' / ' + cmp.levels.join(', '));
+    await page.click('.mode-btn[data-mode="explore"]');
+    await page.waitForTimeout(500);
     // A ward clicked opens its sheet.
     await setOv(page, 'crime_rate_per_1000');
     await page.waitForTimeout(2000);
@@ -136,6 +187,14 @@ const setOv = (page, k) => page.evaluate(k => {
       ok(await page.evaluate(() => _activeLevel() === 'oa' && PH_OA.shownCount() === Object.values(OA_INDEX.lads).reduce((a, l) => a + l.count, 0)),
          'every output area drawn at once',
          await page.evaluate(() => _activeLevel() + ' ' + PH_OA.shownCount()));
+      // An output area is titled by its place, with its code beneath.
+      await page.evaluate(() => map.setView([51.494, -0.094], 15));
+      await page.waitForTimeout(1200);
+      const mc = await page.evaluate(() => { const r = document.getElementById('map').getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; });
+      await page.mouse.move(mc[0], mc[1]); await page.mouse.move(mc[0] + 3, mc[1] + 2);
+      await page.waitForTimeout(700);
+      const tip = await page.evaluate(() => [...document.querySelectorAll('.leaflet-tooltip')].map(t => t.innerText).join(' | '));
+      ok(/Small area in .+ ward, .+\nOutput area E00\d+/.test(tip), 'output area card names its place, with the code beneath', tip);
       await checkAxe(page, 'output areas');
       await setOv(page, 'imd_decile');
       await page.waitForTimeout(1500);
