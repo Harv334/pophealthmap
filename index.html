@@ -2484,7 +2484,7 @@
                is the larger geography, and because an NHS reader usually
                knows their ICB before they know which borough they are
                looking at. -->
-          <label class="lrow" id="icb-row"><div style="width:9px;height:9px;border:2px solid #8E44AD;border-radius:2px;flex-shrink:0"></div><span class="lname">ICB regions <span class="lcount" id="icb-count"></span><span class="lhelp" title="Integrated Care Boards. London has four, and each one covers whole boroughs: West and North, North East, South East and South West. Switch this on and click a region to zoom to it.">?</span></span><input type="checkbox" id="ticb"></label>
+          <label class="lrow" id="icb-row"><div style="width:9px;height:9px;border:2px solid #8E44AD;border-radius:2px;flex-shrink:0"></div><span class="lname">ICB regions <span class="lcount" id="icb-count"></span><span class="lhelp" title="Integrated Care Boards. London has four (West and North, North East, South East and South West), and each one is made up of whole local authorities (LAs). Switch this on and click a region to zoom to it.">?</span></span><input type="checkbox" id="ticb"></label>
           <!-- Its own control, under the layer it belongs to, rather than a
                group inside the borough dropdown. A board and a borough are two
                different sizes of thing, and one list offering both made the
@@ -2506,9 +2506,9 @@
               <div class="pcn-info" id="pcn-info" hidden></div>
             </div>
           </div>
-          <label class="lrow"><div style="width:9px;height:9px;border:2px solid #1a1a1a;border-radius:2px;flex-shrink:0"></div><span class="lname" id="tb-name">London boroughs</span><input type="checkbox" id="tb"></label>
+          <label class="lrow"><div style="width:9px;height:9px;border:2px solid #1a1a1a;border-radius:2px;flex-shrink:0"></div><span class="lname" id="tb-name">LA boundaries</span><input type="checkbox" id="tb"></label>
           <div style="margin:4px 0 8px 0">
-            <div style="font-size:var(--t-xs);color:var(--ink-2);margin-bottom:3px" id="borough-focus-label">Focus by borough</div>
+            <div style="font-size:var(--t-xs);color:var(--ink-2);margin-bottom:3px" id="borough-focus-label">Focus by LA</div>
             <select id="borough-focus" aria-labelledby="borough-focus-label" style="width:100%;padding:4px 6px;border:1px solid var(--line);border-radius:5px;font-size:var(--t-xs);color:var(--ink);background:var(--paper)">
               <option value="all">All London</option>
             </select>
@@ -2567,7 +2567,7 @@
                  map covered eight, so the other 25 could not be picked at all.
                  See initVcseBoroughs. -->
             <option value="all" selected>All London</option>
-            <optgroup label="── Borough ──" id="vcse-borough-group"></optgroup>
+            <optgroup label="── LA ──" id="vcse-borough-group"></optgroup>
             </select>
           <input type="text" id="vcse-search" placeholder="Search organisations...">
         </div>
@@ -2665,24 +2665,24 @@
               <option value="census_disability_any_pct">Disability (any) % · Output area</option>
               <option value="census_disability_lot_pct">Disability (limited a lot) % · Output area</option>
               <option value="census_provides_unpaid_care_pct">Provides unpaid care % · Output area</option>
-              <option value="ft_a_e_attendance_under_5">A&E attendances, ages 0 to 4 · Borough/council</option>
-              <option value="ft_cervical_screening_25_49">Cancer screening coverage: cervical (25 to 49) · Borough/council</option>
-              <option value="ft_child_poverty_low_income">Children in relative low income families (under 16) · Borough/council</option>
-              <option value="ft_depression_qof">Depression: QOF prevalence · Borough/council</option>
-              <option value="ft_flu_vaccination_65plus">Vaccination coverage: flu (65 and over) · Borough/council</option>
-              <option value="ft_healthy_life_expectancy_female">Healthy life expectancy at birth (female) · Borough/council</option>
-              <option value="ft_healthy_life_expectancy_male">Healthy life expectancy at birth (male) · Borough/council</option>
-              <option value="ft_hypertension_qof">Hypertension: QOF prevalence · Borough/council</option>
-              <option value="ft_life_expectancy_female">Life expectancy at birth (female) · Borough/council</option>
-              <option value="ft_life_expectancy_male">Life expectancy at birth (male) · Borough/council</option>
-              <option value="ft_mental_health_qof">Mental health: QOF prevalence · Borough/council</option>
-              <option value="ft_mmr_2_doses_age5">Vaccination coverage: MMR two doses at 5 years · Borough/council</option>
-              <option value="ft_obesity_adults">Overweight including obesity prevalence in adults · Borough/council</option>
-              <option value="ft_obesity_year6">Year 6 obesity, including severe obesity · Borough/council</option>
-              <option value="ft_physical_activity_adults">Physically active adults · Borough/council</option>
-              <option value="ft_self_harm_admissions_10_24">Hospital admissions for self-harm (10 to 24) · Borough/council</option>
-              <option value="ft_smoking_prevalence_adults">Smoking prevalence in adults (18+), current smokers · Borough/council</option>
-              <option value="ft_suicide_rate">Suicide rate · Borough/council</option>
+              <option value="ft_a_e_attendance_under_5">A&E attendances, ages 0 to 4 · LA</option>
+              <option value="ft_cervical_screening_25_49">Cancer screening coverage: cervical (25 to 49) · LA</option>
+              <option value="ft_child_poverty_low_income">Children in relative low income families (under 16) · LA</option>
+              <option value="ft_depression_qof">Depression: QOF prevalence · LA</option>
+              <option value="ft_flu_vaccination_65plus">Vaccination coverage: flu (65 and over) · LA</option>
+              <option value="ft_healthy_life_expectancy_female">Healthy life expectancy at birth (female) · LA</option>
+              <option value="ft_healthy_life_expectancy_male">Healthy life expectancy at birth (male) · LA</option>
+              <option value="ft_hypertension_qof">Hypertension: QOF prevalence · LA</option>
+              <option value="ft_life_expectancy_female">Life expectancy at birth (female) · LA</option>
+              <option value="ft_life_expectancy_male">Life expectancy at birth (male) · LA</option>
+              <option value="ft_mental_health_qof">Mental health: QOF prevalence · LA</option>
+              <option value="ft_mmr_2_doses_age5">Vaccination coverage: MMR two doses at 5 years · LA</option>
+              <option value="ft_obesity_adults">Overweight including obesity prevalence in adults · LA</option>
+              <option value="ft_obesity_year6">Year 6 obesity, including severe obesity · LA</option>
+              <option value="ft_physical_activity_adults">Physically active adults · LA</option>
+              <option value="ft_self_harm_admissions_10_24">Hospital admissions for self-harm (10 to 24) · LA</option>
+              <option value="ft_smoking_prevalence_adults">Smoking prevalence in adults (18+), current smokers · LA</option>
+              <option value="ft_suicide_rate">Suicide rate · LA</option>
               <option value="ft_93465">Alcohol-related conditions: admission episodes (all primary and secondary diagnoses) · MSOA</option>
               <option value="ft_93233">Chronic obstructive pulmonary disease (COPD): emergency hospital admissions · MSOA</option>
               <option value="ft_93229">Coronary heart disease: emergency hospital admissions · MSOA</option>
@@ -2911,13 +2911,13 @@
             <button type="button" data-lvl="ward" class="on">Wards</button>
             <button type="button" data-lvl="lsoa">LSOAs</button>
             <button type="button" data-lvl="msoa">MSOAs</button>
-            <button type="button" data-lvl="borough">Boroughs</button>
+            <button type="button" data-lvl="borough">LAs</button>
           </div>
         </div>
 
         <div class="cb-step">
           <h3><span class="cb-n">2</span>Where?</h3>
-          <div class="cb-help">Choose all of London, one ICB, or one borough.</div>
+          <div class="cb-help">Choose all of London, one ICB, or one LA.</div>
           <select class="q-f" id="cb-scope" aria-label="Which places to include">
             <option value="">All of London</option>
           </select>
@@ -2954,7 +2954,7 @@
           <input type="search" class="dir-search" id="dir-q" autocomplete="off"
                  placeholder="Search by name, address or postcode" aria-label="Search the directory">
           <div class="dir-row2">
-            <select class="q-f" id="dir-borough" aria-label="Where: all of London, an ICB, or a borough"><option value="">All of London</option></select>
+            <select class="q-f" id="dir-borough" aria-label="Where: all of London, an ICB, or an LA"><option value="">All of London</option></select>
             <button type="button" class="ws-btn" id="dir-csv">CSV</button>
           </div>
           <div class="dir-types" id="dir-types"></div>
@@ -3043,7 +3043,7 @@
             <div class="q-sentence" id="q-services"></div>
 
             <div class="q-step" style="margin-top:12px"><span class="q-step-n">2</span>Where should it be?</div>
-            <div class="q-hint" id="q-scope-hint">One borough, or all 33.</div>
+            <div class="q-hint" id="q-scope-hint">One LA, or all 33.</div>
             <div class="q-sentence" id="q-scope"></div>
 
             <div class="q-step" style="margin-top:12px"><span class="q-step-n">3</span>Which figures must it meet?</div>
@@ -3170,13 +3170,13 @@
              there is no room for it and it becomes that dot instead. -->
         <button type="button" class="lhelp dl-help" id="dl-help"
                 aria-label="What these area levels mean" aria-expanded="false"
-                title="The four sizes of area this map can colour. Borough is one of the 33 London local authorities. Ward is the electoral area a borough divides into, and London has 704. MSOA means Middle Layer Super Output Area, a statistical area of about 7,500 people, and London has 1,002. LSOA means Lower Layer Super Output Area, the smallest here, about 1,500 people, and London has 4,994. Wards sit inside boroughs, but MSOAs and LSOAs do not, so a ward is not a whole number of either. An indicator is only offered at the level it is published for."><span class="dl-help-word">Area level</span><span class="dl-help-mark" aria-hidden="true">?</span></button>
+                title="The map can colour five sizes of area. The largest is the local authority (LA), the area run by one council, and London has 33 of them: the 32 boroughs and the City of London. These are divided into 704 wards, which are the areas councillors are elected for. MSOAs, of about 7,500 people, and LSOAs, of about 1,500 people, are statistical areas that fit inside LAs but do not follow ward boundaries. Output areas, of about 125 households, are the smallest and carry Census figures only. Each indicator opens at a level it is published for, and you can switch to any other level that has figures for it."><span class="dl-help-word">Area level</span><span class="dl-help-mark" aria-hidden="true">?</span></button>
         <div class="dl-seg" id="dl-seg">
-          <button type="button" data-dl="borough" title="Local authority level: each council coloured by its figure, worked out from its wards (counts added up, rates weighted by population).">Local authority</button>
+          <button type="button" data-dl="borough" title="Colour the map by local authority (LA), the area run by one council. Where an indicator is not published for LAs, each LA's figure is worked out from its wards by adding up counts and weighting rates by population.">LA</button>
           <button type="button" data-dl="ward" class="active" title="Ward-level data (704 wards)">Ward</button>
           <button type="button" data-dl="msoa" title="MSOA level. MSOAs sit between wards and LSOAs and do not nest into wards. The Local Health indicators are published at this level, so they shade here; anything published elsewhere draws the boundaries only.">MSOA</button>
           <button type="button" data-dl="lsoa" title="LSOA-level data (4,994 LSOAs, the most detailed level here)">LSOA</button>
-          <button type="button" data-dl="oa" hidden title="Output areas: the smallest census areas, about 125 households each. Census indicators only, shown for the councils in view once you zoom in or choose a local authority.">OA</button>
+          <button type="button" data-dl="oa" hidden title="Output areas are the smallest Census areas, of about 125 households each, and carry Census figures only.">OA</button>
         </div>
         <div class="dl-hint" id="dl-hint"></div>
       </div>
@@ -3653,16 +3653,16 @@ function dataUrl(path) {
 // hidden outside London instead.
 const PH_IS_LONDON = !window.PH_REGION || window.PH_REGION.isLondon;
 const PH_AREA = (window.PH_REGION && window.PH_REGION.name) || 'London';
-// "London borough(s)" in London; elsewhere the area is a mix of unitary,
-// metropolitan and county authorities, so the neutral name.
+// The level's name wherever a sentence counts them. "LA" in every region,
+// London included: one name for the level everywhere, introduced as "local
+// authority (LA)" where the levels are explained.
 function ladNoun(n) {
-  if (PH_IS_LONDON) return n === 1 ? 'London borough' : 'London boroughs';
-  return n === 1 ? 'local authority' : 'local authorities';
+  return n === 1 ? 'LA' : 'LAs';
 }
 // The aria-label every "where" picker carries.
 const PH_WHERE_ARIA = PH_IS_LONDON
-  ? 'Where: all of London, an ICB, or a borough'
-  : 'Where: all of ' + PH_AREA + ', or one local authority';
+  ? 'Where: all of London, an ICB, or an LA'
+  : 'Where: all of ' + PH_AREA + ', or one LA';
 
 /* The region picker, and the static wording a region build has to change.
    London's markup already says the right thing, so for London this only
@@ -3706,8 +3706,8 @@ const PH_WHERE_ARIA = PH_IS_LONDON
   // The tour visits named London wards.
   hide('sbar-tour');
 
-  setText('tb-name', 'Local authorities');
-  setText('borough-focus-label', 'Focus by local authority');
+  setText('tb-name', 'LA boundaries');
+  setText('borough-focus-label', 'Focus by LA');
   const firstOpt = (id, t) => {
     const s = $(id);
     if (s && s.options.length) s.options[0].textContent = t;
@@ -3719,21 +3719,31 @@ const PH_WHERE_ARIA = PH_IS_LONDON
   setAttr('dir-borough', 'aria-label', PH_WHERE_ARIA);
   const cbh = document.querySelector('#cb-scope') && document.querySelector('#cb-scope').previousElementSibling;
   if (cbh && cbh.classList.contains('cb-help')) {
-    cbh.textContent = 'Choose all of ' + R.name + ', or one local authority.';
+    cbh.textContent = 'Choose all of ' + R.name + ', or one LA.';
   }
   setText('vs-digest', 'All of ' + R.name);
-  setText('q-scope-hint', 'One local authority, or all ' + (nLads || '') + '.');
+  setText('q-scope-hint', nLads ? 'One LA, or all ' + nLads + '.' : 'One LA, or all of them.');
   setAttr('map', 'aria-label', 'Map of ' + R.name + '. Wards are shaded by the selected indicator.');
   if (nWards) setText('ward-count', nWards.toLocaleString());
-  setAttr('dl-help', 'title',
-    'The four sizes of area this map can colour. Borough is one of the ' +
-    (nLads ? nLads + ' ' : '') + 'local authorities in ' + R.name + '. Ward is the ' +
-    'electoral area an authority divides into' + (nWards ? ', and ' + R.name + ' has ' +
-    nWards.toLocaleString() : '') + '. MSOA means Middle Layer Super Output Area, a ' +
-    'statistical area of about 7,500 people. LSOA means Lower Layer Super Output Area, ' +
-    'the smallest here, about 1,500 people. Wards sit inside local authorities, but ' +
-    'MSOAs and LSOAs do not, so a ward is not a whole number of either. An indicator ' +
-    'is only offered at the level it is published for.');
+  // Four sizes of area, or five once this region's output areas arrive (the
+  // OA button is unhidden then, and ph-levels-changed fires).
+  const levelHelp = () => {
+    const ob = document.querySelector('#dl-seg button[data-dl="oa"]');
+    const oa = !!(ob && !ob.hidden);
+    setAttr('dl-help', 'title',
+      'The map can colour ' + (oa ? 'five' : 'four') + ' sizes of area. The largest is the ' +
+      'local authority (LA), the area run by one council' +
+      (nLads ? ', and this map has ' + nLads + ' of them' : '') + '. These are divided into ' +
+      (nWards ? nWards.toLocaleString() + ' ' : '') + 'wards, which are the areas councillors ' +
+      'are elected for. MSOAs, of about 7,500 people, and LSOAs, ' +
+      (oa ? 'of about 1,500 people' : 'the smallest here at about 1,500 people') +
+      ', are statistical areas that fit inside LAs but do not follow ward boundaries.' +
+      (oa ? ' Output areas, of about 125 households, are the smallest and carry Census figures only.' : '') +
+      ' Each indicator opens at a level it is published for, and you can switch to any other ' +
+      'level that has figures for it.');
+  };
+  levelHelp();
+  document.addEventListener('ph-levels-changed', levelHelp);
   const dlb = s => document.querySelector('#dl-seg button[data-dl="' + s + '"]');
   if (dlb('ward') && nWards) dlb('ward').title = 'Ward-level data (' + nWards.toLocaleString() + ' wards)';
   if (dlb('lsoa')) dlb('lsoa').title = 'LSOA-level data (the most detailed level here)';
@@ -4352,24 +4362,24 @@ const OV_META = {
   crime_vehicle_12mo:             { src: "data.police.uk street-level crime", yr: "Aug 2025 to Jul 2026", g: "Ward, counted from point data", u: "crimes", desc: "Vehicle Offences (theft of/from vehicle, aggravated taking, interference) over 12 months." },
   crime_violence_12mo:            { src: "data.police.uk street-level crime", yr: "Aug 2025 to Jul 2026", g: "Ward, counted from point data", u: "crimes", desc: "Violence Against the Person (homicide, violence with/without injury) over 12 months." },
   crime_asb_12mo:                 { src: "data.police.uk street-level crime", yr: "Aug 2025 to Jul 2026", g: "Ward, counted from point data", u: "crimes", desc: "Reported anti-social behaviour, the largest single category in the street-level data." },
-  ft_a_e_attendance_under_5: { src: "OHID Fingertips", yr: "2024/25", g: "Borough, upper-tier local authority", u: "per 1,000", desc: "A&E attendances, ages 0 to 4. Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
-  ft_cervical_screening_25_49: { src: "OHID Fingertips", yr: "2024", g: "Borough, upper-tier local authority", u: "%", desc: "Cancer screening coverage: cervical (25 to 49). Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
-  ft_child_poverty_low_income: { src: "OHID Fingertips", yr: "2024/25", g: "Borough, upper-tier local authority", u: "%", desc: "Children in relative low income families (under 16). Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
-  ft_depression_qof: { src: "OHID Fingertips", yr: "2024/25", g: "Borough, upper-tier local authority", u: "%", desc: "Depression: QOF prevalence. Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
-  ft_flu_vaccination_65plus: { src: "OHID Fingertips", yr: "2024/25", g: "Borough, upper-tier local authority", u: "%", desc: "Vaccination coverage: flu (65 and over). Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
-  ft_healthy_life_expectancy_female: { src: "OHID Fingertips", yr: "2022 - 24", g: "Borough, upper-tier local authority", u: "years", desc: "Healthy life expectancy at birth (female). Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
-  ft_healthy_life_expectancy_male: { src: "OHID Fingertips", yr: "2022 - 24", g: "Borough, upper-tier local authority", u: "years", desc: "Healthy life expectancy at birth (male). Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
-  ft_hypertension_qof: { src: "OHID Fingertips", yr: "2024/25", g: "Borough, upper-tier local authority", u: "%", desc: "Hypertension: QOF prevalence. Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
-  ft_life_expectancy_female: { src: "OHID Fingertips", yr: "2025", g: "Borough, upper-tier local authority", u: "years", desc: "Life expectancy at birth (female). Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
-  ft_life_expectancy_male: { src: "OHID Fingertips", yr: "2025", g: "Borough, upper-tier local authority", u: "years", desc: "Life expectancy at birth (male). Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
-  ft_mental_health_qof: { src: "OHID Fingertips", yr: "2024/25", g: "Borough, upper-tier local authority", u: "%", desc: "Mental health: QOF prevalence. Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
-  ft_mmr_2_doses_age5: { src: "OHID Fingertips", yr: "2024/25", g: "Borough, upper-tier local authority", u: "%", desc: "Vaccination coverage: MMR two doses at 5 years. Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
-  ft_obesity_adults: { src: "OHID Fingertips", yr: "2024/25", g: "Borough, upper-tier local authority", u: "%", desc: "Overweight including obesity prevalence in adults. Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
-  ft_obesity_year6: { src: "OHID Fingertips", yr: "2024/25", g: "Borough, upper-tier local authority", u: "%", desc: "Year 6 obesity, including severe obesity. Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
-  ft_physical_activity_adults: { src: "OHID Fingertips", yr: "2024/25", g: "Borough, upper-tier local authority", u: "%", desc: "Physically active adults. Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
-  ft_self_harm_admissions_10_24: { src: "OHID Fingertips", yr: "2023/24", g: "Borough, upper-tier local authority", u: "per 100,000", desc: "Hospital admissions for self-harm (10 to 24). Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
-  ft_smoking_prevalence_adults: { src: "OHID Fingertips", yr: "2024", g: "Borough, upper-tier local authority", u: "%", desc: "Smoking prevalence in adults (18+), current smokers. Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
-  ft_suicide_rate: { src: "OHID Fingertips", yr: "2022 - 24", g: "Borough, upper-tier local authority", u: "per 100,000", desc: "Suicide rate. Published for the whole borough, so every ward in it carries the same figure and it cannot separate one ward from another." },
+  ft_a_e_attendance_under_5: { src: "OHID Fingertips", yr: "2024/25", g: "LA (upper tier)", u: "per 1,000", desc: "A&E attendances, ages 0 to 4. Published for the whole local authority (LA), so every ward in it carries the same figure and it cannot separate one ward from another." },
+  ft_cervical_screening_25_49: { src: "OHID Fingertips", yr: "2024", g: "LA (upper tier)", u: "%", desc: "Cancer screening coverage: cervical (25 to 49). Published for the whole local authority (LA), so every ward in it carries the same figure and it cannot separate one ward from another." },
+  ft_child_poverty_low_income: { src: "OHID Fingertips", yr: "2024/25", g: "LA (upper tier)", u: "%", desc: "Children in relative low income families (under 16). Published for the whole local authority (LA), so every ward in it carries the same figure and it cannot separate one ward from another." },
+  ft_depression_qof: { src: "OHID Fingertips", yr: "2024/25", g: "LA (upper tier)", u: "%", desc: "Depression: QOF prevalence. Published for the whole local authority (LA), so every ward in it carries the same figure and it cannot separate one ward from another." },
+  ft_flu_vaccination_65plus: { src: "OHID Fingertips", yr: "2024/25", g: "LA (upper tier)", u: "%", desc: "Vaccination coverage: flu (65 and over). Published for the whole local authority (LA), so every ward in it carries the same figure and it cannot separate one ward from another." },
+  ft_healthy_life_expectancy_female: { src: "OHID Fingertips", yr: "2022 - 24", g: "LA (upper tier)", u: "years", desc: "Healthy life expectancy at birth (female). Published for the whole local authority (LA), so every ward in it carries the same figure and it cannot separate one ward from another." },
+  ft_healthy_life_expectancy_male: { src: "OHID Fingertips", yr: "2022 - 24", g: "LA (upper tier)", u: "years", desc: "Healthy life expectancy at birth (male). Published for the whole local authority (LA), so every ward in it carries the same figure and it cannot separate one ward from another." },
+  ft_hypertension_qof: { src: "OHID Fingertips", yr: "2024/25", g: "LA (upper tier)", u: "%", desc: "Hypertension: QOF prevalence. Published for the whole local authority (LA), so every ward in it carries the same figure and it cannot separate one ward from another." },
+  ft_life_expectancy_female: { src: "OHID Fingertips", yr: "2025", g: "LA (upper tier)", u: "years", desc: "Life expectancy at birth (female). Published for the whole local authority (LA), so every ward in it carries the same figure and it cannot separate one ward from another." },
+  ft_life_expectancy_male: { src: "OHID Fingertips", yr: "2025", g: "LA (upper tier)", u: "years", desc: "Life expectancy at birth (male). Published for the whole local authority (LA), so every ward in it carries the same figure and it cannot separate one ward from another." },
+  ft_mental_health_qof: { src: "OHID Fingertips", yr: "2024/25", g: "LA (upper tier)", u: "%", desc: "Mental health: QOF prevalence. Published for the whole local authority (LA), so every ward in it carries the same figure and it cannot separate one ward from another." },
+  ft_mmr_2_doses_age5: { src: "OHID Fingertips", yr: "2024/25", g: "LA (upper tier)", u: "%", desc: "Vaccination coverage: MMR two doses at 5 years. Published for the whole local authority (LA), so every ward in it carries the same figure and it cannot separate one ward from another." },
+  ft_obesity_adults: { src: "OHID Fingertips", yr: "2024/25", g: "LA (upper tier)", u: "%", desc: "Overweight including obesity prevalence in adults. Published for the whole local authority (LA), so every ward in it carries the same figure and it cannot separate one ward from another." },
+  ft_obesity_year6: { src: "OHID Fingertips", yr: "2024/25", g: "LA (upper tier)", u: "%", desc: "Year 6 obesity, including severe obesity. Published for the whole local authority (LA), so every ward in it carries the same figure and it cannot separate one ward from another." },
+  ft_physical_activity_adults: { src: "OHID Fingertips", yr: "2024/25", g: "LA (upper tier)", u: "%", desc: "Physically active adults. Published for the whole local authority (LA), so every ward in it carries the same figure and it cannot separate one ward from another." },
+  ft_self_harm_admissions_10_24: { src: "OHID Fingertips", yr: "2023/24", g: "LA (upper tier)", u: "per 100,000", desc: "Hospital admissions for self-harm (10 to 24). Published for the whole local authority (LA), so every ward in it carries the same figure and it cannot separate one ward from another." },
+  ft_smoking_prevalence_adults: { src: "OHID Fingertips", yr: "2024", g: "LA (upper tier)", u: "%", desc: "Smoking prevalence in adults (18+), current smokers. Published for the whole local authority (LA), so every ward in it carries the same figure and it cannot separate one ward from another." },
+  ft_suicide_rate: { src: "OHID Fingertips", yr: "2022 - 24", g: "LA (upper tier)", u: "per 100,000", desc: "Suicide rate. Published for the whole local authority (LA), so every ward in it carries the same figure and it cannot separate one ward from another." },
   core20_lsoa_count:              { src: "NHSE Core20PLUS5",     yr: "2025", g: "Ward", u: "LSOAs",  desc: "Count of LSOAs in the ward falling in the national IMD-decile 1–2 (Core20)." },
   claimant_rate_pct:              { src: "NOMIS CLA01",          yr: "August 2026", g: "Ward/LSOA", u: "%", desc: "Claimant count rate (UC + JSA) as % of working-age population." },
 
@@ -4393,7 +4403,7 @@ const OV_META = {
   // unit: "Better (6.8 0–8)". The scale belongs in the label and the
   // description, where it already is.
   ptal_score:                     { src: "GLA LSOA Atlas (TfL PTAL)", yr: "2014", g: "LSOA", u: "", desc: "Public Transport Accessibility Level, averaged over the LSOA. The nine bands 0, 1a, 1b, 2–5, 6a, 6b map onto 0–8, where 8 (6b) is the best connected. Higher is better. TfL's most recent published LSOA banding." },
-  rail_station_dist_m:            { src: "TfL Unified API (London); DfT NaPTAN (elsewhere)",      yr: "as at Sep 2026", g: "LSOA", u: "m", desc: "Straight-line distance from the LSOA centroid to the nearest rail, metro, tram or (in London) Tube, DLR, Overground or Elizabeth line station. Straight line, not walking route, so a real walk is longer wherever a river, railway or park is in the way. Stations just outside London are counted, because for an outer-borough LSOA the nearest one often is." },
+  rail_station_dist_m:            { src: "TfL Unified API (London); DfT NaPTAN (elsewhere)",      yr: "as at Sep 2026", g: "LSOA", u: "m", desc: "Straight-line distance from the LSOA centroid to the nearest rail, metro, tram or (in London) Tube, DLR, Overground or Elizabeth line station. Straight line, not walking route, so a real walk is longer wherever a river, railway or park is in the way. Stations just outside London are counted, because for an LSOA in outer London the nearest one often is." },
   rail_stations_1km:              { src: "TfL Unified API (London); DfT NaPTAN (elsewhere)",      yr: "as at Sep 2026", g: "LSOA", u: "stations", desc: "Stations of any rail mode within 1 km of the LSOA centroid. At ward level this is the population-weighted mean of its LSOAs, not a sum: one station is within 1 km of several LSOAs and summing would count it repeatedly." },
   bus_stop_dist_m:                { src: "TfL Unified API (London); DfT NaPTAN (elsewhere)",      yr: "as at Sep 2026", g: "LSOA", u: "m", desc: "Straight-line distance from the LSOA centroid to the nearest bus stop. Both sides of a road count as separate stops, which is how TfL and NaPTAN register them." },
   bus_stops_800m:                 { src: "TfL Unified API (London); DfT NaPTAN (elsewhere)",      yr: "as at Sep 2026", g: "LSOA", u: "stops", desc: "Bus stops within 800 m of the LSOA centroid, roughly a ten-minute walk. Population-weighted mean at ward level, for the same reason as the station count." },
@@ -4888,7 +4898,7 @@ function scopeOptionsHtml(selected, esc) {
     lads = [...new Set(GJ.features.map(f => (f.properties || {}).LAD).filter(Boolean))].sort();
   }
   if (lads.length) {
-    html += '<optgroup label="' + (PH_IS_LONDON ? 'Boroughs' : 'Local authorities') + '">';
+    html += '<optgroup label="LAs">';
     lads.forEach(function (b) {
       html += '<option value="' + e(b) + '"' + (b === selected ? ' selected' : '') + '>' +
               e(b) + '</option>';
@@ -5105,7 +5115,7 @@ function ovVsHTML(code) {
     VS_ENGLAND_TEXT[code] + (code === 'S' ? '' : ', statistically') + '</span>';
 }
 const _ctxCache = {};
-const _LEVEL_PLURAL = { ward: 'wards', lsoa: 'LSOAs', msoa: 'MSOAs', borough: 'local authorities' };
+const _LEVEL_PLURAL = { ward: 'wards', lsoa: 'LSOAs', msoa: 'MSOAs', borough: 'LAs' };
 function ovContext(level, k, v) {
   const n = parseFloat(v);
   if (isNaN(n) || typeof _bivIds !== 'function') return '';
@@ -5304,10 +5314,15 @@ function indicatorCardHTML(k) {
   const nat = (typeof ovNativeLevel === 'function') ? ovNativeLevel(k) : '';
   const lv = (typeof ovLevels === 'function') ? ovLevels(k) : [];
   const LADDER = ['borough', 'ward', 'msoa', 'lsoa', 'oa'];
-  const nm = l => ({ borough: 'Local authority', ward: 'Ward', msoa: 'MSOA', lsoa: 'LSOA', oa: 'Output area' })[l] || l;
+  const nm = l => ({ borough: 'LA', ward: 'Ward', msoa: 'MSOA', lsoa: 'LSOA', oa: 'Output area' })[l] || l;
+  // The card may be where a reader first meets the level, so its first
+  // mention says "local authority (LA)" and every later one says LA.
+  let laSaid = /\bLA\b/.test(m.desc || '');
+  const laFirst = () => { const t = laSaid ? 'LA' : 'local authority (LA)'; laSaid = true; return t; };
+  const natName = nat === 'borough' ? laFirst().replace(/^l/, 'L') : nm(nat);
   const others = lv.filter(l => l !== nat);
   const how = others.map(l =>
-    l === 'borough' ? 'local authority figures add counts up and weight rates by population'
+    l === 'borough' ? laFirst() + ' figures add up counts and weight rates by population'
     : (nat === 'oa' && (l === 'lsoa' || l === 'msoa')) ? nm(l) + ' figures are also published by ONS, for whole groups of output areas'
     : (nat === 'oa' && l === 'ward') ? 'ward figures are built from output areas through the ONS best-fit lookup'
     : l === 'oa' ? 'output area figures are published by ONS for each output area (Census 2021)'
@@ -5319,7 +5334,7 @@ function indicatorCardHTML(k) {
     '<dl class="ic">' +
     row('Counted', e(f.num)) +
     row('Out of', e(f.den)) +
-    row('Published at', nat ? '<span class="ov-lv-nat">' + e(nm(nat)) + '</span>' +
+    row('Published at', nat ? '<span class="ov-lv-nat">' + e(natName) + '</span>' +
       (how ? ' <span class="ic-sub">' + e(how.charAt(0).toUpperCase() + how.slice(1)) + '.</span>' : '') : '') +
     row('Period', e(m.yr) + (ovAgeNote(k) ? ' <span class="ov-old">(' + e(ovAgeNote(k).replace(/^Figures end in \d+, /, '')) + ')</span>' : '')) +
     row('Caution', ovCaution(k) ? '<span class="ov-old">' + e(ovCaution(k)) + '</span>' : '') +
@@ -7237,8 +7252,8 @@ function showWard(wn) {
     if (val === null || val === undefined || val === '') return '';
     const isNum = !isNaN(parseFloat(val));
     const display = isNum ? parseFloat(val).toLocaleString(undefined, {maximumFractionDigits:1}) : val;
-    // 'la' for a borough series, the word the key at the foot of the panel uses.
-    const pill = f.g === 'borough' ? 'la' : f.g;
+    // 'LA' for a borough series, the word the key at the foot of the panel uses.
+    const pill = f.g === 'borough' ? 'LA' : f.g;
     let per = '', unit = '';
     if (f.k.startsWith('ft_')) {
       per = ovPeriodOf(f.k);
@@ -7269,9 +7284,9 @@ function showWard(wn) {
           ? ' Admissions and mortality are standardised ratios, where England = 100.' : ''}</div>
       ${msoaRows}` : '';
     const ctxRows = cat.fields.filter(f => f.g === 'borough').map(profRow).filter(Boolean).join('');
-    const bor = wdata.lad || 'the borough';
+    const bor = wdata.lad || 'the LA';
     const ctx = ctxRows ? `<div class="sr-ctx">
-      <div class="sr-sub">Borough context${wdata.lad ? ': ' + wdata.lad : ''}</div>
+      <div class="sr-sub">LA figures${wdata.lad ? ' for ' + wdata.lad : ''}</div>
       <div class="sr-sub-note">These figures are for the whole of ${bor}. Every ward in it shows the same values, so they cannot tell this ward apart from its neighbours.</div>
       ${ctxRows}</div>` : '';
     const rows = ownRows + msoa + ctx;
@@ -7328,7 +7343,7 @@ function showWard(wn) {
       <span class="gpill gpill-ward">ward</span> = ward level &nbsp;
       <span class="gpill gpill-lsoa">lsoa</span> = LSOA data, population-weighted to this ward &nbsp;
       <span class="gpill gpill-msoa">msoa</span> = MSOA (approximate) &nbsp;
-      <span class="gpill gpill-la">la</span> = borough level<br>
+      <span class="gpill gpill-la">LA</span> = local authority level<br>
       Crime data: police.uk · Claimants: DWP · Health: OHID Fingertips
     </div>`;
 }
@@ -8784,8 +8799,7 @@ function _applyBoroughSolo() {
   // Outside London the lookup is the region's own (built from ONS's council to
   // ICB lookup by build_icb_boundaries.py --region), and the controls initRegionUi
   // hid come back once it has loaded.
-  const unit = n => PH_IS_LONDON ? (n === 1 ? 'borough' : 'boroughs')
-                                 : (n === 1 ? 'council' : 'councils');
+  const unit = n => (n === 1 ? 'LA' : 'LAs');
 
   fetch(dataUrl('data/map/icb_lookup.json'))
     .then(r => (r.ok ? r.json() : null))
@@ -9211,7 +9225,7 @@ function _applyBoroughSolo() {
     const at = t.lastIndexOf(' · ');
     if (at === -1) return { name: t, level: '' };
     const level = t.slice(at + 3).trim();
-    return /^(Ward|LSOA|MSOA|Output area|Borough|Borough\/council)$/i.test(level)
+    return /^(Ward|LSOA|MSOA|Output area|LA|Borough|Borough\/council|Local authority)$/i.test(level)
       ? { name: t.slice(0, at).trim(), level: level }
       : { name: t, level: '' };
   }
@@ -9270,7 +9284,7 @@ function _applyBoroughSolo() {
   // _levelName reads as part of a sentence ("no ward figures"), so it is lower
   // case. A pill is a label, not a sentence, and 'ward' beside 'MSOA' looks
   // like a mistake rather than a choice.
-  const _LVL_TITLE = { borough: 'Local authority', ward: 'Ward', msoa: 'MSOA', lsoa: 'LSOA', oa: 'Output area' };
+  const _LVL_TITLE = { borough: 'LA', ward: 'Ward', msoa: 'MSOA', lsoa: 'LSOA', oa: 'Output area' };
   function _levelTitle(lv) { return _LVL_TITLE[lv] || lv; }
   // Registries declare lv in whatever order was convenient. Pills always read
   // largest area first, so the same indicator looks the same everywhere.
@@ -9578,7 +9592,7 @@ function _applyBoroughSolo() {
           ' aria-pressed="' + (o.value === cur) + '">' +
           '<span class="nm">' + esc(o.name) + '</span>' +
           (descOf(o) ? '<span class="ds">' + esc(descOf(o)) + '</span>' : '') +
-          '<span class="mt">' + levelsHTML(o) + (o.native === 'borough' ? ' · one figure per council' : '') +
+          '<span class="mt">' + levelsHTML(o) + (o.native === 'borough' ? ' · one figure per LA' : '') +
             (ovAgeNote(o.value) ? ' · <span class="ov-old">' + esc(ovAgeNote(o.value)) + '</span>' : '') +
             (ovCaution(o.value) ? ' · <span class="ov-old">Lockdown census</span>' : '') + '</span>' +
         '</button>').join('')).join('');
@@ -9628,7 +9642,7 @@ function _applyBoroughSolo() {
     curNm.textContent = curOpt ? curOpt.name : 'No indicator selected';
     curDesc.textContent = curOpt ? descOf(curOpt) : 'Pick one below to shade the map.';
     curMeta.innerHTML = curOpt ? [levelsHTML(curOpt), esc((curOpt.meta && curOpt.meta.src) || ''),
-      curOpt.native === 'borough' ? 'one figure per council' : '',
+      curOpt.native === 'borough' ? 'one figure per LA' : '',
       ovAgeNote(curOpt.value) ? '<span class="ov-old">' + esc(ovAgeNote(curOpt.value)) + '</span>' : ''].filter(Boolean).join(' · ') : '';
     curEl.classList.toggle('empty', !curOpt);
     curBtns.hidden = !curOpt;
@@ -10022,7 +10036,7 @@ window.PH_OA = (function () {
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const short = k => {
     const o = sel.querySelector('option[value="' + k + '"]');
-    return (o ? o.textContent : ovLabel(k)).replace(/\s*·\s*(Ward|LSOA|MSOA|Output area|Borough|Local authority|Borough\/council)\s*$/i, '');
+    return (o ? o.textContent : ovLabel(k)).replace(/\s*·\s*(Ward|LSOA|MSOA|Output area|LA|Borough|Local authority|Borough\/council)\s*$/i, '');
   };
   const level = () => (typeof ovDrawnLevel === 'function' && curOv && curOv !== 'none') ? ovDrawnLevel(curOv) : 'ward';
 
@@ -11491,7 +11505,7 @@ function loadIcbRegions() {
           lyr.bindTooltip(
             `<b style="font-size:var(--t-xs)">${_esc(p.label || p.name || 'ICB')}</b>` +
             `<br><span style="font-size:var(--t-xs);color:var(--ink-3)">` +
-            `${p.n_boroughs} ${PH_IS_LONDON ? 'boroughs' : 'councils'}` +
+            `${p.n_boroughs} ${ladNoun(p.n_boroughs)}` +
             `${p.partial ? ' in ' + _esc(PH_AREA) : ''} · click to zoom</span>`,
             { sticky: true, opacity: 0.94 });
           // Click zooms to the region. Deliberately not a filter: borough
@@ -11504,7 +11518,7 @@ function loadIcbRegions() {
             } catch (e) { /* degenerate geometry: leave the view alone */ }
             if (ev && ev.originalEvent) L.DomEvent.stop(ev.originalEvent);
             if (typeof _announce === 'function') {
-              _announce(`Zoomed to ${p.label || p.name}, ${p.n_boroughs} ${PH_IS_LONDON ? 'boroughs' : 'councils'}.`);
+              _announce(`Zoomed to ${p.label || p.name}, ${p.n_boroughs} ${ladNoun(p.n_boroughs)}.`);
             }
           });
         },
@@ -11575,7 +11589,7 @@ document.getElementById('tlsoa').addEventListener('change', e => {
       if (!ovHasLevel(k, target)) {
         e.target.checked = !wantsLsoa;
         const lbl = ((document.getElementById('ov').selectedOptions[0] || {}).text || k)
-                      .replace(/ · (Ward|MSOA|LSOA|Borough)$/i, '');
+                      .replace(/ · (Ward|MSOA|LSOA|Output area|LA|Borough|Local authority|Borough\/council)$/i, '');
         const have = ovLevels(k).map(_levelName).join(' and ');
         _levelToast(`<b>Not available at ${_levelName(target)} level</b><br>"${lbl}"<br>`
           + (have ? `has figures at ${have} level only. ${wantsLsoa
@@ -11808,7 +11822,7 @@ function renderTopBottom() {
   const worstSlice = lowFirst ? rows.slice(-10).reverse() : rows.slice(0, 10);
 
   const unitEl = document.getElementById('rank-unit');
-  if (unitEl) unitEl.textContent = `${rows.length} ${{ lsoa: 'LSOAs', msoa: 'MSOAs', borough: PH_IS_LONDON ? 'boroughs' : 'councils' }[level] || 'wards'}`;
+  if (unitEl) unitEl.textContent = `${rows.length} ${{ lsoa: 'LSOAs', msoa: 'MSOAs', borough: 'LAs' }[level] || 'wards'}`;
   const bestHdr  = document.getElementById('rank-best-hdr');
   const worstHdr = document.getElementById('rank-worst-hdr');
   // "Best 20" in green over the wards with the most Black residents would read
@@ -12151,7 +12165,7 @@ function _applyOverlayChange(key) {
       const ovOptText = (document.getElementById('ov').selectedOptions[0] || {}).text || curOv;
       // Strip the trailing " · Ward" / " · LSOA" output-level tag for the strip — it's
       // duplicated by the meta line in the sidebar and clutters the strip.
-      const cleanLbl = ovOptText.replace(/ · (Ward|LSOA|MSOA|Borough)$/i, '');
+      const cleanLbl = ovOptText.replace(/ · (Ward|LSOA|MSOA|Output area|LA|Borough|Local authority|Borough\/council)$/i, '');
       mlsLbl.textContent = cleanLbl;
       // The numbers, the unit and the period line, for both legends.
       _syncScaleNumbers();
@@ -12265,7 +12279,7 @@ let _dlDriving = false;
 
 // Level names as a reader would say them, for the toasts and the badges.
 function _levelName(level) {
-  return { borough: 'local authority', ward: 'ward', msoa: 'MSOA', lsoa: 'LSOA', oa: 'output area' }[level] || level;
+  return { borough: 'LA', ward: 'ward', msoa: 'MSOA', lsoa: 'LSOA', oa: 'output area' }[level] || level;
 }
 
 function _dlHint(msg, ms) {
@@ -12300,7 +12314,7 @@ function _setDataLevel(level, opts) {
     // third level would have slipped straight through and shaded nothing.
     if (!ovHasLevel(curOv, level)) {
       const ovTxt = ((document.getElementById('ov').selectedOptions[0] || {}).text || curOv)
-                      .replace(/ · (Ward|MSOA|LSOA|Borough)$/i, '');
+                      .replace(/ · (Ward|MSOA|LSOA|Output area|LA|Borough|Local authority|Borough\/council)$/i, '');
       const have = ovLevels(curOv).map(_levelName).join(' and ');
       _levelToast(`<b>Not available at ${_levelName(level)} level</b><br>"${ovTxt}"<br>`
         + (have ? `has figures at ${have} level only. Switching would leave the map unshaded.`
@@ -12341,12 +12355,12 @@ function _setDataLevel(level, opts) {
   if (level === 'borough') {
     var _ovOnB = typeof curOv !== 'undefined' && curOv && curOv !== 'none';
     _dlHint(!_ovOnB
-      ? 'Local authority outlines drawn. Pick an indicator to shade them.'
+      ? 'The LA boundaries are shown, so pick an indicator to colour them.'
       : (ovHasLevel(curOv, 'borough')
           ? (ovNativeLevel(curOv) === 'borough'
-              ? 'Shaded per local authority, which is where these figures are published.'
-              : 'Each local authority shaded by its figure, worked out from its wards.')
-          : 'Local authority outlines only. This indicator has no local authority figures.'),
+              ? 'Each LA is coloured by its own figure, as published.'
+              : 'Each LA is coloured by a figure worked out from its wards.')
+          : 'The LA boundaries are shown, but this indicator has no LA figures to colour them by.'),
       3600);
   }
 
@@ -12543,7 +12557,7 @@ function _ovLabel(k) {
   const sel = document.getElementById('ov');
   if (sel) {
     const opt = sel.querySelector(`option[value="${k}"]`);
-    if (opt) return opt.textContent.trim().replace(/ · (Ward|LSOA|MSOA|Borough)$/i, '');
+    if (opt) return opt.textContent.trim().replace(/ · (Ward|LSOA|MSOA|Output area|LA|Borough|Local authority|Borough\/council)$/i, '');
   }
   return k;
 }
@@ -12611,7 +12625,7 @@ function _refreshUI() {
         box.appendChild(c);
       };
       if (focusActive()) {
-        addChip('', (focusedIcb ? '' : (window.PH_REGION && !PH_REGION.isLondon ? 'Local authority: ' : 'Borough: ')) + focusLabel(), () => {
+        addChip('', (focusedIcb ? '' : 'LA: ') + focusLabel(), () => {
           focusedBorough = 'all';
           focusedIcb = null;
           const bsel = document.getElementById('borough-focus');
@@ -15356,14 +15370,14 @@ var PH_SHOW = {
     }).join('');
     return '<div class="ws-pins">' +
       '<div class="ws-pins-hd"><span class="ws-lbl">Pinned comparison (' + pinned.length + ' of ' + PIN_MAX +
-      (cmpLevel === 'ward' ? '' : ', by ' + esc(cmpLvl().many)) + ')</span>' +
+      (cmpLevel === 'ward' ? '' : ', by ' + capsPlural(cmpLvl().many)) + ')</span>' +
       '<button type="button" class="ws-btn" id="ws-unpin-all">Clear pins</button>' +
       '<button type="button" class="ws-btn primary" id="ws-open-compare">Open Compare</button></div>' +
       '<table class="ws-ptable"><thead><tr>' + head + '</tr></thead><tbody>' + body + '</tbody></table>' +
       '<div class="ws-note">Deprivation deciles run 1 (the most deprived tenth nationally) to 10 (the least). ' +
       'The ward figure is a population-weighted mean of the deciles of the LSOAs inside it, so it is not itself a decile.' +
       (cmpLevel === 'ward' ? ''
-        : ' Figures for a ' + esc(cmpLvl().one) + ' are added up from its wards: counts summed, ' +
+        : ' Figures for ' + esc(cmpLvl().a) + ' are added up from its wards: counts summed, ' +
           'everything else weighted by population.') + '</div>' +
       '</div>';
   }
@@ -15779,13 +15793,18 @@ var PH_SHOW = {
      Pins hold names at whichever level is chosen, so switching level empties
      them: three wards and a borough in one row of cards would be four columns
      of numbers that are not comparable, under a heading that says they are. */
+  // These headings are set in capitals, which would turn "LAs" into "LAS".
+  // The plural s of an acronym stays lower case.
+  function capsPlural(t) {
+    return esc(t).replace(/\b([A-Z]{2,})s\b/g, '$1<span style="text-transform:none">s</span>');
+  }
   var CMP_LEVELS = [
     // Below a ward, and so the one level that is not aggregated from wards: an
     // LSOA has its own published figures and is compared on those directly.
-    { k: 'lsoa',    one: 'LSOA', many: 'LSOAs' },
-    { k: 'ward',    one: 'ward',    many: 'wards' },
-    { k: 'borough', one: 'borough', many: 'boroughs' },
-    { k: 'icb',     one: 'board',   many: 'boards' },
+    { k: 'lsoa',    one: 'LSOA',    many: 'LSOAs',  a: 'an LSOA' },
+    { k: 'ward',    one: 'ward',    many: 'wards',  a: 'a ward' },
+    { k: 'borough', one: 'LA',      many: 'LAs',    a: 'an LA' },
+    { k: 'icb',     one: 'board',   many: 'boards', a: 'a board' },
   ];
   // Boards only where there is a lookup to name them (a region build may not
   // have one). Read at render time: the lookup loads after this runs.
@@ -15948,13 +15967,15 @@ var PH_SHOW = {
         : 'Up to ' + PIN_MAX + ' ' + lvl.many + ', added up from their wards';
     }
     var pinLbl = $('cmp-pin-lbl');
-    if (pinLbl) pinLbl.textContent = 'Pinned ' + lvl.many;
+    if (pinLbl) pinLbl.innerHTML = 'Pinned ' + capsPlural(lvl.many);
 
     if (!pinned.length) {
       cmpPinsEl.innerHTML = '<div class="cmp-empty">' + (cmpLevel === 'ward'
         ? 'Nothing pinned yet. Click a ward on the map and it will be added here, or use ' +
           '"Pin to compare" on the ward bar.'
-        : 'Nothing pinned yet. Choose ' + (lvl.one === 'board' ? 'a board' : 'a borough') +
+        : cmpLevel === 'lsoa'
+        ? 'Nothing pinned yet. Select an LSOA on the map and it will be added here.'
+        : 'Nothing pinned yet. Choose ' + lvl.a +
           ' below, or click anywhere on the map and the one you clicked in is added.') +
         '</div>';
     } else {
@@ -15978,8 +15999,8 @@ var PH_SHOW = {
       pick.hidden = cmpLevel === 'ward' || pinned.length >= PIN_MAX || !left.length;
       if (!pick.hidden) {
         pick.innerHTML = '<select class="q-chip outline" id="cmp-add-area" style="width:100%" ' +
-          'aria-label="Add ' + esc(lvl.one === 'board' ? 'a board' : 'a borough') + '">' +
-          '<option value="">+ add ' + esc(lvl.one === 'board' ? 'a board' : 'a borough') + '</option>' +
+          'aria-label="Add ' + esc(lvl.a) + '">' +
+          '<option value="">+ add ' + esc(lvl.a) + '</option>' +
           left.map(function (n) {
             return '<option value="' + esc(n) + '">' + esc(cmpAreaLabel(n)) + '</option>';
           }).join('') + '</select>' +
@@ -16106,17 +16127,17 @@ var PH_SHOW = {
       // population-weighted mean of the boroughs, which is worth saying.
       if (cmpLevel === 'borough') {
         notes.push('<strong>' + esc(bl.map(labelOf).join(', ')) + '</strong> ' +
-          (bl.length > 1 ? 'are' : 'is') + ' published at borough level, so here ' +
+          (bl.length > 1 ? 'are' : 'is') + ' published for each LA, so here ' +
           (bl.length > 1 ? 'they are' : 'it is') + ' the published figure rather than anything added up.');
       } else if (cmpLevel === 'icb') {
         notes.push('<strong>' + esc(bl.map(labelOf).join(', ')) + '</strong> ' +
-          (bl.length > 1 ? 'are' : 'is') + ' published at borough level, so a board figure is a ' +
-          'population-weighted mean of the boroughs in it, not a published board statistic.');
+          (bl.length > 1 ? 'are' : 'is') + ' published for each LA, so a board figure is a ' +
+          'population-weighted mean of the LAs in it, not a published board statistic.');
       } else {
         notes.push('<strong>' + esc(bl.map(labelOf).join(', ')) + '</strong> ' +
-          (bl.length > 1 ? 'are' : 'is') + ' published at borough level and written onto every ward ' +
-          'in the borough' +
-          (shared ? ', and two or more of your pins share a borough, so they will read as identical there' : '') +
+          (bl.length > 1 ? 'are' : 'is') + ' published for each LA and written onto every ward ' +
+          'in it' +
+          (shared ? ', and two or more of your pins share an LA, so they will read as identical there' : '') +
           '.');
       }
     }
@@ -16360,7 +16381,7 @@ var PH_SHOW = {
     var added = (cmpLevel === 'borough' || cmpLevel === 'icb');
     var head = ['code', 'name'];
     if (cmpLevel === 'lsoa') head.push('ward');
-    if (!added) head.push('borough');
+    if (!added) head.push('LA');
     // Above a ward the figures are added up, and the file says from how many
     // wards and by what rule, which a spreadsheet away from this page has no
     // other way of recording.
@@ -16641,7 +16662,7 @@ var PH_SHOW = {
       '<div class="pop-body"><div class="pop-addr">' +
       _esc([rec.a, rec.pc].filter(Boolean).join(', ')) + '</div>' +
       '<div class="pop-row"><span class="pop-key">Type</span><span>' + _esc(rec.label) + '</span></div>' +
-      (rec.lad ? '<div class="pop-row"><span class="pop-key">Borough/council</span><span>' +
+      (rec.lad ? '<div class="pop-row"><span class="pop-key">LA</span><span>' +
         _esc(rec.lad) + '</span></div>' : '') + '</div>'
     ).openPopup();
     map.setView([rec.lat, rec.lng], Math.max(map.getZoom(), 15));
@@ -16685,7 +16706,7 @@ var PH_SHOW = {
     });
     $('dir-csv').addEventListener('click', function () {
       if (!dirFiltered.length) { alert('Nothing to export.'); return; }
-      var lines = [['name', 'type', 'address', 'postcode', 'borough', 'lat', 'lng']
+      var lines = [['name', 'type', 'address', 'postcode', 'LA', 'lat', 'lng']
         .map(csvCell).join(',')];
       dirFiltered.forEach(function (r) {
         lines.push([r.n, r.label, r.a, r.pc, r.lad, r.lat, r.lng].map(csvCell).join(','));
@@ -16900,9 +16921,9 @@ var PH_SHOW = {
     {
       t: 'What this map shows',
       n: 'This map shows health and living conditions in London. It covers all 33 ' +
-         'boroughs. The tabs along the top open the tools, and the panel (the ' +
+         'local authorities (LAs). The tabs along the top open the tools, and the panel (the ' +
          '&#9776; button) chooses what the map draws. You can work at four sizes of ' +
-         'area: the <strong>33 boroughs</strong>, <strong>704 wards</strong>, and two ' +
+         'area: the <strong>33 LAs</strong>, <strong>704 wards</strong>, and two ' +
          'smaller ones called <strong>MSOAs</strong> (about 8,000 people) and ' +
          '<strong>LSOAs</strong> (about 1,500 people).',
       go: function () {
@@ -17025,7 +17046,7 @@ var PH_SHOW = {
     {
       t: 'Compare: put wards side by side',
       n: '<strong>Compare</strong> holds up to four areas side by side. First choose ' +
-         'the size of area. You can compare LSOAs (small areas), wards, boroughs or health ' +
+         'the size of area. You can compare LSOAs (small areas), wards, LAs or health ' +
          'board areas. Then click them on the map, and choose the figures. Each area ' +
          'keeps one colour on its card, its row and its outline. On every row an arrow ' +
          'marks the highest and the lowest value. The arrows rank the areas you pinned. ' +
@@ -17143,7 +17164,7 @@ var PH_SHOW = {
       t: 'Data export: make a spreadsheet',
       n: '<strong>Data export</strong> writes a spreadsheet. It asks three things. ' +
          'First the size of area, so each area becomes a row. Then the place, either ' +
-         'all of London or one borough. Then the figures, so each figure becomes a ' +
+         'all of London or one LA. Then the figures, so each figure becomes a ' +
          'column. Nothing is averaged or combined in this file.',
       go: function () {
         closeWardSheet();
@@ -17161,7 +17182,7 @@ var PH_SHOW = {
       t: 'Directory: find one place',
       n: '<strong>Directory</strong> lists every service and organisation on the map. ' +
          'That is about 23,000 places across ten sets of data. Search by name, by ' +
-         'address or by postcode. Filter by type or by borough. Click a result and the ' +
+         'address or by postcode. Filter by type or by LA. Click a result and the ' +
          'map marks it. The export button saves what you have filtered.',
       go: function () {
         closeWardSheet();
@@ -17189,8 +17210,8 @@ var PH_SHOW = {
     {
       t: 'What these figures cannot tell you',
       n: 'A figure describes an area, not the people who live in it. Some health ' +
-         'figures are published for a whole borough. The map then repeats them for ' +
-         'every ward in that borough, and marks them where it does. Those figures ' +
+         'figures are published for a whole LA. The map then repeats them for ' +
+         'every ward in that LA, and marks them where it does. Those figures ' +
          'cannot tell one ward from another. An empty ward can mean the figure is ' +
          'hidden to protect privacy, not that it is zero. Please check anything ' +
          'important before you act on it.',
@@ -17670,7 +17691,7 @@ var PH_SHOW = {
     var cautEl = $('rb-caution');
     var bs = Object.keys(rbBoroughs());
     cautEl.innerHTML = bs.length > 1
-      ? '<div class="rb-caution">This area crosses <strong>' + bs.length + ' boroughs</strong> (' +
+      ? '<div class="rb-caution">This area crosses <strong>' + bs.length + ' LAs</strong> (' +
         esc(bs.sort().join(', ')) + '). Figures below are for the area as drawn, not for any ' +
         'one of them.</div>'
       : '';
@@ -17787,7 +17808,7 @@ var PH_SHOW = {
                  .map(csvCell).join(','));
     });
     lines.push([]);
-    lines.push(['lsoa_code', 'lsoa_name', 'ward', 'borough', 'population'].map(csvCell).join(','));
+    lines.push(['lsoa_code', 'lsoa_name', 'ward', 'LA', 'population'].map(csvCell).join(','));
     rbSelected.forEach(function (code) {
       var pr = rbProps(code);
       var i = rbRecord(code) || {};
@@ -17851,13 +17872,13 @@ var PH_SHOW = {
       _reportKeyPoints([
         'A custom area assembled from <b>' + agg.lsoas + ' LSOA' + (agg.lsoas === 1 ? '' : 's') + '</b>. It is not an official geography and no one else publishes figures for it.',
         'Counts are <b>summed</b>; everything else is a <b>population-weighted mean</b>, so a larger LSOA pulls the average further than a smaller one.',
-        multi ? 'It crosses <b>' + Object.keys(bs).length + ' boroughs</b>, so these are not borough figures.' : '',
+        multi ? 'It crosses <b>' + Object.keys(bs).length + ' local authorities (LAs)</b>, so these are not LA figures.' : '',
       ]) +
       '<div class="content">' +
       '<div class="section-h">Figures for this area</div>' +
       '<table class="tbl"><tr><th>Indicator</th><th class="n">Value</th><th>How it was combined</th></tr>' + rows + '</table>' +
       '<div class="section-h">LSOAs included</div>' +
-      '<table class="tbl"><tr><th>LSOA</th><th>Name</th><th>Ward</th><th>Borough/council</th><th class="n">Population</th></tr>' + list + '</table>' +
+      '<table class="tbl"><tr><th>LSOA</th><th>Name</th><th>Ward</th><th>LA</th><th class="n">Population</th></tr>' + list + '</table>' +
       '</div>' +
       '<div class="footer"><div class="indep">PopHealth Map is an independent project, not an NHS service. ' +
       'Figures are published statistics for planning and discussion; check the source before relying on one.</div>' +
@@ -17908,7 +17929,7 @@ var PH_SHOW = {
     ward:    { label: 'ward',          plural: 'wards' },
     lsoa:    { label: 'LSOA',          plural: 'LSOAs' },
     msoa:    { label: 'MSOA',          plural: 'MSOAs' },
-    borough: { label: 'borough',       plural: 'boroughs' },
+    borough: { label: 'LA',            plural: 'LAs' },
   };
 
   function cbSource() {
@@ -18008,7 +18029,7 @@ var PH_SHOW = {
     if (/^imd_|_score$/.test(k)) return 'Deprivation (IMD 2025)';
     if (/^census_/.test(k)) return 'Census 2021';
     if (/^ft_\d+$/.test(k)) return 'Health (published at MSOA)';
-    if (/^ft_/.test(k)) return 'Health (published at borough)';
+    if (/^ft_/.test(k)) return 'Health (published at LA)';
     if (/^crime/.test(k)) return 'Crime';
     if (/^claimant/.test(k)) return 'Benefits';
     if (/^(gb_|green_|blue_|fuel_)/.test(k)) return 'Environment and access';
@@ -18090,7 +18111,7 @@ var PH_SHOW = {
           (chosen === 1 ? '' : 's') + '. Each figure is a stored value for that area. ' +
           'Nothing is averaged or combined here. Use Custom area to join areas together.' +
           (cbLevel === 'borough'
-            ? ' Boroughs hold the health figures published at borough level only.'
+            ? ' LAs hold only the health figures that are published for each LA.'
             : ''));
   }
 
@@ -18102,7 +18123,7 @@ var PH_SHOW = {
     });
     var head = ['code', 'name'];
     if (cbLevel === 'lsoa') head.push('ward');
-    if (cbLevel !== 'borough') head.push('borough');
+    if (cbLevel !== 'borough') head.push('LA');
     head = head.concat(cols.map(labelOf));
     var lines = [head.map(csvCell).join(',')];
     codes.forEach(function (c) {
@@ -18345,13 +18366,13 @@ var PH_SHOW = {
   // wards on it selects every ward in a borough at once.
   var GROUP_ORDER = [
     'Deprivation (IMD 2025)', 'Census 2021', 'Local Health (ward)', 'Crime',
-    'Other', 'Fingertips (borough level)',
+    'Other', 'Fingertips (LA level)',
   ];
   function groupOf(k) {
     if (/^imd_/.test(k) || (/_score$/.test(k) && !/^crime_/.test(k))) return 'Deprivation (IMD 2025)';
     if (/^census_/.test(k)) return 'Census 2021';
     if (/^ft_\d+$/.test(k)) return 'Local Health (ward)';
-    if (/^ft_/.test(k)) return 'Fingertips (borough level)';
+    if (/^ft_/.test(k)) return 'Fingertips (LA level)';
     if (/^crime_/.test(k) || /^claimant_/.test(k)) return 'Crime';
     return 'Other';
   }
@@ -18434,9 +18455,9 @@ var PH_SHOW = {
     var boroughKeys = q.conds.map(function (c) { return c.key; }).filter(isBoroughLevelKey);
     if (boroughKeys.length) {
       notes.push('<strong>' + esc(boroughKeys.map(labelOf).join(', ')) + '</strong> ' +
-        (boroughKeys.length > 1 ? 'are' : 'is') + ' published at borough level and written onto every ward ' +
-        'in the borough. Filtering on ' + (boroughKeys.length > 1 ? 'them' : 'it') +
-        ' selects whole boroughs, not wards within them.');
+        (boroughKeys.length > 1 ? 'are' : 'is') + ' published for each LA and written onto every ward ' +
+        'in it, so filtering on ' + (boroughKeys.length > 1 ? 'them' : 'it') +
+        ' selects whole LAs rather than wards within them.');
     }
     // There was a second caution here, naming the services that covered North
     // West London only. Every layer on the map covers all 33 boroughs now, so
@@ -18737,7 +18758,7 @@ var PH_SHOW = {
                           .map(function (c) { return c.key; });
     // The E05 code first: ward names repeat across boroughs, so the code is
     // the only column another dataset can be joined on.
-    var header = ['code', 'ward', 'borough']
+    var header = ['code', 'ward', 'LA']
       .concat(q.services.map(function (id) { return serviceById(id).label; }))
       .concat([labelOf(q.sort)])
       .concat(condKeys.map(labelOf));

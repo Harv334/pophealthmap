@@ -132,7 +132,7 @@ try:
           lv["colsAfterBorough"] == 0 and "been removed" in lv["warned"],
           f"{lv['colsAfterBorough']} kept; note: {lv['warned'][:120]}")
     check("and it says what boroughs do hold",
-          "published at borough level only" in lv["warned"], lv["warned"][-80:])
+          "health figures that are published for each LA" in lv["warned"], lv["warned"][-80:])
 
     # scoping to one borough
     sc = d.execute_script("""

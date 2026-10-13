@@ -84,6 +84,28 @@ const setOv = (page, k) => page.evaluate(k => {
     await page.waitForTimeout(2000);
     ok(await page.evaluate(() => _activeLevel() === 'lsoa' &&
       ['borough', 'ward', 'msoa', 'lsoa'].every(l => ovHasLevel('census_bad_health_pct', l))), 'Census indicator offers every level');
+    // The local authority level is called LA everywhere, and the places that
+    // explain the levels introduce it once as "local authority (LA)".
+    const la = await page.evaluate(() => {
+      const help = document.getElementById('dl-help').title;
+      const card = (() => { const d = document.createElement('div'); d.innerHTML = indicatorCardHTML('census_bad_health_pct'); return d.textContent; })();
+      const words = [...document.querySelectorAll('[title], [aria-label], option, optgroup, button, label, .sb-lbl, .cb-help, .q-hint')]
+        .map(e => [e.getAttribute('title'), e.getAttribute('aria-label'), e.getAttribute('label'), e.textContent].filter(Boolean).join(' ')).join(' | ');
+      return {
+        button: document.querySelector('#dl-seg button[data-dl="borough"]').textContent.trim(),
+        name: _levelName('borough'),
+        focus: document.getElementById('borough-focus-label').textContent,
+        helpIntro: (help.match(/local authority \(LA\)/g) || []).length,
+        helpFive: /five sizes of area/.test(help),
+        helpDash: /[\u2013\u2014]/.test(help),
+        cardIntro: (card.match(/local authority \(LA\)/gi) || []).length,
+        oldNames: (words.match(/Borough\/council|\bBoroughs?\b|Focus by borough|\bLocal authorit(y|ies)\b/g) || []),
+      };
+    });
+    ok(la.button === 'LA' && la.name === 'LA' && la.focus === 'Focus by LA', 'the local authority level is called LA', JSON.stringify(la));
+    ok(la.helpIntro === 1 && la.helpFive && !la.helpDash, 'Area level help introduces local authority (LA) once and counts five sizes', JSON.stringify(la));
+    ok(la.cardIntro === 1, 'indicator card introduces local authority (LA) once', JSON.stringify(la));
+    ok(la.oldNames.length === 0, 'no control names the level Borough or Local authority', la.oldNames.join(', '));
     // A ward clicked opens its sheet.
     await setOv(page, 'crime_rate_per_1000');
     await page.waitForTimeout(2000);
@@ -185,7 +207,10 @@ const setOv = (page, k) => page.evaluate(k => {
   if (HAS_NE) {
     const { page, errors } = await open(browser, 'index.html?r=north-east&t=1', DESK);
     ok(await page.evaluate(() => { let n = 0; wLyr.eachLayer(() => n++); return n; }) > 300, 'North East wards drawn');
-    ok(await page.evaluate(() => document.getElementById('borough-focus-label').textContent) === 'Focus by local authority', 'region wording');
+    ok(await page.evaluate(() => document.getElementById('borough-focus-label').textContent) === 'Focus by LA', 'region wording: the level is LA');
+    ok(await page.evaluate(() => { const h = document.getElementById('dl-help').title;
+      return (h.match(/local authority \(LA\)/g) || []).length === 1 && /(four|five) sizes of area/.test(h) && !/\bBorough\b/.test(h); }),
+      'region Area level help introduces local authority (LA) once');
     ok(errors.length === 0, 'no page errors (North East)', errors.join(' | '));
     await page.close();
   } else {

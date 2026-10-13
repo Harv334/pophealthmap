@@ -357,7 +357,7 @@ try:
     check("example seeds two conditions", q["conds"] == 2, str(q["conds"]))
     check("indicator menu populated", q["indOpts"] > 80, str(q["indOpts"]))
     check("indicator menu grouped, ward and borough Fingertips kept apart",
-          "Local Health (ward)" in q["groups"] and "Fingertips (borough level)" in q["groups"],
+          "Local Health (ward)" in q["groups"] and "Fingertips (LA level)" in q["groups"],
           str(q["groups"]))
 
     d.execute_script("document.getElementById('q-run').click();")
@@ -401,7 +401,7 @@ try:
       return { key: opt.value, text: document.getElementById('q-caution').textContent.trim() };
     """)
     check("borough-level Fingertips key raises the caveat",
-          "borough level" in caution["text"], f"{caution['key']}: {caution['text'][:110]}")
+          "published for each LA" in caution["text"], f"{caution['key']}: {caution['text'][:110]}")
 
     ward_ft = d.execute_script("""
       var sel = document.querySelector('#q-conds [data-key="0"]');
@@ -411,7 +411,7 @@ try:
       return { key: opt.value, text: document.getElementById('q-caution').textContent.trim() };
     """)
     check("ward-level Fingertips key does not raise it",
-          "borough level" not in ward_ft["text"],
+          "published for each LA" not in ward_ft["text"],
           f"{ward_ft['key']}: {ward_ft['text'][:110] or '(no caution)'}")
 
     # the assistant's own test of the same thing

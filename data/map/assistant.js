@@ -266,7 +266,7 @@ var MODEL_LABEL = "Claude Sonnet 5";
     var m = (typeof OV_META === "object" && OV_META && OV_META[key]) ? OV_META[key] : null;
     if (m) return m;
     var ft = FT_META[key];
-    if (ft) return { desc: ft[0], u: ft[1] || undefined, src: "OHID Fingertips", g: "Borough" };
+    if (ft) return { desc: ft[0], u: ft[1] || undefined, src: "OHID Fingertips", g: "LA" };
     var imd = IMD_META[key];
     return imd ? { desc: imd, u: "decile", src: "MHCLG IMD 2025" } : null;
   }
