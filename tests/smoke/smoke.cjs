@@ -322,6 +322,9 @@ const setOv = (page, k) => page.evaluate(k => {
       'Custom area shows LSOAs, and leaving it goes back to the level before', JSON.stringify(custom));
     ok(!/[–—]/.test([grey.title, gate.hint, forced.hint, cleared.hint].join(' ')), 'level hints and tooltips have no dashes');
     // Presentation view hides the header and the side panel, and Esc leaves it.
+    // It sits behind More in the header (workplan 2.11).
+    await page.click('#tb-more');
+    await page.waitForTimeout(200);
     await page.click('#tb-png');
     await page.waitForTimeout(400);
     await page.click('text=This view');
@@ -358,6 +361,158 @@ const setOv = (page, k) => page.evaluate(k => {
       const rep = await page.evaluate(() => ({ title: document.title, back: [...document.querySelectorAll('button')].some(b => b.textContent === 'Back to the map') })).catch(e => ({ title: e.message }));
       ok(/Ward report/.test(rep.title) && rep.back, 'the report opens in this tab with a way back to the map', JSON.stringify(rep));
     }
+    await page.close();
+  }
+
+  // Search, the header and getting around (workplan 2.11).
+  {
+    const { page, errors } = await open(browser, 'index.html?t=1', DESK);
+    const DASH = /[–—]/;
+    // The header: Copy link in view, Presentation view and the palette
+    // behind More, the panel button saying what it will do in step with
+    // aria-expanded, and the wider search box.
+    const hdr = await page.evaluate(() => {
+      const vis = id => { const e = document.getElementById(id); return !!(e && e.offsetParent); };
+      const m = document.getElementById('hdr-menu');
+      const s = document.getElementById('hdr-search-input');
+      return { link: vis('tb-link'), more: vis('tb-more'), png: vis('tb-png'), cb: vis('tb-cb'),
+        name: m.getAttribute('aria-label'), exp: m.getAttribute('aria-expanded'), text: m.innerText.trim(),
+        width: s.offsetWidth, ph: s.placeholder };
+    });
+    ok(hdr.link && hdr.more && !hdr.png && !hdr.cb, 'Copy link is in the header, Presentation view and the palette are behind More', JSON.stringify(hdr));
+    ok(hdr.name === 'Hide panel' && hdr.exp === 'true' && hdr.text === 'Hide panel', 'the panel button says Hide panel while the panel shows', JSON.stringify(hdr));
+    ok(hdr.width >= 270 && hdr.ph === 'Postcode, ward, GP or charity', 'the header search is wide, with a plain placeholder', JSON.stringify(hdr));
+    await page.click('#hdr-menu');
+    await page.waitForTimeout(400);
+    const hid = await page.evaluate(() => { const m = document.getElementById('hdr-menu');
+      return [m.getAttribute('aria-label'), m.getAttribute('aria-expanded'), m.innerText.trim(), document.getElementById('sidebar').classList.contains('collapsed')].join('|'); });
+    await page.click('#hdr-menu');
+    await page.waitForTimeout(400);
+    ok(hid === 'Show panel|false|Show panel|true', 'hiding the panel turns the button into Show panel, with aria-expanded false', hid);
+    await page.click('#tb-more');
+    await page.waitForTimeout(200);
+    const more = await page.evaluate(() => ({ open: !document.getElementById('tb-more-menu').hidden,
+      exp: document.getElementById('tb-more').getAttribute('aria-expanded'), png: !!document.getElementById('tb-png').offsetParent }));
+    await checkAxe(page, 'More open');
+    await page.keyboard.press('Escape');
+    const moreShut = await page.evaluate(() => document.getElementById('tb-more-menu').hidden &&
+      document.getElementById('tb-more').getAttribute('aria-expanded') === 'false' && document.activeElement.id === 'tb-more');
+    ok(more.open && more.exp === 'true' && more.png && moreShut, 'More opens, and Esc closes it back to its button', JSON.stringify(more));
+
+    // Typing an LA offers it first, and choosing it focuses it, fits it
+    // tightly, names it in the tab title and takes the lists with it.
+    await page.click('#hdr-search-input');
+    await page.waitForFunction(() => typeof LSOA_IMD !== 'undefined' && LSOA_IMD && LSOA_IMD.features, null, { timeout: 20000 }).catch(() => {});
+    await page.fill('#hdr-search-input', 'Tower Hamlets');
+    await page.waitForTimeout(600);
+    const sr = await page.evaluate(() => {
+      const rows = [...document.querySelectorAll('#hdr-search-results .sr-row')];
+      const t = r => (r.querySelector('.sr-type') || {}).textContent || '';
+      return { first: rows.length ? t(rows[0]) + ':' + rows[0].querySelector('.sr-name').textContent : '',
+        lsoas: rows.filter(r => t(r) === 'lsoa').length, more: (document.querySelector('#hdr-search-results .sr-more') || {}).textContent || '',
+        wardsBeforeLsoas: rows.findIndex(r => t(r) === 'ward') < rows.findIndex(r => t(r) === 'lsoa') };
+    });
+    ok(sr.first === 'LA:Tower Hamlets', 'searching an LA offers the LA first', JSON.stringify(sr));
+    ok(sr.lsoas === 5 && /^Show all \d+ LSOAs$/.test(sr.more) && sr.wardsBeforeLsoas, 'at most five LSOAs, below the wards, with Show all', JSON.stringify(sr));
+    await checkAxe(page, 'search results');
+    await page.click('#hdr-search-results .sr-more');
+    await page.waitForTimeout(400);
+    const all = await page.evaluate(() => ({ shown: document.getElementById('hdr-search-results').classList.contains('show'),
+      lsoas: [...document.querySelectorAll('#hdr-search-results .sr-row .sr-type')].filter(e => e.textContent === 'lsoa').length }));
+    ok(all.shown && all.lsoas > 5, 'Show all lists every LSOA and keeps the list open', JSON.stringify(all));
+    await page.fill('#hdr-search-input', 'Tower Hamlets');
+    await page.waitForTimeout(500);
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(2500);
+    const th = await page.evaluate(() => {
+      const m = wLyr.getLayers().filter(l => ladInFocus(l.feature.properties.LAD));
+      const bb = L.featureGroup(m).getBounds();
+      const a = map.latLngToContainerPoint(bb.getSouthWest()), b = map.latLngToContainerPoint(bb.getNorthEast());
+      const sz = map.getSize();
+      return { focus: focusLabel(), title: document.title, fill: Math.max((b.x - a.x) / sz.x, (a.y - b.y) / sz.y) };
+    });
+    ok(th.focus === 'Tower Hamlets' && th.title === 'Tower Hamlets | PopHealth Map', 'choosing the LA focuses it and names it in the tab title', JSON.stringify(th));
+    ok(th.fill > 0.75, 'Focus by LA fits the LA tightly', JSON.stringify(th));
+    await setOv(page, 'imd_score_ward');
+    await page.waitForTimeout(2000);
+    const rank = await page.evaluate(() => ({ title: document.getElementById('rank-title').textContent, unit: document.getElementById('rank-unit').textContent,
+      out: [...document.querySelectorAll('#rank-best .rank-row, #rank-worst .rank-row')].filter(r => !wardInFocus(r.dataset.id)).length }));
+    ok(rank.title === 'Highest and lowest 10 wards in Tower Hamlets' && /^out of \d+$/.test(rank.unit) && rank.out === 0,
+      'the highest and lowest lists follow the focus and say so', JSON.stringify(rank));
+
+    // A ward names itself and its LA in the tab title, and the Ask button has
+    // its own space above the key and the map credits.
+    await page.evaluate(() => { const s = document.getElementById('borough-focus'); s.value = 'all'; s.dispatchEvent(new Event('change')); });
+    await page.waitForTimeout(800);
+    await page.evaluate(() => { const l = wLyr.getLayers().find(l => l.feature.properties.WD24NM === 'Stonebridge'); if (l) l.fire('click'); });
+    await page.waitForTimeout(1500);
+    const ward = await page.evaluate(() => {
+      const r = e => e.getBoundingClientRect();
+      const ask = r(document.getElementById('ai-toggle')), strip = r(document.getElementById('map-legend-strip')),
+        cred = r(document.querySelector('.leaflet-control-attribution'));
+      const hit = (a, b) => a.width && b.width && a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+      return { title: document.title, ask: !!document.getElementById('ai-toggle').offsetParent,
+        clear: !hit(ask, strip) && !hit(ask, cred) && ask.bottom <= Math.min(strip.top || 1e9, cred.top) };
+    });
+    ok(ward.title === 'Stonebridge, Brent | PopHealth Map', 'the tab title names the selected ward and its LA', ward.title);
+    ok(!ward.ask || ward.clear, 'the Ask button sits above the key and the map credits', JSON.stringify(ward));
+
+    // Copy link writes the level whenever it is not the one the indicator
+    // opens at, and Reset puts the layers back as the map opens.
+    await setOv(page, 'ft_93283');
+    await page.waitForTimeout(2500);
+    await page.click('#dl-seg button[data-dl="ward"]');
+    await page.waitForTimeout(800);
+    const lvl = await page.evaluate(() => { _writeUrlState(); return new URLSearchParams(location.search).get('lvl'); });
+    await page.click('#dl-seg button[data-dl="msoa"]');
+    await page.waitForTimeout(1500);
+    const lvl2 = await page.evaluate(() => { _writeUrlState(); return new URLSearchParams(location.search).get('lvl'); });
+    ok(lvl === 'ward' && lvl2 === null, 'Copy link writes the level only when it differs from where the indicator opens', lvl + ' / ' + lvl2);
+    await page.evaluate(() => ['tg', 'tph', 'ticb', 'tb'].forEach(id => { const e = document.getElementById(id); if (e) { e.checked = true; e.dispatchEvent(new Event('change')); } }));
+    await page.waitForTimeout(1500);
+    await page.click('#tb-reset');
+    await page.waitForTimeout(1500);
+    const reset = await page.evaluate(() => ({ on: ['tg', 'th', 'tgr', 'td', 'tph', 'vcse-tab-toggle', 'ticb', 'tb', 'tpcn'].filter(id => { const e = document.getElementById(id); return e && e.checked; }),
+      wards: document.getElementById('tnw').checked, title: document.title, gp: !!(typeof gpL !== 'undefined' && gpL && map.hasLayer(gpL)) }));
+    ok(!reset.on.length && reset.wards && !reset.gp && !/\|/.test(reset.title), 'Reset clears the point and boundary layers and the selection', JSON.stringify(reset));
+
+    // Indicator search: everyday words, "1 match", and a council-only
+    // indicator says where its figures are instead of finding nothing.
+    await page.click('#sbtab-overlay');
+    const ind = {};
+    for (const q of ['smoking', 'pollution', 'arson']) {
+      await page.fill('#ov-search', q);
+      await page.waitForTimeout(400);
+      ind[q] = await page.evaluate(() => document.getElementById('ov-results').innerText.replace(/\s+/g, ' ').trim());
+    }
+    await page.fill('#ov-search', '');
+    ok(!/No indicator matches/.test(ind.smoking) && /Adults who smoke is only published for whole LAs/.test(ind.smoking) && /full profile/.test(ind.smoking),
+      'a council-only indicator says where its figures are', ind.smoking);
+    ok(/Nitrogen dioxide/.test(ind.pollution), 'indicator search knows everyday words', ind.pollution.slice(0, 120));
+    ok(/^1 match\b/.test(ind.arson), 'one result reads "1 match"', ind.arson.slice(0, 60));
+    const words = await page.evaluate(() => [...document.querySelectorAll('.hdr [title], .hdr [aria-label], .hdr [placeholder], #rank-panel')]
+      .map(e => [e.getAttribute('title'), e.getAttribute('aria-label'), e.getAttribute('placeholder'), e.id === 'rank-panel' ? e.textContent : ''].join(' ')).join(' '));
+    ok(!DASH.test(words + Object.values(ind).join(' ') + th.title + ward.title), 'the new header, list and search words have no dashes');
+    ok(errors.length === 0, 'no page errors (search and header)', errors.join(' | '));
+    await page.close();
+  }
+  // Nothing in the header overlaps at the widths people use.
+  for (const w of [1200, 1360, 1400]) {
+    const { isMobile, hasTouch, ...vp } = DESK;
+    const page = await browser.newPage({ viewport: { ...vp, width: w } });
+    await page.goto(BASE + '/index.html?t=1');
+    await page.waitForTimeout(2500);
+    const r = await page.evaluate(() => {
+      const els = [...document.querySelectorAll('.hdr button, .hdr input, .hdr h1, .hdr .dev-badge')].filter(e => e.offsetParent);
+      const over = [];
+      for (let i = 0; i < els.length; i++) for (let j = i + 1; j < els.length; j++) {
+        if (els[i].contains(els[j]) || els[j].contains(els[i])) continue;
+        const a = els[i].getBoundingClientRect(), b = els[j].getBoundingClientRect();
+        if (a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1) over.push((els[i].id || els[i].className) + ' x ' + (els[j].id || els[j].className));
+      }
+      return { over, wide: document.documentElement.scrollWidth > window.innerWidth, tall: document.querySelector('.hdr').offsetHeight > 60 };
+    });
+    ok(!r.over.length && !r.wide && !r.tall, 'nothing in the header overlaps at ' + w + 'px', JSON.stringify(r));
     await page.close();
   }
 
@@ -421,6 +576,14 @@ const setOv = (page, k) => page.evaluate(k => {
     ok(await page.evaluate(() => !document.getElementById('area-peek').hidden), 'phone: tapping an area shows its card');
     await checkAxe(page, 'phone with area card');
     await page.click('#hdr-menu'); await page.waitForTimeout(400);
+    // The drawer: its button says it will hide the panel, and Reset, Copy
+    // link and More share one row under the search box.
+    const drawer = await page.evaluate(() => {
+      const m = document.getElementById('hdr-menu');
+      const tops = ['tb-reset', 'tb-link', 'tb-more'].map(id => Math.round(document.getElementById(id).getBoundingClientRect().top));
+      return { name: m.getAttribute('aria-label'), exp: m.getAttribute('aria-expanded'), row: tops.every(t => t === tops[0]) };
+    });
+    ok(drawer.name === 'Hide panel' && drawer.exp === 'true' && drawer.row, 'phone: the drawer button and the tools row', JSON.stringify(drawer));
     await checkAxe(page, 'phone drawer');
     ok(errors.length === 0, 'no page errors (phone)', errors.join(' | '));
     await page.close();

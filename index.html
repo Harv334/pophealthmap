@@ -335,8 +335,10 @@
 
   /* ── Header search ── */
   .hdr-search { position: relative; }
-  .hdr-search input { width: 200px; padding: 5px 10px 5px 28px; border: 1px solid var(--line); border-radius: 6px; font-size: var(--t-sm); color: var(--ink); background: var(--paper) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'><circle cx='11' cy='11' r='7'/><path d='m21 21-4.35-4.35'/></svg>") no-repeat 8px center; outline: none; transition: border-color .12s, box-shadow .12s; }
-  .hdr-search input:focus { border-color: var(--nhs-blue); box-shadow: 0 0 0 3px rgba(0,94,184,.12); }
+  /* .hdr-right in front, so this outranks the general input[type=text] rule
+     further down, which had been taking the width and the search icon away. */
+  .hdr-right .hdr-search input { width: 220px; padding: 5px 10px 5px 28px; border: 1px solid var(--line); border-radius: 6px; font-size: var(--t-sm); color: var(--ink); background: var(--paper) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'><circle cx='11' cy='11' r='7'/><path d='m21 21-4.35-4.35'/></svg>") no-repeat 8px center; outline: none; transition: border-color .12s, box-shadow .12s; }
+  .hdr-right .hdr-search input:focus { border-color: var(--nhs-blue); box-shadow: 0 0 0 3px rgba(0,94,184,.12); }
   .hdr-search-results { position: absolute; top: 100%; left: 0; margin-top: 4px; width: 320px; max-height: 360px; overflow-y: auto; background: var(--paper); border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,.15); display: none; z-index: 3000; }
   /* Search now lives in the sidebar footer — make it full-width and open the dropdown UPWARD so it doesn't go off-screen. */
   .sb-footer-search { position: relative; margin-bottom: 8px; }
@@ -352,6 +354,8 @@
   .sr-row:last-child { border-bottom: 0; }
   .sr-row .sr-type { font-size: var(--t-xs); text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); font-weight: 600; min-width: 54px; }
   .sr-row .sr-name { flex: 1; color: var(--ink); }
+  /* Show all, at the end of the five LSOAs: a link-like row, not a result. */
+  .sr-row.sr-more .sr-name { color: var(--nhs-blue); font-weight: 600; padding-left: 62px; }
   .sr-row .sr-sub { font-size: var(--t-xs); color: var(--ink-3); }
   .sr-empty { padding: 12px; font-size: var(--t-sm); color: var(--ink-3); text-align: center; }
   .sr-grp { padding: 4px 10px; font-size: var(--t-xs); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); background: var(--paper-2); font-weight: 600; border-bottom: 1px solid var(--line-2); }
@@ -389,7 +393,7 @@
      Styled from here rather than from a style attribute on the element. An
      inline style beats an id selector, so the narrow-screen rule below it was
      dead and had never once applied. */
-  #fingertips-banner { position: absolute; right: 12px; bottom: 88px; max-width: 300px;
+  #fingertips-banner { position: absolute; right: 12px; bottom: 104px; max-width: 300px;
     background: var(--tint-amber); border: 1px solid var(--tint-amber-line); color: var(--tint-amber-ink);
     padding: 9px 12px; border-radius: 6px; box-shadow: 0 2px 10px rgba(0,0,0,.10);
     font-size: var(--t-sm); line-height: 1.45; z-index: 560; display: none;
@@ -397,7 +401,7 @@
   /* Above the Ask button, not under it. At bottom:54px it shared the corner
      with that button (bottom:34px, about 44px tall, and drawn on top), which
      covered the notice and its close button on some screen sizes. */
-  .map-wrap.has-sheet #fingertips-banner { bottom: calc(var(--sheet-lift) + 66px); }
+  .map-wrap.has-sheet #fingertips-banner { bottom: calc(var(--sheet-lift) + 104px); }
   #fingertips-banner .ft-i { display: inline-block; background: #b88030; color: var(--on-accent);
     border-radius: 50%; width: 18px; height: 18px; text-align: center;
     line-height: 18px; font-weight: 700; margin-right: 6px; font-size: var(--t-xs);
@@ -536,6 +540,9 @@
   .deselect-btn { border: 1px solid var(--line); background: var(--paper); color: var(--ink-2); font-size: var(--t-xs); font-weight: 500; padding: 3px 8px; border-radius: 5px; cursor: pointer; line-height: 1.2; white-space: nowrap; flex-shrink: 0; }
   .deselect-btn:hover { background: var(--paper-2); border-color: var(--ink-3); color: var(--ink); }
   .sb-lbl { font-size: var(--t-xs); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3); margin-bottom: 8px; }
+  /* A title that names a place, so it is written as a sentence rather than
+     set in capitals like the section labels. */
+  .sb-lbl.rank-title { text-transform: none; letter-spacing: 0; font-size: var(--t-sm); color: var(--ink-2); line-height: 1.35; }
   .sb-lbl.collapsible { cursor: pointer; user-select: none; display: flex; align-items: center; gap: 5px; }
   .sb-lbl.collapsible::before { content: "▾"; font-size: 9px; color: var(--line); transition: transform .15s; transform-origin: center; display: inline-block; }
   .sb-sec.collapsed .sb-lbl.collapsible::before { transform: rotate(-90deg); }
@@ -863,9 +870,32 @@
   /* Shown at every width now: a drawer toggle on a phone, a collapse toggle
      on a desktop. */
   .hdr-menu { display: inline-flex; appearance: none; background: none; border: 1px solid var(--line);
-    border-radius: 8px; padding: 6px 9px; cursor: pointer; line-height: 0; flex: 0 0 auto; }
+    border-radius: 8px; padding: 6px 9px; cursor: pointer; line-height: 0; flex: 0 0 auto;
+    align-items: center; gap: 6px; }
   .hdr-menu:hover { border-color: var(--nhs-blue); }
   .hdr-menu svg { display: block; }
+  /* "Hide panel" or "Show panel" in words on a desktop, where the icon alone
+     did not say that it hides the panel rather than opening a menu. */
+  .hdr-menu-lbl { font-size: var(--t-sm); font-weight: 500; color: var(--ink); line-height: 18px;
+    white-space: nowrap; }
+  /* More: Presentation view and the colour-blind palette, shown below the
+     button over the map. */
+  .tb-more { position: relative; }
+  .tb-more-chev { margin-left: 1px; transition: transform .12s; }
+  #tb-more[aria-expanded="true"] .tb-more-chev { transform: rotate(180deg); }
+  #tb-more[aria-expanded="true"] { background: var(--paper-2); border-color: var(--ink-faint); }
+  .tb-more-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 3200;
+    display: flex; flex-direction: column; gap: 4px; padding: 6px; min-width: 220px;
+    background: var(--paper); border: 1px solid var(--line); border-radius: 8px;
+    box-shadow: 0 6px 20px rgba(0,0,0,.15); }
+  .tb-more-menu[hidden] { display: none; }
+  .tb-more-menu .tb-btn { width: 100%; justify-content: flex-start; white-space: nowrap;
+    border-color: transparent; }
+  .tb-more-menu .tb-btn:hover { border-color: var(--line); }
+  .tb-more-menu .tb-btn.active { border-color: var(--nhs-blue); }
+  /* From 1200px there is room for a search box that shows what it finds. */
+  @media (min-width: 1200px) { .hdr-right .hdr-search input { width: 280px; }
+    .hdr .hdr-search-results { width: 380px; } }
   .sb-scrim { position: fixed; inset: 0; background: rgba(33,43,50,.45); z-index: 3900;
     display: none; }
   .sb-scrim.on { display: block; }
@@ -1031,11 +1061,16 @@
     .sb-close { appearance: none; background: none; border: 0; cursor: pointer;
       color: var(--ink-2); font-size: var(--t-2xl); line-height: 1; padding: 0 4px; margin: -4px -4px 0 0; }
     .sb-close:hover { color: var(--nhs-red); }
-    .sb-tools .hdr-right { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    /* Reset, Copy link and More share one row under the search box. */
+    .sb-tools .hdr-right { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
     .sb-tools .hdr-search { grid-column: 1 / -1; }
-    .sb-tools .hdr-search input { width: 100%; }
-    .sb-tools .tb-btn { width: 100%; justify-content: center; }
+    .sb-tools .hdr-right .hdr-search input { width: 100%; }
+    .sb-tools .tb-btn { width: 100%; justify-content: center; padding-left: 6px; padding-right: 6px; white-space: nowrap; }
+    .sb-tools .tb-more-menu .tb-btn { justify-content: flex-start; padding-left: 10px; }
     .sb-tools .tb-sep { display: none; }
+    /* The drawer is the panel on a phone, so the button keeps only its icon
+       and its name. */
+    .hdr-menu-lbl { display: none; }
 
     /* Five modes will not fit across a phone, so the rail scrolls instead of
        silently losing the ones on the end.
@@ -1097,7 +1132,10 @@
    Positioned inside .map-wrap, which is the map's own positioned ancestor, so
    it can never stray over the sidebar. Above the map's badges at 2500, below
    the mode panel at 3500, so a mode still covers it. */
-#ai-toggle{position:absolute;right:12px;bottom:34px;z-index:2600;padding:10px 16px;
+/* Its own space above the legend strip and the map credits, rather than on
+   the same row as them, where it sat over the end of the credits once a ward
+   was selected. */
+#ai-toggle{position:absolute;right:12px;bottom:52px;z-index:2600;padding:10px 16px;
   border:1px solid var(--nhs-blue);border-radius:8px;background:var(--nhs-blue);color: var(--on-accent);font-size: var(--t-md);
   font-weight:600;cursor:pointer;box-shadow:0 2px 10px rgba(33,43,50,.22);
   font-family:'Inter Tight',Inter,system-ui,sans-serif;display:flex;align-items:center;gap:7px}
@@ -1442,7 +1480,7 @@
      the ward sheet. Setting a bottom here as well would stretch it down the
      whole map, since it already has a top. */
   .map-wrap.has-sheet .leaflet-bottom { bottom: var(--sheet-lift); }
-  .map-wrap.has-sheet #ai-toggle { bottom: calc(var(--sheet-lift) + 12px); }
+  .map-wrap.has-sheet #ai-toggle { bottom: calc(var(--sheet-lift) + 52px); }
   /* The panel too, not just the button that opens it. At bottom:12px it ran
      down over the sheet's figures, so the ward you were asking about was
      half hidden by the thing you were asking with. */
@@ -1688,6 +1726,8 @@
   .ov-res-nm { font-size: 14px; font-weight: 600; color: var(--ink); line-height: 1.3; }
   .ov-res-sub { font-size: var(--t-xs); color: var(--ink-3); }
   .ov-empty { padding: 10px; font-size: 13px; color: var(--ink-3); }
+  .ov-empty.ov-council { color: var(--ink-2); line-height: 1.45; background: var(--paper-2);
+    border: 1px solid var(--line-2); border-radius: 6px; margin-top: 6px; }
   #ov-home { display: flex; flex-direction: column; gap: 6px; }
   #ov-home[hidden] { display: none; }
   .ov-chips { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
@@ -2331,10 +2371,14 @@
   <!-- Header -->
   <header class="hdr">
     <div class="hdr-left">
-      <button type="button" class="hdr-menu" id="hdr-menu" aria-label="Open the panel"
-              aria-expanded="false" aria-controls="sidebar" title="Layers, overlays and modes">
+      <!-- On a desktop it hides and shows the side panel, and says which in
+           words beside the icon; on a phone it opens the drawer. Its name and
+           aria-expanded are kept in step by _narrowDrawer. -->
+      <button type="button" class="hdr-menu" id="hdr-menu" aria-label="Hide panel"
+              aria-expanded="true" aria-controls="sidebar">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#212B32"
-             stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+             stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+        <span class="hdr-menu-lbl" id="hdr-menu-lbl" aria-hidden="true">Hide panel</span>
       </button>
       <!-- The strapline that sat under the title is gone. It described the
            three things the map does, which the map itself demonstrates the
@@ -2378,21 +2422,30 @@
         <input type="text" id="hdr-search-input" autocomplete="off"
                role="combobox" aria-autocomplete="list" aria-expanded="false"
                aria-controls="hdr-search-results"
-               aria-label="Search for a postcode, ward, LSOA, GP practice or charity"
-               placeholder="Search postcode, ward, GP, charity…" />
+               aria-label="Search for a postcode, LA, ward, LSOA, GP practice or charity"
+               placeholder="Postcode, ward, GP or charity" />
         <div class="hdr-search-results" id="hdr-search-results" role="listbox"
              aria-label="Search results"></div>
         <div class="sr-only" id="hdr-search-status" aria-live="polite"></div>
       </div>
       <div class="tb-sep"></div>
-      <button type="button" class="tb-btn" id="tb-reset" title="Clear all filters and return to default view">↺ Reset</button>
+      <button type="button" class="tb-btn" id="tb-reset" title="Clear everything you have chosen, including any layers you switched on, and go back to the map as it first opened">↺ Reset</button>
       <!-- The address bar has always been live, rewritten as the view changes.
            Nobody knew, because nothing on the page said so, and a share feature
            with no affordance is not one. -->
-      <button type="button" class="tb-btn" id="tb-link" title="Copy a link to exactly this view: the indicator, the area, the layers, the selected ward, and any query or custom area open">⧉ Copy link</button>
-      <button type="button" class="tb-btn" id="tb-cb" title="Switch to a colour-blind safe palette (deuteranopia/protanopia friendly)" aria-pressed="false">◐ Colour-blind palette</button>
-      
-      <button type="button" class="tb-btn" id="tb-png" title="Show the map on its own, without the panels and controls, ready for a screenshot or to present">⤓ Presentation view</button>
+      <button type="button" class="tb-btn" id="tb-link" title="Copy a link that reopens this view, with its indicator, level, area, layers, selected ward and any query or custom area">⧉ Copy link</button>
+      <!-- Presentation view and the colour-blind palette are used now and then,
+           so they sit behind More and give their width to the search box. A
+           disclosure (a button and the group it shows) rather than an ARIA
+           menu, so Tab reaches them in order and the palette keeps its
+           aria-pressed. -->
+      <div class="tb-more" id="tb-more-wrap">
+        <button type="button" class="tb-btn" id="tb-more" aria-expanded="false" aria-controls="tb-more-menu">More<svg class="tb-more-chev" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <div class="tb-more-menu" id="tb-more-menu" role="group" aria-label="More options" hidden>
+          <button type="button" class="tb-btn" id="tb-png" title="Show the map on its own, without the panels and controls, ready for a screenshot or to present">⤓ Presentation view</button>
+          <button type="button" class="tb-btn" id="tb-cb" title="Use colours that people with red-green colour blindness can tell apart" aria-pressed="false">◐ Colour-blind palette</button>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -2879,9 +2932,9 @@
 
           <!-- Top 20 / Bottom 20 rankings — single-indicator mode only -->
           <div id="rank-panel" style="display:none;margin-top:14px;padding-top:12px;border-top:1px solid var(--line-2)">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-              <div class="sb-lbl" style="margin:0">Highest and lowest 10</div>
-              <div id="rank-unit" style="font-size:var(--t-xs);color:var(--ink-3)"></div>
+            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:6px">
+              <div class="sb-lbl rank-title" id="rank-title" style="margin:0">Highest and lowest 10</div>
+              <div id="rank-unit" style="font-size:var(--t-xs);color:var(--ink-3);white-space:nowrap"></div>
             </div>
             <div style="display:flex;gap:8px">
               <div style="flex:1;min-width:0">
@@ -7782,6 +7835,7 @@ function showWard(wn) {
   // results and restored URL state both come through showWard and would
   // otherwise leave the sheet showing the previous ward.
   if (window.PH_SHEET) window.PH_SHEET.show(wn);
+  if (typeof _syncDocTitle === 'function') _syncDocTitle();
 
   if (!wdata) {
     p.innerHTML = `<div class="ph"><div class="ph-icon">⚠</div>${wn}<br><small>No indicator data loaded yet</small></div>`;
@@ -7969,6 +8023,7 @@ window.toggleCat = function(hdr) {
 
 window.deselectWard = function() {
   selW = null;
+  if (typeof _syncDocTitle === 'function') _syncDocTitle();
   if (window.PH_SHEET) window.PH_SHEET.hide();
   if (typeof _restyleAll === 'function') _restyleAll();
   // Put the boundary hairline back on the ward that was selected.
@@ -7983,6 +8038,7 @@ window.deselectWard = function() {
 };
 window.deselectLSOA = function() {
   selLSOA = null;
+  if (typeof _syncDocTitle === 'function') _syncDocTitle();
   if (typeof PH_PEEK !== 'undefined') PH_PEEK.hide();
   if (typeof _restyleAll === 'function') _restyleAll();
   const p = document.getElementById('wpanel');
@@ -9180,6 +9236,8 @@ document.getElementById('tb').addEventListener('change',  e => {
 // focused borough stay visible.
 function _applyBoroughSolo() {
   const focused = focusActive();
+  // The highest and lowest lists follow the focus.
+  if (typeof renderTopBottom === 'function') { try { renderTopBottom(); } catch (e) {} }
 
   // 1. Main ward layer — wstyle() already branches on `outOfBorough` and
   //    returns a fully-transparent style, so a restyle is enough.
@@ -9331,6 +9389,24 @@ function _applyBoroughSolo() {
     });
 })();
 
+/* Fit the map to an LA or ICB that has just been focused, tightly: the
+   area fills the visible map with a small margin, clear of the ward sheet
+   and the comparison bar. The cap used to be zoom 12, which left a single LA
+   such as Tower Hamlets a small patch in the middle of the map and the City
+   of London a speck. */
+function _fitFocus(bounds) {
+  if (!bounds || (bounds.isValid && !bounds.isValid())) return;
+  // After the caller's applyBoroughLock, whose new minimum zoom and bounds
+  // otherwise cut the fit short part of the way in. Its zoom to the new
+  // minimum is animated, and Leaflet drops a second animated move made while
+  // one is running, so the fit waits for that to finish.
+  const go = () => {
+    if (typeof _fitVisible === 'function') _fitVisible(bounds, 15, { pad: 12 });
+    else map.fitBounds(bounds, { padding: [12, 12], maxZoom: 15 });
+  };
+  setTimeout(() => { if (map._animatingZoom) map.once('zoomend', go); else go(); }, 0);
+}
+
 // ── Borough focus dropdown — populate from the ward GeoJSON LAD property ──
 (function initBoroughFocus() {
   const sel = document.getElementById('borough-focus');
@@ -9369,10 +9445,7 @@ function _applyBoroughSolo() {
     if (focusActive() && wLyr) {
       const matched = wLyr.getLayers().filter(l =>
         ladInFocus((l.feature.properties || {}).LAD));
-      if (matched.length) {
-        const g = L.featureGroup(matched);
-        map.fitBounds(g.getBounds(), { padding: [30, 30], maxZoom: 12 });
-      }
+      if (matched.length) _fitFocus(L.featureGroup(matched).getBounds());
     } else if (wLyr) {
       map.fitBounds(wLyr.getBounds(), { padding: [28, 28] });
     }
@@ -9435,6 +9508,8 @@ function _applyBoroughSolo() {
           (part ? ' in ' + PH_AREA : '') + ')';
         sel.appendChild(opt);
       });
+      // The search lists ICBs, and names each LA's ICB, from what just arrived.
+      try { _searchIndex = null; } catch (e) { /* not declared yet: built later anyway */ }
       if (!PH_IS_LONDON) {
         ['icb-row', 'icb-focus-wrap'].forEach(id => {
           const el = document.getElementById(id);
@@ -9471,9 +9546,7 @@ function _applyBoroughSolo() {
     if (focusActive() && wLyr) {
       const matched = wLyr.getLayers().filter(l =>
         ladInFocus((l.feature.properties || {}).LAD));
-      if (matched.length) {
-        map.fitBounds(L.featureGroup(matched).getBounds(), { padding: [30, 30], maxZoom: 12 });
-      }
+      if (matched.length) _fitFocus(L.featureGroup(matched).getBounds());
     } else if (wLyr) {
       map.fitBounds(wLyr.getBounds(), { padding: [28, 28] });
     }
@@ -9514,6 +9587,21 @@ function _applyBoroughSolo() {
 
   function narrow() { return mq.matches; }
 
+  /* The button's name says what pressing it will do, "Hide panel" or "Show
+     panel", in words beside the icon on a desktop and as its accessible name
+     everywhere, and aria-expanded says whether the panel is showing now. On
+     a phone the panel is the drawer; on a desktop it is the column, which is
+     showing unless it has been collapsed. */
+  const lbl = document.getElementById('hdr-menu-lbl');
+  function syncBtn() {
+    const shown = narrow() ? sidebar.classList.contains('open') : !sidebar.classList.contains('collapsed');
+    const name = shown ? 'Hide panel' : 'Show panel';
+    btn.setAttribute('aria-expanded', String(shown));
+    btn.setAttribute('aria-label', name);
+    btn.removeAttribute('title');
+    if (lbl) lbl.textContent = name;
+  }
+
   function setOpen(on) {
     if (!narrow()) on = false;
     // One at a time. The drawer and a full-height ward sheet are both trying
@@ -9522,7 +9610,7 @@ function _applyBoroughSolo() {
     sidebar.classList.toggle('open', on);
     scrim.classList.toggle('on', on);
     scrim.hidden = !on;
-    btn.setAttribute('aria-expanded', String(on));
+    syncBtn();
     // Leaflet caches the container size; without this the map keeps the
     // dimensions it had before the layout changed under it.
     if (typeof map !== 'undefined' && map) setTimeout(() => map.invalidateSize(), 260);
@@ -9545,6 +9633,7 @@ function _applyBoroughSolo() {
     if (!narrow() && foot && footMark && foot.parentNode === sidebar) {
       footMark.parentNode.insertBefore(foot, footMark);
     }
+    syncBtn();
     if (typeof map !== 'undefined' && map) setTimeout(() => map.invalidateSize(), 60);
   }
 
@@ -9555,19 +9644,15 @@ function _applyBoroughSolo() {
   const COLLAPSE_KEY = 'phPanelCollapsed';
   function setCollapsed(on) {
     sidebar.classList.toggle('collapsed', on);
-    btn.setAttribute('aria-expanded', String(!on));
-    btn.title = on ? 'Show the panel' : 'Hide the panel';
+    syncBtn();
     try { window.localStorage.setItem(COLLAPSE_KEY, on ? '1' : ''); } catch (e) {}
     if (typeof map !== 'undefined' && map) setTimeout(() => map.invalidateSize(), 220);
   }
   function isCollapsed() { return sidebar.classList.contains('collapsed'); }
   try {
-    if (window.localStorage.getItem(COLLAPSE_KEY)) {
-      sidebar.classList.add('collapsed');
-      btn.setAttribute('aria-expanded', 'false');
-      btn.title = 'Show the panel';
-    }
+    if (window.localStorage.getItem(COLLAPSE_KEY)) sidebar.classList.add('collapsed');
   } catch (e) { /* private mode: starts expanded */ }
+  syncBtn();
 
   btn.addEventListener('click', () => {
     if (narrow()) setOpen(!isOpen());
@@ -10033,6 +10118,9 @@ function _applyBoroughSolo() {
      Work, fertility to People, and Local Health's fuel poverty goes, as the
      DESNZ figure in Environment is the same measure, newer, per LSOA. */
   const DROP = new Set(['ft_93280']);
+  // The council-only ones are kept aside, so a search for one can say where
+  // its figures are rather than finding nothing.
+  const councilOnly = [];
   const MOVE = { ft_93097: 'Work, money and education', ft_93098: 'Work, money and education',
                  ft_93089: 'People and communities' };
   /* Transport is its own theme: car ownership and travel to work from
@@ -10059,6 +10147,7 @@ function _applyBoroughSolo() {
       if (DROP.has(o.value) || o.native === 'borough') {
         const opt = sel.querySelector('option[value="' + o.value + '"]');
         if (opt) opt.remove();
+        if (!DROP.has(o.value)) councilOnly.push(o);
         return;
       }
       // Outside London the station and bus stop measures come from DfT
@@ -10200,7 +10289,7 @@ function _applyBoroughSolo() {
   const curDesc = document.getElementById('ov-cur-desc');
   const curMeta = document.getElementById('ov-cur-meta');
   const curBtns = document.getElementById('ov-cur-btns');
-  searchEl.placeholder = 'Search ' + all.length + ' indicators, e.g. smoking';
+  searchEl.placeholder = 'Search ' + all.length + ' indicators';
 
   /* A theme opens in the sidebar itself, sliding in over the home view,
      rather than over the map: the map stays in sight and recolours with each
@@ -10254,18 +10343,81 @@ function _applyBoroughSolo() {
 
   let filter = '';
 
-  function scoreHits(q) {
-    return all.map(o => {
-      const nm = o.name.toLowerCase();
-      let sc = 0;
-      if (nm === q) sc = 100;
-      else if (nm.indexOf(q) === 0) sc = 80;
-      else if (nm.indexOf(q) !== -1) sc = 60;
-      else if ((o.levels || []).some(lv => lv.indexOf(q) === 0)) sc = 40;
-      else if (o.theme.toLowerCase().indexOf(q) !== -1) sc = 30;
-      else if (o.hay && o.hay.indexOf(q) !== -1) sc = 20;
-      return sc ? { o: o, s: sc } : null;
+  /* Everyday words for what the indicators are called, so "pollution" finds
+     nitrogen dioxide and "elderly" finds the over-65s. Matched as whole words
+     anywhere in the search, and ranked just below a match on the words typed. */
+  const SYNONYMS = {
+    smoking: ['smok'], smokers: ['smok'], smoke: ['smok'], cigarettes: ['smok'], tobacco: ['smok'],
+    poverty: ['deprivation', 'low-income', 'income'], poor: ['deprivation', 'income'], deprived: ['deprivation'],
+    pollution: ['nitrogen dioxide', 'particles'], air: ['nitrogen dioxide', 'particles'],
+    unemployment: ['claimant', 'out-of-work'], unemployed: ['claimant', 'out-of-work', 'unemployment'],
+    jobless: ['claimant', 'out-of-work', 'unemployment'], benefits: ['claimant', 'out-of-work'],
+    elderly: ['65 and over', '85 and over'], older: ['65 and over', '85 and over'], pensioners: ['65 and over'],
+    children: ['under 16', 'under 5', 'reception', 'year 6', 'child'], kids: ['under 16', 'under 5', 'reception', 'year 6', 'child'],
+    babies: ['under 5', 'fertility'], births: ['fertility'], young: ['under 16', '15 to 24', '10 to 24'],
+    obesity: ['obes', 'overweight'], overweight: ['obes', 'overweight'], weight: ['obes', 'overweight'],
+    parks: ['green space'], park: ['green space'], rivers: ['blue space'], water: ['blue space'],
+    trains: ['station'], train: ['station'], rail: ['station'], tube: ['station', 'public transport'],
+    buses: ['bus'], transport: ['public transport', 'station', 'bus'],
+    cars: ['car or van'], car: ['car or van'], driving: ['car or van'], cycling: ['walk or cycle'], walking: ['walk or cycle'],
+    race: ['ethnic'], ethnicity: ['ethnic'], migrants: ['born outside'], immigrants: ['born outside'], immigration: ['born outside'],
+    language: ['english'], housing: ['renting', 'ownership'], rent: ['renting'], renters: ['renting'],
+    homeowners: ['ownership'], mortgage: ['ownership'],
+    mortality: ['deaths'], death: ['deaths'], dying: ['deaths'], lifespan: ['life expectancy'],
+    heart: ['cardiovascular', 'coronary', 'heart attack'], cardiac: ['cardiovascular', 'coronary', 'heart attack'],
+    'a&e': ['emergency admissions', 'a&e'], hospital: ['admissions'],
+    mental: ['self-harm', 'mental illness', 'depression', 'suicide'], depression: ['depression', 'self-harm'],
+    drinking: ['alcohol'], drink: ['alcohol'], carers: ['unpaid care'], caring: ['unpaid care'],
+    disabled: ['disab'], disability: ['disab'], education: ['qualifications'], school: ['qualifications', 'reception', 'year 6'],
+    burglaries: ['burglary'], knife: ['weapons'], knives: ['weapons'], guns: ['weapons'], drugs: ['drug'],
+    antisocial: ['anti-social'], asb: ['anti-social'], vaccination: ['vaccination', 'mmr'], vaccines: ['vaccination', 'mmr'], jabs: ['vaccination', 'mmr'],
+    exercise: ['physically active'], activity: ['physically active'], 'blood pressure': ['blood pressure'],
+  };
+  function searchTerms(q) {
+    const terms = [q];
+    const padded = ' ' + q + ' ';
+    Object.keys(SYNONYMS).forEach(k => {
+      if (padded.indexOf(' ' + k + ' ') !== -1) SYNONYMS[k].forEach(t => { if (terms.indexOf(t) === -1) terms.push(t); });
+    });
+    return terms;
+  }
+  function scoreOne(o, q) {
+    const nm = o.name.toLowerCase();
+    if (nm === q) return 100;
+    if (nm.indexOf(q) === 0) return 80;
+    if (nm.indexOf(q) !== -1) return 60;
+    if ((o.levels || []).some(lv => lv.indexOf(q) === 0)) return 40;
+    if ((o.theme || '').toLowerCase().indexOf(q) !== -1) return 30;
+    if (o.hay && o.hay.indexOf(q) !== -1) return 20;
+    return 0;
+  }
+  function scoreHits(q, list) {
+    const terms = searchTerms(q);
+    return (list || all).map(o => {
+      let sc = scoreOne(o, q);
+      for (let i = 1; i < terms.length; i++) sc = Math.max(sc, scoreOne(o, terms[i]) - 5);
+      return sc > 0 ? { o: o, s: sc } : null;
     }).filter(Boolean).sort((a, b) => b.s - a.s).map(x => x.o);
+  }
+  /* What to say when the search finds an indicator published only for whole
+     LAs, which the map does not offer: where its figures can be read. */
+  function councilOnlyNote(q) {
+    const hits = scoreHits(q, councilOnly).slice(0, 3);
+    if (!hits.length) return '';
+    const names = hits.map(o => esc(o.name));
+    const list = names.length === 1 ? names[0] : names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
+    const sections = [];
+    hits.forEach(o => {
+      const c = (typeof CATS !== 'undefined') ? CATS.find(c => c.fields.some(f => f.k === o.value)) : null;
+      const lbl = c ? String(c.label).replace(/\s*&\s*/g, ' and ') : '';
+      if (lbl && sections.indexOf(lbl) === -1) sections.push(lbl);
+    });
+    const one = hits.length === 1;
+    return '<div class="ov-empty ov-council">' + list + (one ? ' is' : ' are') +
+      ' only published for whole LAs, so ' + (one ? 'it is' : 'they are') +
+      ' not among the indicators you can colour the map by. You can find each LA\'s figure' +
+      (sections.length ? ' under ' + esc(sections.join(' or ')) : '') +
+      ' in the full profile of any ward.</div>';
   }
 
   function render() {
@@ -10283,12 +10435,14 @@ function _applyBoroughSolo() {
 
     if (q) {
       const hits = scoreHits(q).slice(0, 15);
-      resultsEl.innerHTML = hits.length
-        ? '<div class="ov-res-sub" style="padding:0 2px 4px">' + hits.length + (hits.length === 15 ? '+' : '') + ' matches</div>' +
+      const council = councilOnlyNote(q);
+      resultsEl.innerHTML = (hits.length
+        ? '<div class="ov-res-sub" style="padding:0 2px 4px">' + hits.length + (hits.length === 15 ? '+' : '') +
+            (hits.length === 1 ? ' match' : ' matches') + '</div>' +
           hits.map(o => '<button type="button" class="ov-res' + (o.value === cur ? ' on' : '') + '" data-ov="' + esc(o.value) + '">' +
             '<span class="ov-res-nm">' + esc(o.name) + '</span>' +
             '<span class="ov-res-sub">' + esc(o.theme) + ' · ' + levelsHTML(o) + '</span></button>').join('')
-        : '<div class="ov-empty">No indicator matches that.</div>';
+        : (council ? '' : '<div class="ov-empty">No indicator matches that.</div>')) + council;
     }
     resultsEl.hidden = !q;
     homeEl.hidden = !!q || !!libTheme;
@@ -11145,6 +11299,7 @@ function showLSOA(feat) {
   const _vsd2 = document.getElementById('vs-digest');
   if (_vsd2) _vsd2.textContent = 'LSOA: ' + (props.name || props.lsoa_name || props.code || '');
   if (typeof PH_PEEK !== 'undefined') PH_PEEK.show(props);
+  if (typeof _syncDocTitle === 'function') _syncDocTitle();
 
   // IMD data from embedded properties
   const decile = props.imd_decile || '—';
@@ -11899,6 +12054,13 @@ function _onLsoaImdReady() {
   if (typeof _ovRange !== 'undefined') { for (const k in _ovRange) delete _ovRange[k]; }
   if (typeof _lsoaRange !== 'undefined') { for (const k in _lsoaRange) delete _lsoaRange[k]; }
   if (typeof _searchIndex !== 'undefined') _searchIndex = null;
+  // A search already showing its results lists the LSOAs now they are here.
+  try {
+    const si = document.getElementById('hdr-search-input');
+    const sr = document.getElementById('hdr-search-results');
+    if (si && sr && sr.classList.contains('show') && si.value.trim().length >= 2 &&
+        typeof _runSearch === 'function') _runSearch(si.value);
+  } catch (e) { /* the next keystroke will */ }
   // Core20 LSOAs in ward and Total LSOAs in ward are both selectable overlays,
   // so a corrected count has to reach the shading and not just the panel.
   if (typeof _restyleAll === 'function') _restyleAll();
@@ -12380,6 +12542,8 @@ function renderTopBottom() {
   // now, which was the count when this covered North West London only.
   let mapCodes = null;
   let mapNames = null;
+  // The LA each area is in, so the lists can follow a focused LA or ICB.
+  const mapLads = {};
   if (useLsoa && typeof LSOA_IMD !== 'undefined' && LSOA_IMD && LSOA_IMD.features) {
     mapCodes = new Set();
     mapNames = {};
@@ -12387,6 +12551,7 @@ function renderTopBottom() {
       if (f && f.properties && f.properties.code) {
         mapCodes.add(f.properties.code);
         mapNames[f.properties.code] = f.properties.name || f.properties.code;
+        mapLads[f.properties.code] = f.properties.borough || '';
       }
     }
   } else if (level === 'msoa' && typeof msoaLyr !== 'undefined' && msoaLyr) {
@@ -12394,13 +12559,13 @@ function renderTopBottom() {
     mapNames = {};
     msoaLyr.eachLayer(l => {
       const p = l.feature && l.feature.properties;
-      if (p && p.code) mapNames[p.code] = p.name || p.code;
+      if (p && p.code) { mapNames[p.code] = p.name || p.code; mapLads[p.code] = msoaLad(l.feature); }
     });
   } else if (level === 'borough' && typeof BOROUGH_GJ !== 'undefined' && BOROUGH_GJ.features) {
     mapNames = {};
     for (const f of BOROUGH_GJ.features) {
       const p = f.properties || {};
-      if (p.LAD25CD) mapNames[p.LAD25CD] = p.name || p.LAD25CD;
+      if (p.LAD25CD) { mapNames[p.LAD25CD] = p.name || p.LAD25CD; mapLads[p.LAD25CD] = p.name || ''; }
     }
   }
 
@@ -12409,13 +12574,22 @@ function renderTopBottom() {
   // field on each ward record). Without it the IMD-composite-ward overlay
   // produced an empty Top/Bottom 20 panel because every ward returned null.
   const fieldKey = resolveOvField(curOv);
-  const rows = [];
+  let rows = [];
   for (const [id, row] of Object.entries(pool)) {
     if (useLsoa && mapCodes && !mapCodes.has(id)) continue;
     const v = (row.indicators || row || {})[fieldKey];
     if (v == null || v === '' || isNaN(parseFloat(v))) continue;
     const name = (mapNames && mapNames[id]) || row.name || row.lsoa_name || row.LSOA21NM || id;
-    rows.push({ id, name, v: parseFloat(v) });
+    const lad = level === 'ward' ? (row.lad || (typeof ladOf === 'function' ? ladOf(id) : '')) : (mapLads[id] || '');
+    rows.push({ id, name, lad, v: parseFloat(v) });
+  }
+  // The lists follow a focused LA or ICB, and say so in their title. A focus
+  // with too few areas at this level to rank (one LA at LA level) keeps the
+  // whole region's list, titled with the region.
+  let where = PH_AREA;
+  if (typeof focusActive === 'function' && focusActive()) {
+    const inFocus = rows.filter(r => ladInFocus(r.lad));
+    if (inFocus.length >= 6) { rows = inFocus; where = focusLabel(); }
   }
   if (rows.length < 3) { panel.style.display = 'none'; return; }
   rows.sort((a, b) => a.v - b.v);
@@ -12425,22 +12599,30 @@ function renderTopBottom() {
   // Descriptive → highest first, whatever wh says.
   const descriptive = !!cfg.descriptive;
   const lowFirst = cfg.wh && !descriptive;
-  const bestSlice  = lowFirst ? rows.slice(0, 10) : rows.slice(-10).reverse();
-  const worstSlice = lowFirst ? rows.slice(-10).reverse() : rows.slice(0, 10);
+  // Ten each way, or half the areas when there are fewer than 20, so the two
+  // lists never share an area.
+  const n = Math.min(10, Math.floor(rows.length / 2)) || 1;
+  const bestSlice  = lowFirst ? rows.slice(0, n) : rows.slice(-n).reverse();
+  const worstSlice = lowFirst ? rows.slice(-n).reverse() : rows.slice(0, n);
+  const nWord = n < 10 ? ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'][n - 1] : String(n);
+  const noun = n === 1 ? ({ lsoa: 'LSOA', msoa: 'MSOA', borough: 'LA' }[level] || 'ward')
+                       : ({ lsoa: 'LSOAs', msoa: 'MSOAs', borough: 'LAs' }[level] || 'wards');
 
+  const titleEl = document.getElementById('rank-title');
+  if (titleEl) titleEl.textContent = 'Highest and lowest ' + nWord + ' ' + noun + ' in ' + where;
   const unitEl = document.getElementById('rank-unit');
-  if (unitEl) unitEl.textContent = `${rows.length} ${{ lsoa: 'LSOAs', msoa: 'MSOAs', borough: 'LAs' }[level] || 'wards'}`;
+  if (unitEl) unitEl.textContent = 'out of ' + rows.length.toLocaleString('en-GB');
   const bestHdr  = document.getElementById('rank-best-hdr');
   const worstHdr = document.getElementById('rank-worst-hdr');
   // "Best 20" in green over the wards with the most Black residents would read
   // as a verdict on who lives there. Descriptive lists are named by the figure
   // and set in ink.
   if (descriptive) {
-    bestHdr.textContent  = 'Highest 10';
-    worstHdr.textContent = 'Lowest 10';
+    bestHdr.textContent  = 'Highest ' + nWord;
+    worstHdr.textContent = 'Lowest ' + nWord;
   } else {
-    bestHdr.textContent  = `Best 10 (${cfg.wh ? 'lowest' : 'highest'})`;
-    worstHdr.textContent = `Worst 10 (${cfg.wh ? 'highest' : 'lowest'})`;
+    bestHdr.textContent  = `Best ${nWord} (${cfg.wh ? 'lowest' : 'highest'})`;
+    worstHdr.textContent = `Worst ${nWord} (${cfg.wh ? 'highest' : 'lowest'})`;
   }
   bestHdr.style.color  = descriptive ? 'var(--ink)' : '#0F6E56';
   worstHdr.style.color = descriptive ? 'var(--ink)' : '#A32D2D';
@@ -13324,8 +13506,35 @@ function _syncMapAria() {
   } catch (e) { /* keeps the last name it had */ }
 }
 
+/* The tab's title names what is selected, so a row of tabs (or a bookmark)
+   says which place each one is open on: "Stonebridge, Brent | PopHealth Map"
+   for a ward, the LSOA and its ward for an LSOA, and the LA or ICB in focus
+   when nothing smaller is selected. With nothing chosen it is the page's own
+   title. */
+const _BASE_DOC_TITLE = document.title;
+function _syncDocTitle() {
+  let name = '';
+  try {
+    if (typeof selW !== 'undefined' && selW) {
+      const w = (typeof WARD_DATA !== 'undefined' && WARD_DATA)
+        ? (WARD_DATA[selW] || Object.values(WARD_DATA).find(x => x && x.name === selW)) : null;
+      name = selW + (w && w.lad ? ', ' + w.lad : '');
+    } else if (typeof selLSOA !== 'undefined' && selLSOA) {
+      const f = (typeof LSOA_IMD !== 'undefined' && LSOA_IMD && LSOA_IMD.features)
+        ? LSOA_IMD.features.find(x => x.properties && x.properties.code === selLSOA) : null;
+      const p = f ? f.properties : {};
+      name = (p.name || selLSOA) + (p.ward ? ', ' + p.ward : '');
+    } else if (typeof focusActive === 'function' && focusActive()) {
+      name = focusLabel() || '';
+    }
+  } catch (e) { name = ''; }
+  const t = name ? name + ' | PopHealth Map' : _BASE_DOC_TITLE;
+  if (document.title !== t) document.title = t;
+}
+
 function _refreshUI() {
   _syncMapAria();
+  _syncDocTitle();
   try {
     // --- Digest line ---
     const dig = document.getElementById('vs-digest');
@@ -13414,6 +13623,8 @@ function _resetAll() {
     // "put the map back to how it started", and a pin left behind outlives the
     // search that explained it.
     if (typeof _clearSearchPin === 'function') _clearSearchPin();
+    const sIn = document.getElementById('hdr-search-input');
+    if (sIn) sIn.value = '';
     // Borough or board
     focusedBorough = 'all';
     focusedIcb = null;
@@ -13440,12 +13651,23 @@ function _resetAll() {
     // MSOA boundaries off, alongside the LSOA layer above
     const tmsoa = document.getElementById('tmsoa');
     if (tmsoa && tmsoa.checked) { tmsoa.checked = false; tmsoa.dispatchEvent(new Event('change')); }
+    // The point and boundary layers as well, back to how the map opens: GP
+    // practices, hospitals, parks, dental practices, pharmacies, charities,
+    // ICBs, LA outlines and PCN footprints all off, and no network chosen.
+    // Ward boundaries come back on with the Ward level below.
+    ['tg', 'th', 'tgr', 'td', 'tph', 'tv', 'vcse-tab-toggle', 'ticb', 'tb', 'tpcn'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el && el.checked) { el.checked = false; el.dispatchEvent(new Event('change')); }
+    });
+    const pcnSel = document.getElementById('pcn-focus');
+    if (pcnSel && pcnSel.value) { pcnSel.value = ''; pcnSel.dispatchEvent(new Event('change')); }
     // Whatever is selected, selected. Reset says it clears everything and
     // returns to the default view, and it was leaving a ward highlighted with
     // its bar across the bottom of the map, plus any Directory pin and its
     // popup. Back to Explore also takes down the query highlight and the
     // comparison drawer.
     if (typeof deselectWard === 'function') deselectWard();
+    if (typeof deselectLSOA === 'function') deselectLSOA();
     // The pins are the exception: going back to Explore does not clear them,
     // it is where they draw. They are user state like everything else here, so
     // Reset owes them the same treatment. It matters most at the end of a tour,
@@ -13524,6 +13746,41 @@ function _applyColourPalette() {
 // rather than in whatever was written into the markup.
 _applyColourPalette();
 
+/* More, in the header: Presentation view and the colour-blind palette. It
+   opens below its button, closes on Esc (back to the button), on a press
+   anywhere else and once Presentation view is chosen, and stays open after
+   the palette is switched so the pressed state can be seen. */
+(function _wireMoreMenu() {
+  const btn = document.getElementById('tb-more');
+  const menu = document.getElementById('tb-more-menu');
+  if (!btn || !menu) return;
+  const set = on => {
+    menu.hidden = !on;
+    btn.setAttribute('aria-expanded', String(on));
+  };
+  btn.addEventListener('click', () => {
+    const on = menu.hidden;
+    set(on);
+    if (on) { const first = menu.querySelector('button'); if (first) first.focus(); }
+  });
+  menu.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); set(false); btn.focus(); }
+  });
+  btn.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !menu.hidden) { e.preventDefault(); e.stopPropagation(); set(false); }
+  });
+  document.addEventListener('click', e => {
+    if (!menu.hidden && !menu.contains(e.target) && !btn.contains(e.target)) set(false);
+  });
+  // Leaving the group with Tab closes it, so it does not sit open over the map.
+  menu.addEventListener('focusout', e => {
+    if (e.relatedTarget && !menu.contains(e.relatedTarget) && e.relatedTarget !== btn) set(false);
+  });
+  const png = document.getElementById('tb-png');
+  if (png) png.addEventListener('click', () => set(false));
+  window.PH_MORE = { close: () => set(false) };
+})();
+
 (function _wireCbSafe() {
   const btn = document.getElementById('tb-cb');
   if (!btn) return;
@@ -13563,6 +13820,19 @@ function _urlTool() {
   return (b && b.dataset.mode) || 'explore';
 }
 
+/* The level a freshly opened page lands an indicator on, before the reader
+   has chosen a level: the one it opens at if it has figures there, otherwise
+   Ward, otherwise the level it is published at. The same order as the
+   indicator handler in _wireDlBadgeFromOverlay, from a page at Ward. */
+function _ovLandingLevel(k) {
+  if (!k || k === 'none' || typeof ovHasLevel !== 'function') return 'ward';
+  const nat = (typeof ovOpenLevel === 'function') ? ovOpenLevel(k) : '';
+  if (nat && ovHasLevel(k, nat)) return nat;
+  if (ovHasLevel(k, 'ward')) return 'ward';
+  return (typeof ovNativeLevel === 'function' && ovNativeLevel(k))
+    || (typeof ovLevels === 'function' && ovLevels(k)[0]) || 'ward';
+}
+
 function _writeUrlState() {
   try {
     const p = new URLSearchParams();
@@ -13582,9 +13852,11 @@ function _writeUrlState() {
     if (c20El && c20El.checked) p.set('c20', '1');
     if (window.cbSafe) p.set('cb', '1');
 
-    // Ward is the default, so it is the one level that costs nothing to omit.
+    // The level rides whenever it differs from the one the link's indicator
+    // opens at, which is Ward with no indicator. Leaving it out only for Ward
+    // sent an MSOA indicator someone had switched to Ward back at MSOA.
     if (typeof currentDataLevel !== 'undefined' && currentDataLevel &&
-        currentDataLevel !== 'ward') p.set('lvl', currentDataLevel);
+        currentDataLevel !== _ovLandingLevel(ovEl && ovEl.value)) p.set('lvl', currentDataLevel);
 
     const layersOn = _URL_LAYERS.filter(id => {
       const el = document.getElementById(id);
@@ -13917,6 +14189,30 @@ let _searchIndex = null;
 function _buildSearchIndex() {
   const idx = [];
   try {
+    // LAs and ICBs first: someone who types the name of their council wants
+    // the whole of it, not 40 of its LSOAs. The LAs are read from the Focus
+    // by LA list, so a pick is always one that list can make.
+    const bsel = document.getElementById('borough-focus');
+    if (bsel) {
+      [...bsel.options].forEach(o => {
+        if (!o.value || o.value === 'all') return;
+        const icb = (typeof ICB_OF_LAD !== 'undefined' && ICB_OF_LAD)
+          ? (ICB_OF_LAD[o.value] || ICB_OF_LAD[o.value === 'City of Westminster' ? 'Westminster' : o.value]) : '';
+        const icbName = icb ? ((typeof ICB_LABEL !== 'undefined' && ICB_LABEL[icb]) || ('NHS ' + icb + ' ICB')) : '';
+        idx.push({ type:'LA', label:o.value, sub:icbName, _lc:(o.value + ' ' + (o.value === 'City of Westminster' ? 'westminster' : '')).toLowerCase(), _key:o.value });
+      });
+    }
+    const isel = document.getElementById('icb-focus');
+    if (isel) {
+      [...isel.options].forEach(o => {
+        if (!o.value || o.value === 'all') return;
+        const label = (typeof ICB_LABEL !== 'undefined' && ICB_LABEL[o.value]) || ('NHS ' + o.value + ' ICB');
+        const n = (typeof ICB_OF_LAD !== 'undefined' && ICB_OF_LAD)
+          ? Object.keys(ICB_OF_LAD).filter(l => ICB_OF_LAD[l] === o.value).length : 0;
+        idx.push({ type:'ICB', label:label, sub:n ? n + (n === 1 ? ' LA' : ' LAs') : '',
+                   _lc:(label + ' ' + o.value + ' icb integrated care board').toLowerCase(), _key:o.value });
+      });
+    }
     // Wards
     if (typeof WARD_DATA !== 'undefined') {
       for (const [code, w] of Object.entries(WARD_DATA)) {
@@ -14005,9 +14301,10 @@ function _fitVisible(bounds, maxZoom, opts) {
   }
   try { map.stop(); } catch (e) { /* not animating */ }
   try {
+    const edge = (opts && opts.pad != null) ? opts.pad : 24;
     map.fitBounds(bounds, {
-      paddingTopLeft: [24, 24],
-      paddingBottomRight: [24, 24 + pad],
+      paddingTopLeft: [edge, edge],
+      paddingBottomRight: [edge, edge + pad],
       maxZoom: maxZoom || 14,
     });
   } catch (e) { /* degenerate bounds */ }
@@ -14074,29 +14371,52 @@ function _searchPickResult(item) {
   if (results) results.classList.remove('show');
   // On a phone the box is in the drawer, which would sit over the result.
   if (window.PH_DRAWER && PH_DRAWER.narrow()) PH_DRAWER.close();
-  if (item.type === 'ward') {
+  if (item.type === 'LA' || item.type === 'ICB') {
+    // Focus it, which fits the map to it, exactly as the Focus by LA and
+    // Focus by ICB lists in Layers do.
+    const sel = document.getElementById(item.type === 'LA' ? 'borough-focus' : 'icb-focus');
+    if (sel) { sel.value = item._key; sel.dispatchEvent(new Event('change')); }
+  } else if (item.type === 'ward') {
     // Trigger the ward's click handler via wLyr
     if (typeof wLyr !== 'undefined' && wLyr) {
       const lyr = wLyr.getLayers().find(l => l.feature.properties.WD24NM === item._key);
       if (lyr) { lyr.fire('click'); _fitVisible(lyr.getBounds(), 14); }
     }
   } else if (item.type === 'lsoa') {
-    if (typeof lsoaLyr !== 'undefined' && lsoaLyr) {
-      const lyr = lsoaLyr.getLayers().find(l => l.feature.properties.code === item._code);
-      if (lyr) {
-        // Ensure LSOA layer is visible
-        const t = document.getElementById('tlsoa');
-        if (t && !t.checked) { t.checked = true; t.dispatchEvent(new Event('change')); }
-        lyr.fire('click');
-        _fitVisible(lyr.getBounds(), 15);
-      }
-    }
+    _searchPickLsoa(item);
   } else {
     // A point result: a practice, a school, a charity. Move to it and mark it,
     // because at this zoom the map alone does not say which building was meant.
     _searchFlyTo(item._lat, item._lng, 16);
     _dropSearchPin(item);
   }
+}
+/* An LSOA from the search. The LSOA areas load on demand, so the layer is
+   loaded first, then the map moves to the LSOA level and the LSOA is selected
+   as if it had been clicked. An indicator with no LSOA figures keeps its own
+   level, so the LSOA's profile opens and a pin marks where it is instead. */
+function _searchPickLsoa(item) {
+  if (typeof ensureLsoaLayer !== 'function') return;
+  ensureLsoaLayer().then(lyrs => {
+    if (!lyrs) return;
+    const lyr = lyrs.getLayers().find(l => l.feature.properties.code === item._code);
+    if (!lyr) return;
+    const ov = (typeof curOv !== 'undefined') ? curOv : 'none';
+    const canShow = !ov || ov === 'none' || (typeof ovHasLevel === 'function' && ovHasLevel(ov, 'lsoa'));
+    if (canShow && typeof _setDataLevel === 'function' && currentDataLevel !== 'lsoa') _setDataLevel('lsoa');
+    if (canShow && map.hasLayer(lyrs)) {
+      lyr.fire('click');
+    } else if (canShow) {
+      // The level change adds the layer a moment later.
+      setTimeout(() => lyr.fire('click'), 0);
+    } else {
+      selLSOA = item._code;
+      showLSOA(lyr.feature);
+      const c = lyr.getBounds().getCenter();
+      _dropSearchPin({ type: 'LSOA', label: item.label, sub: item.sub, _lat: c.lat, _lng: c.lng });
+    }
+    _fitVisible(lyr.getBounds(), 15);
+  });
 }
 /**
  * Postcodes.
@@ -14251,41 +14571,70 @@ function _runSearch(q) {
     if (ap !== bp) return ap - bp;
     return a.label.length - b.label.length;
   });
-  const top = matches.slice(0, 40);
-  if (top.length === 0) {
-    results.innerHTML = '<div class="sr-empty" role="presentation">No matches. Try a postcode, ward, LSOA code, GP name, or charity.</div>';
+  if (matches.length === 0) {
+    results.innerHTML = '<div class="sr-empty" role="presentation">Nothing matches that. Try a postcode, or the name of an LA, ward, GP practice or charity.</div>';
     results.classList.add('show');
     if (pq) _renderPostcodeRow(results, pq, q);
     _searchAnnounce(pq ? 'Looking up postcode' : 'No matches');
     return;
   }
-  // Group by type
+  // Group by type, LAs and ICBs first, then wards, then at most five LSOAs
+  // with a row that shows the rest, then services. Forty rows in all, plus
+  // every LSOA once Show all has been chosen for this search.
   const groups = {};
-  top.forEach(m => { (groups[m.type] = groups[m.type] || []).push(m); });
-  const order = ['ward','lsoa','GP','hospital','dental','pharmacy','charity'];
+  matches.forEach(m => { (groups[m.type] = groups[m.type] || []).push(m); });
+  const order = ['LA','ICB','ward','lsoa','GP','hospital','dental','pharmacy','charity'];
+  const allLsoas = _searchAllLsoas === q;
+  const top = [];
   let html = '';
   order.forEach(t => {
-    if (!groups[t]) return;
-    html += `<div class="sr-grp" role="presentation">${t} (${groups[t].length})</div>`;
-    groups[t].forEach((m, i) => {
-      const idx = top.indexOf(m);
+    const g = groups[t];
+    if (!g) return;
+    let shown = t === 'lsoa' ? (allLsoas ? g.slice(0, 200) : g.slice(0, 5)) : g;
+    if (!(t === 'lsoa' && allLsoas)) shown = shown.slice(0, Math.max(0, 40 - top.length));
+    if (!shown.length) return;
+    html += `<div class="sr-grp" role="presentation">${t} (${g.length})</div>`;
+    shown.forEach(m => {
+      const idx = top.push(m) - 1;
       // Labels and subtitles are register text (practice, charity and venue
       // names), so they are escaped like every other place they are shown.
       html += `<div class="sr-row" role="option" aria-selected="false" id="sr-opt-${idx}" data-idx="${idx}"><span class="sr-type">${_esc(m.type)}</span><span class="sr-name">${_esc(m.label)}</span><span class="sr-sub">${_esc(m.sub||'')}</span></div>`;
     });
+    if (t === 'lsoa' && g.length > shown.length && !allLsoas) {
+      html += `<div class="sr-row sr-more" role="option" aria-selected="false" id="sr-opt-more" data-more="lsoa"><span class="sr-name">Show all ${g.length.toLocaleString('en-GB')} LSOAs</span></div>`;
+    }
   });
   results.innerHTML = html;
   results.classList.add('show');
-  results.querySelectorAll('.sr-row').forEach(row => {
+  results.querySelectorAll('.sr-row[data-idx]').forEach(row => {
     row.addEventListener('click', () => {
       const i = parseInt(row.getAttribute('data-idx'), 10);
       if (Number.isFinite(i) && top[i]) _searchPickResult(top[i]);
     });
   });
+  const moreRow = results.querySelector('.sr-more');
+  if (moreRow) moreRow.addEventListener('click', e => {
+    // The list is redrawn under the pointer, so the press must not reach the
+    // document's listener, which would read it as a press outside the list.
+    e.stopPropagation();
+    const lsoaRows = () => [...results.querySelectorAll('.sr-row[data-idx]')]
+      .filter(r => (r.querySelector('.sr-type') || {}).textContent === 'lsoa');
+    const before = lsoaRows().length;
+    _searchAllLsoas = q;
+    const input = document.getElementById('hdr-search-input');
+    _runSearch(input ? input.value : q);
+    if (input) input.focus();
+    // Carry on from where the list was cut off.
+    const next = lsoaRows()[before];
+    if (next && typeof _searchSetActive === 'function') _searchSetActive(next);
+  });
   if (pq) _renderPostcodeRow(results, pq, q);
   _searchAnnounce(top.length + (top.length === 1 ? ' result' : ' results') +
                   (matches.length > top.length ? ', showing the first ' + top.length : ''));
 }
+// The search Show all was chosen for, so the LSOAs stay listed in full until
+// the words in the box change.
+let _searchAllLsoas = null;
 /* Search is the keyboard's way on to the map (the polygons are not
    focusable), so it behaves as a combobox: arrow keys move through the
    results, Enter picks the highlighted one (the first if none is), and the
@@ -14599,9 +14948,12 @@ async function _prepareScreenForScreenshot(opts) {
       }
       if (banner.parentNode) banner.parentNode.removeChild(banner);
       _screenshotState = null;
-      // Back to the button that started it, which is visible again.
+      // Back to the button that started it, which is visible again, or to
+      // More, which holds it.
       const b = document.getElementById('tb-png');
+      const more = document.getElementById('tb-more');
       if (b && b.offsetParent) b.focus();
+      else if (more && more.offsetParent) more.focus();
     }
   };
   banner.querySelector('#screenshot-done').addEventListener('click', () => _screenshotState && _screenshotState.cleanup());
