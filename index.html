@@ -2673,7 +2673,7 @@
        keep their size on screen and get an invisible 44px hit area from
        ::after, so a near miss still lands. */
     .btn, .tb-btn, .ws-btn, .ov-btn, .wbtn, .deselect-btn, .mode-back, #ai-send, #ai-toggle,
-    .q-chip, .cb-seg button, .ai-chip, .map-chip { min-height: 44px; }
+    .q-chip, .cb-seg button, .ai-chip, .map-chip, .basemap-ctl button { min-height: 44px; }
     .sidebar select, .hdr-search input, #ai-input, .ov-search { min-height: 44px; }
     .leaflet-touch .leaflet-bar a, .leaflet-bar a { width: 44px; height: 44px; line-height: 44px; }
     .dl-seg button { min-width: 44px; min-height: 36px; }
@@ -2779,6 +2779,12 @@
     background: var(--paper); color: var(--ink-2);
   }
   .leaflet-bar a { border-bottom-color: var(--line); }
+  /* Satellite button, under the zoom buttons. */
+  .basemap-ctl button { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 11px;
+    border: 0; border-radius: var(--r-sm); background: var(--paper); color: var(--ink-2); font-weight: 600; font-size: 12px; line-height: 1;
+    font-family: inherit; cursor: pointer; }
+  .basemap-ctl button:hover { background: var(--paper-2); }
+  .basemap-ctl button[aria-pressed="true"] { background: var(--nhs-blue); color: #fff; }
   .leaflet-bar a:hover { background: var(--paper-2); }
   .leaflet-bar a.leaflet-disabled { background: var(--paper-2); color: var(--ink-faint); }
   .leaflet-control-attribution a { color: var(--nhs-blue); }
@@ -3861,6 +3867,13 @@
             <label><input type="radio" name="border-weight" value="1" checked><span>Thin</span></label>
             <label><input type="radio" name="border-weight" value="3"><span>Medium</span></label>
             <label><input type="radio" name="border-weight" value="6"><span>Thick</span></label>
+          </div>
+        </div>
+        <div class="opacity-row">
+          <span class="ms-lbl" id="basemap-lbl">Background</span>
+          <div class="seg" id="basemap-choice" role="radiogroup" aria-labelledby="basemap-lbl">
+            <label><input type="radio" name="basemap" value="map" checked><span>Map</span></label>
+            <label><input type="radio" name="basemap" value="sat"><span>Satellite</span></label>
           </div>
         </div>
       </div>
@@ -7646,6 +7659,9 @@ function esriBasemap() {
     attribution: 'Tiles \u00a9 <a href="https://www.esri.com">Esri</a>, HERE, Garmin \u00b7 \u00a9 <a href="https://openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   });
 }
+// The street basemap in use: CARTO, or Esri's canvas if CARTO fails. The
+// satellite option swaps it out and puts it back (see setBasemap).
+let _streetBase = null;
 if (CARTO_KEY) {
   const carto = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png?key=' + encodeURIComponent(CARTO_KEY), {
     maxZoom: 19,
@@ -7653,6 +7669,7 @@ if (CARTO_KEY) {
     crossOrigin: 'anonymous',
     attribution: '\u00a9 <a href="https://openstreetmap.org/copyright">OpenStreetMap</a> \u00b7 \u00a9 <a href="https://carto.com/attributions">CARTO</a>',
   }).addTo(map);
+  _streetBase = carto;
   /* A revoked or over-quota key, or a network that blocks cartocdn.com, fails
      every tile, and the map goes grey with nothing to say why. So if CARTO
      fails four tiles before a single one has loaded, Esri takes over for the
@@ -7662,14 +7679,80 @@ if (CARTO_KEY) {
   const cartoFailed = () => {
     if (++cartoFails < 4) return;
     carto.off('tileerror', cartoFailed);
+    const onMap = map.hasLayer(carto);
     map.removeLayer(carto);
-    esriBasemap().addTo(map);
+    _streetBase = esriBasemap();
+    if (onMap) _streetBase.addTo(map);
   };
   carto.on('tileerror', cartoFailed);
   carto.once('tileload', () => carto.off('tileerror', cartoFailed));
 } else {
-  esriBasemap().addTo(map);
+  _streetBase = esriBasemap().addTo(map);
 }
+/* Satellite background: Esri World Imagery, with Esri's place names and
+   boundaries drawn on top in a pane of their own above the coloured areas,
+   so street and place names stay readable through the fill. Both are made
+   only when first asked for, so nobody downloads imagery they never see. */
+let _satBase = null, _satLabels = null;
+function setBasemap(kind) {
+  const sat = kind === 'sat';
+  if (sat && !_satBase) {
+    _satBase = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 19,
+      maxNativeZoom: 18,
+      crossOrigin: 'anonymous',
+      attribution: 'Imagery \u00a9 <a href="https://www.esri.com">Esri</a>, Maxar, Earthstar Geographics and the GIS User Community',
+    });
+    if (!map.getPane('satLabels')) {
+      const pane = map.createPane('satLabels');
+      pane.style.zIndex = 450;
+      pane.style.pointerEvents = 'none';
+    }
+    _satLabels = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 19,
+      maxNativeZoom: 18,
+      pane: 'satLabels',
+      crossOrigin: 'anonymous',
+    });
+  }
+  if (sat) {
+    if (_streetBase && map.hasLayer(_streetBase)) map.removeLayer(_streetBase);
+    if (!map.hasLayer(_satBase)) _satBase.addTo(map);
+    if (!map.hasLayer(_satLabels)) _satLabels.addTo(map);
+  } else {
+    if (_satBase && map.hasLayer(_satBase)) map.removeLayer(_satBase);
+    if (_satLabels && map.hasLayer(_satLabels)) map.removeLayer(_satLabels);
+    if (_streetBase && !map.hasLayer(_streetBase)) _streetBase.addTo(map);
+  }
+  document.getElementById('map').classList.toggle('basemap-sat', sat);
+  const mb = document.getElementById('basemap-btn');
+  if (mb) mb.setAttribute('aria-pressed', sat ? 'true' : 'false');
+  const r = document.querySelector('#basemap-choice input[value="' + (sat ? 'sat' : 'map') + '"]');
+  if (r && !r.checked) r.checked = true;
+}
+window.setBasemap = setBasemap;
+// A button on the map itself, under the zoom buttons, so the satellite view
+// is one press away rather than inside the folded Map style section. It and
+// the Background choice there always agree.
+(function _basemapButton() {
+  const Ctl = L.Control.extend({
+    options: { position: 'topleft' },
+    onAdd: function () {
+      const box = L.DomUtil.create('div', 'leaflet-bar basemap-ctl');
+      box.innerHTML = '<button type="button" id="basemap-btn" aria-pressed="false" ' +
+        'title="Show satellite imagery behind the map, or the street map again">Satellite</button>';
+      L.DomEvent.disableClickPropagation(box);
+      L.DomEvent.disableScrollPropagation(box);
+      box.firstChild.addEventListener('click', () => {
+        const toSat = !document.getElementById('map').classList.contains('basemap-sat');
+        setBasemap(toSat ? 'sat' : 'map');
+        if (typeof _writeUrlState === 'function') _writeUrlState();
+      });
+      return box;
+    },
+  });
+  new Ctl().addTo(map);
+})();
 /* The data licences need their attribution lines shown with the map. The full
    set is too long for the corner, so the corner carries a "Data credits" link
    that opens them in a dialog (#credits-dlg, beside the footer). */
@@ -15684,6 +15767,7 @@ function _writeUrlState() {
     if (lsEl && lsEl.checked) p.set('lsoa', '1');
     if (c20El && c20El.checked) p.set('c20', '1');
     if (window.cbSafe) p.set('cb', '1');
+    if (document.getElementById('map').classList.contains('basemap-sat')) p.set('bg', 'sat');
 
     // The level rides whenever it differs from the one the link's indicator
     // opens at, which is Ward with no indicator. Leaving it out only for Ward
@@ -15890,6 +15974,11 @@ function _readUrlState() {
         typeof _setDataLevel === 'function') {
       _setDataLevel(lvl, { fromOverlay: true, quiet: _urlDone.lvl });
       _urlDone.lvl = true;
+    }
+
+    if (p.get('bg') === 'sat' && !_urlDone.bg && typeof setBasemap === 'function') {
+      setBasemap('sat');
+      _urlDone.bg = true;
     }
 
     if (p.get('cb') === '1' && !_urlDone.cb) {
@@ -17103,6 +17192,14 @@ function _restyleAll() {
     if (!r || r.name !== 'border-weight' || !r.checked) return;
     borderWeightMult = (+r.value) * 0.5;
     _restyleAll();
+  });
+  // Background: the street map or satellite imagery.
+  const bm = document.getElementById('basemap-choice');
+  if (bm) bm.addEventListener('change', e => {
+    const r = e.target;
+    if (!r || r.name !== 'basemap' || !r.checked) return;
+    setBasemap(r.value);
+    if (typeof _writeUrlState === 'function') _writeUrlState();
   });
 })();
 

@@ -196,6 +196,33 @@ const smallText = page => page.evaluate(() => {
       return { thin, thick, back: w() };
     });
     ok(bw.thick > bw.thin && bw.back === bw.thin, 'Thick borders draw heavier ward outlines, and Thin puts them back', JSON.stringify(bw));
+    // Background: Map or Satellite. Satellite swaps the street tiles for Esri
+    // imagery with place names above the colours, credits it, and rides in Copy link.
+    const bg = await page.evaluate(() => {
+      const urls = () => { const u = []; map.eachLayer(l => { if (l._url) u.push(l._url); }); return u.join(' '); };
+      const lbl = [...document.querySelectorAll('#basemap-choice label')].map(l => l.textContent.trim()).join(',');
+      document.querySelector('#basemap-choice input[value="sat"]').click();
+      _writeUrlState();
+      const sat = { urls: urls(), credit: document.querySelector('.leaflet-control-attribution').textContent,
+        link: location.search, pane: map.getPane('satLabels') && map.getPane('satLabels').style.pointerEvents };
+      const btnOn = document.getElementById('basemap-btn').getAttribute('aria-pressed');
+      document.querySelector('#basemap-choice input[value="map"]').click();
+      _writeUrlState();
+      const btnOff = document.getElementById('basemap-btn').getAttribute('aria-pressed');
+      // The button on the map does the same, and the Map style choice follows it.
+      document.getElementById('basemap-btn').click();
+      const viaBtn = { urls: urls(), radio: document.querySelector('#basemap-choice input:checked').value };
+      document.getElementById('basemap-btn').click();
+      return { lbl, sat, back: urls(), link: location.search, btnOn, btnOff, viaBtn };
+    });
+    ok(bg.lbl === 'Map,Satellite' && /World_Imagery/.test(bg.sat.urls) && /World_Boundaries_and_Places/.test(bg.sat.urls) &&
+       /Imagery/.test(bg.sat.credit) && /bg=sat/.test(bg.sat.link) && bg.sat.pane === 'none',
+      'Satellite shows Esri imagery with place names, credits it and goes in the link', JSON.stringify(bg.sat).slice(0, 300));
+    ok(!/World_Imagery|World_Boundaries/.test(bg.back) && /cartocdn|World_Light_Gray/.test(bg.back) && !/bg=sat/.test(bg.link),
+      'Map puts the street background back', bg.back);
+    ok(bg.btnOn === 'true' && bg.btnOff === 'false' && /World_Imagery/.test(bg.viaBtn.urls) && bg.viaBtn.radio === 'sat',
+      'the Satellite button on the map and the Map style choice stay in step', JSON.stringify({ on: bg.btnOn, off: bg.btnOff, radio: bg.viaBtn.radio }));
+    await checkAxe(page, 'Map style with the background choice');
     let g = await glyphCheck(page);
     ok(!g.length, 'no glyph or emoji icons on the opening screen', g.slice(0, 5).join(' | '));
     g = await smallText(page);
