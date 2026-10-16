@@ -237,7 +237,10 @@ LSOA and ward boundaries at high zoom reflect genuine differences between the
 <p>When small areas are aggregated into wards or LAs, rates, percentages and
 scores are weighted by population, so each area counts in proportion to the
 number of people who live there. Only raw totals, such as population, crimes
-and the number of services, are summed directly. LSOA figures reach wards
+and the number of services, are summed directly. Census percentages are the
+exception, because ONS publishes the counts behind them: each is calculated
+from the summed counts of the output areas, as described under
+<a href="#census-levels">Census figures at every level</a>. LSOA figures reach wards
 in this way, and MSOA figures reach wards through the LSOAs the two share, so a
 ward that straddles two MSOAs gets a blend in proportion to where its people
 live. Where a figure is not published for LAs, each LA's figure is calculated
@@ -544,7 +547,8 @@ follows one rule.</p>
 <p>Every figure is first placed on the 2021 Census building blocks, which are
 output areas, LSOAs and MSOAs, and is then combined into wards and LAs using the
 official ONS lookup files listed in the <a href="#appendix">technical appendix</a>,
-with counts summed and everything else weighted by population. Nothing is matched by
+with counts summed, Census percentages calculated from their summed counts, and
+everything else weighted by population. Nothing is matched by
 name, and no boundary is laid over another to decide where a figure belongs.</p>
 
 <h3 id="best-fit">Best fit, not exact fit</h3>
@@ -560,10 +564,14 @@ be compared fairly with one another.</p>
 <p>ONS publishes Census 2021 figures for output areas, LSOAs and MSOAs, and the
 map shows ONS's own figure at each of those levels, so they need no matching at
 all. Census figures for wards are calculated from output areas rather than
-from LSOAs, as an average of their percentages weighted by the number of
-residents, using ONS's output area to ward best fit lookup, because output areas are
+from LSOAs, using ONS's output area to ward best fit lookup, because output areas are
 about a fifth the size of LSOAs and follow ward boundaries much more closely.
-LA figures are then calculated from the wards in the same way. To see output areas, choose a
+Each ward percentage is calculated from the summed counts of the output areas
+in the ward: the households with no car or van in those output areas, for
+example, divided by all their households. A measure of households is therefore
+a share of the ward's households, and a measure of people a share of its
+residents. LA figures are calculated in the same way, from the summed counts of
+the output areas in each LA's wards. To see output areas, choose a
 Census indicator and <strong>OA</strong> on the level switch, and their borders
 appear as you zoom in. An output area holds about 125 households, so a single
 household can move a percentage noticeably, and these figures are best read as
@@ -817,7 +825,7 @@ var SOURCES = [
     pub: 'ONS, through Nomis',
     what: '32 indicators: health, disability, ethnicity, age, housing, tenure, ' +
           'qualifications, occupation, travel to work, household language and unpaid care.',
-    geo: 'Output area, LSOA and MSOA, as ONS publishes them, and averaged here, weighted by population, into wards and LAs',
+    geo: 'Output area, LSOA and MSOA, as ONS publishes them, and calculated here for wards and LAs from the summed counts of their output areas',
     period: 'Census day, 21 March 2021',
     cadence: 'Once every ten years, with the next in 2031.',
     manifest: 'census' },
