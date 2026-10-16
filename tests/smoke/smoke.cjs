@@ -294,9 +294,9 @@ const smallText = page => page.evaluate(() => {
         const dd = name => { const dt = [...d.querySelectorAll('dt')].find(e => e.textContent === name); return dt ? dt.nextElementSibling.textContent : ''; };
         if (/\(TS\d+A?\)/.test(OV_META[k].src)) {
           const m = dd('Method');
-          const right = k === 'census_population' ? /add up the residents of the output areas/.test(m)
+          const right = k === 'census_population' ? /sum the residents of the output areas/.test(m)
             : /average their percentages, weighting each by its number of residents/.test(m);
-          if (!right || /add up the LSOAs/.test(m)) out.census.push(k);
+          if (!right || /(add up|sum) the LSOAs/.test(m)) out.census.push(k);
         }
         if (/^ft_\d+$/.test(k) && FT_INFO[k.slice(3)]) {
           const u = dd('Updates');
@@ -610,7 +610,7 @@ const smallText = page => page.evaluate(() => {
       'Walbrook, with no resident count, is neither ranked nor compared, in the sheet and the profile', P.Walbrook.sheet);
     ok(Object.values(P).every(x => x.profH === 'H3'), 'the profile\'s "In plain English" is a sibling of its section headings (h3)', Object.values(P).map(x => x.profH).join(','));
     ok(!Object.values(P).some(x => /[–—]/.test(x.sheet)), 'no dashes in the ward summaries');
-    ok(plain.tiles.length === 6 && plain.cols === 3 && !plain.tiles.some(t => /Population|Avg|\+|\(/.test(t)),
+    ok(plain.tiles.length === 6 && plain.cols === 3 && !plain.tiles.some(t => /Population|Avg|\+|\((?!all\)|limited a lot\))/.test(t)),
       'six spelled-out tiles, three to a row, without the population', plain.cols + ' columns: ' + plain.tiles.join(' | '));
     await page.click('#ws-profile');
     await page.waitForTimeout(500);
@@ -1118,7 +1118,7 @@ const smallText = page => page.evaluate(() => {
       const t = document.getElementById('vcse-about').textContent;
       const num = re => { const m = t.match(re); return m ? +m[1].replace(/,/g, '') : NaN; };
       const ring = document.querySelector('.leaflet-marker-icon.vcse-cluster .vcse-ring');
-      return { t, pinned: num(/([\d,]+) charities are shown on the map/), wide: num(/The Directory also lists ([\d,]+)/),
+      return { t, pinned: num(/Showing ([\d,]+) registered charities/), wide: num(/The Directory also lists ([\d,]+)/),
         tab: +document.getElementById('vcse-tab-count').textContent.replace(/,/g, ''),
         key: !document.getElementById('vcse-key').hidden && document.querySelectorAll('#vcse-key li').length,
         ring: ring ? getComputedStyle(ring).backgroundImage : '' };
@@ -1499,7 +1499,7 @@ const smallText = page => page.evaluate(() => {
       gone: document.getElementById('ldr').classList.contains('hidden'),
       wards: Object.keys(WARD_DATA_BY_CODE).length,
     }));
-    ok(ld.name === 'PopHealth Map' && /^Free map of health/.test(ld.line) && !DASH.test(ld.line),
+    ok(ld.name === 'PopHealth Map' && /^Explore health, deprivation and local services/.test(ld.line) && !DASH.test(ld.line),
       'loading screen: the site name and one sentence', JSON.stringify(ld));
     ok(ld.gone && ld.wards > 600 && (await noteText(page)) === '',
       'ward_core.json blocked: the whole ward file stands in and nothing is reported', JSON.stringify(ld));
@@ -1567,7 +1567,7 @@ const smallText = page => page.evaluate(() => {
     await page.waitForFunction(() => !document.getElementById('ldr-msg').hidden, null, { timeout: 20000 }).catch(() => {});
     const m = await page.evaluate(() => ({ text: document.getElementById('ldr-msg').hidden ? '' : document.getElementById('ldr-msg-text').textContent,
       btn: document.getElementById('ldr-reload').textContent, focus: document.activeElement && document.activeElement.id }));
-    ok(/could not be loaded/.test(m.text) && /reload the page/.test(m.text) && !DASH.test(m.text) && m.btn === 'Reload the page' && m.focus === 'ldr-reload',
+    ok(/failed to load/.test(m.text) && /reload the page/.test(m.text) && !DASH.test(m.text) && m.btn === 'Reload the page' && m.focus === 'ldr-reload',
       'wards.js blocked: the loading screen says so within 20 seconds and offers a reload', JSON.stringify(m));
     await page.close();
   }
@@ -1681,8 +1681,12 @@ const smallText = page => page.evaluate(() => {
     ok(frames['methodology.html'].current === 'Methodology' && frames['accessibility.html'].current === 'Accessibility' &&
        frames['privacy.html'].current === 'About and privacy' && frames['404.html'].current === '',
        'pages: the header marks the page you are on');
-    ok(/contact@pophealth\.uk/.test(ref.ftr) && /not an NHS service/.test(ref.ftr), 'pages: footer gives the contact address',
+    ok(/contact@pophealth\.uk/.test(ref.ftr) && /not affiliated with the NHS/.test(ref.ftr), 'pages: footer gives the contact address',
        ref.ftr);
+    // The app's status bar and the pages say who runs the site in the same words.
+    const appNote = ((await (await fetch(BASE + '/index.html')).text()).match(/<span class="sbar-note">([^<]+)<\/span>/) || [])[1] || '';
+    ok(/not affiliated with the NHS/.test(appNote) && ref.ftr.includes(appNote.trim()),
+       'pages: the footer disclaimer matches the app\'s word for word', appNote + ' / ' + ref.ftr);
     ok(frames['404.html'].relative.length === 0, '404: every link is absolute', frames['404.html'].relative.join(' '));
   }
   // What each page says.

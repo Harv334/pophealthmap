@@ -732,12 +732,20 @@ var MODEL_LABEL = "Claude Sonnet 5";
       .replace(/\n/g, "<br>");
   }
 
-  var EXAMPLES = [
+  // The named places are London's. Elsewhere the examples name none, so a
+  // region's Ask panel never suggests a question about places it does not hold.
+  var IS_LONDON = !window.PH_REGION || window.PH_REGION.isLondon;
+  var EXAMPLES = IS_LONDON ? [
     "Compare deprivation in Brent and Bromley",
     "Which 5 wards have the highest over-65 population?",
     "Tell me about Notting Dale",
     "Which LA has the most GP practices?",
     "How deprived is Hackney?",
+  ] : [
+    "Which 5 wards are the most deprived?",
+    "Which 5 wards have the highest over-65 population?",
+    "Which LA has the most GP practices?",
+    "Which ward has the highest crime rate?",
   ];
 
   /**
@@ -767,13 +775,13 @@ var MODEL_LABEL = "Claude Sonnet 5";
     var intro = document.createElement("div");
     intro.className = "ai-msg ai-bot";
     intro.textContent = "Ask about any ward or local authority (LA) on the map. Every figure " +
-      "in an answer is read from the data already loaded in your browser, so " +
-      "no number is written from memory. Your question, and the figures looked " +
-      "up to answer it, are sent through this site's server to Anthropic, " +
-      "whose Claude model writes the reply. This is a free service with " +
-      "running costs, so questions are limited to " + DAILY_CAP + " a day per " +
-      "person. If it asks you to narrow something down, your answer to that is " +
-      "free. The map itself is unlimited.";
+      "in an answer is read from the data loaded in your browser, not written " +
+      "from memory. Your question and the figures used to answer it are sent " +
+      "through this site's server to Anthropic, whose Claude model writes the " +
+      "reply. Questions are limited to " + DAILY_CAP + " a day per person, " +
+      "because the service is free but costs money to run. Answering a request " +
+      "to narrow your question down does not count towards the limit, and the " +
+      "map itself is unlimited.";
     log.appendChild(intro);
 
     var chips = document.createElement("div");
