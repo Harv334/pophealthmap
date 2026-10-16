@@ -2840,7 +2840,7 @@
       "@id": "https://pophealth.uk/#website",
       "url": "https://pophealth.uk/",
       "name": "PopHealth Map",
-      "alternateName": "London Population Health Mapping",
+      "alternateName": "Population Health Map for England",
       "description": "An interactive map of population health for every region of England, at local authority, ward, MSOA and LSOA level.",
       "inLanguage": "en-GB",
       "publisher": { "@id": "https://pophealth.uk/#creator" }
@@ -2854,8 +2854,8 @@
     {
       "@type": "Dataset",
       "@id": "https://pophealth.uk/#dataset",
-      "name": "London population health by ward and LSOA",
-      "description": "Population health, deprivation and service access indicators for all 33 London local authorities, published at 2024 ward and 2021 LSOA level. Covers 704 wards, 4,994 LSOAs, 1,146 GP practices, 1,737 pharmacies and 1,877 dental practices. Sources include OHID Fingertips, ONS Census 2021, IMD 2025, NHS ODS registers, QOF prevalence, police.uk recorded crime, DWP claimant count, fuel poverty, Charity Commission registers, Defra UK-AIR modelled background air quality and the Transport for London stop and station register. Every figure comes from a published source, named in the methodology. The air quality layers are Defra model output rather than measurements, and are labelled as such.",
+      "name": "Population health in England by local authority, ward and LSOA",
+      "description": "Population health, deprivation and service access indicators for every region of England, at local authority (LA), ward, MSOA and LSOA level. In London, it covers 704 wards, 4,994 LSOAs, 1,146 GP practices, 1,737 pharmacies and 1,877 dental practices. Sources include OHID Fingertips, ONS Census 2021, IMD 2025, NHS ODS registers, QOF prevalence, police.uk recorded crime, DWP claimant count, fuel poverty, Charity Commission registers, Defra UK-AIR modelled background air quality and the Transport for London stop and station register. Every figure comes from a published source, named in the methodology. The air quality layers are Defra model output rather than measurements, and are labelled as such.",
       "url": "https://pophealth.uk/",
       "sameAs": "https://github.com/Harv334/pophealthmap",
       "isAccessibleForFree": true,
@@ -2867,6 +2867,7 @@
       "keywords": [
         "population health",
         "public health",
+        "England",
         "London",
         "ward",
         "LSOA",
@@ -2881,10 +2882,10 @@
       ],
       "spatialCoverage": {
         "@type": "Place",
-        "name": "Greater London, United Kingdom",
+        "name": "England, United Kingdom",
         "geo": {
           "@type": "GeoShape",
-          "box": "51.28 -0.51 51.69 0.33"
+          "box": "49.86 -6.42 55.81 1.77"
         }
       },
       "distribution": [
@@ -3389,7 +3390,7 @@
               <button type="button" class="ov-back" id="ov-back">
                 <svg class="ic" aria-hidden="true"><use href="#i-chevron-left"/></svg>All themes</button>
               <h2 class="ov-tv-h" id="ov-tv-h"></h2>
-              <div class="ov-tv-key">A <span class="ov-lv-nat">box</span> marks the level each indicator is published at. Figures at other levels are calculated from it: counts are summed and rates are population-weighted.</div>
+              <div class="ov-tv-key">A <span class="ov-lv-nat">box</span> marks the level each indicator is published at. Figures for larger areas are calculated from it, with counts summed and rates population-weighted, and smaller areas repeat the figure of the area they sit in.</div>
               </div>
               <div class="ov-tv-list" id="ov-tv-list" role="group" aria-labelledby="ov-tv-h"></div>
               <!-- Core20 lives with the deprivation indicators it is built
@@ -5454,12 +5455,12 @@ function indUnit(k) {
   return String((m && m.u) || '').trim();
 }
 /* A column heading: the label, then the unit in brackets unless the label
-   already says it. A unit with brackets of its own follows a comma rather than
-   nesting. */
+   already says it. A unit with brackets of its own, or a label that already
+   ends in brackets, follows a comma rather than nesting. */
 function indHeader(k) {
   const l = indLabel(k), u = indUnit(k);
   if (!u || l.toLowerCase().indexOf(u.toLowerCase()) !== -1) return l;
-  return l + (u.indexOf('(') === -1 ? ' (' + u + ')' : ', ' + u);
+  return l + ((u.indexOf('(') === -1 && !/\)$/.test(l)) ? ' (' + u + ')' : ', ' + u);
 }
 function indSameAs(k) { return IND_SAME_AS[k] || ''; }
 
@@ -6793,7 +6794,7 @@ function indicatorFacts(k) {
     f.cadence = 'We recalculate these every month from the latest register of stops.';
     f.method = /_dist_m$/.test(k)
       ? 'This is a straight-line distance from the middle of each LSOA, not a walking route or a travel time, and it says nothing about how often services run.'
-      : 'This counts what lies within a straight-line distance of the middle of each LSOA, not travel time or how often services run. Ward figures are an average across residents rather than a total, because the same station or stop is near several LSOAs and adding them up would count it many times.';
+      : 'This counts what lies within a straight-line distance of the middle of each LSOA, not travel time or how often services run. Ward figures are an average across residents rather than a total, because the same station or stop is near several LSOAs and summing them would count it many times.';
     return f;
   }
   if (/PTAL/.test(src)) {
@@ -9606,8 +9607,9 @@ function showWard(wn) {
          second button with a different name for the same thing is not needed. -->
     ${cats || '<div class="data-note">We do not have any figures for this ward.</div>'}
     <div class="data-note prof-key">
-      A figure with no label is the ward’s own: Census figures are a population-weighted average of its output areas, the smallest
-      Census areas of about 125 households, and crimes are counted inside its boundary.
+      A figure with no label is the ward’s own. Census figures are calculated from its output areas, the smallest
+      Census areas of about 125 households, with percentages population-weighted and the population summed.
+      Crimes are counted inside its boundary.
       <span class="gpill gpill-lsoa">estimated from LSOAs</span> and <span class="gpill gpill-msoa">estimated from MSOAs</span>
       mark figures published for those larger areas and weighted onto this ward by where its residents live, and a
       <span class="gpill gpill-la">whole-LA figure</span> is the same for every ward in ${_esc(ladPhrase(bor))}.
@@ -17937,13 +17939,13 @@ var PH_SHOW = {
   }
   /* A menu entry or CSV column heading: the display label, then its unit
      unless the label already states it ("Crime rate per 1,000 residents").
-     A unit with brackets of its own, "ratio (England = 100)", follows a comma
-     rather than nesting. indHeader's rule, with this closure's fallbacks for
+     A unit with brackets of its own, "ratio (England = 100)", or a label that
+     already ends in brackets follows a comma rather than nesting. indHeader's rule, with this closure's fallbacks for
      a key IND_NAMES does not know. */
   function headerOf(k) {
     var l = labelOf(k), u = unitOf(k);
     if (!u || l.toLowerCase().indexOf(u.toLowerCase()) !== -1) return l;
-    return l + (u.indexOf('(') === -1 ? ' (' + u + ')' : ', ' + u);
+    return l + ((u.indexOf('(') === -1 && !/\)$/.test(l)) ? ' (' + u + ')' : ', ' + u);
   }
 
   /**
@@ -20784,9 +20786,9 @@ var PH_SHOW = {
     {
       t: 'Custom area: draw your own',
       n: '<strong>Custom area</strong> builds an area that does not follow ward lines. ' +
-         'Click the LSOAs on the map to add them. Click one again to remove it. ' +
-         'Name the area, and the tool aggregates its figures. Counts are summed. ' +
-         'Percentages and scores are weighted by population. The report states the ' +
+         'Click the LSOAs on the map to add them, and click one again to remove it. ' +
+         'Name the area, and the tool aggregates its figures, summing counts and ' +
+         'weighting percentages and scores by population. The report states the ' +
          'method beside every figure.',
       go: function () {
         closeWardSheet();
