@@ -1683,6 +1683,10 @@ const smallText = page => page.evaluate(() => {
        'pages: the header marks the page you are on');
     ok(/contact@pophealth\.uk/.test(ref.ftr) && /not affiliated with the NHS/.test(ref.ftr), 'pages: footer gives the contact address',
        ref.ftr);
+    // The app's status bar and the pages say who runs the site in the same words.
+    const appNote = ((await (await fetch(BASE + '/index.html')).text()).match(/<span class="sbar-note">([^<]+)<\/span>/) || [])[1] || '';
+    ok(/not affiliated with the NHS/.test(appNote) && ref.ftr.includes(appNote.trim()),
+       'pages: the footer disclaimer matches the app\'s word for word', appNote + ' / ' + ref.ftr);
     ok(frames['404.html'].relative.length === 0, '404: every link is absolute', frames['404.html'].relative.join(' '));
   }
   // What each page says.
