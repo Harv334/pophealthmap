@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Methodology and technical notes | PopHealth Map</title>
 <link rel="canonical" href="https://pophealth.uk/methodology.html">
-<meta name="description" content="How PopHealth Map is built: every data source, how figures are worked out from small areas for wards and LAs, and what to watch for when reading them.">
+<meta name="description" content="How PopHealth Map is built: every data source, how figures for wards and LAs are calculated from small areas, and what to watch for when reading them.">
 <!-- Same inline map-pin icon as index.html, so the tab matches. -->
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1a1a'/%3E%3Cpath d='M16 6c-3.9 0-7 3.1-7 7 0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7z' fill='%23fff'/%3E%3Ccircle cx='16' cy='13' r='2.6' fill='%231a1a1a'/%3E%3C/svg%3E">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
@@ -16,14 +16,14 @@
 <meta property="og:locale" content="en_GB">
 <meta property="og:url" content="https://pophealth.uk/methodology.html">
 <meta property="og:title" content="Methodology and technical notes | PopHealth Map">
-<meta property="og:description" content="How PopHealth Map is built: every data source, how figures are worked out from small areas for wards and LAs, and what to watch for when reading them.">
+<meta property="og:description" content="How PopHealth Map is built: every data source, how figures for wards and LAs are calculated from small areas, and what to watch for when reading them.">
 <meta property="og:image" content="https://pophealth.uk/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="PopHealth Map: population health across England by ward and neighbourhood">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Methodology and technical notes | PopHealth Map">
-<meta name="twitter:description" content="How PopHealth Map is built: every data source, how figures are worked out from small areas for wards and LAs, and what to watch for when reading them.">
+<meta name="twitter:description" content="How PopHealth Map is built: every data source, how figures for wards and LAs are calculated from small areas, and what to watch for when reading them.">
 <meta name="twitter:image" content="https://pophealth.uk/og.png">
 <meta name="color-scheme" content="light">
 <!-- Fonts from this origin like the map's, because the networks this is
@@ -60,21 +60,22 @@ from the Census, the NHS, the Index of Multiple Deprivation and other official
 sources. This page explains where each one comes from, how it was placed on
 wards and neighbourhoods, and what it can and cannot tell you, so you can judge
 how far to rely on it. If you only have a few minutes, start with
-<a href="#reading">Reading a figure</a>, and you will find the exact ONS lookup
+<a href="#reading">How to interpret the data</a>, and you will find the exact ONS lookup
 files in the <a href="#appendix">technical appendix</a> at the end.</p>
 
 <div class="caution">
-  <strong>This tool is in development.</strong> The data is real and comes from
-  published sources, but the map is still being built and checked, so treat
-  figures as provisional.
+  <strong>Project status: beta.</strong> All figures come from official
+  published sources, but the methods used to aggregate them and the boundary
+  lookups are still being validated, so please treat figures as
+  provisional.
 </div>
 
 <nav class="toc" aria-labelledby="on-this-page">
   <h2 id="on-this-page">On this page</h2>
   <ol>
     <li><a href="#cite">How to cite this map</a></li>
-    <li><a href="#reading">Reading a figure</a></li>
-    <li><a href="#words">Words used on this map</a></li>
+    <li><a href="#reading">How to interpret the data</a></li>
+    <li><a href="#words">Glossary of geographies and measures</a></li>
     <li><a href="#coverage">What the map covers</a></li>
     <li><a href="#sources">Where the data comes from</a></li>
     <li><a href="#placing">How figures are placed onto areas</a></li>
@@ -111,21 +112,22 @@ them as long as you credit the source, and
 <a href="#licences">Licences and credits</a> gives the wording each publisher
 asks for.</p>
 
-<h2 id="reading">Reading a figure</h2>
+<h2 id="reading">How to interpret the data</h2>
 
-<p>Several things on this map are easy to read the wrong way. None of them is a
-fault, because each comes from how the figures are published, but each one
-changes what a number means, so they are grouped here by the question they
-answer. The names of the areas, from the local authority (LA) down to the LSOA
-and the output area, are explained under <a href="#words">Words used on this
-map</a>.</p>
+<p>Several methodological properties of the underlying datasets affect how
+figures on this map should be interpreted. None of them is an error, because
+each follows from how the figures are published, but each changes what a
+number means, so they are grouped here by the question they answer. The names
+of the areas, from the local authority (LA) down to the LSOA and the output
+area, are explained in the <a href="#words">Glossary of geographies and
+measures</a>.</p>
 
 <h3 id="reading-measures">What a figure measures</h3>
 
 <h4 id="indicator-card">Every indicator has a card</h4>
 
 <p>The <strong>About this indicator</strong> button under the chosen indicator,
-or the key along the bottom of the map, opens a card that says what is counted
+or the key along the bottom of the map, opens a card that explains what is counted
 and out of what, the level its publisher releases it at and how it reaches the
 other levels, the period, the source and how often the source updates it. For
 the Local Health figures, the type of value, the unit, the kind of year and the
@@ -213,7 +215,7 @@ out is shown underneath them.</p>
 unlikely to be down to chance. Hovering over an MSOA shows OHID's verdict beside
 the figure. Many MSOA figures rest on small numbers, so an area that looks high
 on the colour scale is often similar to England by this test. Ward and LA
-figures are worked out from MSOAs and carry no test, and neither do the few
+figures are calculated from MSOA figures and carry no test, and neither do the few
 MSOA figures estimated from 2011 areas.</p>
 
 <h3 id="reading-areas">How a figure reaches an area</h3>
@@ -226,18 +228,19 @@ areas</a>, and these are the parts of it that change what you see.</p>
 <p>LSOA boundaries come from the 2021 Census and wards were redrawn in 2025, so
 the two genuinely cross, and about four in ten LSOAs cross a ward line. Each
 LSOA is given to the one ward it best fits, so a ward's figure counts each LSOA
-once rather than in proportion to the land it shares. When you zoom in and see
-LSOA outlines crossing ward outlines, that is the geography as it is rather
-than a drawing error.</p>
+once rather than in proportion to the land it shares. Visible overlaps between
+LSOA and ward boundaries at high zoom reflect genuine differences between the
+2021 Census and 2025 electoral boundaries, not a rendering error.</p>
 
-<h4 id="adding-up">Only counts are added up</h4>
+<h4 id="adding-up">Rates are population-weighted, and only raw counts are summed</h4>
 
-<p>When small areas are combined into a larger one, counts such as population,
-crimes and services are added up, and everything else is averaged with each
-area weighted by the number of people who live there. LSOA figures reach wards
+<p>When small areas are aggregated into wards or LAs, rates, percentages and
+scores are weighted by population, so each area counts in proportion to the
+number of people who live there. Only raw totals, such as population, crimes
+and the number of services, are summed directly. LSOA figures reach wards
 in this way, and MSOA figures reach wards through the LSOAs the two share, so a
 ward that straddles two MSOAs gets a blend in proportion to where its people
-live. Where a figure is not published for LAs, each LA's figure is worked out
+live. Where a figure is not published for LAs, each LA's figure is calculated
 from its wards in the same way, which makes it the rate for the LA's residents
 rather than an average of unequal wards. It can differ slightly from a figure
 the council or a publisher gives for itself, which may use a different
@@ -272,11 +275,10 @@ they are. The <strong>PCN footprints</strong> outline gives each LSOA to the
 network most of its registered residents use, which makes a convenient boundary
 but not one that NHS England publishes or that practices work to.</p>
 
-<h2 id="words">Words used on this map</h2>
+<h2 id="words">Glossary of geographies and measures</h2>
 
-<p>Official statistics use short names for areas and measures. Where the map
-uses one, this section says what it means, and where a plain word is clearer,
-the map uses that instead and this section gives the official name.</p>
+<p>The tables below show how the terms used on this map correspond to official
+statistical names and definitions.</p>
 
 <h3 id="words-areas">Areas</h3>
 
@@ -309,10 +311,10 @@ the map uses that instead and this section gives the official name.</p>
             England has 6,856 and London 1,002.</td></tr>
     <tr><td class="term">LSOA</td><td>Lower layer Super Output Area</td>
         <td>A statistical area of about 1,500 people, of which England has
-            33,755 and London 4,994. LSOAs hold roughly equal numbers of people
-            rather than following anything on the ground, so they are small
-            where people live close together and large where they do not. They
-            are the smallest areas with figures on most topics, and deprivation
+            33,755 and London 4,994. LSOAs are designed to hold roughly equal
+            populations rather than follow physical landmarks, so they are
+            compact in dense urban areas and larger in outer suburbs and the
+            countryside. They are the smallest areas with figures on most topics, and deprivation
             is published for them.</td></tr>
     <tr><td class="term">OA</td><td>Output area</td>
         <td>The smallest Census area, of about 125 households. England has
@@ -343,7 +345,7 @@ the map uses that instead and this section gives the official name.</p>
     <tr><td class="term">Indicator</td><td>Indicator</td>
         <td>Something you can colour the map by, such as life expectancy or the
             share of homes rented from a council or housing association. Each
-            indicator has a card that says what it measures.</td></tr>
+            indicator has a card that explains what it measures.</td></tr>
     <tr><td class="term">Figure</td><td>Value</td>
         <td>A single number for one area, such as the life expectancy of one
             ward.</td></tr>
@@ -507,7 +509,7 @@ monthly figures.</p>
 <p>The last column, <strong>Last updated here</strong>, is read from our own
 record of each update rather than written by hand, so it shows when this site
 last took new figures from each source and whether that worked. If a source
-stops updating, its row says so rather than quietly showing older figures.</p>
+stops updating, its row is marked rather than quietly showing older figures.</p>
 
 <div class="wrap" tabindex="0" role="region" aria-label="Sources">
   <table id="src-table" class="stack">
@@ -542,7 +544,7 @@ follows one rule.</p>
 <p>Every figure is first placed on the 2021 Census building blocks, which are
 output areas, LSOAs and MSOAs, and is then combined into wards and LAs using the
 official ONS lookup files listed in the <a href="#appendix">technical appendix</a>,
-with counts added up and everything else averaged by population. Nothing is matched by
+with counts summed and everything else weighted by population. Nothing is matched by
 name, and no boundary is laid over another to decide where a figure belongs.</p>
 
 <h3 id="best-fit">Best fit, not exact fit</h3>
@@ -557,11 +559,11 @@ be compared fairly with one another.</p>
 
 <p>ONS publishes Census 2021 figures for output areas, LSOAs and MSOAs, and the
 map shows ONS's own figure at each of those levels, so they need no matching at
-all. Census figures for wards are worked out from output areas rather than
-from LSOAs, by averaging their percentages weighted by the number of residents
-and using ONS's output area to ward best fit lookup, because output areas are
+all. Census figures for wards are calculated from output areas rather than
+from LSOAs, as an average of their percentages weighted by the number of
+residents, using ONS's output area to ward best fit lookup, because output areas are
 about a fifth the size of LSOAs and follow ward boundaries much more closely.
-LA figures are then worked out from the wards in the same way. To see output areas, choose a
+LA figures are then calculated from the wards in the same way. To see output areas, choose a
 Census indicator and <strong>OA</strong> on the level switch, and their borders
 appear as you zoom in. An output area holds about 125 households, so a single
 household can move a percentage noticeably, and these figures are best read as
@@ -579,7 +581,7 @@ wards through the LSOAs the two share.</p>
 
 <p>Some Local Health figures are still published for the MSOAs of 2011. Where a
 2011 area was split or merged to make a 2021 one, the figure for the 2021 area
-is worked out from the 2011 ones, weighted by how many people lived in each, and
+is calculated from the 2011 ones, weighted by how many people lived in each, and
 the map says <em>Estimated from 2011 areas</em> beside it and does not compare
 it with England, because the publisher's comparison applied to the old area. In
 the current release OHID publishes no figure under either code for the areas
@@ -601,7 +603,7 @@ right.</p>
 <p>The City of London has 25 wards, but its few LSOAs are each matched to one of
 just five of them, so the other 20 wards have no deprivation score, no Local
 Health figures and none of the other figures built from LSOAs. Census figures
-are worked out from output areas instead, so some of those 20 wards do have them.
+are calculated from output areas instead, so some of those 20 wards do have them.
 This comes from the geography rather than from a missed update, and you can
 choose <strong>LA</strong> to see the figures for the City as a whole.</p>
 
@@ -633,11 +635,14 @@ catchment.</p>
 
 <h3 id="gap-benefits">Benefits other than the claimant count</h3>
 
-<p>Figures for benefits such as Personal Independence Payment, Pension Credit
-and Carer's Allowance are not on the map, because their current figures for
-small areas are only available through DWP's own Stat-Xplore service, which
-needs a registered account. The claimant count, which covers people claiming
-benefits because they are unemployed, is included.</p>
+<p>These are not currently included. Small-area figures for DWP benefits, such
+as Universal Credit, Personal Independence Payment, Employment and Support
+Allowance, Carer's Allowance and Pension Credit, are not published on Nomis for
+2021 LSOAs: some have never been published there, and the rest stop in 2018 on
+older boundaries. Current figures are available only through DWP's Stat-Xplore
+service, and including them needs a separate connection to it. The claimant
+count, which covers people claiming benefits because they are unemployed, is
+included.</p>
 
 <h2 id="appendix">Technical appendix</h2>
 
@@ -777,7 +782,7 @@ licences file</a>.</p>
     <p>PopHealth Map is a free map of health and deprivation for every neighbourhood
     in England, and you can get in touch at
     <a href="mailto:contact@pophealth.uk">contact@pophealth.uk</a>.</p>
-    <p>Independent project, not an NHS service.</p>
+    <p>An independent open-data project (not affiliated with the NHS).</p>
   </div>
 </footer>
 
@@ -868,7 +873,7 @@ var SOURCES = [
     pub: 'NHS England',
     what: 'Recorded prevalence from GP registers: hypertension, depression and ' +
           'severe mental illness.',
-    geo: 'GP practice, added up to LAs',
+    geo: 'GP practice, aggregated by OHID to upper-tier LAs',
     period: 'The latest published year',
     cadence: 'Yearly.',
     manifest: 'qof' },
@@ -1041,10 +1046,10 @@ var SOURCES = [
     pub: 'NHS England',
     what: 'Which LSOAs are in the most deprived fifth of England, and how many each ward has.',
     geo: 'LSOA',
-    period: 'Worked out from the IMD 2025',
+    period: 'Calculated from the IMD 2025',
     cadence: 'Follows the IMD.',
     manifest: null,
-    status: 'Worked out from the IMD at each update' },
+    status: 'Calculated from the IMD at each update' },
 ];
 
 /* Dates as the house style writes them, "11 October 2026". */

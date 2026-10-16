@@ -1681,7 +1681,7 @@ const smallText = page => page.evaluate(() => {
     ok(frames['methodology.html'].current === 'Methodology' && frames['accessibility.html'].current === 'Accessibility' &&
        frames['privacy.html'].current === 'About and privacy' && frames['404.html'].current === '',
        'pages: the header marks the page you are on');
-    ok(/contact@pophealth\.uk/.test(ref.ftr) && /not an NHS service/.test(ref.ftr), 'pages: footer gives the contact address',
+    ok(/contact@pophealth\.uk/.test(ref.ftr) && /not affiliated with the NHS/.test(ref.ftr), 'pages: footer gives the contact address',
        ref.ftr);
     ok(frames['404.html'].relative.length === 0, '404: every link is absolute', frames['404.html'].relative.join(' '));
   }
