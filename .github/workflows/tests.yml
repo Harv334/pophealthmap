@@ -25,6 +25,17 @@ jobs:
       # for each one, and runs first because it takes a second.
       - name: Check for dashes in user-facing text
         run: python3 tests/check_dashes.py
+      # The Census ward and LA figures, built from summed counts, checked
+      # offline on synthetic tables: the rules themselves and their wiring
+      # into the ward and LA builds. A fault here would otherwise surface
+      # only at the next data refresh.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Check the Census counts build
+        run: |
+          pip install pandas numpy pyarrow requests
+          python3 tests/pipeline/test_census_counts.py
       - uses: actions/setup-node@v4
         with:
           node-version: '22'

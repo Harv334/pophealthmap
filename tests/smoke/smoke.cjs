@@ -26,6 +26,7 @@ const ok = (cond, name, detail) => {
 };
 const DESK = { width: 1400, height: 900 };
 const PHONE = { width: 390, height: 844, isMobile: true, hasTouch: true };
+const SIDEWAYS = { width: 844, height: 390, isMobile: true, hasTouch: true };
 
 async function open(browser, url, vp) {
   const { isMobile, hasTouch, ...viewport } = vp;
@@ -293,16 +294,37 @@ const smallText = page => page.evaluate(() => {
         });
         const dd = name => { const dt = [...d.querySelectorAll('dt')].find(e => e.textContent === name); return dt ? dt.nextElementSibling.textContent : ''; };
         if (/\(TS\d+A?\)/.test(OV_META[k].src)) {
-          const m = dd('Method');
-          // Ward and LA percentages are calculated from the counts of the
-          // output areas, never an average of their percentages.
-          const pub = dd('Published at');
-          const right = k === 'census_population' ? /sum the residents of the output areas/.test(m)
-            : /ward figure is calculated from the counts of the output areas/.test(m) &&
-              /LA figure from the output areas in its wards/.test(m) &&
-              /Ward figures are calculated from the counts of the output areas in each ward/.test(pub) &&
-              /LA\b.{0,40} figures are calculated in the same way, from the output areas in each LA/.test(pub);
-          if (!right || /(add up|sum) the LSOAs|average|weight/.test(m + ' ' + pub)) out.census.push(k);
+          // The card describes the Census figures that are loaded: summed
+          // counts when the ward file says census_method 'counts' (and, for
+          // LAs, when the LA file carries Census figures), and otherwise the
+          // population-weighted averages an older data build made. Checked
+          // in the state the data is in, then in the other state.
+          const realMeta = WARD_META, realBd = BOROUGH_DATA;
+          const states = [[censusWardCounts(), censusLaCounts()]];
+          states.push([!states[0][0], !states[0][1]]);
+          states.forEach(([wc, lc], i) => {
+            if (i) {
+              WARD_META = Object.assign({}, realMeta, { census_method: wc ? 'counts' : 'weighted' });
+              BOROUGH_DATA = lc ? { E09000001: { census_no_car_pct: 40 } } : {};
+            }
+            try {
+              const c = document.createElement('div');
+              c.innerHTML = indicatorCardHTML(k);
+              const dd2 = name => { const dt = [...c.querySelectorAll('dt')].find(e => e.textContent === name); return dt ? dt.nextElementSibling.textContent : ''; };
+              const m = dd2('Method'), pub = dd2('Published at');
+              const right = k === 'census_population' ? /sum the residents of the output areas/.test(m)
+                : (wc ? /ward figure is calculated from the counts of the output areas/.test(m) &&
+                        /Ward figures are calculated from the counts of the output areas in each ward/.test(pub)
+                      : /ward figure is an average of the output areas that best fit the ward under the ONS lookup, weighted by their residents/.test(m) &&
+                        /Ward figures are an average of the output areas in each ward, weighted by population/.test(pub)) &&
+                  (lc ? /LA figure is calculated from the counts of the output areas in its wards/.test(m) &&
+                        /LA\b.{0,40} figures are calculated (in the same way, from|from the counts of) the output areas in each LA/.test(pub)
+                      : /LA figure is an average of its ward figures, weighted by population/.test(m) &&
+                        /LA\b.{0,40} figures are an average of the ward figures, weighted by population/.test(pub));
+              if (!right || /(add up|sum) the LSOAs/.test(m + ' ' + pub) ||
+                  (wc && lc && /average|weight/.test(m + ' ' + pub))) out.census.push(k + (i ? ' (other state)' : ''));
+            } finally { WARD_META = realMeta; BOROUGH_DATA = realBd; }
+          });
         }
         if (/^ft_\d+$/.test(k) && FT_INFO[k.slice(3)]) {
           const u = dd('Updates');
@@ -360,10 +382,25 @@ const smallText = page => page.evaluate(() => {
       const fromWards = laAggregate(k)[code];
       BOROUGH_DATA[code] = Object.assign({}, before || {}, { [k]: 12.34 });
       const own = boroughOvValue(code, k);
+      // Ask's LA lookup gives the same figure as the map, read from the LA
+      // file, rather than its own average of the wards.
+      const ward = Object.values(WARD_DATA).find(w => w && w.lad_code === code);
+      const askLa = window.PH_ASSISTANT && ward ? PH_ASSISTANT.areasFor('la')[ward.lad] : null;
+      const ask = askLa ? askLa.indicators[k] : undefined;
+      const askTool = window.PH_ASSISTANT && ward ? PH_ASSISTANT.runTool('get_area', { name: ward.lad, level: 'la' }) : null;
       if (before) BOROUGH_DATA[code] = before; else delete BOROUGH_DATA[code];
-      return { own, fromWards, none: [fmtNum(null), fmtOv(undefined, k)] };
+      // Whichever state the LA file is in, the map shows its own Census
+      // figure when it has one and the ward average when it has none, and
+      // the card says which (see censusLaCounts).
+      const has = Object.values(BOROUGH_DATA).some(d => Object.keys((d && (d.indicators || d)) || {}).some(x => /^census_.+_pct$/.test(x)));
+      const live = boroughOvValue(code, k);
+      const liveRight = before && before[k] != null ? live === before[k] : live === fromWards;
+      return { own, fromWards, has, state: censusLaCounts() === has, liveRight, ask, askCode: askLa && askLa.lad_code,
+        askTool: JSON.stringify(askTool || '').indexOf('12.34') !== -1, none: [fmtNum(null), fmtOv(undefined, k)] };
     });
     ok(laCen.own === 12.34 && typeof laCen.fromWards === 'number', 'an LA Census figure from the data build is used ahead of the ward average', JSON.stringify(laCen));
+    ok(laCen.state && laCen.liveRight, 'the LA Census figure on the map, and what the card says about it, follow the LA file', JSON.stringify(laCen));
+    ok(laCen.ask === 12.34 && laCen.askTool, 'Ask gives the same LA figure as the map, from the LA file', JSON.stringify(laCen));
     ok(laCen.none.every(t => t === 'No figure'), 'a missing figure reads "No figure"', laCen.none.join(' | '));
     // The local authority level is called LA everywhere, and the places that
     // explain the levels introduce it once as "local authority (LA)".
@@ -1086,6 +1123,29 @@ const smallText = page => page.evaluate(() => {
       ok(/<link rel="icon" type="image\/png" sizes="32x32" href="(https:\/\/pophealth\.uk\/)?favicon-32\.png">/.test(html) &&
          /<link rel="apple-touch-icon" href="(https:\/\/pophealth\.uk\/)?apple-touch-icon\.png">/.test(html), p + ': PNG favicon and touch icon linked');
     }
+    // The printable reports carry the same mark in their masthead: a ward
+    // report as opened from the sheet, and the drawing the LSOA and Custom
+    // area reports share with it.
+    {
+      const { page } = await open(browser, 'index.html?t=1', DESK);
+      const marks = s => s ? [...s.querySelectorAll('rect')].map(r => [r.getAttribute('x') || 0, r.getAttribute('y') || 0, r.getAttribute('rx'), r.getAttribute('fill')].join(':')).join(' ') : '';
+      const shared = await page.evaluate(m => {
+        const d = document.createElement('div'); d.innerHTML = _reportMasthead('LSOA report');
+        const svg = d.querySelector('.masthead svg');
+        return { rects: new Function('s', 'return (' + m + ')(s)')(svg), w: svg && svg.getAttribute('width'), vb: svg && svg.getAttribute('viewBox') };
+      }, marks.toString());
+      ok(shared.rects === appRects && shared.vb === '0 0 20 20', 'reports: the masthead mark is the header mark, scaled', JSON.stringify(shared) + ' / ' + appRects);
+      await page.evaluate(() => showWard('Lansbury'));
+      await page.waitForTimeout(800);
+      const [rep] = await Promise.all([page.waitForEvent('popup', { timeout: 20000 }).catch(() => null), page.click('#ws-pdf')]);
+      if (rep) {
+        await rep.waitForFunction(() => !!document.querySelector('.masthead svg'), null, { timeout: 30000 }).catch(() => {});
+        const got = await rep.evaluate(m => new Function('s', 'return (' + m + ')(s)')(document.querySelector('.masthead svg')), marks.toString());
+        ok(got === appRects, 'reports: a generated ward report shows the header mark in its masthead', got);
+        await rep.close();
+      } else ok(false, 'reports: the ward report opens to check its mark');
+      await page.close();
+    }
     // The PNGs exist at the sizes they claim, and the manifest names them.
     const pngSize = f => { const b = fs.readFileSync(path.join(ROOT, f)); return b.slice(1, 4).toString() === 'PNG' ? [b.readUInt32BE(16), b.readUInt32BE(20)] : null; };
     for (const [f, s] of [['favicon-32.png', 32], ['apple-touch-icon.png', 180], ['icon-192.png', 192], ['icon-512.png', 512], ['icon-maskable-512.png', 512]]) {
@@ -1375,7 +1435,7 @@ const smallText = page => page.evaluate(() => {
   // 10 a day, with a reply to a clarifying question free.
   const ASK_SAME = [/this site's server/, /Anthropic's Claude model/, /10 questions a day/,
     /narrow a question down does not use one up/];
-  for (const [vpName, vp] of [['desktop', DESK], ['phone', PHONE]]) {
+  for (const [vpName, vp] of [['desktop', DESK], ['phone', PHONE], ['landscape', SIDEWAYS]]) {
     const { page, errors } = await open(browser, 'index.html?t=1', vp);
     const ui = await page.evaluate(() => ({
       heading: document.querySelector('#tab-overlay .sb-lbl span').textContent.trim(),
@@ -1393,8 +1453,11 @@ const smallText = page => page.evaluate(() => {
       const out = [];
       for (let i = 0; i < PH_TOUR.length; i++) {
         await new Promise(r => setTimeout(r, 400));
+        const narr = document.getElementById('tour-narr'), ask = document.getElementById('ai-toggle');
         out.push({ t: document.getElementById('tour-title').textContent, c: document.getElementById('tour-ctr').textContent,
-          n: document.getElementById('tour-narr').innerText, spot: document.querySelectorAll('.tour-spot').length });
+          n: narr.innerText, spot: document.querySelectorAll('.tour-spot').length,
+          ch: narr.clientHeight, sh: narr.scrollHeight,
+          ask: !!ask && getComputedStyle(ask).display !== 'none' && ask.getBoundingClientRect().width > 0 });
         if (i < PH_TOUR.length - 1) document.getElementById('tour-next').click();
       }
       return out;
@@ -1413,18 +1476,29 @@ const smallText = page => page.evaluate(() => {
     ok(/local authorities \(LAs\)/.test(ch[0].n) && /\b\d{2,3} indicators\b/.test(ch[0].n) && /\b\d{2} local authorities/.test(ch[0].n) && /\b\d{3} wards\b/.test(ch[0].n)
        && !/borough/i.test(all),
       vpName + ': the first chapter counts indicators, LAs and wards from the data and names the level LA', ch[0].n);
-    ok(/postcode/.test(ch[2].n), vpName + ': the place chapter mentions postcode search');
+    ok(/postcode/.test(ch[2].n) && /a panel opens with/.test(ch[2].n) && !/along the bottom|at the top centre|on the right/.test(ch[2].n),
+      vpName + ': the place chapter mentions postcode search and names no side for the panel, which moves with the screen', ch[2].n.slice(0, 120));
+    // On a phone the Ask button waits until the tour ends, because the strip
+    // is what is being read (workplan 1.5).
+    if (vp.isMobile) ok(ch.every(c => !c.ask), vpName + ': the Ask button is hidden throughout the tour', ch.map(c => c.ask).join(','));
+    // Held sideways, the strip gives the narration about 200px, so a chapter
+    // is read rather than scrolled through a slot (most fit outright).
+    if (vpName === 'landscape') {
+      ok(ch.every(c => c.ch >= Math.min(c.sh, 180)) && ch.filter(c => c.sh <= c.ch + 2).length >= 4,
+        'landscape: the tour narration has at least 180px on every chapter, and most chapters fit without scrolling',
+        ch.map(c => c.t + ' ' + c.ch + '/' + c.sh).join(' | '));
+    }
     ok(['Query', 'Compare', 'Custom area', 'Data export', 'Directory', 'Ask about this data'].every(w => ch[3].n.includes(w)) &&
        ASK_SAME.every(re => re.test(ch[3].n)) && /personal/.test(ch[3].n) && ch[3].spot >= 2,
       vpName + ': the tools chapter names every tool and describes Ask as the panel does', ch[3].n);
     const dirSentence = (ch[3].n.match(/Directory[^.]*\./) || [''])[0];
     ok(dirSentence && !/\d/.test(dirSentence), vpName + ': the tour gives no charity or Directory count of its own', dirSentence);
-    ok(/Key indicators|Start here/.test(ch[5].n) && (vpName === 'phone') === /menu button first/.test(ch[5].n),
+    ok(/Key indicators|Start here/.test(ch[5].n) && !!vp.isMobile === /menu button first/.test(ch[5].n),
       vpName + ': the last chapter names a group on the Indicators tab, and on a phone says to open the menu first', ch[5].n);
     // Do the last chapter as a reader would.
     const before = await page.evaluate(() => ({ next: document.getElementById('tour-next').textContent, ov: document.getElementById('ov').value }));
     ok(before.next === 'Skip and finish' && before.ov === 'none', vpName + ': the last chapter waits, with no indicator chosen', JSON.stringify(before));
-    if (vpName === 'phone') {
+    if (vp.isMobile) {
       await page.tap('#hdr-menu'); await page.waitForTimeout(600);
       await page.tap('#sbtab-overlay'); await page.waitForTimeout(300);
       await page.tap('#ov-chips button:nth-child(3)');
@@ -1674,6 +1748,18 @@ const smallText = page => page.evaluate(() => {
       const sh = await rectOf(page, '#ward-sheet');
       const vh = page.viewportSize().height;
       ok(!!sh && sh.h <= vh * 0.61, 'phone: the open ward sheet takes at most about 60% of the screen', JSON.stringify(sh));
+      // The Ask button waits while the sheet is fully open, rather than
+      // floating over the strip of map above it, and the sheet's own row
+      // offers "Ask about this ward" instead (workplan 1.10).
+      const askShown = () => page.evaluate(() => { const t = document.getElementById('ai-toggle');
+        return !!t && getComputedStyle(t).display !== 'none' && t.getBoundingClientRect().width > 0; });
+      const hasAsk = await page.evaluate(() => !!document.getElementById('ai-toggle'));
+      if (hasAsk) {
+        ok(!(await askShown()), 'phone: the Ask button is hidden while the ward sheet is fully open');
+        const wa = await page.evaluate(() => { const b = document.getElementById('ws-ask'), r = b.getBoundingClientRect();
+          return { shown: !b.hidden && r.width > 0, text: b.textContent.trim(), w: Math.round(r.width), h: Math.round(r.height) }; });
+        ok(wa.shown && wa.text === 'Ask about this ward' && wa.h >= 44, 'phone: the open sheet offers "Ask about this ward"', JSON.stringify(wa));
+      }
       const attr = await rectOf(page, '.leaflet-control-attribution');
       ok(!!attr && attr.b <= sh.t && !overlaps(attr, await rectOf(page, '#map-legend-strip')) && !overlaps(attr, await rectOf(page, '#ai-toggle')),
         'phone: the credits sit on the sheet\'s edge, one line, covered by nothing', JSON.stringify({ attr, sh }));
@@ -1683,6 +1769,23 @@ const smallText = page => page.evaluate(() => {
       await page.waitForTimeout(900);
       const shP = await rectOf(page, '#ward-sheet'), attrP = await rectOf(page, '.leaflet-control-attribution');
       ok(!!attrP && !!shP && attrP.b <= shP.t + 1, 'phone: the credits clear the sheet at peek too', JSON.stringify({ attrP, shP }));
+      if (hasAsk) {
+        const askP = await rectOf(page, '#ai-toggle');
+        ok((await askShown()) && !!askP && askP.b <= shP.t, 'phone: the Ask button is back above the sheet at peek', JSON.stringify({ askP, shP }));
+        // "Ask about this ward" opens the panel with the ward named in the
+        // box, ready to send, and sends nothing by itself.
+        await page.evaluate(() => PH_SHEET.setState(0));
+        await page.waitForTimeout(500);
+        await page.tap('#ws-ask');
+        await page.waitForTimeout(500);
+        const asked = await page.evaluate(() => ({ open: document.getElementById('ai-panel').classList.contains('open'),
+          box: (document.getElementById('ai-input') || {}).value || '', sent: document.querySelectorAll('#ai-log .ai-msg.ai-user, #ai-log .ai-user').length,
+          state: PH_SHEET.state() }));
+        ok(asked.open && asked.box === 'Tell me about Stonebridge' && !asked.sent && asked.state === 1,
+          'phone: "Ask about this ward" opens Ask with the ward named, and the sheet drops to its head', JSON.stringify(asked));
+        await page.click('#ai-close');
+        await page.waitForTimeout(300);
+      }
       await page.evaluate(() => { showWard('Lansbury'); PH_SHEET.setState(0); });
       await page.waitForTimeout(700);
       await checkTargets(page, 'the open ward sheet');
@@ -1787,7 +1890,9 @@ const smallText = page => page.evaluate(() => {
     await page.evaluate(() => { deselectWard(); PH_TOUR.start(); });
     await page.waitForTimeout(800);
     const tr = await rectOf(page, '#tour-strip');
-    ok(!!tr && tr.r >= mp.r - 10 && tr.h >= mp.h - 20 && tr.w <= 380, 'landscape: the tour stands down the right of the map', JSON.stringify({ tr, mp }));
+    // A little wider than the ward panel, and up into the row above the
+    // map, so its narration has room (see the tour checks above).
+    ok(!!tr && tr.r >= mp.r - 10 && tr.h >= mp.h - 20 && tr.w <= 460 && tr.w <= mp.w * 0.55, 'landscape: the tour stands down the right of the map', JSON.stringify({ tr, mp }));
     hit = await clear('#tour-strip');
     ok(!hit.length, 'landscape: nothing on the map sits under the tour', hit.join(', '));
     await page.evaluate(() => PH_TOUR.end());
@@ -1937,6 +2042,17 @@ const smallText = page => page.evaluate(() => {
     ok(await page.evaluate(() => { const h = document.getElementById('dl-help').title;
       return (h.match(/local authority \(LA\)/g) || []).length === 1 && /(four|five) sizes of area/.test(h) && !/\bBorough\b/.test(h); }),
       'region Area level help introduces local authority (LA) once');
+    // Ask is written for London's wards and LAs, so a region has no Ask
+    // button, no panel and no "Ask about this ward" (workplan 1.6).
+    const askNE = await page.evaluate(async () => {
+      const w = Object.keys(WARD_DATA)[0];
+      if (w) showWard(w);
+      await new Promise(r => setTimeout(r, 600));
+      const b = document.getElementById('ws-ask');
+      return { toggle: !!document.getElementById('ai-toggle'), panel: !!document.getElementById('ai-panel'),
+        sheetAsk: !!b && !b.hidden && b.getBoundingClientRect().width > 0, available: !!(window.PH_ASSISTANT && PH_ASSISTANT.available) };
+    });
+    ok(!askNE.toggle && !askNE.panel && !askNE.sheetAsk && !askNE.available, 'region: no Ask button or panel outside London', JSON.stringify(askNE));
     ok(errors.length === 0, 'no page errors (North East)', errors.join(' | '));
     await page.close();
   } else {
@@ -2085,14 +2201,28 @@ const smallText = page => page.evaluate(() => {
     const missing = await mp.evaluate(ids => ids.filter(id => !document.getElementById(id)), a.all);
     ok(!missing.length, 'every source row a card links to exists on the methodology page', missing.join(', ') + ' of ' + a.all.join(', '));
     // The page describes the controls the map has, and how Census figures
-    // are combined: from the summed counts of output areas, never by adding
-    // up or averaging percentages.
+    // are combined: from the summed counts of output areas once the data
+    // build says so (indicators.js census_method), and otherwise as the
+    // population-weighted average that built the figures on the map. Never
+    // by adding up percentages.
+    await mp.waitForFunction(() => document.querySelector('[data-cen]') && SOURCES[0].geo, null, { timeout: 5000 }).catch(() => {});
     const mt = await mp.evaluate(() => document.querySelector('main').innerHTML);
+    const cenM = await mp.evaluate(async () => {
+      const t = await (await fetch('data/map/indicators.js')).text();
+      const d = JSON.parse(t.slice(t.indexOf('var PH_IND_STATS = ') + 19, t.lastIndexOf(';')));
+      const vis = document.querySelector('#census-levels').nextElementSibling.innerText + ' ' +
+        document.querySelector('#adding-up').nextElementSibling.innerText;
+      const row = (document.getElementById('src-census') || {}).innerText || '';
+      return { ward: d.census_method === 'counts', la: d.census_la_method === 'counts', vis, row };
+    });
     ok(/About this indicator/.test(mt) && !/<strong>i<\/strong>/.test(mt) && !/<strong>About<\/strong> button/.test(mt),
       'methodology: names the About this indicator button, not controls that are gone');
     ok(!/Census[^.<]{0,80}added up|added up[^.<]{0,40}Census/.test(mt), 'methodology: Census figures are not said to be added up');
-    ok(/calculated from the summed counts of the output areas\s+in the ward/.test(mt) && !/average of their percentages/.test(mt),
-      'methodology: Census ward figures are calculated from the summed counts of their output areas');
+    ok((cenM.ward ? /calculated from the summed counts of the output areas\s+in the ward/.test(cenM.vis) && !/weighted by their residents/.test(cenM.vis)
+                  : /average of the\s+percentages of the output areas in the ward, weighted by their residents/.test(cenM.vis) && !/summed counts/.test(cenM.vis)) &&
+       (cenM.la ? /LA figures are\s+calculated from the summed counts/.test(cenM.vis) : /LA figures are an average of the ward figures,\s+weighted by population/.test(cenM.vis)) &&
+       (cenM.ward && cenM.la ? /summed counts/.test(cenM.row) : /averaged here, weighted by population/.test(cenM.row)),
+      'methodology: describes the Census method that built the figures on the map', JSON.stringify(cenM).slice(0, 400));
     await mp.close();
   }
   {

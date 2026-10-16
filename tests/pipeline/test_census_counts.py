@@ -15,7 +15,11 @@ through the pipeline's own census rules, and checks:
   * the figures files keep their shape (no count columns in them),
   * LA figures are the summed counts of the output areas in their wards,
   * a counts file that is missing falls back to the residents-weighted
-    average rather than to nothing.
+    average rather than to nothing,
+  * build_borough_data and build_ward_data, reading the files by name,
+    write the summed-count figures and record census_method, and a build
+    with no counts files records "weighted" and leaves the LA file without
+    Census figures.
 
 No network: _fetch_census_table and the lookups are replaced.
 """
@@ -167,6 +171,7 @@ check("wards from LSOA counts match wards from output area counts here (whole LS
       all(from_lsoa[wd][k] == ward[wd][k] for wd in wards for k in KEYS))
 
 # LA figures: the summed counts of all the output areas in the LA's wards.
+ORIG_WARD_INPUTS = p._census_ward_inputs
 p._census_ward_inputs = lambda: (oa_figs, oa_cnt, OA_WARD)
 p._ward_to_lad = lambda: WARD_LAD
 la = p.census_la_figures()
@@ -174,6 +179,65 @@ want = round(no_car.sum() / hh.sum() * 100, 2)
 check("LA figure = summed counts of its output areas",
       la.get("E09000001", {}).get("census_no_car_pct") == want, f"{la.get('E09000001')} vs {want}")
 check("LA records leave population to the map", "census_population" not in la.get("E09000001", {}))
+
+# The wiring: build_borough_data and build_ward_data, reading the figures and
+# counts as the data build does (by file name, through _read_parquet_opt) from
+# a scratch data folder that holds only two ward boundaries. The lookups are
+# replaced, so nothing is fetched.
+print("=== the LA and ward builds, from the files ===")
+import json, tempfile
+tmp = pathlib.Path(tempfile.mkdtemp())
+(tmp / "boundaries").mkdir()
+(tmp / "boundaries" / "wards.geojson").write_text(json.dumps({"type": "FeatureCollection", "features": [
+    {"type": "Feature", "geometry": None, "properties": {"WD25CD": wd, "WD25NM": f"Ward {i}",
+     "LAD25CD": "E09000001", "LAD25NM": "City of London"}} for i, wd in enumerate(wards)]}), encoding="utf-8")
+p._census_ward_inputs = ORIG_WARD_INPUTS
+p.DATA_DIR = tmp
+FT = pd.DataFrame({"LAD25CD": ["E09000001"], "indicator_short": ["90366"], "value": [80.5]})
+def files(with_counts=True):
+    f = {"census2021_oa.parquet": oa_figs.rename(columns={"LSOA21CD": "OA21CD"}),
+         "census2021.parquet": lsoa_figs, "fingertips.parquet": FT}
+    if with_counts:
+        f["census2021_oa_counts.parquet"] = oa_cnt.rename(columns={"LSOA21CD": "OA21CD"})
+        f["census2021_counts.parquet"] = lsoa_cnt
+    return f
+FILES = files()
+p._read_parquet_opt = lambda path: FILES.get(pathlib.Path(path).name)
+p.get_oa_to_ward = lambda: OA_WARD
+p.get_lsoa_to_ward = lambda: LSOA_WARD
+p.get_lsoa_ward_lookup = lambda: {l: (wd, WARD_LAD[wd]) for l, wd in LSOA_WARD.items()}
+p._ward_to_lad = lambda: WARD_LAD
+
+bd = p.build_borough_data()
+rec = bd.get("E09000001", {})
+check("build_borough_data writes the LA's Census figure from summed counts",
+      rec.get("census_no_car_pct") == round(no_car.sum() / hh.sum() * 100, 2), str(rec)[:200])
+check("and leaves population out of the LA record", "census_population" not in rec)
+check("and keeps the published LA figures beside it", rec.get("ft_90366") == 80.5, str(rec.get("ft_90366")))
+
+try:
+    wd_out = p.build_ward_data()
+    meta = wd_out.get("metadata", {})
+    w0 = wd_out.get("wards", {}).get(wards[0], {}).get("indicators", {})
+    check("build_ward_data records census_method 'counts'", meta.get("census_method") == "counts", str(meta.get("census_method")))
+    check("and its ward figure is the summed counts",
+          w0.get("census_no_car_pct") == ward[wards[0]]["census_no_car_pct"], str(w0.get("census_no_car_pct")))
+    # A stale build with no counts files: the wards are averaged by residents
+    # and say so, and the LA file carries no Census figure, so the map works
+    # one out from the wards and its card says that too.
+    FILES = files(with_counts=False)
+    stale = p.build_ward_data()
+    check("with no counts files, build_ward_data records census_method 'weighted'",
+          stale.get("metadata", {}).get("census_method") == "weighted", str(stale.get("metadata", {}).get("census_method")))
+    bd_stale = p.build_borough_data()
+    check("and the LA file carries no Census figures",
+          not any(k.startswith("census_") for k in bd_stale.get("E09000001", {})), str(bd_stale.get("E09000001")))
+    stats = p.build_indicator_stats(wd_out, {}, {}, bd)
+    check("the indicator stats tell the methodology page both methods",
+          stats.get("census_method") == "counts" and stats.get("census_la_method") == "counts",
+          str({k: stats.get(k) for k in ("census_method", "census_la_method")}))
+except Exception as e:  # a lookup this scratch folder does not hold
+    check("build_ward_data runs on the scratch folder", False, repr(e))
 
 print(f"\n{'All checks passed' if not FAILS else f'{len(FAILS)} failed'}")
 sys.exit(1 if FAILS else 0)

@@ -1737,6 +1737,7 @@
   .ws-title .ws-meta { font-size: var(--t-sm); color: var(--ink-2); margin-top: 1px; white-space: nowrap;
     overflow: hidden; text-overflow: ellipsis; }
   .ws-acts { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .ws-acts .ws-btn[hidden] { display: none; }
   /* The figure on the map for the selected ward, in the part of the sheet that
      shows at peek: on a phone a tap is the only way to read a value. */
   .ws-fig { margin-top: 3px; font-size: var(--t-sm); color: var(--ink-2); line-height: 1.35; }
@@ -2580,7 +2581,23 @@
       white-space: normal; line-height: 1.25; text-align: center; justify-content: center; }
     .ws-sheet.peek .ws-acts #ws-pin,
     .ws-sheet.peek .ws-acts #ws-pdf,
+    .ws-sheet.peek .ws-acts #ws-ask,
     .ws-sheet.collapsed .ws-acts { display: none; }
+    /* Four buttons and two icons squeezed each label onto three lines, so
+       with "Ask about this ward" there the row becomes two: Pin and the
+       report beside the size and close icons, then Ask and the profile. At
+       peek only the profile is left, and it takes the first row. */
+    .ws-acts:has(#ws-ask:not([hidden])) { display: grid; grid-template-columns: 1fr 1fr auto auto; }
+    .ws-acts:has(#ws-ask:not([hidden])) #ws-pin { grid-area: 1 / 1; }
+    .ws-acts:has(#ws-ask:not([hidden])) #ws-pdf { grid-area: 1 / 2; }
+    .ws-acts:has(#ws-ask:not([hidden])) #ws-size { grid-area: 1 / 3; }
+    .ws-acts:has(#ws-ask:not([hidden])) #ws-close { grid-area: 1 / 4; }
+    .ws-acts:has(#ws-ask:not([hidden])) #ws-ask { grid-area: 2 / 1; }
+    .ws-acts:has(#ws-ask:not([hidden])) #ws-profile { grid-area: 2 / 2; }
+    .ws-sheet.peek .ws-acts:has(#ws-ask:not([hidden])) #ws-profile { grid-area: 1 / 1 / 2 / 3; }
+    /* While pinning, Pin shows at peek too, and shares the row with it. */
+    .ws-sheet.peek.pinning .ws-acts:has(#ws-ask:not([hidden])) #ws-profile { grid-area: 1 / 2; }
+    .ws-sheet.collapsed .ws-acts:has(#ws-ask:not([hidden])) { display: none; }
     /* A bigger grab area for the drag, because a 4px bar is not a target. */
     .ws-handle { width: 52px; height: 5px; top: 7px; }
     .ws-grab { height: 24px; }
@@ -2676,6 +2693,11 @@
        until it is closed rather than peeping out under it. */
     .map-wrap.has-peek:not(.side-r) .map-chip,
     .map-wrap.has-peek:not(.side-r) #ai-toggle { display: none; }
+    /* Nor during the tour, whose strip is the thing being read, nor over a
+       ward panel that is fully open, where it floated over the little map
+       left above it. The panel has its own "Ask about this ward", and the
+       button comes back when the panel drops to its head. */
+    .map-wrap.touring #ai-toggle, .map-wrap.sheet-full #ai-toggle { display: none; }
     .map-wrap.has-sheet #fingertips-banner { bottom: calc(var(--sheet-lift) + 120px); }
     /* One short line in the corner, on a light ground, read as a caption. */
     .leaflet-control-attribution { font-size: var(--t-xs); line-height: 1.4; white-space: nowrap;
@@ -2797,6 +2819,28 @@
     .map-wrap.side-cramped .map-legend-strip { display: none !important; }
     .map-wrap.side-cramped .leaflet-control-attribution { white-space: normal;
       max-width: calc(100vw - var(--side-r) - 16px); }
+  }
+
+  /* ── The tour on a phone held sideways ────────────────────────────────────
+     At 390px tall the stacked heading, the progress bar and the two buttons
+     left the narration about 106px, so most of each chapter sat in a small
+     inner scroll. Here the strip also takes the row above the map and is a
+     little wider, the counter and End tour share the title's line, the
+     progress bar is a hairline and the buttons sit on one compact row, which
+     gives the narration about 200px. The ward panel stands beside it. */
+  @media (max-height: 450px) {
+    .map-wrap { --tour-w: min(440px, 52vw); }
+    .tour-strip { grid-row: 1 / 3; width: var(--tour-w); padding: 8px 12px 10px; }
+    .map-wrap.touring .ws-sheet, .map-wrap.touring .cmp-bar { right: calc(var(--tour-w) + 16px);
+      width: max(240px, min(var(--side-w), calc(100% - var(--tour-w) - 150px))); }
+    .tour-hd { flex-direction: row; align-items: baseline; justify-content: space-between;
+      gap: 8px; margin-bottom: 4px; }
+    .tour-hd .tour-title { font-size: var(--t-lg); line-height: 1.25; min-width: 0; }
+    .tour-hd > div { flex-shrink: 0; gap: 6px; }
+    .tour-prog { gap: 3px; margin-bottom: 6px; }
+    .tour-prog .seg { height: 2px; }
+    .tour-narr { margin-bottom: 6px; line-height: 1.5; }
+    .tour-ctrls { gap: 8px; }
   }
 
   /* ── Ask, on a phone, is the whole screen ─────────────────────────────────
@@ -4037,6 +4081,8 @@
           <div class="ws-acts">
             <button type="button" class="ws-btn" id="ws-pin"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg>Pin to compare</button>
             <button type="button" class="ws-btn" id="ws-pdf" title="Open the printable ward report, which you can save as a PDF">Open printable report</button>
+            <!-- Shown only where the Ask panel is on the page (London). -->
+            <button type="button" class="ws-btn" id="ws-ask" hidden>Ask about this ward</button>
             <button type="button" class="ws-btn primary" id="ws-profile">Open full profile</button>
             <button type="button" class="ws-close" id="ws-size" aria-expanded="true"
                     aria-label="Show less of this panel" title="Show less of this panel"><svg class="ic" aria-hidden="true"><use href="#i-chevron-down"/></svg></button>
@@ -6774,13 +6820,22 @@ function indicatorFacts(k) {
   if (ts && CENSUS_BASE[ts]) {
     [f.num, f.den] = CENSUS_BASE[ts];
     f.cadence = 'ONS runs a census every ten years, so these figures describe Census day, 21 March 2021, and the next census is due in 2031.';
-    // What build_ward_data does: each output area is placed in the ward it
-    // best fits, and the ward's percentage is calculated from the counts of
-    // those output areas (their numerators summed over their bases summed),
-    // and an LA's from the output areas in its wards. Residents are summed.
+    // Each output area is placed in the ward it best fits. A ward file built
+    // from counts (censusWardCounts) sums those output areas' numerators over
+    // their bases; an older one averaged their percentages by residents. An
+    // LA's figure is its output areas' counts when the LA file carries them
+    // (censusLaCounts), and otherwise its wards averaged by population.
+    // Residents are summed either way.
+    const wc = censusWardCounts(), lc = censusLaCounts();
     f.method = k === 'census_population'
       ? 'For wards we sum the residents of the output areas that best fit each ward under the ONS lookup, so the totals can differ a little from the ward tables ONS publishes.'
-      : 'Each figure is the count divided by its base, as a percentage. A ward figure is calculated from the counts of the output areas that best fit the ward under the ONS lookup, and an LA figure from the output areas in its wards, so the figures can differ a little from the tables ONS publishes for wards and LAs.';
+      : 'Each figure is the count divided by its base, as a percentage. ' +
+        (wc ? 'A ward figure is calculated from the counts of the output areas that best fit the ward under the ONS lookup'
+            : 'A ward figure is an average of the output areas that best fit the ward under the ONS lookup, weighted by their residents') +
+        (lc ? ', and an LA figure is calculated from the counts of the output areas in its wards'
+            : ', and an LA figure is an average of its ward figures, weighted by population') +
+        ', so the figures can differ a little from the tables ONS publishes for wards and LAs.' +
+        (wc && lc ? '' : ' Because the average is weighted by residents, a measure of households is weighted by residents too.');
     return f;
   }
   if (/police/i.test(src)) {
@@ -6889,11 +6944,14 @@ function _publishedAt(k, nat, lv) {
     if (l === nat) return;
     if (l === 'borough') {
       out.push(laSums(k) ? 'LA figures are the sum of the ward figures.'
-        : nat === 'oa' ? 'LA figures are calculated in the same way, from the output areas in each LA.'
+        : nat === 'oa' && censusLaCounts()
+        ? (censusWardCounts() ? 'LA figures are calculated in the same way, from the output areas in each LA.'
+            : 'LA figures are calculated from the counts of the output areas in each LA.')
         : 'LA figures are an average of the ward figures, weighted by population.');
     } else if (l === 'ward' && nat === 'oa') {
       out.push(k === 'census_population' ? 'Ward figures are the sum of the residents of the output areas in each ward.'
-        : 'Ward figures are calculated from the counts of the output areas in each ward.');
+        : censusWardCounts() ? 'Ward figures are calculated from the counts of the output areas in each ward.'
+        : 'Ward figures are an average of the output areas in each ward, weighted by population.');
     } else if (l === 'ward' && nat === 'msoa') {
       out.push('Ward figures blend the MSOAs that each ward overlaps, in proportion to where its residents live.');
     } else if (l === 'ward' && nat === 'lsoa') {
@@ -8349,6 +8407,23 @@ function laSums(k) {
   const meta = (typeof OV_META === 'object' && OV_META[k]) || {};
   return LA_SUM_UNITS.has(meta.u) || /_12mo$|^crime_total$|^census_population$|_lsoa_count$/.test(resolveOvField(k));
 }
+// How the Census figures on screen were made, so the card, the profile key
+// and the Data export notes describe the data that is loaded. A ward file
+// built from summed counts says census_method 'counts' in its metadata; an
+// older one averaged its output areas' percentages, weighted by residents.
+// An LA's Census figures are summed counts when the LA file carries them,
+// and otherwise laAggregate's population-weighted average of its wards.
+function censusWardCounts() {
+  return !!(typeof WARD_META === 'object' && WARD_META && WARD_META.census_method === 'counts');
+}
+function censusLaCounts() {
+  for (const code in BOROUGH_DATA) {
+    const d = BOROUGH_DATA[code];
+    const r = d && (d.indicators || d);
+    if (r && Object.keys(r).some(k => /^census_.+_pct$/.test(k))) return true;
+  }
+  return false;
+}
 function laAggregate(k) {
   if (_laAgg[k]) return _laAgg[k];
   const wards = (typeof WARD_DATA_BY_CODE !== 'undefined' && WARD_DATA_BY_CODE &&
@@ -9724,8 +9799,9 @@ function showWard(wn) {
          second button with a different name for the same thing is not needed. -->
     ${cats || '<div class="data-note">We do not have any figures for this ward.</div>'}
     <div class="data-note prof-key">
-      A figure with no label is the ward’s own. Census figures are calculated from the counts of its output areas,
-      the smallest Census areas of about 125 households, and the population is their residents summed.
+      A figure with no label is the ward’s own. ${censusWardCounts()
+        ? 'Census figures are calculated from the counts of its output areas, the smallest Census areas of about 125 households, and the population is their residents summed.'
+        : 'Census figures are calculated from its output areas, the smallest Census areas of about 125 households, with each percentage an average weighted by population and the population their residents summed.'}
       Crimes are counted inside its boundary.
       <span class="gpill gpill-lsoa">estimated from LSOAs</span> and <span class="gpill gpill-msoa">estimated from MSOAs</span>
       mark figures published for those larger areas and weighted onto this ward by where its residents live, and a
@@ -9909,13 +9985,16 @@ function _reportFontsHref() {
   try { return new URL('vendor/fonts.css', location.href).href; } catch (e) { return 'vendor/fonts.css'; }
 }
 // The mark: four areas, one picked out. Drawn here so it needs no file.
+// The site mark, the same four rounded blue squares as the page header, the
+// favicon and the icons: drawn on the header's 20-unit grid and scaled to
+// size by the viewBox, so the corners stay in proportion.
 function _reportMark(size) {
-  const s = size || 18, c = (s - 2) / 2;
-  return `<svg width="${s}" height="${s}" viewBox="0 0 ${s} ${s}" aria-hidden="true">` +
-    `<rect x="0" y="0" width="${c}" height="${c}" fill="${REPORT_INK}"/>` +
-    `<rect x="${c + 2}" y="0" width="${c}" height="${c}" fill="${REPORT_INK}" opacity=".35"/>` +
-    `<rect x="0" y="${c + 2}" width="${c}" height="${c}" fill="${REPORT_INK}" opacity=".6"/>` +
-    `<rect x="${c + 2}" y="${c + 2}" width="${c}" height="${c}" fill="${REPORT_ACCENT}"/></svg>`;
+  const s = size || 18;
+  return `<svg width="${s}" height="${s}" viewBox="0 0 20 20" aria-hidden="true" focusable="false">` +
+    `<rect width="9" height="9" rx="2" fill="#003087"/>` +
+    `<rect x="11" width="9" height="9" rx="2" fill="#8BBDEA"/>` +
+    `<rect y="11" width="9" height="9" rx="2" fill="#005EB8"/>` +
+    `<rect x="11" y="11" width="9" height="9" rx="2" fill="#3D8FDA"/></svg>`;
 }
 function _reportMasthead(kind) {
   return `<header class="masthead"><div class="brand">${_reportMark(18)}<span>PopHealth Map</span></div>` +
@@ -18402,6 +18481,7 @@ var PH_SHOW = {
   var pinBtn  = $('ws-pin');
   var pdfBtn  = $('ws-pdf');
   var profBtn = $('ws-profile');
+  var askBtn  = $('ws-ask');
   var closeBtn = $('ws-close');
   var mapWrap = $('map-wrap');
 
@@ -19005,6 +19085,8 @@ var PH_SHOW = {
     renderFig();
 
     syncPinBtn();
+    // The Ask panel is built after this script, and only in London.
+    if (askBtn) askBtn.hidden = !(window.PH_ASSISTANT && PH_ASSISTANT.available);
     renderBody(w);
     var wasOpen = sheet.classList.contains('open');
     sheet.classList.add('open');
@@ -19255,6 +19337,16 @@ var PH_SHOW = {
       // The note sits under the header, so the sheet opens far enough to show it.
       onBlocked: function () { if (sheetState !== 0) { sheetState = 0; applyState(); } },
     });
+  });
+
+  // Opens the Ask panel with the ward named in its box, ready to send. On a
+  // phone the panel covers the screen, so the sheet drops to its head
+  // underneath and the map is as it was when the panel closes.
+  if (askBtn) askBtn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    if (!currentWard || !window.PH_ASSISTANT) return;
+    if (isNarrow() && sheetState === 0) setSheetState(1);
+    PH_ASSISTANT.askAbout(currentWard);
   });
 
   profBtn.addEventListener('click', function (e) {
@@ -20886,7 +20978,10 @@ var PH_SHOW = {
     },
     {
       t: 'Select a place',
-      n: 'Select any ward and a panel opens along the bottom with a short summary in plain ' +
+      // "A panel opens", with no side named: it is along the bottom on a
+      // desktop and an upright phone, and beside the map on a phone held
+      // sideways.
+      n: 'Select any ward and a panel opens with a short summary in plain ' +
          'English and its main figures. Its buttons let you pin the ward to compare it with ' +
          'others, open a printable report or see its full profile. To go straight to a place, ' +
          'type a postcode, a ward or LA name, or a GP practice into the <strong>search</strong> ' +
@@ -22170,11 +22265,13 @@ var PH_SHOW = {
     if (nat === 'oa') {
       // How a ward's figure is made from them is the card's Method line.
       return L === 'ward'
-        ? 'ONS publishes Census 2021 figures for output areas, and each ward figure is calculated ' +
-          'from the counts of the output areas that best fit the ward under the ONS output area to ward lookup.'
+        ? 'ONS publishes Census 2021 figures for output areas, and each ward figure is ' +
+          (censusWardCounts() ? 'calculated from the counts of' : 'an average, weighted by population, of') +
+          ' the output areas that best fit the ward under the ONS output area to ward lookup.'
         : L === 'borough'
-        ? 'ONS publishes Census 2021 figures for output areas, and each LA figure is calculated ' +
-          'from the counts of the output areas in its wards.'
+        ? 'ONS publishes Census 2021 figures for output areas, and each LA figure is ' +
+          (censusLaCounts() ? 'calculated from the counts of the output areas in its wards.'
+            : 'an average of its ward figures, weighted by population.')
         : 'ONS publishes Census 2021 figures for output areas, LSOAs and MSOAs, so these are its own ' + one + ' figures.';
     }
     if (nat === 'msoa') {

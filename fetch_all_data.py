@@ -1907,7 +1907,8 @@ def _census_split(df: "pd.DataFrame", code_col: str):
 
 
 def census_group_figures(figs: "pd.DataFrame", counts: "pd.DataFrame | None",
-                         code_to_group: dict, code_col: str = "LSOA21CD") -> dict:
+                         code_to_group: dict, code_col: str = "LSOA21CD",
+                         stale_out: "list | None" = None) -> dict:
     """Census figures for groups of areas: {group: {key: value}}.
 
     Each area (output area or LSOA) goes to the group code_to_group gives it.
@@ -1916,7 +1917,8 @@ def census_group_figures(figs: "pd.DataFrame", counts: "pd.DataFrame | None",
     percentage whose counts are not in the counts frame (a parquet written
     before the counts were kept) falls back to the old average of the area
     percentages weighted by residents, with a warning, so a stale file still
-    gives figures."""
+    gives figures. The keys that fell back are appended to stale_out when it
+    is given, so the caller can record how the figures were made."""
     out: dict = {}
     if figs is None or figs.empty:
         return out
@@ -1964,6 +1966,8 @@ def census_group_figures(figs: "pd.DataFrame", counts: "pd.DataFrame | None",
             for g in d.index:
                 if d[g] > 0:
                     out.setdefault(g, {})[key] = round(float(n[g]) / float(d[g]), 2)
+    if stale_out is not None:
+        stale_out.extend(stale)
     if stale:
         warn(f"census: no counts for {len(stale)} percentages ({', '.join(stale[:3])}...); "
              f"those are averaged by residents until the census source is rerun")
@@ -4859,16 +4863,24 @@ def census_la_figures() -> dict:
     """Census percentages for each LA, {LAD25CD: {key: pct}}: the summed
     counts of the same output areas (or LSOAs) its wards are built from, so
     an LA figure is its wards added up rather than their percentages
-    averaged. Population is left to the map, which sums the wards."""
+    averaged. Population is left to the map, which sums the wards.
+
+    Only percentages built from counts are written. One whose counts are
+    missing (a stale parquet) is left out, so the map works it out from the
+    wards and its card says so, rather than the LA file holding an average
+    that the site would describe as summed counts."""
     cen_src, cnt_src, lookup = _census_ward_inputs()
     if cen_src is None or cen_src.empty:
         return {}
     w2l = _ward_to_lad()
     to_la = {code: w2l[wd] for code, wd in lookup.items() if wd in w2l}
-    figs = census_group_figures(cen_src, cnt_src, to_la)
+    stale: list = []
+    figs = census_group_figures(cen_src, cnt_src, to_la, stale_out=stale)
+    drop = set(stale) | {"census_population"}
     for vals in figs.values():
-        vals.pop("census_population", None)
-    return figs
+        for key in drop:
+            vals.pop(key, None)
+    return {la: vals for la, vals in figs.items() if vals}
 
 
 def build_ward_data() -> dict:
@@ -5048,12 +5060,20 @@ def build_ward_data() -> dict:
     # ward percentage is its areas' numerator counts summed over their
     # denominator counts summed (see census_group_figures), so a household
     # measure is a share of the ward's households, not of its residents.
+    # census_method in the metadata records which way they were made, so the
+    # map's cards describe the figures that are shipped: "counts" when every
+    # percentage was built from counts, "weighted" when any fell back to the
+    # residents-weighted average of a stale parquet.
+    census_method = ""
     cen_src, cnt_src, cen_lookup = _census_ward_inputs()
     if cen_src is not None and not cen_src.empty:
         sources["census"] = "ONS Census 2021 (Nomis)"
-        for wd, vals in census_group_figures(cen_src, cnt_src, cen_lookup).items():
+        cen_stale: list = []
+        for wd, vals in census_group_figures(cen_src, cnt_src, cen_lookup,
+                                             stale_out=cen_stale).items():
             if wd in wards:
                 wards[wd]["indicators"].update(vals)
+        census_method = "weighted" if cen_stale else "counts"
 
     # Everything below is LSOA, so the LSOA lookup and the LSOA populations.
     cen = _read_parquet_opt(DATA_DIR / "demographics" / "census2021.parquet")
@@ -5239,6 +5259,8 @@ def build_ward_data() -> dict:
             "lsoa_to_ward_lookup":
                 "ONS LSOA (2021) -> Electoral Ward (2025) -> LAD (2025) best-fit",
             "lsoa_to_ward_lookup_year": "2025",
+            # How the Census ward percentages were made (see above).
+            "census_method": census_method,
         },
     }
 
@@ -5883,6 +5905,16 @@ def build_indicator_stats(ward_data: dict, lsoa_data: dict,
          f"period carried for {dated}")
     return {
         "generated": datetime.now(timezone.utc).isoformat(),
+        # How the Census ward figures were made, for the methodology page,
+        # which reads this file rather than the much larger ward file.
+        "census_method": ((ward_data or {}).get("metadata") or {}).get("census_method", ""),
+        # "counts" when the LA file carries Census percentages (each from
+        # summed counts, see census_la_figures); otherwise the map averages
+        # the wards by population.
+        "census_la_method": "counts" if any(
+            k.startswith("census_") and k.endswith("_pct")
+            for rec in (borough_data or {}).values() if isinstance(rec, dict)
+            for k in (rec.get("indicators") or rec)) else "",
         "stats": stats,
     }
 

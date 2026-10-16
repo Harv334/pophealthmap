@@ -171,11 +171,20 @@ Recorded so a failure can be told from a known gap. Against production at
 | `test_sheet_query` | passes |
 | `test_split` | passes |
 | `test_tools` | passes |
-| `test_tour` | passes |
+| `test_tour` | rewritten for the six-chapter tour, see below |
 | `test_mobile` | **fails, deliberately left that way** |
 | `test_ovpicker` | fails, one stale assertion |
 | `test_slim` | fails, one stale assertion |
 | `test_tidy` | fails, one stale assertion |
+
+`test_tour` was written for the eleven-chapter tour and looked for chapters
+called "Colour the map" and "Click a ward" that no longer exist. It now walks
+the six chapters (What PopHealth Map is, Choose an indicator, Select a place,
+The tools, What the figures cannot tell you, Your turn), completes the last
+one by choosing an indicator, and checks Previous, Finish and Escape. Its
+page scripts were checked against the site in Playwright; it has not yet been
+run under Selenium, because the machine it was written on had no ChromeDriver
+matching its Chrome. Set `CHROME_BIN` to choose the browser.
 
 `test_mobile` asserts a sidebar structure that changed upstream: commit
 `b9dd9aa` made Indicators the default tab and `cfa5c69` folded the Map controls

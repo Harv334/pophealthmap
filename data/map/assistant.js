@@ -90,10 +90,21 @@ var MODEL_LABEL = "Claude Sonnet 5";
     return ADDITIVE[key] === 1 || /_count$/.test(key);
   }
 
+  // The LA file (borough_data.json), which index.html loads into a
+  // top-level BOROUGH_DATA keyed by LAD code. It is not on window, so it is
+  // read by name.
+  function laFile() {
+    return (typeof BOROUGH_DATA === "object" && BOROUGH_DATA) ? BOROUGH_DATA : {};
+  }
+
   function boroughRollup() {
-    // Boroughs are not a stored level: aggregate wards up, population-weighted
-    // for rates and summed for counts, mirroring how the map builds ward
-    // figures from LSOAs.
+    // LA figures follow the map's rule (boroughOvValue in index.html): the
+    // figure the LA file publishes for the LA when it has one, and otherwise
+    // the wards aggregated up, population-weighted for rates and summed for
+    // counts. So Ask quotes the same LA figure the map shows, including the
+    // Census percentages the data build calculates from summed counts.
+    // Areas are keyed by the LA's name, which is how questions name them;
+    // the LAD code is kept to find the LA's own record.
     var out = {};
     var w = wards();
     Object.keys(w).forEach(function (k) {
@@ -102,6 +113,7 @@ var MODEL_LABEL = "Claude Sonnet 5";
       if (!lad) return;
       if (!out[lad]) out[lad] = { name: lad, _wards: 0, indicators: {}, _num: {}, _den: {} };
       var b = out[lad];
+      if (!b.lad_code && ward.lad_code) b.lad_code = ward.lad_code;
       b._wards++;
       var ind = ward.indicators || {};
       var pop = parseFloat(ind.census_population) || 0;
@@ -123,6 +135,14 @@ var MODEL_LABEL = "Claude Sonnet 5";
         if (b._den[key] > 0) b.indicators[key] = Math.round((b._num[key] / b._den[key]) * 100) / 100;
       });
       delete b._num; delete b._den;
+      var own = b.lad_code && laFile()[b.lad_code];
+      var rec = own && (own.indicators || own);
+      if (rec) {
+        Object.keys(rec).forEach(function (key) {
+          var v = parseFloat(rec[key]);
+          if (!isNaN(v)) b.indicators[key] = v;
+        });
+      }
     });
     return out;
   }
@@ -433,8 +453,19 @@ var MODEL_LABEL = "Claude Sonnet 5";
    * an API key or a deployed Worker: they are pure functions over the JSON the
    * page has already loaded. Nothing here mutates map state.
    */
+  // Set by initFloating once the panel exists; null where there is no panel.
+  var openWith = null;
+
   window.PH_ASSISTANT = {
     runTool: function (n, i) { return runTool(n, i); },
+    // Whether the Ask panel is on this page (configured, and in London).
+    get available() { return !!openWith; },
+    // Opens the panel with a question about the named place in the box.
+    askAbout: function (name) {
+      if (!openWith || !name) return false;
+      openWith("Tell me about " + name);
+      return true;
+    },
     areasFor: areasFor,
     findArea: findArea,
     isAdditive: isAdditive,
@@ -925,6 +956,11 @@ var MODEL_LABEL = "Claude Sonnet 5";
    */
   function initFloating() {
     if (!ASSISTANT_ENDPOINT) return; // not configured: no panel, map unaffected
+    // The examples, the tool layer's wording and the answering service's own
+    // instructions are written for London's wards and LAs, so outside London
+    // (the England view included) there is no button and no panel, rather
+    // than one that promises answers about places it cannot describe.
+    if (!IS_LONDON) return;
     var host = document.querySelector(".map-wrap");
     if (!host || document.getElementById("ai-panel")) return;
 
@@ -998,6 +1034,20 @@ var MODEL_LABEL = "Claude Sonnet 5";
       toggle.setAttribute("aria-expanded", "false");
       toggle.focus();
     }
+
+    // "Ask about this ward" on the ward sheet opens the panel with the ward
+    // named in the box, for the reader to send or change. Nothing is sent
+    // for them, because each question counts towards the daily limit.
+    openWith = function (text) {
+      open();
+      var input = document.getElementById("ai-input");
+      if (input && text) {
+        input.value = text;
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        input.focus();
+        try { input.setSelectionRange(text.length, text.length); } catch (e) { /* not a text field */ }
+      }
+    };
 
     toggle.addEventListener("click", open);
     close.addEventListener("click", shut);

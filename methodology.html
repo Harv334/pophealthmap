@@ -238,10 +238,12 @@ LSOA and ward boundaries at high zoom reflect genuine differences between the
 <p>When small areas are aggregated into wards or LAs, rates, percentages and
 scores are weighted by population, so each area counts in proportion to the
 number of people who live there. Only raw totals, such as population, crimes
-and the number of services, are summed directly. Census percentages are the
-exception, because ONS publishes the counts behind them: each is calculated
-from the summed counts of the output areas, as described under
-<a href="#census-levels">Census figures at every level</a>. LSOA figures reach wards
+and the number of services, are summed directly. <span data-cen="ward-weighted">Census
+percentages are combined from their output areas in this way too, as described
+under <a href="#census-levels">Census figures at every level</a>.</span><span data-cen="ward-counts" hidden>Census
+percentages are the exception, because ONS publishes the counts behind them:
+each is calculated from the summed counts of the output areas, as described under
+<a href="#census-levels">Census figures at every level</a>.</span> LSOA figures reach wards
 in this way, and MSOA figures reach wards through the LSOAs the two share, so a
 ward that straddles two MSOAs gets a blend in proportion to where its people
 live. Where a figure is not published for LAs, each LA's figure is calculated
@@ -548,8 +550,8 @@ follows one rule.</p>
 <p>Every figure is first placed on the 2021 Census building blocks, which are
 output areas, LSOAs and MSOAs, and is then combined into wards and LAs using the
 official ONS lookup files listed in the <a href="#appendix">technical appendix</a>,
-with counts summed, Census percentages calculated from their summed counts, and
-everything else weighted by population. Nothing is matched by
+with counts summed<span data-cen="ward-counts" hidden>, Census percentages calculated from their summed counts,</span>
+and everything else weighted by population. Nothing is matched by
 name, and no boundary is laid over another to decide where a figure belongs.</p>
 
 <h3 id="best-fit">Best fit, not exact fit</h3>
@@ -567,12 +569,18 @@ map shows ONS's own figure at each of those levels, so they need no matching at
 all. Census figures for wards are calculated from output areas rather than
 from LSOAs, using ONS's output area to ward best fit lookup, because output areas are
 about a fifth the size of LSOAs and follow ward boundaries much more closely.
-Each ward percentage is calculated from the summed counts of the output areas
-in the ward: the households with no car or van in those output areas, for
-example, divided by all their households. A measure of households is therefore
-a share of the ward's households, and a measure of people a share of its
-residents. LA figures are calculated in the same way, from the summed counts of
-the output areas in each LA's wards. To see output areas, choose a
+<span data-cen="ward-weighted">Each ward percentage is an average of the
+percentages of the output areas in the ward, weighted by their residents, so a
+measure of households, such as the share with no car or van, is weighted by
+residents too.</span><span data-cen="ward-counts" hidden>Each ward percentage is
+calculated from the summed counts of the output areas in the ward: the
+households with no car or van in those output areas, for example, divided by all
+their households. A measure of households is therefore a share of the ward's
+households, and a measure of people a share of its residents.</span>
+<span data-cen="la-weighted">LA figures are an average of the ward figures,
+weighted by population.</span><span data-cen="la-counts" hidden>LA figures are
+calculated from the summed counts of the output areas in each LA's wards.</span>
+To see output areas, choose a
 Census indicator and <strong>OA</strong> on the level switch, and their borders
 appear as you zoom in. An output area holds about 125 households, so a single
 household can move a percentage noticeably, and these figures are best read as
@@ -826,7 +834,8 @@ var SOURCES = [
     pub: 'ONS, through Nomis',
     what: '32 indicators: health, disability, ethnicity, age, housing, tenure, ' +
           'qualifications, occupation, travel to work, household language and unpaid care.',
-    geo: 'Output area, LSOA and MSOA, as ONS publishes them, and calculated here for wards and LAs from the summed counts of their output areas',
+    // Set again by censusMethod below from what the latest data build says.
+    geo: 'Output area, LSOA and MSOA, as ONS publishes them, and averaged here, weighted by population, into wards and LAs',
     period: 'Census day, 21 March 2021',
     cadence: 'Once every ten years, with the next in 2031.',
     manifest: 'census' },
@@ -1205,9 +1214,25 @@ Array.prototype.forEach.call(document.querySelectorAll('table.stack'), labelTabl
   function readPeriods(text) {
     try {
       var at = text.indexOf('var PH_IND_STATS = ');
-      var st = JSON.parse(text.slice(at + 19, text.lastIndexOf(';'))).stats || {};
+      var doc = JSON.parse(text.slice(at + 19, text.lastIndexOf(';')));
+      var st = doc.stats || {};
       Object.keys(st).forEach(function (k) { if (st[k].yr) periods[k] = String(st[k].yr); });
+      censusMethod(doc.census_method === 'counts', doc.census_la_method === 'counts');
     } catch (e) { /* keep the typed periods */ }
+  }
+  // The page describes how the Census ward and LA figures that are live were
+  // made: from summed counts once the data build says so, and otherwise as
+  // population-weighted averages, which is what the page says without it.
+  function censusMethod(ward, la) {
+    var show = { 'ward-counts': ward, 'ward-weighted': !ward, 'la-counts': la, 'la-weighted': !la };
+    [].forEach.call(document.querySelectorAll('[data-cen]'), function (el) {
+      el.hidden = !show[el.getAttribute('data-cen')];
+    });
+    SOURCES[0].geo = 'Output area, LSOA and MSOA, as ONS publishes them, and ' +
+      (ward && la ? 'calculated here for wards and LAs from the summed counts of their output areas'
+        : ward ? 'calculated here for wards from the summed counts of their output areas, and averaged, weighted by population, into LAs'
+        : la ? 'averaged here, weighted by population, into wards, and calculated for LAs from the summed counts of their output areas'
+        : 'averaged here, weighted by population, into wards and LAs');
   }
 
   Promise.all([
