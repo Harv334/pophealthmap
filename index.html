@@ -135,7 +135,7 @@
 })();
 </script>
 <title>PopHealth Map - population health across England by ward and neighbourhood</title>
-<meta name="description" content="Free map of health and deprivation for every ward and neighbourhood in England. Life expectancy, hospital admissions, crime, air quality, transport and more, from open NHS and government data.">
+<meta name="description" content="Explore health, deprivation and local services across every neighbourhood in England, free and with no sign-in. Life expectancy, hospital admissions, crime, air quality, transport and more, from open NHS and government data.">
 
 <!-- One canonical address. The site also answers on www and on the GitHub
      Pages address, both of which redirect here, and any mirror carries a
@@ -152,14 +152,14 @@
 <meta property="og:locale" content="en_GB">
 <meta property="og:url" content="https://pophealth.uk/">
 <meta property="og:title" content="PopHealth Map - population health across England by ward and neighbourhood">
-<meta property="og:description" content="Free map of health and deprivation for every ward and neighbourhood in England. Life expectancy, hospital admissions, crime, air quality, transport and more, from open NHS and government data.">
+<meta property="og:description" content="Explore health, deprivation and local services across every neighbourhood in England, free and with no sign-in. Life expectancy, hospital admissions, crime, air quality, transport and more, from open NHS and government data.">
 <meta property="og:image" content="https://pophealth.uk/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="PopHealth Map: population health across England by ward and neighbourhood">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="PopHealth Map - population health across England by ward and neighbourhood">
-<meta name="twitter:description" content="Free map of health and deprivation for every ward and neighbourhood in England. Life expectancy, hospital admissions, crime, air quality, transport and more, from open NHS and government data.">
+<meta name="twitter:description" content="Explore health, deprivation and local services across every neighbourhood in England, free and with no sign-in. Life expectancy, hospital admissions, crime, air quality, transport and more, from open NHS and government data.">
 <meta name="twitter:image" content="https://pophealth.uk/og.png">
 
 <!-- Inline so it costs no request and cannot 404. A map pin in the map's own ink. -->
@@ -346,7 +346,13 @@
     margin-top: 1px; white-space: nowrap; }
   .hdr-region[hidden] { display: none; }
   .hdr-tag { display: none; white-space: nowrap; color: var(--ink-3); font-size: var(--t-xs); }
-  @media (min-width: 1360px) { .hdr-tag { display: inline; } }
+  /* The tagline is a full sentence, so where the header is tight it wraps to
+     two lines rather than squeezing the name or pushing the tools off screen. */
+  @media (min-width: 1360px) {
+    .hdr-tag { display: inline; white-space: normal; line-height: 1.35; min-width: 0; }
+    .hdr-left { min-width: 0; }
+    .hdr-left > div, .hdr-right { flex-shrink: 0; }
+  }
   .hdr-right { display: flex; align-items: center; gap: 8px; }
 
   /* ── Buttons ──
@@ -2835,7 +2841,7 @@
       "url": "https://pophealth.uk/",
       "name": "PopHealth Map",
       "alternateName": "London Population Health Mapping",
-      "description": "An interactive map of population health across all 33 London boroughs, at ward and LSOA level.",
+      "description": "An interactive map of population health for every region of England, at local authority, ward, MSOA and LSOA level.",
       "inLanguage": "en-GB",
       "publisher": { "@id": "https://pophealth.uk/#creator" }
     },
@@ -3013,14 +3019,14 @@
            link preview and the methodology page said PopHealth Map, so a
            shared link previewed under one name and opened under another. -->
       <div>
-        <h1 class="hdr-logo">PopHealth Map<span class="dev-badge" title="This tool is still in development">In development</span></h1>
+        <h1 class="hdr-logo">PopHealth Map<span class="dev-badge" title="Figures are provisional while the site is being checked.">Beta</span></h1>
         <!-- The region, shown only when it is not London (the default). -->
         <div class="hdr-region" id="hdr-region" hidden></div>
       </div>
       <!-- A one-line description beside the name on wide screens, where the
            header otherwise leaves a gap. Outside the h1 so the page's
            heading stays the name alone. -->
-      <span class="hdr-tag">Free health map for every neighbourhood in England</span>
+      <span class="hdr-tag">Explore health, deprivation and local services across every neighbourhood in England, free and with no sign-in.</span>
       <!-- Phones only. The search box lives in the drawer below 900px, which
            left the most-used control two taps away and invisible. This opens
            the drawer and puts the cursor straight in the box. -->
@@ -3286,7 +3292,7 @@
                layer_counts.json and then from the records themselves; see
                vcseAboutText. The Directory and the tour do not repeat them. -->
           <div class="vcse-about" id="vcse-about">
-            These are registered charities, taken from the Charity Commission's register.
+            These are registered charities from the Charity Commission's register.
           </div>
           <!-- The key to the dots, shown while they are on the map. Built from
                VCSE_BUCKET_COLORS and the income bands, so it cannot drift from
@@ -3323,15 +3329,15 @@
             <button type="button" id="vcse-tag-clear" style="font-size:var(--t-xs);color:var(--ink-2);background:none;border:none;cursor:pointer;padding:0;text-decoration:underline;display:none">clear</button>
           </div>
           <details class="vcse-tag-group" data-fam="wt">
-            <summary>What they do <span class="vcse-tag-count"></span></summary>
+            <summary>Cause area <span class="vcse-tag-count"></span></summary>
             <div class="vcse-tag-list"></div>
           </details>
           <details class="vcse-tag-group" data-fam="ht">
-            <summary>How they help <span class="vcse-tag-count"></span></summary>
+            <summary>Activity type <span class="vcse-tag-count"></span></summary>
             <div class="vcse-tag-list"></div>
           </details>
           <details class="vcse-tag-group" data-fam="ot">
-            <summary>Whom they help <span class="vcse-tag-count"></span></summary>
+            <summary>Who they support <span class="vcse-tag-count"></span></summary>
             <div class="vcse-tag-list"></div>
           </details>
         </div>
@@ -3383,7 +3389,7 @@
               <button type="button" class="ov-back" id="ov-back">
                 <svg class="ic" aria-hidden="true"><use href="#i-chevron-left"/></svg>All themes</button>
               <h2 class="ov-tv-h" id="ov-tv-h"></h2>
-              <div class="ov-tv-key">A <span class="ov-lv-nat">box</span> marks the level each indicator is published at, and figures at the other levels are worked out from it.</div>
+              <div class="ov-tv-key">A <span class="ov-lv-nat">box</span> marks the level each indicator is published at. Figures at other levels are calculated from it: counts are summed and rates are population-weighted.</div>
               </div>
               <div class="ov-tv-list" id="ov-tv-list" role="group" aria-labelledby="ov-tv-h"></div>
               <!-- Core20 lives with the deprivation indicators it is built
@@ -3394,7 +3400,7 @@
                   <span>Highlight Core20<button type="button" class="lhelp" title="Core20 means the 20% most deprived LSOAs in England, the ones in deprivation deciles 1 and 2, which NHS England's Core20PLUS5 framework prioritises for targeted health action." aria-label="About Core20" aria-expanded="false">?</button> LSOAs</span>
                 </label>
                 <div style="font-size:var(--t-xs);color:var(--ink-3);margin-top:4px;line-height:1.45">
-                  This fills the most deprived 20% of LSOAs in England, those in deprivation deciles 1 and 2, in magenta on the map.
+                  Highlights LSOAs in the most deprived 20% in England (IMD deciles 1 to 2) in magenta.
                 </div>
                 <div id="core20-count" style="font-size:var(--t-xs);color:var(--ink-2);margin-top:3px"></div>
               </div>
@@ -3607,10 +3613,9 @@
                this file and "small area" thirteen, and the two sat next to each
                other in the Data export level picker, where one button read
                "Small areas" and the next read "MSOAs". -->
-          <div class="rb-hint">Build an area of your own from LSOAs, the small statistical
-            areas of about 1,500 people, and see its combined figures, with rates weighted by
-            population rather than added up. Select an LSOA on the map to add it, and select it
-            again to take it out.</div>
+          <div class="rb-hint">Combine LSOAs (small statistical areas of about 1,500 residents)
+            into a custom area, with counts summed and rates population-weighted. Select an LSOA
+            on the map to add or remove it.</div>
         </div>
         <div class="rb-count" id="rb-count">
           <span>No LSOAs added yet</span>
@@ -3644,8 +3649,7 @@
             <h2>Data export</h2>
             
           </div>
-          <div class="cb-sub">Build a spreadsheet of the figures you need by choosing the areas and
-            then the indicators, and a CSV file will download to your device.</div>
+          <div class="cb-sub">Select your geography and indicators below to download a custom CSV dataset.</div>
         </div>
 
         <div class="cb-scroll" id="cb-scroll">
@@ -3784,7 +3788,7 @@
         </div>
         <div class="q-scroll">
           <div class="q-block">
-            <div class="q-sub">Find every ward that matches what you are looking for, such as high deprivation and high disability in one LA, and see them listed below and highlighted on the map.
+            <div class="q-sub">Filter wards by several criteria at once, such as high deprivation combined with high disability, to list the matching wards and highlight them on the map.
               <!-- The worked example used to be filled in on first open, so the
                    panel arrived holding somebody else's question about Brent.
                    It now opens empty and the example is one click away. -->
@@ -3800,20 +3804,20 @@
               <span class="q-step-n">1</span>
               <label class="q-step-opt">
                 <input type="checkbox" id="q-use-services">
-                <span>Which services must the ward have?</span>
+                <span>Filter by local services (optional)</span>
               </label>
             </div>
-            <div class="q-hint" id="q-services-hint">This step is optional, so choose one or more
-              services to keep only the wards that have them, or leave it unticked to include every ward.</div>
+            <div class="q-hint" id="q-services-hint">Tick to select services a ward must contain, or
+              leave unticked to include all wards.</div>
             <div class="q-sentence" id="q-services"></div>
 
             <div class="q-step" style="margin-top:12px"><span class="q-step-n">2</span>Where should it be?</div>
             <div class="q-hint" id="q-scope-hint">Choose one LA or ICB, or search all of London.</div>
             <div class="q-sentence" id="q-scope"></div>
 
-            <div class="q-step" style="margin-top:12px"><span class="q-step-n">3</span>Which figures must it meet?</div>
-            <div class="q-hint">A ward matches only if it meets every condition, and a ward with no
-              figure for one of them is left out and counted below the results.</div>
+            <div class="q-step" style="margin-top:12px"><span class="q-step-n">3</span>Set indicator thresholds</div>
+            <div class="q-hint">Wards must meet all the conditions below. Wards with missing data for
+              any selected indicator are excluded and counted below the results.</div>
             <div id="q-conds"></div>
             <div class="q-sentence" style="margin-top:6px">
               <span class="q-chip add" id="q-add-cond"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg>Add a condition</span>
@@ -3907,7 +3911,7 @@
       <div class="loading-overlay" id="ldr" role="status" aria-live="polite">
         <div class="ldr-card">
           <p class="ldr-name">PopHealth Map</p>
-          <p class="ldr-line">Free map of health, deprivation and local services for every neighbourhood in England, with no sign-in.</p>
+          <p class="ldr-line">Explore health, deprivation and local services across every neighbourhood in England, free and with no sign-in.</p>
           <svg class="ldr-map" id="ldr-map" role="img"
                aria-label="A map of London's wards, filling in with deprivation colour while the page loads"></svg>
           <div class="ldr-msg" id="ldr-msg" hidden>
@@ -3940,7 +3944,7 @@
            in this corner below the zoom buttons. -->
       <div id="fingertips-banner">
         <span class="ft-i">i</span>
-        Some areas have no colour because OHID withholds small-area figures where small numbers could identify someone, so a blank area means the figure is missing rather than zero.
+        Unshaded areas indicate suppressed data (withheld by OHID to protect privacy where counts are small), not a value of zero.
         <button id="fingertips-banner-close" title="Dismiss this notice for this session" aria-label="Dismiss this notice"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button>
       </div>
       <!-- "Area level", not "Viewing". The strip in the top-left corner of the
@@ -3963,7 +3967,7 @@
                 aria-label="What these area levels mean" aria-expanded="false"
                 title="The map can colour five sizes of area. The largest is the local authority (LA), the area run by one council, and London has 33 of them: the 32 boroughs and the City of London. These are divided into 704 wards, which are the areas councillors are elected for. MSOAs, of about 7,500 people, and LSOAs, of about 1,500 people, are statistical areas that fit inside LAs but do not follow ward boundaries. Output areas, of about 125 households, are the smallest and carry Census figures only. Until you choose a level yourself, each indicator opens at a level it is published for. After that the map stays at the level you chose whenever the indicator has figures for it, and greys out any level it has none for."><span class="dl-help-word">Area level</span><span class="dl-help-mark" aria-hidden="true">?</span></button>
         <div class="dl-seg" id="dl-seg">
-          <button type="button" data-dl="borough" title="Colour the map by local authority (LA), the area run by one council. Where an indicator is not published for LAs, each LA's figure is worked out from its wards by adding up counts and weighting rates by population.">LA</button>
+          <button type="button" data-dl="borough" title="Colour the map by local authority (LA), the area run by one council. Where an indicator is not published for LAs, each LA's figure is calculated from its wards: counts are summed and rates are population-weighted.">LA</button>
           <button type="button" data-dl="ward" class="active" title="Colour the map by ward, the 704 areas councillors are elected for.">Ward</button>
           <button type="button" data-dl="msoa" title="Colour the map by MSOA, the statistical areas of about 7,500 people that sit between wards and LSOAs and do not follow ward boundaries. OHID publishes its Local Health figures for MSOAs.">MSOA</button>
           <button type="button" data-dl="lsoa" title="Colour the map by LSOA, the statistical areas of about 1,500 people that the deprivation figures are published for. London has 4,994 of them.">LSOA</button>
@@ -4055,7 +4059,7 @@
     <span class="sbar-left">
       <!-- The palette is NHS blue and the audience is NHS staff, so who runs
            this has to be said on the page, not left to be inferred. -->
-      <span class="sbar-note">Independent project, not an NHS service</span>
+      <span class="sbar-note">An independent project, not affiliated with the NHS.</span>
       <a class="sbar-link" href="privacy.html">About and privacy</a>
       <!-- Back in the bar: an accessibility statement has to be easy to find
            from every page, not only reachable at its own URL. -->
@@ -4367,8 +4371,7 @@ var LOADER_MAP = {w:1000,h:771,n:704,d:'IAAAAAAAAAAAAAJAAIAAFAAAIDFEECDGGCFDCCIC
     if (document.getElementById('region-missing')) return;
     failed = true;
     clearTimeout(slowTimer);
-    say('The map could not be loaded, which usually means the connection dropped ' +
-        'for a moment. Please reload the page to try again.', true);
+    say('The map failed to load. Please check your connection and reload the page.', true);
   };
 
   // Scripts the page needed that did not arrive, named for the console only.
@@ -5285,9 +5288,9 @@ const IND_NAMES = {
   // Health, Census 2021
   census_good_health_pct:          ['Good or very good health', 'General health: very good or good'],
   census_bad_health_pct:           ['Bad or very bad health', 'General health: bad or very bad'],
-  census_disability_any_pct:       ['Disabled residents', 'Disabled under the Equality Act'],
-  census_disability_lot_pct:       ['Disabled, limited a lot', 'Disabled under the Equality Act: day-to-day activities limited a lot'],
-  census_provides_unpaid_care_pct: ['Provides unpaid care', 'Provision of unpaid care: provides any unpaid care'],
+  census_disability_any_pct:       ['Disabled residents (all)', 'Disabled under the Equality Act'],
+  census_disability_lot_pct:       ['Disabled residents (limited a lot)', 'Disabled under the Equality Act: day-to-day activities limited a lot'],
+  census_provides_unpaid_care_pct: ['Unpaid carers', 'Provision of unpaid care: provides any unpaid care'],
   // Health, OHID Local Health (published for MSOAs)
   ft_93280:  ['Fuel poverty (Local Health)', 'Fuel poverty (low income, low energy efficiency methodology)'],
   ft_93097:  ['Out-of-work benefit claimants', 'Unemployment: people claiming out of work benefit (aged 16 to 64)'],
@@ -5368,8 +5371,8 @@ const IND_NAMES = {
   census_black_pct:           ['Black or Black British', 'Ethnic group: Black, Black British, Black Welsh, Caribbean or African'],
   census_mixed_pct:           ['Mixed or multiple ethnic groups', 'Ethnic group: Mixed or Multiple ethnic groups'],
   census_other_ethnic_pct:    ['Other ethnic group', 'Ethnic group: Other ethnic group'],
-  census_english_hh_all_pct:  ['English main language: all adults', 'Household language: all adults in household have English as a main language'],
-  census_english_hh_none_pct: ['English main language: no adults', 'Household language: no people in household have English as a main language'],
+  census_english_hh_all_pct:  ['Households: all adults speak English as a main language', 'Household language: all adults in household have English as a main language'],
+  census_english_hh_none_pct: ['Households: no one speaks English as a main language', 'Household language: no people in household have English as a main language'],
   // Work, money and education
   census_unemployed_pct:           ['Unemployment (Census 2021)', 'Economic activity status: unemployed'],
   census_higher_managerial_pct:    ['Higher managerial and professional', 'Socio-economic classification: higher managerial, administrative and professional occupations'],
@@ -5796,7 +5799,7 @@ const OV_META = {
 
   // Crime + deprivation flags
   crime_rate_per_1000:            { src: "data.police.uk street-level crime; ONS population", yr: "Aug 2025 to Jul 2026", g: "Ward, counted from point data", u: "per 1,000", desc: "Crimes recorded by the police in the last 12 months for every 1,000 people living in the area." },
-  crime_total:                    { src: "data.police.uk street-level crime", yr: "Aug 2025 to Jul 2026", g: "Ward, counted from point data", u: "crimes", desc: "All crimes recorded by the police in the last 12 months, adding up every category." },
+  crime_total:                    { src: "data.police.uk street-level crime", yr: "Aug 2025 to Jul 2026", g: "Ward, counted from point data", u: "crimes", desc: "All crimes recorded by the police in the last 12 months, summed across every category." },
   crime_arson_12mo:               { src: "data.police.uk street-level crime", yr: "Aug 2025 to Jul 2026", g: "Ward, counted from point data", u: "crimes", desc: "Arson and criminal damage recorded by the police in the last 12 months, including deliberate damage to homes, buildings and vehicles." },
   crime_burglary_12mo:            { src: "data.police.uk street-level crime", yr: "Aug 2025 to Jul 2026", g: "Ward, counted from point data", u: "crimes", desc: "Burglaries of homes, businesses and community buildings recorded by the police in the last 12 months." },
   crime_drug_offences_12mo:       { src: "data.police.uk street-level crime", yr: "Aug 2025 to Jul 2026", g: "Ward, counted from point data", u: "crimes", desc: "Drug offences recorded by the police in the last 12 months, including possession, supply and production." },
@@ -5848,7 +5851,7 @@ const OV_META = {
   // whenever it is six characters or fewer, so "0–8" rendered as if it were a
   // unit: "Better (6.8 0–8)". The scale belongs in the label and the
   // description, where it already is.
-  ptal_score:                     { src: "GLA LSOA Atlas (TfL PTAL)", yr: "2014", g: "LSOA", u: "", desc: "How well connected the area is by public transport, using the Public Transport Accessibility Level that Transport for London works out from walking times to stops and how often services run. The nine levels (0, 1a, 1b, 2 to 5, 6a and 6b) are numbered 0 to 8 here, so a higher figure means better access. The figures date from 2014, before the Elizabeth line and the Northern line extension opened." },
+  ptal_score:                     { src: "GLA LSOA Atlas (TfL PTAL)", yr: "2014", g: "LSOA", u: "", desc: "How well connected the area is by public transport, using the Public Transport Accessibility Level that Transport for London calculates from walking times to stops and how often services run. The nine levels (0, 1a, 1b, 2 to 5, 6a and 6b) are numbered 0 to 8 here, so a higher figure means better access. The figures date from 2014, before the Elizabeth line and the Northern line extension opened." },
   rail_station_dist_m:            { src: "TfL Unified API (London); DfT NaPTAN (elsewhere)",      yr: "as at Sep 2026", g: "LSOA", u: "m", desc: "The straight-line distance from the middle of the LSOA to the nearest railway, metro or tram station, including Underground, Overground, DLR and Elizabeth line stations in London. A real walk is longer wherever a river, a railway or a park is in the way, and stations just outside the area count, because for an LSOA near the edge the nearest one often is." },
   rail_stations_1km:              { src: "TfL Unified API (London); DfT NaPTAN (elsewhere)",      yr: "as at Sep 2026", g: "LSOA", u: "stations", desc: "The number of railway, metro and tram stations within 1 kilometre of the middle of the LSOA." },
   bus_stop_dist_m:                { src: "TfL Unified API (London); DfT NaPTAN (elsewhere)",      yr: "as at Sep 2026", g: "LSOA", u: "m", desc: "The straight-line distance from the middle of the LSOA to the nearest bus stop, where the stops on each side of a road count separately, as the stop registers list them." },
@@ -5857,7 +5860,7 @@ const OV_META = {
   // IMD 2025
   imd_score:                      { src: "MHCLG IMD 2025",       yr: "2025", g: "LSOA", u: "score",  desc: "The overall Index of Multiple Deprivation 2025 score combines income, employment, education, health, crime, access to housing and services, and living environment, and a higher score means more deprivation." },
   imd_decile_mean:                { src: "MHCLG IMD 2025", yr: "2025", g: "Ward, population-weighted mean of its LSOAs", u: "decile", desc: "The average of the national deprivation deciles of the ward's LSOAs, weighted by population, where decile 1 is the most deprived tenth of England. It is an average rather than a decile, so a ward at 3 has a typical LSOA in the third tenth rather than sitting in that tenth itself." },
-  imd_score_ward:                 { src: "MHCLG IMD 2025 (pop-weighted, mid-2022)", yr: "2025", g: "Ward", u: "score",  desc: "The Index of Multiple Deprivation 2025 score for the ward, worked out from the scores of the LSOAs inside it, where a higher score means more deprivation." },
+  imd_score_ward:                 { src: "MHCLG IMD 2025 (pop-weighted, mid-2022)", yr: "2025", g: "Ward", u: "score",  desc: "The Index of Multiple Deprivation 2025 score for the ward, calculated as a population-weighted average of the scores of the LSOAs inside it, where a higher score means more deprivation." },
   imd_decile:                     { src: "MHCLG IMD 2025",       yr: "2025", g: "LSOA", u: "decile", desc: "Which tenth of England the LSOA falls in when all 33,755 LSOAs are ranked by deprivation, where decile 1 is the most deprived tenth and decile 10 the least." },
   income_score:                   { src: "MHCLG IMD 2025",       yr: "2025", g: "LSOA", u: "score",  desc: "The share of residents on a low income, counted from the benefits and tax credits paid to people on low incomes. It is given as a proportion, so 0.25 means 25% of residents, and a higher figure means more deprivation." },
   employment_score:               { src: "MHCLG IMD 2025",       yr: "2025", g: "LSOA", u: "score",  desc: "The share of working-age residents who would like to work but cannot because of unemployment, sickness, disability or caring responsibilities. It is given as a proportion, so 0.12 means 12% of working-age residents, and a higher figure means more deprivation." },
@@ -6707,7 +6710,7 @@ function indicatorFacts(k) {
     } else if (/life expectancy/i.test(vt)) {
       f.num = 'Deaths at each age among residents, pooled over five years';
       f.den = 'Residents at each age, from the ONS mid-year population estimates';
-      f.method = 'OHID works out period life expectancy from an abridged life table, separately for women and men.';
+      f.method = 'OHID calculates period life expectancy from an abridged life table, separately for women and men.';
     } else if (/crude rate/i.test(vt)) {
       [f.num, f.den] = FT_COUNTED[ftId] || ['', ''];
       f.method = 'This is a crude rate ' + unit + ', which means it is not adjusted for the ages of the people living there.';
@@ -6726,7 +6729,7 @@ function indicatorFacts(k) {
     // ward it best fits, and the ward's percentage is the average of its
     // output areas' percentages weighted by their residents. Counts are added.
     f.method = k === 'census_population'
-      ? 'For wards we add up the residents of the output areas that best fit each ward under the ONS lookup, so the totals can differ a little from the ward tables ONS publishes.'
+      ? 'For wards we sum the residents of the output areas that best fit each ward under the ONS lookup, so the totals can differ a little from the ward tables ONS publishes.'
       : 'Each figure is the count divided by its base, as a percentage. For wards we take the output areas that best fit each ward under the ONS lookup and average their percentages, weighting each by its number of residents, so household measures are weighted by residents too and can differ a little from the ward tables ONS publishes.';
     return f;
   }
@@ -6763,7 +6766,7 @@ function indicatorFacts(k) {
     f.num = 'Homes (residential addresses) within that distance of a space of that kind';
     f.den = 'All homes (residential addresses) in the area';
     f.cadence = 'Defra updates these figures from time to time rather than on a fixed timetable.';
-    f.method = 'We add up the homes near a space and all the homes across the output areas in each LSOA before dividing, so a large output area counts for more than a small one.';
+    f.method = 'We sum the homes near a space and all the homes across the output areas in each LSOA before dividing, so a large output area counts for more than a small one.';
     return f;
   }
   if (/IMD|Core20/.test(src)) {
@@ -6787,7 +6790,7 @@ function indicatorFacts(k) {
     return f;
   }
   if (/NaPTAN|TfL Unified/.test(src)) {
-    f.cadence = 'We work these out again every month from the latest register of stops.';
+    f.cadence = 'We recalculate these every month from the latest register of stops.';
     f.method = /_dist_m$/.test(k)
       ? 'This is a straight-line distance from the middle of each LSOA, not a walking route or a travel time, and it says nothing about how often services run.'
       : 'This counts what lies within a straight-line distance of the middle of each LSOA, not travel time or how often services run. Ward figures are an average across residents rather than a total, because the same station or stop is near several LSOAs and adding them up would count it many times.';
@@ -6813,7 +6816,7 @@ function _publishedBy(k) {
   if (/^ft_/.test(k)) return 'OHID publishes these figures only for each LA as a whole.';
   if (/police/i.test(src)) return 'We count the crimes in each ward from the locations the police publish.';
   if (k === 'core20_lsoa_count') return 'We count these for each ward from the deprivation deciles MHCLG publishes for LSOAs.';
-  if (k === 'imd_score_ward' || k === 'imd_decile_mean') return 'We work these out for each ward from the figures MHCLG publishes for LSOAs.';
+  if (k === 'imd_score_ward' || k === 'imd_decile_mean') return 'We calculate these for each ward from the figures MHCLG publishes for LSOAs.';
   if (/IMD/.test(src)) return 'MHCLG publishes these figures for LSOAs.';
   if (/NOMIS CLA01/.test(src)) return 'ONS publishes claimant counts for LSOAs, and we turn them into a rate.';
   if (/DESNZ/.test(src)) return 'DESNZ publishes these estimates for LSOAs.';
@@ -6835,10 +6838,10 @@ function _publishedAt(k, nat, lv) {
   lv.slice().sort((a, b) => LADDER.indexOf(b) - LADDER.indexOf(a)).forEach(l => {
     if (l === nat) return;
     if (l === 'borough') {
-      out.push(laSums(k) ? 'LA figures add up the ward figures.'
+      out.push(laSums(k) ? 'LA figures are the sum of the ward figures.'
         : 'LA figures are an average of the ward figures, weighted by population.');
     } else if (l === 'ward' && nat === 'oa') {
-      out.push(k === 'census_population' ? 'Ward figures add up the residents of the output areas in each ward.'
+      out.push(k === 'census_population' ? 'Ward figures are the sum of the residents of the output areas in each ward.'
         : 'Ward figures are an average of the output areas in each ward, weighted by population.');
     } else if (l === 'ward' && nat === 'msoa') {
       out.push('Ward figures blend the MSOAs that each ward overlaps, in proportion to where its residents live.');
@@ -6851,7 +6854,7 @@ function _publishedAt(k, nat, lv) {
     } else if (LADDER.indexOf(l) > LADDER.indexOf(nat)) {
       out.push(NAME[l] + ' figures repeat the figure of the ' + NAME[nat] + ' each one sits in.');
     } else {
-      out.push(NAME[l] + ' figures are worked out from the ' + PLURAL[nat] + '.');
+      out.push(NAME[l] + ' figures are calculated from the ' + PLURAL[nat] + '.');
     }
   });
   return out;
@@ -8143,7 +8146,7 @@ function applyPrefetchedCounts() {
       const c20 = document.getElementById('core20-count');
       if (c20 && Number.isFinite(c.core20)) {
         c20.textContent = c.core20.toLocaleString() +
-          (Number.isFinite(c.lsoa) ? ' of the ' + c.lsoa.toLocaleString() : '') + ' LSOAs on this map are Core20.';
+          (Number.isFinite(c.lsoa) ? ' of the ' + c.lsoa.toLocaleString() : '') + ' LSOAs in ' + phWhere() + ' are Core20.';
       }
     });
 }
@@ -8455,19 +8458,17 @@ function vcseCountsOf(records) {
 function vcseAboutText(c) {
   const where = phWhere();
   const fmt = n => n.toLocaleString('en-GB');
-  const bits = ["These are registered charities, taken from the Charity Commission's register."];
-  if (c && Number.isFinite(c.pinned)) {
-    bits.push(fmt(c.pinned) + ' charit' + (c.pinned === 1 ? 'y is' : 'ies are') + ' shown on the map: those based in ' +
-      where + ' that name the LAs they work in.');
-    if (Number.isFinite(c.wide) && c.wide > 0) {
-      bits.push('The Directory also lists ' + fmt(c.wide) + ' that work across the whole of ' + where +
-        (PH_IS_LONDON ? ' from a London base.' : ' from a base in the region.'));
-    }
-    const rest = Number.isFinite(c.total) && Number.isFinite(c.wide) ? c.total - c.pinned - c.wide : 0;
-    if (rest > 0) {
-      bits.push('A further ' + fmt(rest) + ' work in ' + where + ' but are based elsewhere or have no address ' +
-        'we can place, so they are not included.');
-    }
+  if (!c || !Number.isFinite(c.pinned)) return "These are registered charities from the Charity Commission's register.";
+  const bits = ['Showing ' + fmt(c.pinned) + ' registered charit' + (c.pinned === 1 ? 'y' : 'ies') +
+    ' based in ' + where + ' that name the LAs they work in (source: Charity Commission).'];
+  if (Number.isFinite(c.wide) && c.wide > 0) {
+    bits.push('The Directory also lists ' + fmt(c.wide) + ' that work across the whole of ' + where +
+      ' from a base there.');
+  }
+  const rest = Number.isFinite(c.total) && Number.isFinite(c.wide) ? c.total - c.pinned - c.wide : 0;
+  if (rest > 0) {
+    bits.push('A further ' + fmt(rest) + ' that work in ' + where + ' are excluded because they are based ' +
+      'outside it or have no address that can be mapped.');
   }
   return bits.join(' ');
 }
@@ -8499,8 +8500,8 @@ function buildVcseKey() {
     ['large', 'medium', 'small', 'micro', 'zero'].map(ib => '<li>' + dot(ib, grey) +
       _esc(VCSE_INCOME_BANDS[ib]) + '</li>').join('') + '</ul>' +
     '<div class="vk-grp"><span class="vcse-ring" style="width:28px;height:28px;background:conic-gradient(' + all +
-    ')" aria-hidden="true"><span>12</span></span><span>A ring is a group of charities close together, coloured by ' +
-    'the causes in it. Zoom in, or select it, to see each one.</span></div>';
+    ')" aria-hidden="true"><span>12</span></span><span>Rings show clusters of nearby charities, coloured by cause. ' +
+    'Select a ring or zoom in to expand it.</span></div>';
 }
 try { buildVcseKey(); } catch (e) { console.warn('buildVcseKey failed', e); }
 
@@ -8752,9 +8753,9 @@ const currentVCSETags = { wt: new Set(), ht: new Set(), ot: new Set() };
 const VCSE_TAG_LABELS = { wt: {}, ht: {}, ot: {} };
 // Labels shown as the group title (must match the 3 <summary> texts in index).
 const VCSE_FAM_LABELS = {
-  wt: 'What they do',
-  ht: 'How they help',
-  ot: 'Whom they help',
+  wt: 'Cause area',
+  ht: 'Activity type',
+  ot: 'Who they support',
 };
 
 function _vcseOrgMatchesTags(r) {
@@ -9333,7 +9334,7 @@ function profileCaption(key, has, lad) {
         (has.borough ? ', and figures ' + (has.msoa ? 'OHID' : 'the Office for Health Improvement and Disparities (OHID)') +
           ' publishes only for the whole of ' + ladPhrase(la) : '') + '.';
     case 'imd2025':
-      return 'The English Indices of Deprivation 2025, worked out for this ward from the LSOAs inside it, ' +
+      return 'The English Indices of Deprivation 2025, calculated for this ward from the LSOAs inside it, ' +
         'each weighted by the number of people living there.';
     case 'people':
       return 'Age, ethnicity, country of birth and household language at the 2021 Census' +
@@ -9346,7 +9347,7 @@ function profileCaption(key, has, lad) {
       return 'Homes, cars and travel to work at the 2021 Census' +
         (has.lsoa ? ', and how near the nearest station and bus stop are, estimated from the LSOAs in this ward' : '') + '.';
     case 'environment':
-      return 'Households in fuel poverty and modelled air pollution, worked out for this ward from the LSOAs inside it' +
+      return 'Households in fuel poverty and modelled air pollution, calculated for this ward from the LSOAs inside it' +
         (has.msoa ? ', with the fuel poverty figure OHID estimates for MSOAs beside them' : '') + '.';
     case 'crime': {
       const per = (typeof WARD_META === 'object' && WARD_META && WARD_META.crime_period) || '';
@@ -9538,7 +9539,7 @@ function showWard(wn) {
     const twoLE = msoaF.some(f => f.k === 'ft_93283' || f.k === 'ft_932831') &&
       ctxF.some(f => /^ft_life_expectancy_(fe)?male$/.test(f.k));
     const msoa = msoaRows ? `<div class="sr-lh${hideFrom(msoaStart)}"><div class="sr-sub">OHID estimates for this ward</div>
-      <div class="sr-sub-note">OHID publishes these for MSOAs, and this ward’s figure is worked out from them, weighted by where its residents live.${
+      <div class="sr-sub-note">OHID publishes these for MSOAs. This ward’s figure is calculated from them, weighted by where its residents live.${
         msoaF.some(f => ovIsStdRatio(f.k))
           ? ' A figure with no unit is a ratio where 100 is the England level once age is allowed for.' : ''}${
         twoLE ? ' Life expectancy appears twice: here as OHID’s estimate for this ward' + (lePer ? ' over ' + _esc(lePer) : '') +
@@ -9605,7 +9606,7 @@ function showWard(wn) {
          second button with a different name for the same thing is not needed. -->
     ${cats || '<div class="data-note">We do not have any figures for this ward.</div>'}
     <div class="data-note prof-key">
-      A figure with no label is the ward’s own: Census figures are worked out from its output areas, the smallest
+      A figure with no label is the ward’s own: Census figures are a population-weighted average of its output areas, the smallest
       Census areas of about 125 households, and crimes are counted inside its boundary.
       <span class="gpill gpill-lsoa">estimated from LSOAs</span> and <span class="gpill gpill-msoa">estimated from MSOAs</span>
       mark figures published for those larger areas and weighted onto this ward by where its residents live, and a
@@ -10795,7 +10796,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
   </div>
 
   <div class="footer">
-    <div class="indep">PopHealth Map is an independent project, not an NHS service. Figures are published statistics for planning and discussion; check the source before relying on one.</div>
+    <div class="indep">PopHealth Map is an independent open-data project, not affiliated with the NHS. Figures are published statistics for planning and discussion; check the source before relying on one.</div>
     <strong>Sources:</strong> ${reportCredits(['census', 'imd', crimeRows.length ? 'crime' : '', 'fuel_poverty', 'claimant', 'gp', 'pharmacy', 'dental', 'hospitals', 'vcse', _green ? 'greenspace' : '']).map(_esc).join(' · ')}. Each median and comparison is taken across the ${PH_AREA} wards with a figure for that measure.
     ${reportProvenanceHtml()}
   </div>
@@ -13824,7 +13825,7 @@ window.generateLSOAReport = function(code) {
   </div>
 
   <div class="footer">
-    <div class="indep">PopHealth Map is an independent project, not an NHS service. Figures are published statistics for planning and discussion; check the source before relying on one.</div>
+    <div class="indep">PopHealth Map is an independent open-data project, not affiliated with the NHS. Figures are published statistics for planning and discussion; check the source before relying on one.</div>
     <strong>Data sources:</strong> ${reportCredits(['imd', 'census', crimeRows.length ? 'crime' : '', 'fuel_poverty', 'claimant', 'greenblue', 'gp', 'pharmacy', 'dental', 'hospitals', 'vcse', _green ? 'greenspace' : '']).map(_esc).join(' · ')}.
     <div style="margin-top:6px">Services and green spaces are listed when they sit inside this LSOA\u2019s boundary, and each median and comparison is taken across the ${PH_AREA} LSOAs with a figure for that measure.</div>
     ${reportProvenanceHtml()}
@@ -15116,7 +15117,7 @@ function _setDataLevel(level, opts) {
       : (ovHasLevel(curOv, 'borough')
           ? (ovNativeLevel(curOv) === 'borough'
               ? 'Each LA is coloured by its own figure, as published.'
-              : 'Each LA is coloured by a figure worked out from its wards.')
+              : 'Each LA is coloured by a figure calculated from its wards.')
           : 'The LA boundaries are shown, but this indicator has no LA figures to colour them by.'),
       3600);
   }
@@ -17408,7 +17409,8 @@ async function loadData() {
   } else {
     // Neither ward file could be read: the map runs with boundaries only.
     document.getElementById('src-lbl').textContent =
-      'ward_data.json not found — map running with boundaries only. Run fetch_all_data.py to populate data.';
+      'Indicator data is temporarily unavailable, so only boundary outlines are shown.';
+    console.warn('ward_data.json not found: the map is running with boundaries only. Run fetch_all_data.py to populate the data.');
     buildWardLayer();
     injectWardIMD();
     setTimeout(initVCSEFilters, 100);
@@ -17483,7 +17485,7 @@ loadData().catch(err => {
     }
     // The same wording applyPrefetchedCounts writes before the deciles load.
     out.textContent = n.toLocaleString() + " of the " + LSOA_IMD.features.length.toLocaleString() +
-      " LSOAs on this map are Core20.";
+      " LSOAs in " + phWhere() + " are Core20.";
   }
   window._core20UpdateCount = updateCount;
   updateCount();
@@ -17517,8 +17519,8 @@ var PH_SHOW = {
 </script>
 
 <div id="dev-banner" role="status" hidden>
-  <div><b>In development.</b> The data is real and from published sources, but the
-  map is still being checked, so treat figures as provisional.</div>
+  <div><b>Beta.</b> The data is real and comes from published sources. The map is still
+  being checked, so treat figures as provisional.</div>
   <button class="dev-x" type="button" aria-label="Dismiss"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button>
 </div>
 <script>
@@ -18686,8 +18688,8 @@ var PH_SHOW = {
       '<div class="ws-note">Deprivation deciles run 1 (the most deprived tenth nationally) to 10 (the least). ' +
       'The ward figure is a population-weighted mean of the deciles of the LSOAs inside it, so it is not itself a decile.' +
       (cmpLevel === 'ward' ? ''
-        : ' These figures are worked out from the wards in each ' + esc(cmpLvl().one) + ', adding up counts and ' +
-          'weighting everything else by population, so they are not published ' + esc(cmpLvl().one) + ' statistics.') + '</div>' +
+        : ' These figures are calculated from the wards in each ' + esc(cmpLvl().one) + ', with counts summed and ' +
+          'everything else weighted by population. They are not published ' + esc(cmpLvl().one) + ' statistics.') + '</div>' +
       '</div>';
   }
 
@@ -19142,7 +19144,7 @@ var PH_SHOW = {
     // CSV exists for, while an extra column is ignored by anything that does
     // not ask for it. Line ends inside quoted cells are respected.
     if (/^text\/csv/.test(mime || '')) {
-      var src = csvCell('PopHealth Map (pophealth.uk), an independent project and not an NHS service' +
+      var src = csvCell('PopHealth Map (pophealth.uk), an independent open-data project not affiliated with the NHS' +
         (DATA_DATE ? ', with figures updated on ' + fmtDate(DATA_DATE) : ''));
       var out = '', q = false, row = 0, start = 0, body = String(text).replace(/\n+$/, '');
       for (var ci = 0; ci <= body.length; ci++) {
@@ -19414,7 +19416,7 @@ var PH_SHOW = {
       subEl.textContent = (cmpLevel === 'ward' || cmpLevel === 'lsoa')
         ? 'Pin up to ' + maxWord + ' ' + lvl.many + ' to see them side by side.'
         : 'Choose up to ' + maxWord + ' ' + lvl.many + ' to see them side by side, with each ' +
-          lvl.one + '\u2019s figures worked out from its wards.';
+          lvl.one + '\u2019s figures calculated from its wards.';
     }
     var pinLbl = $('cmp-pin-lbl');
     if (pinLbl) pinLbl.innerHTML = 'Pinned ' + capsPlural(lvl.many);
@@ -19601,7 +19603,7 @@ var PH_SHOW = {
       if (cmpLevel === 'borough') {
         notes.push('<strong>' + esc(bl.map(labelOf).join(', ')) + '</strong> ' +
           (bl.length > 1 ? 'are' : 'is') + ' published for each LA, so here ' +
-          (bl.length > 1 ? 'they are' : 'it is') + ' the published figure rather than anything added up.');
+          (bl.length > 1 ? 'they are' : 'it is') + ' the published figure, not an aggregate of ward figures.');
       } else if (cmpLevel === 'icb') {
         notes.push('<strong>' + esc(bl.map(labelOf).join(', ')) + '</strong> ' +
           (bl.length > 1 ? 'are' : 'is') + ' published for each LA, so an ICB figure is a ' +
@@ -19617,8 +19619,8 @@ var PH_SHOW = {
     // Said once, where the figures are, rather than only in the drawer that
     // has to be opened to see them.
     if (cmpLevel !== 'ward' && pinned.length) {
-      notes.push('These figures are worked out from the wards in each ' + esc(cmpLvl().one) +
-        ', adding up counts and weighting everything else by population, so they are not published ' +
+      notes.push('These figures are calculated from the wards in each ' + esc(cmpLvl().one) +
+        ', with counts summed and everything else weighted by population. They are not published ' +
         esc(cmpLvl().one) + ' statistics.');
     }
     cmpCautionEl.innerHTML = notes.map(function (n) {
@@ -19685,8 +19687,8 @@ var PH_SHOW = {
     cmpLegendEl.innerHTML = mets.length
       ? '<span class="cmp-key">' + ico('arrow-up', 'ic-sm') + ' highest ' + ico('arrow-down', 'ic-sm') + ' lowest</span>' +
         ((cmpLevel === 'ward' || cmpLevel === 'lsoa') ? ''
-          : 'These figures are worked out from the wards in each ' + esc(lvl.one) +
-            ', adding up counts and weighting everything else by population, so they are not published ' +
+          : 'These figures are calculated from the wards in each ' + esc(lvl.one) +
+            ', with counts summed and everything else weighted by population. They are not published ' +
             esc(lvl.one) + ' statistics. ') +
         'The arrows mark the highest and lowest of the ' +
         (pinned.length === 1 ? 'pinned area' : pinned.length + ' pinned areas') +
@@ -20782,8 +20784,8 @@ var PH_SHOW = {
     {
       t: 'Custom area: draw your own',
       n: '<strong>Custom area</strong> builds an area that does not follow ward lines. ' +
-         'Click the LSOAs on the map to add them. Click one again to take it out. ' +
-         'Name the area, and the tool totals its figures. Counts are added together. ' +
+         'Click the LSOAs on the map to add them. Click one again to remove it. ' +
+         'Name the area, and the tool aggregates its figures. Counts are summed. ' +
          'Percentages and scores are weighted by population. The report states the ' +
          'method beside every figure.',
       go: function () {
@@ -21561,7 +21563,7 @@ var PH_SHOW = {
       '<div class="section-h">LSOAs included</div>' +
       '<table class="tbl"><tr><th>LSOA</th><th>Name</th><th>Ward</th><th>LA</th><th class="n">Population</th></tr>' + list + '</table>' +
       '</div>' +
-      '<div class="footer"><div class="indep">PopHealth Map is an independent project, not an NHS service. ' +
+      '<div class="footer"><div class="indep">PopHealth Map is an independent open-data project, not affiliated with the NHS. ' +
       'Figures are published statistics for planning and discussion; check the source before relying on one.</div>' +
       // Absolute, so the link still leads somewhere from a copy of this page
       // saved to disk or printed.
@@ -21763,7 +21765,7 @@ var PH_SHOW = {
     claimant_count: { from: 'claimant_rate_pct', u: 'people',
       desc: 'People claiming Universal Credit or Jobseeker’s Allowance mainly because they are out of work.' },
     gb_total_uprn: { from: 'gb_commitment_pct', u: 'addresses',
-      desc: 'The homes (residential addresses) Defra counted in the LSOA, which its green and blue space shares are worked out from.' },
+      desc: 'The homes (residential addresses) Defra counted in the LSOA, from which its green and blue space shares are calculated.' },
     imd_rank: { from: 'imd_score', u: '', nat: 'lsoa',
       desc: 'Where the LSOA ranks among all 33,755 in England for deprivation, where 1 is the most deprived.' },
     total_lsoa_count: { src: '', yr: '', u: 'LSOAs',
@@ -22066,7 +22068,7 @@ var PH_SHOW = {
     if (nat === 'oa') {
       // How a ward's figure is made from them is the card's Method line.
       return L === 'ward'
-        ? 'ONS publishes Census 2021 figures for output areas, and each ward figure is worked out ' +
+        ? 'ONS publishes Census 2021 figures for output areas, and each ward figure is calculated ' +
           'from the output areas that best fit the ward under the ONS output area to ward lookup.'
         : 'ONS publishes Census 2021 figures for output areas, LSOAs and MSOAs, so these are its own ' + one + ' figures.';
     }
@@ -22085,7 +22087,7 @@ var PH_SHOW = {
         : /IMD/.test(src) ? 'MHCLG publishes this for each LSOA'
         : 'This is published for each LSOA';
       return first + '.' + (L === 'ward'
-        ? ' Each ward figure ' + (cbSums(k) ? 'adds up' : 'is an average, weighted by population, of') +
+        ? ' Each ward figure ' + (cbSums(k) ? 'is the sum of' : 'is an average, weighted by population, of') +
           ' the LSOAs that best fit the ward under the ONS lookup.'
         : '');
     }
@@ -22094,7 +22096,7 @@ var PH_SHOW = {
         return 'Counted here for each ward from the street-level crime locations the police publish' +
           (k === 'crime_rate_per_1000' ? ', then divided by the ward’s residents at the 2021 Census' : '') + '.';
       }
-      if (k === 'imd_decile_mean') return 'Worked out here for each ward as the average of its LSOAs’ deprivation deciles, weighted by population.';
+      if (k === 'imd_decile_mean') return 'Calculated here for each ward as the average of its LSOAs’ deprivation deciles, weighted by population.';
       return 'Counted here for each ward from the LSOAs that best fit it under the ONS lookup.';
     }
     return '';
@@ -22177,7 +22179,7 @@ var PH_SHOW = {
       }
       if (c.kind === 'est') {
         L.push('   Yes where OHID published this figure for an older 2011 MSOA, and the figure for the 2021 MSOA was ' +
-          'worked out from it, weighted by how many people lived in each part.', '');
+          'calculated from it, weighted by how many people lived in each part.', '');
         return;
       }
       var k = c.key, m = cbMeta(k), f = indicatorFacts(k) || {};
@@ -22211,7 +22213,7 @@ var PH_SHOW = {
     L.push('Opening the file');
     para('The file is plain text in UTF-8, with commas between the columns and one heading row. If a symbol ' +
       'such as µg/m³ looks wrong in Excel, open the file from the Data tab with From Text/CSV instead.');
-    para('PopHealth Map is an independent project, not an NHS service. If something in the figures looks wrong, ' +
+    para('PopHealth Map is an independent open-data project, not affiliated with the NHS. If something in the figures looks wrong, ' +
       'please tell us at contact@pophealth.uk.');
     return L.join('\n');
   }
