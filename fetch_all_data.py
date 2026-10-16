@@ -1878,9 +1878,96 @@ def _cen_findall(df: pd.DataFrame, *kws, exclude=()) -> list[str]:
 
 def _cen_pct(df: pd.DataFrame, num_cols: list[str], den_col: str) -> "pd.Series":
     """Compute (sum(numerator) / denominator) * 100, as a float Series."""
+    num, den = _cen_counts(df, num_cols, den_col)
+    return (num / den.replace(0, pd.NA)) * 100
+
+
+def _cen_counts(df: pd.DataFrame, num_cols: list[str], den_col: str):
+    """The numerator count (the numerator columns summed) and the
+    denominator count behind one percentage, as two float Series."""
     num = df[num_cols].apply(pd.to_numeric, errors="coerce").sum(axis=1)
-    den = pd.to_numeric(df[den_col], errors="coerce").replace(0, pd.NA)
-    return (num / den) * 100
+    den = pd.to_numeric(df[den_col], errors="coerce")
+    return num.astype(float), den.astype(float)
+
+
+# Every census percentage is kept with the two counts it was made from, as
+# <key>__num and <key>__den, so that larger areas are built by adding up the
+# counts and dividing once. Averaging the percentages instead, weighted by
+# residents, is wrong for a household measure such as no car or tenure, whose
+# base is households: a ward of large families and one of single people have
+# the same number of residents but very different numbers of households.
+CEN_NUM, CEN_DEN = "__num", "__den"
+
+
+def _census_split(df: "pd.DataFrame", code_col: str):
+    """(figures, counts): the census frame as it has always been written, and
+    the count columns on their own, both keyed by code_col."""
+    cnt = [c for c in df.columns if c.endswith((CEN_NUM, CEN_DEN))]
+    return df.drop(columns=cnt), df[[code_col] + cnt].copy()
+
+
+def census_group_figures(figs: "pd.DataFrame", counts: "pd.DataFrame | None",
+                         code_to_group: dict, code_col: str = "LSOA21CD") -> dict:
+    """Census figures for groups of areas: {group: {key: value}}.
+
+    Each area (output area or LSOA) goes to the group code_to_group gives it.
+    A percentage is the group's summed numerator over its summed denominator,
+    from the areas that have both counts. census_population is summed. A
+    percentage whose counts are not in the counts frame (a parquet written
+    before the counts were kept) falls back to the old average of the area
+    percentages weighted by residents, with a warning, so a stale file still
+    gives figures."""
+    out: dict = {}
+    if figs is None or figs.empty:
+        return out
+    f = figs.copy()
+    f[code_col] = f[code_col].astype(str)
+    f["_g"] = f[code_col].map(code_to_group)
+    f = f[f["_g"].notna()]
+    if f.empty:
+        return out
+    pop = (pd.to_numeric(f["census_population"], errors="coerce")
+           if "census_population" in f.columns else pd.Series(float("nan"), index=f.index))
+    if pop.notna().any():
+        for g, v in pop[pop > 0].groupby(f["_g"]).sum().items():
+            out.setdefault(g, {})["census_population"] = int(round(float(v)))
+
+    c = None
+    if counts is not None and not counts.empty:
+        c = counts.copy()
+        c[code_col] = c[code_col].astype(str)
+        c["_g"] = c[code_col].map(code_to_group)
+        c = c[c["_g"].notna()]
+    stale = []
+    for key in [k for k in f.columns if k.endswith("_pct")]:
+        nk, dk = key + CEN_NUM, key + CEN_DEN
+        if c is not None and nk in c.columns and dk in c.columns:
+            num = pd.to_numeric(c[nk], errors="coerce")
+            den = pd.to_numeric(c[dk], errors="coerce")
+            use = num.notna() & den.notna() & (den > 0)
+            if not use.any():
+                continue
+            n = num[use].groupby(c.loc[use, "_g"]).sum()
+            d = den[use].groupby(c.loc[use, "_g"]).sum()
+            for g in d.index:
+                if d[g] > 0:
+                    out.setdefault(g, {})[key] = round(float(n[g]) / float(d[g]) * 100, 2)
+        else:
+            stale.append(key)
+            v = pd.to_numeric(f[key], errors="coerce")
+            w = pop.where(pop > 0, 1.0).fillna(1.0)
+            use = v.notna()
+            if not use.any():
+                continue
+            n = (v[use] * w[use]).groupby(f.loc[use, "_g"]).sum()
+            d = w[use].groupby(f.loc[use, "_g"]).sum()
+            for g in d.index:
+                if d[g] > 0:
+                    out.setdefault(g, {})[key] = round(float(n[g]) / float(d[g]), 2)
+    if stale:
+        warn(f"census: no counts for {len(stale)} percentages ({', '.join(stale[:3])}...); "
+             f"those are averaged by residents until the census source is rerun")
+    return out
 
 
 def run_census2021() -> pd.DataFrame:
@@ -1888,8 +1975,13 @@ def run_census2021() -> pd.DataFrame:
     out = _census_frame("lsoa")
     if out is None or out.empty:
         return pd.DataFrame()
+    # The figures file keeps its shape for everything that reads it; the
+    # counts behind each percentage go beside it, for the ward and LA build.
+    out, counts = _census_split(out, "LSOA21CD")
     out_path = DATA_DIR / "demographics" / "census2021.parquet"
     out = write_parquet_guarded(out_path, out, source="census")
+    write_parquet_guarded(DATA_DIR / "demographics" / "census2021_counts.parquet",
+                          counts, source="census")
     ok(f"census2021: {len(out):,} LSOAs x {len(out.columns)-1} indicators -> {out_path.relative_to(REPO_ROOT)}")
 
     # The same figures as ONS publishes them for MSOAs, from the same zips.
@@ -1897,6 +1989,7 @@ def run_census2021() -> pd.DataFrame:
     # taking ONS's own file means nothing is derived here.
     msoa = _census_frame("msoa")
     if msoa is not None and not msoa.empty:
+        msoa = _census_split(msoa, "LSOA21CD")[0]
         msoa = msoa.rename(columns={"LSOA21CD": "MSOA21CD"})
         want = set(get_lsoa_to_msoa().values())
         msoa = msoa[msoa["MSOA21CD"].isin(want)]
@@ -1965,10 +2058,20 @@ def _census_frame(level: str = "lsoa") -> pd.DataFrame | None:
             if not silent:
                 warn(f"  {tab}/{key}: num={len(num_cols)} den={den_col} - column match failed")
             return
-        vals = _cen_pct(t, num_cols, den_col)
+        num, den = _cen_counts(t, num_cols, den_col)
+        merge_counts(key, t[cc], num, den)
+
+    # One percentage from its two counts, merged onto `out` with the counts
+    # beside it (see CEN_NUM).
+    def merge_counts(key: str, codes, num, den):
+        nonlocal out
+        num = pd.to_numeric(num, errors="coerce").astype(float)
+        den = pd.to_numeric(den, errors="coerce").astype(float)
         df = pd.DataFrame({
-            "LSOA21CD": t[cc].astype(str).str.strip(),
-            key: vals.values,
+            "LSOA21CD": codes.astype(str).str.strip().values,
+            key: ((num / den.replace(0, pd.NA)) * 100).values,
+            key + CEN_NUM: num.values,
+            key + CEN_DEN: den.values,
         })
         out = out.merge(df, on="LSOA21CD", how="left")
 
@@ -2001,6 +2104,13 @@ def _census_frame(level: str = "lsoa") -> pd.DataFrame | None:
         wa = 100 - pd.to_numeric(out["census_under16_pct"], errors="coerce") \
                  - pd.to_numeric(out["census_over65_pct"], errors="coerce")
         out["census_working_age_pct"] = wa
+        # Both bands come from the same table and base, so the working-age
+        # count is that base less the two counts.
+        u, o = "census_under16_pct", "census_over65_pct"
+        if all(k in out.columns for k in (u + CEN_NUM, u + CEN_DEN, o + CEN_NUM)):
+            out["census_working_age_pct" + CEN_NUM] = (
+                out[u + CEN_DEN] - out[u + CEN_NUM] - out[o + CEN_NUM])
+            out["census_working_age_pct" + CEN_DEN] = out[u + CEN_DEN]
 
     # TS004 country of birth ---------------------------------------------
     # First attempt matches a "Not born in the UK" column directly; if that
@@ -2016,12 +2126,9 @@ def _census_frame(level: str = "lsoa") -> pd.DataFrame | None:
             uk_col = _cen_find(t, "united kingdom", exclude=("not",))
             tot_col = _cen_find(t, "total")
             if cc and uk_col and tot_col:
-                vals = (1 - pd.to_numeric(t[uk_col], errors="coerce")
-                        / pd.to_numeric(t[tot_col], errors="coerce").replace(0, pd.NA)) * 100
-                out = out.merge(pd.DataFrame({
-                    "LSOA21CD": t[cc].astype(str).str.strip(),
-                    "census_born_outside_uk_pct": vals.values,
-                }), on="LSOA21CD", how="left")
+                tot = pd.to_numeric(t[tot_col], errors="coerce")
+                merge_counts("census_born_outside_uk_pct", t[cc],
+                             tot - pd.to_numeric(t[uk_col], errors="coerce"), tot)
 
     # TS021 ethnic group -> non-white = 1 - (white/total) -----------------
     # IMPORTANT: the "white" column must be the PARENT "Ethnic group: White"
@@ -2069,19 +2176,16 @@ def _census_frame(level: str = "lsoa") -> pd.DataFrame | None:
             "census_other_ethnic_pct": _parent_col("other"),
         }
         if cc and tot_col:
-            den = pd.to_numeric(t[tot_col], errors="coerce").replace(0, pd.NA)
-            merge_df = pd.DataFrame({
-                "LSOA21CD": t[cc].astype(str).str.strip(),
-            })
+            den = pd.to_numeric(t[tot_col], errors="coerce")
             for key, col in parents.items():
                 if not col:
                     warn(f"  TS021/{key}: parent column not found")
                     continue
-                merge_df[key] = (pd.to_numeric(t[col], errors="coerce") / den) * 100
+                merge_counts(key, t[cc], pd.to_numeric(t[col], errors="coerce"), den)
             # Derive non-white as 100 - white (kept for back-compat with the UI).
-            if "census_white_pct" in merge_df.columns:
-                merge_df["census_non_white_pct"] = 100 - merge_df["census_white_pct"]
-            out = out.merge(merge_df, on="LSOA21CD", how="left")
+            if parents.get("census_white_pct"):
+                merge_counts("census_non_white_pct", t[cc],
+                             den - pd.to_numeric(t[parents["census_white_pct"]], errors="coerce"), den)
 
     # TS037 general health -----------------------------------------------
     # "Very good health" + "Good health" for good; "Bad health" + "Very bad health" for bad.
@@ -2107,12 +2211,9 @@ def _census_frame(level: str = "lsoa") -> pd.DataFrame | None:
         none_col = _cen_find(t, "provides no unpaid care") or _cen_find(t, "no unpaid care")
         tot_col = _cen_find(t, "total")
         if cc and none_col and tot_col:
-            vals = (1 - pd.to_numeric(t[none_col], errors="coerce")
-                    / pd.to_numeric(t[tot_col], errors="coerce").replace(0, pd.NA)) * 100
-            out = out.merge(pd.DataFrame({
-                "LSOA21CD": t[cc].astype(str).str.strip(),
-                "census_provides_unpaid_care_pct": vals.values,
-            }), on="LSOA21CD", how="left")
+            tot = pd.to_numeric(t[tot_col], errors="coerce")
+            merge_counts("census_provides_unpaid_care_pct", t[cc],
+                         tot - pd.to_numeric(t[none_col], errors="coerce"), tot)
 
     # TS044 household deprivation (any of 4 dimensions) ------------------
     t = tables.get("TS044")
@@ -2121,12 +2222,9 @@ def _census_frame(level: str = "lsoa") -> pd.DataFrame | None:
         none_col = _cen_find(t, "not deprived in any dimension") or _cen_find(t, "not deprived")
         tot_col = _cen_find(t, "total")
         if cc and none_col and tot_col:
-            vals = (1 - pd.to_numeric(t[none_col], errors="coerce")
-                    / pd.to_numeric(t[tot_col], errors="coerce").replace(0, pd.NA)) * 100
-            out = out.merge(pd.DataFrame({
-                "LSOA21CD": t[cc].astype(str).str.strip(),
-                "census_housing_deprived_pct": vals.values,
-            }), on="LSOA21CD", how="left")
+            tot = pd.to_numeric(t[tot_col], errors="coerce")
+            merge_counts("census_housing_deprived_pct", t[cc],
+                         tot - pd.to_numeric(t[none_col], errors="coerce"), tot)
 
     # TS045 car/van ------------------------------------------------------
     attach("census_no_car_pct", "TS045",
@@ -2264,15 +2362,20 @@ def run_census_oa() -> pd.DataFrame:
     if frame is None or frame.empty:
         warn("census_oa: no OA census figures")
         return pd.DataFrame()
-    frame = frame.rename(columns={"LSOA21CD": "OA21CD"}).set_index("OA21CD")
+    frame = frame.rename(columns={"LSOA21CD": "OA21CD"})
+    frame, counts = _census_split(frame, "OA21CD")
+    frame = frame.set_index("OA21CD")
     keys = [c for c in frame.columns if c.startswith("census_")]
-    # Kept for the ward build, which adds census wards up from output areas
-    # (see get_oa_to_ward). Only output areas in scope.
+    # Kept for the ward build, which builds census wards from the counts of
+    # their output areas (see get_oa_to_ward). Only output areas in scope.
     oa_ward = get_oa_to_ward()
     if oa_ward:
-        scoped = frame[frame.index.isin(set(oa_ward))].reset_index()
+        scope = set(oa_ward)
+        scoped = frame[frame.index.isin(scope)].reset_index()
         write_parquet_guarded(DATA_DIR / "demographics" / "census2021_oa.parquet",
                               scoped, source="census_oa")
+        write_parquet_guarded(DATA_DIR / "demographics" / "census2021_oa_counts.parquet",
+                              counts[counts["OA21CD"].isin(scope)], source="census_oa")
 
     svc = _oa_boundary_service()
     if not svc:
@@ -4719,6 +4822,55 @@ def _read_parquet_opt(path: Path):
         return None
     return pd.read_parquet(path)
 
+def _census_ward_inputs():
+    """(figures, counts, area -> ward lookup) for the census ward build:
+    output areas through ONS's OA->ward best fit when both answer, otherwise
+    LSOAs through the LSOA->ward lookup. Frames are keyed by LSOA21CD
+    whichever level they hold; either may be None."""
+    demo = DATA_DIR / "demographics"
+    cen_oa = _read_parquet_opt(demo / "census2021_oa.parquet")
+    oa_to_ward = get_oa_to_ward() if cen_oa is not None and not cen_oa.empty else {}
+    if oa_to_ward:
+        cnt = _read_parquet_opt(demo / "census2021_oa_counts.parquet")
+        info(f"census -> wards from {len(cen_oa):,} output areas (ONS OA->ward best fit)")
+        return (cen_oa.rename(columns={"OA21CD": "LSOA21CD"}),
+                None if cnt is None else cnt.rename(columns={"OA21CD": "LSOA21CD"}),
+                oa_to_ward)
+    return (_read_parquet_opt(demo / "census2021.parquet"),
+            _read_parquet_opt(demo / "census2021_counts.parquet"),
+            get_lsoa_to_ward())
+
+
+def _ward_to_lad() -> dict:
+    """{WD25CD: LAD25CD}, from the ward boundaries, then the LSOA lookup."""
+    out = {wd: lad for wd, lad in get_lsoa_ward_lookup().values()}
+    gj = DATA_DIR / "boundaries" / "wards.geojson"
+    if gj.exists():
+        for feat in json.loads(gj.read_text(encoding="utf-8")).get("features", []):
+            p = feat.get("properties", {})
+            wd = p.get("WD25CD") or p.get("WD24CD")
+            lad = p.get("LAD25CD") or p.get("LAD24CD")
+            if wd and lad:
+                out[wd] = lad
+    return out
+
+
+def census_la_figures() -> dict:
+    """Census percentages for each LA, {LAD25CD: {key: pct}}: the summed
+    counts of the same output areas (or LSOAs) its wards are built from, so
+    an LA figure is its wards added up rather than their percentages
+    averaged. Population is left to the map, which sums the wards."""
+    cen_src, cnt_src, lookup = _census_ward_inputs()
+    if cen_src is None or cen_src.empty:
+        return {}
+    w2l = _ward_to_lad()
+    to_la = {code: w2l[wd] for code, wd in lookup.items() if wd in w2l}
+    figs = census_group_figures(cen_src, cnt_src, to_la)
+    for vals in figs.values():
+        vals.pop("census_population", None)
+    return figs
+
+
 def build_ward_data() -> dict:
     """Wrapped shape expected by index.html loadData():
          {wards: {WD25CD: {name, lad, indicators:{...}}}, metadata: {...}}
@@ -4842,9 +4994,10 @@ def build_ward_data() -> dict:
     # An MSOA is a group of whole LSOAs, and a ward is a best-fit group of
     # LSOAs, so the two are joined through the LSOAs they share rather than
     # directly. Each LSOA carries its MSOA's value and contributes its
-    # population as weight, which is the same aggregation the census block
-    # below uses. A ward straddling two MSOAs gets a blend in proportion to
-    # where its people are, not to how much land falls in each.
+    # population as weight: OHID publishes rates, not the counts behind them,
+    # so a weighted average is the best available. A ward straddling two
+    # MSOAs gets a blend in proportion to where its people are, not to how
+    # much land falls in each.
     ftm = _read_parquet_opt(DATA_DIR / "outcomes" / "fingertips_msoa.parquet")
     if ftm is not None and not ftm.empty:
         sources["health_msoa"] = "OHID Fingertips (Local Health, MSOA)"
@@ -4888,69 +5041,27 @@ def build_ward_data() -> dict:
                     n_filled += 1
         info(f"fingertips msoa -> {len(num):,} wards, {n_filled:,} values")
 
-    # --- Census 2021: per output area (or LSOA) -> per-ward, population-weighted
+    # --- Census 2021: per output area (or LSOA) -> per ward, from the counts
     # Output areas when ONS's OA->ward best-fit lookup answers: they are a
     # fifth the size of LSOAs, so the ward follows its real boundary much more
-    # closely. Otherwise LSOAs through the LSOA->ward lookup, as before.
-    cen = _read_parquet_opt(DATA_DIR / "demographics" / "census2021.parquet")
-    cen_oa = _read_parquet_opt(DATA_DIR / "demographics" / "census2021_oa.parquet")
-    oa_to_ward = get_oa_to_ward() if cen_oa is not None and not cen_oa.empty else {}
-    if oa_to_ward and cen_oa is not None:
-        cen = cen_oa.rename(columns={"OA21CD": "LSOA21CD"})
-        lsoa_to_ward = oa_to_ward
-        info(f"census -> wards from {len(cen):,} output areas (ONS OA->ward best fit)")
-    if cen is not None and not cen.empty:
+    # closely. Otherwise LSOAs through the LSOA->ward lookup, as before. Each
+    # ward percentage is its areas' numerator counts summed over their
+    # denominator counts summed (see census_group_figures), so a household
+    # measure is a share of the ward's households, not of its residents.
+    cen_src, cnt_src, cen_lookup = _census_ward_inputs()
+    if cen_src is not None and not cen_src.empty:
         sources["census"] = "ONS Census 2021 (Nomis)"
-        # Area code -> WD25CD from the ONS best-fit lookup (LSOA unless the
-        # output area lookup was chosen above).
-        if not oa_to_ward:
-            lsoa_to_ward = get_lsoa_to_ward()
+        for wd, vals in census_group_figures(cen_src, cnt_src, cen_lookup).items():
+            if wd in wards:
+                wards[wd]["indicators"].update(vals)
 
-        pop_by_lsoa = dict(zip(
-            cen["LSOA21CD"].astype(str),
-            pd.to_numeric(cen.get("census_population", pd.Series(dtype="float")),
-                          errors="coerce").fillna(0),
-        ))
-        pct_cols = [c for c in cen.columns if c.endswith("_pct")]
-        from collections import defaultdict as _dd
-        # Weighted numerator/denominator: uses LSOA population when present,
-        # otherwise a weight of 1.0 per LSOA (unweighted mean). This keeps the
-        # fetcher producing ward-level %s even when TS001 pop is missing.
-        ward_num = _dd(lambda: _dd(float))
-        ward_den = _dd(lambda: _dd(float))
-        ward_pop_sum = _dd(float)
-
-        for _, row in cen.iterrows():
-            lc = str(row["LSOA21CD"])
-            wd = lsoa_to_ward.get(lc)
-            if not wd:
-                continue
-            pop = pop_by_lsoa.get(lc, 0) or 0
-            if pop > 0:
-                ward_pop_sum[wd] += float(pop)
-            weight = float(pop) if pop > 0 else 1.0
-            for pc in pct_cols:
-                v = row[pc]
-                if pd.notna(v):
-                    ward_num[wd][pc] += float(v) * weight
-                    ward_den[wd][pc] += weight
-
-        for wd, w in wards.items():
-            if ward_pop_sum.get(wd, 0) > 0:
-                w["indicators"]["census_population"] = int(round(ward_pop_sum[wd]))
-            for pc in pct_cols:
-                den = ward_den[wd].get(pc, 0)
-                if den > 0:
-                    w["indicators"][pc] = round(ward_num[wd][pc] / den, 2)
-
-    # The census block above may have worked on output areas; everything
-    # below is LSOA, so put the LSOA lookup and populations back.
-    if oa_to_ward:
+    # Everything below is LSOA, so the LSOA lookup and the LSOA populations.
+    cen = _read_parquet_opt(DATA_DIR / "demographics" / "census2021.parquet")
+    if cen_src is not None and not cen_src.empty:
         lsoa_to_ward = get_lsoa_to_ward()
-        _cl = _read_parquet_opt(DATA_DIR / "demographics" / "census2021.parquet")
-        pop_by_lsoa = ({} if _cl is None or _cl.empty else dict(zip(
-            _cl["LSOA21CD"].astype(str),
-            pd.to_numeric(_cl["census_population"], errors="coerce").fillna(0))))
+        pop_by_lsoa = ({} if cen is None or cen.empty or "census_population" not in cen.columns
+                       else dict(zip(cen["LSOA21CD"].astype(str),
+                                     pd.to_numeric(cen["census_population"], errors="coerce").fillna(0))))
 
     # --- Fuel poverty + PTAL: per-LSOA -> per-ward (population weighted) ----
     # Reuses lsoa_to_ward + pop_by_lsoa built in the census block above. If
@@ -5159,8 +5270,11 @@ def build_borough_data() -> dict:
     caveats say so; this gives the numbers a level where they are simply true
     instead of apologising for them at ward level.
 
-    Nothing is aggregated or split. Every value is the published figure for
-    that local authority.
+    The Fingertips values are the published figure for that local authority,
+    with nothing aggregated or split. The one derived set is the Census
+    percentages, each the summed counts of the LA's output areas (see
+    census_la_figures), which the map would otherwise have to average from
+    ward percentages.
 
     Flat records keyed by LAD25CD, matching msoa_data.json and lsoa_data.json.
     Names come from data/map/boroughs.js, which the browser already loads.
@@ -5168,8 +5282,8 @@ def build_borough_data() -> dict:
     out: dict = {}
     ft = _read_parquet_opt(DATA_DIR / "outcomes" / "fingertips.parquet")
     if ft is None or ft.empty:
-        warn("borough_data: no fingertips parquet, so nothing to write")
-        return out
+        warn("borough_data: no fingertips parquet")
+        ft = pd.DataFrame(columns=["LAD25CD", "indicator_short", "value"])
 
     for _, row in ft.iterrows():
         v = row["value"]
@@ -5183,7 +5297,15 @@ def build_borough_data() -> dict:
         out.setdefault(lad, {})[f"ft_{row['indicator_short']}"] = float(v)
 
     n_vals = sum(len(v) for v in out.values())
-    info(f"borough_data: {len(out):,} {LA_WORD}s, {n_vals:,} published values, none derived")
+    # Census percentages for each LA, from the summed counts of its output
+    # areas. The map would otherwise average its wards' percentages by
+    # residents, which is wrong for household measures.
+    cen = census_la_figures()
+    for lad, vals in cen.items():
+        out.setdefault(lad, {}).update(vals)
+    n_cen = sum(len(v) for v in cen.values())
+    info(f"borough_data: {len(out):,} {LA_WORD}s, {n_vals:,} published values, "
+         f"{n_cen:,} Census figures from summed counts")
     return out
 
 

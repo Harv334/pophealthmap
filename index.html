@@ -3418,7 +3418,7 @@
                label from IND_NAMES ("One name for each indicator"), so edit
                names there; the value and the level suffix are what count here. -->
           <select id="ov" hidden aria-hidden="true" tabindex="-1">
-            <option value="none">— none (area colours) —</option>
+            <option value="none">No indicator (area colours)</option>
             <optgroup label="Health and care">
               <option value="census_good_health_pct">Good/very good health % · Output area</option>
               <option value="census_bad_health_pct">Bad/very bad health % · Output area</option>
@@ -3502,7 +3502,7 @@
               <option value="census_other_ethnic_pct">Other ethnic group % · Output area</option>
               <option value="census_under16_pct">Under 16 % · Output area</option>
               <option value="census_under5_pct">Under 5 % · Output area</option>
-              <option value="census_working_age_pct">Working age (16–64) % · Output area</option>
+              <option value="census_working_age_pct">Working age (16 to 64) % · Output area</option>
               <option value="census_over65_pct">65+ % · Output area</option>
               <option value="census_over85_pct">85+ % · Output area</option>
               <option value="census_english_hh_all_pct">Households where all adults have English as main language % · Output area</option>
@@ -3530,7 +3530,7 @@
               <option value="no2_ugm3">Nitrogen dioxide NO₂ µg/m³ (Defra) · LSOA</option>
               <option value="pm25_ugm3">Fine particulates PM2.5 µg/m³ (Defra) · LSOA</option>
               <option value="pm10_ugm3">Particulates PM10 µg/m³ (Defra) · LSOA</option>
-              <option value="ptal_score">Public transport accessibility, PTAL 0–8 (TfL/GLA) · LSOA</option>
+              <option value="ptal_score">Public transport accessibility, PTAL 0 to 8 (TfL/GLA) · LSOA</option>
               <option value="rail_station_dist_m">Distance to nearest station, straight line, m (TfL) · LSOA</option>
               <option value="rail_stations_1km">Stations within 1 km (TfL) · LSOA</option>
               <option value="bus_stop_dist_m">Distance to nearest bus stop, straight line, m (TfL) · LSOA</option>
@@ -5189,7 +5189,7 @@ const CATS = [
     { k: "census_born_outside_uk_pct",       l: "Born outside UK (%)",           g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_under16_pct",               l: "Under 16 (%)",                  g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_under5_pct",                l: "Under 5 (%)",                   g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
-    { k: "census_working_age_pct",           l: "Working age, 16–64 (%)",        g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
+    { k: "census_working_age_pct",           l: "Working age, 16 to 64 (%)",    g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_over65_pct",                l: "65 and over (%)",               g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_over85_pct",                l: "85 and over (%)",               g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_white_pct",                 l: "White (%)",                     g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
@@ -5197,8 +5197,8 @@ const CATS = [
     { k: "census_black_pct",                 l: "Black / Black British (%)",     g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_mixed_pct",                 l: "Mixed / Multiple (%)",          g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_other_ethnic_pct",          l: "Other ethnic group (%)",        g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
-    { k: "census_english_hh_all_pct",        l: "Households — all adults English first language (%)", g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
-    { k: "census_english_hh_none_pct",       l: "Households — no adults English first language (%)",  g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
+    { k: "census_english_hh_all_pct",        l: "Households: all adults English first language (%)", g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
+    { k: "census_english_hh_none_pct",       l: "Households: no adults English first language (%)",  g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
   ]},
   { key: "economy", label: "Work, money and education", ico: "briefcase", fields: [
     { k: "census_unemployed_pct",            l: "Unemployed (%)",                g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
@@ -5217,7 +5217,7 @@ const CATS = [
     { k: "census_active_travel_pct",         l: "Walk/cycle to work (%)",        g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_public_transport_pct",      l: "Public transport to work (%)",  g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_car_to_work_pct",           l: "Car/van to work (%)",           g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
-    { k: "ptal_score",          l: "Transport accessibility (PTAL, 0–8)", g: "lsoa", lv: ["ward","lsoa"] },
+    { k: "ptal_score",          l: "Transport accessibility (PTAL, 0 to 8)", g: "lsoa", lv: ["ward","lsoa"] },
     { k: "rail_station_dist_m", l: "Distance to nearest station, straight line (m)", g: "lsoa", lv: ["ward","lsoa"] },
     { k: "rail_stations_1km",   l: "Stations within 1 km",             g: "lsoa", lv: ["ward","lsoa"] },
     { k: "bus_stop_dist_m",     l: "Distance to nearest bus stop, straight line (m)", g: "lsoa", lv: ["ward","lsoa"] },
@@ -6726,12 +6726,13 @@ function indicatorFacts(k) {
   if (ts && CENSUS_BASE[ts]) {
     [f.num, f.den] = CENSUS_BASE[ts];
     f.cadence = 'ONS runs a census every ten years, so these figures describe Census day, 21 March 2021, and the next census is due in 2031.';
-    // What build_ward_data does today: each output area is placed in the
-    // ward it best fits, and the ward's percentage is the average of its
-    // output areas' percentages weighted by their residents. Counts are added.
+    // What build_ward_data does: each output area is placed in the ward it
+    // best fits, and the ward's percentage is calculated from the counts of
+    // those output areas (their numerators summed over their bases summed),
+    // and an LA's from the output areas in its wards. Residents are summed.
     f.method = k === 'census_population'
       ? 'For wards we sum the residents of the output areas that best fit each ward under the ONS lookup, so the totals can differ a little from the ward tables ONS publishes.'
-      : 'Each figure is the count divided by its base, as a percentage. For wards we take the output areas that best fit each ward under the ONS lookup and average their percentages, weighting each by its number of residents, so household measures are weighted by residents too and can differ a little from the ward tables ONS publishes.';
+      : 'Each figure is the count divided by its base, as a percentage. A ward figure is calculated from the counts of the output areas that best fit the ward under the ONS lookup, and an LA figure from the output areas in its wards, so the figures can differ a little from the tables ONS publishes for wards and LAs.';
     return f;
   }
   if (/police/i.test(src)) {
@@ -6840,10 +6841,11 @@ function _publishedAt(k, nat, lv) {
     if (l === nat) return;
     if (l === 'borough') {
       out.push(laSums(k) ? 'LA figures are the sum of the ward figures.'
+        : nat === 'oa' ? 'LA figures are calculated in the same way, from the output areas in each LA.'
         : 'LA figures are an average of the ward figures, weighted by population.');
     } else if (l === 'ward' && nat === 'oa') {
       out.push(k === 'census_population' ? 'Ward figures are the sum of the residents of the output areas in each ward.'
-        : 'Ward figures are an average of the output areas in each ward, weighted by population.');
+        : 'Ward figures are calculated from the counts of the output areas in each ward.');
     } else if (l === 'ward' && nat === 'msoa') {
       out.push('Ward figures blend the MSOAs that each ward overlaps, in proportion to where its residents live.');
     } else if (l === 'ward' && nat === 'lsoa') {
@@ -7052,9 +7054,9 @@ function bivFill(level, id) {
   return (x == null || y == null) ? BIV_MISSING : BIV_COLOURS[y][x];
 }
 function fmtNum(v, decimals=0) {
-  if (v === null || v === undefined || v === '') return '—';
+  if (v === null || v === undefined || v === '') return 'No figure';
   const n = parseFloat(v);
-  if (isNaN(n)) return '—';
+  if (isNaN(n)) return 'No figure';
   // Rounded once, by toFixed, and only then grouped with thousands
   // separators, so every view shows the same digits as the hover card and
   // the downloads (which are written without separators, see indCsvValue).
@@ -7085,8 +7087,8 @@ function lsoaOvValue(code, k) {
   return (d.indicators || d)[resolveOvField(k)];
 }
 function fmtOv(v, k) {
-  if (v === null || v === undefined || v === '') return '—';
-  if (typeof v === 'number' && isNaN(v)) return '—';
+  if (v === null || v === undefined || v === '') return 'No figure';
+  if (typeof v === 'number' && isNaN(v)) return 'No figure';
   const key = k || '';
   // The decimal places are the indicator's own (IND_DECIMALS), shared with
   // the rankings, the key figures and the Data export.
@@ -7216,7 +7218,8 @@ function phTitle(text, opts) {
     if (!core) {
       out.push(tok);
       afterMinor = false;
-      if (['-', '–', ':', '|'].indexOf(tok) !== -1) starts = true;
+      // dash-ok: matches a published name's own en dash, to restart the capitals after it.
+      if (['-', '–', ':', '|'].indexOf(tok) !== -1) starts = true; // dash-ok
       return;
     }
     const up = core.toUpperCase();
@@ -8663,7 +8666,7 @@ function loadDentalLayer(practices) {
     if (!p.lat || !p.lng) return;
     const marker = L.marker([p.lat, p.lng], {icon: mkDentalIcon()});
     const imdBadge = p.imd_decile ? `<div class="pop-row"><span class="pop-key">IMD decile</span><span>${_esc(p.imd_decile)} of 10 (1 = most deprived)</span></div>` : '';
-    marker.bindPopup(`<div class="pop-hdr" style="background:#7B2D8E">${_esc(p.name||p.n)}</div><div class="pop-body"><div class="pop-addr">${_esc(p.postcode||p.pc||'—')}</div>${imdBadge}</div>`);
+    marker.bindPopup(`<div class="pop-hdr" style="background:#7B2D8E">${_esc(p.name||p.n)}</div><div class="pop-body"><div class="pop-addr">${_esc(p.postcode||p.pc||'Postcode not given')}</div>${imdBadge}</div>`);
     marker.bindTooltip(_esc(p.name||p.n), { direction: 'top', className: 'marker-tip' });
     dentalData.push({ name: p.name||p.n, postcode: p.postcode||p.pc, lat: p.lat, lng: p.lng, marker });
   });
@@ -9607,8 +9610,8 @@ function showWard(wn) {
          second button with a different name for the same thing is not needed. -->
     ${cats || '<div class="data-note">We do not have any figures for this ward.</div>'}
     <div class="data-note prof-key">
-      A figure with no label is the ward’s own. Census figures are calculated from its output areas, the smallest
-      Census areas of about 125 households, with percentages population-weighted and the population summed.
+      A figure with no label is the ward’s own. Census figures are calculated from the counts of its output areas,
+      the smallest Census areas of about 125 households, and the population is their residents summed.
       Crimes are counted inside its boundary.
       <span class="gpill gpill-lsoa">estimated from LSOAs</span> and <span class="gpill gpill-msoa">estimated from MSOAs</span>
       mark figures published for those larger areas and weighted onto this ward by where its residents live, and a
@@ -10230,7 +10233,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
   };
   const _esc = s => (s == null ? '' : String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'));
   const _fmt = v => (v == null || v === '' || isNaN(parseFloat(v))) ? null : parseFloat(v);
-  const _fmtN = (v, dp) => (v == null ? '—' : v.toLocaleString(undefined, {maximumFractionDigits: dp == null ? 1 : dp}));
+  const _fmtN = (v, dp) => (v == null ? 'No figure' : v.toLocaleString(undefined, {maximumFractionDigits: dp == null ? 1 : dp}));
 
   // ── Inline-SVG chart primitives ────────────────────────────────────────
   // Horizontal bar chart with optional reference tick (London median).
@@ -10437,11 +10440,11 @@ function _generateWardReport(_reportWindow, wn, opts) {
 
   const today = new Date().toLocaleDateString('en-GB', { day:'numeric', month:'long', year:'numeric' });
   const borough = (wdata && wdata.lad) || '';
-  const population = popN ? popN.toLocaleString() : '—';
+  const population = popN ? popN.toLocaleString() : 'No figure';
 
   // ── KPI helper: large stat card with optional London-percentile micro-bar ──
   const _kpi = (lbl, val, sub, extra) => {
-    const dim = (val == null || val === '' || val === '—');
+    const dim = (val == null || val === '' || val === 'No figure');
     return `<div class="kpi">
       <div class="kpi-lbl">${_esc(lbl)}</div>
       <div class="kpi-val${dim ? ' dim' : ''}">${dim ? 'No figure' : val}</div>
@@ -10730,7 +10733,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
     <div class="hero-text">
       <div class="kicker">${PH_AREA} ward report · ${_esc(today)}${isCore20 ? ' &nbsp;' + core20Badge : ''}</div>
       <h1>${_esc(wdata ? wdata.name : wn)}</h1>
-      <div class="sub">${[_esc(borough), population !== '—' ? population + ' residents' : '',
+      <div class="sub">${[_esc(borough), population !== 'No figure' ? population + ' residents' : '',
         imdRank ? (imdRank === 1 ? 'Most deprived' : ordinal(imdRank) + ' most deprived') +
           ' of the ' + totalWards.toLocaleString('en-GB') + ' ' + PH_AREA + ' wards with a deprivation score' : ''].filter(Boolean).join(' · ')}</div>
     </div>
@@ -13394,7 +13397,7 @@ window.generateLSOAReport = function(code) {
   };
   const _esc = s => (s == null ? '' : String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'));
   const _fmt = v => (v == null || v === '' || isNaN(parseFloat(v))) ? null : parseFloat(v);
-  const _fmtN = (v, dp) => (v == null ? '—' : v.toLocaleString(undefined, {maximumFractionDigits: dp == null ? 1 : dp}));
+  const _fmtN = (v, dp) => (v == null ? 'No figure' : v.toLocaleString(undefined, {maximumFractionDigits: dp == null ? 1 : dp}));
 
   // ── Inline SVG chart helpers (same shape as ward report) ──
   function _chartHbar(rows, opts) {
@@ -13631,7 +13634,7 @@ window.generateLSOAReport = function(code) {
 
   // KPI rendering helpers
   const _kpi = (lbl, val, sub, extra) => {
-    const dim = (val == null || val === '' || val === '—');
+    const dim = (val == null || val === '' || val === 'No figure');
     return `<div class="kpi">
       <div class="kpi-lbl">${_esc(lbl)}</div>
       <div class="kpi-val${dim ? ' dim' : ''}">${dim ? 'No figure' : val}</div>
@@ -18049,7 +18052,7 @@ var PH_SHOW = {
   }
 
   function fmtVal(v, k) {
-    if (v == null) return '—';
+    if (v == null) return 'No figure';
     // To the indicator's own decimal places (IND_DECIMALS), which give the
     // mean decile its one place: a tenth of a decile is most of its signal.
     if (typeof fmtOv === 'function') return fmtOv(v, k);
@@ -18674,9 +18677,9 @@ var PH_SHOW = {
       var cells = pinned.map(function (n) {
         // cmpIndsOf, not indsOf: the pins hold whatever Compare is set to
         // compare, and at board level a ward lookup on a board's name finds
-        // nothing and fills the table with dashes.
+        // nothing and fills the table with gaps.
         var v = num(cmpIndsOf(n)[r.k]);
-        return '<td>' + (v == null ? '—' :
+        return '<td>' + (v == null ? 'No figure' :
           fmtNum(v, indDecimals(r.k)) + (r.pct ? '%' : '')) + '</td>';
       }).join('');
       return '<tr><td>' + esc(labelOf(r.k)) + '</td>' + cells + '</tr>';
@@ -21361,7 +21364,7 @@ var PH_SHOW = {
       sumEl.innerHTML = '<div class="rb-group"><h3>This area</h3><div class="rb-stats">' +
         RB_HEADLINE.map(function (m) {
           var v = i[m.k];
-          var shown = (v === undefined || v === null) ? '—'
+          var shown = (v === undefined || v === null) ? 'No figure'
             : (m.k === 'census_population'
                 ? Math.round(v).toLocaleString()
                 : v.toFixed(indDecimals(m.as || m.k)) + (m.pct ? '<span>%</span>' : ''));
@@ -22071,7 +22074,10 @@ var PH_SHOW = {
       // How a ward's figure is made from them is the card's Method line.
       return L === 'ward'
         ? 'ONS publishes Census 2021 figures for output areas, and each ward figure is calculated ' +
-          'from the output areas that best fit the ward under the ONS output area to ward lookup.'
+          'from the counts of the output areas that best fit the ward under the ONS output area to ward lookup.'
+        : L === 'borough'
+        ? 'ONS publishes Census 2021 figures for output areas, and each LA figure is calculated ' +
+          'from the counts of the output areas in its wards.'
         : 'ONS publishes Census 2021 figures for output areas, LSOAs and MSOAs, so these are its own ' + one + ' figures.';
     }
     if (nat === 'msoa') {
@@ -22775,7 +22781,7 @@ var PH_SHOW = {
 
     var sortLbl = headerOf(q.sort);
     var html = rows.slice(0, 200).map(function (r, i) {
-      var v = r.sortVal == null ? '—' : fmtVal(r.sortVal, q.sort);
+      var v = r.sortVal == null ? 'No figure' : fmtVal(r.sortVal, q.sort);
       return '<div class="q-row" data-ward="' + esc(r.name) + '">' +
         '<span class="q-rank">' + String(i + 1).padStart(2, '0') + '</span>' +
         '<span class="q-nm">' + esc(r.name) + '<small>' + esc(r.lad) +
