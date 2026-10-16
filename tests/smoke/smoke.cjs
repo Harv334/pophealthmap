@@ -951,6 +951,87 @@ const smallText = page => page.evaluate(() => {
     await page.close();
   }
 
+  // The site mark (workplan 1.2): four rounded squares in four blues, about
+  // 20px beside the name in the app header, the pages' header and the tab,
+  // and the same drawing in every icon. It adds nothing to the header's
+  // height or the heading's name.
+  {
+    const favMark = html => {
+      const m = html.match(/<link rel="icon" type="image\/svg\+xml" href="data:image\/svg\+xml,([^"]+)">/);
+      return m ? decodeURIComponent(m[1]).replace(/'/g, '"') : '';
+    };
+    const sizes = [];
+    // Each square's place, corner and colour, so two drawings can be compared.
+    let appRects = '';
+    for (const [w, h, phone, maxH] of [[1200, 800, false, 47], [1400, 900, false, 47], [390, 844, true, 43]]) {
+      const page = await browser.newPage({ viewport: { width: w, height: h }, isMobile: phone, hasTouch: phone });
+      await page.goto(BASE + '/index.html?t=1');
+      await page.waitForTimeout(2500);
+      const r = await page.evaluate(() => {
+        const svg = document.querySelector('.hdr h1.hdr-logo > svg.hdr-mark');
+        const h1 = document.querySelector('.hdr h1');
+        const rect = e => { const b = e.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom, w: b.width, h: b.height }; };
+        const others = [...document.querySelectorAll('.hdr button, .hdr input, .hdr .hdr-tag')].filter(e => e.offsetParent).map(rect);
+        const s = svg && rect(svg), n = h1 && rect(h1);
+        return {
+          svg: s, hidden: svg && svg.getAttribute('aria-hidden'), rects: svg ? svg.querySelectorAll('rect').length : 0,
+          fills: svg ? [...svg.querySelectorAll('rect')].map(r => r.getAttribute('fill')) : [],
+          mark: svg ? [...svg.querySelectorAll('rect')].map(r => [r.getAttribute('x') || 0, r.getAttribute('y') || 0, r.getAttribute('rx'), r.getAttribute('fill')].join(':')).join(' ') : '',
+          name: h1 ? h1.textContent.trim() : '',
+          centred: s && n ? Math.abs((s.t + s.b) / 2 - (n.t + n.b) / 2) : 99,
+          hit: s ? others.filter(o => s.l < o.r && s.r > o.l && s.t < o.b && s.b > o.t).length : 0,
+          hdr: document.querySelector('.hdr').offsetHeight,
+        };
+      });
+      ok(r.svg && Math.round(r.svg.w) === 20 && Math.round(r.svg.h) === 20 && r.hidden === 'true' && r.rects === 4 && r.centred <= 1 && !r.hit,
+        'the site mark sits 20px beside the name in the app header at ' + w + 'px', JSON.stringify(r).slice(0, 300));
+      ok(new Set(r.fills).size === 4 && r.fills.every(f => /^#[0-9A-F]{6}$/i.test(f)), 'the site mark is four shades of blue', r.fills.join(' '));
+      ok(r.hdr <= maxH, 'the mark leaves the app header ' + maxH + 'px or less at ' + w + 'px', r.hdr + 'px');
+      ok(/^PopHealth Map\s*Beta$/.test(r.name), 'the header heading still reads PopHealth Map with the Beta badge at ' + w + 'px', r.name);
+      appRects = r.mark;
+      await page.close();
+    }
+    for (const p of ['index.html', 'methodology.html', 'accessibility.html', 'privacy.html', '404.html']) {
+      const html = await (await fetch(BASE + '/' + p)).text();
+      const page = await browser.newPage();
+      await page.setContent('<body>' + favMark(html) + '<div id="b">' + ((html.match(/<a class="brand"[^>]*>(<svg[\s\S]*?<\/svg>)/) || [])[1] || '') + '</div></body>');
+      const [fav, brand] = await page.evaluate(() => {
+        const m = s => s ? [...s.querySelectorAll('rect')].map(r => [r.getAttribute('x') || 0, r.getAttribute('y') || 0, r.getAttribute('rx'), r.getAttribute('fill')].join(':')).join(' ') : '';
+        return [m(document.querySelector('body > svg')), m(document.querySelector('#b svg'))];
+      });
+      await page.close();
+      ok(fav && fav === appRects, p + ': the tab icon is the header mark', fav + ' / ' + appRects);
+      if (p !== 'index.html') ok(brand === appRects, p + ': the page header shows the same mark', brand);
+      ok(/<link rel="icon" type="image\/png" sizes="32x32" href="(https:\/\/pophealth\.uk\/)?favicon-32\.png">/.test(html) &&
+         /<link rel="apple-touch-icon" href="(https:\/\/pophealth\.uk\/)?apple-touch-icon\.png">/.test(html), p + ': PNG favicon and touch icon linked');
+    }
+    // The PNGs exist at the sizes they claim, and the manifest names them.
+    const pngSize = f => { const b = fs.readFileSync(path.join(ROOT, f)); return b.slice(1, 4).toString() === 'PNG' ? [b.readUInt32BE(16), b.readUInt32BE(20)] : null; };
+    for (const [f, s] of [['favicon-32.png', 32], ['apple-touch-icon.png', 180], ['icon-192.png', 192], ['icon-512.png', 512], ['icon-maskable-512.png', 512]]) {
+      const d = fs.existsSync(path.join(ROOT, f)) && pngSize(f);
+      ok(d && d[0] === s && d[1] === s, f + ' is a ' + s + 'px PNG', JSON.stringify(d));
+    }
+    const man = JSON.parse(fs.readFileSync(path.join(ROOT, 'site.webmanifest'), 'utf8'));
+    const icons = man.icons || [];
+    ok(man.id === '/' && man.lang === 'en-GB' && man.start_url === '/', 'manifest: id, lang en-GB and start address', JSON.stringify({ id: man.id, lang: man.lang }));
+    ok(icons.some(i => i.purpose === 'maskable' && i.src === 'icon-maskable-512.png' && i.sizes === '512x512') &&
+       icons.some(i => (i.purpose || 'any') === 'any' && i.sizes === '512x512') && icons.some(i => i.sizes === '192x192'),
+       'manifest: 192 and 512 icons, and a maskable 512', JSON.stringify(icons));
+    ok(icons.every(i => { const d = pngSize(i.src); return d && i.sizes === d[0] + 'x' + d[1]; }), 'manifest: every icon is the size it says');
+    // The link preview: 1200x630, as the tags say, and described in words.
+    const og = pngSize('og.png');
+    ok(og && og[0] === 1200 && og[1] === 630, 'og.png is 1200 by 630', JSON.stringify(og));
+    for (const p of ['index.html', 'methodology.html', 'accessibility.html', 'privacy.html']) {
+      const html = await (await fetch(BASE + '/' + p)).text();
+      const meta = k => (html.match(new RegExp('<meta (?:property|name)="' + k.replace(/[:.]/g, '\\$&') + '" content="([^"]*)"')) || [])[1];
+      ok(meta('og:image') === 'https://pophealth.uk/og.png' && meta('og:image:width') === '1200' && meta('og:image:height') === '630' &&
+         meta('twitter:image') === 'https://pophealth.uk/og.png', p + ': preview image tags match og.png');
+      const alt = meta('og:image:alt') || '';
+      ok(/map of London wards/i.test(alt) && alt === meta('twitter:image:alt') && !/[–—]/.test(alt),
+        p + ': the preview image is described the same way for both cards', alt);
+    }
+  }
+
   // Data export (workplan 2.7): headings with label, unit and period, figures
   // to each indicator's own decimal places, a notes file to cite, and a
   // preview built from the rows inside the panel.

@@ -156,14 +156,17 @@
 <meta property="og:image" content="https://pophealth.uk/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="PopHealth Map: population health across England by ward and neighbourhood">
+<meta property="og:image:alt" content="A map of London wards shaded by deprivation score, beside the name PopHealth Map and the words Free, no sign-in">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="PopHealth Map - population health across England by ward and neighbourhood">
 <meta name="twitter:description" content="Explore health, deprivation and local services across every neighbourhood in England, free and with no sign-in. Life expectancy, hospital admissions, crime, air quality, transport and more, from open NHS and government data.">
 <meta name="twitter:image" content="https://pophealth.uk/og.png">
+<meta name="twitter:image:alt" content="A map of London wards shaded by deprivation score, beside the name PopHealth Map and the words Free, no sign-in">
 
-<!-- Inline so it costs no request and cannot 404. A map pin in the map's own ink. -->
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1a1a'/%3E%3Cpath d='M16 6c-3.9 0-7 3.1-7 7 0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7z' fill='%23fff'/%3E%3Ccircle cx='16' cy='13' r='2.6' fill='%231a1a1a'/%3E%3C/svg%3E">
+<!-- Inline so it costs no request and cannot 404. The site mark, the same
+     four blues as the header. The PNG icons and og.png are drawn from it by
+     scripts/build_images.cjs. -->
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Crect width='9' height='9' rx='2' fill='%23003087'/%3E%3Crect x='11' width='9' height='9' rx='2' fill='%238BBDEA'/%3E%3Crect y='11' width='9' height='9' rx='2' fill='%23005EB8'/%3E%3Crect x='11' y='11' width='9' height='9' rx='2' fill='%233D8FDA'/%3E%3C/svg%3E">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="manifest" href="site.webmanifest">
@@ -342,6 +345,11 @@
      had before. */
   .hdr-logo { font-size: var(--t-lg); font-weight: 600; color: var(--nhs-dark); margin: 0;
     letter-spacing: -.01em; }
+  /* The site mark, the same four blues as the favicon and the pages' header.
+     Decorative, so the heading's name stays "PopHealth Map". 20px sits inside
+     the line the name already takes, so the header is no taller for it. */
+  .hdr-logo { display: flex; align-items: center; white-space: nowrap; }
+  .hdr-mark { flex: none; display: block; margin-right: 8px; }
   .hdr-region { font-size: var(--t-xs); font-weight: 600; color: var(--ink-2);
     margin-top: 1px; white-space: nowrap; }
   .hdr-region[hidden] { display: none; }
@@ -3020,7 +3028,7 @@
            link preview and the methodology page said PopHealth Map, so a
            shared link previewed under one name and opened under another. -->
       <div>
-        <h1 class="hdr-logo">PopHealth Map<span class="dev-badge" title="Figures are provisional while the site is being checked.">Beta</span></h1>
+        <h1 class="hdr-logo"><svg class="hdr-mark" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><rect width="9" height="9" rx="2" fill="#003087"/><rect x="11" width="9" height="9" rx="2" fill="#8BBDEA"/><rect y="11" width="9" height="9" rx="2" fill="#005EB8"/><rect x="11" y="11" width="9" height="9" rx="2" fill="#3D8FDA"/></svg>PopHealth Map<span class="dev-badge" title="Figures are provisional while the site is being checked.">Beta</span></h1>
         <!-- The region, shown only when it is not London (the default). -->
         <div class="hdr-region" id="hdr-region" hidden></div>
       </div>
