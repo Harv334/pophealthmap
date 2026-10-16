@@ -575,7 +575,7 @@ const smallText = page => page.evaluate(() => {
     await page.click('#sbtab-layers');
     const pcn = await page.evaluate(() => document.querySelectorAll('#pcn-focus option').length);
     ok(pcn > 50, 'PCN list loaded', pcn + ' options');
-    // "In plain English" (workplan 2.5): first in the sheet and the profile,
+    // "Summary" (workplan 2.5): first in the sheet and the profile,
     // leading with the ward's ranking, with a case for each kind of ward.
     const plain = await page.evaluate(async () => {
       const out = {};
@@ -585,8 +585,8 @@ const smallText = page => page.evaluate(() => {
         const body = document.getElementById('ws-body'), prof = document.getElementById('wpanel');
         const sheetBlock = body.firstElementChild, profBlock = prof.querySelector('.ws-insight');
         out[w] = {
-          sheetFirst: !!sheetBlock && !!sheetBlock.querySelector('.ws-insight-h') && sheetBlock.querySelector('.ws-insight-h').textContent === 'In plain English',
-          profFirst: !!profBlock && profBlock.querySelector('.ws-insight-h').textContent === 'In plain English' &&
+          sheetFirst: !!sheetBlock && !!sheetBlock.querySelector('.ws-insight-h') && sheetBlock.querySelector('.ws-insight-h').textContent === 'Summary',
+          profFirst: !!profBlock && profBlock.querySelector('.ws-insight-h').textContent === 'Summary' &&
             !!(profBlock.compareDocumentPosition(prof.querySelector('.keystats')) & Node.DOCUMENT_POSITION_FOLLOWING),
           sheet: sheetBlock.querySelector('p').textContent,
           prof: profBlock ? profBlock.querySelector('p').textContent : '',
@@ -598,7 +598,7 @@ const smallText = page => page.evaluate(() => {
     });
     const P = plain.out;
     ok(Object.values(P).every(x => x.sheetFirst && x.profFirst && x.sheet === x.prof),
-      '"In plain English" comes first in the ward sheet and the profile, and they match', JSON.stringify(P).slice(0, 300));
+      '"Summary" comes first in the ward sheet and the profile, and they match', JSON.stringify(P).slice(0, 300));
     ok(/^Stonebridge is more deprived than 99% of London's wards, and \d+ of its \d+ LSOAs are among the most deprived fifth of England\./.test(P.Stonebridge.sheet),
       'Stonebridge leads with its ranking and its Core20 count', P.Stonebridge.sheet);
     ok(/^Holloway is (more|less) deprived than \d+% of London's wards\./.test(P.Holloway.sheet) && !/deprived fifth/.test(P.Holloway.sheet),
@@ -608,7 +608,7 @@ const smallText = page => page.evaluate(() => {
       'Bishopsgate opens with its residents and makes no comparison with the median', P.Bishopsgate.sheet);
     ok(/^Walbrook\b/.test(P.Walbrook.sheet) && /no Census figures of its own/.test(P.Walbrook.sheet) && !/median|deprived than|can expect/.test(P.Walbrook.sheet) && P.Walbrook.prof === P.Walbrook.sheet,
       'Walbrook, with no resident count, is neither ranked nor compared, in the sheet and the profile', P.Walbrook.sheet);
-    ok(Object.values(P).every(x => x.profH === 'H3'), 'the profile\'s "In plain English" is a sibling of its section headings (h3)', Object.values(P).map(x => x.profH).join(','));
+    ok(Object.values(P).every(x => x.profH === 'H3'), 'the profile\'s "Summary" is a sibling of its section headings (h3)', Object.values(P).map(x => x.profH).join(','));
     ok(!Object.values(P).some(x => /[–—]/.test(x.sheet)), 'no dashes in the ward summaries');
     ok(plain.tiles.length === 6 && plain.cols === 3 && !plain.tiles.some(t => /Population|Avg|\+|\((?!all\)|limited a lot\))/.test(t)),
       'six spelled-out tiles, three to a row, without the population', plain.cols + ' columns: ' + plain.tiles.join(' | '));
@@ -623,8 +623,8 @@ const smallText = page => page.evaluate(() => {
         return { h: s ? s.querySelector('h2').textContent : '', beforeKpis: !!s && s.nextElementSibling === document.querySelector('.report .kpis'),
           text: s ? s.querySelector('p').textContent : '' };
       });
-      ok(r.h === 'In plain English' && r.beforeKpis && r.text === P.Bishopsgate.sheet,
-        'the printable report opens with the same "In plain English" summary', JSON.stringify(r).slice(0, 300));
+      ok(r.h === 'Summary' && r.beforeKpis && r.text === P.Bishopsgate.sheet,
+        'the printable report opens with the same "Summary" summary', JSON.stringify(r).slice(0, 300));
       await rep.close();
     } else ok(false, 'the printable report opens');
     // The Area profile and the printable reports look finished (workplan 2.6).
