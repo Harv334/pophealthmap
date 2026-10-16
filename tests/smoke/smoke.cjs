@@ -1128,12 +1128,8 @@ const smallText = page => page.evaluate(() => {
     ok(ch.key === 11 && /conic-gradient/.test(ch.ring), 'charities: a key to the dots, and groups drawn as a ring of causes',
       ch.key + ' / ' + ch.ring.slice(0, 40));
     await checkAxe(page, 'Charities tab with its key');
-    const tour = await page.evaluate(async () => {
-      const src = await (await fetch('index.html')).text();
-      const m = src.match(/t: 'Directory: find one place',[\s\S]*?go: function/);
-      return m ? m[0] : '';
-    });
-    ok(tour && !/\d/.test(tour.replace(/^t: '[^']*',/, '')), 'the tour gives no charity or Directory count of its own');
+    // The tour names the Directory without a count of its own; that check
+    // runs with the tour checks below, on the chapter as it is shown.
     // The PCN list has no placeholder and no "Gp".
     await page.click('#sbtab-layers');
     const pcn = await page.evaluate(() => [...document.querySelectorAll('#pcn-focus option')].map(o => o.textContent));
@@ -1209,6 +1205,97 @@ const smallText = page => page.evaluate(() => {
     await page.close();
   }
 
+  // The tour, the Indicators name and the Ask panel (workplan 1.4 to 1.6).
+  // Six chapters in plain words; the last completes when the reader chooses
+  // any indicator, on a desktop from the tab and on a phone through the menu;
+  // and the tour, the Ask panel and the privacy page describe the same route
+  // for a question: through this site's server to Anthropic's Claude model,
+  // 10 a day, with a reply to a clarifying question free.
+  const ASK_SAME = [/this site's server/, /Anthropic's Claude model/, /10 questions a day/,
+    /narrow a question down does not use one up/];
+  for (const [vpName, vp] of [['desktop', DESK], ['phone', PHONE]]) {
+    const { page, errors } = await open(browser, 'index.html?t=1', vp);
+    const ui = await page.evaluate(() => ({
+      heading: document.querySelector('#tab-overlay .sb-lbl span').textContent.trim(),
+      chip: document.getElementById('map-colour-chip').textContent.trim(),
+      tab: document.getElementById('sbtab-overlay').textContent.trim(),
+      titles: [...document.querySelectorAll('#dl-seg button')].map(b => b.title),
+      body: document.body.innerText,
+    }));
+    ok(ui.heading === 'Indicators' && ui.chip === 'Indicators' && ui.tab === 'Indicators',
+      vpName + ': the Indicators panel, its tab and the phone chip share the name "Indicators"', JSON.stringify([ui.heading, ui.chip, ui.tab]));
+    ok(!/colour the map/i.test(ui.body) && ui.titles.every(t => !/^Colour the map/.test(t)) && ui.titles.some(t => /^Show figures by ward, the [\d,]+ areas councillors are elected for\.$/.test(t)),
+      vpName + ': no control is called "Colour the map", and the level buttons say what they show', ui.titles.join(' | '));
+    const ch = await page.evaluate(async () => {
+      PH_TOUR.start();
+      const out = [];
+      for (let i = 0; i < PH_TOUR.length; i++) {
+        await new Promise(r => setTimeout(r, 400));
+        out.push({ t: document.getElementById('tour-title').textContent, c: document.getElementById('tour-ctr').textContent,
+          n: document.getElementById('tour-narr').innerText, spot: document.querySelectorAll('.tour-spot').length });
+        if (i < PH_TOUR.length - 1) document.getElementById('tour-next').click();
+      }
+      return out;
+    });
+    ok(ch.length === 6 && ch[0].c === 'Chapter 1 of 6' &&
+       ch.map(c => c.t).join('|') === 'What PopHealth Map is|Choose an indicator|Select a place|The tools|What the figures cannot tell you|Your turn',
+      vpName + ': the tour is six chapters, in order', ch.map(c => c.t).join(' | '));
+    const all = ch.map(c => c.t + ' ' + c.n).join(' ');
+    ok(!/[–—]/.test(all) && !/\bclick/i.test(all) && !/never receives|choropleth|overlay/i.test(all),
+      vpName + ': the tour has no dashes, no "click" and no claim that the data is never sent');
+    const short = ch.filter(c => {
+      const s = c.n.split(/(?<=[.:])\s+/).map(x => x.split(/\s+/).filter(Boolean).length);
+      return s.some((_, i) => i >= 2 && s[i] < 8 && s[i - 1] < 8 && s[i - 2] < 8);
+    });
+    ok(!short.length, vpName + ': no chapter has three short sentences in a row', short.map(c => c.t).join(', '));
+    ok(/local authorities \(LAs\)/.test(ch[0].n) && /\b\d{2,3} indicators\b/.test(ch[0].n) && /\b\d{2} local authorities/.test(ch[0].n) && /\b\d{3} wards\b/.test(ch[0].n)
+       && !/borough/i.test(all),
+      vpName + ': the first chapter counts indicators, LAs and wards from the data and names the level LA', ch[0].n);
+    ok(/postcode/.test(ch[2].n), vpName + ': the place chapter mentions postcode search');
+    ok(['Query', 'Compare', 'Custom area', 'Data export', 'Directory', 'Ask about this data'].every(w => ch[3].n.includes(w)) &&
+       ASK_SAME.every(re => re.test(ch[3].n)) && /personal/.test(ch[3].n) && ch[3].spot >= 2,
+      vpName + ': the tools chapter names every tool and describes Ask as the panel does', ch[3].n);
+    const dirSentence = (ch[3].n.match(/Directory[^.]*\./) || [''])[0];
+    ok(dirSentence && !/\d/.test(dirSentence), vpName + ': the tour gives no charity or Directory count of its own', dirSentence);
+    ok(/Key indicators|Start here/.test(ch[5].n) && (vpName === 'phone') === /menu button first/.test(ch[5].n),
+      vpName + ': the last chapter names a group on the Indicators tab, and on a phone says to open the menu first', ch[5].n);
+    // Do the last chapter as a reader would.
+    const before = await page.evaluate(() => ({ next: document.getElementById('tour-next').textContent, ov: document.getElementById('ov').value }));
+    ok(before.next === 'Skip and finish' && before.ov === 'none', vpName + ': the last chapter waits, with no indicator chosen', JSON.stringify(before));
+    if (vpName === 'phone') {
+      await page.tap('#hdr-menu'); await page.waitForTimeout(600);
+      await page.tap('#sbtab-overlay'); await page.waitForTimeout(300);
+      await page.tap('#ov-chips button:nth-child(3)');
+    } else {
+      await page.click('#sbtab-overlay'); await page.waitForTimeout(300);
+      await page.click('#ov-chips button:nth-child(3)');
+    }
+    await page.waitForTimeout(1500);
+    const after = await page.evaluate(() => ({ next: document.getElementById('tour-next').textContent, ov: document.getElementById('ov').value,
+      done: document.getElementById('tour-strip').classList.contains('task-done'),
+      said: (document.querySelector('#tour-narr .tour-task-done') || {}).innerText || '',
+      drawer: PH_DRAWER.isOpen() }));
+    ok(after.done && after.next === 'Finish' && after.ov !== 'none' && /coloured by/.test(after.said) && !after.drawer,
+      vpName + ': choosing a key indicator completes the last chapter', JSON.stringify(after));
+    await page.click('#tour-next');
+    await page.waitForTimeout(800);
+    const end = await page.evaluate(() => ({ run: PH_TOUR.running(), ov: document.getElementById('ov').value, spots: document.querySelectorAll('.tour-spot, .tour-pulse').length }));
+    ok(!end.run && end.ov === after.ov && !end.spots, vpName + ': Finish closes the tour and keeps the indicator the reader chose', JSON.stringify(end));
+    // The Ask panel's opening message, in the same terms.
+    await page.click('#ai-toggle');
+    await page.waitForTimeout(400);
+    const intro = await page.evaluate(() => {
+      const m = document.querySelector('#ai-log .ai-intro');
+      return { text: m ? m.innerText : '', paras: m ? m.querySelectorAll('p').length : 0,
+        caution: (document.getElementById('ai-caution') || {}).innerText || '' };
+    });
+    ok(intro.paras === 2 && ASK_SAME.every(re => re.test(intro.text)) && /personal/.test(intro.text) && /local authority \(LA\)/.test(intro.text) &&
+       !/[–—]/.test(intro.text + intro.caution) && /check any figure/.test(intro.caution),
+      vpName + ': the Ask panel opens with two paragraphs that describe the same route as the tour', intro.text);
+    ok(errors.length === 0, 'no page errors (tour, ' + vpName + ')', errors.join(' | '));
+    await page.close();
+  }
+
   // Phone
   {
     const { page, errors } = await open(browser, 'index.html?ov=imd_decile&t=1', PHONE);
@@ -1220,7 +1307,7 @@ const smallText = page => page.evaluate(() => {
     ok(!r.overlap, 'phone: legend clear of the map credits');
     ok(r.footer === 'sidebar', 'phone: footer in the drawer');
     // Give the map room on phones (workplan 2.10): the credits on one line,
-    // nothing floating over them, and "Colour the map" over the map.
+    // nothing floating over them, and the "Indicators" chip over the map.
     {
       const cr = await page.evaluate(() => {
         const a = document.querySelector('.leaflet-control-attribution');
@@ -1233,11 +1320,11 @@ const smallText = page => page.evaluate(() => {
         'phone: the map credits are one line, keep the tile and OpenStreetMap credit, and nothing covers them', JSON.stringify(cr) + ' ' + covered.join(','));
       const chip = await rectOf(page, '#map-colour-chip');
       ok(!!chip && chip.h >= 44 && !overlaps(chip, await rectOf(page, '#ai-toggle')) && !overlaps(chip, await rectOf(page, '#map-legend-strip')),
-        'phone: "Colour the map" floats over the map, clear of the Ask button and the key', JSON.stringify(chip));
+        'phone: the "Indicators" chip floats over the map, clear of the Ask button and the key', JSON.stringify(chip));
       await page.touchscreen.tap(chip.l + 20, chip.t + 20);
       await page.waitForTimeout(600);
       ok(await page.evaluate(() => PH_DRAWER.isOpen() && document.getElementById('tab-overlay').classList.contains('active')),
-        'phone: "Colour the map" opens the Indicators tab');
+        'phone: the "Indicators" chip opens the Indicators tab');
       // The search prompt fits its box in the drawer, measured in the box's
       // own font (an input's scrollWidth ignores its placeholder).
       const phFit = await page.evaluate(() => {
@@ -1723,6 +1810,9 @@ const smallText = page => page.evaluate(() => {
     ok(pr.contactParas === 1, 'privacy: contact paragraph given once', pr.contactParas + ' paragraphs');
     ok(!/\bWorker\b/.test(pr.ask) && /Anthropic/.test(pr.ask) && /48 hours/.test(pr.ask) && /IP address/.test(pr.ask),
       'privacy: Ask bullets in plain terms, same claims');
+    const prAsk = pr.ask.replace(/\s+/g, ' ');
+    ok(ASK_SAME.every(re => re.test(prAsk)) && /personal information/.test(pr.main) && !/[\u2013\u2014]/.test(prAsk),
+      'privacy: the Ask panel described in the same terms as the tour and the panel', prAsk);
     const nf = texts['404.html'];
     ok(/We could not find a page at this address/.test(nf.main) && nf.home === 'https://pophealth.uk/',
       '404: new copy, and the way back to the map is absolute');

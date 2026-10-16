@@ -89,22 +89,23 @@ region.</p>
   health or circumstances.</p>
 </div>
 
-<p>The <strong>Ask about this data</strong> panel answers questions about the figures on the map.
-When you send a question:</p>
+<p>The <strong>Ask about this data</strong> panel answers questions in plain English
+about the figures on the map. When you send a question:</p>
 
 <ul>
-  <li>Your question goes to a small server that this site runs on Cloudflare, which
-    passes it on to <strong>Anthropic</strong>, and Anthropic's Claude model writes
-    the answer.</li>
-  <li>To write the answer, the model asks your browser for the figures it needs.
-    Your browser looks them up in the map's own data, which it has already
-    downloaded from this site, and sends them back the same way.</li>
+  <li>Your question passes through a small server that this site runs on Cloudflare
+    to <strong>Anthropic</strong>, and Anthropic's Claude model writes the reply.</li>
+  <li>To write it, the model asks your browser for the figures it needs. Your browser
+    looks them up in the map's own data, which it has already downloaded from this
+    site, and the figures it finds pass back the same way, through this site's server
+    to Anthropic. The model is never sent the rest of the data.</li>
   <li>Everything said earlier in the panel goes along with each new question, so
     that the model can follow the conversation, and closing or reloading the page
     clears it.</li>
-  <li>To keep to the limit of 10 questions a day, the server on Cloudflare records
-    your IP address with a count of the questions asked today, and it deletes that
-    record automatically after 48 hours.</li>
+  <li>You can ask 10 questions a day, and replying when the model asks you to narrow
+    a question down does not use one up. To keep to that limit, the server on
+    Cloudflare records your IP address with a count of the questions asked today,
+    and it deletes that record automatically after 48 hours.</li>
   <li>If you never send a question, nothing is sent to that server or to Anthropic,
     and opening the panel on its own sends nothing.</li>
 </ul>
