@@ -551,6 +551,19 @@ const smallText = page => page.evaluate(() => {
     await page.waitForTimeout(800);
     const back = await page.evaluate(() => ({ name: document.getElementById('ws-name').textContent, selW, title: document.title }));
     ok(back.name === back.selW && back.title.indexOf(back.selW) === 0, 'the ward sheet follows a ward chosen in Compare', JSON.stringify(back));
+    // The Compare quick view gives an average decile as an average decile, to
+    // one decimal place, and never turns it into a share of England (workplan
+    // 1.11): "the most deprived 23%" from 2.3 overstated it.
+    await page.click('.mode-btn[data-mode="compare"]');
+    await page.waitForTimeout(600);
+    await page.evaluate(() => { const l = wLyr.getLayers().find(l => l.feature.properties.WD24NM === 'Lansbury'); if (l) l.fire('click'); });
+    await page.waitForTimeout(600);
+    const qv = await page.evaluate(() => document.getElementById('cmp-quick').innerHTML);
+    ok(/have an average deprivation decile of <strong>2\.3<\/strong> or lower, where 1 is the most deprived tenth of England\./.test(qv) &&
+       !/deprived <strong>\d+%|deprived \d+%/.test(qv),
+      'the Compare quick view gives the average deprivation decile, not a percentage', qv);
+    await page.click('.mode-btn[data-mode="explore"]');
+    await page.waitForTimeout(600);
     await page.evaluate(() => { const b = document.getElementById('ws-unpin-all'); if (b) b.click(); });
     await page.waitForTimeout(300);
     const wpt = await page.evaluate(() => { let c = null; wLyr.eachLayer(l => { if (!c && /Bethnal|Hoxton|Stratford|Peckham/.test(l.feature.properties.WD24NM)) c = l.getBounds().getCenter(); });
@@ -707,6 +720,13 @@ const smallText = page => page.evaluate(() => {
           // The key figure and the bar for the same indicator show one value.
           badKpi: (() => { const k = [...document.querySelectorAll('.kpi')].find(e => e.querySelector('.kpi-lbl').textContent === 'Bad or very bad health'); return k ? k.querySelector('.kpi-val').textContent.trim() : ''; })(),
           badBar: (() => { const t = [...document.querySelectorAll('svg.ch-compare text')]; const i = t.findIndex(e => e.textContent === 'Bad or very bad health'); return i === -1 ? '' : (t.slice(i + 1).find(e => /\d/.test(e.textContent)) || {}).textContent || ''; })(),
+          // The bar for a descriptive row is the neutral colour, whichever
+          // side of the median it falls (direction comes from OV_CFG).
+          careFill: (() => { const t = [...document.querySelectorAll('svg.ch-compare text')].find(e => e.textContent === 'Unpaid carers');
+            let n = t && t.nextElementSibling, seen = 0;
+            while (n && !(n.tagName === 'rect' && ++seen === 2)) n = n.nextElementSibling;
+            return n ? n.getAttribute('fill') : ''; })(),
+          mail: (() => { const a = document.querySelector('.footer a[href^="mailto:"]'); return a ? decodeURIComponent(a.getAttribute('href')) + ' | ' + a.textContent : ''; })(),
         };
       });
       ok(r2.badKpi && r2.badKpi === r2.badBar, 'the report\'s key figure and bar chart give the same value', r2.badKpi + ' / ' + r2.badBar);
@@ -714,6 +734,10 @@ const smallText = page => page.evaluate(() => {
       ok(r2.lang === 'en-GB' && r2.pcodes.length === 0 && r2.counts.length === 1 && r2.dashes === 0,
         'the report declares en-GB, has no "P95", gives one ward count and no dashes', JSON.stringify(r2));
       ok(r2.png, 'every report chart offers SVG and PNG');
+      ok(r2.careFill.toUpperCase() === '#9AA6B2', 'the report draws unpaid care as descriptive, in the neutral colour', r2.careFill);
+      ok(/^mailto:contact@pophealth\.uk\?subject=Problem with a figure in the report for Lansbury ward&body=/.test(r2.mail) &&
+         /Link to the map view: http/.test(r2.mail) && /please describe it here/.test(r2.mail) && / \| contact@pophealth\.uk$/.test(r2.mail),
+        'the report footer says how to report a problem with a figure, by a pre-filled email', r2.mail);
       await rep2.close();
     } else ok(false, 'the Lansbury report opens');
     // The LSOA profile gives the published decile band rather than "Assessment".
@@ -725,6 +749,41 @@ const smallText = page => page.evaluate(() => {
         pills: document.querySelectorAll('#wpanel .sr .gpill').length, amp: /&/.test([...document.querySelectorAll('#wpanel h3')].map(h => h.textContent).join(' ')) };
     });
     ok(!lp.assess && lp.band && lp.pills === 0 && !lp.amp, 'LSOA profile gives the decile band, no level pills and no "&"', JSON.stringify(lp));
+    // The figures an analyst challenges first (workplan 1.11).
+    const fig = await page.evaluate(() => {
+      const vals = _bivIds('ward').map(id => _bivValue('ward', id, 'census_bad_health_pct')).filter(x => x != null);
+      return {
+        fmt: [fmtOv(7.3, 'ft_suicide_rate'), fmtOv(12.34, 'census_bad_health_pct'), fmtOv(101.34, 'ft_93227'), fmtOv(2.345, 'imd_decile_mean'), fmtOv(85.27, 'crime_rate_per_1000')],
+        desc: ['ft_93089', 'census_car_to_work_pct', 'census_active_travel_pct', 'census_provides_unpaid_care_pct'].filter(k => !OV_CFG[k].descriptive),
+        ctx: [ovContext('ward', 'census_bad_health_pct', Math.max(...vals)), ovContext('ward', 'census_bad_health_pct', Math.min(...vals))],
+      };
+    });
+    ok(fig.fmt.join('|') === '7.3 per 100,000|12.3%|101.3|2.3|85.3',
+      'figures carry their own unit: "%" only on percentages, a rate per 100,000 says so, a ratio has none, and a mean decile has one place', fig.fmt.join(' | '));
+    ok(!fig.desc.length, 'fertility, car to work, walk or cycle to work and unpaid care are descriptive', fig.desc.join(', '));
+    ok(/^Higher than 99% of /.test(fig.ctx[0]) && /^Lower than 99% of /.test(fig.ctx[1]) && !/100%/.test(fig.ctx.join(' ')),
+      'hover context stops at 99%, never 100%', fig.ctx.join(' | '));
+    await setOv(page, 'ft_93089');
+    await page.waitForTimeout(1500);
+    const fert = await page.evaluate(() => [document.getElementById('rank-best-hdr').textContent, document.getElementById('rank-worst-hdr').textContent]);
+    ok(/^Highest 10/.test(fert[0]) && /^Lowest 10/.test(fert[1]), 'fertility ranks as Highest and Lowest, not Best and Worst', fert.join(' / '));
+    // Every indicator card ends with a way to report a problem with the
+    // figure: an email to us, already filled in, and nothing else.
+    const icRep = await page.evaluate(() => {
+      const panel = document.getElementById('ov-info-panel');
+      const a = panel && panel.querySelector('a.ic-report');
+      if (!a) return null;
+      a.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+      return { text: a.textContent, href: decodeURIComponent(a.getAttribute('href')), cards: Object.keys(OV_META).filter(k => !/class="ic-more ic-report"/.test(indicatorCardHTML(k))).length };
+    });
+    ok(!!icRep && icRep.text === 'Report a problem with this figure' && icRep.cards === 0 &&
+       icRep.href.indexOf('mailto:contact@pophealth.uk?subject=Problem with a figure: General fertility rate&body=') === 0 &&
+       /Indicator: General fertility rate\r\nIndicator key: ft_93089\r\nLevel: (MSOA|Ward)\r\nArea: .+\r\nLink to this view: http[^\r]*ov=ft_93089/.test(icRep.href) &&
+       /What looks wrong \(please describe it here\):/.test(icRep.href),
+      'every indicator card has "Report a problem with this figure", a pre-filled email naming the indicator, its key, level, area and link',
+      JSON.stringify(icRep));
+    await setOv(page, 'none');
+    await page.waitForTimeout(800);
     await checkAxe(page, 'LSOA profile');
     // The screenshot dialog and the level toast are built on the Data
     // credits dialog's frame and the page's own tokens (workplan 2.9).
@@ -1374,17 +1433,53 @@ const smallText = page => page.evaluate(() => {
     g = await glyphCheck(page);
     ok(!g.length, 'phone: no glyph or emoji icons in the drawer', g.slice(0, 5).join(' | '));
     // The four tools wait behind More, so the tabs and their content start
-    // straight under the search row. 650px for the content needs the drawer
-    // to scroll as one column (workplan 1.10); until then it is checked here
-    // against what the pinned footer leaves.
-    const dr = await page.evaluate(() => ({
-      tools: Math.round(document.getElementById('sb-tools').getBoundingClientRect().height),
-      pane: Math.round(document.querySelector('#sidebar > .tab-pane.active').getBoundingClientRect().height),
+    // straight under the search row, and the drawer scrolls as one column
+    // (workplan 1.10): the search row and the tabs stay at the top, and the
+    // open tab gets the rest of the drawer, at least 650px, with Map style and
+    // the footer links after it rather than pinned below it.
+    const drawerOf = () => page.evaluate(() => {
+      const sb = document.getElementById('sidebar'), r = s => document.querySelector(s).getBoundingClientRect();
+      const pane = document.querySelector('#sidebar > .tab-pane.active');
+      return {
+        tools: Math.round(r('#sb-tools').height),
+        room: Math.round(r('#sidebar').bottom - r('#sidebar > .sb-tabs').bottom),
+        own: pane.scrollHeight - pane.clientHeight,                 // 0: the pane does not scroll on its own
+        order: r('#map-controls-sec').top >= r('#sidebar > .tab-pane.active').bottom - 1 && r('#sidebar footer.sbar').top >= r('#map-controls-sec').bottom - 1,
+        sticky: ['#sb-tools', '#sidebar > .sb-tabs'].map(s => getComputedStyle(document.querySelector(s)).position),
+        scrolls: getComputedStyle(sb).overflowY,
+      };
+    });
+    const dr = Object.assign(await drawerOf(), await page.evaluate(() => ({
       inMenu: ['tb-reset', 'tb-link', 'tb-cb', 'tb-png'].every(id => document.getElementById(id).parentNode.id === 'sb-more-menu'),
       menuHidden: document.getElementById('sb-more-menu').hidden,
-    }));
-    ok(dr.tools <= 64 && dr.pane >= 540 && dr.inMenu && dr.menuHidden,
-      'phone: the drawer keeps the four tools behind More, so its content starts under one row', JSON.stringify(dr));
+    })));
+    ok(dr.tools <= 64 && dr.room >= 650 && dr.own <= 1 && dr.order && dr.sticky.join() === 'sticky,sticky' && dr.scrolls === 'auto' && dr.inMenu && dr.menuHidden,
+      'phone: the drawer is one scrolling column, with the search row and tabs at the top and at least 650px for the open tab', JSON.stringify(dr));
+    // Scrolled to the end, the search row and tabs are still at the top and
+    // Map style and the footer links are on screen.
+    {
+      await page.evaluate(() => document.querySelector('.sb-tab[data-tab="layers"]').click());
+      await page.waitForTimeout(300);
+      const end = await page.evaluate(async () => {
+        const sb = document.getElementById('sidebar');
+        sb.scrollTop = sb.scrollHeight;
+        await new Promise(r => setTimeout(r, 200));
+        const r = s => document.querySelector(s).getBoundingClientRect();
+        const out = { scrolled: sb.scrollTop > 0, tools: Math.round(r('#sb-tools').top), tabs: Math.round(r('#sidebar > .sb-tabs').top),
+          foot: r('#sidebar footer.sbar').bottom <= innerHeight + 1, style: r('#map-controls-sec').top >= r('#sidebar > .sb-tabs').bottom };
+        // A newly opened tab starts at its top.
+        document.querySelector('.sb-tab[data-tab="overlay"]').click();
+        await new Promise(r => setTimeout(r, 200));
+        out.reset = sb.scrollTop === 0;
+        return out;
+      });
+      ok(end.scrolled && end.tools === 0 && end.tabs > 0 && end.tabs <= 70 && end.foot && end.style && end.reset,
+        'phone: scrolled to its end the drawer keeps search and tabs at the top, and a new tab opens at its top', JSON.stringify(end));
+    }
+    // 16px in every field on a touch screen, so iOS does not zoom into one.
+    const small = await page.evaluate(() => [...document.querySelectorAll('input:not([type=checkbox]):not([type=radio]):not([type=range]), select, textarea')]
+      .filter(e => parseFloat(getComputedStyle(e).fontSize) < 16).map(e => e.id || e.className || e.tagName));
+    ok(!small.length, 'phone: every input, select and text box is 16px, so iOS does not zoom', small.slice(0, 6).join(', '));
     await page.click('#sb-more');
     await page.waitForTimeout(200);
     const menu = await hitSizes(page, '#sb-more-menu button');
@@ -1434,6 +1529,38 @@ const smallText = page => page.evaluate(() => {
     const t = async () => { const h = await page.evaluate(() => { const r = document.querySelector('.ws-title').getBoundingClientRect(); return [r.left + 20, r.top + 10]; }); await page.touchscreen.tap(h[0], h[1]); await page.waitForTimeout(600); return page.evaluate(() => PH_SHEET.state()); };
     const a = await t(), b2 = await t();
     ok(a === 0 && b2 === 1, 'phone: one tap opens the ward sheet, one tap puts it back', a + ',' + b2);
+    // The grab handle drags (workplan 1.10): a real touch swipe on it, which
+    // the browser would otherwise take as a scroll, moves the sheet with the
+    // finger and settles it one state up or down; a tap on it still toggles.
+    {
+      const cdp = await page.context().newCDPSession(page);
+      const grabAt = () => page.evaluate(() => { const g = document.getElementById('ws-grab'), r = g.getBoundingClientRect();
+        return { x: r.left + r.width / 2, y: r.top + r.height / 2, ta: getComputedStyle(g).touchAction, inHead: !!g.closest('#ws-head') }; });
+      const swipe = async dy => {
+        const g = await grabAt();
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: g.x, y: g.y }] });
+        for (let i = 1; i <= 8; i++) {
+          await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: g.x, y: g.y + dy * i / 8 }] });
+          await page.waitForTimeout(16);
+        }
+        const mid = await page.evaluate(() => Math.round(document.getElementById('ward-sheet').getBoundingClientRect().height));
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+        await page.waitForTimeout(600);
+        return { mid, state: await page.evaluate(() => PH_SHEET.state()) };
+      };
+      const g0 = await grabAt();
+      const h0 = await page.evaluate(() => Math.round(document.getElementById('ward-sheet').getBoundingClientRect().height));
+      const up = await swipe(-200), down = await swipe(160);
+      const g1 = await grabAt();
+      await page.touchscreen.tap(g1.x, g1.y);
+      await page.waitForTimeout(600);
+      const tapped = await page.evaluate(() => PH_SHEET.state());
+      ok(g0.ta === 'none' && g0.inHead && up.mid > h0 + 100 && up.state === 0 && down.state === 1 && tapped === 0,
+        'phone: swiping the ward sheet\'s handle drags it open and closed, and a tap on it still toggles',
+        JSON.stringify({ g0, h0, up, down, tapped }));
+      await page.evaluate(() => PH_SHEET.setState(1));
+      await page.waitForTimeout(400);
+    }
     await checkAxe(page, 'phone ward sheet');
     // The open sheet stops at about 60% of the screen, a pin drops it to
     // peek with a note, and the comparison opens at peek and then as a table
@@ -1533,6 +1660,20 @@ const smallText = page => page.evaluate(() => {
     const mp = await rectOf(page, '#map');
     let sh = await rectOf(page, '#ward-sheet');
     ok(!!sh && sh.r >= mp.r - 10 && sh.w <= 380 && sh.t <= mp.t + 10, 'landscape: the ward sheet stands at the right of the map', JSON.stringify({ sh, mp }));
+    // The drawer on its side: one scrolling column still leaves the open tab
+    // at least 250px under the search row and the tabs (workplan 1.10).
+    {
+      await page.evaluate(() => PH_DRAWER.open());
+      await page.waitForTimeout(500);
+      const d = await page.evaluate(() => {
+        const r = s => document.querySelector(s).getBoundingClientRect();
+        const pane = document.querySelector('#sidebar > .tab-pane.active');
+        return { room: Math.round(r('#sidebar').bottom - r('#sidebar > .sb-tabs').bottom), own: pane.scrollHeight - pane.clientHeight };
+      });
+      ok(d.room >= 250 && d.own <= 1, 'landscape: the drawer gives the open tab at least 250px, in one scrolling column', JSON.stringify(d));
+      await page.evaluate(() => PH_DRAWER.close());
+      await page.waitForTimeout(400);
+    }
     let hit = await clear('#ward-sheet');
     ok(!hit.length, 'landscape: nothing on the map sits under the ward sheet', hit.join(', '));
     await page.evaluate(() => PH_SHEET.setState(0));

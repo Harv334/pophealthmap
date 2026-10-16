@@ -249,9 +249,9 @@ var MODEL_LABEL = "Claude Sonnet 5";
    * explained that a higher score meant less deprivation.
    */
   var DECILE_SCALE = "Deciles run 1 (the most deprived tenth nationally) to 10 " +
-    "(the least). This is an average of them, not a decile itself: a value of 3 " +
-    "means the typical LSOA here sits in the third decile, among roughly the 30 " +
-    "per cent most deprived. Only a value of 1 would mean the most deprived tenth.";
+    "(the least). This is an average of them, not a decile itself, so report it " +
+    "as an average decile to one decimal place (for example 2.3, where 1 is the " +
+    "most deprived tenth) and never turn it into a percentage of England.";
 
   var IMD_META = {
     imd_decile_mean: "Mean IMD decile of the LSOAs in this area, population weighted. " + DECILE_SCALE,
