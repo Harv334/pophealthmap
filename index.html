@@ -562,7 +562,7 @@
   .map-legend-strip[role="button"] { pointer-events: auto; cursor: pointer; }
   .map-legend-strip[role="button"]:hover { border-color: var(--nhs-blue); }
   .map-legend-strip:focus-visible { outline: 2px solid var(--nhs-blue); outline-offset: 2px; }
-  /* "Colour the map", phones only (see the narrow-screen rules). */
+  /* "Indicators", the floating chip, phones only (see the narrow-screen rules). */
   .map-chip { display: none; position: absolute; left: 8px; bottom: 72px; z-index: 2600;
     align-items: center; gap: 7px; padding: 8px var(--s-3); min-height: 36px; margin: 0;
     font: inherit; font-family: 'Inter Tight', Inter, system-ui, sans-serif; font-size: var(--t-sm);
@@ -1215,6 +1215,9 @@
   @keyframes tour-pulse { 0%, 100% { outline-offset: 0; outline-color: var(--nhs-yellow); }
                           50% { outline-offset: 3px; outline-color: rgba(255,184,28,.55); } }
   @media (prefers-reduced-motion: reduce) { .tour-pulse { animation: none; } }
+  /* A control a chapter names without driving it: a steady ring drawn inside
+     the element, so it is never clipped by a scrolling row around it. */
+  .tour-spot { outline: 3px solid var(--nhs-yellow); outline-offset: -3px; border-radius: var(--r-sm); }
   .tour-task-done { display: none; }
   .tour-strip.task-done .tour-task-ask { display: none; }
   .tour-strip.task-done .tour-task-done { display: inline; }
@@ -1332,7 +1335,18 @@
        Zeroing the width also reclaims the gutter the panes leave for it. */
     .sidebar { --grip: 0px; }
     .sb-grip { display: none; }
-    .sidebar > .tab-pane.active { flex: 1 1 auto; min-height: 0; }
+    /* One scrolling column (workplan 1.10). The search row and the tabs stay
+       at the top, and the open tab, Map style and the footer links follow
+       one another down the drawer, which scrolls as a whole. Pinned above and
+       below a pane that scrolled on its own, they left Export, Query and the
+       charity list squeezed into the gap between them: 102px of a phone held
+       on its side. --sb-tools-h is the search row's height, written by
+       _narrowDrawer, so the tabs stick just under it. */
+    .sidebar { overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch; }
+    .sidebar > * { flex-shrink: 0; }
+    .sidebar > .sb-tabs, .sidebar > .sb-modebar { position: sticky; top: var(--sb-tools-h, 61px); z-index: 4; }
+    .sidebar > .tab-pane.active { flex: 1 0 auto; min-height: 0; overflow: visible; }
     .sidebar > .sb-sec { flex: 0 0 auto; }
     /* Three segments plus a label is too much badge for a phone. The label
        goes, the segments stay: they are the control, the word "Viewing" is
@@ -1370,13 +1384,15 @@
        sat in a 2x2 grid under the search box and cost 157px above every tab;
        they open from More now, over the panel rather than pushing it down. */
     .sb-tools { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center;
-      gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--line-2);
-      background: var(--paper-2); flex: 0 0 auto; position: relative; z-index: 5; }
+      gap: 6px; padding: 8px; border-bottom: 1px solid var(--line-2);
+      background: var(--paper-2); flex: 0 0 auto; position: sticky; top: 0; z-index: 5; }
     .sb-tools-hd { display: contents; }
     .sb-tools-hd > span { display: none; }
     .sb-close { grid-column: 3; grid-row: 1; color: var(--ink-2); }
     .sb-tools .hdr-right { grid-column: 1; grid-row: 1; display: block; min-width: 0; }
-    .sb-tools .hdr-right .hdr-search input { width: 100%; }
+    /* The prompt is set at 16px on a touch screen (so iOS does not zoom),
+       and the row is trimmed by a few pixels so it still fits a 390px phone. */
+    .sb-tools .hdr-right .hdr-search input { width: 100%; padding-right: 6px; }
     /* The header's own More (Presentation view and the palette) is not
        needed here: on a phone those two, with Reset and Copy link, are under
        the drawer's More. */
@@ -1385,7 +1401,7 @@
     /* The drawer is the panel on a phone, so the button keeps only its icon
        and its name. */
     .hdr-menu-lbl { display: none; }
-    .sb-more { grid-column: 2; grid-row: 1; padding: 0 10px; }
+    .sb-more { grid-column: 2; grid-row: 1; padding: 0 8px; }
     .sb-more[aria-expanded="true"] { background: var(--nhs-light); border-color: var(--nhs-blue); color: var(--nhs-dark); }
     .sb-more-menu { position: absolute; top: calc(100% - 2px); right: 10px; min-width: 220px;
       display: flex; flex-direction: column; gap: 2px; padding: 6px; background: var(--paper);
@@ -1491,6 +1507,7 @@
 #ai-body{flex:1 1 auto;display:flex;flex-direction:column;min-height:0;overflow:hidden}
 #ai-log{flex:1 1 auto;overflow-y:auto;padding:var(--s-3) var(--s-3);font-size: var(--t-md);line-height:1.5}
 .ai-msg{margin-bottom:10px;padding:8px 10px;border-radius:var(--r-md);white-space:normal;word-wrap:break-word}
+.ai-msg p{margin:0}.ai-msg p+p{margin-top:8px}
 .ai-user{background:var(--nhs-blue);color: var(--on-accent);width:fit-content;max-width:85%;margin-left:auto}
 .ai-bot{background:var(--bg);color:var(--ink)}
 .ai-thinking{color:var(--ink-3);font-style:italic}
@@ -1704,6 +1721,10 @@
   .ws-sheet.collapsed { max-height: 66px; }
   .ws-handle { width: 36px; height: 4px; background: var(--line); border-radius: var(--r-sm);
     position: absolute; top: 6px; left: 50%; transform: translateX(-50%); pointer-events: none; }
+  /* The strip across the top of the sheet that the handle sits in: the part
+     a thumb drags. Positioned against the sheet, though it lives in the head. */
+  .ws-grab { position: absolute; top: 0; left: 0; right: 0; height: 18px; touch-action: none; cursor: grab; z-index: 1; }
+  .ws-sheet.dragging { transition: none; }
   .ws-head { padding: var(--s-3) 15px 10px; display: flex; align-items: center; gap: 12px;
     border-bottom: 1px solid var(--line); cursor: pointer; flex-shrink: 0; }
   .ws-head:hover { background: var(--paper-2); }
@@ -2013,7 +2034,8 @@
   #ov-info-panel dl.ic dt { color: var(--ink-3); font-weight: 700; margin-top: 8px; }
   #ov-info-panel dl.ic dd { margin: 1px 0 0; color: var(--ink-2); }
   #ov-info-panel .ic-sub { display: block; color: var(--ink-2); margin-top: 3px; }
-  #ov-info-panel .ic-more { display: inline-block; margin-top: 10px; color: var(--nhs-blue); font-weight: 600; }
+  #ov-info-panel .ic-more { display: flex; align-items: center; min-height: 24px; margin-top: 10px; color: var(--nhs-blue); font-weight: 600; }
+  #ov-info-panel .ic-report { margin-top: 2px; font-weight: 500; }
   /* Change and Clear side by side, with About this indicator below them. */
   .ov-cur-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 4px; }
   .ov-cur-btns #ov-about { grid-column: 1 / -1; }
@@ -2561,8 +2583,7 @@
     .ws-sheet.collapsed .ws-acts { display: none; }
     /* A bigger grab area for the drag, because a 4px bar is not a target. */
     .ws-handle { width: 52px; height: 5px; top: 7px; }
-    .ws-sheet::before { content: ''; position: absolute; top: 0; left: 0; right: 0;
-      height: 20px; }
+    .ws-grab { height: 24px; }
     .cmp-bar { max-height: 60vh; max-height: 60dvh; }
     /* Four cards across is a desktop shape, and four stacked cards meant
        scrolling and remembering, so a phone gets one table instead, with the
@@ -2640,7 +2661,7 @@
        the Fingertips notice above the strip. */
     /* The credits are one line now (workplan 2.10), so everything above
        them comes down: the strip sits on the credits line, and the Ask
-       button and "Colour the map" share the row above it. */
+       button and the "Indicators" chip share the row above it. */
     .map-legend-strip { bottom: 24px; }
     .map-wrap.has-sheet .map-legend-strip { bottom: calc(var(--sheet-lift) + 24px); }
     #ai-toggle { right: 8px; padding: 8px var(--s-3); font-size: var(--t-sm); bottom: 72px; }
@@ -2689,6 +2710,13 @@
     .btn, .tb-btn, .ws-btn, .ov-btn, .wbtn, .deselect-btn, .mode-back, #ai-send, #ai-toggle,
     .q-chip, .cb-seg button, .ai-chip, .map-chip, .basemap-ctl button { min-height: 44px; }
     .sidebar select, .hdr-search input, #ai-input, .ov-search { min-height: 44px; }
+    /* 16px in every field a thumb types into or picks from, because iOS
+       zooms the whole page into any smaller one and leaves it zoomed. The
+       page's own zoom stays allowed (no maximum-scale). !important because
+       a dozen component rules (.lsub select, .q-sortrow select and the like)
+       set smaller sizes with more specific selectors, and this has to win
+       over all of them on a touch screen. */
+    input:not([type=checkbox]):not([type=radio]):not([type=range]), select, textarea { font-size: 16px !important; }
     .leaflet-touch .leaflet-bar a, .leaflet-bar a { width: 44px; height: 44px; line-height: 44px; }
     .dl-seg button { min-width: 44px; min-height: 36px; }
     .dl-help { width: 28px; height: 28px; line-height: 28px; }
@@ -2746,7 +2774,7 @@
     .map-wrap.touring .ws-sheet.peek, .map-wrap.touring .ws-sheet.collapsed, .map-wrap.touring .cmp-bar.peek {
       bottom: auto; max-height: calc(100% - 16px); }
     .ws-sheet.peek .ws-body, .ws-sheet.collapsed .ws-body { display: none; }
-    .ws-handle, .ws-sheet::before { display: none; }
+    .ws-handle, .ws-grab { display: none; }
     .ws-head { flex-wrap: wrap; }
     .ws-acts { width: 100%; }
     .ws-body { display: block; }
@@ -3358,7 +3386,7 @@
       <div class="tab-pane" id="tab-overlay" role="tabpanel" aria-labelledby="sbtab-overlay">
         <div class="sb-sec" style="flex:1;border-bottom:none;overflow-y:auto">
           <div class="sb-lbl" style="display:flex;align-items:center;gap:6px">
-            <span>Colour the map by</span>
+            <span>Indicators</span>
           </div>
 
           <!-- Tick-box picker. Built at run time from the options of the
@@ -3944,7 +3972,7 @@
       </div>
       <!-- Phones only: the indicator list lives in the drawer, out of sight,
            so this floats over the map and opens it (workplan 2.10). -->
-      <button type="button" class="map-chip" id="map-colour-chip"><svg class="ic" aria-hidden="true"><use href="#i-palette"/></svg>Colour the map</button>
+      <button type="button" class="map-chip" id="map-colour-chip"><svg class="ic" aria-hidden="true"><use href="#i-palette"/></svg>Indicators</button>
       <!-- Fingertips suppression banner: shown when a Fingertips overlay is selected -->
       <!-- Top left, under the zoom control. It used to sit bottom right, where
            the Ask button covers it and the Ask panel hides it completely: the
@@ -3976,11 +4004,11 @@
                 aria-label="What these area levels mean" aria-expanded="false"
                 title="The map can colour five sizes of area. The largest is the local authority (LA), the area run by one council, and London has 33 of them: the 32 boroughs and the City of London. These are divided into 704 wards, which are the areas councillors are elected for. MSOAs, of about 7,500 people, and LSOAs, of about 1,500 people, are statistical areas that fit inside LAs but do not follow ward boundaries. Output areas, of about 125 households, are the smallest and carry Census figures only. Until you choose a level yourself, each indicator opens at a level it is published for. After that the map stays at the level you chose whenever the indicator has figures for it, and greys out any level it has none for."><span class="dl-help-word">Area level</span><span class="dl-help-mark" aria-hidden="true">?</span></button>
         <div class="dl-seg" id="dl-seg">
-          <button type="button" data-dl="borough" title="Colour the map by local authority (LA), the area run by one council. Where an indicator is not published for LAs, each LA's figure is calculated from its wards: counts are summed and rates are population-weighted.">LA</button>
-          <button type="button" data-dl="ward" class="active" title="Colour the map by ward, the 704 areas councillors are elected for.">Ward</button>
-          <button type="button" data-dl="msoa" title="Colour the map by MSOA, the statistical areas of about 7,500 people that sit between wards and LSOAs and do not follow ward boundaries. OHID publishes its Local Health figures for MSOAs.">MSOA</button>
-          <button type="button" data-dl="lsoa" title="Colour the map by LSOA, the statistical areas of about 1,500 people that the deprivation figures are published for. London has 4,994 of them.">LSOA</button>
-          <button type="button" data-dl="oa" hidden title="Colour the map by output area (OA), the smallest Census areas of about 125 households, which carry Census figures only.">OA</button>
+          <button type="button" data-dl="borough" title="Show figures by local authority (LA), the area run by one council. Where an indicator is not published for LAs, each LA's figure is calculated from its wards, with counts summed and rates population-weighted.">LA</button>
+          <button type="button" data-dl="ward" class="active" title="Show figures by ward, the 704 areas councillors are elected for.">Ward</button>
+          <button type="button" data-dl="msoa" title="Show figures by MSOA, the statistical areas of about 7,500 people that sit between wards and LSOAs and do not follow ward boundaries. OHID publishes its Local Health figures for MSOAs.">MSOA</button>
+          <button type="button" data-dl="lsoa" title="Show figures by LSOA, the statistical areas of about 1,500 people that the deprivation figures are published for. London has 4,994 of them.">LSOA</button>
+          <button type="button" data-dl="oa" hidden title="Show figures by output area (OA), the smallest Census areas of about 125 households, which carry Census figures only.">OA</button>
         </div>
         <div class="dl-hint" id="dl-hint" role="status"></div>
       </div>
@@ -3989,13 +4017,16 @@
            it and deselectWard() puts it away again. The head cycles the three
            heights, so the buttons inside it stop their own clicks propagating. -->
       <div class="ws-sheet" id="ward-sheet" role="region" aria-label="Selected ward">
-        <div class="ws-handle"></div>
         <!-- Clicking the header still resizes the sheet with a mouse or a thumb,
              but it is not itself a button any more: it holds buttons, and a
              button inside a button is unusable with a screen reader. The size
              control for the keyboard is #ws-size. -->
         <div class="ws-head" id="ws-head"
              title="Select to change how much of the panel is showing">
+          <!-- The grab strip, inside the head so the head's pointer listeners
+               see a drag that starts on it. touch-action: none on the strip
+               keeps the browser from taking the swipe as a scroll. -->
+          <div class="ws-grab" id="ws-grab" aria-hidden="true"><div class="ws-handle"></div></div>
           <div class="ws-title">
             <div class="ws-lbl">Selected ward</div>
             <h2 id="ws-name">&nbsp;</h2>
@@ -4775,8 +4806,8 @@ const PH_WHERE_ARIA = PH_IS_LONDON
   levelHelp();
   document.addEventListener('ph-levels-changed', levelHelp);
   const dlb = s => document.querySelector('#dl-seg button[data-dl="' + s + '"]');
-  if (dlb('ward') && nWards) dlb('ward').title = 'Colour the map by ward, the ' + nWards.toLocaleString() + ' areas councillors are elected for.';
-  if (dlb('lsoa')) dlb('lsoa').title = 'Colour the map by LSOA, the statistical areas of about 1,500 people that the deprivation figures are published for.';
+  if (dlb('ward') && nWards) dlb('ward').title = 'Show figures by ward, the ' + nWards.toLocaleString() + ' areas councillors are elected for.';
+  if (dlb('lsoa')) dlb('lsoa').title = 'Show figures by LSOA, the statistical areas of about 1,500 people that the deprivation figures are published for.';
 
   // Green space is a London build so far. Asked once, cheaply, so the layer
   // is only offered where its file exists.
@@ -4795,7 +4826,8 @@ const PH_WHERE_ARIA = PH_IS_LONDON
 /* wh says which end of an indicator is worse: true when a higher figure is the
    concern. It cannot say that an indicator has no worse end. descriptive:true
    marks the ones that describe who lives somewhere (ethnicity, country of
-   birth, age, tenure, household language, occupation mix, car availability)
+   birth, age, tenure, household language, occupation mix, car availability,
+   travel to work, unpaid care, fertility)
    rather than how good or bad things are there. The rankings read it, and the
    report charts carry the same flag on their rows, so that a ward with more
    Black or more older residents is "highest", not "best" or "worst", and is
@@ -4809,7 +4841,9 @@ const OV_CFG = {
   census_bad_health_pct:           { lo:"Lower", hi:"Higher", wh:true,  min:0,    max:8    },
   census_disability_any_pct:       { lo:"Lower", hi:"Higher", wh:true,  min:5,    max:25   },
   census_disability_lot_pct:       { lo:"Lower", hi:"Higher", wh:true,  min:0,    max:10   },
-  census_provides_unpaid_care_pct: { lo:"Lower", hi:"Higher", wh:true,  min:2,    max:10   },
+  // Unpaid care is descriptive: more carers is more need for carer support,
+  // and it is also more people looking after one another. Neither is "worse".
+  census_provides_unpaid_care_pct: { lo:"Lower", hi:"Higher", wh:true,  min:2,    max:10,   descriptive:true },
   // Crime (ward total, 12 months)
   crime_total:                     { lo:"Fewer", hi:"More",   wh:true,  min:200,  max:5000 },
   // Per 1,000 residents. Capped near the 95th percentile: a handful of
@@ -4949,10 +4983,11 @@ const OV_CFG = {
   // descriptive: a main language other than English is not a deficit.
   census_english_hh_all_pct:       { lo:"Lower", hi:"Higher", wh:false, min:40,   max:95,   descriptive:true },
   census_english_hh_none_pct:      { lo:"Lower", hi:"Higher", wh:true,  min:0,    max:30,   descriptive:true },
-  // Travel to work (Census 2021, TS061). Active travel = health positive (wh:false);
-  // car to work = negative (wh:true) at ward level for air-quality framing.
-  census_active_travel_pct:        { lo:"Lower", hi:"Higher", wh:false, min:5,    max:40   },
-  census_car_to_work_pct:          { lo:"Lower", hi:"Higher", wh:true,  min:10,   max:70   },
+  // Travel to work (Census 2021, TS061). Descriptive: how people get to work
+  // follows where they live and work (and the Census fell in a lockdown), so
+  // a ward is not ranked better or worse for its share of drivers or walkers.
+  census_active_travel_pct:        { lo:"Lower", hi:"Higher", wh:false, min:5,    max:40,   descriptive:true },
+  census_car_to_work_pct:          { lo:"Lower", hi:"Higher", wh:true,  min:10,   max:70,   descriptive:true },
   // Selectable, described and present in the ward data, but with no entry here
   // it drew flat grey. Bounds are the observed 7.4-47.2 across 684 wards,
   // rounded out. Descriptive: commuting by public transport says more about
@@ -4965,7 +5000,8 @@ const OV_CFG = {
   ft_93106                      : { lo:"Lower", hi:"Higher", wh:true, min:11.8697, max:31.3188 },
   ft_93107                      : { lo:"Lower", hi:"Higher", wh:true, min:9.3062, max:33.1308 },
   ft_93108                      : { lo:"Lower", hi:"Higher", wh:true, min:15.1293, max:48.9512 },
-  ft_93089                      : { lo:"Lower", hi:"Higher", wh:false, min:26.6285, max:75.9128 },
+  // General fertility rate. Descriptive: more births is not better or worse.
+  ft_93089                      : { lo:"Lower", hi:"Higher", wh:false, min:26.6285, max:75.9128, descriptive:true },
   ft_93115                      : { lo:"Lower", hi:"Higher", wh:true, min:23.7886, max:130.1168 },
   ft_93114                      : { lo:"Lower", hi:"Higher", wh:true, min:33.0975, max:142.8947 },
   ft_93219                      : { lo:"Lower", hi:"Higher", wh:true, min:28.1776, max:102.0726 },
@@ -6586,8 +6622,12 @@ function ovContext(level, k, v) {
   // as better when it means more deprived. Those say which way they lean.
   const rev = typeof OV_CFG !== 'undefined' && OV_CFG[k] && OV_CFG[k].rev;
   const hi = rev ? 'Less deprived than ' : 'Higher than ', lo = rev ? 'More deprived than ' : 'Lower than ';
-  if (below >= above) return hi + Math.round(100 * below / vals.length) + '% of ' + where;
-  return lo + Math.round(100 * above / vals.length) + '% of ' + where;
+  if (!below && !above) return '';                    // every area has this figure
+  // Held to 1 to 99, as pctileCaption is: the highest of 684 wards is higher
+  // than 683 of them, which rounds to a "100%" that would include itself.
+  const pc = c => Math.min(99, Math.max(1, Math.round(100 * c / vals.length)));
+  if (below >= above) return hi + pc(below) + '% of ' + where;
+  return lo + pc(above) + '% of ' + where;
 }
 function ovEndYear(k) {
   const p = (typeof ovPeriodOf === 'function') ? ovPeriodOf(k) : '';
@@ -6949,6 +6989,61 @@ function _spellOnce() {
     return s;
   };
 }
+/* Report a problem with a figure.
+
+   A link on every indicator card, and a line at the foot of every printable
+   report, that opens the reader's own email with the details already written
+   in: the indicator, its key, the level and area being viewed and the link
+   that reopens the view (the address Copy link gives). A plain mailto: link,
+   so nothing new runs anywhere and nothing is counted. The card's link is
+   written again whenever it is about to be used, so it describes the view as
+   it is then rather than when the card was drawn. */
+const PH_CONTACT = 'contact@pophealth.uk';
+const _LEVEL_WORD = { borough: 'LA', ward: 'Ward', msoa: 'MSOA', lsoa: 'LSOA', oa: 'Output area' };
+function _viewLink(write) {
+  if (write) { try { _writeUrlState(); } catch (e) { /* the address bar stands */ } }
+  return location.href;
+}
+function _viewArea() {
+  try { if (selW) return selW + ' ward'; } catch (e) { /* not set up yet */ }
+  try {
+    if (selLSOA) {
+      const d = LSOA_DATA[selLSOA];
+      return (d && d.name ? d.name + ', ' : '') + 'LSOA ' + selLSOA;
+    }
+  } catch (e) { /* not set up yet */ }
+  const pick = id => {
+    const s = document.getElementById(id);
+    return (s && s.value && s.value !== 'all' && s.selectedIndex >= 0) ? s.options[s.selectedIndex].text.trim() : '';
+  };
+  return pick('borough-focus') || pick('icb-focus') || 'All of ' + PH_AREA;
+}
+function _mailtoHref(subject, lines) {
+  return 'mailto:' + PH_CONTACT + '?subject=' + encodeURIComponent(subject) +
+    '&body=' + encodeURIComponent(lines.join('\r\n'));
+}
+function indicatorReportHref(k, write) {
+  const lbl = indLabel(k) || k;
+  let lvl = '';
+  try { lvl = _LEVEL_WORD[currentDataLevel] || ''; } catch (e) { /* not set up yet */ }
+  return _mailtoHref('Problem with a figure: ' + lbl, [
+    'Indicator: ' + lbl,
+    'Indicator key: ' + k,
+    'Level: ' + lvl,
+    'Area: ' + _viewArea(),
+    'Link to this view: ' + _viewLink(write),
+    '',
+    'What looks wrong (please describe it here):',
+    '',
+  ]);
+}
+(function _wireReportLinks() {
+  const refresh = e => {
+    const a = e.target && e.target.closest && e.target.closest('a.ic-report');
+    if (a && a.dataset.k) a.href = indicatorReportHref(a.dataset.k, true);
+  };
+  ['pointerdown', 'focusin', 'click', 'contextmenu'].forEach(t => document.addEventListener(t, refresh, true));
+})();
 function indicatorCardHTML(k) {
   const e = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const m = (typeof OV_META === 'object' && OV_META[k]) || {};
@@ -6989,7 +7084,9 @@ function indicatorCardHTML(k) {
     row('Updates', e(updates)) +
     row('Method', e(method)) +
     '</dl>' +
-    '<a class="ic-more" href="methodology.html#' + _methAnchor(k) + '">See where these figures come from</a>';
+    '<a class="ic-more" href="methodology.html#' + _methAnchor(k) + '">See where these figures come from</a>' +
+    '<a class="ic-more ic-report" data-k="' + e(k) + '" href="' + e(indicatorReportHref(k)) + '"' +
+    ' title="Opens an email to ' + PH_CONTACT + ' with this figure\'s details filled in">Report a problem with this figure</a>';
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -7101,7 +7198,16 @@ function fmtOv(v, k) {
   // The decimal places are the indicator's own (IND_DECIMALS), shared with
   // the rankings, the key figures and the Data export.
   const s = fmtNum(v, indDecimals(key));
-  return /_pct$|_rate$/.test(key) ? s + '%' : s;
+  // The unit is the indicator's own (OV_META), not guessed from its key: a
+  // key ending _rate is a rate per 100,000, not a percentage. "%" rides on the
+  // number, a "per 1,000" follows it unless the label already says it, and
+  // anything else (scores, ratios, counts) is left to the label and legend.
+  // A key with no entry (a custom indicator) falls back to its _pct ending.
+  const m = (typeof OV_META === 'object' && OV_META) ? OV_META[key] : null;
+  const u = m ? String(m.u || '').trim() : (/_pct$/.test(key) ? '%' : '');
+  if (u === '%') return s + '%';
+  if (/^per /.test(u) && indLabel(key).toLowerCase().indexOf(u.toLowerCase()) === -1) return s + ' ' + u;
+  return s;
 }
 function ovTooltipRows(valueForKey, ward, level) {
   // valueForKey: function(k) -> raw value
@@ -9725,8 +9831,18 @@ function reportCrimePeriod() {
   return fmtPeriod(WARD_META && WARD_META.crime_period) || 'latest 12 months';
 }
 // The closing lines every report carries: when the data was refreshed, where
-// it came from, and the licence most of it is published under.
-function reportProvenanceHtml() {
+// it came from, the licence most of it is published under, and how to tell us
+// about a figure that looks wrong (an email with the report and the map view
+// it came from already written in; see indicatorReportHref).
+function reportProvenanceHtml(area) {
+  const what = area ? 'the report for ' + area : 'a report';
+  const mail = _mailtoHref('Problem with a figure in ' + what, [
+    'Report: ' + (area || 'PopHealth Map report'),
+    'Link to the map view: ' + _viewLink(true),
+    '',
+    'Which figure looks wrong, and why (please describe it here):',
+    '',
+  ]).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
   let when = '';
   if (DATA_DATE) {
     const d = new Date(DATA_DATE + 'T00:00:00Z');
@@ -9737,7 +9853,8 @@ function reportProvenanceHtml() {
   }
   return '<div style="margin-top:6px">' + when +
     'Made with PopHealth Map, <a href="https://pophealth.uk">https://pophealth.uk</a>. ' +
-    'Contains public sector information licensed under the Open Government Licence v3.0.</div>';
+    'Contains public sector information licensed under the Open Government Licence v3.0. ' +
+    'To report a problem with a figure, email <a href="' + mail + '">' + PH_CONTACT + '</a>.</div>';
 }
 /* "Where this area sits in London" in words: "Higher than 95% of London
    wards", or from the other side, "Lower than 79% of London wards", for an
@@ -10296,7 +10413,14 @@ function _generateWardReport(_reportWindow, wn, opts) {
     const padR = 60;
     const dp   = opts.dp == null ? 1 : opts.dp;
     const u    = opts.unit || '%';
-    const data = (rows || []).map(r => ({...r, v: r.v == null ? null : parseFloat(r.v), ref: r.ref == null ? null : parseFloat(r.ref)}));
+    // Direction and descriptive come from OV_CFG, the one place they are
+    // set, so a report bar cannot disagree with the map and the rankings.
+    // A row without an entry keeps its own.
+    const data = (rows || []).map(r => {
+      const cfg = (r.k && typeof OV_CFG === 'object' && OV_CFG[r.k]) || null;
+      return {...r, wh: cfg ? !!cfg.wh : r.wh, descriptive: cfg ? !!cfg.descriptive : r.descriptive,
+              v: r.v == null ? null : parseFloat(r.v), ref: r.ref == null ? null : parseFloat(r.ref)};
+    });
     const dmax = Math.max(0.0001, ...data.map(r => Math.max(r.v || 0, r.ref || 0)) , opts.minMax || 1);
     const H = 6 + data.length * rowH + 12;
     const barW = W - padL - padR;
@@ -10489,14 +10613,14 @@ function _generateWardReport(_reportWindow, wn, opts) {
     { l:'65 and over', v: inds.census_over65_pct,      c:'#8E6BBF' },
   ], { width: 360 });
 
-  // descriptive as in OV_CFG: these describe who lives here, so no direction.
+  // Each row takes its direction, or none, from OV_CFG (see _chartCompare).
   const compareCensus = _chartCompare([
-    { k: 'census_born_outside_uk_pct', l: indLabel('census_born_outside_uk_pct'),   v: inds.census_born_outside_uk_pct,    ref: _median(_wardVals('census_born_outside_uk_pct')),    descriptive: true, dp: 0 },
-    { k: 'census_no_qual_pct', l: indLabel('census_no_qual_pct'), v: inds.census_no_qual_pct,            ref: _median(_wardVals('census_no_qual_pct')),            wh: true,  dp: 0 },
-    { k: 'census_level4_qual_pct', l: indLabel('census_level4_qual_pct'),     v: inds.census_level4_qual_pct,        ref: _median(_wardVals('census_level4_qual_pct')),        wh: false, dp: 0 },
-    { k: 'census_higher_managerial_pct', l: indLabel('census_higher_managerial_pct'), v: inds.census_higher_managerial_pct,  ref: _median(_wardVals('census_higher_managerial_pct')),  descriptive: true, dp: 0 },
-    { k: 'census_routine_semi_routine_pct', l: indLabel('census_routine_semi_routine_pct'),      v: inds.census_routine_semi_routine_pct, ref: _median(_wardVals('census_routine_semi_routine_pct')), descriptive: true, dp: 0 },
-    { k: 'census_english_hh_none_pct', l: indLabel('census_english_hh_none_pct'), v: inds.census_english_hh_none_pct, ref: _median(_wardVals('census_english_hh_none_pct')), descriptive: true, dp: 0 },
+    { k: 'census_born_outside_uk_pct', l: indLabel('census_born_outside_uk_pct'),   v: inds.census_born_outside_uk_pct,    ref: _median(_wardVals('census_born_outside_uk_pct')),    dp: 0 },
+    { k: 'census_no_qual_pct', l: indLabel('census_no_qual_pct'), v: inds.census_no_qual_pct,            ref: _median(_wardVals('census_no_qual_pct')),            dp: 0 },
+    { k: 'census_level4_qual_pct', l: indLabel('census_level4_qual_pct'),     v: inds.census_level4_qual_pct,        ref: _median(_wardVals('census_level4_qual_pct')),        dp: 0 },
+    { k: 'census_higher_managerial_pct', l: indLabel('census_higher_managerial_pct'), v: inds.census_higher_managerial_pct,  ref: _median(_wardVals('census_higher_managerial_pct')),  dp: 0 },
+    { k: 'census_routine_semi_routine_pct', l: indLabel('census_routine_semi_routine_pct'),      v: inds.census_routine_semi_routine_pct, ref: _median(_wardVals('census_routine_semi_routine_pct')), dp: 0 },
+    { k: 'census_english_hh_none_pct', l: indLabel('census_english_hh_none_pct'), v: inds.census_english_hh_none_pct, ref: _median(_wardVals('census_english_hh_none_pct')), dp: 0 },
   ], { width: 376, padL: 196, rowH: 18 });   // room for the display labels
 
   // ── Health & deprivation: IMD-domain radar + ward-level health bars ──
@@ -10542,14 +10666,14 @@ function _generateWardReport(_reportWindow, wn, opts) {
   const domainSVG = _domainRows.some(r => r.p != null) ? _reportDotPlot(_domainRows, { rowH: 19 }) : '';
 
   const healthBars = _chartCompare([
-    { k: 'census_good_health_pct', l: indLabel('census_good_health_pct'), v: inds.census_good_health_pct,        ref: _median(_wardVals('census_good_health_pct')),        wh: false, dp: 0 },
-    { k: 'census_bad_health_pct', l: indLabel('census_bad_health_pct'),   v: inds.census_bad_health_pct,         ref: _median(_wardVals('census_bad_health_pct')),         wh: true,  dp: 1 },
-    { k: 'census_disability_any_pct', l: indLabel('census_disability_any_pct'),      v: inds.census_disability_any_pct,     ref: _median(_wardVals('census_disability_any_pct')),     wh: true,  dp: 1 },
-    { k: 'census_disability_lot_pct', l: indLabel('census_disability_lot_pct'), v: inds.census_disability_lot_pct, ref: _median(_wardVals('census_disability_lot_pct')),    wh: true,  dp: 1 },
-    { k: 'census_provides_unpaid_care_pct', l: indLabel('census_provides_unpaid_care_pct'),  v: inds.census_provides_unpaid_care_pct, ref: _median(_wardVals('census_provides_unpaid_care_pct')), wh: false, dp: 1 },
-    { k: 'fuel_poverty_pct', l: indLabel('fuel_poverty_pct'),          v: inds.fuel_poverty_pct,              ref: _median(_wardVals('fuel_poverty_pct')),              wh: true,  dp: 1 },
-    { k: 'census_unemployed_pct', l: indLabel('census_unemployed_pct'),            v: inds.census_unemployed_pct,         ref: _median(_wardVals('census_unemployed_pct')),         wh: true,  dp: 1 },
-    { k: 'claimant_rate_pct', l: indLabel('claimant_rate_pct'), v: inds.claimant_rate_pct,             ref: _median(_wardVals('claimant_rate_pct')),             wh: true,  dp: 1 },
+    { k: 'census_good_health_pct', l: indLabel('census_good_health_pct'), v: inds.census_good_health_pct,        ref: _median(_wardVals('census_good_health_pct')),        dp: 0 },
+    { k: 'census_bad_health_pct', l: indLabel('census_bad_health_pct'),   v: inds.census_bad_health_pct,         ref: _median(_wardVals('census_bad_health_pct')),         dp: 1 },
+    { k: 'census_disability_any_pct', l: indLabel('census_disability_any_pct'),      v: inds.census_disability_any_pct,     ref: _median(_wardVals('census_disability_any_pct')),     dp: 1 },
+    { k: 'census_disability_lot_pct', l: indLabel('census_disability_lot_pct'), v: inds.census_disability_lot_pct, ref: _median(_wardVals('census_disability_lot_pct')),    dp: 1 },
+    { k: 'census_provides_unpaid_care_pct', l: indLabel('census_provides_unpaid_care_pct'),  v: inds.census_provides_unpaid_care_pct, ref: _median(_wardVals('census_provides_unpaid_care_pct')), dp: 1 },
+    { k: 'fuel_poverty_pct', l: indLabel('fuel_poverty_pct'),          v: inds.fuel_poverty_pct,              ref: _median(_wardVals('fuel_poverty_pct')),              dp: 1 },
+    { k: 'census_unemployed_pct', l: indLabel('census_unemployed_pct'),            v: inds.census_unemployed_pct,         ref: _median(_wardVals('census_unemployed_pct')),         dp: 1 },
+    { k: 'claimant_rate_pct', l: indLabel('claimant_rate_pct'), v: inds.claimant_rate_pct,             ref: _median(_wardVals('claimant_rate_pct')),             dp: 1 },
   ], { width: 376, padL: 164, rowH: 16 });   // room for the display labels
 
   // ── Health outcomes: Local Health estimates, as a table ──
@@ -10811,7 +10935,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
   <div class="footer">
     <div class="indep">PopHealth Map is an independent open-data project, not affiliated with the NHS. Figures are published statistics for planning and discussion; check the source before relying on one.</div>
     <strong>Sources:</strong> ${reportCredits(['census', 'imd', crimeRows.length ? 'crime' : '', 'fuel_poverty', 'claimant', 'gp', 'pharmacy', 'dental', 'hospitals', 'vcse', _green ? 'greenspace' : '']).map(_esc).join(' · ')}. Each median and comparison is taken across the ${PH_AREA} wards with a figure for that measure.
-    ${reportProvenanceHtml()}
+    ${reportProvenanceHtml((wdata ? wdata.name : wn) + ' ward')}
   </div>
 </div>
 <div class="actions">
@@ -11409,6 +11533,24 @@ function _fitFocus(bounds) {
     }, true);
   }
 
+  /* The drawer scrolls as one column (see the CSS), so the tabs stick under
+     the search row at its measured height, and a newly opened tab or tool
+     starts at its top rather than wherever the last one was scrolled to. */
+  if (tools && typeof ResizeObserver === 'function') {
+    new ResizeObserver(() => {
+      sidebar.style.setProperty('--sb-tools-h', Math.round(tools.getBoundingClientRect().height) + 'px');
+    }).observe(tools);
+  }
+  if (window.MutationObserver) {
+    let lastPane = null;
+    new MutationObserver(() => {
+      const pane = sidebar.querySelector(':scope > .tab-pane.active');
+      if (pane === lastPane) return;
+      lastPane = pane;
+      if (narrow()) sidebar.scrollTop = 0;
+    }).observe(sidebar, { subtree: true, attributes: true, attributeFilter: ['class'] });
+  }
+
   function relocate() {
     if (narrow()) {
       if (hdrRight.parentNode !== tools) tools.appendChild(hdrRight);
@@ -11501,7 +11643,7 @@ function _fitFocus(bounds) {
 
    The key along the bottom opens the indicator's card when it is tapped,
    because on a phone that card is otherwise two taps away in a closed
-   drawer. "Colour the map" floats over the map for the same reason: the
+   drawer. The "Indicators" chip floats over the map for the same reason: the
    indicator list is the main thing this site does and it lives in the
    drawer, out of sight. And the credits line is cut to one line on a
    phone: Leaflet's own name goes, and "Data credits" moves to the foot of
@@ -13445,7 +13587,14 @@ window.generateLSOAReport = function(code) {
     const W = opts.width || 360, rowH = 22;
     const padL = opts.padL || 150, padR = 60;
     const dp = opts.dp == null ? 1 : opts.dp, u = opts.unit || '%';
-    const data = (rows || []).map(r => ({...r, v: r.v == null ? null : parseFloat(r.v), ref: r.ref == null ? null : parseFloat(r.ref)}));
+    // Direction and descriptive come from OV_CFG, the one place they are
+    // set, so a report bar cannot disagree with the map and the rankings.
+    // A row without an entry keeps its own.
+    const data = (rows || []).map(r => {
+      const cfg = (r.k && typeof OV_CFG === 'object' && OV_CFG[r.k]) || null;
+      return {...r, wh: cfg ? !!cfg.wh : r.wh, descriptive: cfg ? !!cfg.descriptive : r.descriptive,
+              v: r.v == null ? null : parseFloat(r.v), ref: r.ref == null ? null : parseFloat(r.ref)};
+    });
     const dmax = Math.max(0.0001, ...data.map(r => Math.max(r.v || 0, r.ref || 0)), opts.minMax || 1);
     const H = 6 + data.length * rowH + 12, barW = W - padL - padR;
     let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" class="ch-compare">`;
@@ -13577,25 +13726,25 @@ window.generateLSOAReport = function(code) {
     { l:'16 to 64',    v: inds.census_working_age_pct, c:'#1F4E8C' },
     { l:'65 and over', v: inds.census_over65_pct,      c:'#8E6BBF' },
   ], { width: 360 });
-  // descriptive as in OV_CFG: these describe who lives here, so no direction.
+  // Each row takes its direction, or none, from OV_CFG (see _chartCompare).
   const compareCensus = _chartCompare([
-    { k: 'census_born_outside_uk_pct', l: indLabel('census_born_outside_uk_pct'),     v: inds.census_born_outside_uk_pct,    ref: _median(_lsoaVals('census_born_outside_uk_pct')),    descriptive: true, dp: 0 },
-    { k: 'census_no_qual_pct', l: indLabel('census_no_qual_pct'),   v: inds.census_no_qual_pct,            ref: _median(_lsoaVals('census_no_qual_pct')),            wh: true,  dp: 0 },
-    { k: 'census_level4_qual_pct', l: indLabel('census_level4_qual_pct'),       v: inds.census_level4_qual_pct,        ref: _median(_lsoaVals('census_level4_qual_pct')),        wh: false, dp: 0 },
-    { k: 'census_higher_managerial_pct', l: indLabel('census_higher_managerial_pct'),   v: inds.census_higher_managerial_pct,  ref: _median(_lsoaVals('census_higher_managerial_pct')),  descriptive: true, dp: 0 },
-    { k: 'census_routine_semi_routine_pct', l: indLabel('census_routine_semi_routine_pct'),        v: inds.census_routine_semi_routine_pct, ref: _median(_lsoaVals('census_routine_semi_routine_pct')), descriptive: true, dp: 0 },
+    { k: 'census_born_outside_uk_pct', l: indLabel('census_born_outside_uk_pct'),     v: inds.census_born_outside_uk_pct,    ref: _median(_lsoaVals('census_born_outside_uk_pct')),    dp: 0 },
+    { k: 'census_no_qual_pct', l: indLabel('census_no_qual_pct'),   v: inds.census_no_qual_pct,            ref: _median(_lsoaVals('census_no_qual_pct')),            dp: 0 },
+    { k: 'census_level4_qual_pct', l: indLabel('census_level4_qual_pct'),       v: inds.census_level4_qual_pct,        ref: _median(_lsoaVals('census_level4_qual_pct')),        dp: 0 },
+    { k: 'census_higher_managerial_pct', l: indLabel('census_higher_managerial_pct'),   v: inds.census_higher_managerial_pct,  ref: _median(_lsoaVals('census_higher_managerial_pct')),  dp: 0 },
+    { k: 'census_routine_semi_routine_pct', l: indLabel('census_routine_semi_routine_pct'),        v: inds.census_routine_semi_routine_pct, ref: _median(_lsoaVals('census_routine_semi_routine_pct')), dp: 0 },
   ], { width: 780, padL: 240 });
 
   // ── Charts: health & deprivation ──
   const healthBars = _chartCompare([
-    { k: 'census_good_health_pct', l: indLabel('census_good_health_pct'),       v: inds.census_good_health_pct,           ref: _median(_lsoaVals('census_good_health_pct')),           wh: false, dp: 0 },
-    { k: 'census_bad_health_pct', l: indLabel('census_bad_health_pct'),         v: inds.census_bad_health_pct,            ref: _median(_lsoaVals('census_bad_health_pct')),            wh: true,  dp: 1 },
-    { k: 'census_disability_any_pct', l: indLabel('census_disability_any_pct'),            v: inds.census_disability_any_pct,        ref: _median(_lsoaVals('census_disability_any_pct')),        wh: true,  dp: 1 },
-    { k: 'census_disability_lot_pct', l: indLabel('census_disability_lot_pct'),  v: inds.census_disability_lot_pct,        ref: _median(_lsoaVals('census_disability_lot_pct')),        wh: true,  dp: 1 },
-    { k: 'census_provides_unpaid_care_pct', l: indLabel('census_provides_unpaid_care_pct'),        v: inds.census_provides_unpaid_care_pct,  ref: _median(_lsoaVals('census_provides_unpaid_care_pct')),  wh: false, dp: 1 },
-    { k: 'fuel_poverty_pct', l: indLabel('fuel_poverty_pct'),                v: inds.fuel_poverty_pct,                 ref: _median(_lsoaVals('fuel_poverty_pct')),                 wh: true,  dp: 1 },
-    { k: 'census_unemployed_pct', l: indLabel('census_unemployed_pct'),                  v: inds.census_unemployed_pct,            ref: _median(_lsoaVals('census_unemployed_pct')),            wh: true,  dp: 1 },
-    { k: 'claimant_rate_pct', l: indLabel('claimant_rate_pct'),       v: inds.claimant_rate_pct,                ref: _median(_lsoaVals('claimant_rate_pct')),                wh: true,  dp: 1 },
+    { k: 'census_good_health_pct', l: indLabel('census_good_health_pct'),       v: inds.census_good_health_pct,           ref: _median(_lsoaVals('census_good_health_pct')),           dp: 0 },
+    { k: 'census_bad_health_pct', l: indLabel('census_bad_health_pct'),         v: inds.census_bad_health_pct,            ref: _median(_lsoaVals('census_bad_health_pct')),            dp: 1 },
+    { k: 'census_disability_any_pct', l: indLabel('census_disability_any_pct'),            v: inds.census_disability_any_pct,        ref: _median(_lsoaVals('census_disability_any_pct')),        dp: 1 },
+    { k: 'census_disability_lot_pct', l: indLabel('census_disability_lot_pct'),  v: inds.census_disability_lot_pct,        ref: _median(_lsoaVals('census_disability_lot_pct')),        dp: 1 },
+    { k: 'census_provides_unpaid_care_pct', l: indLabel('census_provides_unpaid_care_pct'),        v: inds.census_provides_unpaid_care_pct,  ref: _median(_lsoaVals('census_provides_unpaid_care_pct')),  dp: 1 },
+    { k: 'fuel_poverty_pct', l: indLabel('fuel_poverty_pct'),                v: inds.fuel_poverty_pct,                 ref: _median(_lsoaVals('fuel_poverty_pct')),                 dp: 1 },
+    { k: 'census_unemployed_pct', l: indLabel('census_unemployed_pct'),                  v: inds.census_unemployed_pct,            ref: _median(_lsoaVals('census_unemployed_pct')),            dp: 1 },
+    { k: 'claimant_rate_pct', l: indLabel('claimant_rate_pct'),       v: inds.claimant_rate_pct,                ref: _median(_lsoaVals('claimant_rate_pct')),                dp: 1 },
   ], { width: 408, padL: 164 });   // room for the display labels
 
   // IMD domains as a dot plot: where this LSOA sits among London's LSOAs.
@@ -13841,7 +13990,7 @@ window.generateLSOAReport = function(code) {
     <div class="indep">PopHealth Map is an independent open-data project, not affiliated with the NHS. Figures are published statistics for planning and discussion; check the source before relying on one.</div>
     <strong>Data sources:</strong> ${reportCredits(['imd', 'census', crimeRows.length ? 'crime' : '', 'fuel_poverty', 'claimant', 'greenblue', 'gp', 'pharmacy', 'dental', 'hospitals', 'vcse', _green ? 'greenspace' : '']).map(_esc).join(' · ')}.
     <div style="margin-top:6px">Services and green spaces are listed when they sit inside this LSOA\u2019s boundary, and each median and comparison is taken across the ${PH_AREA} LSOAs with a figure for that measure.</div>
-    ${reportProvenanceHtml()}
+    ${reportProvenanceHtml((props.name ? props.name + ', ' : '') + 'LSOA ' + code)}
   </div>
 </div>
 <div class="actions">
@@ -16840,7 +16989,7 @@ async function _prepareScreenForScreenshot(opts) {
   // Hover labels follow the pointer, which is over the map while the
   // screenshot tool is in use, so one would otherwise land in the picture.
   const tipStyle = document.createElement('style');
-  // "Colour the map" is a control, not part of the picture.
+  // The "Indicators" chip is a control, not part of the picture.
   tipStyle.textContent = '.leaflet-tooltip,#map-colour-chip{display:none!important}';
   document.head.appendChild(tipStyle);
 
@@ -18048,6 +18197,9 @@ var PH_SHOW = {
     ptal_score: 'high-good',
   };
   function polarityOf(k) {
+    // Descriptive in OV_CFG (who lives here, how they travel, births, unpaid
+    // care): no good end, whatever a publisher's RAG rating says.
+    if (typeof OV_CFG === 'object' && OV_CFG[k] && OV_CFG[k].descriptive) return null;
     if (POLARITY[k]) return POLARITY[k];
     if (/^crime_/.test(k) && k !== 'crime_score') return 'high-bad';
     if (/_score$/.test(k)) return 'high-bad';          // every IMD domain score
@@ -18389,25 +18541,58 @@ var PH_SHOW = {
   /* Drag the handle.
      Click-to-cycle is fine with a mouse and unguessable with a thumb: there is
      a handle drawn at the top of the sheet that looks exactly like every other
-     sheet handle on a phone, and it did nothing. Up opens, down closes, and a
-     tap still cycles so nothing is taken away. */
+     sheet handle on a phone, and it did nothing. The handle sat outside the
+     head that listened for the drag, and the head lets the browser pan, so a
+     swipe was taken as a scroll and cancelled. The grab strip now lives in the
+     head with touch-action: none, takes the pointer for the length of the
+     drag, and the sheet follows the finger. Let go, and it settles one state
+     up or down; a tap still opens and closes it, so nothing is taken away. */
   (function dragSheet() {
-    var startY = null, startState = 0;
+    var grab = $('ws-grab');
+    var startY = null, startState = 0, startH = 0, onGrab = false, moving = false;
+    function end(e, cancelled) {
+      if (startY === null) return;
+      var dy = (e && typeof e.clientY === 'number') ? e.clientY - startY : 0;
+      var wasMoving = moving;
+      startY = null; moving = false;
+      sheet.classList.remove('dragging');
+      sheet.style.maxHeight = '';
+      if (cancelled || Math.abs(dy) < 24) {          // a tap, not a drag
+        if (wasMoving) applyState();                 // put the classes back
+        return;
+      }
+      headEl._dragged = true;                        // so the click does not also fire
+      var to = Math.max(0, Math.min(2, startState + (dy < 0 ? -1 : 1)));
+      if (to === sheetState) applyState(); else setSheetState(to);
+    }
     headEl.addEventListener('pointerdown', function (e) {
       if (e.target.closest('.ws-acts')) return;
+      if (e.button !== undefined && e.button !== 0) return;
       startY = e.clientY;
       startState = sheetState;
+      startH = sheet.getBoundingClientRect().height;
       headEl._dragged = false;
+      onGrab = !!(grab && grab.contains(e.target));
+      // Only the strip holds on to the pointer: a press on the head's text
+      // or buttons stays an ordinary tap.
+      if (onGrab && grab.setPointerCapture) { try { grab.setPointerCapture(e.pointerId); } catch (x) { /* already gone */ } }
     });
-    headEl.addEventListener('pointerup', function (e) {
-      if (startY === null) return;
+    headEl.addEventListener('pointermove', function (e) {
+      if (startY === null || !onGrab) return;
       var dy = e.clientY - startY;
-      startY = null;
-      if (Math.abs(dy) < 24) return;            // a tap, not a drag
-      headEl._dragged = true;                   // so the click does not also fire
-      setSheetState(startState + (dy < 0 ? -1 : 1));
+      if (!moving && Math.abs(dy) < 6) return;
+      if (!moving) {
+        moving = true;
+        // Full height while the finger has it, with the size set by hand, so
+        // the figures come into view as it rises.
+        sheet.classList.add('dragging');
+        sheet.classList.remove('peek', 'collapsed');
+      }
+      var cap = stateHeights()[0], min = stateHeights()[2];
+      sheet.style.maxHeight = Math.round(Math.max(min, Math.min(cap, startH - dy))) + 'px';
     });
-    headEl.addEventListener('pointercancel', function () { startY = null; });
+    headEl.addEventListener('pointerup', function (e) { end(e, false); });
+    headEl.addEventListener('pointercancel', function (e) { end(e, true); });
   })();
 
   // The heights are viewport-derived on a phone, so a rotate or a resize has
@@ -18444,32 +18629,6 @@ var PH_SHOW = {
       '<div class="' + numCls + '">' + shown + '</div>' +
       (sub ? '<div class="ws-k-sub" title="' + esc(sub) + '">' + esc(sub) + '</div>' : '') +
       '</div>';
-  }
-
-  /**
-   * Where a mean decile actually places somewhere, in words that do not
-   * overstate it.
-   *
-   * Deciles run 1, the most deprived tenth of England, to 10, the least. So a
-   * ward whose typical neighbourhood sits at 9.9 is inside "the most deprived
-   * 99%" of the country. That is arithmetically true and it is useless: it is
-   * true of very nearly everywhere, and it reads as a description of somewhere
-   * severely deprived. Village in Merton, one of the least deprived wards in
-   * London, was described exactly that way.
-   *
-   * Above the midpoint the informative statement is the other one, so that is
-   * the one made. 9.9 becomes "among the least deprived 11%". The two framings
-   * meet at 5.5, where both give 55% and either is fair.
-   *
-   * The site's own assistant is told not to make this mistake, in as many
-   * words, because overstating deprivation is the worst direction to be wrong
-   * in for this data. The ward summary was making it anyway.
-   */
-  function decileBand(dec) {
-    var pct = function (v) { return Math.min(100, Math.max(1, Math.round(v))); };
-    return dec > 5.5
-      ? { dir: 'least', pct: pct((11 - dec) * 10) }
-      : { dir: 'most',  pct: pct(dec * 10) };
   }
 
   /**
@@ -19519,23 +19678,29 @@ var PH_SHOW = {
       // This called that one "worst" and then reported it as "the most deprived
       // X%", which inverted the claim and inflated it at the same time: four
       // wards around decile 9 came out as "the most deprived 90% of England".
+      //
+      // An average decile is not a decile, so it is not turned into a share of
+      // England either ("the most deprived 23%" from 2.3 says the typical
+      // neighbourhood is in a band it may not be in). The figure is given as
+      // it is, to one decimal place, with the direction of the scale.
       var leastDep = Math.max.apply(null, decs);
       var mostDep  = Math.min.apply(null, decs);
       var allOf = pinned.length === 2 ? 'Both pinned ' : 'All ' + cbNum(pinned.length) + ' pinned ';
+      var d1 = function (v) { return v.toFixed(1); };
       if (leastDep <= 5.5) {
-        bits.push(allOf + lvl.many + ' are in the most deprived <strong>' +
-          decileBand(leastDep).pct + '%</strong> of England by ' + byDec + '.');
+        bits.push(allOf + lvl.many + ' have an average deprivation decile of <strong>' + d1(leastDep) +
+          '</strong> or lower, where 1 is the most deprived tenth of England.');
       } else if (mostDep > 5.5) {
-        bits.push(allOf + lvl.many + ' are in the least deprived <strong>' +
-          decileBand(mostDep).pct + '%</strong> of England by ' + byDec + '.');
+        bits.push(allOf + lvl.many + ' have an average deprivation decile of <strong>' + d1(mostDep) +
+          '</strong> or higher, where 10 is the least deprived tenth of England.');
       } else {
         // Straddling the middle, where neither framing says anything: one of
         // these wards is in the more deprived half and another is not, and any
         // single band wide enough to hold both is too wide to be worth stating.
         bits.push((pinned.length === 2 ? 'These two ' : 'These ' + cbNum(pinned.length) + ' ') + lvl.many +
-          ' sit either side of the national middle, from <strong>' +
-          mostDep.toFixed(1) + '</strong> to <strong>' + leastDep.toFixed(1) +
-          '</strong> by ' + byDec + '.');
+          ' sit either side of the national middle, with average deprivation deciles from <strong>' +
+          d1(mostDep) + '</strong> to <strong>' + d1(leastDep) +
+          '</strong>, where 1 is the most deprived tenth of England.');
       }
     }
     // Name the outlier on each active indicator that actually separates them.
@@ -20603,15 +20768,95 @@ var PH_SHOW = {
     }
   }
 
+  /* Counts for the narration, read from what this page has loaded rather than
+     typed, so the monthly refresh cannot leave the tour quoting old numbers.
+     Each returns null when its data is not there yet, and the sentence that
+     uses it then leaves the number out rather than printing a wrong one. */
+  function tourCount(what) {
+    var n = 0;
+    if (what === 'ind') {
+      // The picker's search box already counts the indicators it offers.
+      var s = $('ov-search');
+      var m = s && /([\d,]+)\s+indicators/.exec(s.placeholder || '');
+      if (m) n = +m[1].replace(/,/g, '');
+      if (!n) {
+        var ov = $('ov');
+        if (ov) n = Array.prototype.filter.call(ov.options, function (o) { return o.value !== 'none'; }).length;
+      }
+    } else if (what === 'ward') {
+      n = (typeof GJ !== 'undefined' && GJ && GJ.features) ? GJ.features.length : 0;
+    } else if (what === 'la') {
+      n = (typeof BOROUGH_GJ !== 'undefined' && BOROUGH_GJ && BOROUGH_GJ.features) ? BOROUGH_GJ.features.length : 0;
+    }
+    return n ? n.toLocaleString('en-GB') : null;
+  }
+  /* The name of the first group on the Indicators tab and its first
+     indicator, as the tab itself shows them, so the last chapter points at
+     words the reader can actually see. */
+  function tourFirstGroup() {
+    var h = document.querySelector('#ov-home .ov-h');
+    return (h && h.textContent.trim()) || '';
+  }
+  function tourFirstChip() {
+    var c = document.querySelector('#ov-chips button, #ov-chips [role="button"]');
+    return (c && c.textContent.trim()) || '';
+  }
+  function tourEsc(t) {
+    return String(t).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  var MENU_ICON = '<svg class="ic" role="img" aria-label="menu"><use href="#i-menu"/></svg>';
+
+  /* Things a chapter points at without driving them, such as the tool tabs.
+     Marked here and cleared before every chapter and when the tour ends, so
+     no chapter has to remember to put its highlight away. */
+  var tourSpots = [];
+  function tourSpot(sel) {
+    document.querySelectorAll(sel).forEach(function (el) {
+      el.classList.add('tour-spot');
+      tourSpots.push(el);
+    });
+  }
+  function tourSpotClear() {
+    tourSpots.forEach(function (el) { el.classList.remove('tour-spot'); });
+    tourSpots = [];
+  }
+  // The whole map, framed into the part the strip leaves visible, for the
+  // chapters that are about London rather than one ward.
+  function tourFitAll() {
+    if (typeof wLyr === 'undefined' || !wLyr || !wLyr.getBounds) return;
+    try { tourFit(wLyr.getBounds(), 11); } catch (e) { /* no layer yet */ }
+  }
+  function closeAsk() {
+    var c = document.getElementById('ai-close');
+    var p = document.getElementById('ai-panel');
+    if (c && p && p.classList.contains('open')) c.click();
+  }
+
+  /* Six chapters: what the map is, the one thing it is for (choosing an
+     indicator), the one thing everyone does next (selecting a place), the
+     tools in a sentence each, what the figures cannot say, and a step the
+     reader does themselves. Each tool teaches itself in its own opening
+     sentence, so the tour names them rather than walking through each one.
+
+     A chapter's narration is a function where it quotes a count, so the
+     count is read when the chapter is shown, after the data has arrived. */
   var TOUR = [
     {
-      t: 'What this map shows',
-      n: 'This map shows health and living conditions in London. It covers all 33 ' +
-         'local authorities (LAs). The tabs along the top open the tools, and the panel (the ' +
-         '<svg class="ic" role="img" aria-label="menu"><use href="#i-menu"/></svg> button) chooses what the map draws. You can work at four sizes of ' +
-         'area: the <strong>33 LAs</strong>, <strong>704 wards</strong>, and two ' +
-         'smaller ones called <strong>MSOAs</strong> (about 8,000 people) and ' +
-         '<strong>LSOAs</strong> (about 1,500 people).',
+      t: 'What PopHealth Map is',
+      n: function () {
+        var ind = tourCount('ind'), la = tourCount('la'), wd = tourCount('ward');
+        return 'PopHealth Map brings together ' + (ind ? '<strong>' + ind + ' indicators</strong>' : 'indicators') +
+          ' of health, deprivation and daily life from official sources, so you can see how ' +
+          'London changes from one neighbourhood to the next. London is made up of ' +
+          (la ? '<strong>' + la + ' local authorities (LAs)</strong>' : 'local authorities (LAs)') +
+          ', each run by one council and divided into ' +
+          (wd ? '<strong>' + wd + ' wards</strong>' : 'wards') +
+          ', the areas councillors are elected for, and the map can also show smaller ' +
+          'statistical areas called MSOAs, of about 7,500 people, and LSOAs, of about 1,500 people. ' +
+          'It is free, with no sign-in, and the next five chapters show you around.';
+      },
       go: function () {
         railClick('explore');
         // The indicator first: changing #ov pulls the sidebar to the Indicators
@@ -20621,27 +20866,35 @@ var PH_SHOW = {
       },
     },
     {
-      t: 'Colour the map by a figure',
-      n: 'Open the <strong>Indicators</strong> tab. Choose a figure from the list. The ' +
-         'map then gives every ward a colour for that figure. The bar along the bottom ' +
-         'shows what the colours mean. This example uses deprivation. Darker wards are ' +
-         'more deprived. Colour follows the figure, not the size of the number. A high ' +
-         'deprivation decile is the least deprived tenth.',
+      t: 'Choose an indicator',
+      n: 'Open the <strong>Indicators</strong> tab and choose an indicator, and the map shades ' +
+         'every area by its figure, with the key along the bottom showing what each colour means. ' +
+         'This example is the <strong>Deprivation score (IMD 2025)</strong>, so the darker a ward ' +
+         'is, the more deprived it is. Darker usually means a higher figure, but deprivation ' +
+         'deciles and ranks count down from 1 for the most deprived, so on those maps the colours ' +
+         'are turned round and darker still means more deprived. The <strong>Area level</strong> ' +
+         'switch on the map shows the same indicator by LA, ward, MSOA or LSOA wherever it has ' +
+         'figures for them.',
       go: function () {
         railClick('explore');
+        // Back to wards with nothing drawn, so the example opens at the level
+        // the narration describes whichever way the reader arrived.
+        wardLevel();
         sidebarTab('overlay');
         setOverlay('imd_score_ward');
       },
     },
     {
-      t: 'Click a ward to see its figures',
-      n: 'Click any ward on the map. A bar opens along the bottom. It shows the main ' +
-         'figures for that ward. The buttons in the bar let you pin the ward, download ' +
-         'a report, or open its full list of figures.',
+      t: 'Select a place',
+      n: 'Select any ward and a panel opens along the bottom with a short summary in plain ' +
+         'English and its main figures. Its buttons let you pin the ward to compare it with ' +
+         'others, open a printable report or see its full profile. To go straight to a place, ' +
+         'type a postcode, a ward or LA name, or a GP practice into the <strong>search</strong> ' +
+         'at the top of the page.',
       go: function () {
         railClick('explore');
-        // Arriving here backwards from the Query chapter, which clears the
-        // overlay, otherwise leaves this chapter looking at a blank grey map.
+        // Arriving here backwards from a later chapter, which may have left
+        // the map at another level, otherwise frames the wrong kind of area.
         wardLevelKeepOverlay();
         sidebarTab('layers');
         setOverlay('imd_score_ward');
@@ -20697,259 +20950,86 @@ var PH_SHOW = {
       },
     },
     {
-      t: 'Find the wards that match',
-      // Compare and Directory used to share this chapter as a closing clause.
-      // They have chapters of their own below, so this one is about Query.
-      n: '<strong>Query</strong> finds the wards that meet several conditions at once. ' +
-         'Add each condition in the panel. The panel reads them back as a sentence. ' +
-         'The wards that match are listed below it and outlined on the map. This ' +
-         'example finds wards in Brent with a GP practice and a pharmacy, where ' +
-         'deprivation and disability are both high.',
+      /* One sentence a tool, and the same account of Ask as the panel's own
+         opening message and the privacy page: what is sent, through where, to
+         whom, and the daily limit. No counts of places here: the Directory's
+         heading and the Charities tab give the live ones. */
+      t: 'The tools',
+      n: 'The tabs along the top do the deeper work. <strong>Query</strong> finds every ward ' +
+         'that meets the conditions you set, and <strong>Compare</strong> lines up to four ' +
+         'places side by side. <strong>Custom area</strong> adds up the figures for an area you ' +
+         'build yourself from LSOAs. <strong>Data export</strong> makes a spreadsheet of the ' +
+         'areas and indicators you choose. <strong>Directory</strong> finds a GP practice, ' +
+         'pharmacy or charity by name or postcode. <strong>Ask about this data</strong> answers ' +
+         'questions in plain English: your question and the figures looked up to answer it pass ' +
+         'through this site\'s server to Anthropic\'s Claude model, which writes the reply, so ' +
+         'please leave out anything personal. You can ask 10 questions a day, and replying when ' +
+         'it asks you to narrow a question down does not use one up.',
       go: function () {
-        // Query answers in wards, so the map goes back to ward level first.
-        // The previous chapter's ward bar comes down with it: this chapter is
-        // about the wards a query returns, not the one that was clicked.
-        closeWardSheet();
-        wardLevel();
-        railClick('query');
-        if (window.PH_QUERY) {
-          window.PH_QUERY.build();
-          /* Lay the worked example down again.
-
-             It is seeded once, when the ward data arrives, and the stage reset
-             clears the builder before every chapter so that a query is not
-             still outlined under the chapter after this one. Those two met
-             here: by the time this chapter ran, the example had been cleared,
-             and an empty filter matches everything. The panel answered "704
-             wards" and read back "Wards anywhere in London", under narration
-             describing a borough, two services and two conditions. */
-          window.PH_QUERY.seed();
-        }
-        var run = $('q-run');
-        if (run) run.click();
-      },
-    },
-    {
-      t: 'Compare: put wards side by side',
-      n: '<strong>Compare</strong> holds up to four areas side by side. First choose ' +
-         'the size of area. You can compare LSOAs (small areas), wards, LAs or ' +
-         'integrated care boards (ICBs). Then click them on the map, and choose the figures. Each area ' +
-         'keeps one colour on its card, its row and its outline. On every row an arrow ' +
-         'marks the highest and the lowest value. The arrows rank the areas you pinned. ' +
-         'They do not say which is good, because all of them can be high or all of ' +
-         'them low.',
-      go: function () {
-        closeWardSheet();
-        wardLevel();
-        railClick('compare');
-        /* Roundwood and Stonebridge, by name.
-
-           This took the first two wards carrying both figures, which is
-           Aldersgate and Cripplegate: two City of London wards, among the
-           smallest in London, and at this chapter's zoom they came out about
-           12 pixels across. A comparison whose subjects cannot be picked out
-           on the map teaches nothing about comparing them.
-
-           These two are neighbours in Brent with about 17,000 and 20,000
-           residents, big enough to read at a glance and adjacent enough to
-           frame together without zooming out to the whole borough.
-
-           Named rather than derived, which is the opposite of what the ward
-           chapter does a few chapters up. That one needs any reasonable ward
-           and derives it so a rename cannot strand it; this one needs a
-           particular pair that looks right side by side. The fallback below
-           covers the rename case: the two largest wards in whichever borough
-           has the biggest pair, which is the property that matters here. */
-        var byName = {};
-        allWards().forEach(function (w) { byName[w.name] = w; });
-        var usable = function (w) {
-          return w && num(w.inds.imd_decile_mean) !== null
-                   && num(w.inds.census_bad_health_pct) !== null;
-        };
-        var picked = ['Roundwood', 'Stonebridge'].filter(function (n) {
-          return usable(byName[n]);
-        });
-        if (picked.length < 2) {
-          var byLad = {};
-          allWards().forEach(function (w) {
-            if (!usable(w) || num(w.inds.census_population) === null) return;
-            (byLad[w.lad] = byLad[w.lad] || []).push(w);
-          });
-          var best = null;
-          Object.keys(byLad).forEach(function (lad) {
-            var top = byLad[lad].sort(function (a, b) {
-              return num(b.inds.census_population) - num(a.inds.census_population);
-            }).slice(0, 2);
-            if (top.length < 2) return;
-            var sum = num(top[0].inds.census_population) + num(top[1].inds.census_population);
-            if (!best || sum > best.sum) best = { sum: sum, names: [top[0].name, top[1].name] };
-          });
-          if (best) picked = best.names;
-        }
-        picked.forEach(function (n) { selectWardByName(n, { noFit: true }); });
-        /* Both of them, not the last one. selectWardByName fits the map to the
-           ward it just selected, so pinning two left the map framed on the
-           second with the first somewhere off screen, under a chapter about
-           putting wards side by side. */
-        tourFit(wardBoundsByName(picked), 12);
-      },
-    },
-    {
-      t: 'Custom area: draw your own',
-      n: '<strong>Custom area</strong> builds an area that does not follow ward lines. ' +
-         'Click the LSOAs on the map to add them, and click one again to remove it. ' +
-         'Name the area, and the tool aggregates its figures, summing counts and ' +
-         'weighting percentages and scores by population. The report states the ' +
-         'method beside every figure.',
-      go: function () {
-        closeWardSheet();
-        railClick('report');
-        /* An example area, built rather than described.
-
-           The chapter said "click the LSOAs on the map to add them" over an
-           empty panel and an unshaded map, so the one tool here whose output
-           depends entirely on a selection was the one chapter that showed
-           none. Five LSOAs from a single ward: they are contiguous, because an
-           LSOA is best-fitted to one ward, and five is enough for the totals
-           and the population weighting to be worth reading.
-
-           The boundaries carry the geography this draws from, so it waits for
-           them. apply() reports false rather than half-applying when they are
-           not there yet, which is what makes the retry safe. */
-        var seedArea = function () {
-          if (!window.PH_REPORT || !window.PH_REPORT.apply) return false;
-          if (typeof LSOA_IMD === 'undefined' || !LSOA_IMD || !LSOA_IMD.features) return false;
-          var byWard = {};
-          LSOA_IMD.features.forEach(function (f) {
-            var pr = f.properties || {};
-            if (!pr.ward_code || !pr.code) return;
-            (byWard[pr.ward_code] = byWard[pr.ward_code] || []).push(pr.code);
-          });
-          var pick = null, name = '';
-          for (var wc in byWard) {
-            if (byWard[wc].length >= 5) {
-              pick = byWard[wc].slice(0, 5);
-              var f0 = LSOA_IMD.features.filter(function (f) {
-                return (f.properties || {}).ward_code === wc; })[0];
-              name = 'Example: part of ' + (((f0 || {}).properties || {}).ward || 'a ward');
-              break;
-            }
-          }
-          if (!pick) return false;
-          var ok = window.PH_REPORT.apply({ name: name, codes: pick });
-          if (ok) tourFit(wardBoundsByName([(((LSOA_IMD.features.filter(function (f) {
-            return (f.properties || {}).code === pick[0]; })[0] || {}).properties || {}).ward)]), 12);
-          return ok;
-        };
-        if (!seedArea() && typeof ensureLsoaImd === 'function') {
-          ensureLsoaImd().then(function () { seedArea(); });
-        }
-      },
-    },
-    {
-      t: 'Data export: make a spreadsheet',
-      n: '<strong>Data export</strong> writes a spreadsheet. It asks three things. ' +
-         'First the size of area, so each area becomes a row. Then the place, either ' +
-         'all of London or one LA. Then the figures, so each figure becomes a ' +
-         'column. Nothing is averaged or combined in this file.',
-      go: function () {
-        closeWardSheet();
-        railClick('csv');
-        // Three figures picked, so the row and column counts show something.
-        if (window.PH_CSV) {
-          ['census_population', 'imd_decile_mean', 'census_bad_health_pct']
-            .forEach(function (k) {
-              try { window.PH_CSV.pick(k); } catch (e) { /* not at this level */ }
-            });
-        }
-      },
-    },
-    {
-      t: 'Directory: find one place',
-      // No count here: the Directory's heading gives the live one, and the
-      // Charities tab says once what the charity count covers.
-      n: '<strong>Directory</strong> lists every service and organisation on the map. ' +
-         'Search by name, by ' +
-         'address or by postcode. Filter by type or by LA. Click a result and the ' +
-         'map marks it. The export button saves what you have filtered.',
-      go: function () {
-        closeWardSheet();
-        railClick('directory');
-      },
-    },
-    {
-      t: 'Ask a question about the data',
-      n: 'The panel on the right answers questions about the figures on this map. Type your ' +
-         'question and press enter. Your browser looks the numbers up on this page. ' +
-         'The answer is then written around what your browser found. It never receives ' +
-         'the data itself. You get <strong>10 questions a day</strong>, because this ' +
-         'part costs money to run.',
-      go: function () {
-        // Idempotent: the chapter before will normally have closed it, but the
-        // tour drives the real controls, so a ward clicked by hand during that
-        // chapter would otherwise arrive here under the answer panel.
-        closeWardSheet();
         railClick('explore');
-        var t = document.getElementById('ai-toggle');
-        var p = document.getElementById('ai-panel');
-        if (t && p && !p.classList.contains('open')) t.click();
+        setOverlay('imd_score_ward');
+        tourSpot('.mode-tabs');
+        tourSpot('#ai-toggle');
+        tourFitAll();
       },
     },
     {
-      t: 'What these figures cannot tell you',
-      n: 'A figure describes an area, not the people who live in it. Some health ' +
-         'figures are published for a whole LA. The map then repeats them for ' +
-         'every ward in that LA, and marks them where it does. Those figures ' +
-         'cannot tell one ward from another. An empty ward can mean the figure is ' +
-         'hidden to protect privacy, not that it is zero. Please check anything ' +
-         'important before you act on it.',
+      t: 'What the figures cannot tell you',
+      n: 'Every figure describes an area as a whole rather than the individual people who live ' +
+         'there. Some health figures are only published for a whole LA, so the map repeats the ' +
+         'LA\'s figure in each of its wards and says so where it does, which means those figures ' +
+         'cannot tell one ward from another. A grey area usually means the figure has been ' +
+         'withheld to protect privacy rather than that it is zero, so please check anything ' +
+         'important against its source before you act on it.',
       go: function () {
         // Also reachable by pressing Back from the end, so it cannot rely on
         // the chapter before it having run.
-        closeWardSheet();
         railClick('explore');
-        setOverlay('none');
+        setOverlay('imd_score_ward');
         sidebarTab('layers');
-        var c = document.getElementById('ai-close');
-        var p = document.getElementById('ai-panel');
-        if (c && p && p.classList.contains('open')) c.click();
+        closeAsk();
+        tourFitAll();
       },
     },
     {
       /* The one chapter the reader does rather than watches. Every chapter
          before this drives the controls itself; this one points at them and
          waits, so the first thing someone does on their own is the thing the
-         map is for. Next reads "Skip" until it is done, and the choice they
-         make is kept when the tour closes rather than reset away. */
-      t: 'Your turn: colour the map',
+         map is for. Any indicator counts, since the map is cleared first, and
+         Next reads "Skip and finish" until one is chosen. The choice is kept
+         when the tour closes rather than reset away. */
+      t: 'Your turn',
       task: true,
-      n: '<span class="tour-task-ask">Now try it yourself. Open the <strong>Indicators</strong> ' +
-         'tab' + '<span class="tour-phone-only"> (tap the <svg class="ic" role="img" aria-label="menu"><use href="#i-menu"/></svg> button first)</span>' +
-         ', then tick <strong>Deprivation score (IMD 2025)</strong> under <em>Key indicators</em>. ' +
-         'The map will colour every ward by how deprived it is.</span>' +
-         '<span class="tour-task-done">That is it: every ward is now coloured by ' +
-         'deprivation, and darker means more deprived. Click any ward to see its ' +
-         'figures, or pick another indicator from the list. Press <strong>Finish</strong> ' +
-         'to start exploring.</span>',
+      n: function () {
+        var grp = tourFirstGroup(), chip = tourFirstChip();
+        var eg = (grp && chip) ? ', for example <strong>' + tourEsc(chip) + '</strong> under <em>' + tourEsc(grp) + '</em>,'
+               : grp ? ', for example one under <em>' + tourEsc(grp) + '</em>,' : '';
+        return '<span class="tour-task-ask">Now it is your turn. Open the <strong>Indicators</strong> ' +
+          'tab<span class="tour-phone-only"> (tap the ' + MENU_ICON + ' menu button first)</span> ' +
+          'and choose any indicator' + eg + ' to colour the map by it.</span>' +
+          '<span class="tour-task-done">That is it: the map is now coloured by ' +
+          '<strong class="tour-task-ov">the indicator you chose</strong>, and the key along the ' +
+          'bottom shows what each shade means. Select any area to see its figures, and press ' +
+          '<strong>Finish</strong> when you are ready to explore.</span>';
+      },
       go: function () {
-        closeWardSheet();
         railClick('explore');
         setOverlay('none');
-        // Back to plain wards, so ticking a ward indicator is all it takes.
+        // Back to plain wards, so choosing an indicator is all it takes.
         lsoaLayer(false, false);
         wardLevel();
         sidebarTab('layers');
-        var c = document.getElementById('ai-close');
-        var p = document.getElementById('ai-panel');
-        if (c && p && p.classList.contains('open')) c.click();
+        closeAsk();
+        tourFitAll();
         tourTaskArm();
       },
     },
   ];
 
-  /* The task chapter's bookkeeping. TOUR_TASK_OV is what counts as done. */
-  var TOUR_TASK_OV = 'imd_score_ward';
+  /* The task chapter's bookkeeping. Any indicator chosen while it is up
+     counts as done, and tourTaskOv is the one to keep when the tour closes. */
   var tourTaskDone = false;
+  var tourTaskOv = null;
   function tourTaskPulse(on) {
     // The menu button only matters where the panel is a drawer.
     var narrow = !!(window.PH_DRAWER && PH_DRAWER.narrow());
@@ -20966,10 +21046,12 @@ var PH_SHOW = {
   }
   function tourTaskArm() {
     tourTaskDone = false;
+    tourTaskOv = null;
     tourTaskShow(false);
   }
   function tourTaskClear() {
     tourTaskDone = false;
+    tourTaskOv = null;
     tourTaskPulse(false);
     if (tourStrip) tourStrip.classList.remove('task-done');
   }
@@ -20978,8 +21060,13 @@ var PH_SHOW = {
     if (!ov) return;
     ov.addEventListener('change', function () {
       if (tourAt < 0 || !TOUR[tourAt] || !TOUR[tourAt].task) return;
-      if (ov.value !== TOUR_TASK_OV) return;
+      if (!ov.value || ov.value === 'none') return;
       tourTaskDone = true;
+      tourTaskOv = ov.value;
+      var nm = tourStrip && tourStrip.querySelector('.tour-task-ov');
+      if (nm && typeof indLabel === 'function') {
+        try { nm.textContent = indLabel(ov.value) || nm.textContent; } catch (e) { /* keep the words */ }
+      }
       tourTaskShow(true);
       tourLift();
     });
@@ -21121,7 +21208,7 @@ var PH_SHOW = {
     var c = TOUR[tourAt];
     $('tour-title').textContent = c.t;
     $('tour-ctr').textContent = 'Chapter ' + (tourAt + 1) + ' of ' + TOUR.length;
-    $('tour-narr').innerHTML = c.n;
+    $('tour-narr').innerHTML = (typeof c.n === 'function') ? c.n() : c.n;
     $('tour-prog').innerHTML = TOUR.map(function (_, i) {
       return '<span class="seg' + (i < tourAt ? ' done' : i === tourAt ? ' on' : '') + '"></span>';
     }).join('');
@@ -21131,6 +21218,7 @@ var PH_SHOW = {
     $('tour-next').innerHTML = last ? 'Finish' : 'Next chapter' + ico('arrow-right');
     $('tour-next-lbl').textContent = last ? '' : 'Up next: ' + TOUR[tourAt + 1].t;
     tourTaskClear();
+    tourSpotClear();
     tourResetStage();
     try { c.go(); } catch (e) { /* a chapter must never strand the tour */ }
     tourLift();
@@ -21152,8 +21240,9 @@ var PH_SHOW = {
   }
   function tourEnd() {
     if (!tourStrip) return;
-    var keepOv = tourTaskDone ? TOUR_TASK_OV : null;
+    var keepOv = tourTaskDone ? tourTaskOv : null;
     tourTaskClear();
+    tourSpotClear();
     tourAt = -1;
     tourStrip.classList.remove('open');
     try { window.dispatchEvent(new CustomEvent('ph:tour-end')); } catch (e) {}
@@ -21583,7 +21672,7 @@ var PH_SHOW = {
       'Figures are the same ones the map draws; see the <a href="' +
       esc(new URL('methodology.html', location.href).href) + '" target="_blank" rel="noopener">' +
       'methodology page</a> for where each comes from and what it cannot tell you.' +
-      reportProvenanceHtml() + '</div>' +
+      reportProvenanceHtml(rbAreaName()) + '</div>' +
       '</div><div class="actions">' +
       '<button onclick="window.print()">Print or save as PDF</button>' +
       '<button onclick="window.close()">Close</button></div></body></html>';
