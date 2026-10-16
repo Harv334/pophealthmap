@@ -294,9 +294,15 @@ const smallText = page => page.evaluate(() => {
         const dd = name => { const dt = [...d.querySelectorAll('dt')].find(e => e.textContent === name); return dt ? dt.nextElementSibling.textContent : ''; };
         if (/\(TS\d+A?\)/.test(OV_META[k].src)) {
           const m = dd('Method');
+          // Ward and LA percentages are calculated from the counts of the
+          // output areas, never an average of their percentages.
+          const pub = dd('Published at');
           const right = k === 'census_population' ? /sum the residents of the output areas/.test(m)
-            : /average their percentages, weighting each by its number of residents/.test(m);
-          if (!right || /(add up|sum) the LSOAs/.test(m)) out.census.push(k);
+            : /ward figure is calculated from the counts of the output areas/.test(m) &&
+              /LA figure from the output areas in its wards/.test(m) &&
+              /Ward figures are calculated from the counts of the output areas in each ward/.test(pub) &&
+              /LA\b.{0,40} figures are calculated in the same way, from the output areas in each LA/.test(pub);
+          if (!right || /(add up|sum) the LSOAs|average|weight/.test(m + ' ' + pub)) out.census.push(k);
         }
         if (/^ft_\d+$/.test(k) && FT_INFO[k.slice(3)]) {
           const u = dd('Updates');
@@ -343,6 +349,22 @@ const smallText = page => page.evaluate(() => {
     await page.waitForTimeout(2000);
     ok(await page.evaluate(() => _activeLevel() === 'lsoa' &&
       ['borough', 'ward', 'msoa', 'lsoa'].every(l => ovHasLevel('census_bad_health_pct', l))), 'Census indicator offers every level');
+    // The data build writes each LA's Census percentages, calculated from the
+    // summed counts of its output areas, into the LA file. The map uses that
+    // figure when it is there and works one out from the wards only when it
+    // is not; a missing figure reads "No figure", never a dash.
+    const laCen = await page.evaluate(() => {
+      const code = _laCodes()[0];
+      const k = 'census_no_car_pct';
+      const before = BOROUGH_DATA[code];
+      const fromWards = laAggregate(k)[code];
+      BOROUGH_DATA[code] = Object.assign({}, before || {}, { [k]: 12.34 });
+      const own = boroughOvValue(code, k);
+      if (before) BOROUGH_DATA[code] = before; else delete BOROUGH_DATA[code];
+      return { own, fromWards, none: [fmtNum(null), fmtOv(undefined, k)] };
+    });
+    ok(laCen.own === 12.34 && typeof laCen.fromWards === 'number', 'an LA Census figure from the data build is used ahead of the ward average', JSON.stringify(laCen));
+    ok(laCen.none.every(t => t === 'No figure'), 'a missing figure reads "No figure"', laCen.none.join(' | '));
     // The local authority level is called LA everywhere, and the places that
     // explain the levels introduce it once as "local authority (LA)".
     const la = await page.evaluate(() => {
@@ -1751,11 +1773,14 @@ const smallText = page => page.evaluate(() => {
     const missing = await mp.evaluate(ids => ids.filter(id => !document.getElementById(id)), a.all);
     ok(!missing.length, 'every source row a card links to exists on the methodology page', missing.join(', ') + ' of ' + a.all.join(', '));
     // The page describes the controls the map has, and how Census figures
-    // are combined (averaged by population, not added up).
+    // are combined: from the summed counts of output areas, never by adding
+    // up or averaging percentages.
     const mt = await mp.evaluate(() => document.querySelector('main').innerHTML);
     ok(/About this indicator/.test(mt) && !/<strong>i<\/strong>/.test(mt) && !/<strong>About<\/strong> button/.test(mt),
       'methodology: names the About this indicator button, not controls that are gone');
     ok(!/Census[^.<]{0,80}added up|added up[^.<]{0,40}Census/.test(mt), 'methodology: Census figures are not said to be added up');
+    ok(/calculated from the summed counts of the output areas\s+in the ward/.test(mt) && !/average of their percentages/.test(mt),
+      'methodology: Census ward figures are calculated from the summed counts of their output areas');
     await mp.close();
   }
   {

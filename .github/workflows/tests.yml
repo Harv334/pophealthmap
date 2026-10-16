@@ -20,6 +20,11 @@ jobs:
         with:
           # From a deploy, test what is about to be published.
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || 'main' }}
+      # No em or en dashes in anything a visitor can read: the pages, the Ask
+      # panel and the label files, with comments set aside. Prints file:line
+      # for each one, and runs first because it takes a second.
+      - name: Check for dashes in user-facing text
+        run: python3 tests/check_dashes.py
       - uses: actions/setup-node@v4
         with:
           node-version: '22'

@@ -11,10 +11,26 @@ a failure says what broke rather than only that something did.
 
 ```
 tests/
+  check_dashes.py  no em or en dash in user-facing text; runs first in
+              GitHub Actions (.github/workflows/tests.yml)
   smoke/      Playwright + axe-core; runs in GitHub Actions on every pull
               request and before every deploy (.github/workflows/tests.yml)
   browser/    Selenium, against a served copy of the site
   pipeline/   Python, against fetch_all_data.py and the files it writes
+```
+
+## check_dashes.py
+
+The house style never uses an em dash or an en dash, and writes ranges as
+"1 to 2". This reads the map page, the four pages around it, the Ask panel and
+the label files in `data/map/`, sets HTML, JavaScript and CSS comments aside,
+and prints `file:line` for every dash left, including `&mdash;` and `\u2014`
+spellings. Regular expression literals are skipped, because a pattern that
+finds dashes to replace them is never shown to anyone; any other line that
+matches dashes for that reason carries a `dash-ok` comment saying why.
+
+```bash
+python3 tests/check_dashes.py
 ```
 
 ## smoke/
@@ -115,6 +131,13 @@ root from their own location, so they run from anywhere:
 `test_names_and_ci.py` checks the display-name and phone helpers, the rule that
 stores a Fingertips placeholder row as missing, and the DESNZ fuel poverty year,
 all offline, so they are tested before the next refresh runs them.
+
+`test_census_counts.py` builds Nomis-shaped Census tables for a dozen output
+areas, runs them through the pipeline's own Census rules, and checks that ward
+and LA percentages are the summed numerator counts over the summed
+denominator counts, that output area counts added up to LSOAs give the LSOA
+percentages, and that the files the map reads keep their shape. It needs
+pandas and numpy but no network.
 
 `test_guards.py` and `test_guards_gp.py` copy real downloads out of `.cache/`
 to build their fixtures, so they need a populated cache. `.cache/` is not in the
