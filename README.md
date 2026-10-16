@@ -127,7 +127,7 @@ To trigger one by hand, use **Run workflow** in the Actions tab, not
 ## The AI panel
 
 The map has an optional question panel: ask for a comparison, a ranking or a
-summary of any ward or borough in plain English.
+summary of any ward or LA.
 
 The model is not given the dataset up front. It is given four tools, and the
 browser runs them against the JSON already loaded on the page, so every figure in

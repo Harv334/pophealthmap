@@ -1785,7 +1785,7 @@
   .ws-insight { border-left: 3px solid var(--nhs-blue); background: var(--nhs-light);
     border-radius: var(--r-sm); padding: var(--s-2) 11px; font-size: var(--t-sm); line-height: 1.5; color: var(--ink-2); }
   .ws-insight strong { color: var(--ink); font-weight: 600; }
-  /* "In plain English": the summary is the feature, so it is named. */
+  /* "Summary": the summary is the feature, so it is named. */
   .ws-insight .ws-insight-h { margin: 0 0 2px; font-size: var(--t-sm); font-weight: 700;
     line-height: 1.35; color: var(--nhs-dark); }
   .ws-insight p { margin: 0; }
@@ -9589,7 +9589,7 @@ function showWard(wn) {
       ${stat(_esc(indLabel('core20_lsoa_count')), (c20L !== null && totL !== null) ? c20L.toFixed(0) + ' of ' + totL.toFixed(0) : null, 'in England’s most deprived fifth')}
     </div>`;
 
-  // "In plain English" comes first, the same summary the ward sheet opens
+  // "Summary" comes first, the same summary the ward sheet opens
   // with, written by the sheet's code so the two cannot disagree.
   const plain = (window.PH_SHEET && PH_SHEET.summaryBlock) ? PH_SHEET.summaryBlock(wdata.name) : '';
 
@@ -10711,7 +10711,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
   const disAnyPct = _pctile('census_disability_any_pct', disAny);
   const unempPctR = _pctile('census_unemployed_pct',  unempPct);
   const imdPct    = _pctile('imd_score', imdW);
-  // "In plain English" opens the report, the same summary as the ward sheet
+  // "Summary" opens the report, the same summary as the ward sheet
   // and the Area profile, from the same code.
   const plainSummary = (window.PH_SHEET && PH_SHEET.summary) ? PH_SHEET.summary(wdata ? wdata.name : wn) : '';
 
@@ -10737,7 +10737,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
     ${miniMapSVG ? `<div class="hero-map">${miniMapSVG}</div>` : ''}
   </div>
 
-  ${plainSummary ? `<section class="keypoints plain"><h2>In plain English</h2><p>${plainSummary}</p></section>` : ''}
+  ${plainSummary ? `<section class="keypoints plain"><h2>Summary</h2><p>${plainSummary}</p></section>` : ''}
 
   <div class="kpis">
     ${_kpi('Population',     popN  != null ? Math.round(popN).toLocaleString('en-GB') : null, 'Census 2021')}
@@ -18462,7 +18462,7 @@ var PH_SHOW = {
   }
 
   /**
-   * "In plain English": the summary that opens the ward sheet, the Area
+   * "Summary": the summary that opens the ward sheet, the Area
    * profile and the printable report. It is written here once, so the three
    * cannot say different things about the same ward.
    *
@@ -18635,7 +18635,7 @@ var PH_SHOW = {
     // A plain block rather than a named section: the sheet and the profile
     // can both be on screen, and two landmarks with one name is a fault.
     return '<div class="ws-insight">' +
-      '<' + h + ' class="ws-insight-h">In plain English</' + h + '>' +
+      '<' + h + ' class="ws-insight-h">Summary</' + h + '>' +
       '<p data-plain-ward="' + esc(w.name) + '">' +
       (text || 'There are no figures for this ward yet.') + '</p></div>';
   }
@@ -19172,7 +19172,7 @@ var PH_SHOW = {
   // own idea of what is selected rather than keeping a second one.
   window.PH_SHEET = {
     show: show, hide: hide,
-    // "In plain English", for the Area profile and the printable report, so
+    // "Summary", for the Area profile and the printable report, so
     // all three say the same thing about a ward.
     summary: summaryOf,
     summaryBlock: function (wn, h) {
@@ -20867,8 +20867,8 @@ var PH_SHOW = {
       },
     },
     {
-      t: 'Ask a question in plain English',
-      n: 'The panel on the right answers questions in plain English. Type your ' +
+      t: 'Ask a question about the data',
+      n: 'The panel on the right answers questions about the figures on this map. Type your ' +
          'question and press enter. Your browser looks the numbers up on this page. ' +
          'The answer is then written around what your browser found. It never receives ' +
          'the data itself. You get <strong>10 questions a day</strong>, because this ' +
