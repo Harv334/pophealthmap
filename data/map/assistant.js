@@ -1,8 +1,9 @@
 /**
  * PopHealth Map assistant.
  *
- * The model never receives the dataset. It receives tool definitions, and the
- * four functions below run against the JSON this page has already loaded. So
+ * The model is never sent the whole dataset. It receives tool definitions, and
+ * the four functions below run against the JSON this page has already loaded,
+ * so only the figures a question looks up are sent with it. So
  * every figure in an answer is the same number the map is drawing, and the
  * model cannot invent a statistic: if a tool returns nothing, there is nothing
  * for it to report.
@@ -52,8 +53,8 @@ var MODEL_LABEL = "Claude Sonnet 5";
       + " " + (m[3] ? m[2] + "." + m[3] : m[2]);
   }
   function modelSentence(label) {
-    return "Answers are written by " + label
-      + ". The figures in them come from this page.";
+    return "Answers are worded by " + label
+      + ", and every figure in them comes from this map.";
   }
   function reportModel(id) {
     var el = document.getElementById("ai-model-note");
@@ -89,10 +90,21 @@ var MODEL_LABEL = "Claude Sonnet 5";
     return ADDITIVE[key] === 1 || /_count$/.test(key);
   }
 
+  // The LA file (borough_data.json), which index.html loads into a
+  // top-level BOROUGH_DATA keyed by LAD code. It is not on window, so it is
+  // read by name.
+  function laFile() {
+    return (typeof BOROUGH_DATA === "object" && BOROUGH_DATA) ? BOROUGH_DATA : {};
+  }
+
   function boroughRollup() {
-    // Boroughs are not a stored level: aggregate wards up, population-weighted
-    // for rates and summed for counts, mirroring how the map builds ward
-    // figures from LSOAs.
+    // LA figures follow the map's rule (boroughOvValue in index.html): the
+    // figure the LA file publishes for the LA when it has one, and otherwise
+    // the wards aggregated up, population-weighted for rates and summed for
+    // counts. So Ask quotes the same LA figure the map shows, including the
+    // Census percentages the data build calculates from summed counts.
+    // Areas are keyed by the LA's name, which is how questions name them;
+    // the LAD code is kept to find the LA's own record.
     var out = {};
     var w = wards();
     Object.keys(w).forEach(function (k) {
@@ -101,6 +113,7 @@ var MODEL_LABEL = "Claude Sonnet 5";
       if (!lad) return;
       if (!out[lad]) out[lad] = { name: lad, _wards: 0, indicators: {}, _num: {}, _den: {} };
       var b = out[lad];
+      if (!b.lad_code && ward.lad_code) b.lad_code = ward.lad_code;
       b._wards++;
       var ind = ward.indicators || {};
       var pop = parseFloat(ind.census_population) || 0;
@@ -122,6 +135,14 @@ var MODEL_LABEL = "Claude Sonnet 5";
         if (b._den[key] > 0) b.indicators[key] = Math.round((b._num[key] / b._den[key]) * 100) / 100;
       });
       delete b._num; delete b._den;
+      var own = b.lad_code && laFile()[b.lad_code];
+      var rec = own && (own.indicators || own);
+      if (rec) {
+        Object.keys(rec).forEach(function (key) {
+          var v = parseFloat(rec[key]);
+          if (!isNaN(v)) b.indicators[key] = v;
+        });
+      }
     });
     return out;
   }
@@ -248,9 +269,9 @@ var MODEL_LABEL = "Claude Sonnet 5";
    * explained that a higher score meant less deprivation.
    */
   var DECILE_SCALE = "Deciles run 1 (the most deprived tenth nationally) to 10 " +
-    "(the least). This is an average of them, not a decile itself: a value of 3 " +
-    "means the typical LSOA here sits in the third decile, among roughly the 30 " +
-    "per cent most deprived. Only a value of 1 would mean the most deprived tenth.";
+    "(the least). This is an average of them, not a decile itself, so report it " +
+    "as an average decile to one decimal place (for example 2.3, where 1 is the " +
+    "most deprived tenth) and never turn it into a percentage of England.";
 
   var IMD_META = {
     imd_decile_mean: "Mean IMD decile of the LSOAs in this area, population weighted. " + DECILE_SCALE,
@@ -432,8 +453,19 @@ var MODEL_LABEL = "Claude Sonnet 5";
    * an API key or a deployed Worker: they are pure functions over the JSON the
    * page has already loaded. Nothing here mutates map state.
    */
+  // Set by initFloating once the panel exists; null where there is no panel.
+  var openWith = null;
+
   window.PH_ASSISTANT = {
     runTool: function (n, i) { return runTool(n, i); },
+    // Whether the Ask panel is on this page (configured, and in London).
+    get available() { return !!openWith; },
+    // Opens the panel with a question about the named place in the box.
+    askAbout: function (name) {
+      if (!openWith || !name) return false;
+      openWith("Tell me about " + name);
+      return true;
+    },
     areasFor: areasFor,
     findArea: findArea,
     isAdditive: isAdditive,
@@ -700,7 +732,7 @@ var MODEL_LABEL = "Claude Sonnet 5";
         return (data.content || [])
           .filter(function (b) { return b.type === "text"; })
           .map(function (b) { return b.text; })
-          .join("\n").trim() || "No answer returned.";
+          .join("\n").trim() || "Sorry, no answer came back. Please try again, or ask it a different way.";
       }
       // Every tool_use block must get exactly one tool_result, in one message.
       var results = (data.content || [])
@@ -714,7 +746,7 @@ var MODEL_LABEL = "Claude Sonnet 5";
         });
       history.push({ role: "user", content: results });
     }
-    return "I could not finish that in a reasonable number of steps. Try a narrower question.";
+    return "Sorry, that question needed more steps than I can take. Please try a narrower question, such as one about a single ward or LA.";
   }
 
   // ---- panel -------------------------------------------------------------
@@ -768,20 +800,27 @@ var MODEL_LABEL = "Claude Sonnet 5";
     log.setAttribute("aria-live", "polite");
     log.setAttribute("aria-label", "Conversation");
 
-    // One opening message, not three stacked notices. It carries the reason
-    // for the cap as well, so the count in the header can be just a count.
-    // It also says where a question goes, because "read from your browser" on
-    // its own invites the belief that nothing leaves it.
+    // One opening message, not three stacked notices. It says where a
+    // question goes, in the same words as the tour and the privacy page,
+    // because "read from your browser" on its own invites the belief that
+    // nothing leaves it. It carries the reason for the cap as well, so the
+    // count in the header can be just a count.
     var intro = document.createElement("div");
-    intro.className = "ai-msg ai-bot";
-    intro.textContent = "Ask about any ward or local authority (LA) on the map. Every figure " +
-      "in an answer is read from the data loaded in your browser, not written " +
-      "from memory. Your question and the figures used to answer it are sent " +
-      "through this site's server to Anthropic, whose Claude model writes the " +
-      "reply. Questions are limited to " + DAILY_CAP + " a day per person, " +
-      "because the service is free but costs money to run. Answering a request " +
-      "to narrow your question down does not count towards the limit, and the " +
-      "map itself is unlimited.";
+    intro.className = "ai-msg ai-bot ai-intro";
+    [
+      "Ask about any ward or local authority (LA) in plain English, and the " +
+        "answer will be built from the figures on this map rather than from " +
+        "memory. Your question and the figures looked up to answer it pass " +
+        "through this site's server to Anthropic's Claude model, which writes " +
+        "the reply, so please leave out anything personal.",
+      "You can ask " + DAILY_CAP + " questions a day, because each answer costs " +
+        "money to produce, and replying when it asks you to narrow a question " +
+        "down does not use one up. Everything else on the map has no limit.",
+    ].forEach(function (t) {
+      var para = document.createElement("p");
+      para.textContent = t;
+      intro.appendChild(para);
+    });
     log.appendChild(intro);
 
     var chips = document.createElement("div");
@@ -834,8 +873,8 @@ var MODEL_LABEL = "Claude Sonnet 5";
     privacy.rel = "noopener";
     privacy.textContent = "About and privacy";
     caution.appendChild(warn);
-    caution.appendChild(document.createTextNode(" AI generated output should be "
-      + "independently verified before making any decisions. "));
+    caution.appendChild(document.createTextNode(" Answers are written by AI, so please "
+      + "check any figure against the map or its source before you rely on it. "));
     caution.appendChild(privacy);
 
     // Which model wrote the sentence, named on the page rather than left to be
@@ -886,7 +925,8 @@ var MODEL_LABEL = "Claude Sonnet 5";
         renderLimit();
       } catch (err) {
         thinking.className = "ai-msg ai-bot ai-error";
-        thinking.textContent = (err && err.message) ? err.message : "Something went wrong.";
+        thinking.textContent = (err && err.message) ? err.message
+          : "Sorry, that question could not be answered. Please try again, or ask it a different way.";
         // Back in the box, so trying again is one press rather than retyping.
         if (!input.value) input.value = q;
       } finally {
@@ -916,6 +956,11 @@ var MODEL_LABEL = "Claude Sonnet 5";
    */
   function initFloating() {
     if (!ASSISTANT_ENDPOINT) return; // not configured: no panel, map unaffected
+    // The examples, the tool layer's wording and the answering service's own
+    // instructions are written for London's wards and LAs, so outside London
+    // (the England view included) there is no button and no panel, rather
+    // than one that promises answers about places it cannot describe.
+    if (!IS_LONDON) return;
     var host = document.querySelector(".map-wrap");
     if (!host || document.getElementById("ai-panel")) return;
 
@@ -989,6 +1034,20 @@ var MODEL_LABEL = "Claude Sonnet 5";
       toggle.setAttribute("aria-expanded", "false");
       toggle.focus();
     }
+
+    // "Ask about this ward" on the ward sheet opens the panel with the ward
+    // named in the box, for the reader to send or change. Nothing is sent
+    // for them, because each question counts towards the daily limit.
+    openWith = function (text) {
+      open();
+      var input = document.getElementById("ai-input");
+      if (input && text) {
+        input.value = text;
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        input.focus();
+        try { input.setSelectionRange(text.length, text.length); } catch (e) { /* not a text field */ }
+      }
+    };
 
     toggle.addEventListener("click", open);
     close.addEventListener("click", shut);

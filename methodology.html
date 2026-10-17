@@ -6,8 +6,8 @@
 <title>Methodology and technical notes | PopHealth Map</title>
 <link rel="canonical" href="https://pophealth.uk/methodology.html">
 <meta name="description" content="How PopHealth Map is built: every data source, how figures for wards and LAs are calculated from small areas, and what to watch for when reading them.">
-<!-- Same inline map-pin icon as index.html, so the tab matches. -->
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1a1a'/%3E%3Cpath d='M16 6c-3.9 0-7 3.1-7 7 0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7z' fill='%23fff'/%3E%3Ccircle cx='16' cy='13' r='2.6' fill='%231a1a1a'/%3E%3C/svg%3E">
+<!-- Same inline site mark as index.html, so the tab matches. -->
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Crect width='9' height='9' rx='2' fill='%23003087'/%3E%3Crect x='11' width='9' height='9' rx='2' fill='%238BBDEA'/%3E%3Crect y='11' width='9' height='9' rx='2' fill='%23005EB8'/%3E%3Crect x='11' y='11' width='9' height='9' rx='2' fill='%233D8FDA'/%3E%3C/svg%3E">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="manifest" href="site.webmanifest">
@@ -20,11 +20,12 @@
 <meta property="og:image" content="https://pophealth.uk/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="PopHealth Map: population health across England by ward and neighbourhood">
+<meta property="og:image:alt" content="A map of London wards shaded by deprivation score, beside the name PopHealth Map and the words Free, no sign-in">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Methodology and technical notes | PopHealth Map">
 <meta name="twitter:description" content="How PopHealth Map is built: every data source, how figures for wards and LAs are calculated from small areas, and what to watch for when reading them.">
 <meta name="twitter:image" content="https://pophealth.uk/og.png">
+<meta name="twitter:image:alt" content="A map of London wards shaded by deprivation score, beside the name PopHealth Map and the words Free, no sign-in">
 <meta name="color-scheme" content="light">
 <!-- Fonts from this origin like the map's, because the networks this is
      read on block Google Fonts often enough to matter. The frame and text
@@ -40,7 +41,7 @@
      and name lead back to the map, then the three pages in one order. -->
 <header class="site-hdr">
   <div class="site-hdr-in">
-    <a class="brand" href="index.html"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><rect width="9" height="9" fill="#0B1F33"/><rect x="11" width="9" height="9" fill="#0B1F33" opacity=".35"/><rect y="11" width="9" height="9" fill="#0B1F33" opacity=".6"/><rect x="11" y="11" width="9" height="9" fill="#0E7C7B"/></svg><span>PopHealth Map</span></a>
+    <a class="brand" href="index.html"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><rect width="9" height="9" rx="2" fill="#003087"/><rect x="11" width="9" height="9" rx="2" fill="#8BBDEA"/><rect y="11" width="9" height="9" rx="2" fill="#005EB8"/><rect x="11" y="11" width="9" height="9" rx="2" fill="#3D8FDA"/></svg><span>PopHealth Map</span></a>
     <nav class="site-nav" aria-label="Site">
       <ul>
         <li><a href="methodology.html" aria-current="page">Methodology</a></li>
@@ -237,7 +238,12 @@ LSOA and ward boundaries at high zoom reflect genuine differences between the
 <p>When small areas are aggregated into wards or LAs, rates, percentages and
 scores are weighted by population, so each area counts in proportion to the
 number of people who live there. Only raw totals, such as population, crimes
-and the number of services, are summed directly. LSOA figures reach wards
+and the number of services, are summed directly. <span data-cen="ward-weighted">Census
+percentages are combined from their output areas in this way too, as described
+under <a href="#census-levels">Census figures at every level</a>.</span><span data-cen="ward-counts" hidden>Census
+percentages are the exception, because ONS publishes the counts behind them:
+each is calculated from the summed counts of the output areas, as described under
+<a href="#census-levels">Census figures at every level</a>.</span> LSOA figures reach wards
 in this way, and MSOA figures reach wards through the LSOAs the two share, so a
 ward that straddles two MSOAs gets a blend in proportion to where its people
 live. Where a figure is not published for LAs, each LA's figure is calculated
@@ -544,7 +550,8 @@ follows one rule.</p>
 <p>Every figure is first placed on the 2021 Census building blocks, which are
 output areas, LSOAs and MSOAs, and is then combined into wards and LAs using the
 official ONS lookup files listed in the <a href="#appendix">technical appendix</a>,
-with counts summed and everything else weighted by population. Nothing is matched by
+with counts summed<span data-cen="ward-counts" hidden>, Census percentages calculated from their summed counts,</span>
+and everything else weighted by population. Nothing is matched by
 name, and no boundary is laid over another to decide where a figure belongs.</p>
 
 <h3 id="best-fit">Best fit, not exact fit</h3>
@@ -560,10 +567,20 @@ be compared fairly with one another.</p>
 <p>ONS publishes Census 2021 figures for output areas, LSOAs and MSOAs, and the
 map shows ONS's own figure at each of those levels, so they need no matching at
 all. Census figures for wards are calculated from output areas rather than
-from LSOAs, as an average of their percentages weighted by the number of
-residents, using ONS's output area to ward best fit lookup, because output areas are
+from LSOAs, using ONS's output area to ward best fit lookup, because output areas are
 about a fifth the size of LSOAs and follow ward boundaries much more closely.
-LA figures are then calculated from the wards in the same way. To see output areas, choose a
+<span data-cen="ward-weighted">Each ward percentage is an average of the
+percentages of the output areas in the ward, weighted by their residents, so a
+measure of households, such as the share with no car or van, is weighted by
+residents too.</span><span data-cen="ward-counts" hidden>Each ward percentage is
+calculated from the summed counts of the output areas in the ward: the
+households with no car or van in those output areas, for example, divided by all
+their households. A measure of households is therefore a share of the ward's
+households, and a measure of people a share of its residents.</span>
+<span data-cen="la-weighted">LA figures are an average of the ward figures,
+weighted by population.</span><span data-cen="la-counts" hidden>LA figures are
+calculated from the summed counts of the output areas in each LA's wards.</span>
+To see output areas, choose a
 Census indicator and <strong>OA</strong> on the level switch, and their borders
 appear as you zoom in. An output area holds about 125 households, so a single
 household can move a percentage noticeably, and these figures are best read as
@@ -817,6 +834,7 @@ var SOURCES = [
     pub: 'ONS, through Nomis',
     what: '32 indicators: health, disability, ethnicity, age, housing, tenure, ' +
           'qualifications, occupation, travel to work, household language and unpaid care.',
+    // Set again by censusMethod below from what the latest data build says.
     geo: 'Output area, LSOA and MSOA, as ONS publishes them, and averaged here, weighted by population, into wards and LAs',
     period: 'Census day, 21 March 2021',
     cadence: 'Once every ten years, with the next in 2031.',
@@ -1196,9 +1214,25 @@ Array.prototype.forEach.call(document.querySelectorAll('table.stack'), labelTabl
   function readPeriods(text) {
     try {
       var at = text.indexOf('var PH_IND_STATS = ');
-      var st = JSON.parse(text.slice(at + 19, text.lastIndexOf(';'))).stats || {};
+      var doc = JSON.parse(text.slice(at + 19, text.lastIndexOf(';')));
+      var st = doc.stats || {};
       Object.keys(st).forEach(function (k) { if (st[k].yr) periods[k] = String(st[k].yr); });
+      censusMethod(doc.census_method === 'counts', doc.census_la_method === 'counts');
     } catch (e) { /* keep the typed periods */ }
+  }
+  // The page describes how the Census ward and LA figures that are live were
+  // made: from summed counts once the data build says so, and otherwise as
+  // population-weighted averages, which is what the page says without it.
+  function censusMethod(ward, la) {
+    var show = { 'ward-counts': ward, 'ward-weighted': !ward, 'la-counts': la, 'la-weighted': !la };
+    [].forEach.call(document.querySelectorAll('[data-cen]'), function (el) {
+      el.hidden = !show[el.getAttribute('data-cen')];
+    });
+    SOURCES[0].geo = 'Output area, LSOA and MSOA, as ONS publishes them, and ' +
+      (ward && la ? 'calculated here for wards and LAs from the summed counts of their output areas'
+        : ward ? 'calculated here for wards from the summed counts of their output areas, and averaged, weighted by population, into LAs'
+        : la ? 'averaged here, weighted by population, into wards, and calculated for LAs from the summed counts of their output areas'
+        : 'averaged here, weighted by population, into wards and LAs');
   }
 
   Promise.all([

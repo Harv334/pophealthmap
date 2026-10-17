@@ -11,10 +11,26 @@ a failure says what broke rather than only that something did.
 
 ```
 tests/
+  check_dashes.py  no em or en dash in user-facing text; runs first in
+              GitHub Actions (.github/workflows/tests.yml)
   smoke/      Playwright + axe-core; runs in GitHub Actions on every pull
               request and before every deploy (.github/workflows/tests.yml)
   browser/    Selenium, against a served copy of the site
   pipeline/   Python, against fetch_all_data.py and the files it writes
+```
+
+## check_dashes.py
+
+The house style never uses an em dash or an en dash, and writes ranges as
+"1 to 2". This reads the map page, the four pages around it, the Ask panel and
+the label files in `data/map/`, sets HTML, JavaScript and CSS comments aside,
+and prints `file:line` for every dash left, including `&mdash;` and `\u2014`
+spellings. Regular expression literals are skipped, because a pattern that
+finds dashes to replace them is never shown to anyone; any other line that
+matches dashes for that reason carries a `dash-ok` comment saying why.
+
+```bash
+python3 tests/check_dashes.py
 ```
 
 ## smoke/
@@ -116,6 +132,13 @@ root from their own location, so they run from anywhere:
 stores a Fingertips placeholder row as missing, and the DESNZ fuel poverty year,
 all offline, so they are tested before the next refresh runs them.
 
+`test_census_counts.py` builds Nomis-shaped Census tables for a dozen output
+areas, runs them through the pipeline's own Census rules, and checks that ward
+and LA percentages are the summed numerator counts over the summed
+denominator counts, that output area counts added up to LSOAs give the LSOA
+percentages, and that the files the map reads keep their shape. It needs
+pandas and numpy but no network.
+
 `test_guards.py` and `test_guards_gp.py` copy real downloads out of `.cache/`
 to build their fixtures, so they need a populated cache. `.cache/` is not in the
 repo: run the relevant pipeline source once first, or skip them.
@@ -148,11 +171,20 @@ Recorded so a failure can be told from a known gap. Against production at
 | `test_sheet_query` | passes |
 | `test_split` | passes |
 | `test_tools` | passes |
-| `test_tour` | passes |
+| `test_tour` | rewritten for the six-chapter tour, see below |
 | `test_mobile` | **fails, deliberately left that way** |
 | `test_ovpicker` | fails, one stale assertion |
 | `test_slim` | fails, one stale assertion |
 | `test_tidy` | fails, one stale assertion |
+
+`test_tour` was written for the eleven-chapter tour and looked for chapters
+called "Colour the map" and "Click a ward" that no longer exist. It now walks
+the six chapters (What PopHealth Map is, Choose an indicator, Select a place,
+The tools, What the figures cannot tell you, Your turn), completes the last
+one by choosing an indicator, and checks Previous, Finish and Escape. Its
+page scripts were checked against the site in Playwright; it has not yet been
+run under Selenium, because the machine it was written on had no ChromeDriver
+matching its Chrome. Set `CHROME_BIN` to choose the browser.
 
 `test_mobile` asserts a sidebar structure that changed upstream: commit
 `b9dd9aa` made Indicators the default tab and `cfa5c69` folded the Map controls
