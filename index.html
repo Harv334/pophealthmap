@@ -403,13 +403,13 @@
      they are, and they turn red on hover because each one takes something
      away. 32px square; where one sits in a corner, a negative margin of its
      own keeps the card it closes from growing to fit it. */
-  .btn-icon, .sb-close, .ws-close, .load-note-x, #fingertips-banner-close, .help-pop-x, .ap-x,
+  .btn-icon, .sb-close, .ws-close, .load-note-x, .help-pop-x, .ap-x,
   .cmp-pin .cmp-x, .rb-item .x, .ws-pin-x, .q-del, #ai-close, #dev-banner .dev-x {
     appearance: none; display: inline-flex; align-items: center; justify-content: center;
     flex: none; width: 32px; height: 32px; padding: 0; margin: 0; border: 0;
     border-radius: var(--r-sm); background: none; color: var(--ink-3); cursor: pointer;
     line-height: 0; opacity: 1; float: none; }
-  .btn-icon:hover, .sb-close:hover, .ws-close:hover, .load-note-x:hover, #fingertips-banner-close:hover,
+  .btn-icon:hover, .sb-close:hover, .ws-close:hover, .load-note-x:hover,
   .help-pop-x:hover, .ap-x:hover, .cmp-pin .cmp-x:hover, .rb-item .x:hover, .ws-pin-x:hover,
   .q-del:hover, #ai-close:hover, #dev-banner .dev-x:hover { background: var(--nhs-light); color: var(--nhs-red); }
 
@@ -444,7 +444,7 @@
      back to the bottom, since nothing is left for it to rise above. */
   body.presenting .ws-sheet, body.presenting #cmp-bar, body.presenting .tour-strip,
   body.presenting .area-peek, body.presenting #ai-panel, body.presenting #load-note,
-  body.presenting #fingertips-banner, body.presenting footer.sbar { display: none !important; }
+  body.presenting footer.sbar { display: none !important; }
   body.presenting .map-wrap { --sheet-lift: 0px !important; }
   body.presenting .main { grid-template-columns: minmax(0, 1fr); }
   /* The picture keeps its credits: the map's attribution stays in its corner,
@@ -505,33 +505,16 @@
     box-shadow: var(--shadow); }
   .search-pin-dot { position: absolute; left: 10.5px; top: 7.5px;
     width: 7px; height: 7px; border-radius: 50%; background: var(--paper); }
+  /* Its label keeps Leaflet's own margin (the other popups draw their own
+     padding), and removing the pin is a button a thumb can hit. */
+  .search-pin-pop .leaflet-popup-content { margin: 10px 12px !important; min-width: 0; }
+  .search-pin-pop .search-pin-clear { display: inline-flex; align-items: center; min-height: 44px;
+    margin: 4px 0 -6px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--r-sm);
+    background: var(--paper); color: var(--nhs-blue); font: inherit; font-size: var(--t-sm); font-weight: 600; cursor: pointer; }
+  .search-pin-pop .search-pin-clear:hover { border-color: var(--nhs-blue); }
 
-  /* ── Fingertips suppression notice ──
-     Bottom right, which is where it belongs: it is a footnote about the
-     shading, and the top-left corner is where people are reading the map.
-
-     It shares that corner with the Ask panel and its button, so it hides
-     itself while the panel is open rather than being stacked behind it or
-     fighting it for the space. See _wireFingertipsBanner.
-
-     Styled from here rather than from a style attribute on the element. An
-     inline style beats an id selector, so the narrow-screen rule below it was
-     dead and had never once applied. */
-  #fingertips-banner { position: absolute; right: 12px; bottom: 104px; max-width: 300px;
-    background: var(--tint-amber); border: 1px solid var(--tint-amber-line); color: var(--tint-amber-ink);
-    padding: 9px var(--s-3); border-radius: var(--r-md); box-shadow: var(--shadow);
-    font-size: var(--t-sm); line-height: 1.45; z-index: 560; display: none;
-    pointer-events: none; }
-  /* Above the Ask button, not under it. At bottom:54px it shared the corner
-     with that button (bottom:34px, about 44px tall, and drawn on top), which
-     covered the notice and its close button on some screen sizes. */
-  .map-wrap.has-sheet #fingertips-banner { bottom: calc(var(--sheet-lift) + 104px); }
-  #fingertips-banner .ft-i { display: inline-block; background: #b88030; color: var(--on-accent);
-    border-radius: 50%; width: 18px; height: 18px; text-align: center;
-    line-height: 18px; font-weight: 700; margin-right: 6px; font-size: var(--t-xs);
-    vertical-align: middle; }
-  #fingertips-banner-close { float: right; margin: -6px -6px 0 4px; color: var(--tint-amber-ink);
-    pointer-events: auto; }
+  /* The missing-figure note is a line of the map's key now (.mls-note),
+     rather than a floating card of its own: see _wireBlankNote. */
 
   /* ── Something failed to load (see PH_LOAD) ───────────────────────────────
      On the map, not only in the status bar, where a failure used to be
@@ -579,6 +562,14 @@
   .map-chip:hover { background: var(--nhs-light); color: var(--nhs-dark); }
   /* The unit, on its own line under the name, when it is too long to go on
      each end value. Set by _syncScaleNumbers. */
+  /* The missing-figure note: one line under the scale, as wide as the key
+     and no wider (it hangs in the padding the key makes for it), with the
+     whole of it in the title and read out with the key. */
+  .map-legend-strip.has-note:not(.is-biv) { padding-bottom: calc(6px + 1.5em); }
+  .map-legend-strip .mls-note { position: absolute; left: var(--s-3); right: var(--s-3); bottom: 5px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.5;
+    color: var(--tint-amber-ink); font-weight: 600; }
+  .map-legend-strip .mls-note[hidden] { display: none; }
   .map-legend-strip .mls-unit { display: block; font-weight: 400; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; }
   .map-legend-strip .mls-min, .map-legend-strip .mls-max { font-variant-numeric: tabular-nums; color: var(--ink-2); min-width: 34px; }
   .map-legend-strip .mls-min { text-align: right; }
@@ -2116,9 +2107,9 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
     box-shadow: var(--shadow-lg); padding: 10px var(--s-3) var(--s-3); font-size: var(--t-md); color: var(--ink-2); }
   .area-peek[hidden] { display: none; }
   .ap-row .vs { margin-left: 0; margin-top: 2px; }
-  /* One thing at a time in that corner: the notice and the Ask button come
-     back when the card is closed. */
-  .map-wrap.has-peek #fingertips-banner, .map-wrap.has-peek #ai-toggle { display: none !important; }
+  /* One thing at a time in that corner: the Ask button comes back when the
+     card is closed. */
+  .map-wrap.has-peek #ai-toggle { display: none !important; }
   .ap-hd { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 6px; }
   .ap-hd > div { flex: 1; min-width: 0; }
   .ap-nm { font-weight: 700; color: var(--ink); font-size: var(--t-lg); }
@@ -2775,20 +2766,48 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
        left above it. The panel has its own "Ask about this ward", and the
        button comes back when the panel drops to its head. */
     .map-wrap.touring #ai-toggle, .map-wrap.sheet-full #ai-toggle { display: none; }
-    .map-wrap.has-sheet #fingertips-banner { bottom: calc(var(--sheet-lift) + 120px); }
+    .map-wrap.cmp-full #ai-toggle, .map-wrap.cmp-full .map-chip { display: none; }
     /* One short line in the corner, on a light ground, read as a caption. */
     .leaflet-control-attribution { font-size: var(--t-xs); line-height: 1.4; white-space: nowrap;
       padding: 1px 6px; background: color-mix(in srgb, var(--paper) 80%, transparent); }
-    /* Full width along the bottom instead: at this width there is no room for
-       300px of notice beside anything and still a map. */
-    #fingertips-banner { left: 8px; right: 8px; bottom: 120px; max-width: none;
-      font-size: var(--t-xs); padding: var(--s-2) 10px; }
     .map-legend-strip { left: 8px; right: 8px; transform: none; max-width: none;
       font-size: var(--t-xs); padding: 5px 9px; }
     .map-legend-strip .mls-label { max-width: 45%; }
+    .map-legend-strip .mls-note { left: 9px; right: 9px; bottom: 4px; }
+    .map-legend-strip.has-note:not(.is-biv) { padding-bottom: calc(5px + 1.5em); }
+    /* The key with its missing-figure line is a line taller, so the Ask
+       button and the chip above it go up by a line too. */
+    .map-wrap.has-note #ai-toggle, .map-wrap.has-note .map-chip { bottom: 90px; }
+    .map-wrap.has-note.has-sheet #ai-toggle, .map-wrap.has-note.has-sheet .map-chip { bottom: calc(var(--sheet-lift) + 90px); }
+    /* A fully open ward sheet leaves a strip of map for seeing where the
+       ward is. The key and the basemap switch wait until it drops back
+       (the credits stay, one line on the sheet's edge, as the licences
+       ask), rather than piling up over that strip and each other. */
+    .map-wrap.sheet-full .map-legend-strip { display: none !important; }
+    .map-wrap.sheet-full .basemap-ctl { display: none; }
+    /* Two lines for the borough, residents and deprivation, rather than
+       one ending in "average deprivation decil...". */
+    .ws-title .ws-meta { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical; }
     /* The viewing strip is scope only now; keep it to one line. */
     .viewing-strip { padding: 4px 10px 5px; font-size: var(--t-xs); }
   }
+  /* A phone on its side: the Indicators chip and the Satellite button
+     share the map's left edge, so the switch waits while the chip shows
+     (Map style in the panel does the same job). */
+  @media (max-width: 900px) and (max-height: 500px) {
+    .app:has(.mode-btn[data-mode="explore"][aria-selected="true"]) .map-wrap:not(.touring):not(.sheet-full):not(.has-peek) .basemap-ctl { display: none; }
+    /* And the chip stands right of the zoom buttons, which reach down to
+       its row on a screen this short. */
+    .map-chip { left: 66px; }
+  }
+  /* Reading down a fully open sheet on a phone, the head is one line: the
+     ward's name with the size and close buttons (see panWardIntoView's
+     neighbour in the sheet's script). */
+  .ws-sheet.ws-compact .ws-lbl, .ws-sheet.ws-compact .ws-meta, .ws-sheet.ws-compact .ws-fig,
+  .ws-sheet.ws-compact .ws-pinnote, .ws-sheet.ws-compact .ws-acts > .ws-btn { display: none !important; }
+  .ws-sheet.ws-compact .ws-head { flex-wrap: nowrap; padding-top: 12px; padding-bottom: 6px; }
+  .ws-sheet.ws-compact .ws-acts { display: flex !important; width: auto; }
 
   /* Coarse pointers get bigger targets, whatever the width. A 25px row is a
      comfortable click and an awkward tap. */
@@ -2820,12 +2839,12 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
     .dl-seg button { min-width: 44px; min-height: 36px; }
     .dl-help { width: 28px; height: 28px; line-height: 28px; }
     .sb-modebar-back { min-height: 44px; }
-    .btn-icon, .sb-close, .ws-close, .load-note-x, #fingertips-banner-close, .help-pop-x, .ap-x,
+    .btn-icon, .sb-close, .ws-close, .load-note-x, .help-pop-x, .ap-x,
     .cmp-pin .cmp-x, .rb-item .x, .ws-pin-x, .q-del, #ai-close, #dev-banner .dev-x,
     .hdr-menu, .hdr-search-btn, .chip-x, .lhelp, .dl-seg button, .tour-hd .tour-end, .q-example,
     .sb-lbl.collapsible, .sidebar .sbar a, .sidebar .sbar button {
       position: relative; }
-    .btn-icon::after, .sb-close::after, .ws-close::after, .load-note-x::after, #fingertips-banner-close::after,
+    .btn-icon::after, .sb-close::after, .ws-close::after, .load-note-x::after,
     .help-pop-x::after, #ai-close::after, #dev-banner .dev-x::after, .cmp-pin .cmp-x::after,
     .rb-item .x::after, .hdr-menu::after, .hdr-search-btn::after {
       content: ''; position: absolute; inset: -6px; }
@@ -2887,11 +2906,9 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
     .map-wrap.side-r .leaflet-right { right: var(--side-r); }
     .map-wrap.side-r #ai-toggle { right: calc(var(--side-r) + 8px); }
     .map-wrap.side-r .dl-badge { right: calc(var(--side-r) + 8px); }
-    .map-wrap.side-r #fingertips-banner { right: calc(var(--side-r) + 8px); }
     /* Two panels up at once (the tour and a ward) leave too little map for
        the switches and the key, so they wait; the credits wrap to fit. */
-    .map-wrap.side-cramped .dl-badge, .map-wrap.side-cramped #ai-toggle,
-    .map-wrap.side-cramped #fingertips-banner { display: none; }
+    .map-wrap.side-cramped .dl-badge, .map-wrap.side-cramped #ai-toggle { display: none; }
     /* !important because the key's own display is written inline. */
     .map-wrap.side-cramped .map-legend-strip { display: none !important; }
     .map-wrap.side-cramped .leaflet-control-attribution { white-space: normal;
@@ -2918,6 +2935,14 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
     .tour-prog .seg { height: 2px; }
     .tour-narr { margin-bottom: 6px; line-height: 1.5; }
     .tour-ctrls { gap: 8px; }
+  }
+  /* Too short for a sheet beside the map that starts under the area level
+     switch: the side sheet runs from under the page header to the bottom of
+     the screen, over the tabs and the Viewing line, so its figures get the
+     height. (--hdr-b is written by sideSync.) */
+  @media (max-height: 420px) {
+    .ws-sheet, .map-wrap.touring .ws-sheet { position: fixed; top: calc(var(--hdr-b, 44px) + 6px); bottom: 6px; z-index: 1300; }
+    .ws-sheet.peek, .ws-sheet.collapsed { bottom: auto; max-height: calc(100vh - var(--hdr-b, 44px) - 12px); }
   }
 
   /* ── Ask, on a phone, is the whole screen ─────────────────────────────────
@@ -3664,8 +3689,8 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
               <option value="census_working_age_pct">Aged 15 to 64 % · Output area</option>
               <option value="census_over65_pct">65+ % · Output area</option>
               <option value="census_over85_pct">85+ % · Output area</option>
-              <option value="census_english_hh_all_pct">Households where all adults have English as main language % · Output area</option>
-              <option value="census_english_hh_none_pct">Households where no adults have English as main language % · Output area</option>
+              <option value="census_english_hh_all_pct">All adults in the household have English as a main language % · Output area</option>
+              <option value="census_english_hh_none_pct">No one in the household has English as a main language % · Output area</option>
             </optgroup>
             <optgroup label="Work, money and education">
               <option value="census_unemployed_pct">Unemployed % · Output area</option>
@@ -4067,13 +4092,14 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
            scale-bar via the same data, so users can read the choropleth without scrolling. -->
       <!-- A tap or click on it opens the indicator's card (workplan 2.10). -->
       <div id="map-legend-strip" class="map-legend-strip" style="display:none" role="button" tabindex="0"
-           aria-label="About this indicator" aria-describedby="mls-min mls-max"
+           aria-label="About this indicator" aria-describedby="mls-min mls-max mls-note"
            title="Select to read about this indicator">
         <span class="mls-label" id="mls-label"></span>
         <span class="mls-min" id="mls-min"></span>
         <span class="mls-grad" id="mls-grad"></span>
         <span class="mls-max" id="mls-max"></span>
         <span class="mls-biv" id="mls-biv"></span>
+        <span class="mls-note" id="mls-note" hidden></span>
       </div>
       <!-- Loading screen. A map rather than a spinner: see _paintLoaderMap
            below for why, and for where the geometry comes from. The copy used
@@ -4108,17 +4134,6 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
       <!-- Phones only: the indicator list lives in the drawer, out of sight,
            so this floats over the map and opens it (workplan 2.10). -->
       <button type="button" class="map-chip" id="map-colour-chip"><svg class="ic" aria-hidden="true"><use href="#i-palette"/></svg>Indicators</button>
-      <!-- Fingertips suppression banner: shown when a Fingertips overlay is selected -->
-      <!-- Top left, under the zoom control. It used to sit bottom right, where
-           the Ask button covers it and the Ask panel hides it completely: the
-           notice explaining why wards are blank was itself invisible exactly
-           when someone had a blank ward in front of them. Nothing else lives
-           in this corner below the zoom buttons. -->
-      <div id="fingertips-banner">
-        <span class="ft-i">i</span>
-        <span id="fingertips-banner-text">Areas left without colour have no figure. OHID, the Office for Health Improvement and Disparities, withholds figures where so few people are counted that someone could be identified, so a blank area does not mean zero.</span>
-        <button id="fingertips-banner-close" title="Dismiss this notice for this session" aria-label="Dismiss this notice"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button>
-      </div>
       <!-- "Area level", not "Viewing". The strip in the top-left corner of the
            same map is already labelled Viewing, and it answers a different
            question: that one is WHERE (All of London, or one borough), this
@@ -5409,8 +5424,8 @@ const CATS = [
     { k: "census_black_pct",                 l: "Black / Black British (%)",     g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_mixed_pct",                 l: "Mixed / Multiple (%)",          g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_other_ethnic_pct",          l: "Other ethnic group (%)",        g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
-    { k: "census_english_hh_all_pct",        l: "Households: all adults English first language (%)", g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
-    { k: "census_english_hh_none_pct",       l: "Households: no adults English first language (%)",  g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
+    { k: "census_english_hh_all_pct",        l: "All adults in the household have English as a main language (%)", g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
+    { k: "census_english_hh_none_pct",       l: "No one in the household has English as a main language (%)", g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
   ]},
   { key: "economy", label: "Work, money and education", ico: "briefcase", fields: [
     { k: "census_unemployed_pct",            l: "Unemployed (%)",                g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
@@ -5605,8 +5620,8 @@ const IND_NAMES = {
   census_black_pct:           ['Black or Black British', 'Ethnic group: Black, Black British, Black Welsh, Caribbean or African'],
   census_mixed_pct:           ['Mixed or multiple ethnic groups', 'Ethnic group: Mixed or Multiple ethnic groups'],
   census_other_ethnic_pct:    ['Other ethnic group', 'Ethnic group: Other ethnic group'],
-  census_english_hh_all_pct:  ['Households: all adults speak English as a main language', 'Household language: all adults in household have English as a main language'],
-  census_english_hh_none_pct: ['Households: no one speaks English as a main language', 'Household language: no people in household have English as a main language'],
+  census_english_hh_all_pct:  ['All adults in the household have English as a main language', 'Household language: all adults in household have English as a main language'],
+  census_english_hh_none_pct: ['No one in the household has English as a main language', 'Household language: no people in household have English as a main language'],
   // Work, money and education
   census_unemployed_pct:           ['Unemployment (Census 2021)', 'Economic activity status: unemployed'],
   census_higher_managerial_pct:    ['Higher managerial and professional', 'Socio-economic classification: higher managerial, administrative and professional occupations'],
@@ -6373,8 +6388,8 @@ const OV_PLAIN = {
   census_working_age_pct: "Residents aged " + AGE_WORK + ".",
   census_over65_pct: "Residents aged 65 and over.",
   census_over85_pct: "Residents aged 85 and over.",
-  census_english_hh_all_pct: "Households where every adult's main language is English.",
-  census_english_hh_none_pct: "Households where no adult's main language is English. They may still speak English well.",
+  census_english_hh_all_pct: "Households where every adult has English as a main language.",
+  census_english_hh_none_pct: "Households where no one has English as a main language. They may still speak English well.",
   census_unemployed_pct: "People aged 16 and over who are looking for work.",
   census_no_qual_pct: "People aged 16 and over with no qualifications.",
   census_level4_qual_pct: "People aged 16 and over with a degree or equivalent.",
@@ -10566,10 +10581,49 @@ function _reportVs(v, m, dp) {
    would print over the tick starts just after it instead. x is the bar's end
    plus a gap, tickX the tick's x (or null), txt the figure as printed. Text
    width is estimated at 10px Inter. */
-function _reportLabelX(x, tickX, txt) {
+function _reportLabelX(x, tickX, txt, fs) {
   if (tickX == null || isNaN(tickX)) return x;
-  const w = String(txt).length * 5.7;
+  const w = String(txt).length * 0.57 * (fs || 10);
   return (tickX >= x - 3 && tickX <= x + w + 2) ? tickX + 4 : x;
+}
+/* How wide a chart label prints, in SVG units at font size fs. Measured in
+   the report's own type face where a canvas is to hand (the page has Inter
+   loaded, as the report does), with a little to spare, and estimated at a
+   generous 0.6em a character where it is not. */
+let _reportMeasureCtx = null;
+function _reportTextW(txt, fs) {
+  try {
+    if (!_reportMeasureCtx) _reportMeasureCtx = document.createElement('canvas').getContext('2d');
+    _reportMeasureCtx.font = fs + "px Inter, system-ui, sans-serif";
+    const w = _reportMeasureCtx.measureText(String(txt)).width;
+    if (w > 0) return w * 1.06;
+  } catch (e) { /* no canvas: estimate below */ }
+  return String(txt).length * 0.6 * fs;
+}
+/* A chart label on one line, or on two where it is wider than maxW, broken
+   between words. A label is never cut short: the chart sizes its left
+   margin to the longest line it gets back. */
+function _reportLabelLines(txt, maxW, fs) {
+  const s = String(txt);
+  if (_reportTextW(s, fs) <= maxW) return [s];
+  // A bracket goes onto the second line whole: "Unemployment" over
+  // "(Census 2021)" rather than "Unemployment (Census" over "2021)".
+  const br = s.indexOf(' (');
+  if (br > 0 && _reportTextW(s.slice(0, br), fs) <= maxW && _reportTextW(s.slice(br + 1), fs) <= maxW) {
+    return [s.slice(0, br), s.slice(br + 1)];
+  }
+  const words = s.split(' ');
+  let a = words.shift();
+  while (words.length > 1 && _reportTextW(a + ' ' + words[0], fs) <= maxW) a += ' ' + words.shift();
+  return words.length ? [a, words.join(' ')] : [a];
+}
+/* An SVG label, its lines centred on y and ending at x. */
+function _reportLabelSvg(lines, x, y, fs, fill) {
+  const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const lh = Math.round(fs * 1.15 * 10) / 10;
+  const y0 = y + fs * 0.35 - (lines.length - 1) * lh / 2;
+  return `<text x="${x}" y="${y0}" text-anchor="end" font-size="${fs}" fill="${fill || '#334155'}">` +
+    lines.map((l, i) => i ? `<tspan x="${x}" dy="${lh}">${esc(l)}</tspan>` : esc(l)).join('') + '</text>';
 }
 // The IMD domains as the reports' charts name them.
 const REPORT_IMD_DOMAINS = [
@@ -10591,28 +10645,36 @@ function _reportPercentile(vals, v) {
    every London LSOA (left least deprived, right most), the tick is the London
    median. rows: [{ l, p }] with p from _reportPercentile. */
 function _reportDotPlot(rows, opts) {
-  const W = 380, padL = 118, padR = 48, rowH = (opts && opts.rowH) || 23, top = 22;
+  opts = opts || {};
+  // opts.fs sets every label's size (the ward report prints them at 11);
+  // without it the smaller sizes the other reports use.
+  const fs = opts.fs || 10, fsSmall = opts.fs || 8.5, fsVal = opts.fs || 9.5;
+  const W = opts.width || 380, padR = opts.fs ? 44 : 48, rowH = opts.rowH || 23, top = opts.fs ? 24 : 22;
+  // The left margin fits the longest domain name, so none is cut short.
+  const padL = Math.ceil(Math.max(90, ...rows.map(r => _reportTextW(r.l, fs)))) + 12;
   const x0 = padL, x1 = W - padR, span = x1 - x0;
   const H = top + rows.length * rowH + 6;
   const X = p => x0 + span * Math.max(0, Math.min(100, p)) / 100;
   let s = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" class="ch-dots" role="img" ` +
           `aria-label="Deprivation by IMD domain, as a position among ${PH_AREA} LSOAs">`;
-  s += `<text x="${x0}" y="11" font-size="8.5" fill="#64748B">Less deprived</text>`;
-  s += `<text x="${x1}" y="11" font-size="8.5" fill="#64748B" text-anchor="end">More deprived</text>`;
+  s += `<text x="${x0}" y="${fsSmall + 2}" font-size="${fsSmall}" fill="#64748B">Less deprived</text>`;
+  // At the larger size the two ends of the scale need the width of the
+  // figures' column too, or they run into each other.
+  s += `<text x="${opts.fs ? W : x1}" y="${fsSmall + 2}" font-size="${fsSmall}" fill="#64748B" text-anchor="end">More deprived</text>`;
   s += `<line x1="${X(50)}" y1="${top - 6}" x2="${X(50)}" y2="${H - 4}" stroke="${REPORT_INK}" stroke-width="1" stroke-dasharray="2,2"/>`;
   rows.forEach((r, i) => {
     const y = top + i * rowH + rowH / 2;
-    s += `<text x="${x0 - 10}" y="${y + 3.5}" font-size="10" fill="#334155" text-anchor="end">${String(r.l).replace(/[<>&]/g, '')}</text>`;
+    s += _reportLabelSvg([r.l], x0 - 10, y, fs);
     s += `<line x1="${x0}" y1="${y}" x2="${x1}" y2="${y}" stroke="#E2E8F0" stroke-width="5" stroke-linecap="round"/>`;
     if (r.p == null) {
-      s += `<text x="${x1 + 6}" y="${y + 3.5}" font-size="9" fill="#64748B">No figure</text>`;
+      s += `<text x="${x1 + 6}" y="${y + 3.5}" font-size="${opts.fs || 9}" fill="#64748B">No figure</text>`;
       return;
     }
     const c = r.p >= 50 ? REPORT_CMP.worse : REPORT_CMP.better;
     s += `<line x1="${X(50)}" y1="${y}" x2="${X(r.p)}" y2="${y}" stroke="${c}" stroke-width="5" stroke-linecap="round" opacity=".35"/>`;
     s += `<circle cx="${X(r.p)}" cy="${y}" r="5.5" fill="${c}" stroke="#fff" stroke-width="1.5"/>`;
     // The share of LSOAs this one is more deprived than, as the legend says.
-    s += `<text x="${x1 + 8}" y="${y + 3.5}" font-size="9.5" fill="${REPORT_INK}" font-weight="600">${Math.min(99, Math.max(1, Math.round(r.p)))}%</text>`;
+    s += `<text x="${x1 + 8}" y="${y + fsVal * 0.35}" font-size="${fsVal}" fill="${REPORT_INK}" font-weight="600">${Math.min(99, Math.max(1, Math.round(r.p)))}%</text>`;
   });
   return s + '</svg>';
 }
@@ -10813,70 +10875,116 @@ const REPORT_CSS = `
     .actions, .chart-dl, .chart-dl-wrap { display: none; }
     .hero, .kpis, .keypoints, .services, .panel, .locblock { break-inside: avoid; page-break-inside: avoid; }
     .keypoints { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .badge, .kpi-ctx-bar, svg { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .badge, .kpi-ctx-bar, svg, .legend span, .legend-tick, .mm-dot { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+  /* A phone: the page is the screen's width, in one column, with the key
+     figures two to a row. Print is untouched. */
+  @media screen and (max-width: 700px) {
+    body { padding: 56px 0 0; }
+    .report { width: 100%; box-shadow: none; }
+    .report .masthead { flex-wrap: wrap; gap: 4px 12px; padding-left: 16px; padding-right: 16px; }
+    .report .hero { flex-direction: column; align-items: stretch; gap: 14px; padding-left: 16px; padding-right: 16px; }
+    .report .hero-map { flex: none; }
+    .report .hero-text h1 { font-size: 30px; }
+    .report .keypoints { margin-left: 16px; margin-right: 16px; }
+    .report .kpis { grid-template-columns: 1fr 1fr; padding-left: 16px; padding-right: 16px; }
+    .report .kpi, .report .kpi + .kpi { padding: 12px 10px 12px 0; border-left: 0; border-top: 1px solid var(--rule); }
+    .report .kpi:nth-child(-n+2) { border-top: 0; }
+    .report .kpi:nth-child(2n) { padding-left: 12px; border-left: 1px solid var(--rule); }
+    .report .services-wrap { padding-left: 16px; padding-right: 16px; }
+    .report .services { grid-template-columns: 1fr 1fr; }
+    .report .svc, .report .svc + .svc { padding-left: 0; border-left: 0; }
+    .report .content, .report .content.cols { display: block; padding-left: 16px; padding-right: 16px; overflow-x: auto; }
+    .report .row { flex-direction: column; gap: 0; }
+    .report table.ho th, .report table.ho td { white-space: normal; }
+    .report .locations { padding-left: 16px; padding-right: 16px; }
+    .report .locations-grid { grid-template-columns: 1fr; }
+    .report .locblock.span-2 { grid-column: auto; }
+    .report .footer { padding-left: 16px; padding-right: 16px; }
+    .actions { top: 10px; right: 16px; left: 16px; }
   }
 `;
-/* The ward report is one A4 sheet: a compact header, the figures in two
-   columns, and the lists cut to three names each when printed. The LSOA and
-   area reports keep the longer single-column flow. */
+/* The ward report prints on two A4 pages, with nothing smaller than 11px
+   (8.25pt) so it can be read on paper. The first page has the header, the
+   Summary, the key figures, who lives here and the deprivation charts; the
+   second has crime, health outcomes, the services in the ward and the
+   sources. It was once zoomed out to fit one page, which printed the
+   smallest text at about 4pt and still ran onto a second page. The figures
+   sit in two columns on screen and on paper; a phone has one. */
 const WARD_ONEPAGE_CSS = `
-  .onepage .masthead { padding: 10px 32px; }
-  .onepage .hero { padding: 14px 32px 12px; gap: 22px; align-items: flex-start; }
-  .onepage .kicker .badge { font-size: 8.5px; padding: 2px 6px; margin: 0; }
-  .onepage .hero-text h1 { font-size: 30px; margin-top: 4px; }
-  .onepage .hero-text .sub { margin-top: 6px; font-size: 11.5px; }
+  .onepage .masthead { padding: 10px 32px; font-size: 11px; }
+  .onepage .hero { padding: 12px 32px 10px; gap: 22px; align-items: flex-start; }
+  .onepage .hero-text .kicker { font-size: 11px; }
+  .onepage .kicker .badge { font-size: 11px; padding: 2px 6px; margin: 0; }
+  .onepage .hero-text h1 { font-size: 28px; margin-top: 3px; }
+  .onepage .hero-text .sub { margin-top: 6px; font-size: 12px; }
   .onepage .svcline { margin-top: 6px; font-size: 11px; color: var(--ink-2); }
   .onepage .svcline span { color: var(--ink-3); }
   .onepage .hero-text .badges { margin-top: 8px; }
   .onepage .hero-map { flex: 0 0 150px; }
-  .onepage .minimap { width: 150px; height: 88px; }
+  .onepage .minimap { width: 150px; height: 80px; }
   .onepage .minimap-cap { display: none; }
-  .onepage .keypoints.plain { margin: 12px 32px 2px; padding: 9px 14px 9px 16px; }
-  .onepage .keypoints.plain h2 { margin-bottom: 4px; }
-  .onepage .keypoints.plain p { font-size: 11px; line-height: 1.5; }
+  .onepage .keypoints.plain { margin: 10px 32px 2px; padding: 8px 14px 8px 16px; }
+  .onepage .keypoints.plain h2 { margin-bottom: 4px; font-size: 11px; }
+  .onepage .keypoints.plain p { font-size: 12px; line-height: 1.45; }
   .onepage .kpis { padding: 0 32px; }
-  .onepage .kpi { padding: 8px 10px 8px 0; }
-  .onepage .kpi-sub { margin-top: 2px; }
-  .onepage .kpi + .kpi { padding-left: 12px; }
+  .onepage .kpi { padding: 7px 8px 7px 0; }
+  .onepage .kpi + .kpi { padding-left: 10px; }
+  .onepage .kpi-lbl { font-size: 11px; letter-spacing: .03em; line-height: 1.3; }
   .onepage .kpi-val { font-size: 20px; margin-top: 3px; }
   .onepage .kpi-val.dim { font-size: 13px; }
+  .onepage .kpi-sub, .onepage .kpi-ctx-cap { margin-top: 2px; font-size: 11px; line-height: 1.35; }
   .onepage .kpi-ctx { margin-top: 6px; }
   .onepage .content.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 28px; padding: 0 32px 4px; }
   .onepage .col { min-width: 0; }
-  .onepage .section-h, .onepage .locations h2 { margin: 16px 0 8px; padding-bottom: 6px; font-size: 13.5px; }
+  .onepage .section-h, .onepage .locations h2 { margin: 14px 0 8px; padding-bottom: 5px; font-size: 14px; }
   .onepage .panel { padding: 0 0 4px; margin-bottom: 8px; }
-  .onepage .panel h3 { margin-bottom: 5px; font-size: 10.5px; }
-  .onepage .legend { margin-top: 3px; font-size: 8.5px; }
-  .onepage table.ho { font-size: 10px; }
-  .onepage table.ho th { white-space: normal; vertical-align: bottom; line-height: 1.25; }
-  .onepage table.ho { table-layout: fixed; }
+  .onepage .panel h3 { margin-bottom: 5px; font-size: 12px; }
+  .onepage .legend, .onepage .no-census { margin-top: 3px; font-size: 11px; line-height: 1.4; }
+  .onepage .no-census { margin: 0; color: var(--ink-2); }
+  .onepage table.ho { font-size: 11px; table-layout: fixed; }
+  .onepage table.ho th { padding: 0 0 4px 8px; font-size: 11px; letter-spacing: .02em; white-space: normal; vertical-align: bottom; line-height: 1.25; }
+  .onepage table.ho td { padding: 4px 0 4px 8px; }
   .onepage table.ho th:first-child, .onepage table.ho td:first-child { width: 34%; white-space: normal; }
-  .onepage table.ho th:last-child, .onepage table.ho td:last-child { width: 19%; white-space: normal; font-size: 9px; }
+  .onepage table.ho th:last-child, .onepage table.ho td:last-child { width: 21%; white-space: normal; }
   .onepage table.ho .u { display: none; }
-  .onepage table.ho td { padding: 4px 0 4px 10px; }
-  .onepage table.ho th { padding: 0 0 4px 10px; }
   .onepage .locations { padding: 0 32px 10px; }
   .onepage .locations-grid { gap: 8px 22px; }
-  .onepage .locblock h4 { margin-bottom: 4px; padding-bottom: 3px; font-size: 9px; }
-  .onepage .locblock ol { font-size: 9.5px; }
+  .onepage .locblock h4 { margin-bottom: 4px; padding-bottom: 3px; font-size: 11px; letter-spacing: .04em; }
+  .onepage .locblock h4 .count { font-size: 11px; }
+  .onepage .locblock ol { font-size: 11px; list-style-position: inside; padding-left: 0; }
   .onepage .locblock li { margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .onepage .locblock ol { list-style-position: inside; padding-left: 0; }
+  .onepage .locblock li .meta { font-size: 11px; }
+  .onepage .locblock .empty { font-size: 11px; color: var(--ink-3); }
   .onepage .locblock li.more { display: none; list-style: none; color: var(--ink-3); }
-  .onepage .footer { padding: 10px 32px 14px; font-size: 8.5px; line-height: 1.45; }
-  .onepage .footer .indep { font-size: 9.5px; margin-bottom: 4px; }
-  .onepage.measure .locblock li.extra { display: none; }
-  .onepage.measure .panel h3 { padding-right: 0; }
-  .onepage.measure .locblock li.more { display: list-item; }
+  .onepage .footer { padding: 10px 32px 14px; font-size: 11px; line-height: 1.45; }
+  .onepage .footer .indep { font-size: 11.5px; margin-bottom: 4px; }
   @media print {
-    @page { size: A4 portrait; margin: 8mm; }
-    .onepage { zoom: var(--fit, 1); }
+    @page { size: A4 portrait; margin: 9mm 10mm 10mm; }
+    /* The page margins do the work of the side padding on paper. */
+    .onepage .masthead, .onepage .hero, .onepage .kpis, .onepage .content.cols,
+    .onepage .locations, .onepage .footer { padding-left: 0; padding-right: 0; }
+    .onepage .masthead { padding-top: 0; }
+    .onepage .keypoints.plain { margin-left: 0; margin-right: 0; }
+    /* Crime and health outcomes start the second page. */
+    .onepage .content.p2 { break-before: page; page-break-before: always; }
+    .onepage .content.p2 > .col > .section-h:first-child { margin-top: 0; }
     .onepage .locblock li.extra { display: none; }
     .onepage .locblock li.more { display: list-item; }
-    .onepage .section-h, .onepage .locations h2 { margin-top: 12px; }
+  }
+  @media screen and (max-width: 700px) {
+    .onepage .masthead, .onepage .hero, .onepage .kpis, .onepage .locations, .onepage .footer { padding-left: 16px; padding-right: 16px; }
+    .onepage .content.cols { display: block; padding-left: 16px; padding-right: 16px; }
+    .onepage .keypoints.plain { margin-left: 16px; margin-right: 16px; }
+    .onepage .hero { flex-direction: column; align-items: stretch; }
+    .onepage .hero-map { flex: none; }
+    .onepage .kpi, .onepage .kpi + .kpi { padding: 10px 8px 10px 0; }
+    .onepage .kpi:nth-child(2n) { padding-left: 12px; }
+    .onepage .locblock li { white-space: normal; }
   }
 `;
 // ─────────────────────────────────────────────────────────────────────────
-// Ward report — A4 at-a-glance profile (single printable page).
+// Ward report: an A4 profile, two printed pages.
 // All charts inline SVG (no external libraries) so the popup remains
 // fully self-contained.
 // ─────────────────────────────────────────────────────────────────────────
@@ -10997,36 +11105,45 @@ function _generateWardReport(_reportWindow, wn, opts) {
   // ── Inline-SVG chart primitives ────────────────────────────────────────
   // Horizontal bar chart with optional reference tick (London median).
   // rows: [{ l: label, v: value, ref?: median, c?: bar-colour, sub?: trailing text }]
-  // opts: { width, rowH, padL, max, unit, dp, refLabel }
+  // opts: { width, rowH, fs, labelMax, max, unit, dp, refLabel }
+  /* The labels' column is as wide as the longest label needs (up to
+     labelMax, past which a label breaks onto a second line), so no label
+     runs off the chart's left edge. A two-line row is taller by a line. */
+  const _chartRows = (data, W, opts) => {
+    const fs = opts.fs || 10, rowH = opts.rowH || 18, lh = Math.round(fs * 1.15 * 10) / 10;
+    const lines = data.map(r => _reportLabelLines(r.l, opts.labelMax || W * 0.5, fs));
+    const padL = Math.ceil(Math.max(40, ...lines.flat().map(l => _reportTextW(l, fs)))) + 10;
+    let y = opts.padT || 6;
+    const ys = lines.map(ls => { const h = rowH + (ls.length - 1) * lh; const c = y + h / 2; y += h; return c; });
+    return { fs, lines, padL, ys, bottom: y };
+  };
   function _chartHbar(rows, opts) {
     opts = opts || {};
     const W = opts.width || 360;
-    const rowH = opts.rowH || 18;
-    const padL = opts.padL || 130;
     const padR = opts.padR || 56;
-    const padT = opts.padT || 6;
     const dp   = opts.dp == null ? 1 : opts.dp;
     const u    = opts.unit || '';
     const data = (rows || []).map(r => ({...r, v: r.v == null ? null : parseFloat(r.v)}));
     const dmax = opts.max != null ? opts.max :
                  Math.max(0.0001, ...data.map(r => Math.max(r.v || 0, r.ref || 0)));
-    const H = padT + data.length * rowH + 8;
+    const { fs, lines, padL, ys, bottom } = _chartRows(data, W, opts);
+    const H = bottom + 8;
     const barW = W - padL - padR;
     let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" class="ch-hbar">`;
     data.forEach((r, i) => {
-      const y = padT + i * rowH + rowH/2;
+      const y = ys[i];
       const v = r.v == null ? 0 : Math.max(0, r.v);
       const w = (v / dmax) * barW;
       const c = r.c || '#1F4E8C';
-      svg += `<text x="${padL - 8}" y="${y + 3.5}" text-anchor="end" font-size="10" fill="#334155">${_esc(r.l)}</text>`;
+      svg += _reportLabelSvg(lines[i], padL - 8, y, fs);
       svg += `<rect x="${padL}" y="${y - 6}" width="${barW}" height="11" fill="#EDF1F5" rx="2"/>`;
       const tickX = (r.ref != null && !isNaN(r.ref)) ? padL + (Math.max(0, r.ref) / dmax) * barW : null;
       if (r.v != null) {
         svg += `<rect x="${padL}" y="${y - 6}" width="${w}" height="11" fill="${c}" rx="2"/>`;
         const valTxt = (r.k ? fmtNum(r.v, indDecimals(r.k)) : _fmtN(r.v, dp)) + (u ? ' ' + u : '');
-        svg += `<text x="${_reportLabelX(padL + Math.max(w, 6) + 4, tickX, valTxt)}" y="${y + 3.5}" font-size="10" fill="#0B1F33" font-variant-numeric="tabular-nums">${valTxt}</text>`;
+        svg += `<text x="${_reportLabelX(padL + Math.max(w, 6) + 4, tickX, valTxt, fs)}" y="${y + fs * 0.35}" font-size="${fs}" fill="#0B1F33" font-variant-numeric="tabular-nums">${valTxt}</text>`;
       } else {
-        svg += `<text x="${_reportLabelX(padL + 4, tickX, 'No figure')}" y="${y + 3.5}" font-size="10" fill="#64748B">No figure</text>`;
+        svg += `<text x="${_reportLabelX(padL + 4, tickX, 'No figure', fs)}" y="${y + fs * 0.35}" font-size="${fs}" fill="#64748B">No figure</text>`;
       }
       // London median reference tick
       if (r.ref != null && !isNaN(r.ref)) {
@@ -11042,9 +11159,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
   function _chartCompare(rows, opts) {
     opts = opts || {};
     const W = opts.width || 360;
-    const rowH = opts.rowH || 22;
-    const padL = opts.padL || 150;
-    const padR = 60;
+    const padR = opts.fs ? 50 : 60;
     const dp   = opts.dp == null ? 1 : opts.dp;
     const u    = opts.unit || '%';
     // Direction and descriptive come from OV_CFG, the one place they are
@@ -11056,11 +11171,12 @@ function _generateWardReport(_reportWindow, wn, opts) {
               v: r.v == null ? null : parseFloat(r.v), ref: r.ref == null ? null : parseFloat(r.ref)};
     });
     const dmax = Math.max(0.0001, ...data.map(r => Math.max(r.v || 0, r.ref || 0)) , opts.minMax || 1);
-    const H = 6 + data.length * rowH + 12;
+    const { fs, lines, padL, ys, bottom } = _chartRows(data, W, Object.assign({ rowH: 22 }, opts));
+    const H = bottom + 12;
     const barW = W - padL - padR;
     let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" class="ch-compare">`;
     data.forEach((r, i) => {
-      const y = 6 + i * rowH + rowH/2;
+      const y = ys[i];
       const wv = r.v != null ? (Math.max(0, r.v) / dmax) * barW : 0;
       const wr = r.ref != null ? (Math.max(0, r.ref) / dmax) * barW : null;
       const above = (r.v != null && r.ref != null) ? (r.v > r.ref) : null;
@@ -11071,14 +11187,14 @@ function _generateWardReport(_reportWindow, wn, opts) {
       const c = r.descriptive ? REPORT_CMP.neutral
               : above == null ? '#94A3B8'
               : (isWh === above ? REPORT_CMP.worse : REPORT_CMP.better);
-      svg += `<text x="${padL - 8}" y="${y + 3.5}" text-anchor="end" font-size="10" fill="#334155">${_esc(r.l)}</text>`;
+      svg += _reportLabelSvg(lines[i], padL - 8, y, fs);
       svg += `<rect x="${padL}" y="${y - 6}" width="${barW}" height="11" fill="#EDF1F5" rx="2"/>`;
       if (r.v != null) {
         svg += `<rect x="${padL}" y="${y - 6}" width="${wv}" height="11" fill="${c}" rx="2"/>`;
         const valTxt = (r.k ? fmtNum(r.v, indDecimals(r.k)) : _fmtN(r.v, dp)) + u;
-        svg += `<text x="${_reportLabelX(padL + Math.max(wv, 6) + 4, wr != null ? padL + wr : null, valTxt)}" y="${y + 3.5}" font-size="10" fill="#0B1F33" font-variant-numeric="tabular-nums">${valTxt}</text>`;
+        svg += `<text x="${_reportLabelX(padL + Math.max(wv, 6) + 4, wr != null ? padL + wr : null, valTxt, fs)}" y="${y + fs * 0.35}" font-size="${fs}" fill="#0B1F33" font-variant-numeric="tabular-nums">${valTxt}</text>`;
       } else {
-        svg += `<text x="${_reportLabelX(padL + 4, wr != null ? padL + wr : null, 'No figure')}" y="${y + 3.5}" font-size="10" fill="#64748B">No figure</text>`;
+        svg += `<text x="${_reportLabelX(padL + 4, wr != null ? padL + wr : null, 'No figure', fs)}" y="${y + fs * 0.35}" font-size="${fs}" fill="#64748B">No figure</text>`;
       }
       if (wr != null) {
         svg += `<line x1="${padL + wr}" y1="${y - 8}" x2="${padL + wr}" y2="${y + 7}" stroke="#0B1F33" stroke-width="1.6"/>`;
@@ -11090,32 +11206,37 @@ function _generateWardReport(_reportWindow, wn, opts) {
 
 
   // Stacked horizontal bar (e.g. ethnicity, age). parts: [{l, v, c}]
+  // opts.fs sets the legend's type size; the legend runs onto a second
+  // line rather than past the chart's right edge.
   function _chartStack(parts, opts) {
     opts = opts || {};
-    const W = opts.width || 360, H = 18;
+    const W = opts.width || 360, H = 18, fs = opts.fs || 9, fsIn = opts.fs || 9.5;
     const total = parts.reduce((a, b) => a + (parseFloat(b.v) || 0), 0) || 1;
     let x = 0;
-    let svg = `<svg viewBox="0 0 ${W} ${H + 16}" xmlns="http://www.w3.org/2000/svg" class="ch-stack">`;
+    let bars = '';
     parts.forEach(p => {
       const v = parseFloat(p.v) || 0;
       const w = (v / total) * W;
-      svg += `<rect x="${x}" y="0" width="${w}" height="${H}" fill="${p.c}"/>`;
-      if (w > 28) {
-        svg += `<text x="${x + w/2}" y="${H/2 + 3.2}" text-anchor="middle" font-size="9.5" fill="#fff" font-weight="600">${v.toFixed(0)}%</text>`;
+      bars += `<rect x="${x}" y="0" width="${w}" height="${H}" fill="${p.c}"/>`;
+      if (w > fsIn * 3) {
+        bars += `<text x="${x + w/2}" y="${H/2 + fsIn * 0.35}" text-anchor="middle" font-size="${fsIn}" fill="#fff" font-weight="600">${v.toFixed(0)}%</text>`;
       }
       x += w;
     });
-    // Legend underneath
-    let lx = 0;
+    // Legend underneath, wrapping to a new line where the next entry
+    // would not fit.
+    let lx = 0, ly = H + 5;
+    const lh = Math.max(13, Math.round(fs * 1.35));
     parts.forEach(p => {
       const v = parseFloat(p.v);
       const lblTxt = p.l + (isNaN(v) ? '' : ' ' + v.toFixed(0) + '%');
-      const lblW = lblTxt.length * 5.0 + 16;
-      svg += `<rect x="${lx}" y="${H + 5}" width="9" height="9" fill="${p.c}" rx="1"/>`;
-      svg += `<text x="${lx + 12}" y="${H + 13}" font-size="9" fill="#334155">${_esc(lblTxt)}</text>`;
+      const lblW = (opts.fs ? _reportTextW(lblTxt, fs) : lblTxt.length * 5.0) + 16;
+      if (lx > 0 && lx + lblW - 4 > W) { lx = 0; ly += lh; }
+      bars += `<rect x="${lx}" y="${ly}" width="9" height="9" fill="${p.c}" rx="1"/>`;
+      bars += `<text x="${lx + 12}" y="${ly + 4.5 + fs * 0.35}" font-size="${fs}" fill="#334155">${_esc(lblTxt)}</text>`;
       lx += lblW;
     });
-    svg += `</svg>`;
+    const svg = `<svg viewBox="0 0 ${W} ${ly + Math.max(11, fs + 2)}" xmlns="http://www.w3.org/2000/svg" class="ch-stack">` + bars + `</svg>`;
     return svg;
   }
 
@@ -11246,12 +11367,12 @@ function _generateWardReport(_reportWindow, wn, opts) {
     { l:'Black', v: inds.census_black_pct,        c:'#2A9D8F' },
     { l:'Mixed', v: inds.census_mixed_pct,        c:'#8E6BBF' },
     { l:'Other', v: inds.census_other_ethnic_pct, c:'#9AA6B2' },
-  ], { width: 360 });
+  ], { width: 320, fs: 11 });
   const ageStack = _chartStack([
     { l:AGE_CHILD_CAP, v: inds.census_under16_pct,     c:'#2A9D8F' },
     { l:AGE_WORK,      v: inds.census_working_age_pct, c:'#1F4E8C' },
     { l:'65 and over', v: inds.census_over65_pct,      c:'#8E6BBF' },
-  ], { width: 360 });
+  ], { width: 320, fs: 11 });
 
   // Each row takes its direction, or none, from OV_CFG (see _chartCompare).
   const compareCensus = _chartCompare([
@@ -11260,8 +11381,9 @@ function _generateWardReport(_reportWindow, wn, opts) {
     { k: 'census_level4_qual_pct', l: indLabel('census_level4_qual_pct'),     v: inds.census_level4_qual_pct,        ref: _median(_wardVals('census_level4_qual_pct')),        dp: 0 },
     { k: 'census_higher_managerial_pct', l: indLabel('census_higher_managerial_pct'), v: inds.census_higher_managerial_pct,  ref: _median(_wardVals('census_higher_managerial_pct')),  dp: 0 },
     { k: 'census_routine_semi_routine_pct', l: indLabel('census_routine_semi_routine_pct'),      v: inds.census_routine_semi_routine_pct, ref: _median(_wardVals('census_routine_semi_routine_pct')), dp: 0 },
-    { k: 'census_english_hh_none_pct', l: indLabel('census_english_hh_none_pct'), v: inds.census_english_hh_none_pct, ref: _median(_wardVals('census_english_hh_none_pct')), dp: 0 },
-  ], { width: 376, padL: 196, rowH: 18 });   // room for the display labels
+    // A short form of the indicator's name, which is long for a chart row.
+    { k: 'census_english_hh_none_pct', l: 'No one with English as main language', v: inds.census_english_hh_none_pct, ref: _median(_wardVals('census_english_hh_none_pct')), dp: 0 },
+  ], { width: 320, fs: 11, rowH: 20 });   // the label column fits the longest label
 
   // ── Health & deprivation: IMD-domain radar + ward-level health bars ──
   const wardCode = (wdata && wdata.code) || '';
@@ -11303,7 +11425,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
   }));
   // A ward with no LSOA of its own (most of the City's) has nothing to place,
   // so the chart is left out rather than drawn as seven empty rows.
-  const domainSVG = _domainRows.some(r => r.p != null) ? _reportDotPlot(_domainRows, { rowH: 19 }) : '';
+  const domainSVG = _domainRows.some(r => r.p != null) ? _reportDotPlot(_domainRows, { rowH: 18, fs: 11, width: 320 }) : '';
 
   const healthBars = _chartCompare([
     { k: 'census_good_health_pct', l: indLabel('census_good_health_pct'), v: inds.census_good_health_pct,        ref: _median(_wardVals('census_good_health_pct')),        dp: 0 },
@@ -11314,7 +11436,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
     { k: 'fuel_poverty_pct', l: indLabel('fuel_poverty_pct'),          v: inds.fuel_poverty_pct,              ref: _median(_wardVals('fuel_poverty_pct')),              dp: 1 },
     { k: 'census_unemployed_pct', l: indLabel('census_unemployed_pct'),            v: inds.census_unemployed_pct,         ref: _median(_wardVals('census_unemployed_pct')),         dp: 1 },
     { k: 'claimant_rate_pct', l: indLabel('claimant_rate_pct'), v: inds.claimant_rate_pct,             ref: _median(_wardVals('claimant_rate_pct')),             dp: 1 },
-  ], { width: 376, padL: 164, rowH: 16 });   // room for the display labels
+  ], { width: 320, fs: 11, rowH: 18 });
 
   // ── Health outcomes: Local Health estimates, as a table ──
   // A table rather than more bars: the census bars are percentages on one
@@ -11371,7 +11493,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
     ref: _median(_wardVals(k)),
     c: '#7a3a3a',
   })).filter(r => r.v != null).sort((a,b) => (b.v||0) - (a.v||0));
-  const crimeSVG = crimeRows.length ? _chartHbar(crimeRows, { width: 376, padL: 146, rowH: 15, dp: 0, unit: '' }) : '';
+  const crimeSVG = crimeRows.length ? _chartHbar(crimeRows, { width: 320, fs: 11, rowH: 18, dp: 0, unit: '' }) : '';
   const crimeTotal = _fmt(inds.crime_total);
 
   // ── Mini-map SVG: ward polygon on a borough-context backdrop ────────────
@@ -11471,10 +11593,10 @@ function _generateWardReport(_reportWindow, wn, opts) {
     if (!items || !items.length) {
       return `<div class="${cls}"><h4>${_esc(title)} <span class="count">0</span></h4><div class="empty">none</div></div>`;
     }
-    // On screen every item; on paper the first two and a count of the rest,
-    // so the report still fits one A4 sheet however busy the ward is.
-    const lis = items.map((d, i) => `<li${i >= 2 ? ' class="extra"' : ''}>${fmt(d)}</li>`).join('') +
-      (items.length > 2 ? `<li class="more">and ${items.length - 2} more</li>` : '');
+    // On screen every item; on paper the first four and a count of the
+    // rest, so the second page holds the lists however busy the ward is.
+    const lis = items.map((d, i) => `<li${i >= 4 ? ' class="extra"' : ''}>${fmt(d)}</li>`).join('') +
+      (items.length > 4 ? `<li class="more">and ${items.length - 4} more</li>` : '');
     return `<div class="${cls}"><h4>${_esc(title)} <span class="count">${count != null ? count : items.length}</span></h4><ol>${lis}</ol></div>`;
   }
 
@@ -11502,6 +11624,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
   const html = `<!doctype html>
 <html lang="en-GB"><head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${_esc(wdata ? wdata.name : wn)} | Ward report | PopHealth Map</title>
 <link rel="stylesheet" href="${_reportFontsHref()}">
 <style>${REPORT_CSS}${WARD_ONEPAGE_CSS}</style>
@@ -11542,12 +11665,6 @@ function _generateWardReport(_reportWindow, wn, opts) {
         ${compareCensus}
         <div class="legend"><span class="legend-tick"></span> ${PH_AREA} ward median,${_reportSwatch(REPORT_CMP.better)}better than the median,${_reportSwatch(REPORT_CMP.worse)}worse,${_reportSwatch(REPORT_CMP.neutral)}neither better nor worse</div>
       </div>`}
-      ${crimeRows.length ? `<div class="section-h">Crime</div>
-      <div class="panel">
-        <h3>${crimeTotal != null ? Math.round(crimeTotal).toLocaleString('en-GB') + ' crimes recorded' : 'Crimes recorded'} from ${_esc(monthWords(reportCrimePeriod()))}</h3>
-        ${crimeSVG}
-        <div class="legend"><span class="legend-tick"></span> ${PH_AREA} ward median. Source: police.uk.</div>
-      </div>` : ''}
     </div>
     <div class="col">
       <div class="section-h">Health and deprivation</div>
@@ -11561,13 +11678,26 @@ function _generateWardReport(_reportWindow, wn, opts) {
         ${healthBars}
         <div class="legend"><span class="legend-tick"></span> ${PH_AREA} ward median,${_reportSwatch(REPORT_CMP.better)}better than the median,${_reportSwatch(REPORT_CMP.worse)}worse</div>
       </div>
-      ${healthOutcomesTable ? `<div class="panel">
-        <h3>Health outcomes</h3>
-        ${healthOutcomesTable}
-        <div class="legend">OHID\u2019s Local Health estimates for MSOAs, weighted onto the ward by where its residents live.${healthOutcomes.some(r => r.cov != null) ? ' OHID withholds some MSOA figures where numbers are small, so a figure marked with a share of residents rests on that part of the ward only, and a ward with figures for under 80% of its residents has none.' : ''} A ratio compares deaths or admissions with England, where 100 is the England level once age is allowed for.</div>
-      </div>` : ''}
     </div>
   </div>
+
+  ${(crimeRows.length || healthOutcomesTable) ? `<div class="content cols p2">
+    ${crimeRows.length ? `<div class="col">
+      <div class="section-h">Crime</div>
+      <div class="panel">
+        <h3>${crimeTotal != null ? Math.round(crimeTotal).toLocaleString('en-GB') + ' crimes recorded' : 'Crimes recorded'} from ${_esc(monthWords(reportCrimePeriod()))}</h3>
+        ${crimeSVG}
+        <div class="legend"><span class="legend-tick"></span> ${PH_AREA} ward median. Source: police.uk.</div>
+      </div>
+    </div>` : ''}
+    ${healthOutcomesTable ? `<div class="col">
+      <div class="section-h">Health outcomes</div>
+      <div class="panel">
+        ${healthOutcomesTable}
+        <div class="legend">OHID\u2019s Local Health estimates for MSOAs, weighted onto the ward by where its residents live.${healthOutcomes.some(r => r.cov != null) ? ' OHID withholds some MSOA figures where numbers are small, so a figure marked with a share of residents rests on that part of the ward only, and a ward with figures for under 80% of its residents has none.' : ''} A ratio compares deaths or admissions with England, where 100 is the England level once age is allowed for.</div>
+      </div>
+    </div>` : ''}
+  </div>` : ''}
 
   <div class="locations">
     <h2>Services and places in this ward</h2>
@@ -11591,27 +11721,6 @@ function _generateWardReport(_reportWindow, wn, opts) {
   <button onclick="window.print()">Print or save as PDF</button>
   <button onclick="window.close()">Close</button>
 </div>
-<script>
-  // One A4 sheet, whatever the ward. Measured at the printed width with the
-  // print-only list rules applied, then scaled down for print if it would run
-  // onto a second page. A4 less 8 mm margins is 733 x 1062 CSS px.
-  (function _fitOnePage() {
-    const r = document.querySelector('.report.onepage');
-    if (!r) return;
-    const measure = () => {
-      const w = r.style.width;
-      r.style.width = '733px';
-      r.classList.add('measure');
-      const h = r.getBoundingClientRect().height;
-      r.classList.remove('measure');
-      r.style.width = w;
-      document.documentElement.style.setProperty('--fit', String(Math.min(1, 1050 / h)));
-    };
-    if (document.fonts && document.fonts.ready) document.fonts.ready.then(measure); else measure();
-    window.addEventListener('load', measure);
-    window.addEventListener('beforeprint', measure);
-  })();
-<\/script>
 <script>
   // "↓ SVG" and "↓ PNG" on every chart (see _reportChartDownloads).
   (${_reportChartDownloads.toString()})();
@@ -12374,7 +12483,7 @@ function _fitFocus(bounds) {
         strip.removeAttribute('aria-describedby');
         return;
       }
-      strip.setAttribute('aria-describedby', 'mls-min mls-max');
+      strip.setAttribute('aria-describedby', 'mls-min mls-max mls-note');
       strip.setAttribute('aria-label', 'About this indicator: ' + (lbl ? [...lbl.childNodes]
         .filter(n => !(n.classList && n.classList.contains('mls-unit'))).map(n => n.textContent).join('').trim() : ''));
     };
@@ -14634,6 +14743,7 @@ function _buildLSOAReportHtml(code) {
   const html = `<!doctype html>
 <html lang="en-GB"><head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${_esc(props.name || code)} | LSOA report | PopHealth Map</title>
 <link rel="stylesheet" href="${_reportFontsHref()}">
 <style>${REPORT_CSS}</style>
@@ -16361,73 +16471,44 @@ document.addEventListener('change', e => {
   });
 })();
 
-// ── Fingertips suppression banner ────────────────────────────────────────
-// Show the warning banner whenever a Fingertips overlay (ft_*) is the active
-// overlay on either dropdown, and the user hasn't dismissed it for this
-// session. The banner explains that some wards may be greyed out because
-// OHID Fingertips suppresses MSOA values where small counts could risk
-// re-identification.
-(function _wireFingertipsBanner() {
-  const banner = document.getElementById('fingertips-banner');
-  const closeBtn = document.getElementById('fingertips-banner-close');
-  if (!banner) return;
-  let dismissed = false;
+// ── The missing-figure note ──────────────────────────────────────────────
+// A line in the map's key whenever an OHID (Fingertips) indicator is drawn,
+// saying why some areas are blank. It was a floating card of its own, which
+// on a phone landed under the zoom buttons and the level switch, and could
+// be dismissed and forgotten; as part of the key it goes where the key goes.
+(function _wireBlankNote() {
+  const note = document.getElementById('mls-note');
+  const strip = document.getElementById('map-legend-strip');
+  if (!note || !strip) return;
   const isFt = k => typeof k === 'string' && k.startsWith('ft_');
-
-  /**
-   * The notice and the Ask panel share the bottom-right corner.
-   *
-   * Rather than stack them or shuffle one sideways, the notice stands down
-   * while the panel is open. It is a footnote about the shading and it will
-   * still be there when the panel closes; the panel is what the person is
-   * actively using. Overlapping them was the original complaint and moving the
-   * notice to the opposite corner solved it by putting a footnote in the part
-   * of the map people read first.
-   *
-   * The panel is built by assistant.js after this runs and toggles a class on
-   * itself, so this watches the DOM rather than listening for an event that
-   * would have to be added there and kept in step.
-   */
-  function askOpen() {
-    const p = document.getElementById('ai-panel');
-    return !!(p && p.classList.contains('open'));
-  }
-
-  const textEl = document.getElementById('fingertips-banner-text');
   const update = () => {
     const ftActive = (typeof curOv !== 'undefined' && isFt(curOv));
     // The reason is read from the data: the MSOAs redrawn in 2021 for the
     // older Local Health series, and withheld figures otherwise. Until the
-    // MSOA figures arrive for an MSOA series, the notice waits for them.
+    // MSOA figures arrive for an MSOA series, the note waits for them.
     let cause = ftActive ? ftBlankCause(curOv) : '';
     if (ftActive && !cause && ovHasLevel(curOv, 'msoa') && typeof ensureMsoaData === 'function') {
       ensureMsoaData().then(() => { if (ftBlankCause(curOv)) update(); });
     }
-    // Only when it changes: the observer below watches the document, so an
-    // unconditional write would wake it again, for ever.
-    const want = cause === 'redrawn' ? BLANK_NOTE_REDRAWN : BLANK_NOTE_WITHHELD;
-    if (textEl && cause && textEl.textContent !== want) textEl.textContent = want;
-    const show = ftActive && !dismissed && !askOpen() && (cause === 'redrawn' || cause === 'withheld' ||
-      (!cause && !ovHasLevel(curOv, 'msoa')));
-    banner.style.display = show ? 'block' : 'none';
+    const show = ftActive && (cause === 'redrawn' || cause === 'withheld' || (!cause && !ovHasLevel(curOv, 'msoa')));
+    const want = !show ? '' : cause === 'redrawn' ? BLANK_NOTE_REDRAWN : BLANK_NOTE_WITHHELD;
+    if (note.textContent !== want) note.textContent = want;
+    note.hidden = !show;
+    if (show) note.title = want; else note.removeAttribute('title');
+    strip.classList.toggle('has-note', show);
+    const wrap = strip.closest('.map-wrap');
+    if (wrap) wrap.classList.toggle('has-note', show);
   };
-
-  // The Ask panel appears late and its open state is a class, so this observes
-  // the document for it rather than assuming it exists at wiring time.
-  const obs = new MutationObserver(update);
-  obs.observe(document.body, {
-    subtree: true, attributes: true, attributeFilter: ['class'], childList: true,
-  });
-
-  if (closeBtn) closeBtn.addEventListener('click', () => {
-    dismissed = true;
-    banner.style.display = 'none';
-  });
   const ovEl = document.getElementById('ov');
   // Deferred a tick so curOv has been updated by the existing handler first.
   if (ovEl) ovEl.addEventListener('change', () => setTimeout(update, 0));
-  // Also surface on initial page load (in case of URL state restoration).
+  // Whatever else changes the indicator (a link, a card, the rankings)
+  // redraws the key's label, so that is watched too.
+  const lblEl = document.getElementById('mls-label');
+  if (lblEl) new MutationObserver(() => setTimeout(update, 0)).observe(lblEl, { childList: true, characterData: true, subtree: true });
+  // Also on first load, in case the link chose the indicator.
   setTimeout(update, 100);
+  setTimeout(update, 2500);
 })();
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -17316,7 +17397,7 @@ function _clearSearchPin() {
   }
   _searchPin = null;
 }
-function _dropSearchPin(item) {
+function _dropSearchPin(item, opts) {
   if (typeof map === 'undefined' || !map) return;
   _clearSearchPin();
   const lat = item && item._lat, lng = item && item._lng;
@@ -17336,17 +17417,31 @@ function _dropSearchPin(item) {
     }),
   }).addTo(map);
   const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  /* The label opens once the map has finished moving, kept clear of the
+     zoom buttons and the level switch at the top left and of the ward sheet
+     along the bottom. Opened before the move, it landed under them. */
+  const sheetEl = document.getElementById('ward-sheet');
+  const sheetH = sheetEl && sheetEl.classList.contains('open') ? Math.round(sheetEl.getBoundingClientRect().height) : 0;
   _searchPin.bindPopup(
     '<div style="font-weight:600;margin-bottom:2px">' + esc(label) + '</div>' +
     (kind ? '<div style="font-size:var(--t-xs);color:var(--ink-2)">' + esc(kind) +
             (sub ? ' · ' + esc(sub) : '') + '</div>' : '') +
-    '<div style="margin-top:5px"><a href="#" class="search-pin-clear" ' +
-    'style="font-size:var(--t-xs);color:var(--nhs-blue)">Remove this pin</a></div>'
-  ).openPopup();
+    '<button type="button" class="search-pin-clear">Remove pin</button>',
+    { className: 'search-pin-pop', autoPanPaddingTopLeft: L.point(90, 150),
+      autoPanPaddingBottomRight: L.point(10, sheetH + 40) });
   _searchPin.on('popupopen', e => {
     const a = e.popup.getElement() && e.popup.getElement().querySelector('.search-pin-clear');
     if (a) a.addEventListener('click', ev => { ev.preventDefault(); _clearSearchPin(); });
   });
+  // On a phone a postcode needs no label: the ward sheet already says
+  // "Near" the postcode, and the pin marks the spot.
+  if (opts && opts.noPopup) return;
+  const pin = _searchPin;
+  let opened = false;
+  const show = () => { if (!opened && _searchPin === pin) { opened = true; pin.openPopup(); } };
+  map.once('moveend', show);
+  // In case the map was already where it needed to be and never moves.
+  setTimeout(show, 900);
 }
 /* On a phone the search box sits beside the More button in the drawer and
    is too narrow for the full prompt, which was cut to "...GP or charit".
@@ -17512,7 +17607,8 @@ function _pickPostcode(pq, res) {
     _searchFlyTo(res.latitude, res.longitude, 15);
   }
   _dropSearchPin({ type: 'postcode', label: res.postcode, sub: res.admin_ward || '',
-                   _lat: res.latitude, _lng: res.longitude });
+                   _lat: res.latitude, _lng: res.longitude },
+                 { noPopup: !!lyr && window.matchMedia('(max-width: 900px)').matches });
 }
 function _renderPostcodeRow(results, pq, q) {
   const id = 'sr-pc-row';
@@ -19392,6 +19488,10 @@ var PH_SHOW = {
   function isShort() { return shortMq.matches; }
   function sideSync() {
     if (!mapWrap) return;
+    // Where the page header ends, for the side sheet on a very short screen,
+    // which runs from there to the bottom (see max-height: 420px).
+    var hdrEl = document.querySelector('.hdr');
+    if (hdrEl) document.documentElement.style.setProperty('--hdr-b', Math.round(hdrEl.getBoundingClientRect().bottom) + 'px');
     var w = 0;
     if (isShort()) {
       var right = mapWrap.getBoundingClientRect().right, left = Infinity;
@@ -19421,6 +19521,12 @@ var PH_SHOW = {
   function lift() {
     if (!mapWrap) return;
     var open = sheet.classList.contains('open');
+    // With the sheet put away for the comparison, the comparison is what
+    // stands along the bottom, so the map's furniture rises for it instead.
+    // (The sheet's own resize, as it is put away, lands here too, and used
+    // to drop the lift from under the comparison.)
+    if (!open && cmpBar && cmpBar.classList.contains('open')) { liftFor(cmpBar); return; }
+    mapWrap.classList.remove('cmp-full');
     var touring = mapWrap.classList.contains('touring');
     mapWrap.classList.toggle('has-sheet', open || touring);
     mapWrap.classList.toggle('sheet-full', open && sheetState === 0);
@@ -19438,6 +19544,8 @@ var PH_SHOW = {
     document.documentElement.style.setProperty('--sheet-lift', px);
   }
   function applyState() {
+    if (sheetState !== 0) sheet.classList.remove('ws-compact');
+    if (sheetState === 0) setTimeout(panWardIntoView, 320);
     sheet.classList.toggle('peek', sheetState === 1);
     sheet.classList.toggle('collapsed', sheetState === 2);
     var sizeBtn = $('ws-size');
@@ -19466,6 +19574,47 @@ var PH_SHOW = {
   sheet.addEventListener('transitionend', function (e) {
     if (e.propertyName === 'max-height') lift();
   });
+
+  /* On a phone the fully open sheet leaves a strip of map above it (or, on
+     a phone on its side, beside it), and the ward chosen was often under
+     the sheet. The map pans, at the same zoom, so the ward's middle sits in
+     the part of the map still showing, unless it is already there. */
+  function panWardIntoView() {
+    if (!currentWard || sheetState !== 0 || !sheet.classList.contains('open')) return;
+    if (!(isNarrow() || isShort()) || typeof map === 'undefined' || !map || typeof wLyr === 'undefined' || !wLyr) return;
+    var lyr = null;
+    wLyr.eachLayer(function (l) { if (!lyr && l.feature && l.feature.properties && l.feature.properties.WD24NM === currentWard) lyr = l; });
+    if (!lyr) return;
+    var mb = map.getContainer().getBoundingClientRect(), sb = sheet.getBoundingClientRect();
+    var free = isShort() ? { l: 60, t: 50, r: sb.left - mb.left - 12, b: mb.height - 30 }
+                         : { l: 16, t: 64, r: mb.width - 16, b: sb.top - mb.top - 26 };
+    if (free.r - free.l < 60 || free.b - free.t < 24) return;
+    var c = map.latLngToContainerPoint(lyr.getBounds().getCenter());
+    if (c.x >= free.l && c.x <= free.r && c.y >= free.t && c.y <= free.b) return;
+    try { map.panBy([c.x - (free.l + free.r) / 2, c.y - (free.t + free.b) / 2], { animate: true, duration: 0.35 }); } catch (e) { /* map not ready */ }
+  }
+  /* Reading down a fully open sheet on a phone, the head drops to one line,
+     the ward's name with the size and close buttons, so the summary gets
+     the room. It comes back at the top. The body's scroll is moved by the
+     same amount as the head changes, so the text does not jump. */
+  if (bodyEl) bodyEl.addEventListener('scroll', function () {
+    var compact = sheet.classList.contains('ws-compact');
+    if (sheetState !== 0 || !(isNarrow() || isShort())) {
+      if (compact) sheet.classList.remove('ws-compact');
+      return;
+    }
+    var h0 = headEl.offsetHeight, st = bodyEl.scrollTop;
+    if (!compact) {
+      // Read before the change: a taller body can clamp the scroll.
+      sheet.classList.add('ws-compact');
+      var d = h0 - headEl.offsetHeight;
+      if (d <= 0 || st < d + 8) { sheet.classList.remove('ws-compact'); return; }
+      bodyEl.scrollTop = st - d;
+    } else if (st <= 0) {
+      sheet.classList.remove('ws-compact');
+      bodyEl.scrollTop += Math.max(0, headEl.offsetHeight - h0);
+    }
+  }, { passive: true });
 
   // One tap opens the sheet fully and the next puts it back. It cycled through
   // three sizes, so from peek the first tap only shrank it a little and the
@@ -19946,6 +20095,7 @@ var PH_SHOW = {
     // was about that ward, not this one.
     if (currentWard !== wn) sheet.querySelectorAll(':scope > .ph-note').forEach(function (n) { n.remove(); });
     if (wn !== currentWard) pinNote(false);
+    if (wn !== currentWard) sheet.classList.remove('ws-compact');
     currentWard = wn;
     // A "Near ..." list from a search belongs to the ward the search opened.
     if (window._phNear && window._phNear.ward !== wn) window._phNear = null;
@@ -21014,6 +21164,7 @@ var PH_SHOW = {
   function closeCompareBar() {
     if (!cmpBar) return;
     cmpBar.classList.remove('open', 'peek');
+    if (mapWrap) mapWrap.classList.remove('cmp-full');
     // lift() works out what is left along the bottom: the sheet if it is
     // open, the tour if it is running, or nothing.
     if (!sheet.classList.contains('open') && mapWrap) lift();
@@ -21022,6 +21173,13 @@ var PH_SHOW = {
   function liftFor(el) {
     if (!mapWrap) return;
     mapWrap.classList.add('has-sheet');
+    // The comparison open past its peek: on a phone the Ask button and the
+    // Indicators chip wait, as they do over a fully open ward sheet, rather
+    // than sitting on the figures being compared.
+    if (el === cmpBar) {
+      mapWrap.classList.toggle('cmp-full', !el.classList.contains('peek'));
+      mapWrap.classList.remove('sheet-full');
+    }
     sideSync();
     var px = liftPx(el.offsetHeight) + 'px';
     mapWrap.style.setProperty('--sheet-lift', px);
@@ -21091,6 +21249,13 @@ var PH_SHOW = {
     $('cmp-bar-csv').addEventListener('click', cmpCsv);
     $('cmp-bar-close').addEventListener('click', closeCompareBar);
     $('cmp-bar-see').addEventListener('click', function () { openCompareBar(false); });
+    // Its height follows what it holds (two areas or four, a table or
+    // cards), so the furniture above it follows the height.
+    if (typeof ResizeObserver === 'function') {
+      new ResizeObserver(function () {
+        if (cmpBar.classList.contains('open') && !sheet.classList.contains('open')) liftFor(cmpBar);
+      }).observe(cmpBar);
+    }
     $('cmp-bar-less').addEventListener('click', function () { openCompareBar(true); });
 
     // The level chips and the area picker are both rebuilt by
@@ -22962,6 +23127,7 @@ var PH_SHOW = {
     // same kind of document as a ward or LSOA profile.
     var multi = Object.keys(bs).length > 1;
     var html = '<!DOCTYPE html><html lang="en-GB"><head><meta charset="utf-8">' +
+      '<meta name="viewport" content="width=device-width, initial-scale=1">' +
       '<title>' + esc(rbAreaName()) + ' | Custom area report | PopHealth Map</title>' +
       '<link rel="stylesheet" href="' + esc(_reportFontsHref()) + '">' +
       '<style>' + REPORT_CSS +
