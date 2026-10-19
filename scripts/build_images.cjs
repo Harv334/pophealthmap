@@ -15,7 +15,7 @@
    and og.png (1200x630), the image a shared link previews with: the London
    ward map coloured by deprivation score (imd_score_ward, the same field,
    seven classes and 5th to 95th percentile range the app uses), with the
-   name, the tagline and "Free, no sign-in".
+   name, the tagline and "A printable report for every ward".
 
    Run from the repo root against a local server, so the self-hosted fonts load:
 
@@ -142,7 +142,7 @@ function ogHtml(tagline) {
   <div class="txt">
     <div class="name">${mark(48)}<span>PopHealth Map</span></div>
     <p class="tag">${tagline}</p>
-    <div class="free">Free, no sign-in</div>
+    <div class="free">A printable report for every ward</div>
   </div>
   <div class="url">pophealth.uk</div>
   <div class="map">${mapSvg(590, 490)}</div>
@@ -156,9 +156,9 @@ function ogHtml(tagline) {
   const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
   const desc = (html.match(/<meta name="description" content="([^"]+)"/) || [])[1];
   if (!desc) throw new Error('index.html has no meta description');
-  // The description's first sentence, less its "free and with no sign-in",
-  // which the image says on its own line.
-  const tagline = desc.split('. ')[0].replace(/,?\s*free and with no sign-in\.?$/, '') + '.';
+  // The description's first sentence, less its closing clause about the
+  // printable report, which the image says on its own line.
+  const tagline = desc.split('. ')[0].replace(/\.$/, '').replace(/,\s*with a printable report for each ward$/, '') + '.';
 
   const browser = await chromium.launch();
   for (const ic of ICONS) {
