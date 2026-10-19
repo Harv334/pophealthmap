@@ -93,9 +93,16 @@ def tables(codes, rows):
             "General health: Very bad health": agg(very_bad)}),
         "TS007A": pd.DataFrame({**code,
             "Age: Total": agg(pop),
-            "Age: Aged 0 to 15 years": agg(u16),
+            "Age: Aged 4 years and under": agg(u16),
             "Age: Aged 16 to 64 years": agg(pop - u16 - o65),
             "Age: Aged 65 years and over": agg(o65)}),
+        # Single years of age: the children at 10, working age at 30 and the
+        # rest at 70, so under 16 and 16 to 64 come out as u16 and the middle.
+        "TS007": pd.DataFrame({**code, "Age: Total": agg(pop),
+            **{("Age: Aged under 1 year" if a == 0 else
+                f"Age: Aged {a} year{'' if a == 1 else 's'}" + (" and over" if a == 100 else "")):
+               (agg(u16) if a == 10 else agg(pop - u16 - o65) if a == 30 else
+                agg(o65) if a == 70 else [0] * len(rows)) for a in range(0, 101)}}),
         "TS021": pd.DataFrame({**code,
             "Ethnic group: Total: All usual residents": agg(pop),
             "Ethnic group: Asian, Asian British or Asian Welsh": agg(asian),
@@ -108,10 +115,18 @@ LSOAS = sorted(set(OA_LSOA.values()))
 LSOA_T = tables(LSOAS, [[i for i, oa in enumerate(OAS) if OA_LSOA[oa] == l] for l in LSOAS])
 p._fetch_census_table = lambda tab, level="lsoa": {"oa": OA_T, "lsoa": LSOA_T}.get(level, {}).get(tab)
 p.info = p.warn = p.ok = lambda *a, **k: None
+# Twelve made-up areas are not England, so the check against ONS's shares is
+# tested on its own (test_fingertips_headline.py), and the age bands record
+# goes to a scratch folder rather than the repo.
+p._census_age_check = lambda *a, **k: None
+import tempfile
+p.DATA_DIR = pathlib.Path(tempfile.mkdtemp())
 
 print("=== census figures from summed counts ===")
 oa_full = p._census_frame("oa")
 lsoa_full = p._census_frame("lsoa")
+check("under 16 and working age built from single years are recorded as 0-15",
+      p.census_age_bands() == "0-15")
 oa_figs, oa_cnt = p._census_split(oa_full, "LSOA21CD")
 lsoa_figs, lsoa_cnt = p._census_split(lsoa_full, "LSOA21CD")
 

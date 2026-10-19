@@ -1730,7 +1730,8 @@ def run_imd2025() -> pd.DataFrame:
 #
 # Indicator -> table mapping:
 #   census_population              TS001  (residents total)
-#   census_under16_pct / over65_pct TS009 (age, 18 categories)
+#   census_under16_pct / working_age TS007 (single year of age), else TS007A
+#   census_over65_pct / over85_pct TS007A (five-year age bands)
 #   census_non_white_pct           TS021  (ethnic group)
 #   census_born_outside_uk_pct     TS004  (country of birth)
 #   census_good_health_pct / bad   TS037  (general health)
@@ -1757,6 +1758,11 @@ CENSUS_TABLES = [
     #   TS059 — Hours worked, not accommodation type
     #   TS068 — Schoolchild/student indicator, not year of arrival
     "TS025", "TS061",
+    # TS007 is age by single year, which ONS publishes for output areas and
+    # LSOAs. It is the only way to the usual bands: TS007A's five-year bands
+    # put 15 year olds with 16 to 19 year olds, so they give under 15 and
+    # 15 to 64, not under 16 and 16 to 64 (see _census_frame).
+    "TS007",
     # Note: TS009 was previously requested but its Nomis bulk zip has no
     # LSOA-level sheet. TS007A ("Age by five-year age bands") is the
     # canonical LSOA-granularity age source.
@@ -1981,9 +1987,15 @@ def census_group_figures(figs: "pd.DataFrame", counts: "pd.DataFrame | None",
 
 def run_census2021() -> pd.DataFrame:
     rule("Census 2021 (Nomis bulk, LSOA)")
+    _CENSUS_AGE_PROBLEMS.clear()
     out = _census_frame("lsoa")
     if out is None or out.empty:
         return pd.DataFrame()
+    if _CENSUS_AGE_PROBLEMS:
+        # Usable, with the older bands the map labels honestly, but not what
+        # was meant to be built, so the refresh workflow raises it.
+        _SOURCE_PARTIAL["census"] = ("under 16 and working age built from TS007A's "
+                                     "0 to 14 and 15 to 64: " + "; ".join(_CENSUS_AGE_PROBLEMS))
     # The figures file keeps its shape for everything that reads it; the
     # counts behind each percentage go beside it, for the ward and LA build.
     out, counts = _census_split(out, "LSOA21CD")
@@ -2009,6 +2021,90 @@ def run_census2021() -> pd.DataFrame:
         else:
             warn("census2021: no in-scope MSOAs in the MSOA files")
     return out
+
+
+# England's age structure at the 2021 Census as ONS publishes it, in per cent
+# of usual residents, for checking the bands built from TS007. 0 to 14 is
+# ONS's own figure (TS007A gives 17.42); 0 to 15 adds the 15 year olds, about
+# 1.15 points; 65 and over is the headline 18.4.
+ONS_ENGLAND_AGE_SHARES = {"0-14": 17.4, "0-15": 18.6, "65+": 18.4}
+ONS_AGE_TOLERANCE = 0.1
+_CENSUS_AGE_PROBLEMS: list = []
+
+
+def _census_single_years(t: "pd.DataFrame | None"):
+    """(table, {age: column}, total column) for TS007, or None unless every
+    age from 0 to 99 and the total are there."""
+    if t is None or t.empty:
+        return None
+    ages: dict = {}
+    for c in t.columns:
+        cl = c.lower()
+        if " to " in cl:
+            continue
+        if re.search(r"aged under 1 year", cl):
+            ages[0] = c
+            continue
+        m = re.search(r"aged (\d+) years?(?: and over)?(?:;|$)", cl.strip())
+        if m:
+            ages.setdefault(int(m.group(1)), c)
+    total = _cen_find(t, "total")
+    if not total or any(a not in ages for a in range(0, 100)) or not _cen_code_col(t):
+        return None
+    return t, ages, total
+
+
+def _census_age_check(t7, code_col, ages, total_col, t7a=None) -> "str | None":
+    """Why TS007's England totals cannot be trusted, or None. Compares the
+    shares aged 0 to 14, 0 to 15 and 65 and over across England's areas (codes
+    beginning E) with ONS's headline shares, and the 0 to 14 share with the
+    one TS007A gives for the same areas."""
+    eng = t7[t7[code_col].astype(str).str.strip().str.startswith("E")]
+    if eng.empty:
+        return "no English areas in TS007"
+    tot = pd.to_numeric(eng[total_col], errors="coerce").sum()
+    if not tot:
+        return "TS007 England total is zero"
+    def share(lo, hi):
+        cols = [ages[a] for a in ages if lo <= a <= hi]
+        return float(eng[cols].apply(pd.to_numeric, errors="coerce").sum().sum()) / tot * 100
+    got = {"0-14": share(0, 14), "0-15": share(0, 15), "65+": share(65, 200)}
+    off = [f"{k} {got[k]:.2f}% against ONS {v}%" for k, v in ONS_ENGLAND_AGE_SHARES.items()
+           if abs(got[k] - v) > ONS_AGE_TOLERANCE + 0.05]   # ONS rounds to 0.1
+    if off:
+        return "England " + "; ".join(off)
+    if t7a is not None and not t7a.empty:
+        cc = _cen_code_col(t7a)
+        cols = []
+        for kw in ("aged 4 years and under", "aged 5 to 9", "aged 10 to 14"):
+            cols += _cen_findall(t7a, kw, exclude=("and over",))
+        den = _cen_find(t7a, "total")
+        if cc and cols and den:
+            e = t7a[t7a[cc].astype(str).str.strip().str.startswith("E")]
+            d = pd.to_numeric(e[den], errors="coerce").sum()
+            if d:
+                a = float(e[cols].apply(pd.to_numeric, errors="coerce").sum().sum()) / d * 100
+                if abs(a - got["0-14"]) > ONS_AGE_TOLERANCE:
+                    return f"0 to 14 is {got['0-14']:.2f}% in TS007 but {a:.2f}% in TS007A"
+    info(f"  TS007: England aged 0 to 15 {got['0-15']:.2f}%, 65 and over {got['65+']:.2f}%, "
+         f"within {ONS_AGE_TOLERANCE} points of ONS")
+    return None
+
+
+def _record_census_age_bands(level: str, bands: str) -> None:
+    """Note which ages the under 16 and working age figures at this level
+    cover, beside the census parquets, for build_indicator_stats."""
+    p = DATA_DIR / "demographics" / "census2021_age_bands.json"
+    try:
+        rec = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        rec = {}
+    rec[level] = bands
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(json.dumps(rec, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+    except OSError as e:
+        warn(f"census2021: could not record the age bands ({e})")
 
 
 def _census_frame(level: str = "lsoa") -> pd.DataFrame | None:
@@ -2084,16 +2180,38 @@ def _census_frame(level: str = "lsoa") -> pd.DataFrame | None:
         })
         out = out.merge(df, on="LSOA21CD", how="left")
 
-    # TS007A age bands (LSOA-level) ---------------------------------------
-    # Column names look like "Age (5 category broad age bands): Aged 0 to 15
-    # years" etc. We try TS007A first; fall back to TS009 if the
-    # downstream format ever reintroduces LSOA rows.
+    # Age ----------------------------------------------------------------
+    # Under 16 and working age (16 to 64) come from TS007, single years of
+    # age, when it is there and its England totals agree with ONS's headline
+    # shares. Otherwise they come from TS007A's five-year bands, which can
+    # only give 0 to 14 and 15 to 64: the old keyword "aged 15 years" never
+    # matched its "Aged 15 to 19 years" band, so "under 16" was 0 to 14 for
+    # years. Which one was built is written beside the parquet
+    # (census2021_age_bands.json) and carried to the map, which labels the
+    # two figures by it.
     _age_tab = "TS007A" if "TS007A" in tables else "TS009"
-    attach("census_under16_pct", _age_tab, [
-        ("aged 0 to 15",),
-        ("aged 4 years and under",), ("aged 5 to 9",),
-        ("aged 10 to 14",), ("aged 15 years",),
-    ], num_exclude=("and over",))
+    bands = "0-14"
+    single = _census_single_years(tables.get("TS007"))
+    if single is not None:
+        t7, ages, total_col = single
+        cc7 = _cen_code_col(t7)
+        under = [ages[a] for a in range(0, 16)]
+        work = [ages[a] for a in range(16, 65)]
+        problem = _census_age_check(t7, cc7, ages, total_col, tables.get("TS007A"))
+        if problem:
+            warn(f"census2021: TS007 single years not used ({problem}); "
+                 f"under 16 and working age fall back to TS007A's 0 to 14 and 15 to 64")
+            _CENSUS_AGE_PROBLEMS.append(problem)
+        else:
+            n_u, d_u = _cen_counts(t7, under, total_col)
+            merge_counts("census_under16_pct", t7[cc7], n_u, d_u)
+            n_w, d_w = _cen_counts(t7, work, total_col)
+            merge_counts("census_working_age_pct", t7[cc7], n_w, d_w)
+            bands = "0-15"
+    if bands != "0-15":
+        attach("census_under16_pct", _age_tab, [
+            ("aged 4 years and under",), ("aged 5 to 9",), ("aged 10 to 14",),
+        ], num_exclude=("and over",))
     # Children under 5 (health-need indicator: child immunisation, HV caseload).
     # Only TS009's single-year bands give this directly; on TS007A the
     # youngest band is 0-15, so this stays blank there.
@@ -2108,8 +2226,10 @@ def _census_frame(level: str = "lsoa") -> pd.DataFrame | None:
     attach("census_over85_pct", _age_tab, [
         ("aged 85 years and over",),
     ])
-    # Derived working-age 16-64 band (computed once under16 + over65 are present).
-    if "census_under16_pct" in out.columns and "census_over65_pct" in out.columns:
+    # Derived working age (15 to 64 from TS007A's bands) when TS007 did not
+    # give 16 to 64 directly.
+    if (bands != "0-15" and "census_under16_pct" in out.columns
+            and "census_over65_pct" in out.columns):
         wa = 100 - pd.to_numeric(out["census_under16_pct"], errors="coerce") \
                  - pd.to_numeric(out["census_over65_pct"], errors="coerce")
         out["census_working_age_pct"] = wa
@@ -2325,6 +2445,7 @@ def _census_frame(level: str = "lsoa") -> pd.DataFrame | None:
             out[col] = pd.to_numeric(out[col], errors="coerce").round(2)
     if "census_population" in out.columns:
         out["census_population"] = pd.to_numeric(out["census_population"], errors="coerce").astype("Int64")
+    _record_census_age_bands(level, bands)
     return out
 
 
