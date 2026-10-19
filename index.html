@@ -728,6 +728,11 @@
   .lkey { padding: 4px 6px; background: var(--paper-2); border-radius: var(--r-sm); }
   .lkey-grid { display: grid; grid-template-columns: auto 1fr; gap: 3px 6px; align-items: center;
     font-size: var(--t-xs); line-height: 1.2; }
+  /* A layer row with a help button. The button cannot sit inside the label
+     (a label's first button would become its control, and the checkbox was
+     left with no name), so the label holds the swatch and the name and is
+     tied to the checkbox with for, and the button sits between them. */
+  .lrow-split > label { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
   .lrow-sub { margin-left: 18px; padding: 3px 0 0; }
   .lrow-sub .lname { font-size: var(--t-xs); }
   .imd-key { margin-top: 6px; display: flex; align-items: center; gap: 2px; font-size: var(--t-xs);
@@ -3287,7 +3292,10 @@
              published; see PH_REGIONS_LIVE in the head and initRegionUi. -->
         <div class="sb-sec" id="region-picker-wrap" hidden>
           <label class="sb-lbl" for="region-picker">Area</label>
-          <select id="region-picker" aria-label="Area: which region the map shows"></select>
+          <div style="display:flex;gap:6px;align-items:center">
+            <select id="region-picker" aria-label="Area: which region the map shows" style="flex:1;min-width:0"></select>
+            <button type="button" id="region-go" class="btn">Open this region</button>
+          </div>
         </div>
         <div class="sb-sec" id="pointlayers-sec">
           <div class="sb-lbl">Places and services</div>
@@ -3321,7 +3329,7 @@
                is the larger geography, and because an NHS reader usually
                knows their ICB before they know which borough they are
                looking at. -->
-          <label class="lrow" id="icb-row"><div class="sw sw-line" style="--sw:#8E44AD"></div><span class="lname">Integrated care boards (ICBs) <span class="lcount" id="icb-count"></span><button type="button" class="lhelp" aria-label="About integrated care boards" aria-expanded="false" title="Integrated care boards (ICBs) are the NHS bodies that plan and pay for health services across an area. London has four (West and North, North East, South East and South West), each made up of whole local authorities (LAs), and you can switch this on and select an ICB to zoom to it.">?</button></span><input type="checkbox" id="ticb"></label>
+          <div class="lrow lrow-split" id="icb-row"><label for="ticb"><div class="sw sw-line" style="--sw:#8E44AD"></div><span class="lname">Integrated care boards (ICBs) <span class="lcount" id="icb-count"></span></span></label><button type="button" class="lhelp" aria-label="About integrated care boards" aria-expanded="false" title="Integrated care boards (ICBs) are the NHS bodies that plan and pay for health services across an area. London has four (West and North, North East, South East and South West), each made up of whole local authorities (LAs), and you can switch this on and select an ICB to zoom to it.">?</button><input type="checkbox" id="ticb"></div>
           <!-- Its own control, under the layer it belongs to, rather than a
                group inside the borough dropdown. A board and a borough are two
                different sizes of thing, and one list offering both made the
@@ -3334,7 +3342,7 @@
           </div>
           <!-- Primary care networks. Shown once this region's pcn.json loads. -->
           <div id="pcn-block" hidden>
-            <label class="lrow" id="pcn-row"><div class="sw sw-line" style="--sw:#0B7A75"></div><span class="lname">PCN footprints <span class="lcount" id="pcn-count"></span><button type="button" class="lhelp" aria-label="About PCN footprints" aria-expanded="false" title="Primary care networks (PCNs) are groups of GP practices that plan services together. Each footprint covers the LSOAs where most registered residents use that network's practices, but PCNs are defined by their patient lists rather than by a boundary, so their real catchments overlap and choosing one shows all of its catchment.">?</button></span><input type="checkbox" id="tpcn"></label>
+            <div class="lrow lrow-split" id="pcn-row"><label for="tpcn"><div class="sw sw-line" style="--sw:#0B7A75"></div><span class="lname">PCN footprints <span class="lcount" id="pcn-count"></span></span></label><button type="button" class="lhelp" aria-label="About PCN footprints" aria-expanded="false" title="Primary care networks (PCNs) are groups of GP practices that plan services together. Each footprint covers the LSOAs where most registered residents use that network's practices, but PCNs are defined by their patient lists rather than by a boundary, so their real catchments overlap and choosing one shows all of its catchment.">?</button><input type="checkbox" id="tpcn"></div>
             <div class="lsub">
               <div class="lsub-lbl">Focus by PCN</div>
               <select id="pcn-focus" aria-label="Focus by primary care network">
@@ -4816,7 +4824,22 @@ const PH_WHERE_ARIA = PH_IS_LONDON
       if (r.id === R.id) o.selected = true;
       pick.appendChild(o);
     });
-    pick.addEventListener('change', () => { location.href = regionHref(pick.value); });
+    /* Choosing and going are separate. Chrome and Edge fire change on every
+       arrow key in a closed select, so navigating on change took a keyboard
+       user to another region with one key press. A choice from the open
+       list (mouse, or Enter in it) still goes straight there; an arrow key
+       only chooses, and Enter or Open this region goes. */
+    const go = () => { if (pick.value !== R.id) location.href = regionHref(pick.value); };
+    let arrowed = false;
+    pick.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); go(); return; }
+      // Alt+ArrowDown and Space open the list, where a choice should go.
+      arrowed = !e.altKey && (/^(Arrow|Page|Home|End)/.test(e.key) || (e.key.length === 1 && e.key !== ' '));
+    });
+    pick.addEventListener('change', () => { if (arrowed) { arrowed = false; return; } go(); });
+    pick.addEventListener('mousedown', () => { arrowed = false; });
+    const goBtn = $('region-go');
+    if (goBtn) goBtn.addEventListener('click', go);
   }
   // One choice is not a choice: hidden until a second region is published.
   if (wrap) wrap.hidden = opts.length < 2;
