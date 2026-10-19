@@ -5680,9 +5680,13 @@ def build_borough_data() -> dict:
         out.setdefault(lad, {})[f"ft_{row['indicator_short']}"] = float(v)
         # A district's figure that is its county's says so, with the county's
         # code and name, so the map can label it as the county's rather than
-        # present it as the district's own.
+        # present it as the district's own. Every LA with figures carries
+        # ft_from, empty when all of them are its own, so the map knows the
+        # record says where each figure is from; a file without it predates
+        # the 501 fetch, when every district's figure was its county's.
+        ff = out[lad].setdefault("ft_from", {})
         if str(row.get("source_kind", "") or "") == "county":
-            out[lad].setdefault("ft_from", {})[f"ft_{row['indicator_short']}"] = [
+            ff[f"ft_{row['indicator_short']}"] = [
                 str(row.get("source_code", "") or ""), str(row.get("source_name", "") or "")]
 
     n_vals = sum(len(v) for v in out.values())
