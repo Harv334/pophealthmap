@@ -5751,6 +5751,19 @@ def record_cover(wards: dict, cover: dict, key: str, vals: dict) -> int:
     return n
 
 
+# police.uk categories left out of the crime total (see build_ward_data).
+CRIME_TOTAL_EXCLUDES = ("anti-social-behaviour",)
+
+
+def crime_total_by_ward(crime):
+    """Crimes per ward, not counting anti-social behaviour. A ward with only
+    anti-social behaviour on record has 0 crimes rather than no figure."""
+    wards = crime["WD25CD"].dropna().unique()
+    if "category" in crime.columns:
+        crime = crime[~crime["category"].astype(str).isin(CRIME_TOTAL_EXCLUDES)]
+    return crime.groupby("WD25CD").size().reindex(wards, fill_value=0)
+
+
 def build_ward_data() -> dict:
     """Wrapped shape expected by index.html loadData():
          {wards: {WD25CD: {name, lad, indicators:{...}}}, metadata: {...}}
@@ -5833,7 +5846,11 @@ def build_ward_data() -> dict:
 
     crime = _read_parquet_opt(DATA_DIR / "crime" / "police_uk_crime.parquet")
     if crime is not None and "WD25CD" in crime.columns:
-        for wd, n in crime.groupby("WD25CD").size().items():
+        # Anti-social behaviour is not a crime, forces record it differently
+        # (a fifth of Met records, almost none of the City of London Police's)
+        # and it has its own indicator, so the total, and the rate the page
+        # works out from it, leave it out.
+        for wd, n in crime_total_by_ward(crime).items():
             if wd:
                 _get(wd)["indicators"]["crime_total"] = int(n)
         # Per-category crime breakdown (violence, theft, drugs, etc.)

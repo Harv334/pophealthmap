@@ -6160,8 +6160,8 @@ const OV_META = {
   census_car_to_work_pct:         { src: "Census 2021 (TS061)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of working residents who usually travel to work by car or van." },
 
   // Crime + deprivation flags
-  crime_rate_per_1000:            { src: "data.police.uk street-level crime; ONS population", yr: "Aug 2025 to Jul 2026", g: "Ward, counted from point data", u: "per 1,000", desc: "Crimes recorded by the police in the last 12 months for every 1,000 people living in the area." },
-  crime_total:                    { src: "data.police.uk street-level crime", yr: "Aug 2025 to Jul 2026", g: "Ward, counted from point data", u: "crimes", desc: "All crimes recorded by the police in the last 12 months, summed across every category." },
+  crime_rate_per_1000:            { src: "data.police.uk street-level crime; ONS population", yr: "Aug 2025 to Jul 2026", g: "Ward, counted from point data", u: "per 1,000", desc: "Crimes recorded by the police in the last 12 months for every 1,000 people living in the area, not counting anti-social behaviour, which has its own indicator." },
+  crime_total:                    { src: "data.police.uk street-level crime", yr: "Aug 2025 to Jul 2026", g: "Ward, counted from point data", u: "crimes", desc: "Crimes recorded by the police in the last 12 months, not counting anti-social behaviour, which has its own indicator." },
   crime_arson_12mo:               { src: "data.police.uk street-level crime", yr: "Aug 2025 to Jul 2026", g: "Ward, counted from point data", u: "crimes", desc: "Arson and criminal damage recorded by the police in the last 12 months, including deliberate damage to homes, buildings and vehicles." },
   crime_burglary_12mo:            { src: "data.police.uk street-level crime", yr: "Aug 2025 to Jul 2026", g: "Ward, counted from point data", u: "crimes", desc: "Burglaries of homes, businesses and community buildings recorded by the police in the last 12 months." },
   crime_drug_offences_12mo:       { src: "data.police.uk street-level crime", yr: "Aug 2025 to Jul 2026", g: "Ward, counted from point data", u: "crimes", desc: "Drug offences recorded by the police in the last 12 months, including possession, supply and production." },
@@ -6531,8 +6531,8 @@ const OV_PLAIN = {
   green_local_pct: "Homes within 300 m of a local park.",
   green_neighbourhood_pct: "Homes within 1 km of a large park.",
   blue_commitment_pct: "Homes within a 15-minute walk of a river, lake, canal or coast.",
-  crime_rate_per_1000: "Recorded crimes in the last 12 months for every 1,000 residents.",
-  crime_total: "All recorded crimes in the last 12 months.",
+  crime_rate_per_1000: "Recorded crimes in the last 12 months for every 1,000 residents, not counting anti-social behaviour.",
+  crime_total: "Recorded crimes in the last 12 months, not counting anti-social behaviour.",
   crime_violence_12mo: "Recorded violent and sexual offences in the last 12 months.",
   crime_asb_12mo: "Reported anti-social behaviour in the last 12 months.",
   crime_theft_12mo: "Recorded thefts, including shoplifting and bike theft, in the last 12 months.",
@@ -7222,7 +7222,7 @@ function indicatorFacts(k) {
   if (/police/i.test(src)) {
     f.num = k === 'crime_asb_12mo'
       ? 'Incidents of anti-social behaviour reported to the police at a location in the area over the last 12 months'
-      : 'Crimes recorded by the police at a location in the area over the last 12 months';
+      : 'Crimes recorded by the police at a location in the area over the last 12 months, not counting anti-social behaviour';
     f.den = k === 'crime_rate_per_1000' ? 'Usual residents at the 2021 Census, per 1,000' : '';
     f.cadence = 'The police publish new figures every month, about two months behind, and we refresh them here on the 15th of each month.';
     f.method = 'The police move each crime to an anonymous point nearby before publishing it, so a crime close to a boundary can fall in the next area.' +
@@ -11909,7 +11909,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
     ${crimeRows.length ? `<div class="col">
       <div class="section-h">Crime</div>
       <div class="panel">
-        <h3>${crimeTotal != null ? Math.round(crimeTotal).toLocaleString('en-GB') + ' crimes recorded' : 'Crimes recorded'} from ${_esc(monthWords(reportCrimePeriod()))}</h3>
+        <h3>${crimeTotal != null ? Math.round(crimeTotal).toLocaleString('en-GB') + ' crimes recorded' : 'Crimes recorded'} from ${_esc(monthWords(reportCrimePeriod()))}, not counting anti-social behaviour</h3>
         ${crimeSVG}
         <div class="legend"><span class="legend-tick"></span> ${PH_AREA} ward median. Source: police.uk.</div>
       </div>
@@ -15079,7 +15079,7 @@ function _buildLSOAReportHtml(code) {
     ${crimeRows.length ? `<div class="section-h">Crime</div>
     <div class="row">
       <div class="panel" style="flex:1">
-        <h3>${crimeTotal != null ? Math.round(crimeTotal).toLocaleString('en-GB') + ' crimes recorded' : 'Crimes recorded'} from ${_esc(monthWords(reportCrimePeriod()))}</h3>
+        <h3>${crimeTotal != null ? Math.round(crimeTotal).toLocaleString('en-GB') + ' crimes recorded' : 'Crimes recorded'} from ${_esc(monthWords(reportCrimePeriod()))}, not counting anti-social behaviour</h3>
         ${crimeSVG}
         <div class="legend"><span class="legend-tick"></span> ${PH_AREA} LSOA median. Sexual offences are not published for LSOAs. Source: police.uk.</div>
       </div>
@@ -15716,6 +15716,18 @@ function injectCrimeCategories() {
       if (!isNaN(v)) { theft += v; sawTheft = true; }
     });
     if (sawTheft) ind.crime_theft_12mo = theft;
+    // Anti-social behaviour is not a crime, forces record it differently (it
+    // is a fifth of records in Met wards and almost none in the City's), and
+    // it has its own indicator, so the total and the rate leave it out. Worked
+    // out from the categories, so a file written before the pipeline did the
+    // same reads the same.
+    let all = 0, sawAll = false;
+    for (const cat in cats) {
+      if (cat === 'anti-social-behaviour') continue;
+      const v = Number(cats[cat]);
+      if (!isNaN(v)) { all += v; sawAll = true; }
+    }
+    if (sawAll) ind.crime_total = all;
     // A count alone mostly measures how many people a ward holds. The rate
     // is what can be compared between wards.
     const pop = Number(ind.census_population), tot = Number(ind.crime_total);
