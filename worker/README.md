@@ -29,52 +29,46 @@ You need a Cloudflare account and an Anthropic API key.
 
 The Worker is deployed as **`pophealthmapai`**. Keep the `name` in
 `wrangler.toml` matching it: wrangler deploys to whatever that says, so a
-mismatch quietly creates a second Worker at a second URL, with no KV namespace
-and no secret, while the site carries on calling the first.
+mismatch quietly creates a second Worker at a second URL, with no bindings and
+no secret, while the site carries on calling the first.
 
-### With wrangler
+### With wrangler (version 4.36 or later)
 
 ```bash
 cd worker
-npm install -g wrangler          # if you do not have it
+npm install -g wrangler@latest   # the burst limit needs 4.36 or later
 wrangler login
 
-# 1. Create the rate-limit store and paste the printed id into wrangler.toml
-wrangler kv namespace create RATE_LIMIT
-
-# 2. Store the API key as a secret. This never enters the repo.
+# 1. Store the API key as a secret. This never enters the repo.
 wrangler secret put ANTHROPIC_API_KEY
 
-# 3. Ship it
+# 2. Ship it. This also creates the daily counter (a Durable Object, from the
+#    [[migrations]] entry) and the burst limit ([[ratelimits]]); there is
+#    nothing to create by hand.
 wrangler deploy
 ```
 
-### Without Node installed, from the dashboard
+The counter used to be a KV namespace (`RATE_LIMIT`). It is no longer used,
+and once this version is live it can be deleted under Storage & Databases → KV.
 
-Same three things in the same order, and the order matters: bindings are read at
-request time, so a Worker deployed before its namespace exists answers questions
-with the cap silently switched off.
+### Without Node installed
 
-1. **Storage & Databases → KV → Create a namespace**, call it `RATE_LIMIT`.
-2. **Workers & Pages → pophealthmapai → Settings → Bindings**
-   - *Add → KV namespace*: variable name `RATE_LIMIT`, pointing at the namespace
-     from step 1. The variable name is what `env.RATE_LIMIT` reads, so it has to
-     be exactly that.
-   - *Add → Secret*: name `ANTHROPIC_API_KEY`, value your key. A secret, not a
-     plaintext variable — plaintext ones are readable from the dashboard.
-   - Confirm the plaintext variable `ALLOWED_ORIGINS` is present and lists
-     `https://pophealth.uk,https://www.pophealth.uk,https://harv334.github.io`.
-     The third is the mirror; without it the Ask panel is dead there.
-3. **Edit code**, paste `src/index.js` over what is there, **Deploy**.
+Durable Object classes and their migrations can only be created by a
+`wrangler deploy` (or the Workers CI build connected to this repository), not
+by pasting code into the dashboard editor. Pasting `src/index.js` alone gives a
+Worker with no counter, which refuses every request with
+`503 Worker is not configured`. Use wrangler once from any machine with Node;
+after that, code-only changes can be pasted in the dashboard as before.
 
-Then ask the assistant one question and confirm the reply has
-`_limit.enforced: true`.
+The secret `ANTHROPIC_API_KEY` and the plaintext variable `ALLOWED_ORIGINS`
+(`https://pophealth.uk,https://www.pophealth.uk,https://harv334.github.io`) are
+under **Workers & Pages → pophealthmapai → Settings → Variables and Secrets**.
 
-Wrangler prints a URL like `https://pophealthmap-ai.<subdomain>.workers.dev`.
+Wrangler prints a URL like `https://pophealthmapai.<subdomain>.workers.dev`.
 Put it in `data/map/assistant.js`:
 
 ```js
-var ASSISTANT_ENDPOINT = "https://pophealthmap-ai.<subdomain>.workers.dev";
+var ASSISTANT_ENDPOINT = "https://pophealthmapai.<subdomain>.workers.dev";
 ```
 
 Commit that and the panel appears. While it is empty the panel does not render
@@ -89,72 +83,112 @@ curl -sS -X POST "$WORKER_URL" \
   -d '{"messages":[{"role":"user","content":"Which ward is most deprived?"}]}' | head -c 400
 ```
 
-Expect JSON with `"stop_reason":"tool_use"` — the model asking for a tool,
+Expect JSON with `"stop_reason":"tool_use"`, the model asking for a tool,
 which is the browser's job to run. A `403` means the Origin header is not in
-`ALLOWED_ORIGINS`.
+`ALLOWED_ORIGINS`, and a `503` with `Worker is not configured` means the API
+key, the counter or the burst limit is missing: the Worker **fails closed** and
+answers nothing until all three are there.
 
-That reply also carries the cap:
+The reply carries the reader's count:
 
 ```json
 "_limit": { "cap": 10, "remaining": 9, "enforced": true }
 ```
 
-`"enforced": false` means the KV namespace is not bound and the cap is not being
-applied to anyone — see the note on `RATE_LIMIT` in `wrangler.toml`. `remaining`
-is absent in that case, because there is no count to report.
-
 The checks that do not reach Anthropic cost nothing and can be run freely: `GET`
-returns 405, an unlisted `Origin` returns 403 with no CORS header, and a body
-without `messages` returns 400. Note that Cloudflare's edge may reject a plain
-scripted client with error 1010 before the Worker ever runs; send a normal
-browser `User-Agent` or you will be testing Cloudflare rather than this code.
+returns 405, an unlisted `Origin` returns 403 with no CORS header, a body
+without `messages` returns 400, and an image block returns 400. Note that
+Cloudflare's edge may reject a plain scripted client with error 1010 before the
+Worker ever runs; send a normal browser `User-Agent` or you will be testing
+Cloudflare rather than this code.
+
+The tests in `tests/pipeline/test_worker_*.py` run this code under Node with
+fake bindings and a stubbed API, so they cost nothing:
+`python3 tests/pipeline/test_worker_cap.py` (the caps),
+`test_worker_followup.py` (which messages count as questions) and
+`test_worker_guard.py` (what is refused, and what is sent upstream).
 
 ## What it costs, and how to cap it
 
-`claude-sonnet-5` at $3 per million input tokens and $15 per million output,
-capped at 1024 output tokens, with the system prompt marked for caching.
+`claude-sonnet-5` at $2 per million input tokens and $10 per million output.
+Cached input costs $2.50 per million to write and $0.20 per million to read.
+Answers are capped at 2,048 output tokens with thinking switched off.
 
-One question is roughly two API calls: the model asks for a tool, the browser
-runs it, the model answers. Measured on the live Worker, a call sends about
-1,500 input tokens, so a question costs roughly **a penny**, and a hundred
-questions a day is around £1.
+**The old figure here was wrong.** It said a call sent about 1,500 input tokens
+and a question cost half a penny. Measured requests were about 45,000
+characters for a first question and 138,000 to 184,000 characters per round
+trip later in a session, roughly $0.05 to $0.30 a question, because the 41 KB
+`list_indicators` result was resent, uncached, with every later call.
 
-It ran on `claude-haiku-4-5` first, at a quarter of that. Haiku was changed
-because it kept getting the deprivation scale wrong: it inverted IMD scores on
-its first live question, and once corrected described a mean decile of 3 as the
-most deprived tenth. Both are the kind of error that reads as authoritative and
-gets quoted. If cost ever matters more than that, Haiku is one line in
-`src/index.js`, but test the deprivation questions before trusting it.
+What changed, and what a question should cost now:
 
-Note the caching threshold if you change model again: a prompt must reach 1,024
-tokens to be cacheable on Sonnet and Opus, 2,048 on Haiku. The system block here
-is about 1,500, so it caches on Sonnet and did nothing at all on Haiku.
+- `list_indicators` sends a short key list (about 13 KB rather than 41 KB).
+- The Worker marks the end of the conversation for caching as well as the
+  system prompt, so each round trip and each later question reads what came
+  before from the cache at a tenth of the price, instead of paying for it again.
+- The panel keeps the conversation under 36 KB between questions, replacing
+  older figures with a stub and then dropping the oldest questions, and the
+  Worker refuses anything over 64 KB.
 
-Three limits sit in front of that, and only one of them is a real spend cap.
+The fixed part of every call (instructions and tool definitions) is about
+7,200 characters, roughly 2,100 tokens. A typical question is two or three
+round trips: a lookup of about 4 KB (one ward or LA profile), up to 13 KB if
+the key list is fetched, and an answer of a few hundred tokens. Estimated from
+those sizes:
 
-**1. The per-IP cap in this Worker.** `DAILY_CAP` in `src/index.js`, **10**
-questions per IP per UTC day, and the panel promises that number in its opening
-message, so the two have to move together. Held in KV, counted per question
-rather than per round trip, with a second counter bounding total round trips so
-a forged continuation cannot slip past it. It stops one person hammering it; it
-does not stop a thousand people. Being per-IP, it also means everyone behind one
-NAT — an NHS trust, a school — shares a single allowance of 10.
+| | per question | per 100 questions |
+|---|---|---|
+| typical, cache warm (a session in progress) | $0.01 to $0.03 | $1 to $3 |
+| first question, or after five idle minutes (cache written again) | $0.02 to $0.05 | $2 to $5 |
+| worst case, nothing read from the cache | up to about $0.15 | up to about $15 |
 
-It fails open: if KV errors, or the namespace is not bound at all, the request
-is answered and not counted, because breaking the site is worse than losing the
-count. That makes an unbound namespace invisible from the outside, which is why
-replies carry `_limit.enforced`. If it is `false`, nothing is being capped.
+**These are estimates from request sizes, not billed figures.** The Worker
+logs every call's `usage` (input, output, cache write and cache read tokens).
+Before relying on the table, run `wrangler tail`, ask ten typical questions,
+and price them from those numbers; correct this table if they differ.
 
-**2. Cloudflare's free tier.** 100,000 Worker requests a day, and 1,000 KV
-writes a day. The KV write limit is the binding one, at one write per question.
-Past it the cap simply stops counting. Neither costs money; they just stop.
+It ran on `claude-haiku-4-5` first. Haiku was changed because it kept getting
+the deprivation scale wrong: it inverted IMD scores on its first live question,
+and once corrected described a mean decile of 3 as the most deprived tenth.
+Both are the kind of error that reads as authoritative and gets quoted. If cost
+ever matters more than that, the model is one line in `src/index.js`, but test
+the deprivation questions before trusting it, and check the caching minimum for
+the new model (1,024 tokens on Sonnet 5; the fixed part here is about 2,100).
 
-**3. The Anthropic spend limit.** This is the one that actually bounds the
-bill, and it is the only one that does. **Set it before you deploy.**
+Four limits sit in front of that. The last is the only one that bounds the
+bill outright.
 
-Console → Settings → Billing → Spend limits → Set limit. Pick a number you
-would not mind paying, such as $20 a month. At half a penny a question that is
-about 4,000 questions. Usage pauses when it is reached; it does not overrun.
+**1. A burst limit per address.** 12 requests a minute from one IPv4 address
+or one IPv6 /64, using Cloudflare's Workers Rate Limiting (`ASK_BURST`), which
+costs no storage writes. It stops a script firing requests in parallel.
+
+**2. The daily cap per address.** `DAILY_CAP` in `src/index.js`, **10**
+questions per UTC day, and the panel promises that number in its opening
+message, so the two have to move together. A second counter bounds round trips
+(60 a day), so a forged continuation cannot slip past it. Counted in a Durable
+Object (`ASK_COUNTER`) **before** the model is called, so parallel requests
+cannot all pass on one count, and handed back if the call fails. Being per
+address, everyone behind one NAT (an NHS trust, a school) shares one allowance.
+
+**3. A daily ceiling for the whole site.** `SITE_DAILY_QUESTIONS` (500) and
+`SITE_DAILY_REQUESTS` (2,000) in `wrangler.toml`. When either is reached, Ask
+stops for everyone until midnight UTC and says so; the rest of the map is
+unaffected. Set it from your budget: at the typical $0.01 to $0.03 a question,
+500 questions is $5 to $15 a day, and at the worst case it could be $75. For a
+$20 a month spend limit, a ceiling of about 30 questions a day (and 120
+requests) keeps a busy day from spending the month.
+
+All three **fail closed**. The KV counter they replace failed open: if KV
+errored, or ran out of its 1,000 free writes a day (a few hundred questions),
+or was not bound at all, questions were answered and not counted, and nothing
+outside showed it.
+
+**4. The Anthropic spend limit.** This is the one that actually bounds the
+bill. **Set it before you deploy**, to a figure that matches the site ceiling
+above: Console → Settings → Billing → Spend limits → Set limit. Usage pauses
+when it is reached; it does not overrun. When it trips, Ask stops for every
+reader until it is raised or the month ends, which is why the site ceiling
+should trip first.
 
 Better still, put this project in its own Workspace (Console → Workspaces),
 create the API key inside it, and set the spend limit on the Workspace. Then
@@ -168,10 +202,22 @@ backstop, not a budget.
 ## Security notes
 
 - `ALLOWED_ORIGINS` is an exact-match allowlist. There is no wildcard, and an
-  unlisted origin gets no CORS header.
+  unlisted origin gets no CORS header. A script can set any Origin header it
+  likes, so this keeps other websites out, not scripts; the limits above and
+  the payload checks below are what bound a script.
+- Only the map's own conversation is forwarded. Turns must alternate; a typed
+  question is plain text of at most 1,000 characters; the model's turns may
+  hold only text and calls to the four tools; the reader's other turns only
+  `tool_result` blocks answering the previous turn's calls, each at most 16 KB;
+  and the whole conversation is at most 64 KB. Images, documents,
+  `cache_control` and anything else are refused, and the messages sent upstream
+  are rebuilt from the checked fields.
+- The model, the output cap, the system prompt and the tools are fixed in the
+  Worker. Anything the caller sends for them is ignored.
 - Upstream error bodies are logged, not returned, because they can echo request
   content back to the caller.
-- Request size and conversation length are bounded; this endpoint is
-  unauthenticated by design, so those limits are the backstop.
 - The key exists only as a Cloudflare secret. It is not in this repo, not in
   `wrangler.toml`, and not in any frontend file.
+- The counter holds today's counts only, keyed by IPv4 address or IPv6 /64,
+  and clears them at the first request of the next UTC day or by an alarm just
+  after midnight, well inside the 48 hours the privacy page states.

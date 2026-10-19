@@ -2346,6 +2346,114 @@ const smallText = page => page.evaluate(() => {
     await page.close();
   }
 
+  // Ask against the real Worker code (worker/src/index.js, run here in Node
+  // with fake bindings) and a scripted model: tables are drawn as tables
+  // (H21), an answer cut off at the output limit says so and the next
+  // question still works (H20), a refusal is answered plainly, and a long
+  // session stays under the Worker's 64 KB limit, or starts again with a
+  // plain message if refused as too long (H18, H17).
+  {
+    const os = require('os');
+    const { pathToFileURL } = require('url');
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'phworker-'));
+    fs.copyFileSync(path.join(ROOT, 'worker/src/index.js'), path.join(tmp, 'worker.mjs'));
+    const W = await import(pathToFileURL(path.join(tmp, 'worker.mjs')).href);
+    const store = new Map();
+    const storage = { get: async k => store.get(k), put: async (k, v) => { if (typeof k === 'object') Object.entries(k).forEach(([a, b]) => store.set(a, b)); else store.set(k, v); },
+      deleteAll: async () => store.clear(), getAlarm: async () => 1, setAlarm: async () => {} };
+    const obj = new W.AskCounter({ storage }, {});
+    const env = { ANTHROPIC_API_KEY: 'sk-test', ALLOWED_ORIGINS: new URL(BASE).origin,
+      ASK_COUNTER: { idFromName: n => n, get: () => ({ fetch: (u, i) => obj.fetch(new Request(u, i)) }) },
+      ASK_BURST: { limit: async () => ({ success: true }) } };
+    let ids = 0, force413 = false;
+    const seen = [];
+    const realFetch = globalThis.fetch, realLog = console.log;
+    // The Worker logs each call's usage; not wanted in this output.
+    console.log = (...a) => { if (!(typeof a[0] === 'string' && a[0].startsWith('{"q"'))) realLog(...a); };
+    // The scripted model: what it says depends on the reader's last words.
+    globalThis.fetch = async (url, init) => {
+      const body = JSON.parse(init.body), msgs = body.messages, last = msgs[msgs.length - 1];
+      const said = last.content.map(b => b.text || '').join(' ');
+      const reply = (stop, content) => new Response(JSON.stringify({ model: 'claude-sonnet-5', stop_reason: stop, content,
+        usage: { input_tokens: 1, output_tokens: 1 } }), { status: 200, headers: { 'content-type': 'application/json' } });
+      if (last.content[0].type === 'tool_result') return reply('end_turn', [{ type: 'text', text: 'Done with the figures.' }]);
+      if (/COMPARE/.test(said)) return reply('end_turn', [{ type: 'text', text: 'Here they are.\n\n| Ward | IMD score |\n|---|---|\n| Notting Dale | 41.2 |\n| **Stonebridge** | 38.5 |\n\n- Higher means more deprived.' }]);
+      if (/CUTTOOL/.test(said)) return reply('max_tokens', [{ type: 'text', text: 'Let me compare those.' }, { type: 'tool_use', id: 'cut' + (++ids), name: 'compare_areas', input: {} }]);
+      if (/CUTTEXT/.test(said)) return reply('max_tokens', [{ type: 'text', text: 'Brent: IMD score 30.3\nBromley: IMD' }]);
+      if (/REFUSE/.test(said)) return reply('refusal', []);
+      if (/PROFILE/.test(said)) return reply('tool_use', [{ type: 'tool_use', id: 'p' + (++ids), name: 'get_area', input: { name: 'Lansbury', level: 'ward' } },
+        { type: 'tool_use', id: 'p' + (++ids), name: 'get_area', input: { name: 'Stonebridge', level: 'ward' } }]);
+      return reply('end_turn', [{ type: 'text', text: 'Fine.' }]);
+    };
+    const { page, errors } = await open(browser, 'index.html?t=1', DESK);
+    await page.route(/workers\.dev/, async route => {
+      const r = route.request();
+      const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'content-type', 'content-type': 'application/json' };
+      if (r.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+      const post = r.postData() || '';
+      let res;
+      if (force413) { force413 = false; res = { status: 413, text: '{"error":"Payload too large"}' }; }
+      else {
+        const out = await W.default.fetch(new Request('https://worker.test/', { method: 'POST', body: post,
+          headers: { 'content-type': 'application/json', Origin: new URL(BASE).origin, 'CF-Connecting-IP': '10.9.' + (seen.length >> 8) + '.' + (seen.length & 255) } }), env);
+        res = { status: out.status, text: await out.text() };
+      }
+      seen.push({ size: post.length, status: res.status, n: (JSON.parse(post).messages || []).length });
+      return route.fulfill({ status: res.status, headers: cors, body: res.text });
+    });
+    await page.click('#ai-toggle');
+    await page.waitForTimeout(300);
+    const ask = async q => {
+      const before = await page.evaluate(() => document.querySelectorAll('#ai-log .ai-msg').length);
+      await page.fill('#ai-input', q);
+      await page.keyboard.press('Enter');
+      await page.waitForFunction(b => document.querySelectorAll('#ai-log .ai-msg').length >= b + 2 &&
+        !document.querySelector('#ai-log .ai-thinking'), before, { timeout: 15000 }).catch(() => {});
+      return page.evaluate(() => { const m = [...document.querySelectorAll('#ai-log .ai-msg.ai-bot')].pop();
+        return { text: m.innerText, html: m.innerHTML, error: m.classList.contains('ai-error') }; });
+    };
+    const t = await ask('COMPARE Notting Dale and Stonebridge');
+    const tbl = await page.evaluate(() => { const m = [...document.querySelectorAll('#ai-log .ai-msg.ai-bot')].pop();
+      return { th: [...m.querySelectorAll('table th[scope="col"]')].map(e => e.textContent), rows: m.querySelectorAll('tbody tr').length,
+        strong: !!m.querySelector('td strong'), li: m.querySelectorAll('ul li').length }; });
+    ok(tbl.th.join('|') === 'Ward|IMD score' && tbl.rows === 2 && tbl.strong && tbl.li === 1 && !/\|/.test(t.text),
+      'Ask: a Markdown table is drawn as a table with column headers, not pipes (H21)', JSON.stringify({ tbl, text: t.text }));
+    await page.addScriptTag({ content: AXE });
+    const axeAsk = await page.evaluate(tags => axe.run('#ai-panel', { runOnly: tags, resultTypes: ['violations'] })
+      .then(r => r.violations.map(v => v.id + ' (' + v.nodes[0].target.join(' ') + ')')), AXE_TAGS);
+    ok(axeAsk.length === 0, 'accessibility: the Ask panel with a table answer', axeAsk.join(', '));
+    ok(await page.evaluate(() => PH_ASSISTANT.render('<img src=x onerror=alert(1)>\n| <b>a</b> | b |\n|---|---|\n| <i>c</i> | d |').indexOf('<img') === -1 &&
+      PH_ASSISTANT.render('| <b>a</b> | b |\n|---|---|\n| c | d |').indexOf('&lt;b&gt;') !== -1), 'Ask: text in tables is escaped like the rest of the answer');
+    const c1 = await ask('CUTTOOL compare everything');
+    const c2 = await ask('and the next one?');
+    ok(/Let me compare those\.\s+This answer was cut short, so please ask about fewer places at once\.$/.test(c1.text) && !c1.error &&
+       c2.text === 'Fine.' && !c2.error, 'Ask: an answer cut off mid tool call says so, and the next question still works (H20)', JSON.stringify([c1.text, c2.text]));
+    const c3 = await ask('CUTTEXT compare Brent and Bromley');
+    ok(/Bromley: IMD\s+This answer was cut short/.test(c3.text), 'Ask: an answer cut off mid text keeps what was written and says it was cut short', c3.text);
+    const rf = await ask('REFUSE this');
+    const rf2 = await ask('and now?');
+    ok(rf.text === 'I cannot answer that one. Please ask about the figures on the map.' && rf2.text === 'Fine.', 'Ask: a refusal gets a plain reply and the next question works', JSON.stringify([rf.text, rf2.text]));
+    const profiles = [];
+    for (let i = 0; i < 8; i++) profiles.push(await ask('PROFILE ' + i + ' Lansbury and Stonebridge'));
+    const maxSize = Math.max(...seen.map(s => s.size)), bad = seen.filter(s => s.status !== 200);
+    ok(profiles.every(p => p.text === 'Done with the figures.') && !bad.length && maxSize < 64 * 1024,
+      'Ask: a long session of profile lookups stays under the Worker\'s 64 KB limit and every request is accepted (H18)',
+      JSON.stringify({ maxSize, bad, last: profiles[profiles.length - 1].text }));
+    ok(await page.evaluate(() => JSON.stringify(PH_ASSISTANT.runTool('list_indicators', {})).length) < 16 * 1024,
+      'Ask: the indicator list fits in one tool result (under 16 KB)');
+    force413 = true;
+    const big = await ask('one more');
+    const after = await ask('again');
+    ok(big.text === 'That conversation has grown too long for me to follow, so I have cleared the earlier questions. Please ask again.' &&
+       after.text === 'Fine.' && seen[seen.length - 1].n === 1,
+      'Ask: a conversation refused as too long is cleared with a plain message, and the next question starts afresh', JSON.stringify([big.text, after.text, seen[seen.length - 1]]));
+    ok(!DASH.test(big.text + c1.text + rf.text), 'Ask: the new messages have no dashes');
+    ok(errors.length === 0, 'no page errors (Ask with the Worker)', errors.join(' | '));
+    await page.close();
+    globalThis.fetch = realFetch;
+    console.log = realLog;
+  }
+
   // A region
   if (HAS_NE) {
     const { page, errors } = await open(browser, 'index.html?r=north-east&t=1', DESK);

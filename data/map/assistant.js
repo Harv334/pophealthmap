@@ -375,7 +375,31 @@ var MODEL_LABEL = "Claude Sonnet 5";
 
   // ---- the tools ---------------------------------------------------------
 
+  /**
+   * A short name for an indicator, for the key list.
+   *
+   * The map's own label (indLabel in index.html) where it has one, which is
+   * the few words the picker shows. Otherwise the first sentence of the
+   * description, cut to a line.
+   */
+  function shortLabel(key) {
+    if (typeof indLabel === "function") {
+      try {
+        var l = indLabel(key);
+        if (l && l !== key) return l;
+      } catch (e) { /* fall through to the description */ }
+    }
+    var d = labelFor(key);
+    d = String(d).split(/\.\s/)[0].replace(/\.$/, "");
+    return d.length > 90 ? d.slice(0, 87) + "..." : d;
+  }
+
   var TOOLS = {
+    /* The key list, kept short. It used to send every indicator's full
+       description, source, year and aggregation rule, 41 KB that was then
+       resent with every later round trip and question; the model needs only
+       enough to pick a key, and get_area and rank_areas carry the detail for
+       the keys it picks. */
     list_indicators: function () {
       var seen = {}, w = wards();
       Object.keys(w).forEach(function (k) {
@@ -384,19 +408,16 @@ var MODEL_LABEL = "Claude Sonnet 5";
       return {
         indicators: Object.keys(seen).filter(function (k) { return !isWithheld(k); }).sort().map(function (k) {
           var m = metaFor(k);
-          return {
-            key: k,
-            description: m && m.desc ? m.desc : k,
-            unit: m && m.u ? m.u : undefined,
-            source: m && m.src ? m.src : undefined,
-            year: m && m.yr ? m.yr : undefined,
-            aggregation: isAdditive(k) ? "summed across wards" : "population-weighted mean",
-            published_at: isBoroughLevel(k) ? "LA" : "ward",
-            higher_means: higherMeans(k),
-          };
+          var row = { key: k, label: shortLabel(k) };
+          if (m && m.u) row.unit = m.u;
+          if (m && m.yr) row.period = m.yr;
+          if (isBoroughLevel(k)) row.la_only = true;
+          var hm = higherMeans(k);
+          if (hm) row.higher_means = hm;
+          return row;
         }),
         note: "Deprivation deciles run 1 (most deprived) to 10 (least deprived). " +
-          "Indicators marked published_at 'LA' are published for the whole " +
+          "Indicators marked la_only are published for the whole " +
           "local authority (LA), so they are the same value for every ward in " +
           "it; do not rank wards by them. Call the local authority level 'LA' " +
           "in answers, not 'borough'.",
@@ -671,21 +692,91 @@ var MODEL_LABEL = "Claude Sonnet 5";
    */
   var MAX_HISTORY = 24; // plus at most 10 more from one question's tool rounds
 
-  function trimHistory() {
-    if (history.length <= MAX_HISTORY) return;
+  /* By size as well as by count. The Worker refuses a conversation over 64 KB,
+     and a few questions that each looked up a profile or two used to pass the
+     old 200,000 character limit by the fourth question, after which every
+     question failed with "Payload too large" until a reload. Between
+     questions the history is kept under HISTORY_BYTES, which leaves room for
+     the next question's own lookups: first the figures from earlier answers
+     are replaced by a short stub (the answers that quoted them stay), then
+     whole old exchanges are dropped. Nothing is changed while the history is
+     small, so the conversation the Worker caches is not rewritten. */
+  var HISTORY_BYTES = 36000;
+  var STUB = "[figures shown earlier]";
+  // One tool result may be at most 16 KB at the Worker; a bigger one is
+  // replaced by a note asking the model to narrow its request.
+  var RESULT_BYTES = 15000;
+
+  function historySize() {
+    try { return JSON.stringify(history).length; } catch (e) { return Infinity; }
+  }
+
+  function exchangeStarts() {
     var starts = [];
     for (var i = 0; i < history.length; i++) {
       var m = history[i];
       if (m.role === "user" && typeof m.content === "string") starts.push(i);
     }
-    for (var s = 0; s < starts.length; s++) {
-      if (history.length - starts[s] <= MAX_HISTORY) {
-        history.splice(0, starts[s]);
-        return;
+    return starts;
+  }
+
+  function trimHistory() {
+    var starts = exchangeStarts();
+    if (history.length > MAX_HISTORY) {
+      for (var s = 0; s < starts.length; s++) {
+        if (history.length - starts[s] <= MAX_HISTORY) {
+          history.splice(0, starts[s]);
+          break;
+        }
+      }
+      if (history.length > MAX_HISTORY && starts.length) history.splice(0, starts[starts.length - 1]);
+      starts = exchangeStarts();
+    }
+    if (historySize() <= HISTORY_BYTES) return;
+    // Stub every earlier exchange's tool results; the question being asked
+    // now (the last start) has none yet.
+    var current = starts.length ? starts[starts.length - 1] : history.length;
+    for (var i = 0; i < current; i++) {
+      var m = history[i];
+      if (m.role === "user" && Array.isArray(m.content)) {
+        m.content = m.content.map(function (b) {
+          return b && b.type === "tool_result" ? { type: "tool_result", tool_use_id: b.tool_use_id, content: STUB } : b;
+        });
       }
     }
-    if (starts.length) history.splice(0, starts[starts.length - 1]);
+    // Then drop whole exchanges from the front until it fits.
+    starts = exchangeStarts();
+    while (starts.length > 1 && historySize() > HISTORY_BYTES) {
+      history.splice(0, starts[1]);
+      starts = exchangeStarts();
+    }
   }
+
+  /* What the model said, as it goes back into the history. Text and tool
+     calls only: nothing else is sent by the map, and the Worker refuses a
+     conversation carrying anything else. Empty text blocks are left out too,
+     because the API refuses those. */
+  function keepBlocks(content, withTools) {
+    return (content || []).filter(function (b) {
+      if (!b) return false;
+      if (b.type === "text") return !!String(b.text || "").trim();
+      return withTools && b.type === "tool_use";
+    }).map(function (b) {
+      return b.type === "text" ? { type: "text", text: b.text }
+        : { type: "tool_use", id: b.id, name: b.name, input: b.input || {} };
+    });
+  }
+
+  function textOf(blocks) {
+    return blocks.filter(function (b) { return b.type === "text"; })
+      .map(function (b) { return b.text; }).join("\n").trim();
+  }
+
+  // Said when an answer stops at the output limit, or the model declines.
+  var CUT_SHORT = "This answer was cut short, so please ask about fewer places at once.";
+  var DECLINED = "I cannot answer that one. Please ask about the figures on the map.";
+  var TOO_LONG = "That conversation has grown too long for me to follow, so I have "
+    + "cleared the earlier questions. Please ask again.";
 
   async function ask(question) {
     /* The map now defers half the ward indicators to a second fetch, so a
@@ -709,6 +800,9 @@ var MODEL_LABEL = "Claude Sonnet 5";
       // once rather than run together with its failed first attempt.
       var at = history.indexOf(asked);
       if (at !== -1) history.length = at;
+      // A conversation the Worker would not take will not be taken next time
+      // either, so it is started again rather than failing for good.
+      if (err && err.reset) history.length = 0;
       throw err;
     }
   }
@@ -751,12 +845,22 @@ var MODEL_LABEL = "Claude Sonnet 5";
       if (ctl && ctl.signal.aborted && !data) throw new Error(TIMED_OUT);
       // Refused for the day. The Worker says so in words; the badge should
       // agree rather than go on offering questions that will be refused.
-      if (res.status === 429) {
+      // Only this reader's own limit empties the badge: the site's daily
+      // ceiling and the one-minute burst limit are not theirs to count.
+      if (res.status === 429 && !(data && (data.scope === "site" || data.scope === "burst"))) {
         writeUsed(capNow());
         renderLimit();
       }
-      // The daily limit's own words are kept. Any other refusal (403, 413,
-      // 500) carries the Worker's internal wording, which means nothing to a
+      // A conversation the Worker refused as too long or malformed. Asking
+      // again would send the same history and be refused the same way, so
+      // the history is cleared (in ask) and the reader told.
+      if (res.status === 400 || res.status === 413) {
+        var e413 = new Error(TOO_LONG);
+        e413.reset = true;
+        throw e413;
+      }
+      // The limits' own words are kept. Any other refusal (403, 500, 502)
+      // carries the Worker's internal wording, which means nothing to a
       // reader, so it is replaced with one plain sentence.
       if (!res.ok || !data) {
         throw new Error(res.status === 429 && data && data.error ? data.error
@@ -778,26 +882,54 @@ var MODEL_LABEL = "Claude Sonnet 5";
         }
       }
 
-      history.push({ role: "assistant", content: data.content });
+      var stop = data.stop_reason;
 
-      if (data.stop_reason !== "tool_use") {
-        return (data.content || [])
-          .filter(function (b) { return b.type === "text"; })
-          .map(function (b) { return b.text; })
-          .join("\n").trim() || "Sorry, no answer came back. Please try again, or ask it a different way.";
+      // Declined. Nothing it wrote is kept, and the history records a plain
+      // reply so the next question follows on from a finished turn.
+      if (stop === "refusal") {
+        history.push({ role: "assistant", content: [{ type: "text", text: DECLINED }] });
+        return DECLINED;
       }
+
+      // Stopped at the output limit. A tool call cut off there is never run,
+      // and a tool call left without its result makes the API refuse every
+      // later question, so only the text is kept, and the reader is told the
+      // answer is incomplete rather than shown half a table as if it were all.
+      if (stop === "max_tokens") {
+        var partial = keepBlocks(data.content, false);
+        history.push({ role: "assistant", content: partial.length ? partial
+          : [{ type: "text", text: "This answer was cut short." }] });
+        var said = textOf(partial);
+        return (said ? said + "\n\n" : "") + CUT_SHORT;
+      }
+
+      var calls = (data.content || []).some(function (b) { return b && b.type === "tool_use"; });
+      if (stop !== "tool_use" || !calls) {
+        var blocks = keepBlocks(data.content, false);
+        var answer = textOf(blocks);
+        history.push({ role: "assistant", content: blocks.length ? blocks
+          : [{ type: "text", text: "No answer." }] });
+        return answer || "Sorry, no answer came back. Please try again, or ask it a different way.";
+      }
+
+      var turn = keepBlocks(data.content, true);
+      history.push({ role: "assistant", content: turn });
       // Every tool_use block must get exactly one tool_result, in one message.
-      var results = (data.content || [])
+      var results = turn
         .filter(function (b) { return b.type === "tool_use"; })
         .map(function (b) {
-          return {
-            type: "tool_result",
-            tool_use_id: b.id,
-            content: JSON.stringify(runTool(b.name, b.input)),
-          };
+          var out = JSON.stringify(runTool(b.name, b.input));
+          if (out.length > RESULT_BYTES) {
+            out = JSON.stringify({ error: "That result is too large to send. Ask for fewer " +
+              "indicators or fewer areas at once, for example with compare_areas and a short indicators list." });
+          }
+          return { type: "tool_result", tool_use_id: b.id, content: out };
         });
       history.push({ role: "user", content: results });
     }
+    // Out of rounds with tool results last. A short reply closes the turn, so
+    // the next question does not follow a reader's turn with another.
+    history.push({ role: "assistant", content: [{ type: "text", text: "I could not finish that answer." }] });
     return "Sorry, that question needed more steps than I can take. Please try a narrower question, such as one about a single ward or LA.";
   }
 
@@ -809,12 +941,73 @@ var MODEL_LABEL = "Claude Sonnet 5";
     });
   }
 
-  function render(text) {
-    // Deliberately minimal: escape everything, then allow bold and line breaks.
-    return esc(text)
-      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-      .replace(/\n/g, "<br>");
+  /* Deliberately minimal: every piece of text is escaped first, then bold,
+     line breaks, "- " lists and simple Markdown tables are allowed. Tables
+     because the instructions ask for one when comparing places, and the
+     first example most people press is a comparison: shown raw, it came back
+     as rows of pipes and dashes. A table is a header row, a separator row of
+     dashes, then body rows; anything else is left as text. */
+  function inline(s) {
+    return esc(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
   }
+  function tableCells(line) {
+    var t = String(line).trim();
+    if (t.charAt(0) === "|") t = t.slice(1);
+    if (t.slice(-1) === "|") t = t.slice(0, -1);
+    return t.split("|").map(function (c) { return c.trim(); });
+  }
+  var TABLE_RULE = /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)+\|?\s*$/;
+  var LIST_ITEM = /^\s*[-*]\s+/;
+
+  function render(text) {
+    var lines = String(text).split(/\r?\n/);
+    var parts = []; // { html, block }
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      if (line.indexOf("|") !== -1 && i + 1 < lines.length && TABLE_RULE.test(lines[i + 1])) {
+        var head = tableCells(line);
+        var rows = [];
+        i += 2;
+        while (i < lines.length && lines[i].indexOf("|") !== -1 && lines[i].trim()) {
+          rows.push(tableCells(lines[i]));
+          i++;
+        }
+        i--;
+        parts.push({ block: true, html: '<div class="ai-tbl" tabindex="0" role="group" aria-label="Table"><table><thead><tr>'
+          + head.map(function (h) { return '<th scope="col">' + inline(h) + "</th>"; }).join("")
+          + "</tr></thead><tbody>"
+          + rows.map(function (r) {
+            return "<tr>" + head.map(function (_, j) { return "<td>" + inline(r[j] || "") + "</td>"; }).join("") + "</tr>";
+          }).join("")
+          + "</tbody></table></div>" });
+        continue;
+      }
+      if (LIST_ITEM.test(line)) {
+        var items = [];
+        while (i < lines.length && LIST_ITEM.test(lines[i])) {
+          items.push("<li>" + inline(lines[i].replace(LIST_ITEM, "")) + "</li>");
+          i++;
+        }
+        i--;
+        parts.push({ block: true, html: "<ul>" + items.join("") + "</ul>" });
+        continue;
+      }
+      parts.push({ block: false, html: inline(line) });
+    }
+    // Blank lines next to a table or list would only add a gap.
+    parts = parts.filter(function (p, k) {
+      if (p.block || p.html) return true;
+      var prev = parts[k - 1], next = parts[k + 1];
+      return !((prev && prev.block) || (next && next.block));
+    });
+    var out = "";
+    parts.forEach(function (p, k) {
+      if (k && !p.block && !parts[k - 1].block) out += "<br>";
+      out += p.html;
+    });
+    return out;
+  }
+  window.PH_ASSISTANT.render = render;
 
   // The named places are London's. Elsewhere the examples name none, so a
   // region's Ask panel never suggests a question about places it does not hold.
@@ -892,6 +1085,8 @@ var MODEL_LABEL = "Claude Sonnet 5";
     var input = document.createElement("input");
     input.id = "ai-input";
     input.autocomplete = "off";
+    // The Worker takes a typed question of up to 1,000 characters.
+    input.maxLength = 1000;
     input.placeholder = "Ask a question about the data...";
     // A placeholder is not a name: it is gone once anyone types.
     input.setAttribute("aria-label", "Your question about the data");
@@ -954,7 +1149,7 @@ var MODEL_LABEL = "Claude Sonnet 5";
     }
 
     async function submit(q) {
-      q = String(q || "").trim();
+      q = String(q || "").trim().slice(0, 1000);
       if (!q || busy) return;
       input.value = "";
       busy = true;

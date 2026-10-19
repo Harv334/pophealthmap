@@ -1546,6 +1546,14 @@
 .ai-thinking{color:var(--ink-3);font-style:italic}
 .ai-error{background:var(--tint-red);color:var(--nhs-red)}
 .ai-msg em{color:var(--ink-2)}
+/* Comparison tables and lists in answers (render() in assistant.js). The
+   table scrolls sideways inside the answer rather than widening the panel. */
+.ai-tbl{overflow-x:auto;margin:6px 0}
+.ai-tbl:focus-visible{outline:2px solid var(--nhs-bright);outline-offset:2px}
+.ai-tbl table{border-collapse:collapse;font-size: var(--t-sm);font-variant-numeric:tabular-nums}
+.ai-tbl th,.ai-tbl td{border-bottom:1px solid var(--line-2);padding:3px 8px 3px 0;text-align:left;vertical-align:top}
+.ai-tbl th{font-weight:600;color:var(--ink-2)}
+.ai-msg ul{margin:4px 0;padding-left:20px}
 #ai-form{display:flex;gap:6px;padding:10px;border-top:1px solid var(--line-2);background:var(--paper-2)}
 #ai-input{flex:1 1 auto;padding:8px 10px;border:1px solid var(--line);border-radius:var(--r-sm);font-size: var(--t-md);
   font-family:inherit;min-width:0}

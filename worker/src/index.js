@@ -27,7 +27,17 @@
  * reads claw some of that back.
  */
 const MODEL = "claude-sonnet-5";
-const MAX_TOKENS = 1024;
+
+/**
+ * Room for the longest answers, with thinking switched off.
+ *
+ * Sonnet 5 thinks adaptively unless told not to, and its thinking shares
+ * max_tokens with the answer. At 1,024 that left comparisons, the longest
+ * answers, cut off mid-figure. Thinking is disabled in the request below,
+ * which suits a model whose job is to look figures up and report them, and
+ * the cap is doubled. The panel still says so when an answer is cut short.
+ */
+const MAX_TOKENS = 2048;
 const DAILY_CAP = 10; // questions per IP, per UTC day
 
 /**
@@ -40,13 +50,38 @@ const DAILY_CAP = 10; // questions per IP, per UTC day
  * continuation and none of them get counted. That is an unauthenticated
  * endpoint spending money with no ceiling.
  *
- * So there are two counters in one value. Questions give the honest user the
+ * So there are two counters per address. Questions give the honest user the
  * message they expect, and requests bound what a forger can spend: six round
  * trips per question is more than the client's five-round limit ever needs,
  * and it caps a determined caller at a few pounds a day rather than at
  * whatever the API will sell them.
  */
 const REQUEST_CAP = DAILY_CAP * 6;
+
+/**
+ * A ceiling for the whole site, per UTC day.
+ *
+ * The per-address caps stop one person; they do not stop many addresses, or
+ * one person with many. These bound the day's total, and when they are
+ * reached Ask stops for everyone until midnight UTC rather than spending on.
+ * SITE_DAILY_QUESTIONS and SITE_DAILY_REQUESTS in wrangler.toml override them.
+ */
+const SITE_QUESTION_CAP = 500;
+const SITE_REQUEST_CAP = 2000;
+
+/**
+ * What a conversation may contain. The browser's history fits well inside
+ * these (data/map/assistant.js trims it to stay so); anything outside them is
+ * not the map talking.
+ */
+const LIMITS = {
+  messages: 40,         // turns in one conversation
+  payload: 64 * 1024,   // characters of JSON for the whole messages array
+  typed: 1000,          // characters in a typed question
+  toolResult: 16 * 1024, // characters in one tool_result
+  assistantText: 12000, // characters in one assistant text block
+  toolInput: 2000,      // characters of JSON in one tool call's input
+};
 
 const SYSTEM_PROMPT = `You are the assistant built into PopHealth Map, a public
 population health map of the 33 London local authorities at ward and LSOA level.
@@ -119,7 +154,7 @@ Rules that matter:
   City of London are its 33 LAs). Use "LA" in answers, introducing it once as
   "local authority (LA)", rather than "borough" or "council area".
 - Some indicators are published for the whole LA and repeated for every ward in
-  it. Tool results mark these, with published_at, with la_level_indicators, or
+  it. Tool results mark these, with la_only, with la_level_indicators, or
   with a caveat. When one appears, say the figure is an LA figure. Never
   present it as a difference between wards, and do not rank wards by it: the
   ordering would be an artefact, not a finding.
@@ -301,77 +336,288 @@ function isNewQuestion(messages) {
 }
 
 /**
- * Per-IP daily cap, held in KV.
+ * Check a conversation before it is forwarded, and rebuild it from what passed.
  *
- * Every KV call is wrapped, because on Cloudflare's free plan KV allows 1,000
- * writes a day and this writes once per question. Unwrapped, the 1,001st
- * question of the day would throw inside the request handler and return a 500:
- * the assistant would break outright at exactly the moment it got popular,
- * rather than degrade.
+ * The caller supplies the whole messages array, and this endpoint has no login,
+ * so without this anyone could post any conversation at all, images and
+ * documents included, and use the Worker as a free general-purpose model under
+ * this site's name. A conversation from the map has one shape, and only that
+ * shape is accepted:
  *
- * A KV failure fails open, matching the unbound-namespace case above. That is a
- * deliberate trade: losing the per-IP cap is recoverable, taking the feature
- * down is not. It does mean KV is not the thing standing between you and a
- * large bill. The spend limit on the Anthropic side is, and it is the one that
- * must actually be set. See worker/README.md.
+ *   - turns alternate, starting and ending with the reader;
+ *   - a typed question is a plain string of at most LIMITS.typed characters;
+ *   - an assistant turn holds only text and calls to the four tools;
+ *   - a reader turn made of blocks holds only tool_result blocks, one for each
+ *     tool call in the turn before it, each a string of at most
+ *     LIMITS.toolResult characters;
+ *   - the whole array is at most LIMITS.payload characters of JSON.
+ *
+ * Images, documents, cache_control and anything else are refused rather than
+ * stripped, because the map never sends them. The messages forwarded are
+ * rebuilt from the fields checked here, so nothing unchecked rides along.
  */
-const NOOP = async () => {};
+const TOOL_NAMES = new Set(TOOLS.map((t) => t.name));
+const TOOL_ID = /^[A-Za-z0-9_-]{1,100}$/;
 
-async function checkDailyCap(env, ip, isQuestion) {
-  // KV not bound: fail open. `enforced` says so out loud, because this is the
-  // one failure that looks exactly like success -- questions are answered, the
-  // panel still counts down from its own localStorage, and nothing anywhere
-  // reveals that the cap is not actually being applied to anyone.
-  if (!env.RATE_LIMIT) return { allowed: true, enforced: false, commit: NOOP };
-  const key = `${new Date().toISOString().slice(0, 10)}:${ip}`;
-  let questions = 0;
-  let requests = 0;
+function refuse(error, status) {
+  return { ok: false, error, status: status || 400 };
+}
+
+function isPlainObject(v) {
+  return !!v && typeof v === "object" && !Array.isArray(v);
+}
+
+function validateMessages(messages) {
+  if (!Array.isArray(messages) || !messages.length) return refuse("messages[] required");
+  if (messages.length > LIMITS.messages) return refuse("Conversation too long", 413);
+  let size;
   try {
-    const raw = await env.RATE_LIMIT.get(key);
-    if (raw) {
-      // "questions,requests". A bare number is the old single-counter format;
-      // reading it as questions keeps yesterday's keys from resetting anyone.
-      const parts = String(raw).split(",");
-      questions = parseInt(parts[0], 10) || 0;
-      requests = parts.length > 1 ? parseInt(parts[1], 10) || 0 : questions;
+    size = JSON.stringify(messages).length;
+  } catch {
+    return refuse("messages[] must be JSON");
+  }
+  if (size > LIMITS.payload) return refuse("Payload too large", 413);
+
+  const out = [];
+  let pending = null; // the tool_use ids the previous assistant turn is waiting on
+  for (let i = 0; i < messages.length; i++) {
+    const m = messages[i];
+    const role = i % 2 === 0 ? "user" : "assistant";
+    if (!isPlainObject(m) || m.role !== role) {
+      return refuse("Turns must alternate, starting with the reader");
     }
-  } catch (e) {
-    console.log(`KV read failed, not counting: ${e && e.message}`);
-    return { allowed: true, enforced: false, commit: NOOP };
-  }
-
-  if (questions >= DAILY_CAP) {
-    return { allowed: false, reason: `Daily limit of ${DAILY_CAP} questions reached. Try again tomorrow.` };
-  }
-  if (requests >= REQUEST_CAP) {
-    return { allowed: false, reason: "Daily limit reached. Try again tomorrow." };
-  }
-
-  // Counted on the way out rather than here, so a request the model never
-  // answered does not burn someone's quota. Anthropic does not bill a call
-  // that failed, and neither should we.
-  return {
-    allowed: true,
-    enforced: true,
-    // What the caller has left once this question is counted. The panel shows
-    // it, so someone can see the limit approaching rather than meet it.
-    remaining: Math.max(0, DAILY_CAP - questions - (isQuestion ? 1 : 0)),
-    commit: async () => {
-      try {
-        // 48h TTL comfortably outlives the UTC day the key is for.
-        await env.RATE_LIMIT.put(
-          key,
-          `${questions + (isQuestion ? 1 : 0)},${requests + 1}`,
-          { expirationTtl: 172800 },
-        );
-      } catch (e) {
-        // Most likely the free plan's 1,000 writes/day. Answer the question and
-        // leave the counter where it is.
-        console.log(`KV write failed, cap not incremented: ${e && e.message}`);
+    if (role === "user") {
+      if (typeof m.content === "string") {
+        if (pending) return refuse("A tool call was left without a result");
+        if (!m.content.trim()) return refuse("Empty question");
+        if (m.content.length > LIMITS.typed) return refuse("Question too long", 413);
+        out.push({ role: "user", content: m.content });
+        continue;
       }
-    },
+      if (!Array.isArray(m.content) || !m.content.length) return refuse("Unsupported reader turn");
+      if (!pending) return refuse("A tool result with no tool call before it");
+      const seen = new Set();
+      const blocks = [];
+      for (const b of m.content) {
+        if (!isPlainObject(b) || b.type !== "tool_result") return refuse("Only tool results may be sent as blocks");
+        if (Object.keys(b).some((k) => !["type", "tool_use_id", "content", "is_error"].includes(k))) {
+          return refuse("Unsupported field in a tool result");
+        }
+        if (!pending.has(b.tool_use_id) || seen.has(b.tool_use_id)) return refuse("A tool result answers no open tool call");
+        if (typeof b.content !== "string") return refuse("A tool result must be text");
+        if (b.content.length > LIMITS.toolResult) return refuse("A tool result is too large", 413);
+        seen.add(b.tool_use_id);
+        const clean = { type: "tool_result", tool_use_id: b.tool_use_id, content: b.content };
+        if (b.is_error === true) clean.is_error = true;
+        blocks.push(clean);
+      }
+      if (seen.size !== pending.size) return refuse("Every tool call needs one result");
+      pending = null;
+      out.push({ role: "user", content: blocks });
+    } else {
+      const raw = typeof m.content === "string" ? [{ type: "text", text: m.content }] : m.content;
+      if (!Array.isArray(raw) || !raw.length) return refuse("Unsupported assistant turn");
+      const ids = new Set();
+      const blocks = [];
+      for (const b of raw) {
+        if (!isPlainObject(b) || "cache_control" in b) return refuse("Unsupported assistant content");
+        if (b.type === "text") {
+          if (typeof b.text !== "string") return refuse("Unsupported assistant content");
+          if (b.text.length > LIMITS.assistantText) return refuse("An earlier answer is too long", 413);
+          if (b.text.trim()) blocks.push({ type: "text", text: b.text });
+        } else if (b.type === "tool_use") {
+          if (typeof b.id !== "string" || !TOOL_ID.test(b.id) || ids.has(b.id)) return refuse("Unsupported tool call");
+          if (!TOOL_NAMES.has(b.name)) return refuse("Unknown tool");
+          if (!isPlainObject(b.input) || JSON.stringify(b.input).length > LIMITS.toolInput) {
+            return refuse("Unsupported tool call");
+          }
+          ids.add(b.id);
+          blocks.push({ type: "tool_use", id: b.id, name: b.name, input: b.input });
+        } else {
+          return refuse("Unsupported assistant content");
+        }
+      }
+      if (!blocks.length) return refuse("Empty assistant turn");
+      pending = ids.size ? ids : null;
+      out.push({ role: "assistant", content: blocks });
+    }
+  }
+  // Alternation starting with the reader means an odd count ends with them.
+  if (out.length % 2 === 0) return refuse("The last turn must be the reader's");
+  return { ok: true, messages: out };
+}
+
+/**
+ * Mark the end of the conversation for caching.
+ *
+ * Only the system block used to be cached, so every round trip paid full price
+ * for everything said so far, tool results included, and a question cost
+ * several times what it needed to. A breakpoint on the last block means the
+ * next round trip, and the next question, read all of this from the cache.
+ */
+function withCacheBreakpoint(messages) {
+  const out = messages.slice();
+  const last = out[out.length - 1];
+  const blocks = typeof last.content === "string"
+    ? [{ type: "text", text: last.content }]
+    : last.content.map((b) => ({ ...b }));
+  blocks[blocks.length - 1].cache_control = { type: "ephemeral" };
+  out[out.length - 1] = { role: last.role, content: blocks };
+  return out;
+}
+
+/**
+ * Whose allowance a request counts against.
+ *
+ * An IPv4 address as it is. An IPv6 address by its /64, because one household
+ * or phone is normally given a whole /64 and can pick a fresh address in it at
+ * will, so counting single IPv6 addresses would be no limit at all.
+ */
+function expandIPv6(ip) {
+  let s = String(ip).split("%")[0].toLowerCase();
+  // An IPv4 tail (::ffff:1.2.3.4) becomes two groups.
+  const v4 = s.match(/(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+  if (v4) {
+    const n = v4.slice(1).map(Number);
+    s = s.slice(0, v4.index) + ((n[0] << 8) | n[1]).toString(16) + ":" + ((n[2] << 8) | n[3]).toString(16);
+  }
+  const halves = s.split("::");
+  if (halves.length > 2) return null;
+  const head = halves[0] ? halves[0].split(":") : [];
+  const tail = halves.length === 2 && halves[1] ? halves[1].split(":") : [];
+  const fill = halves.length === 2 ? 8 - head.length - tail.length : 0;
+  if (fill < 0) return null;
+  const groups = head.concat(new Array(fill).fill("0"), tail);
+  if (groups.length !== 8 || groups.some((g) => !/^[0-9a-f]{1,4}$/.test(g))) return null;
+  return groups.map((g) => g.padStart(4, "0"));
+}
+
+function clientKey(ip) {
+  const s = String(ip || "").trim();
+  if (!s) return "unknown";
+  if (s.includes(":")) {
+    const g = expandIPv6(s);
+    return g ? g.slice(0, 4).join(":") + "::/64" : "unknown";
+  }
+  return s;
+}
+
+function utcDay(now) {
+  return new Date(now === undefined ? Date.now() : now).toISOString().slice(0, 10);
+}
+
+/**
+ * The daily counters, in a Durable Object.
+ *
+ * They used to live in KV, which is the wrong tool for a counter: it reads,
+ * waits for the whole model call, then writes, so parallel requests from one
+ * address all read the same count and all pass, and on the free plan its
+ * 1,000 writes a day ran out at a few hundred questions, after which the cap
+ * failed open for everyone until midnight.
+ *
+ * A Durable Object handles one request at a time and its storage calls cannot
+ * interleave, so a count is checked and taken in one step, before the model is
+ * called, and handed back if the call fails. It holds today's counts only:
+ * the first request of a new day, or the alarm set just after midnight UTC,
+ * clears the day before, so no address is kept beyond the next day (the
+ * privacy page says 48 hours).
+ *
+ * Declared in wrangler.toml as ASK_COUNTER, class AskCounter, SQLite-backed,
+ * which the free plan allows.
+ */
+export class AskCounter {
+  constructor(state, env) {
+    this.state = state;
+    this.storage = state.storage;
+    this.env = env;
+  }
+
+  async rollover(day) {
+    const held = await this.storage.get("day");
+    if (held !== day) {
+      await this.storage.deleteAll();
+      await this.storage.put("day", day);
+    }
+    if (!(await this.storage.getAlarm())) {
+      const next = Date.parse(day + "T00:00:00Z") + 86400000 + 60000;
+      await this.storage.setAlarm(next);
+    }
+  }
+
+  async alarm() {
+    await this.rollover(utcDay());
+  }
+
+  async fetch(request) {
+    const { op, key, question, caps } = await request.json();
+    const day = utcDay();
+    await this.rollover(day);
+    const ipKey = "ip:" + key;
+    const mine = (await this.storage.get(ipKey)) || { q: 0, r: 0 };
+    const site = (await this.storage.get("site")) || { q: 0, r: 0 };
+    const q = question ? 1 : 0;
+
+    if (op === "refund") {
+      mine.q = Math.max(0, mine.q - q);
+      mine.r = Math.max(0, mine.r - 1);
+      site.q = Math.max(0, site.q - q);
+      site.r = Math.max(0, site.r - 1);
+      await this.storage.put({ [ipKey]: mine, site });
+      return Response.json({ ok: true });
+    }
+
+    // A question is refused once today's questions are used up. Round trips
+    // within a question already asked are bounded by the request count, so
+    // the last question of the day can still be finished.
+    let refused = null;
+    if (question && mine.q >= caps.questions) refused = "questions";
+    else if (mine.r >= caps.requests) refused = "requests";
+    else if ((question && site.q >= caps.siteQuestions) || site.r >= caps.siteRequests) refused = "site";
+    if (refused) return Response.json({ allowed: false, refused, remaining: Math.max(0, caps.questions - mine.q) });
+
+    mine.q += q;
+    mine.r += 1;
+    site.q += q;
+    site.r += 1;
+    await this.storage.put({ [ipKey]: mine, site });
+    return Response.json({ allowed: true, remaining: Math.max(0, caps.questions - mine.q) });
+  }
+}
+
+function capsFor(env) {
+  const n = (v, d) => {
+    const x = parseInt(v, 10);
+    return x > 0 ? x : d;
+  };
+  return {
+    questions: DAILY_CAP,
+    requests: REQUEST_CAP,
+    siteQuestions: n(env.SITE_DAILY_QUESTIONS, SITE_QUESTION_CAP),
+    siteRequests: n(env.SITE_DAILY_REQUESTS, SITE_REQUEST_CAP),
   };
 }
+
+async function counter(env, op, key, question) {
+  // One object for the whole site: the counts are small, and one object is
+  // what makes the site-wide ceiling exact.
+  const stub = env.ASK_COUNTER.get(env.ASK_COUNTER.idFromName("daily"));
+  const res = await stub.fetch("https://ask-counter/", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ op, key, question, caps: capsFor(env) }),
+  });
+  if (!res.ok) throw new Error(`counter answered ${res.status}`);
+  return res.json();
+}
+
+const REFUSALS = {
+  questions: `Daily limit of ${DAILY_CAP} questions reached. Try again tomorrow.`,
+  requests: "Daily limit reached. Try again tomorrow.",
+  site: "Ask has answered as many questions as it can for today. Please try again tomorrow. The rest of the map still works.",
+  burst: "That was a lot of questions in a short time. Please wait a minute and try again.",
+};
+
+const UNAVAILABLE = "The assistant is unavailable right now.";
 
 export default {
   async fetch(request, env) {
@@ -380,7 +626,13 @@ export default {
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
     if (request.method !== "POST") return json({ error: "POST only" }, 405, cors);
     if (!cors["Access-Control-Allow-Origin"]) return json({ error: "Origin not allowed" }, 403, cors);
-    if (!env.ANTHROPIC_API_KEY) return json({ error: "Worker is not configured" }, 500, cors);
+    // Fails closed. Without the API key, the counter or the burst limiter the
+    // Worker answers nothing, rather than answering without a limit: an
+    // unbound counter used to look exactly like a working one.
+    if (!env.ANTHROPIC_API_KEY || !env.ASK_COUNTER || !env.ASK_BURST) {
+      console.log("not configured: needs ANTHROPIC_API_KEY, ASK_COUNTER and ASK_BURST (see wrangler.toml)");
+      return json({ error: "Worker is not configured" }, 503, cors);
+    }
 
     let body;
     try {
@@ -389,51 +641,86 @@ export default {
       return json({ error: "Body must be JSON" }, 400, cors);
     }
 
-    const messages = Array.isArray(body.messages) ? body.messages : null;
-    if (!messages || !messages.length) return json({ error: "messages[] required" }, 400, cors);
-    // Bound what a caller can push through: this is an unauthenticated endpoint.
-    if (messages.length > 40) return json({ error: "Conversation too long" }, 400, cors);
-    if (JSON.stringify(messages).length > 200_000) return json({ error: "Payload too large" }, 413, cors);
+    const checked = validateMessages(body && body.messages);
+    if (!checked.ok) return json({ error: checked.error }, checked.status, cors);
+    const messages = checked.messages;
 
-    // Counted after parsing, so the cap can be per question rather than per
-    // round trip. A caller already over the cap is refused either way, so a
-    // continuation cannot be used to slip past it.
-    const ip = request.headers.get("CF-Connecting-IP") || "unknown";
-    const cap = await checkDailyCap(env, ip, isNewQuestion(messages));
-    if (!cap.allowed) return json({ error: cap.reason }, 429, cors);
+    const key = clientKey(request.headers.get("CF-Connecting-IP"));
+    const isQuestion = isNewQuestion(messages);
 
-    const upstream = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": env.ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: MAX_TOKENS,
-        system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
-        tools: TOOLS,
-        messages,
-      }),
-    });
+    // A burst limit first: it costs no storage, and it stops one address
+    // firing requests in parallel before any of them reach the counter.
+    try {
+      const burst = await env.ASK_BURST.limit({ key });
+      if (!burst || !burst.success) return json({ error: REFUSALS.burst, scope: "burst" }, 429, cors);
+    } catch (e) {
+      console.log(`burst limiter failed, refusing: ${e && e.message}`);
+      return json({ error: UNAVAILABLE }, 503, cors);
+    }
+
+    // Counted before the model is called, so parallel requests cannot all
+    // pass on the same count. Handed back below if the call fails.
+    let held;
+    try {
+      held = await counter(env, "take", key, isQuestion);
+    } catch (e) {
+      console.log(`counter failed, refusing: ${e && e.message}`);
+      return json({ error: UNAVAILABLE }, 503, cors);
+    }
+    if (!held.allowed) {
+      return json({ error: REFUSALS[held.refused] || REFUSALS.requests, scope: held.refused }, 429, cors);
+    }
+    const giveBack = async () => {
+      try {
+        await counter(env, "refund", key, isQuestion);
+      } catch (e) {
+        console.log(`refund failed: ${e && e.message}`);
+      }
+    };
+
+    let upstream;
+    try {
+      upstream = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-api-key": env.ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          // Fixed here, never taken from the request: the model, the output
+          // cap, the instructions and the tools are the Worker's alone.
+          model: MODEL,
+          max_tokens: MAX_TOKENS,
+          thinking: { type: "disabled" },
+          system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
+          tools: TOOLS,
+          messages: withCacheBreakpoint(messages),
+        }),
+      });
+    } catch (e) {
+      console.log(`anthropic unreachable: ${e && e.message}`);
+      await giveBack();
+      return json({ error: UNAVAILABLE }, 502, cors);
+    }
 
     if (!upstream.ok) {
       const detail = await upstream.text();
       console.log(`anthropic ${upstream.status}: ${detail.slice(0, 400)}`);
+      // Anthropic does not bill a call that failed, and neither do we.
+      await giveBack();
       // Do not pass the upstream body back: it can echo request content.
-      return json({ error: "The assistant is unavailable right now." }, 502, cors);
+      return json({ error: UNAVAILABLE }, 502, cors);
     }
 
-    // The call reached the model, so it counts, whatever the client does next.
-    await cap.commit();
-
     const data = await upstream.json();
+    // What each call cost, for `wrangler tail`: worker/README.md prices a
+    // question from these.
+    if (data && data.usage) {
+      console.log(JSON.stringify({ q: isQuestion, stop: data.stop_reason, usage: data.usage }));
+    }
     // Under an underscore so it cannot collide with a field the API adds later.
-    // remaining is undefined when KV is unbound, which the panel reads as "no
-    // count to show" rather than as zero left; enforced === false is how you
-    // tell that case apart from a working cap without reading Worker logs.
-    data._limit = { cap: DAILY_CAP, remaining: cap.remaining, enforced: cap.enforced !== false };
+    data._limit = { cap: DAILY_CAP, remaining: held.remaining, enforced: true };
     return json(data, 200, cors);
   },
 };

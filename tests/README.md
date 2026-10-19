@@ -143,10 +143,12 @@ pandas and numpy but no network.
 to build their fixtures, so they need a populated cache. `.cache/` is not in the
 repo: run the relevant pipeline source once first, or skip them.
 
-`test_worker_cap.py` runs the Cloudflare Worker's rate limiting in Chrome
-against a fake KV and a stubbed Anthropic API. There is no Node on the machine
-this was written on, but the Worker is plain JavaScript and Chrome can execute
-it. It costs nothing and calls nothing real.
+`test_worker_cap.py`, `test_worker_followup.py` and `test_worker_guard.py` run
+the Cloudflare Worker (`worker/src/index.js`) under Node through
+`worker_harness.py`, with its real Durable Object counter over in-memory
+storage, a fake burst limiter and a stubbed Anthropic API. They check the caps,
+which messages count as questions, and what the Worker refuses and sends
+upstream. They need Node 18 or later, cost nothing and call nothing real.
 
 `test_assistant_tools.py` is the assistant's tool functions, transliterated into
 Python and checked against `ward_data.json` directly. It was called
