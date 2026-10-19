@@ -4378,10 +4378,99 @@ def _hosp_canon(name: str) -> str:
 # ODS holds names in capitals, so they have to be recased to sit next to the
 # rest of the map. str.title alone gives "1St Ave", "Bmi" and "St Mary'S".
 HOSP_ACRONYMS = {"NHS", "BMI", "UCLH", "GOSH", "CDC", "UTC", "HMP", "RNOH",
-                 "PTS", "II", "III"}
+                 "PTS", "II", "III", "VII", "QEII", "UHCW", "CNTW"}
 
 def _hosp_title(name: str) -> str:
     return title_case(name, initials=True, acronyms={a: a for a in HOSP_ACRONYMS})
+
+# The register says only that a trust has a site there. It lists private
+# hospitals where a trust buys care, teams and offices with "hospital" in their
+# name, and sites that have closed, so a hand-checked list decides what each
+# record is in the regions it covers (London and the North East so far):
+# whether to keep it, the name a resident knows it by, its type and whether it
+# has a 24-hour A&E (yes, no, or eye for an eye A&E only).
+HOSPITAL_SITES = REPO_ROOT / "data" / "curated" / "hospital_sites.csv"
+HOSP_TYPES = {"NHS hospital", "NHS specialist hospital", "NHS community hospital",
+              "NHS mental health hospital", "NHS day hospital", "Private hospital",
+              "Listed on the NHS register of trust sites"}
+# A record that the list does not cover keeps the register's own claim.
+HOSP_UNCHECKED = "Listed on the NHS register of trust sites"
+# Outside the checked regions: brands that are always independent, and words
+# that mark a team or a service rather than a building.
+HOSP_PRIVATE = re.compile(r"\b(?:BMI|SPIRE|NUFFIELD|RAMSAY|CYGNET|PRIORY|CIRCLE|HCA|"
+                          r"SCHOEN|PRIVATE|INDEPENDENT)\b", re.I)
+HOSP_OUTPOST = re.compile(r"HOSPITAL\s*(?:AT|@)\s*HOME|VIRTUAL WARD|\bTEAM\b|"
+                          r"\bLIAISON\b|COMM HOSP WARDS|^PRIVATE HOSPITALS?$", re.I)
+
+def _hosp_site_key(postcode: str, name: str) -> tuple:
+    return (normalise_postcode(postcode), " ".join(str(name).lower().split()))
+
+def load_hospital_sites(path=None) -> dict:
+    """The checked list, keyed by (postcode without spaces, register name)."""
+    path = path or HOSPITAL_SITES
+    out = {}
+    if not Path(path).exists():
+        return out
+    with open(path, newline="", encoding="utf-8") as fh:
+        for r in csv.DictReader(fh):
+            keep = r["keep"].strip().lower() == "yes"
+            if keep and r["type"] not in HOSP_TYPES:
+                raise ValueError(f"hospital_sites.csv: unknown type {r['type']!r} "
+                                 f"for {r['register_name']}")
+            out[_hosp_site_key(r["postcode"], r["register_name"])] = {
+                "keep": keep, "name": r["display_name"].strip(),
+                "type": r["type"].strip(), "ae": r["ae"].strip().lower(),
+            }
+    return out
+
+def hosp_blob_row(r) -> dict:
+    """One record of data/map/hospitals.js. ae is true for a 24-hour A&E, false
+    for none, "eye" for an eye A&E only, and absent where nobody has checked."""
+    pc = normalise_postcode(r["postcode"])
+    # The postcode is the only address ODS gives, and it is the popup's
+    # address line, so it is spaced the way a person writes it.
+    row = {"n": r["name"], "a": f"{pc[:-3]} {pc[-3:]}" if len(pc) > 3 else pc,
+           "lat": round(float(r["lat"]), 6), "lng": round(float(r["lng"]), 6),
+           "t": r["type"]}
+    ae = str(r.get("ae") or "").strip().lower()
+    if ae in ("yes", "no"):
+        row["ae"] = ae == "yes"
+    elif ae == "eye":
+        row["ae"] = "eye"
+    return row
+
+def apply_hospital_sites(rows: list, sites: dict) -> list:
+    """Each register record as the checked list describes it.
+
+    rows carry "name" (as _hosp_title gives it) and "postcode". A record the
+    list covers is dropped or renamed and typed from it. One it does not cover
+    is matched on its postcode alone when the list has exactly one entry
+    there, since the register respells names between releases. Anything else
+    keeps the register's claim, loses records whose name marks a team or a
+    service, and is called a private hospital when it carries a private brand.
+    """
+    by_pc: dict = {}
+    for (pc, _), v in sites.items():
+        by_pc.setdefault(pc, []).append(v)
+    out = []
+    for r in rows:
+        hit = sites.get(_hosp_site_key(r["postcode"], r["name"]))
+        if hit is None and len(by_pc.get(normalise_postcode(r["postcode"]), [])) == 1:
+            hit = by_pc[normalise_postcode(r["postcode"])][0]
+        r = dict(r)
+        if hit is not None:
+            if not hit["keep"]:
+                continue
+            r["name"] = hit["name"] or r["name"]
+            r["type"] = hit["type"]
+            r["ae"] = hit["ae"]
+        else:
+            if HOSP_OUTPOST.search(r["name"]):
+                continue
+            r["type"] = "Private hospital" if HOSP_PRIVATE.search(r["name"]) else HOSP_UNCHECKED
+            r["ae"] = ""
+        out.append(r)
+    return out
 
 def run_hospitals() -> pd.DataFrame | None:
     rule("Hospitals (ODS NHS trust sites)")
@@ -4443,11 +4532,13 @@ def run_hospitals() -> pd.DataFrame | None:
         out_rows.append({
             "name": _hosp_title(name),
             "addr": "", "postcode": npc, "lat": lat, "lng": lng,
-            # Every row here comes from the NHS trust sites register, and that
-            # is the whole of what the register claims about it.
-            "type": "NHS trust site",
+            # Set from data/curated/hospital_sites.csv just below.
+            "type": HOSP_UNCHECKED, "ae": "",
             "LSOA21CD": lsoa, "WD25CD": wd, "LAD25CD": lad,
         })
+    n_before = len(out_rows)
+    out_rows = apply_hospital_sites(out_rows, load_hospital_sites())
+    ok(f"hospitals: checked list kept {len(out_rows):,} of {n_before:,} register sites")
 
     out = pd.DataFrame(out_rows).sort_values("name") if out_rows else pd.DataFrame()
     out_path = DATA_DIR / "healthcare" / "hospitals.parquet"
@@ -6088,15 +6179,9 @@ def export_map_blobs() -> None:
     # is written like every other one.
     hosp = _read_parquet_opt(DATA_DIR / "healthcare" / "hospitals.parquet")
     if hosp is not None and len(hosp):
-        # The postcode is the only address ODS gives, and it is the popup's
-        # address line, so it is spaced the way a person writes it.
-        fmt_pc = lambda p: f"{p[:-3]} {p[-3:]}" if len(p) > 3 else p
-        write_map_blob("HOSP", [
-            {"n": r["name"], "a": fmt_pc(r["postcode"]),
-             "lat": round(float(r["lat"]), 6),
-             "lng": round(float(r["lng"]), 6), "t": r["type"]}
-            for _, r in hosp.iterrows()
-        ], "Hospital sites, from the ODS NHS trust sites register.")
+        write_map_blob("HOSP", [hosp_blob_row(r) for _, r in hosp.iterrows()],
+                       "Hospital sites, from the ODS NHS trust sites register, "
+                       "checked against data/curated/hospital_sites.csv.")
         ok(f"map blob: {len(hosp):,} hospitals -> data/map/{MAP_BLOBS['HOSP']}")
 
 
