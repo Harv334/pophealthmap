@@ -1870,7 +1870,13 @@
      and cannot inherit the lift from there. The same value is written to the
      root element for it. Without this it sat squarely over the figures. */
 
-  @media (max-width: 900px) {
+  /* The actions take about 660px and never shrink, so the ward name needs the
+     sheet's own width, not the window's: with the sidebar open, a window of
+     900 to 1180px left the name a few letters wide and pushed the close
+     button out of the sheet. Under 980px of sheet, the actions take a row of
+     their own. */
+  .ws-sheet { container-type: inline-size; }
+  @container (max-width: 980px) {
     .ws-head { flex-wrap: wrap; }
     .ws-acts { width: 100%; justify-content: flex-end; }
   }
@@ -2535,14 +2541,17 @@
     border-bottom: 1px solid var(--line); background: var(--paper); }
   .q-resultbar strong { color: var(--nhs-dark); font-variant-numeric: tabular-nums; }
   .q-resultbar .q-empty { color: var(--ink-3); font-weight: 500; }
+  /* The results are an ordered list of buttons, so a keyboard reaches each
+     ward and a screen reader hears one name and figure per row. */
+  .q-list { list-style: none; margin: 0; padding: 0; }
   .q-row { display: flex; align-items: center; gap: 8px; padding: 7px var(--s-3); cursor: pointer;
-    border-bottom: 1px solid var(--paper-2); }
+    border: 0; border-bottom: 1px solid var(--paper-2); width: 100%; background: none; font: inherit;
+    text-align: left; color: inherit; }
   .q-row:hover { background: var(--nhs-light); }
   .q-row.sel { background: var(--nhs-light); }
   .q-row .q-rank { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: var(--t-xs);
     color: var(--ink-3); width: 20px; flex-shrink: 0; font-variant-numeric: tabular-nums; }
-  .q-row .q-nm { flex: 1; min-width: 0; font-size: var(--t-sm); color: var(--ink); overflow: hidden;
-    text-overflow: ellipsis; white-space: nowrap; }
+  .q-row .q-nm { flex: 1; min-width: 0; font-size: var(--t-sm); color: var(--ink); overflow-wrap: anywhere; }
   .q-row .q-nm small { display: block; font-size: var(--t-xs); color: var(--ink-3); white-space: normal; }
   .q-row .q-v { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: var(--t-xs);
     color: var(--ink-2); flex-shrink: 0; font-variant-numeric: tabular-nums; }
@@ -3919,7 +3928,7 @@
               any selected indicator are excluded and counted below the results.</div>
             <div id="q-conds"></div>
             <div class="q-sentence" style="margin-top:6px">
-              <span class="q-chip add" id="q-add-cond"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg>Add a condition</span>
+              <button type="button" class="q-chip add" id="q-add-cond"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg>Add a condition</button>
             </div>
             <div id="q-caution"></div>
             <div class="q-readback" id="q-readback"></div>
@@ -23171,6 +23180,10 @@ var PH_SHOW = {
       || indicatorKeys()[0];
     q.conds.push({ key: next, op: 'lte', value: null });
     renderConds(); renderCaution(); renderReadback();
+    // Straight to the new condition's indicator, rather than leaving focus on
+    // the button with the new row somewhere above it.
+    var sels = qCondsEl.querySelectorAll('.q-f-ind');
+    if (sels.length) sels[sels.length - 1].focus();
   });
   qSortEl.addEventListener('change', function () { q.sort = qSortEl.value; });
   qSortDirEl.addEventListener('change', function () { q.dir = qSortDirEl.value; });
@@ -23247,15 +23260,18 @@ var PH_SHOW = {
     var sortLbl = headerOf(q.sort);
     var html = rows.slice(0, 200).map(function (r, i) {
       var v = r.sortVal == null ? 'No figure' : fmtVal(r.sortVal, q.sort);
-      return '<div class="q-row" data-ward="' + esc(r.name) + '">' +
-        '<span class="q-rank">' + String(i + 1).padStart(2, '0') + '</span>' +
+      // The list numbers the rows for a screen reader, so the visible rank is
+      // hidden from it.
+      return '<li><button type="button" class="q-row" data-ward="' + esc(r.name) + '">' +
+        '<span class="q-rank" aria-hidden="true">' + String(i + 1).padStart(2, '0') + '</span>' +
         '<span class="q-nm">' + esc(r.name) + '<small>' + esc(r.lad) +
           (r.counts.length ? ' · ' + r.counts.map(function (n, si) {
             return serviceCount(q.services[si], n);
           }).join(', ') : '') + '</small></span>' +
         '<span class="q-v">' + v + '</span>' +
-        '</div>';
+        '</button></li>';
     }).join('');
+    if (html) html = '<ol class="q-list" aria-label="Matching wards">' + html + '</ol>';
 
     if (rows.length > 200) {
       html += '<div class="ws-note" style="padding:8px 12px">Showing the first 200 of ' +
@@ -23299,8 +23315,9 @@ var PH_SHOW = {
   qResEl.addEventListener('click', function (e) {
     var row = e.target.closest('[data-ward]');
     if (!row) return;
-    qResEl.querySelectorAll('.q-row').forEach(function (r) { r.classList.remove('sel'); });
+    qResEl.querySelectorAll('.q-row').forEach(function (r) { r.classList.remove('sel'); r.removeAttribute('aria-current'); });
     row.classList.add('sel');
+    row.setAttribute('aria-current', 'true');
     selectWardByName(row.getAttribute('data-ward'));
   });
 
