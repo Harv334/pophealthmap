@@ -914,12 +914,18 @@
   .sc-unit:empty { display: none; }
 
   /* ── Top / bottom 20 rankings ── */
-  .rank-list { display: flex; flex-direction: column; gap: 1px; }
-  .rank-row { display: flex; align-items: baseline; gap: 4px; font-size: var(--t-xs); padding: 2px var(--s-1); border-radius: var(--r-sm); cursor: pointer; line-height: 1.2; }
+  .rank-list { margin: 0; padding: 0 0 0 22px; list-style: decimal; font-size: var(--t-xs); }
+  .rank-list li { margin: 0 0 1px; padding: 0; }
+  .rank-list li::marker { color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .rank-row { display: flex; align-items: baseline; gap: 6px; width: 100%; margin: 0; border: 0; background: none;
+    font: inherit; font-size: var(--t-xs); color: inherit; text-align: left; padding: 2px var(--s-1);
+    border-radius: var(--r-sm); cursor: pointer; line-height: 1.25; }
   .rank-row:hover { background: var(--paper-2); }
-  .rank-rank { color: var(--ink-3); width: 16px; text-align: right; flex-shrink: 0; font-variant-numeric: tabular-nums; }
-  .rank-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
+  .rank-row:focus-visible { outline: 2px solid var(--nhs-blue); outline-offset: 1px; }
+  .rank-name { flex: 1; min-width: 0; overflow-wrap: anywhere; color: var(--ink); }
+  .rank-vs.vs { flex-shrink: 0; margin-left: 0; padding: 0 4px; }
   .rank-val { color: var(--ink-2); font-variant-numeric: tabular-nums; flex-shrink: 0; font-size: var(--t-xs); }
+  .rank-notes p { font-size: var(--t-xs); color: var(--ink-2); margin: 8px 0 0; line-height: 1.4; }
 
   /* ── Map ── */
   .map-wrap { --sheet-lift: 0px; position: relative; min-height: 0; min-width: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); overflow: hidden; }
@@ -3665,16 +3671,17 @@
               <div class="sb-lbl rank-title" id="rank-title" style="margin:0">Highest and lowest 10</div>
               <div id="rank-unit" style="font-size:var(--t-xs);color:var(--ink-3);white-space:nowrap"></div>
             </div>
-            <div style="display:flex;gap:8px">
-              <div style="flex:1;min-width:0">
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <div style="min-width:0">
                 <div id="rank-best-hdr" style="font-size:var(--t-xs);color:#0F6E56;font-weight:600;margin-bottom:4px">Best 10</div>
-                <div id="rank-best" class="rank-list"></div>
+                <div id="rank-best"></div>
               </div>
-              <div style="flex:1;min-width:0">
+              <div style="min-width:0">
                 <div id="rank-worst-hdr" style="font-size:var(--t-xs);color:#A32D2D;font-weight:600;margin-bottom:4px">Worst 10</div>
-                <div id="rank-worst" class="rank-list"></div>
+                <div id="rank-worst"></div>
               </div>
             </div>
+            <div id="rank-notes" class="rank-notes"></div>
             <div style="font-size:var(--t-xs);color:var(--ink-3);margin-top:6px;line-height:1.4">
               Select a row to zoom to that area. These lists are hidden while a second indicator is being compared.
             </div>
@@ -6669,13 +6676,36 @@ function ovVsHTML(code) {
 }
 const _ctxCache = {};
 const _LEVEL_PLURAL = { ward: 'wards', lsoa: 'LSOAs', msoa: 'MSOAs', borough: 'LAs' };
-function ovContext(level, k, v) {
+/* Wards under 1,000 residents (most of the City of London's), or with no
+   Census count at all, are left out of ward rankings of rates and
+   percentages: a figure resting on a few hundred people can swing a long
+   way. Counts are not affected, nor figures published for the whole LA,
+   which a small ward only repeats. The rankings, the hover percentile and
+   the ward reports all use this one rule. */
+const SMALL_WARD_POP = 1000;
+function rankSkipsSmall(level, k) {
+  if (level !== 'ward' || laSums(k) || ovNativeLevel(k) === 'borough') return false;
+  // Rates and percentages of residents only: a deprivation score, air
+  // quality or a distance does not rest on how many people live there.
+  const u = indUnit(k);
+  return u === '%' || /^per |^ratio|^years$/.test(u);
+}
+function wardIsSmall(rec) {
+  const ind = rec ? (rec.indicators || rec) : null;
+  const p = ind ? parseFloat(ind.census_population) : NaN;
+  return !(p >= SMALL_WARD_POP);
+}
+function ovContext(level, k, v, rec) {
   const n = parseFloat(v);
   if (isNaN(n) || typeof _bivIds !== 'function') return '';
+  const skipSmall = rankSkipsSmall(level, k);
+  if (skipSmall && rec && wardIsSmall(rec)) return '';
   const key = level + '|' + k;
   let vals = _ctxCache[key];
   if (!vals) {
-    vals = _bivIds(level).map(id => _bivValue(level, id, k)).filter(x => x != null).sort((a, b) => a - b);
+    vals = _bivIds(level)
+      .filter(id => !skipSmall || !wardIsSmall(typeof WARD_DATA !== 'undefined' ? WARD_DATA[id] : null))
+      .map(id => _bivValue(level, id, k)).filter(x => x != null).sort((a, b) => a - b);
     if (vals.length < 5) return '';
     _ctxCache[key] = vals;
   }
@@ -7306,7 +7336,7 @@ function ovTooltipRows(valueForKey, ward, level) {
     if (isMissing) {
       return `<span class="tip-row"><b>${ovLabel(k)}:</b> <span class="tip-none">no data</span></span>`;
     }
-    const ctx = (level && !bivOn()) ? ovContext(level, k, v) : '';
+    const ctx = (level && !bivOn()) ? ovContext(level, k, v, ward) : '';
     return `<span class="tip-row"><b>${ovLabel(k)}:</b> ${fmtOv(v, k)}</span>` +
       (ctx ? `<span class="ctx">${ctx}</span>` : '');
   };
@@ -14756,6 +14786,19 @@ function renderTopBottom() {
   // field on each ward record). Without it the IMD-composite-ward overlay
   // produced an empty Top/Bottom 20 panel because every ward returned null.
   const fieldKey = resolveOvField(curOv);
+  // Ties are broken on the measure underneath: an LSOA's decile by its
+  // national rank, a ward's average decile by its deprivation score, so the
+  // ten shown at an end shared by hundreds are the ten furthest along it,
+  // not whichever came first in the file. tb runs the same way as v.
+  const isDecile = /decile/.test(fieldKey);
+  const tbOf = (row) => {
+    const ind = row.indicators || row || {};
+    if (isDecile && useLsoa) { const r = parseFloat(ind.imd_rank); return isNaN(r) ? null : r; }
+    if (isDecile && level === 'ward') { const s = parseFloat(ind.imd_score); return isNaN(s) ? null : -s; }
+    return null;
+  };
+  // Rates and percentages leave out wards under 1,000 residents (SMALL_WARD_POP).
+  const skipSmall = rankSkipsSmall(level, curOv);
   let rows = [];
   for (const [id, row] of Object.entries(pool)) {
     if (useLsoa && mapCodes && !mapCodes.has(id)) continue;
@@ -14763,7 +14806,8 @@ function renderTopBottom() {
     if (v == null || v === '' || isNaN(parseFloat(v))) continue;
     const name = (mapNames && mapNames[id]) || row.name || row.lsoa_name || row.LSOA21NM || id;
     const lad = level === 'ward' ? (row.lad || (typeof ladOf === 'function' ? ladOf(id) : '')) : (mapLads[id] || '');
-    rows.push({ id, name, lad, v: parseFloat(v) });
+    rows.push({ id, name, lad, v: parseFloat(v), tb: tbOf(row), small: skipSmall && wardIsSmall(row),
+                vs: level === 'msoa' ? ovVsEngland('msoa', id, fieldKey) : '' });
   }
   // The lists follow a focused LA or ICB, and say so in their title. A focus
   // with too few areas at this level to rank (one LA at LA level) keeps the
@@ -14773,60 +14817,125 @@ function renderTopBottom() {
     const inFocus = rows.filter(r => ladInFocus(r.lad));
     if (inFocus.length >= 6) { rows = inFocus; where = focusedIcb ? focusLabel() : ladPhrase(focusLabel()); }
   }
+  // "in the North East", "in London".
+  const inWhere = (where === PH_AREA && /^(North|South|East|West)\b/.test(where)) ? 'the ' + where : where;
+  const smallOut = rows.filter(r => r.small);
+  rows = rows.filter(r => !r.small);
   if (rows.length < 3) { panel.style.display = 'none'; return; }
-  rows.sort((a, b) => a.v - b.v);
+  // Two orderings, so that within a tie that is still unbroken both lists
+  // name areas alphabetically rather than one of them backwards.
+  const byName = (a, b) => String(a.name).localeCompare(String(b.name), 'en-GB');
+  const tbCmp = (a, b) => (a.tb == null || b.tb == null) ? 0 : a.tb - b.tb;
+  const asc  = rows.slice().sort((a, b) => (a.v - b.v) || tbCmp(a, b) || byName(a, b));
+  const desc = rows.slice().sort((a, b) => (b.v - a.v) || -tbCmp(a, b) || byName(a, b));
 
-  // wh:true → higher is worse; best = lowest values (front of ascending list).
-  // wh:false → higher is better; best = highest values (end of ascending list).
-  // Descriptive → highest first, whatever wh says.
+  // wh:true → higher is worse; best = lowest values.
+  // wh:false → higher is better; best = highest values.
+  // Descriptive indicators and counts are named by the figure, not judged.
   const descriptive = !!cfg.descriptive;
+  const neutral = descriptive || laSums(curOv);
   const lowFirst = cfg.wh && !descriptive;
   // Ten each way, or half the areas when there are fewer than 20, so the two
   // lists never share an area.
   const n = Math.min(10, Math.floor(rows.length / 2)) || 1;
-  const bestSlice  = lowFirst ? rows.slice(0, n) : rows.slice(-n).reverse();
-  const worstSlice = lowFirst ? rows.slice(-n).reverse() : rows.slice(0, n);
-  const nWord = n < 10 ? ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'][n - 1] : String(n);
-  const noun = n === 1 ? ({ lsoa: 'LSOA', msoa: 'MSOA', borough: 'LA' }[level] || 'ward')
-                       : ({ lsoa: 'LSOAs', msoa: 'MSOAs', borough: 'LAs' }[level] || 'wards');
+  const lowSlice = asc.slice(0, n), highSlice = desc.slice(0, n);
+  const bestSlice  = neutral ? highSlice : (lowFirst ? lowSlice : highSlice);
+  const worstSlice = neutral ? lowSlice  : (lowFirst ? highSlice : lowSlice);
+  const words = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
+                 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen', 'twenty'];
+  const numWord = (x) => (x >= 1 && x <= 20) ? words[x - 1] : x.toLocaleString('en-GB');
+  const capWord = (x) => { const w = numWord(x); return w.charAt(0).toUpperCase() + w.slice(1); };
+  const nWord = n < 10 ? numWord(n) : String(n);
+  const nounOf = (c) => c === 1 ? ({ lsoa: 'LSOA', msoa: 'MSOA', borough: 'LA' }[level] || 'ward')
+                               : ({ lsoa: 'LSOAs', msoa: 'MSOAs', borough: 'LAs' }[level] || 'wards');
+  const noun = nounOf(n);
 
   const titleEl = document.getElementById('rank-title');
-  if (titleEl) titleEl.textContent = 'Highest and lowest ' + nWord + ' ' + noun + ' in ' + where;
+  if (titleEl) titleEl.textContent = 'Highest and lowest ' + nWord + ' ' + noun + ' in ' + inWhere;
   const unitEl = document.getElementById('rank-unit');
   if (unitEl) unitEl.textContent = 'out of ' + rows.length.toLocaleString('en-GB');
   const bestHdr  = document.getElementById('rank-best-hdr');
   const worstHdr = document.getElementById('rank-worst-hdr');
+  // The unit once, in each header, short enough to sit beside "Best 10".
+  const u = indUnit(curOv);
+  const uShort = !u ? '' : u === '%' ? '%' : /^ratio/.test(u) ? 'ratio' : /^per /.test(u) ? 'rate ' + u : u;
   // "Best 20" in green over the wards with the most Black residents would read
-  // as a verdict on who lives there. Descriptive lists are named by the figure
-  // and set in ink.
-  if (descriptive) {
-    bestHdr.textContent  = 'Highest ' + nWord;
-    worstHdr.textContent = 'Lowest ' + nWord;
+  // as a verdict on who lives there, and "Best" crime counts mostly name the
+  // emptiest wards. Neutral lists are named by the figure and set in ink.
+  if (neutral) {
+    bestHdr.textContent  = 'Highest ' + nWord + (uShort ? ' (' + uShort + ')' : '');
+    worstHdr.textContent = 'Lowest ' + nWord + (uShort ? ' (' + uShort + ')' : '');
   } else {
-    bestHdr.textContent  = `Best ${nWord} (${cfg.wh ? 'lowest' : 'highest'})`;
-    worstHdr.textContent = `Worst ${nWord} (${cfg.wh ? 'highest' : 'lowest'})`;
+    const hiLo = (w) => '(' + w + (uShort ? ' ' + uShort : '') + ')';
+    bestHdr.textContent  = `Best ${nWord} ${hiLo(cfg.wh ? 'lowest' : 'highest')}`;
+    worstHdr.textContent = `Worst ${nWord} ${hiLo(cfg.wh ? 'highest' : 'lowest')}`;
   }
-  bestHdr.style.color  = descriptive ? 'var(--ink)' : '#0F6E56';
-  worstHdr.style.color = descriptive ? 'var(--ink)' : '#A32D2D';
+  bestHdr.style.color  = neutral ? 'var(--ink)' : '#0F6E56';
+  worstHdr.style.color = neutral ? 'var(--ink)' : '#A32D2D';
 
   // To the indicator's own decimal places, as on the hover card and in the
   // Data export, rather than by the size of the number.
   const rankDp = indDecimals(curOv);
   const fmt = v => fmtNum(v, rankDp);
-  // Each row's tooltip names the indicator (from IND_NAMES) and its unit,
-  // which the narrow columns have no room for.
   const unitSfx = indValueUnit(curOv);
-  const render = (arr) => arr.map((r, i) => {
-    const safeName = (r.name || '').replace(/[<>&"']/g, c => (
-      {'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]
-    ));
-    const safeId = String(r.id).replace(/'/g, '&#39;');
-    return `<div class="rank-row" data-kind="${level}" data-id="${safeId}" title="${safeName}, ${_esc(indLabel(curOv))}: ${fmt(r.v)}${unitSfx}">`
-      + `<span class="rank-rank">${i+1}.</span>`
-      + `<span class="rank-name">${safeName}</span>`
-      + `<span class="rank-val">${fmt(r.v)}</span>`
-      + `</div>`;
-  }).join('');
+
+  // What the lists cannot show by themselves, said under them.
+  const notes = [];
+  if (smallOut.length) {
+    const lads = Array.from(new Set(smallOut.map(r => r.lad).filter(Boolean)));
+    const one = smallOut.length === 1;
+    notes.push(capWord(smallOut.length) + ' ' + (lads.length === 1 ? lads[0] + ' ' : '') +
+      (one ? 'ward' : 'wards') + ' with fewer than 1,000 residents ' + (one ? 'is' : 'are') +
+      ' left out, because ' + (one ? 'its figures rest' : 'their figures rest') +
+      ' on a few hundred people and can swing a long way.');
+  }
+  // More areas share an end value than the list can show.
+  const tieNote = (slice, sorted, low) => {
+    if (!slice.length) return;
+    const end = sorted[0].v;
+    const c = rows.filter(r => r.v === end).length;
+    if (c <= n) return;
+    const cN = c.toLocaleString('en-GB'), nn = nounOf(c);
+    const nWord = numWord(n);   // "the ten with", in a sentence
+    if (isDecile && useLsoa && Number.isInteger(end)) {
+      const tenth = end === 1 ? ', the most deprived tenth of England,' : end === 10 ? ', the least deprived tenth of England,' : ',';
+      notes.push(`${cN} ${nn} in ${inWhere} are in decile ${end}${tenth} so this list shows the ${nWord} with the ` +
+        `${low ? 'lowest' : 'highest'} national rank.`);
+    } else if (isDecile && level === 'ward' && slice.every(r => r.tb != null)) {
+      notes.push(`${cN} ${nn} in ${inWhere} share the ${low ? 'lowest' : 'highest'} figure, ${fmt(end)}, ` +
+        `so this list shows the ${nWord} with the ${low ? 'highest' : 'lowest'} deprivation score.`);
+    } else if (end === 0 && laSums(curOv)) {
+      notes.push(`${cN} ${nn} in ${inWhere} have none, so this list shows ${nWord} of them in alphabetical order.`);
+    } else {
+      notes.push(`${cN} ${nn} in ${inWhere} share the ${low ? 'lowest' : 'highest'} figure, ${fmt(end)}${unitSfx}, ` +
+        `so this list shows ${nWord} of them in alphabetical order.`);
+    }
+  };
+  tieNote(lowSlice, asc, true);
+  tieNote(highSlice, desc, false);
+  const hasVs = level === 'msoa' && rows.some(r => r.vs);
+  if (hasVs) {
+    notes.push('Only areas marked better or worse differ from England by OHID’s test, so an area can appear in these lists by chance.');
+  }
+  const notesEl = document.getElementById('rank-notes');
+  if (notesEl) notesEl.innerHTML = notes.map(t => `<p>${_esc(t)}</p>`).join('');
+
+  // OHID's verdict on an MSOA row, in a word.
+  const VS_WORD = { B: 'Better', W: 'Worse', S: 'Similar', H: 'Higher', L: 'Lower' };
+  // An ordered list of buttons: the list numbers the rows, a screen reader
+  // reads each row as one control, and names wrap rather than being cut.
+  const render = (arr) => '<ol class="rank-list">' + arr.map((r) => {
+    const safeName = _esc(r.name || '');
+    const safeId = _esc(String(r.id));
+    const vsTxt = VS_WORD[r.vs] || '';
+    const vsTag = vsTxt
+      ? ` <span class="rank-vs vs ${r.vs === 'W' ? 'vs-w' : r.vs === 'B' ? 'vs-b' : 'vs-s'}" title="OHID's test against England">${vsTxt}<span class="sr-only"> than England</span></span>`
+      : '';
+    return `<li><button type="button" class="rank-row" data-kind="${level}" data-id="${safeId}" title="${safeName}, ${_esc(indLabel(curOv))}: ${fmt(r.v)}${unitSfx}">`
+      + `<span class="rank-name">${safeName}</span>${vsTag} `
+      + `<span class="rank-val">${fmt(r.v)}<span class="sr-only">${_esc(unitSfx)}</span></span>`
+      + `</button></li>`;
+  }).join('') + '</ol>';
   const bestEl  = document.getElementById('rank-best');
   const worstEl = document.getElementById('rank-worst');
   bestEl.innerHTML  = render(bestSlice);
@@ -18315,7 +18424,11 @@ var PH_SHOW = {
   function values(k) {
     if (_dist[k]) return _dist[k];
     var out = [];
+    // Wards under 1,000 residents are left out of rates and percentages, as
+    // in the rankings (rankSkipsSmall), so they set no median or percentile.
+    var skip = typeof rankSkipsSmall === 'function' && rankSkipsSmall('ward', k);
     allWards().forEach(function (w) {
+      if (skip && wardIsSmall(w.inds)) return;
       var v = num(w.inds[k]);
       if (v !== null) out.push(v);
     });
@@ -18334,8 +18447,10 @@ var PH_SHOW = {
   function boroughMedian(k, lad) {
     if (!lad) return null;
     var s = [];
+    var skip = typeof rankSkipsSmall === 'function' && rankSkipsSmall('ward', k);
     allWards().forEach(function (w) {
       if (w.lad !== lad) return;
+      if (skip && wardIsSmall(w.inds)) return;
       var v = num(w.inds[k]);
       if (v !== null) s.push(v);
     });
@@ -19126,7 +19241,7 @@ var PH_SHOW = {
     var line = function (k) {
       var v = wardOvValue(currentWard, k);
       if (v == null || v === '' || isNaN(parseFloat(v))) return '<div>' + e(ovLabel(k)) + ': <span style="color:var(--ink-3)">no figure</span></div>';
-      var ctx = (typeof bivOn === 'function' && bivOn()) ? '' : ovContext('ward', k, v);
+      var ctx = (typeof bivOn === 'function' && bivOn()) ? '' : ovContext('ward', k, v, (typeof WARD_DATA !== 'undefined' && WARD_DATA[currentWard]) || {});
       return '<div>' + e(ovLabel(k)) + ': <b>' + e(fmtOv(v, k)) + '</b>' +
         (ctx ? '<span class="ctx">' + e(ctx) + '</span>' : '') + '</div>';
     };
