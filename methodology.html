@@ -60,15 +60,17 @@
 from the Census, the NHS, the Index of Multiple Deprivation and other official
 sources. This page explains where each one comes from, how it was placed on
 wards and neighbourhoods, and what it can and cannot tell you, so you can judge
-how far to rely on it. If you only have a few minutes, start with
+how far to rely on it. If you only have a few minutes, start with the
+<a href="#five-things">five things to know</a> at the top of
 <a href="#reading">How to interpret the data</a>, and you will find the exact ONS lookup
 files in the <a href="#appendix">technical appendix</a> at the end.</p>
 
 <div class="caution">
-  <strong>Project status: beta.</strong> All figures come from official
-  published sources, but the methods used to aggregate them and the boundary
-  lookups are still being validated, so please treat figures as
-  provisional.
+  <strong>PopHealth Map is in beta.</strong> Every figure comes from an official
+  published source, and this page explains how each one is placed onto wards and
+  neighbourhoods. If a figure looks wrong, please use Report a problem on its card
+  or write to <a href="mailto:contact@pophealth.uk">contact@pophealth.uk</a>, and we
+  will check it against the publisher's own release.
 </div>
 
 <nav class="toc" aria-labelledby="on-this-page">
@@ -116,12 +118,30 @@ asks for.</p>
 
 <h2 id="reading">How to interpret the data</h2>
 
-<p>Several methodological properties of the underlying datasets affect how
-figures on this map should be interpreted. None of them is an error, because
-each follows from how the figures are published, but each changes what a
-number means, so they are grouped here by the question they answer. The names
-of the areas, from the local authority (LA) down to the LSOA and the output
-area, are explained in the <a href="#words">Glossary of geographies and
+<div class="box" id="five-things">
+  <p><strong>Five things to know before you use a figure</strong></p>
+  <ul>
+    <li>Darker usually means a higher figure, whether that is good or bad, except
+      for the deprivation deciles and ranks, where darker always means more
+      deprived. The ends of the legend are the 5th and 95th percentiles rather
+      than the highest and lowest areas.</li>
+    <li>Each indicator has its own period, which can be several years old. The
+      date at the foot of the map says when we last updated the figures, not the
+      years they describe.</li>
+    <li>A blank area has no figure, which is not the same as a figure of zero.</li>
+    <li>Each figure is published for one level of area, and figures for the other
+      levels are calculated from it, so a ward figure is usually a close estimate
+      rather than an exact count. The card for each indicator says which level its
+      publisher uses.</li>
+    <li>Two indicators that rise and fall together are a place to look, not proof
+      that one causes the other.</li>
+  </ul>
+</div>
+
+<p>Each of these comes from how the figures are published rather than from an
+error, and the sections below explain them, grouped by the question they answer.
+The names of the areas, from the local authority (LA) down to the LSOA and the
+output area, are explained in the <a href="#words">Glossary of geographies and
 measures</a>.</p>
 
 <h3 id="reading-measures">What a figure measures</h3>
@@ -132,9 +152,9 @@ measures</a>.</p>
 or the key along the bottom of the map, opens a card that explains what is counted
 and out of what, the level its publisher releases it at and how it reaches the
 other levels, the period, the source and how often the source updates it. For
-the Local Health figures, the type of value, the unit, the kind of year and the
-date of the last update are OHID's own, taken from OHID's published
-records.</p>
+the Local Health figures, the card uses OHID's own description of each figure,
+including its unit, whether its years are calendar or financial years, and when
+OHID last updated it.</p>
 
 <h4 id="periods">Each indicator has its own period</h4>
 
@@ -173,9 +193,9 @@ no figure for everyone together, so the map offers it as two indicators.</p>
 highest, whether a higher figure is good news or bad. The exception is the
 deprivation deciles and ranks, which count down from 1 for the most deprived,
 so on those maps the colours are turned round and darker still means more
-deprived. Whether a higher figure is better or worse is used in the Highest
-and lowest 10 lists and in the printable reports, where we follow OHID's own
-published direction for the Local Health figures. Indicators that describe who
+deprived. The Highest and lowest 10 lists and the printable reports do say
+whether a higher figure is better or worse, and for the Local Health figures they
+follow the direction OHID publishes. Indicators that describe who
 lives in an area, such as the share of residents over 65, in social housing or
 of any ethnic group, have no better or worse end, so they are listed as highest
 and lowest rather than best and worst.</p>
@@ -240,11 +260,11 @@ areas</a>, and these are the parts of it that change what you see.</p>
 <p>LSOA boundaries come from the 2021 Census and wards were redrawn in 2025, so
 the two genuinely cross, and about four in ten LSOAs cross a ward line. Each
 LSOA is given to the one ward it best fits, so a ward's figure counts each LSOA
-once rather than in proportion to the land it shares. Visible overlaps between
-LSOA and ward boundaries at high zoom reflect genuine differences between the
-2021 Census and 2025 electoral boundaries, not a rendering error.</p>
+once rather than in proportion to the land it shares. So if you zoom in and see
+LSOA and ward edges crossing, that is how the two sets of boundaries are really
+drawn, not a fault in the map.</p>
 
-<h4 id="adding-up">Rates are population-weighted, and only raw counts are summed</h4>
+<h4 id="adding-up">How figures are combined into wards and LAs</h4>
 
 <p>When small areas are aggregated into wards or LAs, rates, percentages and
 scores are weighted by population, so each area counts in proportion to the
@@ -580,10 +600,11 @@ name, and no boundary is laid over another to decide where a figure belongs.</p>
 <h3 id="best-fit">Best fit, not exact fit</h3>
 
 <p>The ONS lookups give each LSOA to the single ward it mostly sits in, judged by
-where people live. About four in ten LSOAs cross a ward line, so a ward figure
-built in this way is a close estimate for the ward rather than an exact count.
-Because the same lookup is used for every indicator built from LSOAs, ward
-figures are consistent with one another. For a few wards, though, the LSOAs
+where people live. Because many LSOAs cross a ward line (see
+<a href="#lsoas-and-wards">LSOAs do not sit inside wards</a>), a ward figure
+built in this way is a close estimate for the ward rather than an exact count,
+but because the same lookup is used for every indicator, ward figures can still
+be compared fairly with one another. For a few wards, though, the LSOAs
 given to them hold noticeably more or fewer people than the ward itself, and
 those wards, where the LSOAs hold under 80% or over 125% of the ward's
 residents, are marked in the Area profile and the ward report.</p>
@@ -615,7 +636,8 @@ a picture of a street or estate rather than a precise measure.</p>
 <h3 id="msoas">MSOAs</h3>
 
 <p>MSOAs have their own place on the level switch. An MSOA is made of whole
-LSOAs, but because about four in ten LSOAs cross a ward line, MSOAs and wards do
+LSOAs, but because many LSOAs cross a ward line (see
+<a href="#lsoas-and-wards">LSOAs do not sit inside wards</a>), MSOAs and wards do
 not fit inside one another, and where an MSOA edge matches a ward edge it does
 so by coincidence. Local Health figures are published for MSOAs, and they reach
 wards through the LSOAs the two share.</p>
@@ -626,10 +648,9 @@ wards through the LSOAs the two share.</p>
 2011 area was split or merged to make a 2021 one, the figure for the 2021 area
 is calculated from the 2011 ones, weighted by how many people lived in each, and
 the map says <em>Estimated from 2011 areas</em> beside it and does not compare
-it with England, because the publisher's comparison applied to the old area. In
-the current release OHID publishes no figure under either code for the areas
-that changed, so they are left blank rather than estimated, and the rule is
-there for any figure that does arrive for the old areas.</p>
+it with England, because the publisher's comparison applied to the old area. At
+present OHID publishes no figure at all for the areas that changed, so they are
+left blank and nothing on the map is estimated in this way.</p>
 
 <h3 id="la-codes">LA codes are checked at every update</h3>
 
@@ -689,20 +710,19 @@ see it.</p>
 
 <h3 id="gap-pcn">PCN catchments are not always available</h3>
 
-<p>Where a network's patients live comes from an NHS Digital file that its
-website will not let us download automatically, so it has to be added by hand
-at each update. When it is missing, a network shows its practices but no
-catchment.</p>
+<p>The figures for where each network's patients live come from an NHS Digital
+file that we add by hand at each update, because it cannot be downloaded
+automatically. Until the latest file has been added, a network shows its
+practices but no catchment.</p>
 
 <h3 id="gap-benefits">Benefits other than the claimant count</h3>
 
-<p>These are not currently included. Small-area figures for DWP benefits, such
-as Universal Credit, Personal Independence Payment, Employment and Support
-Allowance, Carer's Allowance and Pension Credit, are not published on Nomis for
-2021 LSOAs: some have never been published there, and the rest stop in 2018 on
-older boundaries. Current figures are available only through DWP's Stat-Xplore
-service, and including them needs a separate connection to it. The claimant
-count, which covers people claiming benefits because they are unemployed, is
+<p>The map does not yet include benefits other than the claimant count, such as
+Universal Credit, Personal Independence Payment, Employment and Support
+Allowance, Carer's Allowance and Pension Credit. Current figures for them by LSOA
+are published only through DWP's Stat-Xplore service, because Nomis has either
+never carried them or stops in 2018 on older boundaries. The claimant count,
+which covers people claiming benefits because they are unemployed, is
 included.</p>
 
 <h2 id="appendix">Technical appendix</h2>
@@ -851,10 +871,8 @@ licences file</a>.</p>
 
 <footer class="site-ftr">
   <div class="site-ftr-in">
-    <p>PopHealth Map lets you explore health, deprivation and local services across
-    every neighbourhood in England, free and with no sign-in. You can get in touch at
-    <a href="mailto:contact@pophealth.uk">contact@pophealth.uk</a>.</p>
-    <p>An independent project, not affiliated with the NHS.</p>
+    <p>PopHealth Map is an independent project, not affiliated with the NHS. You can get
+    in touch at <a href="mailto:contact@pophealth.uk">contact@pophealth.uk</a>.</p>
   </div>
 </footer>
 
