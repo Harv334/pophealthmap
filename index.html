@@ -7488,6 +7488,11 @@ function indicatorReportHref(k, write) {
   };
   ['pointerdown', 'focusin', 'click', 'contextmenu'].forEach(t => document.addEventListener(t, refresh, true));
 })();
+/* Output areas are the smallest areas drawn, and where one household moves
+   a figure most: said under the key whenever they are on the map, and on
+   every Census card. */
+const OA_CAVEAT = 'Each output area holds about 125 households, so a few households can change these figures a lot. Read them as a picture of a street or estate rather than an exact count.';
+const OA_CAVEAT_CARD = 'Each output area holds about 125 households, so a few households can change its figures a lot. Read output area figures as a picture of a street or estate rather than an exact count.';
 function indicatorCardHTML(k) {
   const e = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const m = (typeof OV_META === 'object' && OV_META[k]) || {};
@@ -7501,7 +7506,8 @@ function indicatorCardHTML(k) {
   const desc = say(m.desc);
   const num = say(f.num), den = say(f.den);
   const pub = _publishedAt(k, nat, lv).map(say);
-  const age = ovAgeNote(k), caution = say([ovCaution(k), laNotesCaution(k)].filter(Boolean).join(' '));
+  const age = ovAgeNote(k), caution = say([ovCaution(k), laNotesCaution(k),
+    nat === 'oa' && k !== 'census_population' ? OA_CAVEAT_CARD : ''].filter(Boolean).join(' '));
   const vsEng = /^ft_/.test(k) && nat === 'msoa'
     ? say('OHID tests each MSOA figure against England, and when the map shows MSOAs, each area\'s figure says whether it is better than, worse than or similar to England.') : '';
   const source = say(_cardSource(k));
@@ -16211,6 +16217,7 @@ function _syncScaleNumbers() {
       ? _e(_keySourceLine(curOv, drawnLvl, estLa)) +
         (age ? ' <span class="ov-old">' + _e(age) + '.</span>' : '') +
         (caution ? '<span class="ov-caution">' + _e(caution) + '</span>' : '') +
+        (drawnLvl === 'oa' ? '<span class="ctx" id="sc-oa-note">' + _e(OA_CAVEAT) + '</span>' : '') +
         (nativeG === 'msoa' && drawnLvl === 'msoa' ? '<span class="ctx">Select an MSOA to see whether its figure differs from England\'s, by OHID\'s test.</span>' : '') +
         (estLa
           ? '<span class="ctx" id="sc-la-est">' + _e('These LA figures are our estimates from ward figures' +
