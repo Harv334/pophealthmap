@@ -3,10 +3,10 @@
  *
  * The model is never sent the whole dataset. It receives tool definitions, and
  * the four functions below run against the JSON this page has already loaded,
- * so only the figures a question looks up are sent with it. So
- * every figure in an answer is the same number the map is drawing, and the
- * model cannot invent a statistic: if a tool returns nothing, there is nothing
- * for it to report.
+ * so only the figures a question looks up are sent with it, and they are the
+ * same numbers the map is drawing. The model is told to use only those, but
+ * nothing enforces it, so an answer can still carry a derived or mistaken
+ * number, and the panel says so.
  *
  * That is not the same as nothing leaving the browser. Each question, the
  * conversation so far and every tool result go to the Worker and on to
@@ -52,9 +52,12 @@ var MODEL_LABEL = "Claude Sonnet 5";
     return "Claude " + m[1].charAt(0).toUpperCase() + m[1].slice(1)
       + " " + (m[3] ? m[2] + "." + m[3] : m[2]);
   }
+  // The model's only safeguard is its instruction to use the figures it looks
+  // up, so the panel does not promise more than that.
   function modelSentence(label) {
-    return "Answers are worded by " + label
-      + ", and every figure in them comes from this map.";
+    return label + " writes each answer from the figures on this map, but it can"
+      + " still get things wrong, so please check any figure against the map or"
+      + " its source before you rely on it.";
   }
   function reportModel(id) {
     var el = document.getElementById("ai-model-note");
@@ -598,12 +601,12 @@ var MODEL_LABEL = "Claude Sonnet 5";
     var left = Math.max(0, cap - readUsed());
     limitEl.textContent = left + " of " + cap + " left today";
     limitEl.classList.toggle("spent", left === 0);
-    limitEl.title = left === 0
-      ? "You have used today's questions. The count resets at midnight UTC. "
-        + "The map, Query, Compare and Directory are not capped."
-      : left + " of today's " + cap + " questions left. Resets at midnight UTC. "
-        + "The cap is counted per network address, so if you share one this may "
-        + "read higher than what is actually left until the server corrects it.";
+    limitEl.title = (left === 0
+      ? "You have used today's questions. The map, Query, Compare and Directory have no limit. "
+      : "")
+      + "You can ask " + cap + " questions a day, and the count starts again at midnight. "
+      + "If other people share your internet connection, their questions may count "
+      + "towards the same limit.";
   }
 
   /**
@@ -706,9 +709,12 @@ var MODEL_LABEL = "Claude Sonnet 5";
         writeUsed(capNow());
         renderLimit();
       }
+      // The daily limit's own words are kept. Any other refusal (403, 413,
+      // 500) carries the Worker's internal wording, which means nothing to a
+      // reader, so it is replaced with one plain sentence.
       if (!res.ok || !data) {
-        throw new Error(data && data.error ? data.error
-          : "The question service is not answering right now. Please try again later.");
+        throw new Error(res.status === 429 && data && data.error ? data.error
+          : "Sorry, the question service is not available right now. Please try again later.");
       }
       // The Worker's count is the real one. Whenever it reports, this browser's
       // running tally is set to match rather than being trusted over it.
@@ -808,9 +814,9 @@ var MODEL_LABEL = "Claude Sonnet 5";
     var intro = document.createElement("div");
     intro.className = "ai-msg ai-bot ai-intro";
     [
-      "Ask about any ward or local authority (LA) in your own words, and the " +
-        "answer will be built from the figures on this map rather than from " +
-        "memory. Your question and the figures looked up to answer it pass " +
+      "Ask about any ward or local authority (LA) in your own words. The " +
+        "assistant looks up the figures on this map to answer, rather than " +
+        "relying on what it remembers, but it can still make mistakes. Your question and the figures looked up to answer it pass " +
         "through this site's server to Anthropic's Claude model, which writes " +
         "the reply, so please leave out anything personal.",
       "You can ask " + DAILY_CAP + " questions a day, because each answer costs " +
@@ -858,8 +864,8 @@ var MODEL_LABEL = "Claude Sonnet 5";
     // verify, and then scrolled away above every answer it applied to. At the
     // bottom it stays beside them.
     //
-    // The personal data warning goes first, beside the box it is about, and
-    // the input is described by this line so a screen reader hears it too.
+    // The caution sits beside the box it is about, and the input is
+    // described by this line so a screen reader hears it too.
     // The privacy link opens a new tab so following it does not lose the
     // conversation.
     var caution = document.createElement("div");
@@ -872,25 +878,25 @@ var MODEL_LABEL = "Claude Sonnet 5";
     privacy.target = "_blank";
     privacy.rel = "noopener";
     privacy.textContent = "About and privacy";
-    caution.appendChild(warn);
-    caution.appendChild(document.createTextNode(" Answers are written by AI, so please "
-      + "check any figure against the map or its source before you rely on it. "));
-    caution.appendChild(privacy);
-
-    // Which model wrote the sentence, named on the page rather than left to be
-    // guessed. Read from the Worker's reply when it says so, and falling back
-    // to the constant below, which has to be kept in step with MODEL in
-    // worker/src/index.js by hand. A wrong name here would be worse than none,
-    // so the fallback names what that file currently deploys.
-    var modelNote = document.createElement("div");
-    modelNote.className = "ai-caution ai-model";
+    // One line under the box: who writes the answers and how far to trust
+    // them, then the personal data warning, then the privacy link.
+    // The model is named on the page rather than left to be guessed: read
+    // from the Worker's reply when it says so (reportModel), falling back to
+    // MODEL_LABEL, which has to be kept in step with MODEL in
+    // worker/src/index.js by hand.
+    var modelNote = document.createElement("span");
+    modelNote.className = "ai-model";
     modelNote.id = "ai-model-note";
     modelNote.textContent = modelSentence(MODEL_LABEL);
+    caution.appendChild(modelNote);
+    caution.appendChild(document.createTextNode(" "));
+    caution.appendChild(warn);
+    caution.appendChild(document.createTextNode(" "));
+    caution.appendChild(privacy);
 
     container.appendChild(log);
     container.appendChild(form);
     container.appendChild(caution);
-    container.appendChild(modelNote);
 
     function add(cls, text, asHtml) {
       var d = document.createElement("div");

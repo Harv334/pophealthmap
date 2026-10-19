@@ -2387,6 +2387,118 @@ const smallText = page => page.evaluate(() => {
     await ph.page.close();
   }
 
+  // The source status note counts only sources that failed and have a row in
+  // the table: custom and NaPTAN are skipped by design in London, and TfL and
+  // PTAL in the regions, so they are not reported as stale (B8).
+  {
+    const real = JSON.parse(fs.readFileSync(path.join(ROOT, 'data/meta/manifest.json'), 'utf8'));
+    const notes = {};
+    for (const [name, patch] of [['skipped', { naptan: 'skipped', custom: 'skipped' }], ['failed', { naptan: 'skipped', crime: 'failed' }]]) {
+      const m = JSON.parse(JSON.stringify(real));
+      m.last_run = '2026-10-17T21:56:04+00:00';
+      Object.keys(patch).forEach(k => { m.sources[k] = Object.assign({}, m.sources[k] || {}, { status: patch[k] }); });
+      const page = await browser.newPage({ viewport: DESK });
+      await page.route('**/data/meta/manifest.json', r => r.fulfill({ contentType: 'application/json', body: JSON.stringify(m) }));
+      await page.goto(BASE + '/methodology.html');
+      await page.waitForFunction(() => (document.getElementById('src-note') || {}).textContent, null, { timeout: 10000 }).catch(() => {});
+      notes[name] = await page.evaluate(() => ({ note: document.getElementById('src-note').textContent,
+        bad: [...document.querySelectorAll('#src-rows .status-bad')].map(e => e.closest('tr').id) }));
+      await page.close();
+    }
+    ok(notes.skipped.note === 'Every source was updated on 17 October 2026.' && !notes.skipped.bad.length,
+      'methodology: sources skipped by design are not reported as failures', JSON.stringify(notes.skipped));
+    ok(/^One source could not be updated on 17 October 2026\. It is marked in the table above/.test(notes.failed.note) &&
+       notes.failed.bad.join() === 'src-crime', 'methodology: a failed source is counted and marked, with the date in words', JSON.stringify(notes.failed));
+  }
+
+  // Licences travel with the figures (B9): any export or report holding a
+  // TfL station or bus stop measure carries TfL's statements, and one with
+  // air quality carries Defra's citation. Presentation view keeps the map's
+  // credits in the picture (B10). The Ask panel promises no more than it can
+  // keep (H19).
+  {
+    const { page, errors } = await open(browser, 'index.html?t=1', DESK);
+    const lic = await page.evaluate(() => {
+      const csvWith = k => { PH_CSV.setLevel('ward'); PH_CSV.pick(k); return PH_CSV.files().map(f => f.text).join('\n'); };
+      const tfl = csvWith('bus_stops_800m');
+      const no2 = csvWith('no2_ugm3');
+      const notes = PH_CSV.notes();
+      return { tfl, no2: no2, notes,
+        plain: phCreditText(['imd_score']),
+        report: reportProvenanceHtml('Test', ['rail_station_dist_m']),
+        reportPlain: reportProvenanceHtml('Test', ['imd_score']) };
+    });
+    ok(/Powered by TfL Open Data/.test(lic.tfl) && /Geomni UK Map data/.test(lic.tfl) && /version 2\.0 of the Open Government Licence/.test(lic.tfl),
+      'licences: a Data export CSV with a TfL measure carries TfL\'s statements', lic.tfl.split('\n')[1]);
+    ok(/Crown copyright Defra via uk-air\.defra\.gov\.uk/.test(lic.no2) && /Powered by TfL Open Data/.test(lic.notes),
+      'licences: air quality carries Defra\'s citation, and the notes carry the same lines');
+    ok(/not affiliated with the NHS, with figures updated on \d{1,2} \w+ 20\d\d\. Contains public sector information licensed under the Open Government Licence v3\.0\.$/.test(lic.plain),
+      'licences: every file carries the site and OGL credit', lic.plain);
+    ok(/Powered by TfL Open Data/.test(lic.report) && !/TfL/.test(lic.reportPlain),
+      'licences: a report footer names TfL only when it shows a TfL measure');
+    const ask = await page.evaluate(() => {
+      const b = document.getElementById('ai-toggle'); if (b) b.click();
+      return new Promise(r => setTimeout(() => r({ caution: (document.getElementById('ai-caution') || {}).textContent || '',
+        intro: ((document.querySelector('.ai-intro') || {}).textContent || '') }), 600));
+    });
+    ok(!/every figure in them comes from this map|built from the figures on this map/.test(ask.caution + ask.intro) &&
+       /can still get things wrong/.test(ask.caution) && /can still make mistakes/.test(ask.intro),
+      'Ask: the panel does not promise that every figure comes from the map', ask.caution);
+    await page.keyboard.press('Escape');
+    await setOv(page, 'imd_score_ward');
+    await page.waitForTimeout(800);
+    await page.click('#tb-more');
+    await page.waitForTimeout(200);
+    await page.click('#tb-png');
+    await page.waitForTimeout(400);
+    await page.click('text=This view');
+    await page.waitForTimeout(800);
+    const shot = await page.evaluate(() => {
+      const attr = document.querySelector('.leaflet-control-attribution');
+      const cap = document.getElementById('shot-caption');
+      const banner = document.querySelector('.shot-banner');
+      return { attr: !!attr && getComputedStyle(attr).visibility !== 'hidden' && attr.getClientRects().length > 0,
+        zoom: [...document.querySelectorAll('.leaflet-control-zoom')].some(z => z.getClientRects().length && getComputedStyle(z).visibility !== 'hidden'),
+        cap: cap ? cap.textContent : '', keep: banner ? /Keep the credit line/.test(banner.textContent) : false };
+    });
+    await page.waitForTimeout(4800);
+    const later = await page.evaluate(() => {
+      const banner = document.querySelector('.shot-banner'), done = document.getElementById('screenshot-done');
+      const r = banner.getBoundingClientRect();
+      return { mini: banner.classList.contains('mini'), h: Math.round(r.height), done: !!done && done.getClientRects().length > 0 };
+    });
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(400);
+    const gone = await page.evaluate(() => !document.getElementById('shot-caption') && !document.body.classList.contains('presenting'));
+    ok(shot.attr && !shot.zoom && /Deprivation|deprivation/.test(shot.cap) && /pophealth\.uk/.test(shot.cap) &&
+       /Crown copyright/.test(shot.cap) && /OpenStreetMap|Esri/.test(shot.cap) && shot.keep,
+      'Presentation view keeps the attribution and adds a credit caption under the key', JSON.stringify(shot));
+    ok(later.mini && later.h < 60 && later.done && gone, 'Presentation view: the instructions fade to a small Done button, and Esc still leaves',
+      JSON.stringify([later, gone]));
+    ok(errors.length === 0, 'no page errors (licences and Presentation view)', errors.join(' | '));
+    await page.close();
+  }
+
+  // The statement and the privacy notice (B16, H16).
+  {
+    const texts = {};
+    for (const p of ['accessibility.html', 'privacy.html']) {
+      const page = await browser.newPage();
+      await page.goto(BASE + '/' + p);
+      texts[p] = await page.evaluate(() => document.querySelector('main').innerText.replace(/\s+/g, ' '));
+      await page.close();
+    }
+    const a = texts['accessibility.html'], pr = texts['privacy.html'];
+    ok(/last reviewed on 19 October 2026/.test(a) && !/Every control can be reached/.test(a) && !/the toolbar/i.test(a) &&
+       /the pages around it: the Methodology page, the About and privacy page and this statement/.test(a),
+      'accessibility: no false keyboard claims, and the review date is current');
+    ok(['2.4.3', '2.4.7', '2.4.11', '4.1.2', '4.1.3'].every(c => a.includes(c)), 'accessibility: the remaining known failures are listed');
+    ok(/Your personal data and your rights/.test(pr) && /Harvey Seville is responsible/.test(pr) && /legitimate interest/.test(pr) &&
+       /United States/.test(pr) && /background map does this whenever the map is open/.test(pr) && !/optional parts/.test(pr) &&
+       /ph-ldr-swept/.test(pr) && !/devBannerDismissed/.test(pr) && /last updated on 19 October 2026/.test(pr),
+      'privacy: controller, lawful basis, rights, transfers and storage rows as the site behaves');
+  }
+
   await browser.close();
   console.log(failed ? '\n' + failed + ' check(s) failed' : '\nAll checks passed');
   process.exit(failed ? 1 : 0);
