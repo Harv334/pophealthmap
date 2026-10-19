@@ -55,8 +55,13 @@ jobs:
           else
             echo "No North East pack; its checks will be skipped."
           fi
+      # Against the assembled site (scripts/build_site.sh), the same folder
+      # the deploy uploads, so a file the page needs but the site leaves out
+      # fails here rather than on pophealth.uk.
+      - name: Assemble the site
+        run: bash scripts/build_site.sh _site
       - name: Run the smoke tests
         run: |
-          python3 -m http.server 8792 >/dev/null 2>&1 &
+          python3 -m http.server 8792 --directory _site >/dev/null 2>&1 &
           sleep 2
           SMOKE_SETTLE_MS=12000 node tests/smoke/smoke.cjs http://localhost:8792
