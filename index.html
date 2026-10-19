@@ -10524,9 +10524,15 @@ function _generateWardReport(_reportWindow, wn, opts) {
   //     wards. The arithmetic was right the whole time; only the words were
   //     wrong, which is the harder kind of error to notice.
   const _ALL_WARDS = Object.values(WARD_DATA);
+  // Rates and percentages leave out wards under 1,000 residents
+  // (rankSkipsSmall), so no median or percentile rests on them.
   const _wardVals = (k) => _ALL_WARDS
+    .filter(w => !rankSkipsSmall('ward', k) || !wardIsSmall(w))
     .map(w => parseFloat((w.indicators || {})[k]))
     .filter(v => !isNaN(v));
+  // A ward under 1,000 residents, or with no resident count, is not ranked
+  // or placed among other wards, as its Summary says.
+  const _tooSmall = wardIsSmall(wdata);
   const _median = (vals) => {
     if (!vals || !vals.length) return null;
     const s = [...vals].sort((a,b) => a - b);
@@ -10762,15 +10768,17 @@ function _generateWardReport(_reportWindow, wn, opts) {
   // ── KPI helper: large stat card with optional London-percentile micro-bar ──
   const _kpi = (lbl, val, sub, extra) => {
     const dim = (val == null || val === '' || val === 'No figure');
+    // A tile with no figure has nothing for "of residents" to describe.
     return `<div class="kpi">
       <div class="kpi-lbl">${_esc(lbl)}</div>
       <div class="kpi-val${dim ? ' dim' : ''}">${dim ? 'No figure' : val}</div>
-      ${sub ? `<div class="kpi-sub">${_esc(sub)}</div>` : ''}
-      ${extra || ''}
+      ${sub && !dim ? `<div class="kpi-sub">${_esc(sub)}</div>` : ''}
+      ${dim ? '' : (extra || '')}
     </div>`;
   };
   // Build a tiny "you are here" bar showing where this ward sits in London
   const _ctxBar = (pctile, polarity) => {
+    if (_tooSmall) return '<div class="kpi-ctx"><div class="kpi-ctx-cap">Too few residents to compare</div></div>';
     if (pctile == null) return '';
     // polarity: 'lower-better' → blue (better) left, orange (worse) right;
     // 'higher-better' → reversed. Same pair as the compare bars.
@@ -10785,6 +10793,10 @@ function _generateWardReport(_reportWindow, wn, opts) {
   };
 
   // ── Demographics: ethnicity + age stacked bars, plus ward-vs-London compare ──
+  // A ward with no Census figures of its own (Walbrook) gets one sentence
+  // in place of three empty panels.
+  const _noCensus = ['census_population', 'census_white_pct', 'census_under16_pct', 'census_over65_pct']
+    .every(k => _fmt(inds[k]) == null);
   const ethStack = _chartStack([
     { l:'White', v: inds.census_white_pct,        c:'#1F4E8C' },
     { l:'Asian', v: inds.census_asian_pct,        c:'#E0A030' },
@@ -10889,11 +10901,17 @@ function _generateWardReport(_reportWindow, wn, opts) {
   }).filter(Boolean);
   // The period column only appears when the metadata gives one to put in it.
   const _hoPer = healthOutcomes.some(r => r.per);
+  // No LA median column where every ward in the LA has the same figures
+  // (the City's wards all sit in one MSOA): it would only repeat the ward's.
+  const _borVaries = !!borough && WARD_HEALTH_LEAD.some(k => new Set(_ALL_WARDS
+    .filter(w => w.lad === borough)
+    .map(w => parseFloat((w.indicators || {})[k]))
+    .filter(v => !isNaN(v))).size > 1);
   const healthOutcomesTable = healthOutcomes.length ? `<table class="ho">
-      <thead><tr><th>Measure</th><th>This ward</th><th>${PH_AREA} ward median</th>${borough ? `<th>${_esc(borough)} ward median</th>` : ''}${_hoPer ? '<th>Period</th>' : ''}</tr></thead>
+      <thead><tr><th>Measure</th><th>This ward</th><th>${PH_AREA} ward median</th>${_borVaries ? `<th>${_esc(borough)} ward median</th>` : ''}${_hoPer ? '<th>Period</th>' : ''}</tr></thead>
       <tbody>${healthOutcomes.map(r => `<tr>
         <td>${_esc(r.l)}${r.u ? `<span class="u">${_esc(r.u)}</span>` : ''}</td>
-        <td class="w">${r.v}</td><td>${r.lon}</td>${borough ? `<td>${r.bor}</td>` : ''}${_hoPer ? `<td>${_esc(r.per)}</td>` : ''}
+        <td class="w">${r.v}</td><td>${r.lon}</td>${_borVaries ? `<td>${r.bor}</td>` : ''}${_hoPer ? `<td>${_esc(r.per)}</td>` : ''}
       </tr>`).join('')}</tbody>
     </table>` : '';
 
@@ -11017,7 +11035,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
 
   // Build IMD composite KPI with rank-in-London context
   const imdRank = (() => {
-    if (imdW == null) return null;
+    if (imdW == null || _tooSmall) return null;
     const ws = _wardVals('imd_score').sort((a,b) => b - a); // highest first
     const r = ws.findIndex(v => v <= imdW) + 1;
     return r > 0 ? r : null;
@@ -11071,13 +11089,14 @@ function _generateWardReport(_reportWindow, wn, opts) {
   <div class="content cols">
     <div class="col">
       <div class="section-h">Who lives here</div>
+      ${_noCensus ? `<div class="panel"><p class="no-census">There are no Census figures for ${_esc(wdata ? wdata.name : wn)}, because its output areas are counted in neighbouring wards.</p></div>` : `
       <div class="panel"><h3>Ethnicity (Census 2021)</h3>${ethStack}</div>
       <div class="panel"><h3>Age (Census 2021)</h3>${ageStack}</div>
       <div class="panel">
         <h3>Compared with the ${PH_AREA} ward median</h3>
         ${compareCensus}
         <div class="legend"><span class="legend-tick"></span> ${PH_AREA} ward median,${_reportSwatch(REPORT_CMP.better)}better than the median,${_reportSwatch(REPORT_CMP.worse)}worse,${_reportSwatch(REPORT_CMP.neutral)}neither better nor worse</div>
-      </div>
+      </div>`}
       ${crimeRows.length ? `<div class="section-h">Crime</div>
       <div class="panel">
         <h3>${crimeTotal != null ? Math.round(crimeTotal).toLocaleString('en-GB') + ' crimes recorded' : 'Crimes recorded'} from ${_esc(monthWords(reportCrimePeriod()))}</h3>
@@ -18914,7 +18933,8 @@ var PH_SHOW = {
     return '<div class="' + cls + '"' + (opts.title ? ' title="' + esc(opts.title) + '"' : '') + '>' +
       '<div class="ws-k-lbl" title="' + esc(label) + '">' + esc(label) + '</div>' +
       '<div class="' + numCls + '">' + shown + '</div>' +
-      (sub ? '<div class="ws-k-sub" title="' + esc(sub) + '">' + esc(sub) + '</div>' : '') +
+      // No caption under "No figure": "of residents" would describe nothing.
+      (sub && value != null ? '<div class="ws-k-sub" title="' + esc(sub) + '">' + esc(sub) + '</div>' : '') +
       '</div>';
   }
 
@@ -19027,9 +19047,9 @@ var PH_SHOW = {
         if (score === null) bits.push('It has no deprivation score of its own, ' + noScoreReason(w) + '.');
       } else if (score !== null) {
         // Census figures missing but a deprivation score present.
-        if (svc) bits.push(name + ' has ' + svc + ' within its boundary.');
-        bits.push(name + ' has no Census figures of its own, because the small areas they are counted in ' +
-          'are each matched to a neighbouring ward, so this summary does not rank it or compare it with other wards.');
+        bits.push(name + ' has no Census figures of its own, because the small Census areas that cover it ' +
+          'are each counted in a neighbouring ward, so this summary does not compare its residents’ health with other wards.');
+        if (svc) bits.push('It has ' + svc + ' within its boundary.');
       } else {
         // "has 2 pharmacies ..., but no Census figures", unless it has
         // neither, when the services follow as a sentence of their own.
@@ -19287,7 +19307,9 @@ var PH_SHOW = {
     var meta = [];
     if (w.lad) meta.push(w.lad);
     if (pop !== null) meta.push(Math.round(pop).toLocaleString() + ' residents');
-    if (dec !== null) meta.push('average deprivation decile ' + dec.toFixed(1));
+    // Not for a ward with no resident count (Walbrook), whose summary says
+    // it is not compared: its score is an LSOA counted mostly elsewhere.
+    if (dec !== null && pop !== null) meta.push('average deprivation decile ' + dec.toFixed(1));
     metaEl.textContent = meta.join(' · ');
     renderFig();
 
