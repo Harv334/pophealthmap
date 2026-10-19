@@ -583,6 +583,16 @@
   .map-legend-strip .mls-min, .map-legend-strip .mls-max { font-variant-numeric: tabular-nums; color: var(--ink-2); min-width: 34px; }
   .map-legend-strip .mls-min { text-align: right; }
   .map-legend-strip .mls-grad { width: 140px; height: 8px; border-radius: var(--r-sm); border: 1px solid var(--line); }
+  /* England's 100 on a standardised ratio's keys (_syncEnglandMark). */
+  #sc-grad, #mls-grad { position: relative; }
+  .eng-tick { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: var(--ink); pointer-events: none; }
+  .eng-tick > span { position: absolute; top: 100%; left: 50%; transform: translateX(-50%); margin-top: 1px;
+    font-size: 10px; line-height: 1.2; color: var(--ink); white-space: nowrap; }
+  #sc-grad.has-eng { margin-bottom: 14px; }
+  .map-legend-strip.has-eng { padding-bottom: 20px; }
+  .eng-note { display: block; font-size: var(--t-xs); color: var(--ink-2); margin-top: 3px; }
+  #mls-grad > .eng-note { position: absolute; top: 100%; left: 50%; transform: translateX(-50%); margin-top: 3px;
+    font-size: 10px; line-height: 1.2; white-space: nowrap; }
   /* The IMD decile layer's key. Its name is short and its low end is words,
      so on a phone the gradient gives way rather than "1 = most deprived"
      breaking over two lines or the name losing letters. */
@@ -885,6 +895,8 @@
   .gpill-lsoa { background: var(--tint-amber); color: var(--tint-amber-ink); }
   .gpill-msoa { background: var(--nhs-light); color: var(--nhs-dark); }
   .gpill-la   { background: var(--tint-pink); color: #330072; }
+  /* A caveat on one figure: OHID's note, or a ward figure on part of a ward. */
+  .gpill-note { background: transparent; border: 1px solid currentColor; color: var(--tint-amber-ink); }
   /* Fingertips rows in the area profile: the period sits beside the pill and
      the unit beside the figure, because the Local Health set mixes years,
      rates and ratios under labels that name none of them. */
@@ -5093,7 +5105,7 @@ const OV_CFG = {
   // light.
   imd_score:                       { lo:"Lower", hi:"Higher", wh:true,  min:5,    max:60   },
   imd_decile_mean:                 { lo:"More deprived", hi:"Less deprived", wh:false, rev:true, min:1, max:10 },
-  // Ward-level IMD composite, population-weighted on MHCLG mid-2022 denominators.
+  // Ward-level IMD composite, weighted by Census 2021 residents.
   // Aliases to each ward's imd_score field via OV_FIELD_ALIAS.
   imd_score_ward:                  { lo:"Lower", hi:"Higher", wh:true,  min:5,    max:45   },
   imd_decile:                      { lo:"More deprived", hi:"Less deprived", wh:false, rev:true, min:1, max:10 },
@@ -5232,6 +5244,22 @@ const OV_CFG = {
    the map would draw 32 blocks of colour as though that were a ward pattern.
    The declared registry is a judgement about what is meaningful; this is a
    measurement of what exists. Only the second can be automated. */
+/* PTAL is published for the LSOAs of 2011. The pipeline converts it to the
+   LSOAs of 2021 through the ONS lookup; until a refresh has done that, the
+   LSOAs drawn in 2021 have no figure, and the card says how many do. */
+function ptalCoverageText() {
+  const st = indStats('ptal_score');
+  const n = st && st.lv && st.lv.lsoa ? st.lv.lsoa.n : null;
+  const lc = window._phLayerCounts || {};
+  const tot = Number.isFinite(lc.lsoa) ? lc.lsoa
+    : (typeof LSOA_IMD !== 'undefined' && LSOA_IMD && LSOA_IMD.features ? LSOA_IMD.features.length : null);
+  const ward = 'A ward with figures for fewer than four in five of its residents is left blank.';
+  if (Number.isFinite(n) && Number.isFinite(tot) && n < tot) {
+    return 'The GLA’s figures use the LSOAs of 2011, so the LSOAs drawn since then have no figure yet: ' +
+      'there are figures for ' + n.toLocaleString('en-GB') + ' of London’s ' + tot.toLocaleString('en-GB') + ' LSOAs. ' + ward;
+  }
+  return 'The GLA’s figures use the LSOAs of 2011, so LSOAs drawn since then take the figure of the area they were split from. ' + ward;
+}
 function indStats(k) {
   return (typeof PH_IND_STATS === 'object' && PH_IND_STATS && PH_IND_STATS.stats)
     ? (PH_IND_STATS.stats[resolveOvField(k)] || PH_IND_STATS.stats[k] || null)
@@ -5348,7 +5376,7 @@ const CATS = [
     { k: "ft_suicide_rate", l: "Suicide rate", g: "borough", lv: ["borough","ward"] },
   ]},
   { key: "imd2025", label: "Deprivation", ico: "scale", fields: [
-    { k: "imd_score_ward",                   l: "IMD composite score (ward, pop-weighted mid-2022)", g: "ward" },
+    { k: "imd_score_ward",                   l: "IMD composite score (ward, pop-weighted)", g: "ward" },
     { k: "imd_score",                        l: "IMD composite score",           g: "lsoa" },
     { k: "imd_decile_mean",                  l: "IMD decile, ward mean (1 = most deprived)", g: "ward" },
     { k: "imd_decile",                       l: "IMD decile (1 = most deprived)",g: "lsoa" },
@@ -6058,7 +6086,7 @@ const OV_META = {
   // IMD 2025
   imd_score:                      { src: "MHCLG IMD 2025",       yr: "2025", g: "LSOA", u: "score",  desc: "The overall Index of Multiple Deprivation 2025 score combines income, employment, education, health, crime, access to housing and services, and living environment, and a higher score means more deprivation." },
   imd_decile_mean:                { src: "MHCLG IMD 2025", yr: "2025", g: "Ward, population-weighted mean of its LSOAs", u: "decile", desc: "The average of the national deprivation deciles of the ward's LSOAs, weighted by population, where decile 1 is the most deprived tenth of England. It is an average rather than a decile, so a ward at 3 has a typical LSOA in the third tenth rather than sitting in that tenth itself." },
-  imd_score_ward:                 { src: "MHCLG IMD 2025 (pop-weighted, mid-2022)", yr: "2025", g: "Ward", u: "score",  desc: "The Index of Multiple Deprivation 2025 score for the ward, calculated as a population-weighted average of the scores of the LSOAs inside it, where a higher score means more deprivation." },
+  imd_score_ward:                 { src: "MHCLG IMD 2025", yr: "2025", g: "Ward", u: "score",  desc: "The Index of Multiple Deprivation 2025 score for the ward, calculated as an average of the scores of the LSOAs inside it weighted by their Census 2021 residents, where a higher score means more deprivation." },
   imd_decile:                     { src: "MHCLG IMD 2025",       yr: "2025", g: "LSOA", u: "decile", desc: "Which tenth of England the LSOA falls in when all 33,755 LSOAs are ranked by deprivation, where decile 1 is the most deprived tenth and decile 10 the least." },
   income_score:                   { src: "MHCLG IMD 2025",       yr: "2025", g: "LSOA", u: "score",  desc: "The share of residents on a low income, counted from the benefits and tax credits paid to people on low incomes. It is given as a proportion, so 0.25 means 25% of residents, and a higher figure means more deprivation." },
   employment_score:               { src: "MHCLG IMD 2025",       yr: "2025", g: "LSOA", u: "score",  desc: "The share of working-age residents who would like to work but cannot because of unemployment, sickness, disability or caring responsibilities. It is given as a proportion, so 0.12 means 12% of working-age residents, and a higher figure means more deprivation." },
@@ -7060,7 +7088,9 @@ function indicatorFacts(k) {
     f.cadence = 'MHCLG updates the indices every four to six years, and has done so in 2015, 2019 and 2025.';
     if (k === 'core20_lsoa_count') {
       f.num = 'LSOAs in the ward in deprivation decile 1 or 2';
-      f.method = 'We count the LSOAs that best fit the ward under the lookup ONS publishes, using the deciles MHCLG publishes.';
+      f.method = 'We count the LSOAs that best fit the ward under the lookup ONS publishes, using the deciles MHCLG publishes. ' +
+        'Core20 is defined for LSOAs, not wards, so a ward with one Core20 LSOA is not a Core20 ward. ' +
+        'We use the 2025 deprivation deciles, and NHS England’s own Core20 figures may still use the 2019 index, so counts can differ.';
     } else if (k === 'imd_decile') {
       f.method = 'The decile comes from the rank of the overall score, so it shows where an LSOA stands rather than how far apart two LSOAs are.';
     } else if (k === 'imd_decile_mean' || k === 'imd_score_ward') {
@@ -7085,7 +7115,8 @@ function indicatorFacts(k) {
   }
   if (/PTAL/.test(src)) {
     f.cadence = 'TfL and the GLA update these figures only occasionally.';
-    f.method = 'PTAL combines the walking time to nearby stops and stations with how often services run there, and it covers London only.';
+    f.method = 'PTAL combines the walking time to nearby stops and stations with how often services run there, and it covers London only. ' +
+      ptalCoverageText();
     return f;
   }
   return f;
@@ -7135,7 +7166,9 @@ function _publishedAt(k, nat, lv) {
         : censusWardCounts() ? 'Ward figures are calculated from the counts of the output areas in each ward.'
         : 'Ward figures are an average of the output areas in each ward, weighted by population.');
     } else if (l === 'ward' && nat === 'msoa') {
-      out.push('Ward figures blend the MSOAs that each ward overlaps, in proportion to where its residents live.');
+      out.push('Ward figures blend the MSOAs that each ward overlaps, in proportion to where its residents live. ' +
+        'Where OHID withholds an MSOA’s figure, a ward with figures for fewer than four in five of its residents has none, ' +
+        'and one with figures for most but not all of them says what share it rests on.');
     } else if (l === 'ward' && nat === 'lsoa') {
       out.push('Ward figures are an average of the LSOAs in each ward, weighted by population.');
     } else if (l === 'ward' && nat === 'borough') {
@@ -7297,7 +7330,7 @@ function indicatorCardHTML(k) {
   const desc = say(m.desc);
   const num = say(f.num), den = say(f.den);
   const pub = _publishedAt(k, nat, lv).map(say);
-  const age = ovAgeNote(k), caution = say(ovCaution(k));
+  const age = ovAgeNote(k), caution = say([ovCaution(k), laNotesCaution(k)].filter(Boolean).join(' '));
   const vsEng = /^ft_/.test(k) && nat === 'msoa'
     ? say('OHID tests each MSOA figure against England, and when the map shows MSOAs, each area\'s figure says whether it is better than, worse than or similar to England.') : '';
   const source = say(_cardSource(k));
@@ -7414,7 +7447,7 @@ function fmtNum(v, decimals=0) {
 function ovLabel(k) { return indLabel(k); }
 // Field aliases: an overlay key that doesn't exist in the data file but
 // should resolve to a different field. Used to expose the ward-aggregate
-// IMD score (pop-weighted on mid-2022) under a distinct key from the
+// IMD score (weighted by Census 2021 residents) under a distinct key from the
 // LSOA-level imd_score, since both live in the same indicators bag.
 const OV_FIELD_ALIAS = {
   imd_score_ward: 'imd_score',
@@ -8503,6 +8536,7 @@ function applyPrefetchedCounts() {
     .then(payload => {
       const c = payload && payload.counts;
       if (!c) return;
+      window._phLayerCounts = c;
       const setIf = (id, n) => {
         const el = document.getElementById(id);
         if (el && Number.isFinite(n)) el.textContent = n.toLocaleString();
@@ -8517,7 +8551,7 @@ function applyPrefetchedCounts() {
       // The same sentences wireVCSE writes, so the panel does not change its
       // wording when the records actually arrive. Not over them, if they have.
       if (!_vcseLoadedOnce && Number.isFinite(c.vcse) && Number.isFinite(c.vcse_total)) {
-        setVcseAbout({ pinned: c.vcse, wide: c.vcse_wide, total: c.vcse_total });
+        setVcseAbout({ pinned: c.vcse, wide: c.vcse_wide, nopin: c.vcse_nopin, total: c.vcse_total });
       }
       // Likewise the caption under Highlight Core20, which can only be counted
       // from the IMD deciles and so went blank for anyone who never opened an
@@ -8707,6 +8741,59 @@ function laFigCounty(code, k) {
     return (f && (f[0] || f[1])) ? { code: f[0] || '', name: f[1] || '' } : null;
   }
   return /^E07/.test(code) ? { code: '', name: '' } : null;
+}
+/* OHID's own note on an LA figure, where it has one: borough_data's
+   ft_notes holds the 'Value note' Fingertips publishes with the value.
+   ohidNoteWords turns it into a short pill and a sentence; laFigNote is
+   null for a figure with no note, or in an older file without notes. */
+function ohidNoteWords(note) {
+  const n = String(note || '').trim();
+  if (!n) return null;
+  const comb = n.match(/^Value for (.+?) combined/i);
+  if (comb) {
+    const areas = comb[1].replace(/(^|\band )(?!the )City of London\b/, '$1the City of London');
+    return { pill: 'combined figure', text: 'This figure covers ' + areas + ' together.' };
+  }
+  if (/provisional/i.test(n)) {
+    return { pill: 'provisional', text: /mortality|death/i.test(n)
+      ? 'Provisional: OHID based this on provisional death and population figures.'
+      : 'Provisional: OHID based this on provisional figures.' };
+  }
+  if (/data quality/i.test(n)) {
+    return { pill: 'use with caution', text: 'OHID flags a data quality issue with this figure, so treat it with caution.' };
+  }
+  if (/caution/i.test(n)) {
+    return { pill: 'use with caution', text: 'OHID advises caution with this figure, so read its notes on Fingertips before quoting it.' };
+  }
+  if (/modelled|synthetic/i.test(n)) {
+    return { pill: 'modelled', text: 'OHID modelled this figure rather than counting it.' };
+  }
+  return { pill: 'OHID note', text: 'OHID’s note on this figure: ' + n.replace(/\.?$/, '.') };
+}
+function laFigNote(code, k) {
+  if (!code || !ohidLaKey(k)) return null;
+  const r = laRecOf(code);
+  const notes = r && r.ft_notes && typeof r.ft_notes === 'object' ? r.ft_notes : null;
+  return notes && notes[k] ? ohidNoteWords(notes[k]) : null;
+}
+/* The notes on one LA series across the map, for its indicator card:
+   'Provisional: ... (32 of the 33 LAs.)', or the LA's name where one has it. */
+function laNotesCaution(k) {
+  if (!ohidLaKey(k) || typeof BOROUGH_DATA !== 'object' || !BOROUGH_DATA) return '';
+  const codes = Object.keys(BOROUGH_DATA);
+  const by = {};
+  codes.forEach(c => {
+    const w = laFigNote(c, k);
+    if (w) (by[w.text] = by[w.text] || []).push(c);
+  });
+  return Object.keys(by).map(t => {
+    const list = by[t];
+    if (list.length === 1) {
+      const nm = (typeof LAD_CODE_TO_NAME === 'object' && LAD_CODE_TO_NAME[list[0]]) || list[0];
+      return 'For ' + nm + ', ' + t.charAt(0).toLowerCase() + t.slice(1);
+    }
+    return t.replace(/\.$/, '') + ', for ' + list.length + ' of the ' + codes.length + ' LAs.';
+  }).join(' ');
 }
 // A key for "the same published figure": the county's code where there is
 // one, and in an older file the district's LA series taken together, which
@@ -8952,13 +9039,14 @@ vcseCluster.on('click keypress', e => {
    scripts/build_layer_counts.py, so they always add up to the register's
    total and agree with the Directory's count of charities. */
 function vcseCountsOf(records) {
-  let pinned = 0, wide = 0;
+  let pinned = 0, wide = 0, nopin = 0;
   records.forEach(r => {
     if (!r || !r.hq || r.lat == null || r.lng == null) return;
-    if (r.sc === 'explicit') pinned++;
-    else if (r.sc === 'london_wide') wide++;
+    if (r.sc === 'explicit') {
+      if (vcseNoPin(r)) nopin++; else pinned++;
+    } else if (r.sc === 'london_wide') wide++;
   });
-  return { pinned, wide, total: records.length };
+  return { pinned, wide, nopin, total: records.length };
 }
 function vcseAboutText(c) {
   const where = phWhere();
@@ -8970,7 +9058,12 @@ function vcseAboutText(c) {
     bits.push('The Directory also lists ' + fmt(c.wide) + ' that work across the whole of ' + where +
       ' from a base there.');
   }
-  const rest = Number.isFinite(c.total) && Number.isFinite(c.wide) ? c.total - c.pinned - c.wide : 0;
+  const nopin = Number.isFinite(c.nopin) ? c.nopin : 0;
+  if (nopin > 0) {
+    bits.push('It lists ' + fmt(nopin) + ' more without a dot, because the register gives a council office ' +
+      'as their address or they only hold land, such as a park, which the Parks layer shows.');
+  }
+  const rest = Number.isFinite(c.total) && Number.isFinite(c.wide) ? c.total - c.pinned - c.wide - nopin : 0;
   if (rest > 0) {
     bits.push('A further ' + fmt(rest) + ' that work in ' + where + ' are excluded because they are based ' +
       'outside it or have no address that can be mapped.');
@@ -9020,6 +9113,19 @@ function _vcseNameMarker(e) {
   el.setAttribute('aria-label', phTitle(r.n) + ', charity, ' + (VCSE_BUCKET_LABELS[vcseCauseBucket(r)] || '').toLowerCase());
 }
 
+/* Whether a charity is one the Near list, the ward and LSOA reports and the
+   Directory's nearest-first view show: income above zero, accounts not
+   overdue, providing services or advice, and not a parochial church council,
+   school, PTA, lodge, almshouse or land trust (nr, set by the pipeline's
+   charity_serves_area). A file from before that rule has no nr, and every
+   charity in it is kept. */
+function vcseServesArea(r) { return !r || r.nr !== false; }
+/* A charity whose register address does not show where it is: a council
+   office given for a charity the council is trustee of, or one that only
+   holds land such as a park, which the Parks layer already shows (np). It is
+   listed in the Directory but not pinned on the map. */
+function vcseNoPin(r) { return !!(r && r.np); }
+
 let VCSE_ALL = [];
 let VCSE_PINNED = [];
 const vcseData = [];
@@ -9027,7 +9133,7 @@ let _vcseLoadedOnce = false;
 
 function wireVCSE(records) {
   VCSE_ALL = records;
-  VCSE_PINNED = records.filter(r => r.sc === 'explicit' && r.hq && r.lat != null && r.lng != null);
+  VCSE_PINNED = records.filter(r => r.sc === 'explicit' && r.hq && r.lat != null && r.lng != null && !vcseNoPin(r));
   vcseCluster.clearLayers();
   vcseData.length = 0;
   VCSE_PINNED.forEach(r => {
@@ -9850,6 +9956,27 @@ const PROFILE_FROM_LSOA = new Set(['claimant_count', 'claimant_rate_pct']);
 // Sections longer than this show their first PROFILE_SHOW rows and a "Show all".
 const PROFILE_SHOW = 8, PROFILE_MAX = 10;
 // The worded pill for a figure that is not the ward's own count.
+/* How much of a ward a figure built from MSOAs or LSOAs rests on, as a whole
+   percentage, where that is less than all of it; null otherwise. The pipeline
+   writes it into the ward's cover (ward_data.json), and gives a ward under
+   80% no figure at all (WARD_MIN_COVER in fetch_all_data.py). */
+function wardCoverPct(wrec, k) {
+  const c = wrec && wrec.cover;
+  if (!c || typeof c !== 'object') return null;
+  const v = c[resolveOvField(k)];
+  return (typeof v === 'number' && v < 100) ? v : null;
+}
+/* The line under a ward's Core20 count: the LSOAs are in England's most
+   deprived fifth, and where the file says so, the share of the ward's
+   residents who live in them, which says more than the count does. */
+function core20TileSub(pct) {
+  return 'in England’s most deprived fifth (Core20)' +
+    (typeof pct === 'number' ? ', home to ' + fmtNum(pct, pct > 0 && pct < 1 ? 1 : 0) + '% of residents' : '');
+}
+function wardCoverText(pct) {
+  return 'Based on the ' + pct + '% of the ward’s residents whose area has a published figure. ' +
+    'Where that is under 80%, we show no figure for the ward.';
+}
 const PROFILE_PILL = {
   lsoa:    ['gpill gpill-lsoa', 'estimated from LSOAs'],
   msoa:    ['gpill gpill-msoa', 'estimated from MSOAs'],
@@ -10030,9 +10157,18 @@ function showWard(wn) {
     // A district's figure that is its county's says so (see laFigCounty).
     const pill = (f.g === 'borough' && laFigCounty(wdata.lad_code, f.k))
       ? ['gpill gpill-la', 'county figure'] : PROFILE_PILL[f.g];
-    const meta = (per || pill)
+    // OHID's own note on an LA figure (provisional, combined, doubtful), and
+    // for a ward figure built from MSOAs or LSOAs, how much of the ward it
+    // rests on where that is less than all of it (see wardCoverPct).
+    const note = f.g === 'borough' ? laFigNote(wdata.lad_code, f.k) : null;
+    const cov = f.g !== 'borough' ? wardCoverPct(wdata, f.k) : null;
+    const extra = (note ? `<span class="gpill gpill-note" title="${_esc(note.text)}">${_esc(note.pill)}` +
+        `<span class="sr-only">. ${_esc(note.text)}</span></span>` : '') +
+      (cov != null ? `<span class="gpill gpill-note" title="${_esc(wardCoverText(cov))}">` +
+        `based on ${cov}% of residents</span>` : '');
+    const meta = (per || pill || extra)
       ? `<span class="sr-meta">${per ? `<span class="sr-per">${_esc(per)}</span>` : ''}` +
-        `${pill ? `<span class="${pill[0]}">${pill[1]}</span>` : ''}</span>` : '';
+        `${pill ? `<span class="${pill[0]}">${pill[1]}</span>` : ''}${extra}</span>` : '';
     return `<div class="sr" data-k="${_esc(f.k)}"><span class="sl">${_esc(f.l)}${meta}</span>` +
       `<span class="${svCls}">${display}${unit}</span></div>`;
   };
@@ -10103,6 +10239,8 @@ function showWard(wn) {
       ? `<div class="sr-ctx sr-missing"><div class="sr-sub-note">${_esc(laOhidMissingNote(ladCode, bor))}</div></div>` : '';
     const msoa = msoaRows ? `<div class="sr-lh${hideFrom(msoaStart)}"><div class="sr-sub">OHID estimates for this ward</div>
       <div class="sr-sub-note">OHID publishes these for MSOAs. This ward’s figure is calculated from them, weighted by where its residents live.${
+        msoaF.some(f => wardCoverPct(wdata, f.k) != null)
+          ? ' OHID withholds some MSOA figures where numbers are small, so a figure marked with a share of residents rests on that part of the ward only.' : ''}${
         msoaF.some(f => ovIsStdRatio(f.k))
           ? ' A figure with no unit is a ratio where 100 is the England level once age is allowed for.' : ''}${
         twoLE ? ' Life expectancy appears twice: here as OHID’s estimate for this ward' + (lePer ? ' over ' + _esc(lePer) : '') +
@@ -10153,7 +10291,7 @@ function showWard(wn) {
       ${stat('Population', popN !== null ? Math.round(popN).toLocaleString('en-GB') : null, 'Census 2021')}
       ${stat(_esc(indLabel('census_good_health_pct')), goodHlt !== null ? fmtNum(goodHlt, indDecimals('census_good_health_pct')) + '%' : null, 'of residents')}
       ${stat(_esc(indLabel('census_bad_health_pct')), badHlt !== null ? fmtNum(badHlt, indDecimals('census_bad_health_pct')) + '%' : null, 'of residents')}
-      ${stat(_esc(indLabel('core20_lsoa_count')), (c20L !== null && totL !== null) ? c20L.toFixed(0) + ' of ' + totL.toFixed(0) : null, 'in England’s most deprived fifth')}
+      ${stat(_esc(indLabel('core20_lsoa_count')), (c20L !== null && totL !== null) ? c20L.toFixed(0) + ' of ' + totL.toFixed(0) : null, _esc(core20TileSub(typeof wdata.core20_pop_pct === 'number' ? wdata.core20_pop_pct : null)))}
     </div>`;
 
   // "Summary" comes first, the same summary the ward sheet opens
@@ -11038,7 +11176,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
   };
   const _dental   = _bySpatial(typeof dentalData !== 'undefined' ? dentalData : []);
   const _hosp     = _bySpatial(typeof HOSP !== 'undefined' ? HOSP : []);
-  const _vcse     = _bySpatial(typeof vcseData !== 'undefined' ? vcseData : []);
+  const _vcse     = _bySpatial((typeof vcseData !== 'undefined' ? vcseData : []).filter(v => vcseServesArea(v.record)));
   // Named parks and green spaces in the ward, or null with no data to say.
   const _green    = greenspacesIn(_wardGeom, _gsData);
 
@@ -11191,6 +11329,8 @@ function _generateWardReport(_reportWindow, wn, opts) {
       l: indLabel(k),
       u: ratio ? 'ratio, where England is 100' : String((ovMeta(k) || {}).u || '').toLowerCase(),
       v: fx(v),
+      // A figure on part of the ward says how much of it (wardCoverPct).
+      cov: wardCoverPct(wdata, k),
       lon: fx(_median(_wardVals(k))),
       bor: fx(_boroughWardMedian(k)),
       per: periodWords(ovPeriodOf(k)),
@@ -11208,7 +11348,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
       <thead><tr><th>Measure</th><th>This ward</th><th>${PH_AREA} ward median</th>${_borVaries ? `<th>${_esc(borough)} ward median</th>` : ''}${_hoPer ? '<th>Period</th>' : ''}</tr></thead>
       <tbody>${healthOutcomes.map(r => `<tr>
         <td>${_esc(r.l)}${r.u ? `<span class="u">${_esc(r.u)}</span>` : ''}</td>
-        <td class="w">${r.v}</td><td>${r.lon}</td>${_borVaries ? `<td>${r.bor}</td>` : ''}${_hoPer ? `<td>${_esc(r.per)}</td>` : ''}
+        <td class="w">${r.v}${r.cov != null ? `<span class="u">based on ${r.cov}% of residents</span>` : ''}</td><td>${r.lon}</td>${_borVaries ? `<td>${r.bor}</td>` : ''}${_hoPer ? `<td>${_esc(r.per)}</td>` : ''}
       </tr>`).join('')}</tbody>
     </table>` : '';
 
@@ -11305,11 +11445,11 @@ function _generateWardReport(_reportWindow, wn, opts) {
     }
   } catch(e) { /* minimap is decorative — fail silent */ }
 
-  // Core20 flag (renders inline next to the ward name in the hero)
-  const isCore20 = !!(wdata && wdata.is_core20);
-  const core20Badge = isCore20
-    ? `<span class="badge core20">Core20 ward</span>`
-    : '';
+  // No Core20 badge in the hero. NHS England defines Core20 for LSOAs, and
+  // there is no such thing as a Core20 ward: is_core20 only says one of the
+  // ward's LSOAs is Core20. The tile below gives the count and the share of
+  // residents instead.
+  const c20Pop = (wdata && typeof wdata.core20_pop_pct === 'number') ? wdata.core20_pop_pct : null;
 
   // GP / pharmacy named lists from ward_data.json (authoritative)
   const gps = (wdata && wdata.gp_list) || [];
@@ -11363,7 +11503,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
 
   <div class="hero">
     <div class="hero-text">
-      <div class="kicker">${PH_AREA} ward report · ${_esc(today)}${isCore20 ? ' &nbsp;' + core20Badge : ''}</div>
+      <div class="kicker">${PH_AREA} ward report · ${_esc(today)}</div>
       <h1>${_esc(wdata ? wdata.name : wn)}</h1>
       <div class="sub">${[_esc(borough), population !== 'No figure' ? population + ' residents' : '',
         imdRank ? (imdRank === 1 ? 'Most deprived' : ordinal(imdRank) + ' most deprived') +
@@ -11380,7 +11520,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
     ${_kpi(indLabel('census_good_health_pct'), goodHlt != null ? goodHlt.toFixed(indDecimals('census_good_health_pct')) + '%' : null, 'of residents', _ctxBar(goodHpct, 'higher-better'))}
     ${_kpi(indLabel('census_bad_health_pct'), badHlt  != null ? badHlt.toFixed(indDecimals('census_bad_health_pct')) + '%' : null, 'of residents', _ctxBar(badHpct, 'lower-better'))}
     ${_kpi('Disabled residents', disAny != null ? disAny.toFixed(indDecimals('census_disability_any_pct')) + '%' : null, 'of residents', _ctxBar(disAnyPct, 'lower-better'))}
-    ${_kpi(indLabel('core20_lsoa_count'), (c20L != null && totL != null) ? c20L.toFixed(0) + ' of ' + totL.toFixed(0) : null, 'in England\u2019s most deprived fifth')}
+    ${_kpi(indLabel('core20_lsoa_count'), (c20L != null && totL != null) ? c20L.toFixed(0) + ' of ' + totL.toFixed(0) : null, core20TileSub(c20Pop))}
   </div>
 
   <div class="content cols">
@@ -11416,7 +11556,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
       ${healthOutcomesTable ? `<div class="panel">
         <h3>Health outcomes</h3>
         ${healthOutcomesTable}
-        <div class="legend">OHID\u2019s Local Health estimates for MSOAs, weighted onto the ward by where its residents live. A ratio compares deaths or admissions with England, where 100 is the England level once age is allowed for.</div>
+        <div class="legend">OHID\u2019s Local Health estimates for MSOAs, weighted onto the ward by where its residents live.${healthOutcomes.some(r => r.cov != null) ? ' OHID withholds some MSOA figures where numbers are small, so a figure marked with a share of residents rests on that part of the ward only, and a ward with figures for under 80% of its residents has none.' : ''} A ratio compares deaths or admissions with England, where 100 is the England level once age is allowed for.</div>
       </div>` : ''}
     </div>
   </div>
@@ -14298,7 +14438,7 @@ function _buildLSOAReportHtml(code) {
   const _pharm  = _bySpatial(typeof pharmData !== 'undefined' ? pharmData : []);
   const _dental = _bySpatial(typeof dentalData !== 'undefined' ? dentalData : []);
   const _hosp   = _bySpatial(typeof HOSP !== 'undefined' ? HOSP : []);
-  const _vcse   = _bySpatial(typeof vcseData !== 'undefined' ? vcseData : []);
+  const _vcse   = _bySpatial((typeof vcseData !== 'undefined' ? vcseData : []).filter(v => vcseServesArea(v.record)));
   // Named parks and green spaces in the LSOA. The data starts loading when
   // the LSOA's profile opens; if it has not arrived (or cannot), the block is
   // left out rather than saying there are none.
@@ -15175,6 +15315,8 @@ function injectWardIMD() {
       if (!wdata.indicators) wdata.indicators = {};
       wdata.indicators.total_lsoa_count  = counts.total;
       wdata.indicators.core20_lsoa_count = counts.core20;
+      // At least one Core20 LSOA. Core20 is defined for LSOAs, so this is
+      // not a ward designation and nothing shows it as one.
       wdata.is_core20 = counts.core20 > 0;
     }
   }
@@ -15541,6 +15683,7 @@ function _syncDecileStrip() {
   const decile = !indicatorOwns && lsoaActive && lsoaIMDColour;
   mls.classList.toggle('is-decile', decile);
   if (indicatorOwns) return;
+  _syncEnglandMark(null);
   if (!decile) {
     mls.style.display = 'none';
     return;
@@ -15577,6 +15720,7 @@ function _syncScaleNumbers() {
   const mlsMax = document.getElementById('mls-max');
   if (mlsMin) mlsMin.textContent = ends ? ends.lo : '';
   if (mlsMax) mlsMax.textContent = ends ? ends.hi : '';
+  _syncEnglandMark(range);
   // Inside the strip's label rather than beside it, so that anything else
   // that writes the label (a plain textContent) takes the unit with it.
   const mlsLbl = document.getElementById('mls-label');
@@ -15611,7 +15755,8 @@ function _syncScaleNumbers() {
       ? ` · Ward values are population-weighted averages of ${nativeG === 'lsoa' ? 'LSOAs' : 'MSOAs'}`
       : '';
     const _e = t => String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
-    const age = ovAgeNote(curOv), caution = ovCaution(curOv);
+    const age = ovAgeNote(curOv);
+    const caution = [ovCaution(curOv), laNotesCaution(curOv)].filter(Boolean).join(' ');
     metaEl.innerHTML = meta
       ? _e(`${meta.g} · ${meta.src}${fmtPeriod(meta.yr) ? ` (${fmtPeriod(meta.yr)})` : ''}${avgNote}`) +
         (age ? ' · <span class="ov-old">' + _e(age) + '</span>' : '') +
@@ -15624,6 +15769,56 @@ function _syncScaleNumbers() {
           : '')
       : '';
   }
+}
+
+/* Where England's level of 100 sits on a standardised ratio's key.
+
+   The ramp runs from the lowest to the highest areas drawn, so without a
+   mark the darkest blue reads as "high" even when nearly every area is below
+   England. Both keys get a tick at 100 labelled England; when 100 lies beyond
+   every area drawn, a line under each key says that instead. */
+function _englandMarkState(k, range) {
+  if (!k || !range || !ovIsStdRatio(k) || !(range.hi > range.lo)) return null;
+  const min = range.min != null ? range.min : range.lo;
+  const max = range.max != null ? range.max : range.hi;
+  if (max < 100) return { note: 'Every area shown is below England’s level of 100' };
+  if (min > 100) return { note: 'Every area shown is above England’s level of 100' };
+  const t = (100 - range.lo) / (range.hi - range.lo);
+  const pos = Math.round(Math.max(0, Math.min(1, t)) * 1000) / 10;
+  // Beyond an end of the key (which is the 5th or 95th percentile), the tick
+  // sits at that end, and the line under the key says which way most lie.
+  if (t > 1) return { pos, note: 'Most areas shown are below England’s level of 100' };
+  if (t < 0) return { pos, note: 'Most areas shown are above England’s level of 100' };
+  return { pos };
+}
+function _syncEnglandMark(range) {
+  const st = _englandMarkState(curOv, range);
+  [['sc-grad', 'sc-eng'], ['mls-grad', 'mls-eng']].forEach(([gid, nid]) => {
+    const g = document.getElementById(gid);
+    if (!g) return;
+    g.querySelectorAll('.eng-tick').forEach(el => el.remove());
+    let note = document.getElementById(nid);
+    if (st && st.pos != null) {
+      const t = document.createElement('span');
+      t.className = 'eng-tick';
+      t.style.left = st.pos + '%';
+      t.title = 'England’s level, 100';
+      // The line under the key says it when there is one; both would collide.
+      t.innerHTML = st.note ? '' : '<span>England</span>';
+      g.appendChild(t);
+    }
+    const text = st && st.note ? st.note : '';
+    if (text && !note) {
+      note = document.createElement(gid === 'sc-grad' ? 'div' : 'span');
+      note.id = nid;
+      note.className = 'eng-note';
+      if (gid === 'sc-grad') g.insertAdjacentElement('afterend', note); else g.appendChild(note);
+    }
+    if (note) { note.textContent = text; note.hidden = !text; }
+    g.classList.toggle('has-eng', !!(st && st.pos != null));
+  });
+  const strip = document.getElementById('map-legend-strip');
+  if (strip) strip.classList.toggle('has-eng', !!st);
 }
 
 /* The unit on both legends. Up to six characters it rides on every number
@@ -19663,7 +19858,9 @@ var PH_SHOW = {
      another ward on the map, or closing the sheet, puts it away. The
      Directory's lists load on first use, so the block says what it is doing
      until they arrive. */
-  var NEAR_TYPES = [['gp', 'GP practices'], ['pharmacy', 'Pharmacies'], ['vcse', 'Charities']];
+  var NEAR_TYPES = [['gp', 'GP practices'], ['pharmacy', 'Pharmacies'], ['vcse', 'Registered charities nearby']];
+  var NEAR_VCSE_NOTE = 'From the Charity Commission register. A charity listed here may not offer help to the public, ' +
+    'so check its website first.';
   var NEAR_EACH = 3;
   var nearShown = {};
   function nearCtxFor(w) {
@@ -19691,9 +19888,10 @@ var PH_SHOW = {
           ? '<ol>' + list.map(function (r, i) {
               return '<li><button type="button" class="ws-near-item" data-near-t="' + t[0] + '" data-near-i="' + i +
                 '" title="Show ' + esc(r.n) + ' on the map">' + esc(r.n) + '</button>' +
-                '<span class="ws-near-d">' + dirFmtDist(r._d) + '</span></li>';
+                '<span class="ws-near-d">' + esc(dirDistText(r)) + '</span></li>';
             }).join('') + '</ol>'
-          : '<p class="ws-note">None listed in ' + esc(phWhere()) + '.</p>') + '</div>';
+          : '<p class="ws-note">None listed in ' + esc(phWhere()) + '.</p>') +
+          (t[0] === 'vcse' ? '<p class="ws-note ws-near-vnote">' + esc(NEAR_VCSE_NOTE) + '</p>' : '') + '</div>';
       }).join('');
       body.innerHTML = '<div class="ws-near-grid">' + cols + '</div>' +
         '<div class="ws-near-foot"><span class="ws-note">Distances are in a straight line from ' +
@@ -21173,6 +21371,11 @@ var PH_SHOW = {
       lat: r.lat, lng: r.lng,
       sub: src.id === 'hospital' ? [r.t, hospAeText(r)].filter(Boolean).join(' · ') : (r.kind || r.type || r.phase || r.t || ''),
       ae: src.id === 'hospital' ? r.ae : undefined,
+      // A charity's place in the nearest-first lists (vcseServesArea), and
+      // whether it is placed only by its postcode sector, as a small one is,
+      // so its distance is not given to the metre.
+      nr: src.id === 'vcse' ? vcseServesArea(r) : undefined,
+      sec: src.id === 'vcse' && !r.a && !!r.pc,
       // Worked out once here rather than on every keystroke.
       _n: n.toLowerCase(), _a: a.toLowerCase(),
       _po: pp ? pp.out : '', _pi: pp ? pp.inw : '',
@@ -21256,6 +21459,9 @@ var PH_SHOW = {
       return r._n.indexOf(q) !== -1 || r._a.indexOf(q) !== -1 || r.pc.toLowerCase().indexOf(q) === 0;
     });
     if (near) {
+      // Nearest first, the charities are those that serve the area
+      // (vcseServesArea). A search by name still finds every one.
+      out = out.filter(function (r) { return r.nr !== false; });
       out.forEach(function (r) { r._d = dirDistM(near.lat, near.lng, r.lat, r.lng); });
       out.sort(function (a, b) { return a._d - b._d; });
     }
@@ -21270,6 +21476,12 @@ var PH_SHOW = {
       Math.cos(lat1 * k) * Math.cos(lat2 * k) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
     return 2 * 6371000 * Math.asin(Math.min(1, Math.sqrt(h)));
   }
+  // How far away a record is, or for a charity placed only by its postcode
+  // sector, which sector: "under 50 m" from a pin moved to the sector would
+  // claim a precision the record does not have.
+  function dirDistText(r) {
+    return (r && r.sec && r.pc) ? 'in ' + r.pc : dirFmtDist(r._d);
+  }
   function dirFmtDist(m) {
     if (m < 50) return 'under 50 m';
     if (m < 1000) return (Math.round(m / 10) * 10) + ' m';
@@ -21277,7 +21489,7 @@ var PH_SHOW = {
   }
   // The k records of one type nearest a point, each carrying its distance.
   function dirNearest(lat, lng, type, k) {
-    return (dirRecords || []).filter(function (r) { return r.t === type; })
+    return (dirRecords || []).filter(function (r) { return r.t === type && r.nr !== false; })
       .map(function (r) { return { r: r, d: dirDistM(lat, lng, r.lat, r.lng) }; })
       .sort(function (a, b) { return a.d - b.d; })
       .slice(0, k)
@@ -21353,7 +21565,7 @@ var PH_SHOW = {
       // The address is shown because it is searched. Without it, a search for
       // "wembley" returned rows with no "wembley" anywhere on them, which reads
       // as a broken filter rather than as a match on a field being hidden.
-      var meta = [near ? dirFmtDist(r._d) : '', (r.t === 'hospital' && r.sub) ? '' : r.one, r.sub, r.a, r.pc].filter(Boolean).join(' · ');
+      var meta = [near ? dirDistText(r) : '', (r.t === 'hospital' && r.sub) ? '' : r.one, r.sub, r.a, (near && r.sec) ? '' : r.pc].filter(Boolean).join(' · ');
       var full = [r.n, r.one, r.sub, r.a, r.pc, r.lad].filter(Boolean).join(' · ');
       return '<button type="button" class="dir-item" data-i="' + i + '" title="' + esc(full) + '">' +
         '<span class="dir-dot" style="background:' + r.colour + '"></span>' +
@@ -22304,8 +22516,57 @@ var PH_SHOW = {
 
   // imd_rank is a national rank, not a quantity: the mean of two ranks is not
   // the rank of anything, so it is left out rather than averaged into a number
-  // that would look like one.
-  var RB_SKIP = { imd_rank: 1 };
+  // that would look like one. gb_total_uprn is the count of addresses behind
+  // the green space shares, a working figure rather than one to report.
+  var RB_SKIP = { imd_rank: 1, gb_total_uprn: 1 };
+  // An average of LSOA deciles is not itself a decile, so it is reported
+  // under the ward's name for the same thing, to one decimal place.
+  var RB_RENAME = { imd_decile: 'imd_decile_mean' };
+  var RB_DOMAINS = ['income_score', 'employment_score', 'education_score', 'health_score',
+    'crime_score', 'barriers_score', 'environment_score'];
+  var RB_DOMAIN_NOTE = 'Domain scores: income and employment are the share of people affected, and ' +
+    'the others are relative scores where a higher figure means more deprived.';
+
+  /* The Census numerators and denominators of every LSOA
+     (lsoa_census_counts.json), so a Census percentage for the area is its
+     summed counts, as a ward's is, rather than an average of percentages
+     weighted by residents, which is wrong for a household measure. Fetched
+     the first time Custom area is used; until it arrives, or where a map has
+     no such file, the area falls back to weighting by residents and says so. */
+  var rbCounts = null, rbCountsLoading = null;
+  function rbLoadCounts() {
+    if (rbCounts || rbCountsLoading) return rbCountsLoading || Promise.resolve(rbCounts);
+    rbCountsLoading = loadJson(dataUrl('lsoa_census_counts.json'), 'the Census counts for Custom area', rbLoadCounts)
+      .then(function (d) {
+        rbCountsLoading = null;
+        if (d && d.keys && d.rows) {
+          var idx = {};
+          d.keys.forEach(function (k, i) { idx[k] = i; });
+          rbCounts = { idx: idx, n: d.keys.length, rows: d.rows };
+          if (rbSelected.length) renderReportPane();
+        }
+        return rbCounts;
+      });
+    return rbCountsLoading;
+  }
+  // The households in an LSOA: the denominator of a household measure.
+  function rbHouseholds(code) {
+    if (!rbCounts) return null;
+    var row = rbCounts.rows[code], i = rbCounts.idx.census_no_car_pct;
+    if (!row || i == null) return null;
+    var h = row[rbCounts.n + i];
+    return (typeof h === 'number' && h > 0) ? h : null;
+  }
+  // How each figure was combined, in the words the report and CSV use.
+  var RB_METHOD_WORDS = {
+    summed: 'summed',
+    counts: 'from the summed counts',
+    households: 'weighted by households',
+    residents: 'weighted by residents',
+  };
+  function rbLabel(k) {
+    return k === 'imd_decile_mean' ? labelOf(k) + ' (IMD 2025)' : labelOf(k);
+  }
 
   function rbRecord(code) {
     var r = (typeof LSOA_DATA !== 'undefined' && LSOA_DATA) ? LSOA_DATA[code] : null;
@@ -22331,35 +22592,73 @@ var PH_SHOW = {
   }
 
   function rbAggregate() {
-    var sum = {}, num = {}, den = {}, pop = 0, n = 0;
+    var sum = {}, num = {}, den = {}, how = {}, pop = 0, n = 0;
+    // Census counts, summed: cn/cd per key, and whether every LSOA had them.
+    var cn = {}, cd = {}, cMiss = {};
+    // Fuel poverty is weighted by households only when every LSOA has them.
+    var allHH = !!rbCounts && rbSelected.every(function (c) { return !!rbHouseholds(c); });
     rbSelected.forEach(function (code) {
       var i = rbRecord(code);
       if (!i) return;
       n++;
       var p = num_(i.census_population) || 0;
       pop += p;
+      var crow = rbCounts ? rbCounts.rows[code] : null;
+      var hh = rbHouseholds(code);
       Object.keys(i).forEach(function (k) {
         if (RB_SKIP[k]) return;
         var v = num_(i[k]);
         if (v === null) return;
+        var key = RB_RENAME[k] || k;
         if (rbIsAdditive(k)) {
-          sum[k] = (sum[k] || 0) + v;
-        } else {
-          // No population means no weight to give it. Falling back to 1 would
-          // let an empty LSOA count as much as a full one.
-          var w = p > 0 ? p : 0;
-          if (w === 0) return;
-          num[k] = (num[k] || 0) + v * w;
-          den[k] = (den[k] || 0) + w;
+          sum[key] = (sum[key] || 0) + v;
+          how[key] = 'summed';
+          return;
         }
+        var ci = rbCounts ? rbCounts.idx[k] : null;
+        if (ci != null) {
+          var a = crow ? crow[ci] : null, b = crow ? crow[rbCounts.n + ci] : null;
+          if (typeof a === 'number' && typeof b === 'number' && b > 0) {
+            cn[key] = (cn[key] || 0) + a;
+            cd[key] = (cd[key] || 0) + b;
+          } else {
+            cMiss[key] = 1;
+          }
+        }
+        // Fuel poverty is a share of households, so it is weighted by them
+        // when the counts are here. Everything else is weighted by residents.
+        // No weight means no say: falling back to 1 would let an empty LSOA
+        // count as much as a full one.
+        var byHH = k === 'fuel_poverty_pct' && allHH;
+        var w = byHH ? hh : (p > 0 ? p : 0);
+        if (w === 0) return;
+        num[key] = (num[key] || 0) + v * w;
+        den[key] = (den[key] || 0) + w;
+        how[key] = byHH ? 'households' : 'residents';
       });
     });
     var out = {};
     Object.keys(sum).forEach(function (k) { out[k] = sum[k]; });
     Object.keys(num).forEach(function (k) {
-      if (den[k] > 0) out[k] = num[k] / den[k];
+      if (cd[k] > 0 && !cMiss[k]) {
+        out[k] = 100 * cn[k] / cd[k];
+        how[k] = 'counts';
+      } else if (den[k] > 0) {
+        out[k] = num[k] / den[k];
+      }
     });
-    return { indicators: out, lsoas: n, population: pop };
+    return { indicators: out, method: how, lsoas: n, population: pop };
+  }
+  // How the area's figures were combined, in one sentence for the report
+  // and the notes.
+  function rbMethodSentence(agg) {
+    var used = {};
+    Object.keys(agg.method || {}).forEach(function (k) { used[agg.method[k]] = 1; });
+    return 'Counts are added up' +
+      (used.counts ? ', Census percentages are worked out from the summed counts as a ward\u2019s are' : '') +
+      ', and other figures are averages weighted by residents' +
+      (used.households ? ', except fuel poverty, which is weighted by households' : '') + '.' +
+      (rbCounts ? '' : ' Census percentages are weighted by residents too, so measures of households can differ slightly from a ward\u2019s.');
   }
   function num_(v) {
     if (v === null || v === undefined || v === '') return null;
@@ -22387,7 +22686,7 @@ var PH_SHOW = {
   // Each is written to its indicator's own decimal places (IND_DECIMALS).
   var RB_HEADLINE = [
     { k: 'census_population',         wide: false },
-    { k: 'imd_decile',                as: 'imd_decile_mean' },
+    { k: 'imd_decile_mean' },
     { k: 'imd_score' },
     { k: 'census_bad_health_pct',     pct: true },
     { k: 'census_disability_any_pct', pct: true },
@@ -22398,6 +22697,8 @@ var PH_SHOW = {
 
   function renderReportPane() {
     if (!rbPane) return;
+    // The Census counts are only wanted once an area is being built.
+    if (rbSelected.length && !rbCounts) rbLoadCounts();
     var agg = rbAggregate();
     var countEl = $('rb-count');
     var clearBtn = $('rb-clear');
@@ -22425,9 +22726,9 @@ var PH_SHOW = {
           var shown = (v === undefined || v === null) ? 'No figure'
             : (m.k === 'census_population'
                 ? Math.round(v).toLocaleString()
-                : v.toFixed(indDecimals(m.as || m.k)) + (m.pct ? '<span>%</span>' : ''));
+                : v.toFixed(indDecimals(m.k)) + (m.pct ? '<span>%</span>' : ''));
           return '<div class="rb-stat' + (m.wide ? ' wide' : '') + '">' +
-            '<div class="k">' + esc(labelOf(m.as || m.k)) + '</div><div class="v">' + shown + '</div></div>';
+            '<div class="k">' + esc(rbLabel(m.k)) + '</div><div class="v">' + shown + '</div></div>';
         }).join('') + '</div></div>';
     }
 
@@ -22552,12 +22853,16 @@ var PH_SHOW = {
     lines.push(['Area', rbAreaName()].map(csvCell).join(','));
     lines.push(['LSOAs', agg.lsoas].map(csvCell).join(','));
     lines.push([]);
-    lines.push(['Indicator', 'Value', 'Method'].map(csvCell).join(','));
+    lines.push(['Indicator', 'Value', 'How it was combined'].map(csvCell).join(','));
     keys.forEach(function (k) {
-      lines.push([headerOf(k), indCsvValue(agg.indicators[k], k),
-                  rbIsAdditive(k) ? 'summed' : 'population-weighted mean']
+      lines.push([k === 'imd_decile_mean' ? rbLabel(k) : headerOf(k), indCsvValue(agg.indicators[k], k),
+                  RB_METHOD_WORDS[agg.method[k]] || '']
                  .map(csvCell).join(','));
     });
+    if (keys.some(function (k) { return RB_DOMAINS.indexOf(k) !== -1; })) {
+      lines.push([]);
+      lines.push([RB_DOMAIN_NOTE].map(csvCell).join(','));
+    }
     lines.push([]);
     lines.push(['LSOA code', 'LSOA name', 'Ward', 'LA', 'Population'].map(csvCell).join(','));
     rbSelected.forEach(function (code) {
@@ -22602,8 +22907,7 @@ var PH_SHOW = {
     para('These notes go with the CSV for ' + rbAreaName() + ', a custom area made from PopHealth Map ' +
       '(https://pophealth.uk) on ' + cbDate(new Date()) + (dataDate ? ' from the figures updated on ' + dataDate : '') + '.');
     para('The area is made of ' + agg.lsoas + ' LSOA' + (agg.lsoas === 1 ? '' : 's') + ' chosen by hand. It is not an ' +
-      'official geography and no one else publishes figures for it. Counts are summed, and everything else is ' +
-      'an average weighted by each LSOA\u2019s population.');
+      'official geography and no one else publishes figures for it. ' + rbMethodSentence(agg));
     L.push('The figures');
     keys.forEach(function (k, n) {
       L.push((n + 1) + '. ' + headerOf(k));
@@ -22624,17 +22928,19 @@ var PH_SHOW = {
       return esc(b) + ' (' + bs[b] + ')';
     }).join(', ');
     var rows = Object.keys(agg.indicators).sort(function (a, b) {
-      return labelOf(a).localeCompare(labelOf(b));
+      return rbLabel(a).localeCompare(rbLabel(b));
     }).map(function (k) {
       var v = agg.indicators[k];
-      return '<tr><td>' + esc(labelOf(k)) + '</td>' +
-        '<td class="n">' + (rbIsAdditive(k)
+      return '<tr><td>' + esc(rbLabel(k)) + '</td>' +
+        '<td class="n">' + (agg.method[k] === 'summed'
           ? Math.round(v).toLocaleString('en-GB')
           : fmtNum(v, indDecimals(k))) +
         // The unit on the figure, as in the profile: "%", " m", " µg/m³".
         indValueUnit(k) + '</td>' +
-        '<td class="m">' + (rbIsAdditive(k) ? 'summed' : 'population-weighted') + '</td></tr>';
+        '<td class="m">' + esc(RB_METHOD_WORDS[agg.method[k]] || '') + '</td></tr>';
     }).join('');
+    var domainNote = Object.keys(agg.indicators).some(function (k) { return RB_DOMAINS.indexOf(k) !== -1; })
+      ? '<p class="m" style="font-size:10px;color:var(--ink-3);margin:6px 0 0">' + esc(RB_DOMAIN_NOTE) + '</p>' : '';
     var list = rbSelected.map(function (code) {
       var pr = rbProps(code);
       var i = rbRecord(code) || {};
@@ -22668,12 +22974,12 @@ var PH_SHOW = {
       (boroughLine ? ' &middot; ' + boroughLine : '') + '</div></div></div>' +
       _reportKeyPoints([
         'A custom area assembled from <b>' + agg.lsoas + ' LSOA' + (agg.lsoas === 1 ? '' : 's') + '</b>. It is not an official geography and no one else publishes figures for it.',
-        'Counts are <b>summed</b>; everything else is a <b>population-weighted mean</b>, so a larger LSOA pulls the average further than a smaller one.',
+        esc(rbMethodSentence(agg)),
         multi ? 'It crosses <b>' + Object.keys(bs).length + ' local authorities (LAs)</b>, so these are not LA figures.' : '',
       ]) +
       '<div class="content">' +
       '<div class="section-h">Figures for this area</div>' +
-      '<table class="tbl"><tr><th>Indicator</th><th class="n">Value</th><th>How it was combined</th></tr>' + rows + '</table>' +
+      '<table class="tbl"><tr><th>Indicator</th><th class="n">Value</th><th>How it was combined</th></tr>' + rows + '</table>' + domainNote +
       '<div class="section-h">LSOAs included</div>' +
       '<table class="tbl"><tr><th>LSOA</th><th>Name</th><th>Ward</th><th>LA</th><th class="n">Population</th></tr>' + list + '</table>' +
       '</div>' +
@@ -23425,7 +23731,7 @@ var PH_SHOW = {
     row('Counted', f.num);
     row('Out of', f.den);
     row('Method', f.method);
-    row('Caution', typeof ovCaution === 'function' ? ovCaution(k) : '');
+    row('Caution', [typeof ovCaution === 'function' ? ovCaution(k) : '', laNotesCaution(k)].filter(Boolean).join(' '));
     row('Source', cbSourceText(k));
     return L;
   }

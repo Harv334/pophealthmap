@@ -1372,7 +1372,10 @@ const smallText = page => page.evaluate(() => {
       d: [...document.querySelectorAll('#dir-list .dir-item .dir-sub')].slice(0, 30).map(e => e.textContent.split(' · ')[0]),
     }));
     const metres = t => /km$/.test(t) ? parseFloat(t) * 1000 : /^under/.test(t) ? 0 : parseFloat(t);
-    ok(/^Near E1 6AN, nearest first/.test(dnear.head) && dnear.d.length === 30 && dnear.d.every((t, i) => !i || metres(t) >= metres(dnear.d[i - 1])),
+    // A charity placed only by its postcode sector reads "in E1 6" rather
+    // than a distance, so the order is checked over the distances.
+    const dists = l => l.filter(t => !/^in [A-Z]/.test(t));
+    ok(/^Near E1 6AN, nearest first/.test(dnear.head) && dnear.d.length === 30 && dists(dnear.d).every((t, i, l) => !i || metres(t) >= metres(l[i - 1])),
       'directory: a full postcode lists the places nearest to it, nearest first', JSON.stringify(dnear).slice(0, 200));
     await checkAxe(page, 'Directory near a postcode');
     await page.click('#dir-near-x');
@@ -1406,11 +1409,12 @@ const smallText = page => page.evaluate(() => {
       const num = re => { const m = t.match(re); return m ? +m[1].replace(/,/g, '') : NaN; };
       const ring = document.querySelector('.leaflet-marker-icon.vcse-cluster .vcse-ring');
       return { t, pinned: num(/Showing ([\d,]+) registered charities/), wide: num(/The Directory also lists ([\d,]+)/),
+        nopin: /more without a dot/.test(t) ? num(/It lists ([\d,]+) more without a dot/) : 0,
         tab: +document.getElementById('vcse-tab-count').textContent.replace(/,/g, ''),
         key: !document.getElementById('vcse-key').hidden && document.querySelectorAll('#vcse-key li').length,
         ring: ring ? getComputedStyle(ring).backgroundImage : '' };
     });
-    ok(ch.pinned === ch.tab && ch.pinned + ch.wide === az.n && !/[–—]/.test(ch.t),
+    ok(ch.pinned === ch.tab && ch.pinned + ch.wide + ch.nopin === az.n && !/[–—]/.test(ch.t),
       'charities: the tab and the Directory agree on one count, explained once', ch.t + ' / Directory ' + az.n);
     ok(ch.key === 11 && /conic-gradient/.test(ch.ring), 'charities: a key to the dots, and groups drawn as a ring of causes',
       ch.key + ' / ' + ch.ring.slice(0, 40));
@@ -1434,9 +1438,26 @@ const smallText = page => page.evaluate(() => {
         cols: [...n.querySelectorAll('.ws-near-col h4')].map(e => e.textContent),
         d: [...n.querySelectorAll('.ws-near-col')].map(c => [...c.querySelectorAll('.ws-near-d')].map(e => e.textContent)) } : null;
     });
-    ok(!!near && near.h === 'Near E1 6AN' && near.cols.join() === 'GP practices,Pharmacies,Charities' &&
-       near.d.every(l => l.length === 3 && l.every((t, i) => !i || metres(t) >= metres(l[i - 1]))),
+    ok(!!near && near.h === 'Near E1 6AN' && near.cols.join() === 'GP practices,Pharmacies,Registered charities nearby' &&
+       near.d.every(l => l.length === 3 && dists(l).every((t, i, d) => !i || metres(t) >= metres(d[i - 1]))),
       'a postcode search lists the nearest GP practices, pharmacies and charities by distance', JSON.stringify(near));
+    // Review H15: the charities column holds charities that serve the area,
+    // says where they come from, and gives a sector, not a distance, for one
+    // placed only by its postcode sector.
+    const nearV = await page.evaluate(() => {
+      const col = [...document.querySelectorAll('#ws-body .ws-near-col')].find(c => /charities/.test(c.querySelector('h4').textContent));
+      const vcse = (typeof VCSE_ALL !== 'undefined' ? VCSE_ALL : []);
+      const byName = {};
+      vcse.forEach(r => { byName[phTitle(r.n)] = r; });
+      const items = col ? [...col.querySelectorAll('li')].map(li => ({ n: li.querySelector('.ws-near-item').textContent,
+        d: li.querySelector('.ws-near-d').textContent })) : [];
+      return { note: col ? (col.querySelector('.ws-near-vnote') || {}).textContent || '' : '',
+        items: items.map(it => ({ ...it, nr: byName[it.n] ? byName[it.n].nr : null, sec: byName[it.n] ? (!byName[it.n].a && !!byName[it.n].pc) : null })) };
+    });
+    ok(/^From the Charity Commission register\. A charity listed here may not offer help to the public, so check its website first\.$/.test(nearV.note) &&
+       nearV.items.length === 3 && nearV.items.every(it => it.nr !== false) &&
+       nearV.items.every(it => it.sec === null || (it.sec ? /^in [A-Z0-9]+ \d$/.test(it.d) : !/^in /.test(it.d))),
+      'the near list\'s charities serve the area, carry the register note, and give a sector for sector-placed ones', JSON.stringify(nearV));
     await checkAxe(page, 'ward sheet with its near list');
     await page.evaluate(() => showWard('Lansbury'));
     await page.waitForTimeout(500);
@@ -2968,7 +2989,7 @@ const smallText = page => page.evaluate(() => {
       showWard('Lansbury');
       const p = document.getElementById('wpanel');
       const out = { ctx: (p.querySelector('.sr-ctx') || {}).innerText || '', lh: (p.querySelector('.sr-lh .sr-sub-note') || {}).innerText || '',
-        pills: [...p.querySelectorAll('.sr-ctx .gpill')].map(e => e.textContent), key: p.querySelector('.prof-key').innerText,
+        pills: [...p.querySelectorAll('.sr-ctx .gpill:not(.gpill-note)')].map(e => e.textContent), key: p.querySelector('.prof-key').innerText,
         e07: laFigCounty('E07000033', 'ft_suicide_rate') === null ? 'own' : 'county' };
       const bn = Object.values(WARD_DATA).find(w => w.lad_code === 'E09000003');
       showWard(bn.name);
@@ -3015,6 +3036,127 @@ const smallText = page => page.evaluate(() => {
       'Compare reads OHID\'s LA figure as published, and a tie gets no arrow', JSON.stringify(r2.marks));
     ok(!fx.errors.length, 'no page errors with district and missing-LA figures', fx.errors.join(' | '));
     await fx.page.close();
+  }
+
+  // Review round 2: OHID's notes (H2), ward figures weighted by residents and
+  // their coverage (H3, H4), PTAL's gap (H5), England's 100 on ratio keys
+  // (H6), no Core20 ward badge (H7) and Custom area's arithmetic (H9).
+  {
+    const { page, errors } = await open(browser, 'index.html', DESK);
+    const files = await page.evaluate(async () => {
+      const g = u => fetch(u).then(r => r.json());
+      const [bd, wd, cnt] = await Promise.all([g('borough_data.json'), g('ward_data.json'), g('lsoa_census_counts.json')]);
+      const W = Object.values(wd.wards);
+      const byName = n => W.find(w => w.name === n) || {};
+      const covered = W.filter(w => w.cover && Object.keys(w.cover).some(k => /^ft_\d+$/.test(k)));
+      const notes = Object.values(bd).filter(r => r.ft_notes).map(r => r.ft_notes);
+      return {
+        hackney: (bd.E09000012 && bd.E09000012.ft_notes) || {},
+        nLe: notes.filter(n => /provisional/i.test(n.ft_life_expectancy_male || '')).length,
+        withheld: Object.values(bd).some(r => Object.keys(r.ft_notes || {}).some(k => /not published|cannot be calculated/i.test(r.ft_notes[k]) && typeof r[k] === 'number')),
+        coverOk: covered.length > 0 && covered.every(w => Object.keys(w.cover).every(k => w.cover[k] >= 80 && w.cover[k] < 100 && w.indicators[k] != null)),
+        ncg: byName('New Cross Gate').indicators ? byName('New Cross Gate').indicators.ft_932831 : 'missing',
+        poplar: byName('Poplar').indicators ? byName('Poplar').indicators.ft_93259 : null,
+        rv: byName('Royal Victoria').indicators ? byName('Royal Victoria').indicators.ptal_score : 'missing',
+        c20: byName('Hornsey').core20_pop_pct,
+        cnt: !!(cnt && cnt.keys && cnt.keys.indexOf('census_social_rented_pct') !== -1 && Object.keys(cnt.rows).length > 4000),
+      };
+    });
+    ok(/Hackney and City of London combined/.test(files.hackney.ft_mmr_2_doses_age5 || '') && files.nLe >= 30 && !files.withheld,
+      'borough_data.json carries OHID\'s notes, and no withheld value', JSON.stringify(files).slice(0, 300));
+    ok(files.coverOk && files.ncg == null && Math.abs(files.poplar - 197.67) < 0.05,
+      'ward Local Health figures are weighted by residents, marked when partly covered, and blank under 80%', JSON.stringify(files));
+    ok(files.rv == null && typeof files.c20 === 'number' && files.cnt,
+      'PTAL is blank for a ward mostly without figures, wards carry a Core20 share, and the Census counts ship', JSON.stringify(files));
+
+    const r = await page.evaluate(async () => {
+      await ensureWardDetail();
+      const out = {};
+      const hk = Object.values(WARD_DATA).find(w => w.lad_code === 'E09000012');
+      showWard(hk.name);
+      const pills = sel => [...document.querySelectorAll('#wpanel ' + sel)].map(e => e.closest('.sr').getAttribute('data-k') + '=' + e.textContent.replace(/\..*$/, ''));
+      out.hk = pills('.sr-ctx .gpill-note');
+      const part = Object.values(WARD_DATA).find(w => w.cover && Object.keys(w.cover).some(k => /^ft_\d+$/.test(k)));
+      showWard(part.name);
+      out.part = pills('.sr-lh ~ .sr .gpill-note, .sr-lh .gpill-note, .gpill-note');
+      out.partNote = (document.querySelector('#wpanel .sr-lh .sr-sub-note') || {}).textContent || '';
+      out.card = indicatorCardHTML('ft_life_expectancy_male');
+      out.ptal = indicatorCardHTML('ptal_score');
+      out.c20card = indicatorCardHTML('core20_lsoa_count');
+      return out;
+    });
+    ok(r.hk.some(t => /^ft_mmr_2_doses_age5=combined figure/.test(t)) && r.hk.some(t => /^ft_life_expectancy_(fe)?male=provisional/.test(t)),
+      'the profile marks Hackney\'s combined and provisional LA figures', r.hk.join(', '));
+    ok(r.part.some(t => /based on \d\d% of residents/.test(t)) && /rests on that part of the ward only/.test(r.partNote),
+      'a ward health figure on part of the ward says what share of residents it rests on', r.part.join(', ') + ' / ' + r.partNote.slice(-120));
+    ok(/Provisional: OHID based this on provisional death and population figures, for \d+ of the \d+ LAs\./.test(r.card),
+      'the life expectancy card\'s Caution row gives OHID\'s note', r.card.replace(/<[^>]+>/g, ' ').slice(0, 400));
+    ok(/LSOAs of 2011/.test(r.ptal) && /fewer than four in five of its residents is left blank/.test(r.ptal),
+      'the PTAL card explains the 2011 LSOAs and the ward rule', r.ptal.replace(/<[^>]+>/g, ' ').slice(0, 500));
+    ok(/NHS England’s own Core20 figures may still use the 2019 index/.test(r.c20card),
+      'the Core20 card says which deciles it uses', r.c20card.replace(/<[^>]+>/g, ' ').slice(0, 300));
+
+    // H6: a tick at England's 100 on both keys for a ratio, and none otherwise.
+    await setOv(page, 'ft_93250');
+    await page.waitForTimeout(1500);
+    const eng = await page.evaluate(() => ({
+      side: !!document.querySelector('#sc-grad .eng-tick'), strip: !!document.querySelector('#mls-grad .eng-tick'),
+      label: (document.querySelector('#mls-grad .eng-tick') || {}).textContent || '',
+    }));
+    await setOv(page, 'imd_score_ward');
+    await page.waitForTimeout(1200);
+    const none = await page.evaluate(() => !document.querySelector('.eng-tick') && !(document.getElementById('mls-eng') || {}).textContent);
+    ok(eng.side && eng.strip && eng.label === 'England' && none,
+      'a standardised ratio\'s keys mark England\'s 100, and other indicators\' do not', JSON.stringify(eng) + ' / ' + none);
+    const st = await page.evaluate(() => [
+      _englandMarkState('ft_93250', { lo: 80, hi: 95, min: 70, max: 99 }),
+      _englandMarkState('ft_93250', { lo: 101, hi: 140, min: 101, max: 150 }),
+      _englandMarkState('ft_93250', { lo: 50, hi: 150, min: 40, max: 160 }),
+      _englandMarkState('imd_score_ward', { lo: 50, hi: 150, min: 40, max: 160 }),
+      _englandMarkState('ft_93239', { lo: 19.9, hi: 82.4, min: 5, max: 140 })]);
+    ok(st[0].note === 'Every area shown is below England’s level of 100' && st[1].note === 'Every area shown is above England’s level of 100' &&
+       st[2].pos === 50 && !st[2].note && st[3] === null &&
+       st[4].pos === 100 && st[4].note === 'Most areas shown are below England’s level of 100',
+      'when 100 is beyond every area, the key says so instead', JSON.stringify(st));
+
+    // H7: no Core20 ward badge; the tile gives the count and the residents' share.
+    const rep = await page.evaluate(async () => {
+      await Promise.all([ensureAllLayerData(), ensureLsoaImd(), ensureLsoaData(), ensureWardDetail(), ensureGreenspaceData()]);
+      let html = '';
+      _generateWardReport({ sink: h => { html = h; } }, 'Hornsey', {});
+      const d = new DOMParser().parseFromString(html, 'text/html');
+      const kpi = [...d.querySelectorAll('.kpi')].map(k => k.textContent.replace(/\s+/g, ' ').trim()).find(t => /Core20|most deprived fifth/.test(t)) || '';
+      return { kicker: (d.querySelector('.kicker') || {}).textContent || '', kpi };
+    });
+    ok(rep.kicker && !/Core20/i.test(rep.kicker) && /1 of 11/.test(rep.kpi) && /home to [\d.]+% of residents/.test(rep.kpi),
+      'the ward report has no Core20 ward badge, and its tile gives the count and the residents\' share', JSON.stringify(rep));
+
+    // H9: Custom area reports an average decile, sums the Census counts and
+    // leaves out the address count.
+    await page.click('.mode-btn[data-mode="report"]').catch(() => {});
+    await page.waitForTimeout(1500);
+    const rb = await page.evaluate(async () => {
+      const codes = LSOA_IMD.features.filter(f => f.properties.ward === 'Lansbury').map(f => f.properties.code);
+      PH_REPORT.apply({ name: 'Lansbury test', codes });
+      for (let i = 0; i < 40 && !(PH_REPORT.aggregate().method || {}).census_social_rented_pct; i++) await new Promise(r => setTimeout(r, 250));
+      for (let i = 0; i < 40 && PH_REPORT.aggregate().method.census_social_rented_pct !== 'counts'; i++) await new Promise(r => setTimeout(r, 250));
+      const a = PH_REPORT.aggregate();
+      const tiles = [...document.querySelectorAll('#rb-summary .rb-stat')].map(e => e.innerText.replace(/\s+/g, ' '));
+      return { keys: Object.keys(a.indicators), m: a.method, dec: a.indicators.imd_decile_mean, tiles };
+    });
+    ok(rb.keys.indexOf('imd_decile') === -1 && rb.keys.indexOf('gb_total_uprn') === -1 && typeof rb.dec === 'number' &&
+       rb.m.census_social_rented_pct === 'counts' && rb.m.census_population === 'summed' && rb.m.fuel_poverty_pct === 'households' &&
+       rb.tiles.some(t => /^Average deprivation decile \(IMD 2025\) \d\.\d$/.test(t)),
+      'Custom area gives an average decile to one place, sums the Census counts and weights fuel poverty by households', JSON.stringify(rb).slice(0, 400));
+    ok(!errors.length, 'no page errors (review round 2 checks)', errors.join(' | '));
+    await page.close();
+
+    const meth = await open(browser, 'methodology.html', DESK);
+    const mt = await meth.page.evaluate(() => document.body.innerText);
+    ok(!/cover\s+every one/.test(mt) && /fewer than four in five of its residents, we show no figure for the ward/.test(mt) &&
+       /Census day, 21 March 2021/.test(mt) && !/mid-2022/.test(mt) && /measures of households|summed counts as a ward's are/.test(mt),
+      'the methodology describes the ward coverage rule, the Census population and Custom area\'s arithmetic', '');
+    await meth.page.close();
   }
 
   await browser.close();
