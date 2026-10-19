@@ -2387,6 +2387,111 @@ const smallText = page => page.evaluate(() => {
     await ph.page.close();
   }
 
+  // OHID's LA figures: a district's county figure is labelled as the
+  // county's, an LA with none of them says so, adult smoking (stored as its
+  // 18 to 64 breakdown) is left out, and the Census age bands are labelled by
+  // the ages they cover. London has no districts, so the county and missing
+  // cases run on a fixture served in place of the LA and ward files: Tower
+  // Hamlets and Hackney carry a made-up county's figures, Barnet none.
+  {
+    const bd = JSON.parse(fs.readFileSync(path.join(ROOT, 'borough_data.json'), 'utf8'));
+    const wd = JSON.parse(fs.readFileSync(path.join(ROOT, 'ward_data.json'), 'utf8'));
+    const st = (() => { const t = fs.readFileSync(path.join(ROOT, 'data/map/indicators.js'), 'utf8');
+      return JSON.parse(t.slice(t.indexOf('var PH_IND_STATS = ') + 19, t.lastIndexOf(';'))); })();
+    const LAK = k => /^ft_/.test(k) && !/^ft_\d+$/.test(k);
+    for (const c of ['E09000030', 'E09000012']) {
+      bd[c].ft_from = {};
+      Object.keys(bd[c]).filter(LAK).forEach(k => { bd[c].ft_from[k] = ['E10009999', 'Testshire']; bd[c][k] = bd.E09000030[k]; });
+    }
+    Object.keys(bd.E09000003).filter(LAK).forEach(k => delete bd.E09000003[k]);
+    Object.values(wd.wards).forEach(w => {
+      if (w.lad_code === 'E09000003') Object.keys(w.indicators).filter(LAK).forEach(k => delete w.indicators[k]);
+      if (w.lad_code === 'E09000012') Object.keys(w.indicators).filter(LAK).forEach(k => { w.indicators[k] = bd.E09000030[k]; });
+    });
+    // The shipped files first, as they are.
+    const real = await open(browser, 'index.html', DESK);
+    const r0 = await real.page.evaluate(() => {
+      showWard('Lansbury');
+      const p = document.getElementById('wpanel');
+      return { county: /county/i.test(p.innerText) || laAnyCountyFigure(), smokeRow: !!p.querySelector('[data-k="ft_smoking_prevalence_adults"]'),
+        smokeOpt: !!document.querySelector('#ov option[value="ft_smoking_prevalence_adults"]'),
+        smokeAsk: JSON.stringify(PH_ASSISTANT.runTool('list_indicators', {})).indexOf('ft_smoking_prevalence_adults') !== -1,
+        smokeArea: 'ft_smoking_prevalence_adults' in (PH_ASSISTANT.runTool('get_area', { name: 'Lansbury', level: 'ward' }).indicators || {}),
+        u: indLabel('census_under16_pct'), w: indLabel('census_working_age_pct'), den: indicatorFacts('claimant_rate_pct').den,
+        exportSmoke: (() => { PH_CSV.setLevel('borough'); PH_CSV.pick('ft_smoking_prevalence_adults'); PH_CSV.pick('ft_suicide_rate'); return PH_CSV.build().header.join('|'); })() };
+    });
+    const bands = st.census_age_bands === '0-15';
+    ok(!r0.county, 'London: no LA figure is called a county\'s');
+    ok(!r0.smokeRow && !r0.smokeOpt && !r0.smokeAsk && !r0.smokeArea && !/smok/i.test(r0.exportSmoke),
+      'adult smoking at the wrong age is left out of the profile, the picker, the export and Ask', JSON.stringify(r0));
+    ok(bands ? (r0.u === 'Aged under 16' && /16 to 64/.test(r0.w + r0.den))
+             : (r0.u === 'Aged under 15' && r0.w === 'Aged 15 to 64' && r0.den === 'Residents aged 15 to 64 at the 2021 Census'),
+      'the Census age bands are labelled as the ages indicators.js says they cover', [st.census_age_bands, r0.u, r0.w, r0.den].join(' / '));
+    await real.page.close();
+
+    const fx = await (async () => {
+      const page = await browser.newPage({ viewport: { width: DESK.width, height: DESK.height } });
+      const errors = []; page.on('pageerror', e => errors.push(e.message));
+      await page.route(/\/borough_data\.json/, r => r.fulfill({ body: JSON.stringify(bd), contentType: 'application/json' }));
+      await page.route(/\/ward_data\.json/, r => r.fulfill({ body: JSON.stringify(wd), contentType: 'application/json' }));
+      await page.route(/ward_(core|rest)\.json/, r => r.fulfill({ status: 404, body: '' }));
+      await page.goto(BASE + '/index.html');
+      await page.waitForTimeout(SETTLE);
+      return { page, errors };
+    })();
+    const r1 = await fx.page.evaluate(() => {
+      showWard('Lansbury');
+      const p = document.getElementById('wpanel');
+      const out = { ctx: (p.querySelector('.sr-ctx') || {}).innerText || '', lh: (p.querySelector('.sr-lh .sr-sub-note') || {}).innerText || '',
+        pills: [...p.querySelectorAll('.sr-ctx .gpill')].map(e => e.textContent), key: p.querySelector('.prof-key').innerText,
+        e07: laFigCounty('E07000033', 'ft_suicide_rate') === null ? 'own' : 'county' };
+      const bn = Object.values(WARD_DATA).find(w => w.lad_code === 'E09000003');
+      showWard(bn.name);
+      out.missing = (document.querySelector('#wpanel .sr-missing') || {}).innerText || '';
+      PH_CSV.setLevel('borough'); PH_CSV.pick('ft_suicide_rate');
+      const b = PH_CSV.build();
+      out.head = b.header; out.th = (b.table.find(r => r[1] === 'Tower Hamlets') || []).slice(-1)[0];
+      out.cam = (b.table.find(r => r[1] === 'Camden') || []).slice(-1)[0];
+      return out;
+    });
+    ok(/^\s*Figures for the whole of Testshire/.test(r1.ctx) &&
+       /OHID publishes these only for Testshire as a whole, which takes in Tower Hamlets and one other district, so every ward in those districts shows the same figure\. They describe the county rather than Tower Hamlets or this ward\./.test(r1.ctx) &&
+       r1.pills.length && r1.pills.every(t => t === 'county figure'),
+      'a district\'s county figures are titled, noted and marked as the county\'s', r1.ctx.slice(0, 300) + ' / ' + r1.pills.join(','));
+    ok(/further down as OHID’s official figure for Testshire as a whole, the county Tower Hamlets is part of\./.test(r1.lh) && /county figure/.test(r1.key),
+      'the life expectancy note and the key name the county', r1.lh.slice(-160));
+    ok(/^OHID’s figures for the whole of Barnet, such as life expectancy.*are missing from this version of the map\. We are working on it\.$/.test(r1.missing.trim()),
+      'an LA with none of OHID\'s figures says so in its profile', r1.missing);
+    ok(r1.head.indexOf('Area OHID\'s LA figures describe') !== -1 && r1.th === 'Testshire' && r1.cam === 'Camden',
+      'the Data export names the area OHID\'s LA figures describe', r1.head.join('|') + ' / ' + r1.th + ' / ' + r1.cam);
+    ok(r1.e07 === 'county', 'a district in an LA file without ft_from is taken to carry its county\'s figure');
+    await fx.page.click('.mode-btn[data-mode="compare"]');
+    await fx.page.waitForTimeout(800);
+    const r2 = await fx.page.evaluate(async () => {
+      PH_COMPARE.clear(); PH_COMPARE.setLevel('borough');
+      await new Promise(r => setTimeout(r, 400));
+      const m = document.getElementById('cmp-add-metric');
+      if (m) { m.value = 'ft_suicide_rate'; m.dispatchEvent(new Event('change', { bubbles: true })); }
+      for (const n of ['Tower Hamlets', 'Hackney']) {
+        const a = document.getElementById('cmp-add-area');
+        a.value = n; a.dispatchEvent(new Event('change', { bubbles: true }));
+        await new Promise(r => setTimeout(r, 200));
+      }
+      const marks = [...document.querySelectorAll('#cmp-cards .cmp-c-row')].filter(r => /Suicide/.test(r.innerText))
+        .map(r => r.querySelector('.hi, .lo') ? 'arrow' : '');
+      return { caution: document.getElementById('cmp-caution').innerText, marks,
+        same: PH_COMPARE.figures('Tower Hamlets').ft_suicide_rate === BOROUGH_DATA.E09000030.ft_suicide_rate };
+    });
+    ok(/Suicide rate is OHID’s published figure, which for a district is its county’s\./.test(r2.caution) &&
+       /The other figures are calculated from the wards in each LA, with counts added up and the rest weighted by population, so they are not published LA statistics\./.test(r2.caution) &&
+       !/published for each LA, so here/.test(r2.caution),
+      'Compare explains OHID\'s figures and the calculated ones in one note', r2.caution);
+    ok(r2.same && r2.marks.length === 2 && r2.marks.every(x => !x),
+      'Compare reads OHID\'s LA figure as published, and a tie gets no arrow', JSON.stringify(r2.marks));
+    ok(!fx.errors.length, 'no page errors with district and missing-LA figures', fx.errors.join(' | '));
+    await fx.page.close();
+  }
+
   await browser.close();
   console.log(failed ? '\n' + failed + ' check(s) failed' : '\nAll checks passed');
   process.exit(failed ? 1 : 0);
