@@ -2121,14 +2121,22 @@ const smallText = page => page.evaluate(() => {
       BOROUGH_GJ.features.forEach(f => { if (f.properties.name === v) inView = b.contains(L.geoJSON(f).getBounds().getCenter()); });
       return { z: map.getZoom(), inView }; }, v);
     ok(fit.z > before && fit.inView, 'an LA chosen in Compare is brought into view', JSON.stringify({ before, ...fit }));
+    // The bar above a tool is only the way back, so the tool's name appears
+    // once, in the heading at the top of its pane.
     const names = {};
-    for (const m of ['csv', 'report', 'query']) {
+    for (const m of ['query', 'compare', 'report', 'csv', 'directory']) {
       await page.click('.mode-btn[data-mode="' + m + '"]');
       await page.waitForTimeout(600);
-      names[m] = await page.evaluate(() => document.getElementById('sb-modebar-name').textContent);
+      names[m] = await page.evaluate(() => {
+        const pane = document.querySelector('.tab-pane.active'), h = pane.querySelector('h2');
+        const top = document.getElementById('sb-modebar').innerText.trim() + ' | ' + (h ? h.textContent.trim() : '');
+        const n = h ? h.textContent.trim() : '';
+        return { top, once: !!n && (document.getElementById('sb-modebar').innerText.split(n).length === 1) };
+      });
     }
-    ok(names.csv === 'Data export' && names.report === 'Custom area' && names.query === 'Query',
-      'the panel heading names each tool once', JSON.stringify(names));
+    ok(Object.values(names).every(v => v.once && /^Back to Explore \| /.test(v.top)) &&
+       names.report.top === 'Back to Explore | Custom area' && names.csv.top === 'Back to Explore | Data export',
+      'each tool is named once at the top of the panel', JSON.stringify(names));
     ok(await page.evaluate(() => !/sign-in/.test(document.querySelector('#ldr .ldr-line').textContent)),
       'the loading screen line has no sign-in phrase');
     ok(errors.length === 0, 'no page errors (Compare and the map)', errors.join(' | '));
