@@ -1186,8 +1186,8 @@ const smallText = page => page.evaluate(() => {
     }));
     ok(empty.off && /Choose at least one indicator/.test(empty.count),
       'export: the buttons wait for an indicator and the bar says why', JSON.stringify(empty));
-    // Answering steps 1 and 2 folds them to a line each; Change opens them again.
-    await page.click('#cb-level button[data-lvl="ward"]');
+    // Step 1 stays open, because more than one size can be chosen. Answering
+    // step 2 folds it to a line, and Change opens it again.
     await page.selectOption('#cb-scope', 'Tower Hamlets');
     await page.waitForTimeout(300);
     const fold = await page.evaluate(() => [1, 2].map(n => {
@@ -1195,10 +1195,15 @@ const smallText = page => page.evaluate(() => {
       return st.classList.contains('folded') && !st.querySelector('.cb-chg').hidden &&
         getComputedStyle(st.querySelector('.cb-step-body')).display === 'none' ? st.querySelector('h3').textContent : '';
     }));
-    ok(/Wards/.test(fold[0]) && /Tower Hamlets/.test(fold[1]), 'export: steps 1 and 2 fold once answered', JSON.stringify(fold));
-    await page.click('#cb-step-1 .cb-chg');
-    ok(await page.evaluate(() => !document.getElementById('cb-step-1').classList.contains('folded') &&
-      document.activeElement === document.querySelector('#cb-level button.on')), 'export: Change opens the step again');
+    ok(fold[0] === '' && /Tower Hamlets/.test(fold[1]), 'export: step 2 folds once answered and step 1 stays open', JSON.stringify(fold));
+    await page.click('#cb-step-2 .cb-chg');
+    ok(await page.evaluate(() => !document.getElementById('cb-step-2').classList.contains('folded') &&
+      document.activeElement === document.getElementById('cb-scope')), 'export: Change opens the step again');
+    // The last size of area cannot be switched off.
+    await page.click('#cb-level button[data-lvl="ward"]');
+    ok(await page.evaluate(() => PH_CSV.levels().join() === 'ward' &&
+      document.querySelector('#cb-level button[data-lvl="ward"]').getAttribute('aria-pressed') === 'true'),
+      'export: the last size of area stays chosen');
     const ex = await page.evaluate(() => {
       const before = PH_CSV.columns().length;
       PH_CSV.pick('ft_93283');
@@ -1208,7 +1213,7 @@ const smallText = page => page.evaluate(() => {
       const col = i => o.table.slice(1).map(r => r[i]).filter(v => v !== '');
       const le = o.header.indexOf('Life expectancy at birth, women (years, 2019 to 2023)');
       const groupOf = k => { const b = document.querySelector('#cb-cols input[data-col="' + k + '"]');
-        return b ? b.closest('.cb-grp-body').previousElementSibling.getAttribute('data-grp') : ''; };
+        return b ? b.closest('.cb-grp').querySelector('.cb-grp-hd').getAttribute('data-grp') : ''; };
       const sorted = [...document.querySelectorAll('#cb-cols .cb-grp-body')].every(g => {
         const l = [...g.querySelectorAll('.l')].map(e => e.textContent);
         return l.every((t, i) => !i || l[i - 1].localeCompare(t, 'en-GB', { numeric: true, sensitivity: 'base' }) <= 0);
@@ -1265,6 +1270,64 @@ const smallText = page => page.evaluate(() => {
     });
     ok(bar.scrolls && bar.pinned, 'export: the download bar is pinned below the scrolling list', JSON.stringify(bar));
     await checkAxe(page, 'Data export with every group open');
+    // Quicker ways to choose: search, a box for the whole group, and ready-made sets.
+    await page.click('#cb-clear');
+    await page.fill('#cb-find', 'pollution');
+    await page.waitForTimeout(300);
+    const find = await page.evaluate(() => ({
+      shown: [...document.querySelectorAll('#cb-cols .cb-col .l')].map(e => e.textContent),
+      all: document.getElementById('cb-q-all').textContent,
+    }));
+    await page.click('#cb-q-all');
+    const fromFind = await page.evaluate(() => PH_CSV.columns().sort().join());
+    ok(find.shown.length >= 2 && find.shown.every(t => /PM|NO|nitrogen|particulate|air/i.test(t)) &&
+       /^Choose all/.test(find.all) && fromFind.split(',').length === find.shown.length,
+      'export: searching narrows the list and one button chooses every match', JSON.stringify(find));
+    await page.fill('#cb-find', '');
+    await page.click('#cb-clear');
+    await page.click('#cb-cols input[data-grpall="Health"]');
+    const grp = await page.evaluate(() => {
+      const box = document.querySelector('#cb-cols input[data-grpall="Health"]');
+      const g = box.closest('.cb-grp');
+      return { n: PH_CSV.columns().length, checked: box.checked, label: box.getAttribute('aria-label') || '',
+        every: [...g.querySelectorAll('input[data-col]')].every(b => b.checked) };
+    });
+    await page.click('#cb-cols .cb-grp:has(input[data-grpall="Health"]) input[data-col]');
+    const part = await page.evaluate(() => document.querySelector('#cb-cols input[data-grpall="Health"]').indeterminate);
+    ok(grp.n > 5 && grp.checked && grp.every && /Health/.test(grp.label) && part,
+      'export: the box beside a group chooses all of it, and shows when only part is chosen', JSON.stringify(grp));
+    await page.click('#cb-clear');
+    await page.click('#cb-q-key');
+    const key = await page.evaluate(() => PH_CSV.columns().length);
+    ok(key >= 8, 'export: Key indicators chooses a ready-made set', String(key));
+    // More than one size of area makes a ZIP with a CSV and notes for each.
+    await page.click('#cb-level button[data-lvl="borough"]');
+    await page.click('#cb-level button[data-lvl="lsoa"]');
+    await page.waitForFunction(() => PH_CSV.levels().length === 3 && !/Loading/i.test(document.getElementById('cb-count').textContent),
+      null, { timeout: 30000 }).catch(() => {});
+    const multi = await page.evaluate(() => {
+      const files = PH_CSV.files();
+      return { levels: PH_CSV.levels().join(), count: document.getElementById('cb-count').textContent,
+        btn: document.getElementById('cb-download').textContent, notes: document.getElementById('cb-notes').hidden,
+        pressed: [...document.querySelectorAll('#cb-level button[aria-pressed="true"]')].length,
+        names: files.map(f => f.name), csvs: files.filter(f => /\.csv$/.test(f.name)).map(f => f.text.split('\n').length) };
+    });
+    const zip = await page.evaluate(async () => {
+      const b = new Uint8Array(await PH_CSV.zip().arrayBuffer());
+      const u32 = i => (b[i] | b[i + 1] << 8 | b[i + 2] << 16 | b[i + 3] << 24) >>> 0;
+      const end = b.length - 22;
+      return { start: u32(0) === 0x04034b50, end: u32(end) === 0x06054b50, files: b[end + 10] | b[end + 11] << 8 };
+    });
+    ok(multi.pressed === 3 && /ward,lsoa,borough|ward,borough,lsoa/.test(multi.levels) && /three files/.test(multi.count) &&
+       /ZIP/.test(multi.btn) && multi.notes && multi.names.length === 6 && multi.csvs.every(n => n > 2) &&
+       multi.names.some(n => /^pophealth-lsoa/.test(n)) && multi.names.some(n => /-notes\.txt$/.test(n)),
+      'export: three sizes of area make three files, downloaded together as a ZIP with their notes', JSON.stringify(multi));
+    ok(zip.start && zip.end && zip.files === 6, 'export: the ZIP holds the six files', JSON.stringify(zip));
+    await page.click('#cb-preview');
+    await page.waitForTimeout(300);
+    ok(await page.evaluate(() => document.querySelectorAll('#cb-prev table').length === 3), 'export: the preview shows a table for each size of area');
+    await checkAxe(page, 'Data export with three sizes of area');
+    await page.click('#cb-preview');
     ok(errors.length === 0, 'no page errors (Data export)', errors.join(' | '));
     await page.close();
   }

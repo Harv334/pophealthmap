@@ -2345,6 +2345,21 @@
   .cb-col input { margin: 2px 0 0; flex-shrink: 0; accent-color: var(--nhs-blue); cursor: pointer; }
   .cb-col .l { flex: 1; min-width: 0; line-height: 1.35; }
   .cb-col.on .l { font-weight: 600; color: var(--nhs-dark); }
+  /* Search and the ready-made sets above the list, and a box on each group
+     heading that chooses the whole group. */
+  .cb-quick { padding: 0 var(--s-3) 8px; }
+  .cb-find { margin-bottom: 7px; }
+  .cb-quick-row { display: flex; gap: 4px; flex-wrap: wrap; }
+  .cb-grp-row { display: flex; align-items: stretch; background: var(--paper-2); border-bottom: 1px solid var(--line); }
+  .cb-grp-row .cb-grp-hd { flex: 1; min-width: 0; border-bottom: 0; padding-left: 8px; }
+  /* The whole strip left of the group name ticks the box, and its padding
+     keeps the box clear of the name button for small-target spacing. */
+  .cb-grp-tick { display: flex; align-items: center; padding: 0 6px 0 var(--s-3); flex-shrink: 0; cursor: pointer; }
+  .cb-grp-all { width: 16px; height: 16px; margin: 0; accent-color: var(--nhs-blue); cursor: pointer; }
+  .cb-only { display: block; font-size: var(--t-xs); font-weight: 400; color: var(--ink-3); margin-top: 1px; }
+  .cb-col.on .cb-only { font-weight: 400; color: var(--ink-3); }
+  .cb-empty { padding: 9px var(--s-3); font-size: var(--t-xs); line-height: 1.45; color: var(--ink-3); }
+  .cb-prev-lv { font-size: var(--t-xs); font-weight: 600; color: var(--ink-2); margin: 4px 14px 5px; }
   /* The download bar, pinned at the foot of the panel: what the file will
      hold, the preview switch and the two downloads. */
   .cb-acts { padding: 9px var(--s-3) 10px; border-top: 1px solid var(--line);
@@ -3738,12 +3753,12 @@
             <h3><span class="cb-n">1</span>Which areas?<span class="cb-ans" id="cb-ans-1"></span><button
               type="button" class="cb-chg" data-step="1" aria-label="Change which areas" hidden>Change</button></h3>
             <div class="cb-step-body">
-              <div class="cb-help">Each row in the file is one area.</div>
-              <div class="cb-seg" id="cb-level">
-                <button type="button" data-lvl="ward" class="on">Wards</button>
-                <button type="button" data-lvl="lsoa">LSOAs</button>
-                <button type="button" data-lvl="msoa">MSOAs</button>
-                <button type="button" data-lvl="borough">LAs</button>
+              <div class="cb-help">Choose one or more sizes of area. Each size gets its own file, with one row for each area.</div>
+              <div class="cb-seg" id="cb-level" role="group" aria-label="Sizes of area to download">
+                <button type="button" data-lvl="ward" class="on" aria-pressed="true">Wards</button>
+                <button type="button" data-lvl="lsoa" aria-pressed="false">LSOAs</button>
+                <button type="button" data-lvl="msoa" aria-pressed="false">MSOAs</button>
+                <button type="button" data-lvl="borough" aria-pressed="false">LAs</button>
               </div>
             </div>
           </div>
@@ -3761,7 +3776,16 @@
 
           <div class="cb-step" style="border-bottom:none;padding-bottom:4px">
             <h3><span class="cb-n">3</span>Which indicators?</h3>
-            <div class="cb-help">Each indicator you tick becomes one column in the file.</div>
+            <div class="cb-help">Each indicator you choose becomes one column. Search for one, choose a whole group with the box beside its name, or start from a ready-made set.</div>
+          </div>
+          <div class="cb-quick">
+            <input type="search" class="ov-search cb-find" id="cb-find" placeholder="Search indicators"
+                   aria-label="Search the indicators" autocomplete="off">
+            <div class="cb-quick-row" role="group" aria-label="Choose several indicators at once">
+              <button type="button" class="q-chip" data-cbq="key" id="cb-q-key">Key indicators</button>
+              <button type="button" class="q-chip" data-cbq="map" id="cb-q-map" hidden>The map&rsquo;s indicator</button>
+              <button type="button" class="q-chip" data-cbq="all" id="cb-q-all">Select all</button>
+            </div>
           </div>
           <div class="cb-picked" id="cb-picked">
             <span>No indicators chosen yet</span>
@@ -12477,6 +12501,8 @@ function _fitFocus(bounds) {
     antisocial: ['anti-social'], asb: ['anti-social'], vaccination: ['vaccination', 'mmr'], vaccines: ['vaccination', 'mmr'], jabs: ['vaccination', 'mmr'],
     exercise: ['physically active'], activity: ['physically active'], 'blood pressure': ['blood pressure'],
   };
+  // Shared with the Data export search, so the same everyday words work there.
+  window.PH_SEARCH_TERMS = q => searchTerms(q);
   function searchTerms(q) {
     const terms = [q];
     const padded = ' ' + q + ' ';
@@ -19410,33 +19436,36 @@ var PH_SHOW = {
     // so two downloads either side of a monthly refresh neither overwrite each
     // other nor pass for the same figures.
     if (DATA_DATE) filename = filename.replace(/(\.[A-Za-z0-9]+)?$/, '-' + DATA_DATE + '$1');
+    if (/^text\/csv/.test(mime || '')) text = withSourceCol(text);
+    saveBlob(filename, new Blob([text], { type: mime || 'text/plain;charset=utf-8' }));
+  }
+  function saveBlob(filename, blob) {
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 500);
+  }
+  function withSourceCol(text) {
     // Every CSV (Data export, Compare, Query, Directory, Custom area) also says
     // where it came from, so a file passed on without its email still names
     // its source. As a last column rather than trailing rows: rows after the
     // data load as data in pandas, Excel and Power BI and break the join a
     // CSV exists for, while an extra column is ignored by anything that does
     // not ask for it. Line ends inside quoted cells are respected.
-    if (/^text\/csv/.test(mime || '')) {
-      var src = csvCell('PopHealth Map (pophealth.uk), an independent open-data project not affiliated with the NHS' +
-        (DATA_DATE ? ', with figures updated on ' + fmtDate(DATA_DATE) : ''));
-      var out = '', q = false, row = 0, start = 0, body = String(text).replace(/\n+$/, '');
-      for (var ci = 0; ci <= body.length; ci++) {
-        var ch = body[ci];
-        if (ch === '"') q = !q;
-        if ((ch === '\n' && !q) || ci === body.length) {
-          var line = body.slice(start, ci).replace(/\r$/, '');
-          out += line + (line ? ',' + (row ? src : 'Source') : '') + '\n';
-          row++; start = ci + 1;
-        }
+    var src = csvCell('PopHealth Map (pophealth.uk), an independent open-data project not affiliated with the NHS' +
+      (DATA_DATE ? ', with figures updated on ' + fmtDate(DATA_DATE) : ''));
+    var out = '', q = false, row = 0, start = 0, body = String(text).replace(/\n+$/, '');
+    for (var ci = 0; ci <= body.length; ci++) {
+      var ch = body[ci];
+      if (ch === '"') q = !q;
+      if ((ch === '\n' && !q) || ci === body.length) {
+        var line = body.slice(start, ci).replace(/\r$/, '');
+        out += line + (line ? ',' + (row ? src : 'Source') : '') + '\n';
+        row++; start = ci + 1;
       }
-      text = out;
     }
-    var blob = new Blob([text], { type: mime || 'text/plain;charset=utf-8' });
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url; a.download = filename;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    setTimeout(function () { URL.revokeObjectURL(url); }, 500);
+    return out;
   }
 
   // showWard() and deselectWard() call these, so the sheet follows the map's
@@ -21821,7 +21850,26 @@ var PH_SHOW = {
      file needs to explain how, and this one does not have to.
      ───────────────────────────────────────────────────────────────────────── */
   var cbPane = $('tab-csv');
+  /* Several sizes of area can be chosen at once, and each becomes its own
+     file. cbLevel is the one being worked on: the helpers below all read it,
+     and cbWith runs them for each chosen size in turn. */
   var cbLevel = 'ward';
+  var CB_LEVEL_ORDER = ['ward', 'lsoa', 'msoa', 'borough'];
+  var cbLevelSet = { ward: true };
+  function cbChosen() { return CB_LEVEL_ORDER.filter(function (l) { return cbLevelSet[l]; }); }
+  function cbWith(l, fn) {
+    var keep = cbLevel;
+    cbLevel = l;
+    try { return fn(); } finally { cbLevel = keep; }
+  }
+  var cbFind = '';
+  var cbShown = {};         // group label -> the keys it lists right now
+  // A ready-made starting set: the headline figures at each level, of which
+  // only those published for the chosen sizes are added.
+  var CB_KEY = ['census_population', 'imd_score_ward', 'imd_score', 'imd_decile_mean', 'imd_decile',
+    'ft_93283', 'ft_932831', 'census_bad_health_pct', 'census_disability_any_pct', 'census_over65_pct',
+    'claimant_rate_pct', 'crime_rate_per_1000', 'fuel_poverty_pct', 'no2_ugm3', 'core20_lsoa_count',
+    'ft_life_expectancy_female', 'ft_life_expectancy_male', 'ft_smoking_prevalence_adults', 'ft_obesity_adults'];
   /* Levels still waiting on a fetch, keyed by level. Ward and borough are in
      memory by the time this pane can be opened. LSOA figures are 7.8 MB and
      MSOA figures 600 KB, and the names, wards and boroughs for both are on
@@ -22046,11 +22094,31 @@ var PH_SHOW = {
   function cbCap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
   function cbWhere() { return cbScope ? scopeLabel(cbScope) : 'All of ' + PH_AREA; }
 
+  // "wards, LSOAs and LAs"
+  function cbList(words) {
+    return words.length < 2 ? (words[0] || '') : words.slice(0, -1).join(', ') + ' and ' + words[words.length - 1];
+  }
+  // Does an indicator match the search? The picker's everyday words are
+  // shared (window.PH_SEARCH_TERMS), so "pollution" finds nitrogen dioxide
+  // here too. A short word must start a word, so "flu" does not find "fluent".
+  function cbMatches(k, grp, terms) {
+    if (!terms.length) return true;
+    var hay = (labelOf(k) + ' ' + (indTitle(k) || '') + ' ' + grp + ' ' + k).toLowerCase();
+    return terms.some(function (t) {
+      if (t.length >= 4) return hay.indexOf(t) !== -1;
+      return new RegExp('(^|[^a-z0-9])' + t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).test(hay);
+    });
+  }
+
   function renderCsvPane() {
     if (!cbPane) return;
+    var lvs = cbChosen();
+    cbLevel = lvs[0];
+    var multi = lvs.length > 1;
     $('cb-level').querySelectorAll('button').forEach(function (b) {
-      b.classList.toggle('on', b.dataset.lvl === cbLevel);
-      b.setAttribute('aria-pressed', String(b.dataset.lvl === cbLevel));
+      var on = !!cbLevelSet[b.dataset.lvl];
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-pressed', String(on));
     });
 
     var scopeEl = $('cb-scope');
@@ -22058,27 +22126,34 @@ var PH_SHOW = {
       scopeEl.innerHTML = scopeOptionsHtml(cbScope, esc);
     }
 
-    // The two answered steps, folded to a line each.
+    // Step 2 folds to a line once answered. Step 1 stays open, because more
+    // than one size of area can be chosen there.
     [1, 2].forEach(function (n) {
       var st = $('cb-step-' + n);
       if (!st) return;
       st.classList.toggle('folded', !!cbFold[n]);
       st.querySelector('.cb-chg').hidden = !cbFold[n];
-      $('cb-ans-' + n).textContent = !cbFold[n] ? ''
-        : n === 1 ? cbCap(CB_LEVELS[cbLevel].plural) : cbWhere();
+      $('cb-ans-' + n).textContent = !cbFold[n] ? '' : n === 1 ? cbCap(CB_LEVELS[cbLevel].plural) : cbWhere();
     });
 
-    var avail = cbAvailable();
-    // Drop any column the previous level had and this one does not, so the
-    // count cannot promise a column the file will not contain. Dropping it
-    // quietly would be worse than not offering it: LAs here hold only the
-    // 18 health figures published for each LA, with no census and no
-    // deprivation, so switching to LAs after picking population takes the
-    // population away. Say which ones went.
-    var dropped = [];
-    Object.keys(cbCols).forEach(function (k) {
-      if (avail.indexOf(k) === -1) { dropped.push(k); delete cbCols[k]; }
+    // What each chosen size of area publishes, and every indicator at least
+    // one of them has.
+    var pendingLv = lvs.filter(function (l) { return _cbPending[l]; });
+    var availBy = {}, avail = [];
+    lvs.forEach(function (l) {
+      availBy[l] = cbWith(l, cbAvailable);
+      availBy[l].forEach(function (k) { if (avail.indexOf(k) === -1) avail.push(k); });
     });
+    avail.sort();
+    // Drop any column none of the chosen sizes has, so the count cannot
+    // promise a column no file will contain, and say which ones went. Not
+    // while a size is still loading: its list is not known yet.
+    var dropped = [];
+    if (!pendingLv.length) {
+      Object.keys(cbCols).forEach(function (k) {
+        if (avail.indexOf(k) === -1) { dropped.push(k); delete cbCols[k]; }
+      });
+    }
 
     var chosen = Object.keys(cbCols).length;
     $('cb-picked').firstElementChild.innerHTML = chosen
@@ -22086,67 +22161,116 @@ var PH_SHOW = {
       : 'No indicators chosen yet';
     $('cb-clear').hidden = !chosen;
 
+    // The list, narrowed by the search.
+    var q = cbFind.trim().toLowerCase();
+    var terms = q ? ((typeof window.PH_SEARCH_TERMS === 'function') ? window.PH_SEARCH_TERMS(q) : [q]) : [];
+    var groups = cbGroups(avail).map(function (g) {
+      return { label: g.label, keys: g.keys.filter(function (k) { return cbMatches(k, g.label, terms); }) };
+    }).filter(function (g) { return g.keys.length; });
+    cbShown = {};
+    groups.forEach(function (g) { cbShown[g.label] = g.keys; });
+    var shownKeys = [].concat.apply([], groups.map(function (g) { return g.keys; }));
+
     // Repainting the list replaces the box or heading that was just pressed,
     // so the keyboard focus is put back on its replacement.
     var colsEl = $('cb-cols'), act = document.activeElement, again = null;
     if (act && colsEl.contains(act)) {
       again = act.getAttribute('data-col') ? ['data-col', act.getAttribute('data-col')]
+        : act.getAttribute('data-grpall') ? ['data-grpall', act.getAttribute('data-grpall')]
         : act.getAttribute('data-grp') ? ['data-grp', act.getAttribute('data-grp')] : null;
     }
-    colsEl.innerHTML = cbGroups(avail).map(function (g) {
-      var open = cbOpenGroups[g.label] || false;
+    var missingFor = function (k) {
+      if (!multi || pendingLv.length) return '';
+      var miss = lvs.filter(function (l) { return availBy[l].indexOf(k) === -1; });
+      return miss.length ? 'Not published for ' + cbList(miss.map(function (l) { return CB_LEVELS[l].plural; })) : '';
+    };
+    colsEl.innerHTML = groups.length ? groups.map(function (g) {
+      var open = q ? true : (cbOpenGroups[g.label] || false);
       var hit = g.keys.filter(function (k) { return cbCols[k]; }).length;
-      return '<div><button type="button" class="cb-grp-hd' + (open ? ' open' : '') + '" data-grp="' + esc(g.label) +
+      var all = hit === g.keys.length;
+      return '<div class="cb-grp"><div class="cb-grp-row"><label class="cb-grp-tick">' +
+        '<input type="checkbox" class="cb-grp-all" data-grpall="' + esc(g.label) + '"' +
+        (all ? ' checked' : '') + (hit && !all ? ' data-part="1"' : '') +
+        ' aria-label="' + esc((q ? 'Choose every match in ' : 'Choose every indicator in ') + g.label) + '"></label>' +
+        '<button type="button" class="cb-grp-hd' + (open ? ' open' : '') + '" data-grp="' + esc(g.label) +
         '" aria-expanded="' + open + '">' +
         ico('chevron-right', 'a') + '<span class="nm">' + esc(g.label) + '</span>' +
-        '<span class="n">' + (hit ? hit + ' of ' : '') + g.keys.length + '</span></button>' +
+        '<span class="n">' + (hit ? hit + ' of ' : '') + g.keys.length + '</span></button></div>' +
         '<div class="cb-grp-body' + (open ? ' open' : '') + '">' +
         g.keys.map(function (k) {
+          var miss = missingFor(k);
           return '<label class="cb-col' + (cbCols[k] ? ' on' : '') + '">' +
             '<input type="checkbox" data-col="' + esc(k) + '"' + (cbCols[k] ? ' checked' : '') + '>' +
-            '<span class="l">' + esc(labelOf(k)) + '</span></label>';
+            '<span class="l">' + esc(labelOf(k)) + (miss ? '<span class="cb-only">' + esc(miss) + '</span>' : '') +
+            '</span></label>';
         }).join('') + '</div></div>';
-    }).join('');
+    }).join('')
+      : '<div class="cb-empty">' + (q ? 'No indicator matches that, so try another word or clear the search.'
+        : pendingLv.length ? 'The indicators will appear here once the figures have loaded.' : '') + '</div>';
+    colsEl.querySelectorAll('.cb-grp-all[data-part]').forEach(function (b) { b.indeterminate = true; });
     if (again) {
       var back = colsEl.querySelector('[' + again[0] + '="' + CSS.escape(again[1]) + '"]');
       if (back) back.focus();
     }
 
-    var n = cbRows().length;
+    // The ready-made sets. Each says how many it would add, or why it is off.
+    var keyAvail = CB_KEY.filter(function (k) { return avail.indexOf(k) !== -1; });
+    var qk = $('cb-q-key'), qm = $('cb-q-map'), qa = $('cb-q-all');
+    qk.disabled = !keyAvail.length;
+    qk.title = keyAvail.length ? 'Adds ' + cbNum(keyAvail.length) + ' headline indicators: ' + keyAvail.map(labelOf).join(', ') : '';
+    var mapOv = (typeof curOv !== 'undefined' && curOv && curOv !== 'none' && avail.indexOf(curOv) !== -1) ? curOv : '';
+    qm.hidden = !mapOv;
+    qm.title = mapOv ? 'Adds ' + labelOf(mapOv) : '';
+    qa.textContent = q ? 'Choose all ' + cbNum(shownKeys.length) + ' matches' : 'Select all';
+    qa.disabled = !shownKeys.length;
+
     var lv = CB_LEVELS[cbLevel];
-    var pending = !!_cbPending[cbLevel];
+    var counts = lvs.map(function (l) { return { l: l, n: cbWith(l, function () { return cbRows().length; }) }; });
+    var empty = counts.filter(function (c) { return !c.n; })[0];
     $('cb-note').innerHTML =
       (dropped.length
         ? '<span class="cb-dropped" id="cb-dropped">' +
           esc(dropped.map(labelOf).join(', ')) +
-          (dropped.length > 1 ? ' are' : ' is') + ' not published for ' + esc(lv.plural) +
+          (dropped.length > 1 ? ' are' : ' is') + ' not published for ' +
+          esc(cbList(lvs.map(function (l) { return CB_LEVELS[l].plural; }))) +
           ', so ' + (dropped.length > 1 ? 'they have' : 'it has') + ' been removed.</span>'
         : '') +
-      'Each figure is the one the map shows for that area, and the file never adds areas ' +
+      'Each figure is the one the map shows for that area, and the files never add areas ' +
       'together, which is what Custom area is for. Each column heading says what the figure ' +
-      'measures and when it is from, and Download notes gives the source, geography and method ' +
+      'measures and when it is from, and the notes give the source, geography and method ' +
       'of every column with a suggested citation.' +
-      (cbLevel === 'borough'
+      (cbLevelSet.borough
         ? ' At LA level the file can hold only the health figures published for each LA.'
         : '');
 
-    // The pinned bar: what the file will hold, or why it cannot be made yet.
-    var count = pending
+    // The pinned bar: what the files will hold, or why they cannot be made yet.
+    var countPhrase = function (c) {
+      return '<strong>' + cbNum(c.n) + '</strong> ' + esc(c.n === 1 ? CB_LEVELS[c.l].label : CB_LEVELS[c.l].plural);
+    };
+    var count = pendingLv.length
       // There is no honest count to give until the figures arrive, so say what
       // is happening rather than "0 LSOAs".
-      ? 'Loading the ' + lv.label + ' figures, which can take a few seconds the first time. ' +
-        'The row count will appear here as soon as they are ready.'
-      : !n
-      ? 'There are no ' + lv.plural + ' to put in the file yet, which usually means their figures ' +
+      ? 'Loading the ' + cbList(pendingLv.map(function (l) { return CB_LEVELS[l].label; })) +
+        ' figures, which can take a few seconds the first time. The row count will appear here as soon as they are ready.'
+      : empty
+      ? 'There are no ' + CB_LEVELS[empty.l].plural + ' to put in a file yet, which usually means their figures ' +
         'could not be loaded, so please check your connection and try again.'
-      : 'The file will have <strong>' + cbNum(n) + '</strong> ' + esc(n === 1 ? lv.label : lv.plural) +
+      : !multi
+      ? 'The file will have ' + countPhrase(counts[0]) +
         (chosen
           ? ' and <strong>' + cbNum(chosen) + '</strong> indicator' + (chosen === 1 ? '' : 's') + '.'
-          : '. Choose at least one indicator to make the file.');
+          : '. Choose at least one indicator to make the file.')
+      : 'There will be ' + cbNum(lvs.length) + ' files, with ' + cbList(counts.map(countPhrase)) +
+        (chosen
+          ? ', and <strong>' + cbNum(chosen) + '</strong> indicator' + (chosen === 1 ? '' : 's') +
+            ' between them. They download together as one ZIP file, with a notes file for each.'
+          : '. Choose at least one indicator to make the files.');
     var countEl = $('cb-count');
     if (countEl.innerHTML !== count) countEl.innerHTML = count;
-    var ready = chosen > 0 && n > 0 && !pending;
+    var ready = chosen > 0 && !empty && !pendingLv.length;
     $('cb-download').disabled = !ready;
+    $('cb-download').textContent = multi ? 'Download ZIP' : 'Download CSV';
+    $('cb-notes').hidden = multi;
     $('cb-notes').disabled = !ready;
     $('cb-preview').disabled = !ready;
     if (!ready) cbPrevOpen = false;
@@ -22156,7 +22280,32 @@ var PH_SHOW = {
     $('cb-prev').hidden = !cbPrevOpen;
     $('cb-preview').textContent = cbPrevOpen ? 'Hide preview' : 'Preview';
     $('cb-preview').setAttribute('aria-expanded', String(cbPrevOpen));
-    if (cbPrevOpen) renderCsvPreview(cbBuild());
+    if (cbPrevOpen) {
+      if (multi) renderCsvPreviewAll(lvs);
+      else renderCsvPreview(cbBuild());
+    }
+  }
+
+  // With several sizes chosen, the first five rows of each file in turn.
+  function renderCsvPreviewAll(lvs) {
+    $('cb-prev').innerHTML = '<div class="cb-prev-hd"><h3>Preview of the files</h3>' +
+      '<p>The first rows of each file, with every column it will have. A blank cell means there is no figure.</p></div>' +
+      lvs.map(function (l) {
+        return cbWith(l, function () {
+          var out = cbBuild(), head = out.table[0], body = out.table.slice(1, 6);
+          return '<div class="cb-prev-lv">' + esc(cbCap(CB_LEVELS[l].plural)) + ': the first ' + cbNum(body.length) +
+            ' of ' + out.rows.toLocaleString('en-GB') + ' rows</div>' +
+            '<div class="cb-tbl-wrap" tabindex="0" role="region" aria-label="' + esc('Preview of the ' + CB_LEVELS[l].label + ' file') + '">' +
+            '<table class="cb-tbl"><thead><tr>' +
+            head.map(function (h, i) { return '<th scope="col"' + (out.columns[i].kind === 'ind' ? ' class="num"' : '') + '>' + esc(h) + '</th>'; }).join('') +
+            '</tr></thead><tbody>' +
+            body.map(function (r) {
+              return '<tr>' + r.map(function (c, i) {
+                return '<td' + (out.columns[i].kind === 'ind' ? ' class="num"' : '') + '>' + esc(c) + '</td>';
+              }).join('') + '</tr>';
+            }).join('') + '</tbody></table></div>';
+        });
+      }).join('');
   }
 
   /* The preview: the first ten rows, from the same arrays the file is written
@@ -22202,7 +22351,10 @@ var PH_SHOW = {
   function cbBuild() {
     var src = cbSource();
     var codes = cbRows();
-    var keys = Object.keys(cbCols).sort(function (a, b) {
+    // Only the chosen indicators published for this size of area, so a file
+    // made alongside others never carries a column with nothing in it.
+    var here = cbAvailable();
+    var keys = Object.keys(cbCols).filter(function (k) { return here.indexOf(k) !== -1; }).sort(function (a, b) {
       return labelOf(a).localeCompare(labelOf(b), 'en-GB', { numeric: true, sensitivity: 'base' });
     });
     var has = function (suffix, k) {
@@ -22466,11 +22618,10 @@ var PH_SHOW = {
     if (l === 'msoa') return !!(Object.keys(MSOA_DATA).length && msoaLyr);
     return true;
   }
-  function setCsvLevel(l) {
-    cbLevel = l;
-    _cbMsoa = null;
+  // Starts the fetch a size of area needs, if it needs one, and repaints the
+  // pane when its files land.
+  function cbEnsure(l) {
     _cbPending[l] = !cbLevelReady(l);
-    renderCsvPane();
     if (!_cbPending[l]) return;
     var loads = (l === 'lsoa')
       ? [ensureLsoaData(), ensureLsoaImd()]
@@ -22481,15 +22632,93 @@ var PH_SHOW = {
     Promise.all(loads).then(function () {
       _cbPending[l] = false;
       _cbMsoa = null;
-      // Only if the reader is still on this level. They can pick another
-      // while 7.8 MB is in flight, and repainting the pane under them would
-      // undo the choice they just made.
-      if (cbLevel === l) renderCsvPane();
+      renderCsvPane();
     });
+  }
+  // One size of area on its own, as the tests and older links ask for.
+  function setCsvLevel(l) {
+    cbLevelSet = {};
+    cbLevelSet[l] = true;
+    _cbMsoa = null;
+    cbEnsure(l);
+    renderCsvPane();
+  }
+  // A size of area on or off. The last one cannot be switched off, because a
+  // download needs at least one.
+  function toggleCsvLevel(l) {
+    if (cbLevelSet[l] && cbChosen().length === 1) return false;
+    if (cbLevelSet[l]) delete cbLevelSet[l];
+    else { cbLevelSet[l] = true; _cbMsoa = null; cbEnsure(l); }
+    renderCsvPane();
+    return true;
+  }
+
+  /* A ZIP file holding one CSV and one notes file for each chosen size of
+     area. Stored rather than compressed, which every unzip tool opens and
+     which needs no library: the files are text and small enough as they are. */
+  var _cbCrcT = null;
+  function cbCrc32(bytes) {
+    if (!_cbCrcT) {
+      _cbCrcT = new Uint32Array(256);
+      for (var n = 0; n < 256; n++) {
+        var c = n;
+        for (var k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+        _cbCrcT[n] = c >>> 0;
+      }
+    }
+    var crc = 0xFFFFFFFF;
+    for (var i = 0; i < bytes.length; i++) crc = _cbCrcT[(crc ^ bytes[i]) & 0xFF] ^ (crc >>> 8);
+    return (crc ^ 0xFFFFFFFF) >>> 0;
+  }
+  function cbZip(files) {
+    var enc = new TextEncoder(), parts = [], central = [], offset = 0, cdSize = 0;
+    var d = new Date();
+    var time = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1);
+    var date = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
+    files.forEach(function (f) {
+      var name = enc.encode(f.name), data = enc.encode(f.text), crc = cbCrc32(data);
+      var h = new DataView(new ArrayBuffer(30));
+      h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(6, 0x0800, true);
+      h.setUint16(8, 0, true); h.setUint16(10, time, true); h.setUint16(12, date, true);
+      h.setUint32(14, crc, true); h.setUint32(18, data.length, true); h.setUint32(22, data.length, true);
+      h.setUint16(26, name.length, true); h.setUint16(28, 0, true);
+      parts.push(new Uint8Array(h.buffer), name, data);
+      var cd = new DataView(new ArrayBuffer(46));
+      cd.setUint32(0, 0x02014b50, true); cd.setUint16(4, 20, true); cd.setUint16(6, 20, true);
+      cd.setUint16(8, 0x0800, true); cd.setUint16(10, 0, true); cd.setUint16(12, time, true);
+      cd.setUint16(14, date, true); cd.setUint32(16, crc, true); cd.setUint32(20, data.length, true);
+      cd.setUint32(24, data.length, true); cd.setUint16(28, name.length, true);
+      cd.setUint32(42, offset, true);
+      central.push(new Uint8Array(cd.buffer), name);
+      cdSize += 46 + name.length;
+      offset += 30 + name.length + data.length;
+    });
+    var e = new DataView(new ArrayBuffer(22));
+    e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true);
+    e.setUint32(12, cdSize, true); e.setUint32(16, offset, true);
+    return new Blob(parts.concat(central, [new Uint8Array(e.buffer)]), { type: 'application/zip' });
+  }
+  // Every chosen size as its CSV (with its Source column) and notes.
+  function cbFiles() {
+    var files = [];
+    cbChosen().forEach(function (l) {
+      cbWith(l, function () {
+        var out = cbBuild();
+        if (!out.rows || !out.cols) return;
+        var base = cbFileBase() + (DATA_DATE ? '-' + DATA_DATE : '');
+        files.push({ name: base + '.csv', text: withSourceCol(out.text) });
+        files.push({ name: base + '-notes.txt', text: cbNotes(out) });
+      });
+    });
+    return files;
+  }
+  function cbZipName() {
+    return ('pophealth-export' + (cbScope ? '-' + cbScope.replace(/[^A-Za-z0-9]+/g, '-') : ''))
+      .toLowerCase().replace(/-+$/, '') + '.zip';
   }
 
   if (cbPane) {
-    // Answering a step folds it. Focus moves to its Change button, because
+    // Answering step 2 folds it. Focus moves to its Change button, because
     // the control that was pressed has just been folded away.
     var cbFoldStep = function (n) {
       var st = $('cb-step-' + n), had = st && st.contains(document.activeElement);
@@ -22500,8 +22729,9 @@ var PH_SHOW = {
     $('cb-level').addEventListener('click', function (e) {
       var b = e.target.closest('[data-lvl]');
       if (!b) return;
-      setCsvLevel(b.dataset.lvl);
-      cbFoldStep(1);
+      if (!toggleCsvLevel(b.dataset.lvl) && typeof phNote === 'function') {
+        phNote(b, 'At least one size of area is needed, so choose another before removing this one.', { ms: 5000 });
+      }
     });
     /* A choice made with the keyboard fires change on every arrow press, so
        step 2 folds when the list is left rather than mid-choice. */
@@ -22529,7 +22759,29 @@ var PH_SHOW = {
       if (to) to.focus();
     });
     $('cb-clear').addEventListener('click', function () { cbCols = {}; renderCsvPane(); });
+    $('cb-find').addEventListener('input', function (e) { cbFind = e.target.value; renderCsvPane(); });
+    cbPane.querySelector('.cb-quick-row').addEventListener('click', function (e) {
+      var b = e.target.closest('[data-cbq]');
+      if (!b || b.disabled) return;
+      var which = b.getAttribute('data-cbq');
+      var add = which === 'all' ? [].concat.apply([], Object.keys(cbShown).map(function (g) { return cbShown[g]; }))
+        : which === 'map' ? [curOv]
+        : CB_KEY;
+      var have = {};
+      Object.keys(cbShown).forEach(function (g) { cbShown[g].forEach(function (k) { have[k] = 1; }); });
+      add.forEach(function (k) { if (have[k] || which === 'map') cbCols[k] = true; });
+      renderCsvPane();
+    });
     $('cb-cols').addEventListener('click', function (e) {
+      var all = e.target.closest('input[data-grpall]');
+      if (all) {
+        var keys = cbShown[all.getAttribute('data-grpall')] || [];
+        // Ticking a part-chosen group chooses the rest of it.
+        var on = all.checked;
+        keys.forEach(function (k) { if (on) cbCols[k] = true; else delete cbCols[k]; });
+        renderCsvPane();
+        return;
+      }
       var hd = e.target.closest('[data-grp]');
       if (hd) {
         var g = hd.getAttribute('data-grp');
@@ -22546,6 +22798,15 @@ var PH_SHOW = {
     // The buttons are switched off until there is a file to make, and the
     // line above them says why, so these only run when they can succeed.
     $('cb-download').addEventListener('click', function () {
+      var lvs = cbChosen();
+      if (lvs.length > 1) {
+        var files = cbFiles();
+        if (!files.length) return;
+        var name = cbZipName();
+        if (DATA_DATE) name = name.replace(/\.zip$/, '-' + DATA_DATE + '.zip');
+        saveBlob(name, cbZip(files));
+        return;
+      }
       var out = cbBuild();
       if (!out.rows || !out.cols) return;
       download(cbFileBase() + '.csv', out.text, 'text/csv;charset=utf-8');
@@ -22563,11 +22824,16 @@ var PH_SHOW = {
 
   window.PH_CSV = {
     level: function () { return cbLevel; },
+    levels: cbChosen,
     columns: function () { return Object.keys(cbCols); },
     build: cbBuild,
+    buildFor: function (l) { return cbWith(l, cbBuild); },
+    files: cbFiles,
+    zip: function () { return cbZip(cbFiles()); },
     notes: function () { return cbNotes(cbBuild()); },
     fileName: function () { return cbFileBase() + (DATA_DATE ? '-' + DATA_DATE : '') + '.csv'; },
     setLevel: function (l) { setCsvLevel(l); },
+    toggleLevel: function (l) { return toggleCsvLevel(l); },
     pick: function (k) { cbCols[k] = true; renderCsvPane(); },
   };
 
