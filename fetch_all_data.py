@@ -3898,6 +3898,20 @@ def FT_MALE_ID(ind_id: int) -> int:
     return ind_id * 10 + 1
 
 
+def ft_msoa_drop_bare_zeros(ftm: pd.DataFrame) -> pd.DataFrame:
+    """Local Health MSOA rows less any 0 that OHID gives no England
+    comparison. Long-term unemployment (93098) counts Jobseeker's Allowance
+    claims only, and 309 of London's MSOAs read exactly 0 with no comparison:
+    too few claimants to test rather than none, so they are stored as no
+    figure. Every other zero in the release carries a comparison."""
+    if ftm is None or ftm.empty or "value" not in ftm.columns:
+        return ftm
+    vs = (ftm["vs_england"].fillna("").astype(str).str.strip()
+          if "vs_england" in ftm.columns else pd.Series("", index=ftm.index))
+    bare = (pd.to_numeric(ftm["value"], errors="coerce") == 0) & (vs == "")
+    return ftm[~bare]
+
+
 def _ft_msoa_variant(ind_id, df, name, want_msoa, rows, missing_codes) -> int:
     """Latest period per MSOA, 2011 codes bridged, rows appended. Returns the
     number of figures bridged from 2011 codes."""
@@ -5903,7 +5917,7 @@ def build_ward_data() -> dict:
     # rests on its other LSOAs only, so the share of residents covered is
     # recorded, and a ward under WARD_MIN_COVER gets no figure (see
     # bridge_to_wards).
-    ftm = _read_parquet_opt(DATA_DIR / "outcomes" / "fingertips_msoa.parquet")
+    ftm = ft_msoa_drop_bare_zeros(_read_parquet_opt(DATA_DIR / "outcomes" / "fingertips_msoa.parquet"))
     if ftm is not None and not ftm.empty:
         sources["health_msoa"] = "OHID Fingertips (Local Health, MSOA)"
         lsoa_to_ward = get_lsoa_to_ward()
@@ -6318,7 +6332,7 @@ def build_msoa_data() -> dict:
                 v = row[col]
                 if pd.notna(v):
                     rec[col] = int(v) if col == "census_population" else round(float(v), 4)
-    ftm = _read_parquet_opt(DATA_DIR / "outcomes" / "fingertips_msoa.parquet")
+    ftm = ft_msoa_drop_bare_zeros(_read_parquet_opt(DATA_DIR / "outcomes" / "fingertips_msoa.parquet"))
     if ftm is None or ftm.empty:
         warn("msoa_data: no fingertips_msoa parquet")
         ftm = pd.DataFrame(columns=["MSOA21CD", "indicator_id", "value"])

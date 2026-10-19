@@ -5261,7 +5261,7 @@ const OV_CFG = {
   census_public_transport_pct:     { lo:"Lower", hi:"Higher", wh:false, min:7,    max:48,   descriptive:true },
   ft_93280                      : { lo:"Lower", hi:"Higher", wh:true, min:5.5132, max:14.2429 },
   ft_93097                      : { lo:"Lower", hi:"Higher", wh:true, min:0.7017, max:13.1514 },
-  ft_93098                      : { lo:"Lower", hi:"Higher", wh:true, min:-0.1326, max:2.784 },
+  ft_93098                      : { lo:"Lower", hi:"Higher", wh:true, min:0, max:2.784 },
   ft_93105                      : { lo:"Lower", hi:"Higher", wh:true, min:4.8001, max:16.4726 },
   ft_93106                      : { lo:"Lower", hi:"Higher", wh:true, min:11.8697, max:31.3188 },
   ft_93107                      : { lo:"Lower", hi:"Higher", wh:true, min:9.3062, max:33.1308 },
@@ -5642,7 +5642,7 @@ const IND_NAMES = {
   // Health, OHID Local Health (published for MSOAs)
   ft_93280:  ['Fuel poverty (OHID, 2023)', 'Fuel poverty (low income, low energy efficiency methodology)'],
   ft_93097:  ['Out-of-work benefit claimants', 'Unemployment: people claiming out of work benefit (aged 16 to 64)'],
-  ft_93098:  ['Long-term out-of-work claimants', 'Long-term unemployment: people claiming out of work benefit for over 12 months (aged 16 to 64)'],
+  ft_93098:  ['Long-term Jobseeker’s Allowance claimants', 'Long-term unemployment: people claiming out of work benefit for over 12 months (aged 16 to 64)'],
   ft_93105:  ['Reception children with obesity', 'Reception prevalence of obesity (including severe obesity), 3 years data combined'],
   ft_93106:  ['Reception children overweight or obese', 'Reception prevalence of overweight (including obesity), 3 years data combined'],
   ft_93107:  ['Year 6 children with obesity', 'Year 6 prevalence of obesity (including severe obesity), 3 years data combined'],
@@ -6241,7 +6241,7 @@ const OV_META = {
 
   ft_93280                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2023", g: "MSOA", u: "%", desc: "The share of households in fuel poverty, which means they have a low income and live in a home that is costly to heat, so a lower figure is better." },
   ft_93097                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2024/25", g: "MSOA", u: "%", desc: "People aged 16 to 64 claiming out-of-work benefits, as a share of all residents of that age, so a lower figure is better." },
-  ft_93098                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2024/25", g: "MSOA", u: "per 1,000", desc: "People aged 16 to 64 who have claimed out-of-work benefits for more than 12 months, per 1,000 residents of that age, so a lower figure is better." },
+  ft_93098                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2024/25", g: "MSOA", u: "per 1,000", desc: "People aged 16 to 64 who have claimed Jobseeker’s Allowance for more than 12 months, per 1,000 residents of that age, so a lower figure is better. Universal Credit claimants are not counted, because how long they have claimed is not published, so these figures are very low." },
   ft_93105                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2022/23 - 24/25", g: "MSOA", u: "%", desc: "The share of Reception children, aged 4 to 5, measured as living with obesity, including severe obesity, with three school years combined so that the figures are steadier. A lower figure is better." },
   ft_93106                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2022/23 - 24/25", g: "MSOA", u: "%", desc: "The share of Reception children, aged 4 to 5, measured as overweight or living with obesity, with three school years combined so that the figures are steadier. A lower figure is better." },
   ft_93107                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2022/23 - 24/25", g: "MSOA", u: "%", desc: "The share of Year 6 children, aged 10 to 11, measured as living with obesity, including severe obesity, with three school years combined so that the figures are steadier. A lower figure is better." },
@@ -6456,7 +6456,7 @@ const OV_PLAIN = {
   ft_93239: "Emergency admissions for self-harm, compared with England, where 100 is England’s level for the same ages.",
   ft_93283: "How long a girl born now can expect to live, in years, for this small area.",
   ft_932831: "How long a boy born now can expect to live, in years, for this small area.",
-  ft_93098: "People aged 16 to 64 claiming out-of-work benefits for more than a year, per 1,000.",
+  ft_93098: "People aged 16 to 64 claiming Jobseeker’s Allowance for more than a year, per 1,000. Universal Credit is not counted.",
   ft_93250: "Deaths from any cause, compared with England, where 100 is England’s level for the same ages.",
   ft_93252: "Deaths under 75 from any cause, compared with England, where 100 is England’s level for the same ages.",
   ft_93253: "Deaths from cancer, compared with England, where 100 is England’s level for the same ages.",
@@ -6944,7 +6944,11 @@ function ftBlankCause(k) {
   const codes = Object.keys(MSOA_DATA);
   const f = resolveOvField(k);
   const blank = codes.filter(c => { const v = (MSOA_DATA[c] || {})[f]; return v == null || v === '' || isNaN(parseFloat(v)); });
-  const cause = !blank.length ? 'none' : blank.every(msoaRedrawn2021) ? 'redrawn' : 'withheld';
+  // Long-term claimants: OHID's 0s with no England comparison are stored as
+  // no figure (ft_msoa_drop_bare_zeros in the pipeline), so most blanks are
+  // too few claimants to measure rather than withheld.
+  const cause = !blank.length ? 'none' : blank.every(msoaRedrawn2021) ? 'redrawn'
+    : FT_BARE_ZERO_BLANK[k] ? 'few' : 'withheld';
   _blankCause[k] = cause;
   return cause;
 }
@@ -6952,10 +6956,13 @@ function ftBlankCause(k) {
 function msoaNoFigure(code, k) {
   if (typeof k === 'string' && k.startsWith('ft_')) {
     if (msoaRedrawn2021(code)) return 'No figure: this MSOA was redrawn in 2021 and OHID’s figures leave it out';
+    if (ftBlankCause(k) === 'few') return 'No figure: too few long-term claimants to measure';
     if (ftBlankCause(k) === 'withheld') return 'No figure (withheld to protect privacy)';
   }
   return 'No figure';
 }
+const FT_BARE_ZERO_BLANK = { ft_93098: 1 };
+const BLANK_NOTE_FEW = 'Areas left blank have no figure. Where there are too few long-term claimants to measure, OHID gives 0 with no comparison with England, and we show that as no figure rather than as none.';
 const BLANK_NOTE_REDRAWN ='Areas left blank have no figure. OHID’s figures for these areas leave out the MSOAs that were redrawn in 2021, so a blank is a gap in what was published rather than a zero.';
 const BLANK_NOTE_WITHHELD = 'Areas left without colour have no figure. OHID, the Office for Health Improvement and Disparities, withholds figures where so few people are counted that someone could be identified, so a blank area does not mean zero.';
 /* Figures carried from 2011 MSOA codes to a 2021 MSOA by the ONS lookup are
@@ -7122,7 +7129,7 @@ const CENSUS_BASE = {
 const FT_COUNTED = {
   '93089': ['Live births to women aged 15 to 44', 'Women aged 15 to 44'],
   '93097': ['Residents claiming out-of-work benefits', 'Residents aged 16 to 64'],
-  '93098': ['Residents who have claimed out-of-work benefits for more than 12 months', 'Residents aged 16 to 64'],
+  '93098': ['Residents who have claimed Jobseeker’s Allowance for more than 12 months. Universal Credit claimants are not counted, because how long they have claimed is not published, so these figures are very low', 'Residents aged 16 to 64'],
   '93105': ['Reception children measured as living with obesity', 'All Reception children measured'],
   '93106': ['Reception children measured as overweight or living with obesity', 'All Reception children measured'],
   '93107': ['Year 6 children measured as living with obesity', 'All Year 6 children measured'],
@@ -16911,8 +16918,8 @@ document.addEventListener('change', e => {
     if (ftActive && !cause && ovHasLevel(curOv, 'msoa') && typeof ensureMsoaData === 'function') {
       ensureMsoaData().then(() => { if (ftBlankCause(curOv)) update(); });
     }
-    const show = ftActive && (cause === 'redrawn' || cause === 'withheld' || (!cause && !ovHasLevel(curOv, 'msoa')));
-    const want = !show ? '' : cause === 'redrawn' ? BLANK_NOTE_REDRAWN : BLANK_NOTE_WITHHELD;
+    const show = ftActive && (cause === 'redrawn' || cause === 'withheld' || cause === 'few' || (!cause && !ovHasLevel(curOv, 'msoa')));
+    const want = !show ? '' : cause === 'redrawn' ? BLANK_NOTE_REDRAWN : cause === 'few' ? BLANK_NOTE_FEW : BLANK_NOTE_WITHHELD;
     if (note.textContent !== want) note.textContent = want;
     note.hidden = !show;
     if (show) note.title = want; else note.removeAttribute('title');
