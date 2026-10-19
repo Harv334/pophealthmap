@@ -3154,7 +3154,7 @@ const smallText = page => page.evaluate(() => {
     const meth = await open(browser, 'methodology.html', DESK);
     const mt = await meth.page.evaluate(() => document.body.innerText);
     ok(!/cover\s+every one/.test(mt) && /fewer than four in five of its residents, we show no figure for the ward/.test(mt) &&
-       /Census day, 21 March 2021/.test(mt) && !/mid-2022/.test(mt) && /measures of households|summed counts as a ward's are/.test(mt),
+       /Census day, 21 March 2021/.test(mt) && !/mid-2022/.test(mt) && /measures of households|summed counts\s+behind it, as a ward's is/.test(mt),
       'the methodology describes the ward coverage rule, the Census population and Custom area\'s arithmetic', '');
     await meth.page.close();
   }
