@@ -74,7 +74,7 @@
       var btn = 'display:inline-block;padding:9px 18px;border-radius:6px;font-weight:600;' +
         'text-decoration:none;font-size:15px;font-family:inherit;line-height:1.4;cursor:pointer;margin:4px;';
       document.write(
-        '<title>PopHealth Map - England</title>' +
+        '<title>PopHealth Map: England</title>' +
         '<meta name="viewport" content="width=device-width, initial-scale=1">' +
         '<div role="alertdialog" aria-labelledby="eng-h" aria-describedby="eng-p" style="position:fixed;inset:0;' +
         'display:flex;align-items:center;justify-content:center;padding:16px;background:#F4F7F9;' +
@@ -135,8 +135,8 @@
   }
 })();
 </script>
-<title>PopHealth Map - population health across England by ward and neighbourhood</title>
-<meta name="description" content="Explore health, deprivation and local services across every neighbourhood in England, free and with no sign-in. Life expectancy, hospital admissions, crime, air quality, transport and more, from open NHS and government data.">
+<title>PopHealth Map: health and deprivation by ward in England</title>
+<meta name="description" content="A free map of health, deprivation and local services for every ward and neighbourhood in England, with a one-page printable report for each ward.">
 
 <!-- One canonical address. The site also answers on www and on the GitHub
      Pages address, both of which redirect here, and any mirror carries a
@@ -152,15 +152,15 @@
 <meta property="og:site_name" content="PopHealth Map">
 <meta property="og:locale" content="en_GB">
 <meta property="og:url" content="https://pophealth.uk/">
-<meta property="og:title" content="PopHealth Map - population health across England by ward and neighbourhood">
-<meta property="og:description" content="Explore health, deprivation and local services across every neighbourhood in England, free and with no sign-in. Life expectancy, hospital admissions, crime, air quality, transport and more, from open NHS and government data.">
+<meta property="og:title" content="PopHealth Map: health and deprivation by ward in England">
+<meta property="og:description" content="A free map of health, deprivation and local services for every ward and neighbourhood in England, with a one-page printable report for each ward.">
 <meta property="og:image" content="https://pophealth.uk/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="A map of London wards shaded by deprivation score, beside the name PopHealth Map and the words Free, no sign-in">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="PopHealth Map - population health across England by ward and neighbourhood">
-<meta name="twitter:description" content="Explore health, deprivation and local services across every neighbourhood in England, free and with no sign-in. Life expectancy, hospital admissions, crime, air quality, transport and more, from open NHS and government data.">
+<meta name="twitter:title" content="PopHealth Map: health and deprivation by ward in England">
+<meta name="twitter:description" content="A free map of health, deprivation and local services for every ward and neighbourhood in England, with a one-page printable report for each ward.">
 <meta name="twitter:image" content="https://pophealth.uk/og.png">
 <meta name="twitter:image:alt" content="A map of London wards shaded by deprivation score, beside the name PopHealth Map and the words Free, no sign-in">
 
@@ -938,7 +938,7 @@
      drawer, where three across left the fourth on a row of its own. */
   .keystats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin: 6px 0 10px; }
   .keystat { background: var(--paper-2); border-radius: var(--r-sm); padding: 7px 6px; text-align: center; border: 1px solid var(--line-2); }
-  .keystat-lbl { font-size: var(--t-xs); color: var(--ink-3); text-transform: uppercase; letter-spacing: .04em; line-height: 1.2; min-height: 22px; display: flex; align-items: center; justify-content: center; }
+  .keystat-lbl { font-size: var(--t-xs); color: var(--ink-3); line-height: 1.2; min-height: 22px; display: flex; align-items: center; justify-content: center; }
   .keystat-val { font-size: var(--t-lg); font-weight: 600; color: var(--ink); margin-top: 3px; line-height: 1.1; }
   /* This was --line, a border colour used as a text colour: #DDE1E4 on white
      is 1.32:1, which is not dim, it is invisible. The em dash it renders is
@@ -2108,6 +2108,10 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
   #ov-info-panel .ic-x:hover { background: var(--nhs-light); color: var(--nhs-blue); }
   #ov-info-panel .ic-d { margin: 0 0 6px; }
   #ov-info-panel .ic-t { margin: 0 0 6px; color: var(--ink-3); }
+  #ov-info-panel .ic-tech { margin-top: 10px; }
+  #ov-info-panel .ic-tech > summary { min-height: 24px; line-height: 24px; cursor: pointer;
+    color: var(--nhs-blue); font-weight: 600; }
+  #ov-info-panel .ic-tech[open] > summary { margin-bottom: 4px; }
   /* Each term above its definition, so the definitions have the card's
      full width rather than a narrow column beside the terms. */
   /* width and height undo the icon class of the same name (.ic), which
@@ -2339,7 +2343,8 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
     font: inherit; font-size: var(--t-xs); color: var(--ink-3); cursor: pointer; text-decoration: underline; }
   .rb-count .rb-clear:hover { color: var(--nhs-red); }
   .rb-group { padding: var(--s-3) var(--s-3); border-bottom: 1px solid var(--line); }
-  .rb-group h3 { font-size: var(--t-xs); text-transform: uppercase; letter-spacing: .06em;
+  /* Sentence case rather than capitals, which made "LSOAs" read "LSOAS". */
+  .rb-group h3 { font-size: var(--t-xs);
     font-weight: 600; color: var(--ink-3); margin: 0 0 8px; }
   .rb-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
   .rb-stat { border: 1px solid var(--line); border-radius: var(--r-md); padding: 7px 9px; min-width: 0; }
@@ -3245,7 +3250,7 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
            link preview and the methodology page said PopHealth Map, so a
            shared link previewed under one name and opened under another. -->
       <div class="hdr-name">
-        <h1 class="hdr-logo"><svg class="hdr-mark" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><rect width="9" height="9" rx="2" fill="#003087"/><rect x="11" width="9" height="9" rx="2" fill="#8BBDEA"/><rect y="11" width="9" height="9" rx="2" fill="#005EB8"/><rect x="11" y="11" width="9" height="9" rx="2" fill="#3D8FDA"/></svg>PopHealth Map<span class="dev-badge" title="Figures are provisional while the site is being checked.">Beta</span></h1>
+        <h1 class="hdr-logo"><svg class="hdr-mark" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><rect width="9" height="9" rx="2" fill="#003087"/><rect x="11" width="9" height="9" rx="2" fill="#8BBDEA"/><rect y="11" width="9" height="9" rx="2" fill="#005EB8"/><rect x="11" y="11" width="9" height="9" rx="2" fill="#3D8FDA"/></svg>PopHealth Map<span class="dev-badge" title="This site is in beta, so features may change. Figures shown at the level their publisher releases them are the publisher's own, and figures we calculate for other levels are marked as estimates.">Beta</span></h1>
         <!-- The region this map shows, on every map, London included: the
              tagline beside it says England, so the name says which part of
              it is on screen, and pressing it lists the other regions. A
@@ -3260,7 +3265,7 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
       <!-- A one-line description beside the name on wide screens, where the
            header otherwise leaves a gap. Outside the h1 so the page's
            heading stays the name alone. -->
-      <span class="hdr-tag">Explore health, deprivation and local services across every neighbourhood in England, free and with no sign-in.</span>
+      <span class="hdr-tag">Health, deprivation and local services for every neighbourhood in England.</span>
       <!-- Phones only. The search box lives in the drawer below 900px, which
            left the most-used control two taps away and invisible. This opens
            the drawer and puts the cursor straight in the box. -->
@@ -3473,8 +3478,8 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
           <div id="pcn-block" hidden>
             <div class="lrow lrow-split" id="pcn-row"><label for="tpcn"><div class="sw sw-line" style="--sw:#0B7A75"></div><span class="lname">PCN footprints <span class="lcount" id="pcn-count"></span></span></label><button type="button" class="lhelp" aria-label="About PCN footprints" aria-expanded="false" title="Primary care networks (PCNs) are groups of GP practices that plan services together. Each footprint covers the LSOAs where most registered residents use that network's practices, but PCNs are defined by their patient lists rather than by a boundary, so their real catchments overlap and choosing one shows all of its catchment.">?</button><input type="checkbox" id="tpcn"></div>
             <div class="lsub">
-              <div class="lsub-lbl">Focus by PCN</div>
-              <select id="pcn-focus" aria-label="Focus by primary care network">
+              <div class="lsub-lbl" id="pcn-focus-label">Focus by primary care network (PCN)<button type="button" class="lhelp" aria-label="About focusing by primary care network" aria-expanded="false" title="Primary care networks (PCNs) are groups of GP practices that plan services together. Choose one to see where its practices are and, where we have the registration figures, the areas its patients come from.">?</button></div>
+              <select id="pcn-focus" aria-label="Focus by primary care network (PCN)">
                 <option value="">Choose a network</option>
               </select>
               <div class="pcn-info" id="pcn-info" hidden></div>
@@ -3484,7 +3489,7 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
           <div class="lsub">
             <div class="lsub-lbl" id="borough-focus-label">Focus by LA</div>
             <select id="borough-focus" aria-labelledby="borough-focus-label">
-              <option value="all">All London</option>
+              <option value="all">All of London</option>
             </select>
           </div>
           <label class="lrow" id="wardrow"><div class="sw sw-line" style="--sw:#000"></div><span class="lname">Ward boundaries <span class="lcount" id="ward-count">704</span></span><input type="checkbox" id="tnw" checked></label>
@@ -3550,7 +3555,7 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
                  typed here. It was eight hand-written boroughs, from when the
                  map covered eight, so the other 25 could not be picked at all.
                  See initVcseBoroughs. -->
-            <option value="all" selected>All London</option>
+            <option value="all" selected>All of London</option>
             <optgroup label="── LA ──" id="vcse-borough-group"></optgroup>
             </select>
           <input type="text" id="vcse-search" placeholder="Search charities" aria-label="Search charities">
@@ -3625,7 +3630,7 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
               <button type="button" class="ov-back" id="ov-back">
                 <svg class="ic" aria-hidden="true"><use href="#i-chevron-left"/></svg>All themes</button>
               <h2 class="ov-tv-h" id="ov-tv-h"></h2>
-              <div class="ov-tv-key">A <span class="ov-lv-nat">box</span> marks the level each indicator is published at. Figures for larger areas are calculated from it, with counts summed and rates population-weighted, and smaller areas repeat the figure of the area they sit in.</div>
+              <div class="ov-tv-key">The <span class="ov-lv-nat">boxed</span> level is the one these figures are published for, and larger areas are calculated from it.</div>
               </div>
               <div class="ov-tv-list" id="ov-tv-list" role="group" aria-labelledby="ov-tv-h"></div>
               <!-- Core20 lives with the deprivation indicators it is built
@@ -3888,7 +3893,7 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
             <h2>Data export</h2>
             
           </div>
-          <div class="cb-sub">Select your geography and indicators below to download a custom CSV dataset.</div>
+          <div class="cb-sub">Choose the areas and indicators you want, and download them as a spreadsheet with a notes file that says where every figure comes from.</div>
         </div>
 
         <div class="cb-scroll" id="cb-scroll">
@@ -3972,7 +3977,7 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
                  placeholder="Search by name, address or postcode" aria-label="Search the directory">
           <div class="dir-row2">
             <select class="q-f" id="dir-borough" aria-label="Where: all of London, an ICB, or an LA"><option value="">All of London</option></select>
-            <button type="button" class="ws-btn" id="dir-csv">CSV</button>
+            <button type="button" class="ws-btn" id="dir-csv">Download CSV</button>
           </div>
           <div class="dir-types" id="dir-types"></div>
         </div>
@@ -4302,7 +4307,7 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
     <span class="sbar-left">
       <!-- The palette is NHS blue and the audience is NHS staff, so who runs
            this has to be said on the page, not left to be inferred. -->
-      <span class="sbar-note">An independent project, not affiliated with the NHS.</span>
+      <span class="sbar-note">PopHealth Map is an independent project, not affiliated with the NHS.</span>
       <a class="sbar-link" href="privacy.html">About and privacy</a>
       <!-- Back in the bar: an accessibility statement has to be easy to find
            from every page, not only reachable at its own URL. -->
@@ -4313,6 +4318,11 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
       <!-- On a phone the map's credits line is one line long, and this is
            where its "Data credits" link goes (workplan 2.10). -->
       <a class="sbar-link credits-link sbar-credits" href="methodology.html#licences">Data credits</a>
+      <!-- Feedback: an email with three short questions already in it (who
+           you are, what you used the map for, what would help). Nothing is
+           sent or stored by the site itself. The tour's last chapter links
+           here too, reading this href, so the questions live in one place. -->
+      <a class="sbar-link" id="sbar-feedback" href="mailto:contact@pophealth.uk?subject=Feedback%20on%20PopHealth%20Map&amp;body=1.%20What%20is%20your%20role%20%28for%20example%20public%20health%2C%20NHS%2C%20council%2C%20charity%2C%20community%20group%20or%20resident%29%3F%0D%0A%0D%0A2.%20What%20did%20you%20use%20PopHealth%20Map%20for%20today%3F%0D%0A%0D%0A3.%20What%20would%20make%20it%20more%20useful%20to%20you%3F%0D%0A" title="Opens an email to contact@pophealth.uk with three short questions">Feedback</a>
       <a class="sbar-link" href="mailto:contact@pophealth.uk">contact@pophealth.uk</a>
       <span id="src-lbl"></span>
     </span>
@@ -4331,7 +4341,7 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
            A literal, not a fetched value: a version injected from another file
            would report the new number over a stale page, which is the one
            thing it exists to tell you. -->
-      <span id="site-ver" title="Version of the website itself. The date beside it is when the data was last refreshed.">v0.9.0</span>
+      <span id="site-ver" title="Version of the website itself. The date beside it is when the data was last refreshed.">Version 1.0.0</span>
     </span>
   </footer>
 
@@ -5832,12 +5842,18 @@ const IND_DECIMALS = {};
     'crime_drug_offences_12mo', 'crime_public_order_12mo', 'crime_arson_12mo', 'crime_weapons_12mo',
     'crime_misc_society_12mo', 'core20_lsoa_count', 'total_lsoa_count', 'claimant_count',
     'gb_total_uprn', 'imd_decile', 'imd_rank', 'rail_station_dist_m', 'bus_stop_dist_m'];
+  // PTAL has one decimal: a second suggests a precision the measure lacks.
   const two = ['income_score', 'employment_score', 'education_score', 'health_score', 'crime_score',
-    'barriers_score', 'environment_score', 'ptal_score'];
+    'barriers_score', 'environment_score'];
   Object.keys(IND_NAMES).forEach(k => { IND_DECIMALS[k] = 1; });
   whole.forEach(k => { IND_DECIMALS[k] = 0; });
   two.forEach(k => { IND_DECIMALS[k] = 2; });
 })();
+/* The decimal places at one level. The station and bus stop counts are whole
+   numbers for an LSOA, and keep one decimal only as a ward or LA average. */
+function indDecimalsAt(k, level) {
+  return level === 'lsoa' && /_1km$|_800m$/.test(String(k || '')) ? 0 : indDecimals(k);
+}
 function indDecimals(k) {
   const key = String(k || '');
   if (Object.prototype.hasOwnProperty.call(IND_DECIMALS, key)) return IND_DECIMALS[key];
@@ -7450,6 +7466,19 @@ function indicatorReportHref(k, write) {
   };
   ['pointerdown', 'focusin', 'click', 'contextmenu'].forEach(t => document.addEventListener(t, refresh, true));
 })();
+/* One line on how to read an indicator's figure, for the top of its card:
+   which way the colours run and, where the site judges it, whether a higher
+   figure is better or worse. */
+function _cardHowToRead(k) {
+  const cfg = (typeof OV_CFG === 'object' && OV_CFG[k]) || {};
+  if (cfg.rev) return '1 is the most deprived, and on the map darker means more deprived.';
+  if (typeof ovIsStdRatio === 'function' && ovIsStdRatio(k))
+    return '100 is the England level once age is allowed for, so 120 means a fifth more than expected, and darker means higher.';
+  if (cfg.descriptive || laSums(k)) return 'Darker means a higher figure, which is not better or worse in itself.';
+  if (cfg.wh === true) return 'Darker means a higher figure, and a higher figure is worse.';
+  if (cfg.wh === false) return 'Darker means a higher figure, and a higher figure is better.';
+  return 'Darker means a higher figure.';
+}
 function indicatorCardHTML(k) {
   const e = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const m = (typeof OV_META === 'object' && OV_META[k]) || {};
@@ -7459,37 +7488,45 @@ function indicatorCardHTML(k) {
   const nm = l => ({ borough: 'LA', ward: 'Ward', msoa: 'MSOA', lsoa: 'LSOA', oa: 'Output area' })[l] || l;
   // Read in the order the card shows them, so each acronym is spelled out
   // where the reader first meets it, "local authority (LA)" included.
+  // The rows shown first are read first, then the technical details.
   const say = _spellOnce();
   const desc = say(m.desc);
+  const age = ovAgeNote(k), caution = say([ovCaution(k), laNotesCaution(k)].filter(Boolean).join(' '));
+  const how = say(_cardHowToRead(k));
+  const source = say(_cardSource(k));
   const num = say(f.num), den = say(f.den);
   const pub = _publishedAt(k, nat, lv).map(say);
-  const age = ovAgeNote(k), caution = say([ovCaution(k), laNotesCaution(k)].filter(Boolean).join(' '));
   const vsEng = /^ft_/.test(k) && nat === 'msoa'
     ? say('OHID tests each MSOA figure against England, and when the map shows MSOAs, each area\'s figure says whether it is better than, worse than or similar to England.') : '';
-  const source = say(_cardSource(k));
   const updates = say(f.cadence), method = say(f.method);
   const row = (t, v) => v ? '<dt>' + e(t) + '</dt><dd>' + v + '</dd>' : '';
   const period = ovPeriodOf(k);
   return '<div class="ic-top"><div class="ic-h">' + e((typeof _ovLabel === 'function' ? _ovLabel(k) : k) || k) + '</div>' +
     '<button type="button" class="ic-x" aria-label="Close the indicator card">' +
     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>' +
-    // The publisher's own title under the display label, so the figure can
-    // be found at source by the name it is published under.
-    (indTitle(k) ? '<p class="ic-t">Official title: ' + e(indTitle(k)) + '</p>' : '') +
     (desc ? '<p class="ic-d">' + e(desc) + '</p>' : '') +
+    // What the number means, how old it is and whether to trust it come
+    // first; the rest is for analysts, behind Technical details.
+    '<dl class="ic">' +
+    row('Period', e(period.charAt(0).toUpperCase() + period.slice(1)) + (age ? ' <span class="ov-old">(' + e(age.replace(/^Figures end in \d+, /, '')) + ')</span>' : '')) +
+    row('Caution', caution ? '<span class="ov-old">' + e(caution) + '</span>' : '') +
+    row('How to read it', e(how)) +
+    row('Source', e(source)) +
+    '</dl>' +
+    '<details class="ic-tech"><summary>Technical details</summary>' +
+    // The publisher's own title, so the figure can be found at source by
+    // the name it is published under.
+    (indTitle(k) ? '<p class="ic-t">Official title: ' + e(indTitle(k)) + '</p>' : '') +
     '<dl class="ic">' +
     row('Counted', e(num)) +
     row('Out of', e(den)) +
     row('Published at', nat ? '<span class="ov-lv-nat">' + e(nm(nat)) + '</span>' +
       (pub.length ? ' <span class="ic-sub">' + e(pub.join(' ')) + '</span>' : '') : '') +
-    row('Period', e(period.charAt(0).toUpperCase() + period.slice(1)) + (age ? ' <span class="ov-old">(' + e(age.replace(/^Figures end in \d+, /, '')) + ')</span>' : '')) +
-    row('Caution', caution ? '<span class="ov-old">' + e(caution) + '</span>' : '') +
     row('Compared with England', e(vsEng)) +
     row('Unit', e(_cardUnit(k))) +
-    row('Source', e(source)) +
     row('Updates', e(updates)) +
     row('Method', e(method)) +
-    '</dl>' +
+    '</dl></details>' +
     '<a class="ic-more" href="methodology.html#' + _methAnchor(k) + '">See where these figures come from</a>' +
     '<a class="ic-more ic-report" data-k="' + e(k) + '" href="' + e(indicatorReportHref(k)) + '"' +
     ' title="Opens an email to ' + PH_CONTACT + ' with this figure\'s details filled in">Report a problem with this figure</a>';
@@ -9240,12 +9277,21 @@ function vcseCountsOf(records) {
   });
   return { pinned, wide, nopin, total: records.length };
 }
+// Whether the charities are drawn: the tab's text says "Showing" only then.
+function _vcseLayerOn() {
+  return ['tv', 'vcse-tab-toggle'].some(id => (document.getElementById(id) || {}).checked);
+}
 function vcseAboutText(c) {
   const where = phWhere();
   const fmt = n => n.toLocaleString('en-GB');
   if (!c || !Number.isFinite(c.pinned)) return "These are registered charities from the Charity Commission's register.";
-  const bits = ['Showing ' + fmt(c.pinned) + ' registered charit' + (c.pinned === 1 ? 'y' : 'ies') +
-    ' based in ' + where + ' that name the LAs they work in (source: Charity Commission).'];
+  const one = c.pinned === 1;
+  const bits = [_vcseLayerOn()
+    ? 'Showing ' + fmt(c.pinned) + ' registered charit' + (one ? 'y' : 'ies') +
+      ' based in ' + where + ' that name the LAs they work in (source: Charity Commission).'
+    : fmt(c.pinned) + ' registered charit' + (one ? 'y is' : 'ies are') + ' based in ' + where +
+      ' and name the LAs ' + (one ? 'it works' : 'they work') + ' in (source: Charity Commission). ' +
+      'Tick Show charities to put ' + (one ? 'it' : 'them') + ' on the map.'];
   if (Number.isFinite(c.wide) && c.wide > 0) {
     bits.push('The Directory also lists ' + fmt(c.wide) + ' that work across the whole of ' + where +
       ' from a base there.');
@@ -9262,7 +9308,9 @@ function vcseAboutText(c) {
   }
   return bits.join(' ');
 }
+var _vcseAboutLast = null;
 function setVcseAbout(c) {
+  _vcseAboutLast = c;
   const el = document.getElementById('vcse-about');
   if (el) el.textContent = vcseAboutText(c);
 }
@@ -9685,6 +9733,16 @@ function _causeMatches(rec) {
   return _activeBuckets.has(b);
 }
 
+// The count over the list. "On the map" only while the dots are drawn.
+var _vcseCountLast = null;
+function _renderVcseCount() {
+  const countEl = document.getElementById('vcse-count');
+  if (!countEl || !_vcseCountLast) return;
+  const [n, all] = _vcseCountLast, where = _vcseLayerOn() ? ' charities on the map' : ' charities';
+  countEl.textContent = !_vcseLoadedOnce ? ''
+    : n === all ? all.toLocaleString() + where
+    : n.toLocaleString() + ' of the ' + all.toLocaleString() + where + ' match';
+}
 function applyVCSEFilter() {
   const areaFilter = currentVCSEAreaFilter;
   const textFilter = (document.getElementById('vcse-search')?.value || '').toLowerCase().trim();
@@ -9752,13 +9810,8 @@ function applyVCSEFilter() {
     return areaMatch && focusMatch && _vcseOrgMatchesTags(o.record) && _causeMatches(o.record) && (!textFilter || o.name.toLowerCase().includes(textFilter) || (o.addr||'').toLowerCase().includes(textFilter));
   });
 
-  const countEl = document.getElementById('vcse-count');
-  if (countEl) {
-    const all = vcseData.length;
-    countEl.textContent = !_vcseLoadedOnce ? ''
-      : visible.length === all ? all.toLocaleString() + ' charities on the map'
-      : visible.length.toLocaleString() + ' of the ' + all.toLocaleString() + ' charities on the map match';
-  }
+  _vcseCountLast = [visible.length, vcseData.length];
+  _renderVcseCount();
 
   const list = document.getElementById('vcse-list');
   if (!list) return;
@@ -10196,7 +10249,7 @@ function profileCaption(key, has, lad) {
     case 'economy':
       return 'Work and qualifications at the 2021 Census' +
         (has.lsoa || has.msoa ? ', and the people claiming benefits because they are out of work, from the ' +
-          'Department for Work and Pensions' + (has.msoa ? ' and OHID' : '') : '') + '.';
+          'claimant count published by the Office for National Statistics (ONS)' + (has.msoa ? ' and from OHID' : '') : '') + '.';
     case 'housing':
       return 'Homes, cars and travel to work at the 2021 Census' +
         (has.lsoa ? ', and how near the nearest station and bus stop are, estimated from the LSOAs in this ward' : '') + '.';
@@ -10336,8 +10389,9 @@ function showWard(wn) {
     let unit = '';
     if (f.k.startsWith('ft_')) {
       const u = String((ovMeta(f.k) || {}).u || '').trim();
-      // A ratio is left bare: the note above the rows says what it is.
-      if (isNum && u && !ovIsStdRatio(f.k)) {
+      // A ratio carries its anchor, so 204.1 reads as twice England's level.
+      if (isNum && ovIsStdRatio(f.k)) unit = '<span class="sv-u">(England is 100)</span>';
+      else if (isNum && u) {
         unit = u === '%' ? '%' : `<span class="sv-u">${u.toLowerCase()}</span>`;
       }
     } else if (isNum) {
@@ -10348,8 +10402,12 @@ function showWard(wn) {
     // the IMD and the crime year).
     const per = /^(census_|crime_|imd_|core20_|total_lsoa)/.test(f.k) ? '' : periodWords(monthWords(ovPeriodOf(f.k)));
     // A district's figure that is its county's says so (see laFigCounty).
+    // An MSOA estimate sits under "OHID estimates for this ward", which already
+    // says so, and a count from LSOAs is added up rather than estimated.
     const pill = (f.g === 'borough' && laFigCounty(wdata.lad_code, f.k))
-      ? ['gpill gpill-la', 'county figure'] : PROFILE_PILL[f.g];
+      ? ['gpill gpill-la', 'county figure']
+      : f.g === 'msoa' ? null
+      : (f.g === 'lsoa' && laSums(f.k)) ? ['gpill gpill-lsoa', 'added up from LSOAs'] : PROFILE_PILL[f.g];
     // OHID's own note on an LA figure (provisional, combined, doubtful), and
     // for a ward figure built from MSOAs or LSOAs, how much of the ward it
     // rests on where that is less than all of it (see wardCoverPct).
@@ -10435,7 +10493,7 @@ function showWard(wn) {
         msoaF.some(f => wardCoverPct(wdata, f.k) != null)
           ? ' OHID withholds some MSOA figures where numbers are small, so a figure marked with a share of residents rests on that part of the ward only.' : ''}${
         msoaF.some(f => ovIsStdRatio(f.k))
-          ? ' A figure with no unit is a ratio where 100 is the England level once age is allowed for.' : ''}${
+          ? ' A ratio compares the ward with England, where 100 is the England level once age is allowed for.' : ''}${
         twoLE ? ' Life expectancy appears twice: here as OHID’s estimate for this ward' + (lePer ? ' over ' + _esc(lePer) : '') +
           (leCounty
             ? ', and further down as OHID’s official figure for ' + _esc(laCountyPhrase(leCounty, bor)) + ' as a whole' +
@@ -10506,14 +10564,15 @@ function showWard(wn) {
     ${cats || '<div class="data-note">We do not have any figures for this ward.</div>'}
     <div class="data-note prof-key">
       A figure with no label is the ward’s own. ${censusWardCounts()
-        ? 'Census figures are calculated from the counts of its output areas, the smallest Census areas of about 125 households, and the population is their residents summed.'
-        : 'Census figures are calculated from its output areas, the smallest Census areas of about 125 households, with each percentage an average weighted by population and the population their residents summed.'}
-      Crimes are counted inside its boundary.
-      <span class="gpill gpill-lsoa">estimated from LSOAs</span> and <span class="gpill gpill-msoa">estimated from MSOAs</span>
-      mark figures published for those larger areas and weighted onto this ward by where its residents live${anyCtx ? `, and a
+        ? 'Census figures are calculated from the counts of the ward’s output areas, the smallest Census areas of about 125 households,'
+        : 'Census figures are calculated from the ward’s output areas, the smallest Census areas of about 125 households, with each percentage an average weighted by population,'}
+      and crimes are counted inside its boundary.
+      A figure marked <span class="gpill gpill-lsoa">estimated from LSOAs</span> is an average of the smaller LSOAs in the ward,
+      weighted by their residents, and one marked <span class="gpill gpill-lsoa">added up from LSOAs</span> is their total.
+      The OHID estimates share out a figure published for the larger MSOAs by where the ward’s residents live${anyCtx ? `. A
       <span class="gpill gpill-la">whole-LA figure</span> is the same for every ward in ${_esc(ladPhrase(bor))}` : ''}${anyCounty ? `,
       while a <span class="gpill gpill-la">county figure</span> is OHID’s figure for the county ${_esc(ladPhrase(bor))} is part of` : ''}.
-      Crime figures come from police.uk, benefit claimants from the Department for Work and Pensions, and health figures from OHID.
+      Crime figures come from police.uk, the claimant rate from the Office for National Statistics and health figures from the Office for Health Improvement and Disparities (OHID).
     </div>`;
 }
 
@@ -10954,7 +11013,7 @@ const REPORT_CSS = `
   .kpis { display: grid; grid-template-columns: repeat(6, 1fr); padding: 0 40px; border-bottom: 1px solid var(--rule); }
   .kpi { padding: 18px 12px 18px 0; }
   .kpi + .kpi { padding-left: 14px; border-left: 1px solid var(--rule); }
-  .kpi-lbl { font-size: 9px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); }
+  .kpi-lbl { font-size: 10px; font-weight: 600; color: var(--ink-3); }
   .kpi-val { margin-top: 6px; font-size: 25px; font-weight: 700; line-height: 1; letter-spacing: -.02em; }
   /* "No figure", in words rather than a dash, and quieter than a figure. */
   .kpi-val.dim { color: var(--ink-3); font-weight: 500; font-size: 15px; }
@@ -11101,7 +11160,7 @@ const WARD_ONEPAGE_CSS = `
   .onepage .kpis { padding: 0 32px; }
   .onepage .kpi { padding: 7px 8px 7px 0; }
   .onepage .kpi + .kpi { padding-left: 10px; }
-  .onepage .kpi-lbl { font-size: 11px; letter-spacing: .03em; line-height: 1.3; }
+  .onepage .kpi-lbl { font-size: 11px; line-height: 1.3; }
   .onepage .kpi-val { font-size: 20px; margin-top: 3px; }
   .onepage .kpi-val.dim { font-size: 13px; }
   .onepage .kpi-sub, .onepage .kpi-ctx-cap { margin-top: 2px; font-size: 11px; line-height: 1.35; }
@@ -13650,7 +13709,7 @@ function _fitFocus(bounds) {
         ? '<div class="pcn-note" style="margin-top:6px">The shading shows what share of each LSOA\'s registered residents use its practices.</div>' +
           '<div class="pcn-grad"></div><div class="pcn-ends"><span>0%</span><span>100%</span></div>' +
           '<div class="pcn-note">It has 5 or more patients in ' + nL.toLocaleString() + ' LSOAs, according to NHS Digital\'s registrations for ' + esc(DATA.registrations) + '.</div>'
-        : '<div class="pcn-note">The map shows where its practices are, but we do not yet have the figures to show the area its patients come from.</div>') +
+        : '<div class="pcn-note">The map shows where its practices are. It cannot show the area its patients come from, because that needs registration figures we do not hold.</div>') +
       '<button type="button" class="ov-btn quiet" id="pcn-clear" style="margin-top:6px">Clear</button>';
     infoEl.hidden = false;
     document.getElementById('pcn-clear').addEventListener('click', () => {
@@ -14156,6 +14215,9 @@ function _setVcseLayerVisible(on) {
   const b = document.getElementById('vcse-tab-toggle');
   if (a && a.checked !== !!on) a.checked = !!on;
   if (b && b.checked !== !!on) b.checked = !!on;
+  // The tab says "Showing" and "on the map" only while the dots are there.
+  if (_vcseAboutLast) setVcseAbout(_vcseAboutLast);
+  _renderVcseCount();
 }
 { const _tv2 = document.getElementById('tv'); if (_tv2) _tv2.addEventListener('change', e => _setVcseLayerVisible(e.target.checked)); }
 {
@@ -14436,7 +14498,7 @@ function showLSOA(feat) {
     const row = (k) => {
       const val = inds[k];
       if (val == null) return '';
-      return `<div class="sr"><span class="sl">${_esc(indLabel(k))}</span><span class="sv">${fmtNum(val, indDecimals(k))}${indValueUnit(k)}</span></div>`;
+      return `<div class="sr"><span class="sl">${_esc(indLabel(k))}</span><span class="sv">${fmtNum(val, indDecimalsAt(k, 'lsoa'))}${indValueUnit(k)}</span></div>`;
     };
 
     // General census block (excludes ethnicity/age/environment — those get
@@ -19073,8 +19135,9 @@ async function loadData() {
       if (iso) {
         const d = new Date(iso);
         if (!isNaN(d.getTime())) {
-          label = 'Data updated: ' + d.toLocaleDateString('en-GB',
-            { day: 'numeric', month: 'short', year: 'numeric' });
+          // In full and in UTC, as the printed reports write it.
+          label = 'Data updated ' + d.toLocaleDateString('en-GB',
+            { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
         }
       }
       el.textContent = label;
@@ -19276,8 +19339,8 @@ var PH_SHOW = {
 </script>
 
 <div id="dev-banner" role="status" hidden>
-  <div><b>Beta.</b> The data is real and comes from published sources. The map is still
-  being checked, so treat figures as provisional.</div>
+  <div><b>Beta.</b> Features may change. Every figure comes from an official published
+  source, and figures we calculate for other levels are marked as estimates.</div>
   <button class="dev-x" type="button" aria-label="Dismiss"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button>
 </div>
 <script>
@@ -20338,6 +20401,21 @@ var PH_SHOW = {
       nw(withScore) + ' of its ' + nw(all) + ' wards';
   }
 
+  // Where a ward ranks on the deprivation score among the region's wards,
+  // told from the informative side: { more: true, pc: 99 } reads "more
+  // deprived than 99%". Null for a ward that is not ranked (see above).
+  function depShare(i) {
+    var pop = num(i.census_population), score = num(i.imd_score);
+    if (score === null || pop === null || pop < SMALL_WARD) return null;
+    var s = values('imd_score'), below = 0, above = 0;
+    for (var j = 0; j < s.length; j++) { if (s[j] < score) below++; else if (s[j] > score) above++; }
+    if (!s.length) return null;
+    // Held to 1 to 99: the most deprived ward is more deprived than 683 of
+    // 684, which rounds to a "100%" that would have to include itself.
+    var more = below >= above;
+    return { more: more, pc: Math.min(99, Math.max(1, Math.round(100 * (more ? below : above) / s.length))) };
+  }
+
   function summaryText(w) {
     var bits = [], i = w.inds, name = esc(w.name);
     var pop = num(i.census_population), score = num(i.imd_score);
@@ -20346,24 +20424,17 @@ var PH_SHOW = {
     // deprivation score) is not ranked or compared either: it has only a
     // handful of residents, and nothing here says how many.
     var unranked = small || pop === null;
-    var share = (score !== null && !unranked) ? (function () {
-      var s = values('imd_score'), below = 0, above = 0;
-      for (var j = 0; j < s.length; j++) { if (s[j] < score) below++; else if (s[j] > score) above++; }
-      return s.length ? { below: below, above: above, n: s.length } : null;
-    })() : null;
+    var share = unranked ? null : depShare(i);
 
     if (share) {
-      // Held to 1 to 99: the most deprived ward is more deprived than 683 of
-      // 684, which rounds to a "100%" that would have to include itself.
-      var pc = function (c) { return Math.min(99, Math.max(1, Math.round(100 * c / share.n))); };
-      var more = share.below >= share.above;
+      var more = share.more;
       var lead = name + ' is ' + (more ? 'more' : 'less') + ' deprived than <strong>' +
-        pc(more ? share.below : share.above) + '%</strong> of the wards in ' + esc(phWhere());
+        share.pc + '%</strong> of the wards in ' + esc(phWhere());
       var c20 = num(i.core20_lsoa_count), nl = num(i.total_lsoa_count);
       if (c20 && nl) {
         lead += (more ? ', and ' : ', although ') + (c20 >= nl
-          ? (nl === 1 ? 'its one LSOA is' : '<strong>all ' + nl + '</strong> of its LSOAs are')
-          : '<strong>' + c20 + ' of its ' + nl + '</strong> LSOAs ' + (c20 === 1 ? 'is' : 'are')) +
+          ? (nl === 1 ? 'its one neighbourhood (LSOA) is' : '<strong>all ' + nl + '</strong> of its neighbourhoods (LSOAs) are')
+          : '<strong>' + c20 + ' of its ' + nl + '</strong> neighbourhoods (LSOAs) ' + (c20 === 1 ? 'is' : 'are')) +
           ' among the most deprived fifth of England';
       }
       bits.push(lead + '.');
@@ -20395,15 +20466,16 @@ var PH_SHOW = {
         if (svc && !some) bits.push('It has ' + svc + ' within its boundary.');
       }
     }
-    // Comparisons with the medians, which a ward of a few hundred people does
-    // not get: its figures are a handful of residents either way.
+    // Comparisons with a typical ward, which a ward of a few hundred people
+    // does not get: its figures are a handful of residents either way.
     if (unranked) return bits.join(' ');
-    // The medians are compared at the precision they are shown at, so a ward
-    // is never "above" a median printed as the same number.
+    // A typical ward is the median one, compared at the precision it is
+    // shown at, so a ward is never "more than" a figure printed the same.
     var vs = function (v, m, dp) {
       var a = +v.toFixed(dp), b = +m.toFixed(dp);
-      return a > b ? 'above' : (a < b ? 'below' : 'level with');
+      return a > b ? 'more than' : (a < b ? 'less than' : 'the same as');
     };
+    var typical = false;
     var bad = num(i.census_bad_health_pct), badMed = median('census_bad_health_pct');
     if (bad !== null && badMed !== null) {
       // The LA as well as the region: someone looking at a ward in Barking
@@ -20411,25 +20483,28 @@ var PH_SHOW = {
       var badBor = boroughMedian('census_bad_health_pct', w.lad);
       var dL = vs(bad, badMed, 1), dB = badBor !== null ? vs(bad, badBor, 1) : '';
       bits.push('In the 2021 Census, <strong>' + bad.toFixed(1) + '%</strong> of residents described ' +
-        'their health as bad or very bad, ' + dL + ' the ' + esc(PH_AREA) + ' ward median of ' +
-        badMed.toFixed(1) + '%' + (dB ? (dB === dL ? ' and ' : ' but ' + dB + ' ') + 'the ' + esc(w.lad) +
-        ' ward median of ' + badBor.toFixed(1) + '%' : '') + '.');
+        'their health as bad or very bad, ' + dL + ' in a typical ' + esc(PH_AREA) + ' ward (' +
+        badMed.toFixed(1) + '%)' + (dB ? (dB === dL ? (dL === 'the same as' ? ' and ' : ' or ') : ' but ' + dB + ' in ') +
+        'a typical ' + esc(w.lad) + ' ward (' + badBor.toFixed(1) + '%)' : '') + '.');
+      typical = true;
     }
     // Life expectancy is the one outcome measure here, so it is compared with
-    // both medians by how many years it differs. "Estimated" because it is an
-    // MSOA figure carried onto the ward, not one published for it.
+    // both typical wards by how many years it differs. "About" because it is
+    // an MSOA figure carried onto the ward, not one published for it.
     var le = num(i.ft_93283), leMed = median('ft_93283');
     if (le !== null && leMed !== null) {
       var gap = function (ref, what) {
         var d = +le.toFixed(1) - +ref.toFixed(1);
-        return (Math.abs(d) < 0.05 ? 'level with ' : Math.abs(d).toFixed(1) +
-          (d > 0 ? ' years more than ' : ' years less than ')) + what + ' of ' + ref.toFixed(1);
+        return (Math.abs(d) < 0.05 ? 'the same as in ' : Math.abs(d).toFixed(1) +
+          (d > 0 ? ' years more than in ' : ' years less than in ')) + what;
       };
       var leBor = boroughMedian('ft_93283', w.lad);
-      bits.push('A girl born here can expect to live an estimated <strong>' + le.toFixed(1) + ' years</strong>, ' +
-        gap(leMed, 'the ' + esc(PH_AREA) + ' ward median') +
-        (leBor !== null ? ' and ' + gap(leBor, 'the ' + esc(w.lad) + ' ward median') : '') + '.');
+      bits.push('A girl born here can expect to live about <strong>' + le.toFixed(1) + ' years</strong>, ' +
+        gap(leMed, 'a typical ' + esc(PH_AREA) + ' ward') +
+        (leBor !== null ? ' and ' + gap(leBor, 'a typical ' + esc(w.lad) + ' ward') : '') + '.');
+      typical = true;
     }
+    if (typical) bits.push('A typical ward is the middle one when all of them are put in order.');
     return bits.join(' ');
   }
   // The summary for a ward by name, as the profile and the report ask for it.
@@ -20524,9 +20599,13 @@ var PH_SHOW = {
 
     // Six figures, three to a row, each under its full name. The population
     // is not one of them: it is in the line under the ward's name already.
+    // The lead tile is the ward's place among the region's wards, which the
+    // summary also gives; the average decile, which is not itself a decile,
+    // stays in the Area profile's Deprivation section.
+    var dsh = depShare(i);
     var strip = '<div class="ws-strip">' +
-      kpi(labelOf('imd_decile_mean'), dec == null ? null : dec.toFixed(indDecimals('imd_decile_mean')),
-          'where 1 is the most deprived', { emphasis: true }) +
+      kpi(dsh && !dsh.more ? 'Less deprived than' : 'More deprived than', dsh ? dsh.pc + '<span>%</span>' : null,
+          'of the wards in ' + phWhere(), { emphasis: true }) +
       kpi(labelOf('ft_93283'), le == null ? null : le.toFixed(indDecimals('ft_93283')) + '<span> years</span>', lePer) +
       // All causes, as a standardised ratio.
       kpi(labelOf('ft_93250'), mr == null ? null : mr.toFixed(indDecimals('ft_93250')), 'where England is 100',
@@ -20642,13 +20721,13 @@ var PH_SHOW = {
 
     nameEl.textContent = wn;
     var pop = num(w.inds.census_population);
-    var dec = num(w.inds.imd_decile_mean);
+    var dsh = depShare(w.inds);
     var meta = [];
     if (w.lad) meta.push(w.lad);
     if (pop !== null) meta.push(Math.round(pop).toLocaleString() + ' residents');
-    // Not for a ward with no resident count (Walbrook), whose summary says
-    // it is not compared: its score is an LSOA counted mostly elsewhere.
-    if (dec !== null && pop !== null) meta.push('average deprivation decile ' + dec.toFixed(1));
+    // Not for a ward that is not ranked (Walbrook, Bishopsgate), whose
+    // summary says it is not compared.
+    if (dsh) meta.push((dsh.more ? 'more' : 'less') + ' deprived than ' + dsh.pc + '% of the wards in ' + phWhere());
     metaEl.textContent = meta.join(' · ');
     renderFig();
 
@@ -22780,7 +22859,7 @@ var PH_SHOW = {
           (PH_REGION.isEngland ? ''
             : 'The map covers every region of England, and you can switch to yours with the ' +
               '<strong>region button</strong> at the top or by searching for a postcode. ') +
-          'It is free, with no sign-in, and the next five chapters show you around.';
+          'It is for public health and NHS teams, councillors, charities and anyone who wants to know their own area.';
       },
       go: function () {
         railClick('explore');
@@ -22943,7 +23022,12 @@ var PH_SHOW = {
           '<span class="tour-task-done">That is it: the map is now coloured by ' +
           '<strong class="tour-task-ov">the indicator you chose</strong>, and the key along the ' +
           'bottom shows what each shade means. Select any area to see its figures, and press ' +
-          '<strong>Finish</strong> when you are ready to explore.</span>';
+          '<strong>Finish</strong> when you are ready to explore.' +
+          (function () {
+            var fb = document.getElementById('sbar-feedback');
+            return fb ? ' If you have a minute, <a href="' + tourEsc(fb.getAttribute('href')) +
+              '">send us feedback</a>: three short questions about who you are and what would help.' : '';
+          })() + '</span>';
       },
       go: function () {
         railClick('explore');
@@ -24218,8 +24302,8 @@ var PH_SHOW = {
           esc(cbList(lvs.map(function (l) { return CB_LEVELS[l].plural; }))) +
           ', so ' + (dropped.length > 1 ? 'they have' : 'it has') + ' been removed.</span>'
         : '') +
-      'Each figure is the one the map shows for that area, and the files never add areas ' +
-      'together, which is what Custom area is for. Each column heading says what the figure ' +
+      'Each figure is the one the map shows for that area. To add areas together into one, use ' +
+      'Custom area instead. Each column heading says what the figure ' +
       'measures and when it is from, and the notes give the source, geography and method ' +
       'of every column with a suggested citation.' +
       (cbLevelSet.borough
@@ -24568,7 +24652,7 @@ var PH_SHOW = {
       ' in ' + (cbScope ? where : 'all of ' + phWhere()) + ' in alphabetical order, and ' +
       (out.cols === 1 ? 'one column for the indicator you chose' : 'a column for each of the ' + cbNum(out.cols) + ' indicators you chose') +
       '. Each figure is the one the map ' +
-      'shows for that area, and the file never adds areas together, which is what Custom area is for. ' +
+      'shows for that area. To add areas together into one, use Custom area instead. ' +
       'A blank cell means there is no figure for that area, because the publisher withheld it to ' +
       'protect privacy or did not publish one for that area, so please do not read it as zero.' +
       'A blank cell means there is no figure for that area. Most are withheld by the publisher to protect ' +
