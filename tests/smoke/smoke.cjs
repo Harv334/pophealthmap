@@ -1027,14 +1027,16 @@ const smallText = page => page.evaluate(() => {
     // indicator says where its figures are instead of finding nothing.
     await page.click('#sbtab-overlay');
     const ind = {};
-    for (const q of ['smoking', 'pollution', 'arson', 'flu', 'no2', 'zzqx']) {
+    // Suicide rather than smoking: adult smoking is left out until a refresh
+    // rebuilds it at its headline age (FT_WITHHELD).
+    for (const q of ['suicide', 'pollution', 'arson', 'flu', 'no2', 'zzqx']) {
       await page.fill('#ov-search', q);
       await page.waitForTimeout(400);
       ind[q] = await page.evaluate(() => document.getElementById('ov-results').innerText.replace(/\s+/g, ' ').trim());
     }
     await page.fill('#ov-search', '');
-    ok(!/No indicator matches/.test(ind.smoking) && /Adults who smoke is only published for whole LAs/.test(ind.smoking) && /full profile/.test(ind.smoking),
-      'a council-only indicator says where its figures are', ind.smoking);
+    ok(!/No indicator matches/.test(ind.suicide) && /Suicide rate is only published for whole LAs/.test(ind.suicide) && /full profile/.test(ind.suicide),
+      'a council-only indicator says where its figures are', ind.suicide);
     ok(/Nitrogen dioxide/.test(ind.pollution), 'indicator search knows everyday words', ind.pollution.slice(0, 120));
     ok(/^1 match\b/.test(ind.arson), 'one result reads "1 match"', ind.arson.slice(0, 60));
     ok(/only published for whole LAs/.test(ind.flu) && !/\bmatch(es)?\b/.test(ind.flu.replace(/No indicator matches/, '')),
@@ -1208,7 +1210,7 @@ const smallText = page => page.evaluate(() => {
       const before = PH_CSV.columns().length;
       PH_CSV.pick('ft_93283');
       const one = before === 0 ? PH_CSV.notes() : '';
-      PH_CSV.pick('ft_smoking_prevalence_adults'); PH_CSV.pick('crime_total');
+      PH_CSV.pick('ft_suicide_rate'); PH_CSV.pick('crime_total');
       const o = PH_CSV.build();
       const col = i => o.table.slice(1).map(r => r[i]).filter(v => v !== '');
       const le = o.header.indexOf('Life expectancy at birth, women (years, 2019 to 2023)');
@@ -1220,7 +1222,7 @@ const smallText = page => page.evaluate(() => {
       });
       return {
         header: o.header, le, leVals: le === -1 ? [] : col(le),
-        smoke: o.header.find(h => /^Adults who smoke/.test(h)) || '',
+        smoke: o.header.find(h => /^Suicide rate/.test(h)) || '',
         crime: o.header.find(h => /^Total recorded crime/.test(h)) || '',
         crimeVals: col(o.header.findIndex(h => /^Total recorded crime/.test(h))),
         ptal: groupOf('ptal_score'), no2: groupOf('no2_ugm3'), sorted,
