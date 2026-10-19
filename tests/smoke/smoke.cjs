@@ -671,11 +671,11 @@ const smallText = page => page.evaluate(() => {
     const P = plain.out;
     ok(Object.values(P).every(x => x.sheetFirst && x.profFirst && x.sheet === x.prof),
       '"Summary" comes first in the ward sheet and the profile, and they match', JSON.stringify(P).slice(0, 300));
-    ok(/^Stonebridge is more deprived than 99% of London's wards, and \d+ of its \d+ LSOAs are among the most deprived fifth of England\./.test(P.Stonebridge.sheet),
+    ok(/^Stonebridge is more deprived than 99% of the wards in London, and \d+ of its \d+ LSOAs are among the most deprived fifth of England\./.test(P.Stonebridge.sheet),
       'Stonebridge leads with its ranking and its Core20 count', P.Stonebridge.sheet);
-    ok(/^Holloway is (more|less) deprived than \d+% of London's wards\./.test(P.Holloway.sheet) && !/deprived fifth/.test(P.Holloway.sheet),
+    ok(/^Holloway is (more|less) deprived than \d+% of the wards in London\./.test(P.Holloway.sheet) && !/deprived fifth/.test(P.Holloway.sheet),
       'Holloway, with no Core20 LSOAs, has no Core20 clause', P.Holloway.sheet);
-    ok(/^Barnes is less deprived than \d+% of London's wards/.test(P.Barnes.sheet), 'a Richmond ward says "less deprived than"', P.Barnes.sheet);
+    ok(/^Barnes is less deprived than \d+% of the wards in London/.test(P.Barnes.sheet), 'a Richmond ward says "less deprived than"', P.Barnes.sheet);
     ok(/^Bishopsgate is home to only 345 residents/.test(P.Bishopsgate.sheet) && !/median|deprived than/.test(P.Bishopsgate.sheet),
       'Bishopsgate opens with its residents and makes no comparison with the median', P.Bishopsgate.sheet);
     ok(/^Walbrook\b/.test(P.Walbrook.sheet) && /no Census figures of its own/.test(P.Walbrook.sheet) && !/median|deprived than|can expect/.test(P.Walbrook.sheet) && P.Walbrook.prof === P.Walbrook.sheet,
@@ -1597,6 +1597,133 @@ const smallText = page => page.evaluate(() => {
     await page.close();
   }
 
+  // First visit (review round 2, H22 to H28 and onboarding-02): the map opens
+  // on Indicators, names its region in a header button that lists the
+  // others, finds LAs on other regions' maps, starts the tour for campaign
+  // links but not over a shared view, keeps a bare address until the view
+  // changes, says when the LSOAs are loading, and writes its key in words.
+  {
+    const { page, errors } = await open(browser, 'index.html?utm_source=linkedin&utm_medium=social&fbclid=IwAR0abc', DESK);
+    const first = await page.evaluate(() => ({ tour: PH_TOUR.running(), url: location.search,
+      tab: document.querySelector('.sb-tab.active').id, sel: document.getElementById('sbtab-overlay').getAttribute('aria-selected'),
+      pane: document.getElementById('tab-overlay').classList.contains('active') && !document.getElementById('tab-layers').classList.contains('active') }));
+    ok(first.tour, 'a campaign link (utm_*, fbclid) still gets the tour on a first visit', JSON.stringify(first));
+    ok(first.tab === 'sbtab-overlay' && first.sel === 'true' && first.pane, 'the map opens on the Indicators tab', JSON.stringify(first));
+    await page.evaluate(() => PH_TOUR.end());
+    await page.waitForTimeout(1500);
+    const q0 = await page.evaluate(() => location.search);
+    ok(!/[?&](L|z|c)=/.test(q0), 'an untouched map keeps a bare address, without the opening layers or position', q0);
+    await page.evaluate(() => map.setZoom(map.getZoom() + 1));
+    await page.waitForTimeout(1200);
+    const q1 = await page.evaluate(() => location.search);
+    ok(/[?&]z=/.test(q1) && /[?&]c=/.test(q1), 'the position is written once the map has moved', q1);
+    // The first key indicator keeps the wards on the map and says what is loading.
+    await page.route('**/lsoa_imd.js', async r => { await new Promise(x => setTimeout(x, 2500)); r.continue(); });
+    await setOv(page, 'imd_decile');
+    await page.waitForTimeout(400);
+    const loading = await page.evaluate(() => ({ hint: document.getElementById('dl-hint').classList.contains('show') ? document.getElementById('dl-hint').textContent : '',
+      wards: !!(wLyr && map.hasLayer(wLyr)), lsoa: !!(lsoaLyr && map.hasLayer(lsoaLyr)) }));
+    ok(/^Loading [\d,]+ LSOAs, which takes a few seconds the first time\.$/.test(loading.hint) && loading.wards && !loading.lsoa,
+      'the first LSOA indicator keeps the wards drawn and says the LSOAs are loading', JSON.stringify(loading));
+    await page.waitForFunction(() => lsoaLyr && map.hasLayer(lsoaLyr), null, { timeout: 30000 }).catch(() => {});
+    await page.waitForTimeout(800);
+    const loaded = await page.evaluate(() => ({ wards: !!(wLyr && map.hasLayer(wLyr)), hint: document.getElementById('dl-hint').textContent }));
+    ok(!loaded.wards, 'the wards make way once the LSOAs are drawn', JSON.stringify(loaded));
+    await page.unroute('**/lsoa_imd.js');
+    // The region button in the header.
+    const hb = await page.evaluate(() => { const b = document.getElementById('hdr-region-btn');
+      return { name: b.getAttribute('aria-label'), text: b.innerText.trim(), exp: b.getAttribute('aria-expanded'),
+        label: document.querySelector('label[for="region-picker"]').textContent }; });
+    await page.click('#hdr-region-btn');
+    await page.waitForTimeout(300);
+    const menu = await page.evaluate(() => { const m = document.getElementById('hdr-region-menu');
+      return { shown: !m.hidden && m.getBoundingClientRect().height > 100, links: [...m.querySelectorAll('a')].map(a => a.textContent + '=' + a.getAttribute('href')),
+        current: (m.querySelector('a[aria-current="page"]') || {}).textContent, focus: document.activeElement && document.activeElement.textContent }; });
+    ok(hb.name === 'London, change region' && hb.text === 'London' && hb.label === 'Region' && menu.shown &&
+       menu.links.some(l => /^North East=.*\?r=north-east$/.test(l)) && menu.current === 'London' && menu.focus === 'London',
+      'the header names the region in a button that lists the other regions, and the Layers select is called Region', JSON.stringify([hb, menu]));
+    await checkAxe(page, 'region list open');
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
+    ok(await page.evaluate(() => document.getElementById('hdr-region-menu').hidden && document.activeElement.id === 'hdr-region-btn'),
+      'Escape closes the region list and returns to its button');
+    // A search for a place on another region's map.
+    const search = async q => { await page.fill('#hdr-search-input', q); await page.waitForTimeout(900);
+      return page.evaluate(() => ({ text: document.getElementById('hdr-search-results').innerText,
+        row: (document.querySelector('#hdr-search-results .sr-region') || {}).dataset || null })); };
+    const leeds = await search('Leeds'), manc = await search('Manchester'), none = await search('zzqxv');
+    ok(/Leeds is on the Yorkshire and The Humber map\. Open Yorkshire and The Humber/.test(leeds.text) && leeds.row && leeds.row.region === 'yorkshire-and-the-humber' &&
+       /Manchester is on the North West map\. Open the North West/.test(manc.text),
+      'a search for an LA on another map says which map, and offers to open it', JSON.stringify([leeds, manc]));
+    ok(/^We could not find that in London\. Try a postcode, or choose another region from the region button at the top\.$/.test(none.text.trim()),
+      'a search that finds nothing says where it looked and how to change region', none.text);
+    await page.fill('#hdr-search-input', '');
+    // The key under the scale is written in words, for every level.
+    const BAD = /TS0\d|CLA01|bridge|→|pop-weighted|best-fit|NOMIS|Fingertips \(|Ward\/LSOA|·/;
+    const keys = [];
+    for (const [k, lv] of [['imd_decile', ''], ['ft_93283', 'msoa'], ['ft_93283', 'ward'], ['ft_93283', 'borough'], ['census_bad_health_pct', 'lsoa'],
+                           ['census_bad_health_pct', 'ward'], ['claimant_rate_pct', ''], ['imd_score_ward', ''], ['crime_rate_per_1000', ''], ['census_population', 'ward']]) {
+      await setOv(page, k);
+      await page.waitForTimeout(1200);
+      if (lv) { await page.evaluate(lv => _setDataLevel(lv), lv); await page.waitForTimeout(1500); }
+      keys.push(await page.evaluate(k => ({ k, lv: currentDataLevel, meta: document.getElementById('sc-meta').innerText,
+        mid: document.getElementById('sc-mid').textContent, min: document.getElementById('mls-min').textContent, max: document.getElementById('mls-max').textContent,
+        label: document.getElementById('mls-label').innerText }), k));
+    }
+    ok(keys.every(x => x.meta && !BAD.test(x.meta) && !/[–—]/.test(x.meta)), 'the key under the scale has no source codes, arrows or dots', keys.map(x => x.k + '@' + x.lv + ': ' + x.meta).join(' | '));
+    ok(/^Published by OHID \(Local Health\) for MSOAs, 2019 to 2023\. Ward figures are our estimates, blended from the MSOAs each ward overlaps\./.test(keys[2].meta) &&
+       /^Calculated for each ward from MHCLG/.test(keys[7].meta) && /^Published by ONS for LSOAs, /.test(keys[6].meta) && /^Counted from police\.uk crime locations/.test(keys[8].meta),
+      'the key says who publishes the figures and how the level drawn was made from them', [keys[2].meta, keys[6].meta, keys[7].meta, keys[8].meta].join(' | '));
+    ok(keys.every(x => x.mid === '') && keys[0].min === 'Most deprived' && keys[0].max === 'Least deprived' &&
+       keys.filter(x => x.k === 'census_bad_health_pct').every(x => /\d%$/.test(x.min) && !/ %/.test(x.min)) &&
+       keys.filter(x => x.k === 'census_population').every(x => /^\D*[\d,]+ people$/.test(x.min)) &&
+       !/per 1,000 residents\s*per 1,000/.test(keys[8].label) && !keys.some(x => /score|decile/.test(x.min + x.max) && x.k !== 'imd_decile'),
+      'the key has no unlabelled middle number, words for the decile ends, whole counts and no doubled units', JSON.stringify(keys.map(x => [x.k, x.mid, x.min, x.max, x.label])));
+    ok(errors.length === 0, 'no page errors (first visit)', errors.join(' | '));
+    await page.close();
+  }
+  // A shared view still opens without the tour, and ?tour=1 forces it.
+  for (const [url, want] of [['index.html?ov=imd_score_ward', false], ['index.html?ov=imd_score_ward&tour=1', true], ['index.html?ref=producthunt', true]]) {
+    const { page } = await open(browser, url, DESK);
+    const run = await page.evaluate(() => PH_TOUR.running());
+    ok(run === want, url + (want ? ' opens the tour' : ' opens without the tour'), String(run));
+    await page.close();
+  }
+  // On a slow line the tour does not take over the visitor's first click
+  // (onboarding-02): the wards land after they have started using the page.
+  {
+    const page = await browser.newPage({ viewport: { width: DESK.width, height: DESK.height } });
+    const errors = []; page.on('pageerror', e => errors.push(e.message));
+    await page.route(/ward_(core|data)\.json/, async r => { await new Promise(x => setTimeout(x, 6000)); r.continue(); });
+    await page.goto(BASE + '/index.html');
+    await page.waitForTimeout(2500);
+    // The loading screen covers the page, but the keyboard still reaches the
+    // search box behind it.
+    await page.focus('#hdr-search-input');
+    await page.keyboard.type('Stone');
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => typeof wLyr !== 'undefined' && wLyr && wLyr.getLayers().length > 600, null, { timeout: 40000 }).catch(() => {});
+    await page.waitForTimeout(2500);
+    const slow1 = await page.evaluate(() => PH_TOUR.running());
+    await page.evaluate(() => { const l = wLyr.getLayers().find(l => l.feature.properties.WD24NM === 'Stonebridge'); if (l) l.fire('click'); });
+    await page.waitForTimeout(1200);
+    const slow2 = await page.evaluate(() => ({ tour: PH_TOUR.running(), ward: selW }));
+    ok(!slow1 && !slow2.tour && slow2.ward === 'Stonebridge', 'on a slow load the tour stays away once the visitor has started, and a ward click opens the ward', JSON.stringify([slow1, slow2]));
+    ok(errors.length === 0, 'no page errors (slow first visit)', errors.join(' | '));
+    await page.close();
+  }
+  // The key on a phone keeps its ends whole (H28).
+  for (const w of [390, 320]) {
+    const { page } = await open(browser, 'index.html?ov=census_bad_health_pct&t=1', { width: w, height: 760, isMobile: true, hasTouch: true });
+    const fit = await page.evaluate(() => {
+      const s = document.getElementById('map-legend-strip'), m = document.getElementById('map').getBoundingClientRect(), r = s.getBoundingClientRect();
+      const end = id => { const e = document.getElementById(id); return e.scrollWidth <= e.clientWidth + 1 && e.getBoundingClientRect().right <= m.right; };
+      return { min: end('mls-min'), max: end('mls-max'), inMap: r.left >= m.left && r.right <= m.right, name: getComputedStyle(document.getElementById('mls-label')).fontSize };
+    });
+    ok(fit.min && fit.max && fit.inMap, w + 'px phone: the key\'s end values are not clipped and the key stays on the map', JSON.stringify(fit));
+    await page.close();
+  }
+
   // Phone
   {
     const { page, errors } = await open(browser, 'index.html?ov=imd_decile&t=1', PHONE);
@@ -2375,8 +2502,47 @@ const smallText = page => page.evaluate(() => {
       notes: document.getElementById('rank-notes').textContent }));
     ok(neDec.lads.length > 1 && /LSOAs in the North East are in decile 1, the most deprived tenth of England, so this list shows the ten with the lowest national rank\./.test(neDec.notes),
       'region: the lowest 10 LSOAs for deprivation are not all from one LA, and the tie is said', JSON.stringify(neDec));
+    // "the North East" wherever the region follows "of", "in" or "across" (H29).
+    await setOv(page, 'imd_score_ward');
+    await page.waitForTimeout(1500);
+    const neWords = await page.evaluate(async () => {
+      const digest = document.getElementById('vs-digest').textContent;
+      const w = Object.keys(WARD_DATA).find(n => { const i = WARD_DATA[n].indicators || {};
+        return i.imd_decile_mean != null && i.census_population > 2000; });
+      showWard(w);
+      await new Promise(r => setTimeout(r, 600));
+      const t = document.body.innerText + ' ' + [...document.querySelectorAll('option, [aria-label], [title]')]
+        .map(e => e.textContent + ' ' + (e.getAttribute('aria-label') || '') + ' ' + (e.getAttribute('title') || '')).join(' ');
+      return { bad: (t.match(/.{0,30}\b(of|in|across|outside) North East.{0,20}/g) || []).slice(0, 4), poss: (t.match(/North East's/g) || []).length,
+        digest, sheet: (document.querySelector('#ws-body .ws-insight') || {}).innerText || '',
+        hdr: document.getElementById('hdr-region-btn').getAttribute('aria-label') };
+    });
+    ok(!neWords.bad.length && !neWords.poss && /^All of the North East/.test(neWords.digest) && /of the wards in the North East/.test(neWords.sheet) &&
+       neWords.hdr === 'North East, change region',
+      'region: the wording says "the North East", with no possessive', JSON.stringify(neWords));
+    // The tour, on the region's own counts and without Ask (H25).
+    const neTour = await page.evaluate(async () => {
+      PH_TOUR.start();
+      const o = [];
+      for (let i = 0; i < PH_TOUR.length; i++) {
+        await new Promise(r => setTimeout(r, 500));
+        o.push(document.getElementById('tour-narr').innerText);
+        if (i < PH_TOUR.length - 1) document.getElementById('tour-next').click();
+      }
+      PH_TOUR.end();
+      return { o, link: getComputedStyle(document.getElementById('sbar-tour')).display };
+    });
+    ok(neTour.o.length === 6 && /how the North East changes from one neighbourhood to the next\. You can look at its 12 local authorities \(LAs\)/.test(neTour.o[0]) &&
+       !/London/.test(neTour.o.join(' ')) && !/Ask about this data/.test(neTour.o[3]) && neTour.link !== 'none',
+      'region: the tour runs on the region\'s own counts, with Take a tour, and leaves out Ask where there is none', JSON.stringify(neTour).slice(0, 600));
     ok(errors.length === 0, 'no page errors (North East)', errors.join(' | '));
     await page.close();
+    // A first visit to a region gets the tour too, since ?r= alone is not a shared view.
+    {
+      const { page: p2 } = await open(browser, 'index.html?r=north-east', DESK);
+      ok(await p2.evaluate(() => PH_TOUR.running()), 'region: a first visit to ?r=north-east opens the tour');
+      await p2.close();
+    }
   } else {
     console.log('SKIP North East (no data/regions/north-east)');
   }
