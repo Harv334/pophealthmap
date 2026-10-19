@@ -3992,7 +3992,7 @@
       <div class="loading-overlay" id="ldr" role="status" aria-live="polite">
         <div class="ldr-card">
           <p class="ldr-name">PopHealth Map</p>
-          <p class="ldr-line">Explore health, deprivation and local services across every neighbourhood in England, free and with no sign-in.</p>
+          <p class="ldr-line">Explore health, deprivation and local services across every neighbourhood in England.</p>
           <svg class="ldr-map" id="ldr-map" role="img"
                aria-label="A map of London's wards, filling in with deprivation colour while the page loads"></svg>
           <div class="ldr-msg" id="ldr-msg" hidden>
@@ -18041,7 +18041,11 @@ var PH_SHOW = {
                    : rp ? 'report' : cv ? 'csv' : null;
         if (active) {
           var railBtn = rail.querySelector('.mode-btn[data-mode="' + active + '"]');
-          modeName.textContent = railBtn ? railBtn.textContent.trim() : active;
+          // The aria-label where there is one: Custom area and Data export
+          // carry a long and a short label inside the button, and their text
+          // together read "Data exportExport".
+          modeName.textContent = railBtn
+            ? (railBtn.getAttribute('aria-label') || railBtn.textContent.trim()) : active;
         }
       }
 
@@ -19256,9 +19260,14 @@ var PH_SHOW = {
        is off screen or under the sheet. It waits a frame so the compare bar
        that refreshPins draws next is there to be measured. */
     var fitKey = cmpLevel + '|' + pinned.slice().sort().join('|');
-    if (pinned.length >= 2 && fitKey !== lastPinFitKey) {
+    var fromList = cmpLevel === 'borough' || cmpLevel === 'icb';
+    if (fitKey !== lastPinFitKey && (fromList || pinned.length >= 2)) {
       var union = pinLyr.getBounds();
-      setTimeout(function () { _fitVisible(union, 14, { onlyIfHidden: true }); }, 0);
+      /* An LA or ICB chosen from the list is brought into view, with the
+         others already pinned, so the map shows what was just chosen. Wards
+         and LSOAs are picked on the map itself, so the view only moves when
+         one of them is off screen or under the sheet. */
+      setTimeout(function () { _fitVisible(union, 14, { onlyIfHidden: !fromList }); }, 0);
     }
     lastPinFitKey = fitKey;
   }
@@ -19631,6 +19640,7 @@ var PH_SHOW = {
     return n + ' ward' + (n === 1 ? '' : 's');
   }
 
+  var _cmpTickedLsoa = false;
   function setCmpLevel(lvl) {
     if (cmpLevel === lvl) return;
     cmpLevel = lvl;
@@ -19642,17 +19652,36 @@ var PH_SHOW = {
        same way the overlay code switches levels a few hundred lines down.
        __skipLevelGate because that gate exists to stop an indicator being left
        unshaded, and this is not an indicator change. */
+    var box = document.getElementById('tlsoa');
     if (lvl === 'lsoa') {
-      var box = document.getElementById('tlsoa');
       if (box && !box.checked) {
         box.checked = true;
         box.__skipLevelGate = true;
         box.dispatchEvent(new Event('change'));
+        _cmpTickedLsoa = true;
       }
       if (typeof ensureLsoaData === 'function') {
         try { ensureLsoaData().then(function () { renderComparePane(); renderCompareBar(); }); }
         catch (e) { /* offline: the pane shows dashes rather than nothing */ }
       }
+    } else if (_cmpTickedLsoa && box && box.checked) {
+      // LSOA boundaries that Compare switched on go off again with it.
+      box.checked = false;
+      box.__skipLevelGate = true;
+      box.dispatchEvent(new Event('change'));
+      _cmpTickedLsoa = false;
+    }
+    /* The map follows the size of area being compared, so the areas on the
+       map are the ones in the comparison. ICBs are drawn from their LAs, with
+       the ICB outlines switched on. fromMode skips the indicator gate: an
+       indicator with no figures at this level leaves the outlines unshaded,
+       which is still the right map to choose areas on. */
+    if (typeof _setDataLevel === 'function') {
+      _setDataLevel(lvl === 'icb' ? 'borough' : lvl, { fromMode: true });
+    }
+    if (lvl === 'icb') {
+      var icbBox = document.getElementById('ticb');
+      if (icbBox && !icbBox.checked) { icbBox.checked = true; icbBox.dispatchEvent(new Event('change')); }
     }
     renderComparePane();
     renderCompareBar();
