@@ -277,8 +277,8 @@ one repository at a time and GitHub gives it to whichever published last, so a
 second `CNAME` naming it does not fail: it takes the domain, and pophealth.uk
 starts serving this copy instead.
 
-**Three things still name the original site** and are yours to change: a
-`canonical` link, an `og:url`, and a JSON-LD block in `index.html`. The
+**Two things still name the original site** and are yours to change: a
+`canonical` link and a JSON-LD block in `index.html`. The
 canonical tag in particular tells search engines this page is a copy and should
 not rank. `sitemap.xml` and `robots.txt` were left out and would need writing.
 
