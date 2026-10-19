@@ -447,6 +447,14 @@
   body.presenting #fingertips-banner, body.presenting footer.sbar { display: none !important; }
   body.presenting .map-wrap { --sheet-lift: 0px !important; }
   body.presenting .main { grid-template-columns: minmax(0, 1fr); }
+  /* The picture keeps its credits: the map's attribution stays in its corner,
+     and a caption under the key says what is shown, for when, from whom, and
+     whose map it is drawn on (_shotCaptionText). The key rises to make room. */
+  body.presenting .map-legend-strip, body.presenting .map-wrap.has-sheet .map-legend-strip { bottom: 66px !important; }
+  .shot-caption { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 541;
+    width: max-content; max-width: min(820px, calc(100% - 32px)); padding: 5px 10px; text-align: center;
+    background: color-mix(in srgb, var(--paper) 92%, transparent); border-radius: var(--r-sm);
+    font-size: 11.5px; line-height: 1.4; color: var(--ink-2); pointer-events: none; }
   body.presenting .map-wrap { grid-template-rows: minmax(0, 1fr); }
 
   /* ── Header search ── */
@@ -1070,7 +1078,14 @@
     max-width: min(560px, calc(100vw - 32px)); padding: 10px var(--s-4); background: var(--paper);
     color: var(--ink-2); border: 1px solid var(--line); border-radius: var(--r-md);
     box-shadow: var(--shadow-lg); font-size: var(--t-md); line-height: 1.5; }
-  .shot-banner { top: 14px; display: flex; align-items: center; gap: 14px; width: max-content; }
+  .shot-banner { top: 14px; display: flex; align-items: center; gap: 14px; width: max-content;
+    transition: opacity .4s; }
+  /* After four seconds the instructions fade, and only a small Done button
+     stays, in the top right corner, out of the way of the map. */
+  .shot-banner.mini { left: auto; right: 14px; transform: none; padding: 4px; gap: 0; }
+  .shot-banner.mini > span { display: none; }
+  .shot-banner.mini #screenshot-done { padding: 4px 10px; font-size: var(--t-sm); min-height: 0; }
+  .shot-banner.fading > span { opacity: 0; transition: opacity .4s; }
   .shot-banner strong, .toast b { color: var(--ink); font-weight: 600; }
   .shot-banner kbd { font: inherit; font-size: var(--t-sm); font-weight: 600; color: var(--ink);
     white-space: nowrap; padding: 0 6px; background: var(--paper-2); border: 1px solid var(--line);
@@ -17093,6 +17108,40 @@ function _exportDialog(title, options, extras, sub) {
 // screenshot of the actual rendered map — no rasterisation, no
 // projection mismatch.
 let _screenshotState = null;
+/* The credit line drawn into Presentation view, under the key, e.g. "Year 6
+   children with obesity, 2022/23 to 2024/25. Ward figures are estimates from
+   OHID Local Health MSOA figures. Map: PopHealth Map, pophealth.uk. Contains
+   OS data (c) Crown copyright and database right 2026. Map data (c)
+   OpenStreetMap contributors, (c) CARTO." The tile credit follows the
+   background actually showing. */
+function _shotCaptionText() {
+  const parts = [];
+  const k = (typeof curOv === 'string') ? curOv : 'none';
+  if (k && k !== 'none' && typeof OV_META === 'object' && OV_META[k]) {
+    const yr = OV_META[k].yr ? fmtPeriod(String(OV_META[k].yr)) : '';
+    parts.push(ovLabel(k) + (yr ? ', ' + yr : '') + '.');
+    const lvl = (typeof currentDataLevel === 'string') ? currentDataLevel : '';
+    if (/^ft_\d+$/.test(k) && lvl === 'ward') parts.push('Ward figures are estimates from OHID Local Health MSOA figures.');
+    else {
+      const src = (typeof _cardSource === 'function') ? _cardSource(k) : '';
+      if (src) parts.push('Source: ' + src + '.');
+    }
+    if (typeof PH_IS_LONDON !== 'undefined' && PH_IS_LONDON && PH_TFL_KEYS.indexOf(k) !== -1) {
+      parts.push('Powered by TfL Open Data. Contains OS data \u00a9 Crown copyright and database rights 2016. ' +
+        'Geomni UK Map data \u00a9 and database rights 2019.');
+    }
+    if (PH_DEFRA_AIR_KEYS.indexOf(k) !== -1) parts.push('\u00a9 Crown copyright Defra via uk-air.defra.gov.uk.');
+  }
+  parts.push('Map: PopHealth Map, pophealth.uk.');
+  const year = (DATA_DATE || '').slice(0, 4) || String(new Date().getFullYear());
+  parts.push('Contains OS data \u00a9 Crown copyright and database right ' + year + '.');
+  const sat = typeof _satBase !== 'undefined' && _satBase && map.hasLayer(_satBase);
+  const esri = !sat && typeof _streetBase !== 'undefined' && _streetBase && /arcgisonline/.test(_streetBase._url || '');
+  parts.push(sat ? 'Imagery \u00a9 Esri, Maxar, Earthstar Geographics and the GIS User Community.'
+    : esri ? 'Tiles \u00a9 Esri, HERE, Garmin. Map data \u00a9 OpenStreetMap contributors.'
+    : 'Map data \u00a9 OpenStreetMap contributors, \u00a9 CARTO.');
+  return parts.join(' ');
+}
 async function _prepareScreenForScreenshot(opts) {
   opts = opts || { mode: 'nwl', whiteOutside: true };
   if (_screenshotState) return; // already in screenshot mode
@@ -17108,8 +17157,10 @@ async function _prepareScreenForScreenshot(opts) {
   try { map.invalidateSize({ animate: false }); } catch (e) { /* no-op */ }
   const dlBadge = document.getElementById('dl-badge');
   const dlPrevVis = dlBadge ? dlBadge.style.visibility : '';
+  // The zoom and other controls go, but the attribution stays: the tile and
+  // data credits have to be in the picture.
   const ctrlCorners = Array.from(document.querySelectorAll(
-    '.leaflet-top, .leaflet-bottom, .leaflet-control-attribution'
+    '.leaflet-top, .leaflet-bottom .leaflet-control:not(.leaflet-control-attribution)'
   ));
   const ctrlPrevVis = ctrlCorners.map(el => el.style.visibility);
   if (dlBadge) dlBadge.style.visibility = 'hidden';
@@ -17137,7 +17188,9 @@ async function _prepareScreenForScreenshot(opts) {
     }
     if (scopeBounds) {
       try {
-        map.fitBounds(scopeBounds, { padding: [40, 40], animate: false });
+        // Room at the top for the instruction card, and at the bottom for
+        // the key and the credit caption, so neither covers the area.
+        map.fitBounds(scopeBounds, { paddingTopLeft: [40, 110], paddingBottomRight: [40, 120], animate: false });
         movedMap = true;
         await new Promise(r => setTimeout(r, 250));
       } catch (e) { /* no-op */ }
@@ -17187,15 +17240,29 @@ async function _prepareScreenForScreenshot(opts) {
   banner.innerHTML = '<span>' + (touch
     ? 'The map is ready for your screenshot, so take one in the usual way on your device and then select Done.'
     : 'The map is ready for your screenshot. Press <kbd>Win + Shift + S</kbd> on Windows or ' +
-      '<kbd>Cmd + Shift + 4</kbd> on a Mac, and then select Done or press <kbd>Esc</kbd>.') + '</span>' +
+      '<kbd>Cmd + Shift + 4</kbd> on a Mac, and then select Done or press <kbd>Esc</kbd>.') +
+    ' Keep the credit line at the bottom in your picture.</span>' +
     '<button type="button" id="screenshot-done" class="btn btn-primary">Done</button>';
   document.body.appendChild(banner);
+  // The card fades after four seconds so it is not in the picture, leaving a
+  // small Done button; Esc still works throughout.
+  const fadeT1 = setTimeout(() => banner.classList.add('fading'), 4000);
+  const fadeT2 = setTimeout(() => banner.classList.add('mini'), 4400);
+  // The caption under the key: indicator, period, source and tile credit.
+  const caption = document.createElement('div');
+  caption.className = 'shot-caption';
+  caption.id = 'shot-caption';
+  caption.textContent = _shotCaptionText();
+  const mapWrap = document.getElementById('map-wrap');
+  if (mapWrap) mapWrap.appendChild(caption);
 
   const onKey = e => { if (e.key === 'Escape' && _screenshotState) { e.preventDefault(); _screenshotState.cleanup(); } };
   document.addEventListener('keydown', onKey);
   _screenshotState = {
     cleanup: () => {
       document.removeEventListener('keydown', onKey);
+      clearTimeout(fadeT1); clearTimeout(fadeT2);
+      if (caption.parentNode) caption.parentNode.removeChild(caption);
       try { if (whiteOverlay) map.removeLayer(whiteOverlay); } catch(e) {}
       if (tipStyle.parentNode) tipStyle.parentNode.removeChild(tipStyle);
       if (dlBadge) dlBadge.style.visibility = dlPrevVis;

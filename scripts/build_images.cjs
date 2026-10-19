@@ -105,6 +105,15 @@ function mapSvg(width, height) {
     `<g stroke="#fff" stroke-width="0.6" stroke-linejoin="round">${paths}</g></svg>`;
 }
 
+// The year in the OS credit is the year of the data on the site.
+function dataYear() {
+  try {
+    const m = JSON.parse(fs.readFileSync(path.join(ROOT, 'data/meta/manifest.json'), 'utf8'));
+    if (m.last_run) return String(m.last_run).slice(0, 4);
+  } catch (e) { /* fall through */ }
+  return String(new Date().getFullYear());
+}
+
 function ogHtml(tagline) {
   const swatches = RAMP.map(c => `<i style="background:${c}"></i>`).join('');
   return `<!doctype html><html><head>  <link rel="stylesheet" href="vendor/fonts.css">
@@ -120,11 +129,14 @@ function ogHtml(tagline) {
     .tag{margin:30px 0 0;font-size:29px;line-height:1.36;color:#1F2D3D}
     .free{align-self:flex-start;margin-top:30px;padding:10px 20px;border-radius:999px;background:#005EB8;color:#fff;
       font-size:24px;font-weight:600}
-    .url{position:absolute;left:68px;bottom:44px;font-size:22px;font-weight:600;color:#005EB8}
+    .url{position:absolute;left:68px;bottom:74px;font-size:22px;font-weight:600;color:#005EB8}
     .map{position:absolute;left:580px;top:34px}
-    .key{position:absolute;right:48px;bottom:30px;display:flex;align-items:center;gap:10px;font-size:15px;color:#4A5B6C}
+    .key{position:absolute;right:48px;bottom:66px;display:flex;align-items:center;gap:10px;font-size:15px;color:#4A5B6C}
     .key span.k{display:flex}
     .key i{display:block;width:22px;height:12px}
+    /* The image shows the map, so it carries the map's credits, and says
+       whose site it is despite the NHS blue. */
+    .credit{position:absolute;left:68px;right:48px;bottom:16px;font-size:13.5px;line-height:1.45;color:#4A5B6C}
   </style></head><body>
   <div class="bar"></div>
   <div class="txt">
@@ -133,8 +145,10 @@ function ogHtml(tagline) {
     <div class="free">Free, no sign-in</div>
   </div>
   <div class="url">pophealth.uk</div>
-  <div class="map">${mapSvg(590, 520)}</div>
+  <div class="map">${mapSvg(590, 490)}</div>
   <div class="key">Deprivation score by London ward, IMD 2025 <span>Lower</span><span class="k">${swatches}</span><span>Higher</span></div>
+  <div class="credit">An independent project, not affiliated with the NHS<br>
+    Contains OS data &copy; Crown copyright and database right ${dataYear()}. Source: ONS boundaries; MHCLG English Indices of Deprivation 2025.</div>
   </body></html>`;
 }
 
