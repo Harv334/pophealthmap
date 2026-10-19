@@ -2034,6 +2034,44 @@ const smallText = page => page.evaluate(() => {
     await page.close();
   }
 
+  // Compare drives the map: the map shows the size of area being compared,
+  // and an LA chosen from the list is brought into view.
+  {
+    const { page, errors } = await open(browser, 'index.html?t=1&ov=census_bad_health_pct', DESK);
+    await page.click('.mode-btn[data-mode="compare"]');
+    await page.waitForTimeout(1200);
+    const lv = [];
+    for (const k of ['lsoa', 'borough', 'icb', 'ward']) {
+      await page.click('#cmp-levels [data-cmplvl="' + k + '"]');
+      await page.waitForTimeout(2000);
+      lv.push(k + ':' + await page.evaluate(() => _activeLevel()));
+    }
+    ok(lv.join() === 'lsoa:lsoa,borough:borough,icb:borough,ward:ward', 'Compare switches the map to the size of area compared', lv.join());
+    ok(await page.evaluate(() => !document.getElementById('tlsoa').checked), 'LSOA boundaries Compare switched on go off when it leaves LSOAs');
+    await page.click('#cmp-levels [data-cmplvl="borough"]');
+    await page.waitForTimeout(1500);
+    const before = await page.evaluate(() => map.getZoom());
+    const v = await page.evaluate(() => [...document.getElementById('cmp-add-area').options].map(o => o.value).filter(Boolean)[0]);
+    await page.selectOption('#cmp-add-area', v);
+    await page.waitForTimeout(2000);
+    const fit = await page.evaluate(v => { let inView = false; const b = map.getBounds();
+      BOROUGH_GJ.features.forEach(f => { if (f.properties.name === v) inView = b.contains(L.geoJSON(f).getBounds().getCenter()); });
+      return { z: map.getZoom(), inView }; }, v);
+    ok(fit.z > before && fit.inView, 'an LA chosen in Compare is brought into view', JSON.stringify({ before, ...fit }));
+    const names = {};
+    for (const m of ['csv', 'report', 'query']) {
+      await page.click('.mode-btn[data-mode="' + m + '"]');
+      await page.waitForTimeout(600);
+      names[m] = await page.evaluate(() => document.getElementById('sb-modebar-name').textContent);
+    }
+    ok(names.csv === 'Data export' && names.report === 'Custom area' && names.query === 'Query',
+      'the panel heading names each tool once', JSON.stringify(names));
+    ok(await page.evaluate(() => !/sign-in/.test(document.querySelector('#ldr .ldr-line').textContent)),
+      'the loading screen line has no sign-in phrase');
+    ok(errors.length === 0, 'no page errors (Compare and the map)', errors.join(' | '));
+    await page.close();
+  }
+
   // A region
   if (HAS_NE) {
     const { page, errors } = await open(browser, 'index.html?r=north-east&t=1', DESK);
