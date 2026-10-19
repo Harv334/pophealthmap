@@ -3639,9 +3639,9 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
               <option value="census_black_pct">Black / Black British % · Output area</option>
               <option value="census_mixed_pct">Mixed / Multiple % · Output area</option>
               <option value="census_other_ethnic_pct">Other ethnic group % · Output area</option>
-              <option value="census_under16_pct">Under 16 % · Output area</option>
+              <option value="census_under16_pct">Under 15 % · Output area</option>
               <option value="census_under5_pct">Under 5 % · Output area</option>
-              <option value="census_working_age_pct">Working age (16 to 64) % · Output area</option>
+              <option value="census_working_age_pct">Aged 15 to 64 % · Output area</option>
               <option value="census_over65_pct">65+ % · Output area</option>
               <option value="census_over85_pct">85+ % · Output area</option>
               <option value="census_english_hh_all_pct">Households where all adults have English as main language % · Output area</option>
@@ -5363,9 +5363,9 @@ const CATS = [
   { key: "people", label: "People and communities", ico: "users", fields: [
     { k: "census_non_white_pct",             l: "Non-White (%)",                 g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_born_outside_uk_pct",       l: "Born outside UK (%)",           g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
-    { k: "census_under16_pct",               l: "Under 16 (%)",                  g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
+    { k: "census_under16_pct",               l: "Under 15 (%)",                  g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_under5_pct",                l: "Under 5 (%)",                   g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
-    { k: "census_working_age_pct",           l: "Working age, 16 to 64 (%)",    g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
+    { k: "census_working_age_pct",           l: "Aged 15 to 64 (%)",            g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_over65_pct",                l: "65 and over (%)",               g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_over85_pct",                l: "85 and over (%)",               g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_white_pct",                 l: "White (%)",                     g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
@@ -5455,6 +5455,27 @@ const CATS = [
    Internal keys and data are untouched. Anything not listed here (a custom
    indicator from data/custom) keeps the label it arrived with.
    ═══════════════════════════════════════════════════════════════════════════ */
+/* The ages census_under16_pct and census_working_age_pct cover. The pipeline
+   writes census_age_bands into indicators.js: "0-15" when they were built from
+   single years of age (TS007), so they are under 16 and 16 to 64. Anything
+   else, including a file written before the flag existed, means TS007A's
+   five-year bands, which give under 15 and 15 to 64, and every label says
+   so. The keys stay as they are, so links and saved views keep working, and
+   the labels flip back when a refresh rebuilds the bands. */
+const CENSUS_AGE_OK = !!(typeof PH_IND_STATS === 'object' && PH_IND_STATS &&
+  PH_IND_STATS.census_age_bands === '0-15');
+const AGE_CHILD = CENSUS_AGE_OK ? 'under 16' : 'under 15';
+const AGE_WORK = CENSUS_AGE_OK ? '16 to 64' : '15 to 64';
+const AGE_CHILD_CAP = CENSUS_AGE_OK ? 'Under 16' : 'Under 15';
+/* LA series left out until a data refresh rebuilds them. The pipeline lists
+   in indicators.js each OHID LA series whose stored age is not its headline
+   age (ft_age_mismatch). A file written before that check (no
+   ft_age_checked) holds adult smoking as OHID's 18 to 64 breakdown, which
+   OHID itself withholds or flags for most LAs, so that one is left out.
+   The picker, the profile, Compare, the Data export and Ask all skip these. */
+const FT_WITHHELD = new Set((typeof PH_IND_STATS === 'object' && PH_IND_STATS && PH_IND_STATS.ft_age_checked)
+  ? (PH_IND_STATS.ft_age_mismatch || []) : ['ft_smoking_prevalence_adults']);
+function phWithheld(k) { return FT_WITHHELD.has(k); }
 const IND_NAMES = {
   // At a glance
   census_population:               ['Population', 'Usual residents, Census 2021'],
@@ -5538,9 +5559,9 @@ const IND_NAMES = {
   // People and communities, Census 2021
   census_non_white_pct:       ['Ethnic groups other than White', 'Ethnic group: all groups other than White'],
   census_born_outside_uk_pct: ['Born outside the UK', 'Country of birth: born outside the UK'],
-  census_under16_pct:         ['Aged under 16', 'Age: under 16'],
+  census_under16_pct:         ['Aged ' + AGE_CHILD, 'Age: ' + AGE_CHILD],
   census_under5_pct:          ['Aged under 5', 'Age: under 5'],
-  census_working_age_pct:     ['Working age (16 to 64)', 'Age: 16 to 64'],
+  census_working_age_pct:     [CENSUS_AGE_OK ? 'Working age (16 to 64)' : 'Aged 15 to 64', 'Age: ' + AGE_WORK],
   census_over65_pct:          ['Aged 65 and over', 'Age: 65 and over'],
   census_over85_pct:          ['Aged 85 and over', 'Age: 85 and over'],
   census_white_pct:           ['White', 'Ethnic group: White'],
@@ -5557,7 +5578,7 @@ const IND_NAMES = {
   census_level4_qual_pct:          ['Degree-level qualifications', 'Highest level of qualification: Level 4 qualifications and above'],
   census_no_qual_pct:              ['No qualifications', 'Highest level of qualification: no qualifications'],
   claimant_count:                  ['Claimant count', 'Claimant count'],
-  claimant_rate_pct:               ['Claimant rate, working age', 'Claimant count as a proportion of residents aged 16 to 64'],
+  claimant_rate_pct:               ['Claimant rate, working age', 'Claimant count as a proportion of residents aged ' + AGE_WORK],
   // Housing and transport
   census_owned_pct:            ['Home ownership', 'Tenure of household: owned'],
   census_social_rented_pct:    ['Social renting', 'Tenure of household: social rented'],
@@ -5961,9 +5982,9 @@ const OV_META = {
   census_black_pct:               { src: "Census 2021 (TS021)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of residents who identified as Black, Black British, Black Welsh, Caribbean or African." },
   census_mixed_pct:               { src: "Census 2021 (TS021)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of residents who identified with a mixed or multiple ethnic group." },
   census_other_ethnic_pct:        { src: "Census 2021 (TS021)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of residents who identified with another ethnic group, such as Arab." },
-  census_under16_pct:             { src: "Census 2021 (TS007A)", yr: "2021", g: "Output area", u: "%",       desc: "The share of residents aged under 16." },
+  census_under16_pct:             { src: CENSUS_AGE_OK ? "Census 2021 (TS007)" : "Census 2021 (TS007A)", yr: "2021", g: "Output area", u: "%",       desc: "The share of residents aged " + AGE_CHILD + "." + (CENSUS_AGE_OK ? "" : " The Census tables this version of the map uses group ages in fives, so the youngest bands stop at 14.") },
   census_under5_pct:              { src: "Census 2021 (TS007A)", yr: "2021", g: "Output area", u: "%",       desc: "The share of residents aged under 5." },
-  census_working_age_pct:         { src: "Census 2021 (TS007A)", yr: "2021", g: "Output area", u: "%",       desc: "The share of residents aged 16 to 64, the ages usually counted as working age." },
+  census_working_age_pct:         { src: CENSUS_AGE_OK ? "Census 2021 (TS007)" : "Census 2021 (TS007A)", yr: "2021", g: "Output area", u: "%",       desc: CENSUS_AGE_OK ? "The share of residents aged 16 to 64, the ages usually counted as working age." : "The share of residents aged 15 to 64. Working age is usually counted from 16, but the Census tables this version of the map uses group ages in fives, so this band starts at 15." },
   census_over65_pct:              { src: "Census 2021 (TS007A)", yr: "2021", g: "Output area", u: "%",       desc: "The share of residents aged 65 and over." },
   census_over85_pct:              { src: "Census 2021 (TS007A)", yr: "2021", g: "Output area", u: "%",       desc: "The share of residents aged 85 and over." },
   census_higher_managerial_pct:   { src: "Census 2021 (TS062)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of residents aged 16 and over in higher managerial, administrative and professional jobs, using the socio-economic classification ONS publishes." },
@@ -6004,10 +6025,10 @@ const OV_META = {
   ft_obesity_year6: { src: "OHID Fingertips", yr: "2024/25", g: "LA (upper tier)", u: "%", desc: "The share of children in Year 6, aged 10 to 11, living with obesity, including severe obesity, published only for the whole LA." },
   ft_physical_activity_adults: { src: "OHID Fingertips", yr: "2024/25", g: "LA (upper tier)", u: "%", desc: "The share of adults doing at least 150 minutes of moderate activity a week, published only for the whole LA." },
   ft_self_harm_admissions_10_24: { src: "OHID Fingertips", yr: "2023/24", g: "LA (upper tier)", u: "per 100,000", desc: "Hospital admissions for self-harm among people aged 10 to 24, per 100,000, published only for the whole LA." },
-  ft_smoking_prevalence_adults: { src: "OHID Fingertips", yr: "2024", g: "LA (upper tier)", u: "%", desc: "The share of adults aged 18 and over who currently smoke, published only for the whole LA." },
+  ft_smoking_prevalence_adults: { src: "OHID Fingertips", yr: "2025", g: "LA (upper tier)", u: "%", desc: "The share of adults aged 18 and over who currently smoke, published only for the whole LA." },
   ft_suicide_rate: { src: "OHID Fingertips", yr: "2022 - 24", g: "LA (upper tier)", u: "per 100,000", desc: "Deaths from suicide per 100,000 people, published only for the whole LA." },
   core20_lsoa_count:              { src: "NHSE Core20PLUS5",     yr: "2025", g: "Ward", u: "LSOAs",  desc: "The number of the ward's LSOAs that are among the most deprived 20% in England, meaning deprivation deciles 1 and 2, which NHS England calls Core20 in its Core20PLUS5 approach." },
-  claimant_rate_pct:              { src: "NOMIS CLA01",          yr: "August 2026", g: "Ward/LSOA", u: "%", desc: "People aged 16 to 64 claiming Universal Credit or Jobseeker's Allowance mainly because they are out of work, as a share of residents of that age at the 2021 Census." },
+  claimant_rate_pct:              { src: "NOMIS CLA01",          yr: "August 2026", g: "Ward/LSOA", u: "%", desc: "People aged 16 to 64 claiming Universal Credit or Jobseeker's Allowance mainly because they are out of work, as a share of residents aged " + AGE_WORK + " at the 2021 Census." },
 
   // Environment + access
   fuel_poverty_pct:               { src: "DESNZ LILEE",          yr: "2022", g: "LSOA", u: "%",       desc: "The share of households in fuel poverty, which means they have a low income and live in a home that is costly to heat, with an energy efficiency rating of D or below." },
@@ -6216,6 +6237,21 @@ const OV_META = {
       PH_AREA + ' build left out: ' + dropped.join(', '));
   }
 })();
+/* The withheld LA series (FT_WITHHELD) come out of the themes and the
+   hidden select, in every region, so nothing that lists indicators from
+   either offers them. */
+(function _withheldIndicatorFilter() {
+  if (!FT_WITHHELD.size) return;
+  CATS.forEach(function (c) {
+    c.fields = c.fields.filter(function (f) { return !phWithheld(f.k); });
+  });
+  var sel = document.getElementById('ov');
+  if (sel) {
+    Array.prototype.slice.call(sel.querySelectorAll('option')).forEach(function (o) {
+      if (phWithheld(o.value)) o.remove();
+    });
+  }
+})();
 /* One plain-English line per indicator: what the number measures, for the
    indicator picker and library. The fuller technical note stays in OV_META.desc
    and the info panel. */
@@ -6296,9 +6332,9 @@ const OV_PLAIN = {
   census_black_pct: "People from a Black or Black British ethnic group.",
   census_mixed_pct: "People from a Mixed or Multiple ethnic group.",
   census_other_ethnic_pct: "People from another ethnic group, such as Arab.",
-  census_under16_pct: "Residents aged under 16.",
+  census_under16_pct: "Residents aged " + AGE_CHILD + ".",
   census_under5_pct: "Residents aged under 5.",
-  census_working_age_pct: "Residents aged 16 to 64.",
+  census_working_age_pct: "Residents aged " + AGE_WORK + ".",
   census_over65_pct: "Residents aged 65 and over.",
   census_over85_pct: "Residents aged 85 and over.",
   census_english_hh_all_pct: "Households where every adult's main language is English.",
@@ -6996,9 +7032,9 @@ function indicatorFacts(k) {
   }
   if (/NOMIS CLA01/.test(src)) {
     f.num = 'People claiming Universal Credit or Jobseeker\'s Allowance mainly because they are out of work';
-    f.den = 'Residents aged 16 to 64 at the 2021 Census';
+    f.den = 'Residents aged ' + AGE_WORK + ' at the 2021 Census';
     f.cadence = 'ONS publishes the claimant count every month, and we refresh it here on the 15th of each month.';
-    f.method = 'ONS does not publish a rate for LSOAs, so we divide each LSOA\'s count by its residents aged 16 to 64 at the 2021 Census. ONS rounds each LSOA\'s count to the nearest 5, so where there are few claimants the rate is only approximate.';
+    f.method = 'ONS does not publish a rate for LSOAs, so we divide each LSOA\'s count by its residents aged ' + AGE_WORK + ' at the 2021 Census. ONS rounds each LSOA\'s count to the nearest 5, so where there are few claimants the rate is only approximate.';
     return f;
   }
   if (/DESNZ/.test(src)) {
@@ -8643,6 +8679,94 @@ function laIsWardEstimate(k) {
   return true;
 }
 const LA_CITY_OF_LONDON = 'E09000001';
+/* Which area an OHID LA figure describes.
+
+   OHID publishes most of its LA series for districts as well as for counties,
+   but some only for upper-tier LAs: unitary councils, metropolitan and London
+   boroughs, and counties. A district (E07) in a shire county then has no
+   figure of its own and the map carries its county's. The LA file says which:
+   each LA's ft_from names, for every figure that is its county's, the
+   county's code and name. A file without ft_from predates that record, when
+   every LA series was fetched only for upper-tier LAs, so there a district's
+   figure is its county's, though the file does not name the county.
+
+   laFigCounty(code, k) is null for the LA's own figure, and otherwise
+   { code, name } for the county, either of which may be '' in an older
+   file. Only the series keyed by name (ft_life_expectancy_male and the rest)
+   are LA series; the numeric ft_ keys are OHID's MSOA estimates. */
+function ohidLaKey(k) { return /^ft_/.test(k || '') && !/^ft_\d+$/.test(k || ''); }
+function laRecOf(code) {
+  const d = code && BOROUGH_DATA[code];
+  return d ? (d.indicators || d) : null;
+}
+function laFigCounty(code, k) {
+  if (!code || !ohidLaKey(k)) return null;
+  const r = laRecOf(code);
+  if (r && r.ft_from && typeof r.ft_from === 'object') {
+    const f = r.ft_from[k];
+    return (f && (f[0] || f[1])) ? { code: f[0] || '', name: f[1] || '' } : null;
+  }
+  return /^E07/.test(code) ? { code: '', name: '' } : null;
+}
+// A key for "the same published figure": the county's code where there is
+// one, and in an older file the district's LA series taken together, which
+// are identical across the districts of one county.
+function laFigSourceKey(code, k) {
+  const c = laFigCounty(code, k);
+  if (!c) return code || '';
+  if (c.code) return c.code;
+  const r = laRecOf(code) || {};
+  return 'cty:' + Object.keys(r).filter(ohidLaKey).sort().map(x => x + '=' + r[x]).join('|');
+}
+// How many other LAs in this map carry the same county figure.
+function laFigPeers(code, k) {
+  const key = laFigSourceKey(code, k);
+  return Object.keys(BOROUGH_DATA).filter(c => c !== code && laFigCounty(c, k) && laFigSourceKey(c, k) === key).length;
+}
+// The county as a phrase: its name, or what is known about it.
+function laCountyPhrase(c, lad) {
+  return (c && c.name) || ('the county ' + (lad || 'this LA') + ' is part of');
+}
+// Whether any LA figure in this map is a county's.
+let _laAnyCounty = null;
+function laAnyCountyFigure() {
+  if (_laAnyCounty !== null) return _laAnyCounty;
+  const codes = Object.keys(BOROUGH_DATA);
+  const any = codes.some(code => {
+    const r = laRecOf(code) || {};
+    return Object.keys(r).some(k => ohidLaKey(k) && laFigCounty(code, k));
+  });
+  if (codes.length) _laAnyCounty = any;   // not cached before the LA file has loaded
+  return any;
+}
+// An LA with none of OHID's LA series, in a map where others have them.
+function laMissingOhid(code) {
+  const r = laRecOf(code) || {};
+  if (Object.keys(r).some(k => ohidLaKey(k) && r[k] != null && r[k] !== '' && typeof r[k] !== 'object')) return false;
+  return Object.keys(BOROUGH_DATA).some(c => {
+    const o = laRecOf(c) || {};
+    return Object.keys(o).some(k => ohidLaKey(k) && typeof o[k] === 'number');
+  });
+}
+// Councils whose code changed in 2024, so OHID's files may not have caught up.
+const LA_RECODED_2024 = new Set(['E08000038', 'E08000039']);
+function laOhidMissingNote(code, lad) {
+  const la = ladPhrase(lad || 'this LA');
+  return 'OHID’s figures for the whole of ' + la + ', such as life expectancy' +
+    (FT_WITHHELD.has('ft_smoking_prevalence_adults') ? ' and suicide' : ', smoking and suicide') +
+    ', are missing from this version of the map' +
+    (LA_RECODED_2024.has(code) ? ', because ' + la + '’s council code changed in 2024' : '') +
+    '. We are working on it.';
+}
+function laCodeOfName(name) {
+  const f = ((typeof BOROUGH_GJ !== 'undefined' && BOROUGH_GJ.features) || [])
+    .find(f => f.properties && _sameLad(f.properties.name, name));
+  return (f && f.properties.LAD25CD) || '';
+}
+function numWord(n) {
+  const w = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
+  return n >= 0 && n < w.length ? w[n] : String(n);
+}
 function _laCodes() {
   return (typeof BOROUGH_GJ !== 'undefined' && BOROUGH_GJ.features)
     ? BOROUGH_GJ.features.map(f => (f.properties || {}).LAD25CD).filter(Boolean) : [];
@@ -9743,7 +9867,7 @@ function profileCaption(key, has, lad) {
       return 'How residents described their health, disability and unpaid care at the 2021 Census' +
         (has.msoa ? ', then health outcomes estimated by the Office for Health Improvement and Disparities (OHID)' : '') +
         (has.borough ? ', and figures ' + (has.msoa ? 'OHID' : 'the Office for Health Improvement and Disparities (OHID)') +
-          ' publishes only for the whole of ' + ladPhrase(la) : '') + '.';
+          ' publishes only for the whole of ' + (has.county || ladPhrase(la)) : '') + '.';
     case 'imd2025':
       return 'The English Indices of Deprivation 2025, calculated for this ward from the LSOAs inside it, ' +
         'each weighted by the number of people living there.';
@@ -9851,8 +9975,8 @@ function showWard(wn) {
     { k:'census_other_ethnic_pct', l:'Other',  v:inds.census_other_ethnic_pct, c:'#999999' },
   ]);
   const ageBar = stackedBar([
-    { k:'census_under16_pct',      l:'Under 16',    v:inds.census_under16_pct,      c:'#2ea8a0' },
-    { k:'census_working_age_pct',  l:'16 to 64',    v:inds.census_working_age_pct,  c:'#3b6eaf' },
+    { k:'census_under16_pct',      l:AGE_CHILD_CAP, v:inds.census_under16_pct,      c:'#2ea8a0' },
+    { k:'census_working_age_pct',  l:AGE_WORK,      v:inds.census_working_age_pct,  c:'#3b6eaf' },
     { k:'census_over65_pct',       l:'65 and over', v:inds.census_over65_pct,       c:'#a05a9e' },
   ]);
 
@@ -9903,7 +10027,9 @@ function showWard(wn) {
     // The period, unless the section's caption already gives it (the Census,
     // the IMD and the crime year).
     const per = /^(census_|crime_|imd_|core20_|total_lsoa)/.test(f.k) ? '' : periodWords(monthWords(ovPeriodOf(f.k)));
-    const pill = PROFILE_PILL[f.g];
+    // A district's figure that is its county's says so (see laFigCounty).
+    const pill = (f.g === 'borough' && laFigCounty(wdata.lad_code, f.k))
+      ? ['gpill gpill-la', 'county figure'] : PROFILE_PILL[f.g];
     const meta = (per || pill)
       ? `<span class="sr-meta">${per ? `<span class="sr-per">${_esc(per)}</span>` : ''}` +
         `${pill ? `<span class="${pill[0]}">${pill[1]}</span>` : ''}</span>` : '';
@@ -9924,6 +10050,10 @@ function showWard(wn) {
   }));
   const bor = wdata.lad || 'the LA';
   const lePer = periodWords(ovPeriodOf('ft_93283'));
+  // Where OHID's LA figures here are the county's, and which county.
+  const ladCode = wdata.lad_code || laCodeOfName(wdata.lad);
+  const cntyOf = k => laFigCounty(ladCode, k);
+  let anyCtx = false, anyCounty = false;
   const cats = sections.map(({ cat, fields }, catIdx) => {
     const wardFields = fields.filter(onWard);
     // The population is the first key figure above, so it is not repeated
@@ -9949,18 +10079,45 @@ function showWard(wn) {
     // leads this block, and the official LA figure in the box below it.
     const twoLE = msoaF.some(f => f.k === 'ft_93283' || f.k === 'ft_932831') &&
       ctxF.some(f => /^ft_life_expectancy_(fe)?male$/.test(f.k));
+    const leF = ctxF.find(f => /^ft_life_expectancy_(fe)?male$/.test(f.k));
+    const leCounty = leF ? cntyOf(leF.k) : null;
+    const ctyF = ctxF.filter(f => cntyOf(f.k));
+    const cty = ctyF.length ? cntyOf(ctyF[0].k) : null;
+    const allCty = ctyF.length && ctyF.length === ctxF.length;
+    if (ctxF.length) anyCtx = true;
+    if (ctyF.length) anyCounty = true;
+    const peers = cty ? laFigPeers(ladCode, ctyF[0].k) : 0;
+    const ctyName = cty ? laCountyPhrase(cty, bor) : '';
+    const ctyNote = cty
+      ? (cty.name
+          ? 'OHID publishes ' + (allCty ? 'these' : 'the ones marked county figure') + ' only for ' + _esc(cty.name) +
+            ' as a whole, which takes in ' + _esc(ladPhrase(bor)) +
+            (peers ? ' and ' + numWord(peers) + ' other district' + (peers === 1 ? '' : 's') : '') +
+            ', so every ward in ' + (peers ? 'those districts' : _esc(ladPhrase(bor))) + ' shows the same figure. ' +
+            'They describe the county rather than ' + _esc(ladPhrase(bor)) + ' or this ward.'
+          : 'OHID publishes ' + (allCty ? 'these' : 'the ones marked county figure') + ' only for ' + _esc(ctyName) +
+            ' as a whole, so every ward in its districts shows the same figure. ' +
+            'They describe the county rather than ' + _esc(ladPhrase(bor)) + ' or this ward.')
+      : '';
+    const missing = (cat.key === 'health' && !ctxF.length && laMissingOhid(ladCode))
+      ? `<div class="sr-ctx sr-missing"><div class="sr-sub-note">${_esc(laOhidMissingNote(ladCode, bor))}</div></div>` : '';
     const msoa = msoaRows ? `<div class="sr-lh${hideFrom(msoaStart)}"><div class="sr-sub">OHID estimates for this ward</div>
       <div class="sr-sub-note">OHID publishes these for MSOAs. This ward’s figure is calculated from them, weighted by where its residents live.${
         msoaF.some(f => ovIsStdRatio(f.k))
           ? ' A figure with no unit is a ratio where 100 is the England level once age is allowed for.' : ''}${
         twoLE ? ' Life expectancy appears twice: here as OHID’s estimate for this ward' + (lePer ? ' over ' + _esc(lePer) : '') +
-          ', and further down as the official figure for the whole of ' + _esc(ladPhrase(bor)) + '.' : ''}</div></div>
+          (leCounty
+            ? ', and further down as OHID’s official figure for ' + _esc(laCountyPhrase(leCounty, bor)) + ' as a whole' +
+              (leCounty.name ? ', the county ' + _esc(ladPhrase(bor)) + ' is part of.' : '.')
+            : ', and further down as the official figure for the whole of ' + _esc(ladPhrase(bor)) + '.') : ''}</div></div>
       ${msoaRows}` : '';
     const ctx = ctxRows ? `<div class="sr-ctx${hideFrom(ctxStart)}">
-      <div class="sr-sub">Figures for the whole of ${_esc(ladPhrase(bor))}</div>
-      <div class="sr-sub-note">OHID publishes these only for the LA, so every ward in ${_esc(ladPhrase(bor))} shows the same figure and they cannot tell this ward apart from its neighbours.</div>
+      <div class="sr-sub">Figures for the whole of ${_esc(allCty ? ctyName : ladPhrase(bor))}</div>
+      <div class="sr-sub-note">${allCty ? ctyNote
+        : `OHID publishes these only for the LA, so every ward in ${_esc(ladPhrase(bor))} shows the same figure and they cannot tell this ward apart from its neighbours.${ctyNote ? ' ' + ctyNote : ''}`}</div>
       ${ctxRows}</div>` : '';
-    const has = { lsoa: ownF.some(f => f.g === 'lsoa'), msoa: msoaF.length > 0, borough: ctxF.length > 0 };
+    const has = { lsoa: ownF.some(f => f.g === 'lsoa'), msoa: msoaF.length > 0, borough: ctxF.length > 0,
+                  county: allCty ? ctyName : '' };
     const cap = profileCaption(cat.key, has, wdata.lad);
     const more = clip
       ? `<button type="button" class="sr-all" aria-expanded="false" data-n="${total}" onclick="toggleProfileAll(this)">Show all ${total} figures</button>`
@@ -9971,7 +10128,7 @@ function showWard(wn) {
         <span class="cat-hdr-l">${ico(cat.ico, 'cat-ico')}${_esc(cat.label)}</span>
         ${ico('chevron-right', 'cat-arrow' + (op ? ' open' : ''))}
       </button></h3>
-      <div class="cat-body${op ? ' open' : ''}${clip ? ' clipped' : ''}" id="pc-${cat.key}">${cap ? `<p class="cat-cap">${cap}</p>` : ''}${own}${msoa}${ctx}${more}</div>
+      <div class="cat-body${op ? ' open' : ''}${clip ? ' clipped' : ''}" id="pc-${cat.key}">${cap ? `<p class="cat-cap">${cap}</p>` : ''}${own}${msoa}${ctx}${missing}${more}</div>
     </div>`;
   }).join('');
 
@@ -10022,8 +10179,9 @@ function showWard(wn) {
         : 'Census figures are calculated from its output areas, the smallest Census areas of about 125 households, with each percentage an average weighted by population and the population their residents summed.'}
       Crimes are counted inside its boundary.
       <span class="gpill gpill-lsoa">estimated from LSOAs</span> and <span class="gpill gpill-msoa">estimated from MSOAs</span>
-      mark figures published for those larger areas and weighted onto this ward by where its residents live, and a
-      <span class="gpill gpill-la">whole-LA figure</span> is the same for every ward in ${_esc(ladPhrase(bor))}.
+      mark figures published for those larger areas and weighted onto this ward by where its residents live${anyCtx ? `, and a
+      <span class="gpill gpill-la">whole-LA figure</span> is the same for every ward in ${_esc(ladPhrase(bor))}` : ''}${anyCounty ? `,
+      while a <span class="gpill gpill-la">county figure</span> is OHID’s figure for the county ${_esc(ladPhrase(bor))} is part of` : ''}.
       Crime figures come from police.uk, benefit claimants from the Department for Work and Pensions, and health figures from OHID.
     </div>`;
 }
@@ -10944,8 +11102,8 @@ function _generateWardReport(_reportWindow, wn, opts) {
     { l:'Other', v: inds.census_other_ethnic_pct, c:'#9AA6B2' },
   ], { width: 360 });
   const ageStack = _chartStack([
-    { l:'Under 16',    v: inds.census_under16_pct,     c:'#2A9D8F' },
-    { l:'16 to 64',    v: inds.census_working_age_pct, c:'#1F4E8C' },
+    { l:AGE_CHILD_CAP, v: inds.census_under16_pct,     c:'#2A9D8F' },
+    { l:AGE_WORK,      v: inds.census_working_age_pct, c:'#1F4E8C' },
     { l:'65 and over', v: inds.census_over65_pct,      c:'#8E6BBF' },
   ], { width: 360 });
 
@@ -12754,8 +12912,8 @@ function _fitFocus(bounds) {
     unemployment: ['claimant', 'out-of-work'], unemployed: ['claimant', 'out-of-work', 'unemployment'],
     jobless: ['claimant', 'out-of-work', 'unemployment'], benefits: ['claimant', 'out-of-work'],
     elderly: ['65 and over', '85 and over'], older: ['65 and over', '85 and over'], pensioners: ['65 and over'],
-    children: ['under 16', 'under 5', 'reception', 'year 6', 'child'], kids: ['under 16', 'under 5', 'reception', 'year 6', 'child'],
-    babies: ['under 5', 'fertility'], births: ['fertility'], young: ['under 16', '15 to 24', '10 to 24'],
+    children: ['under 16', 'under 15', 'under 5', 'reception', 'year 6', 'child'], kids: ['under 16', 'under 15', 'under 5', 'reception', 'year 6', 'child'],
+    babies: ['under 5', 'fertility'], births: ['fertility'], young: ['under 16', 'under 15', '15 to 24', '10 to 24'],
     obesity: ['obes', 'overweight'], overweight: ['obes', 'overweight'], weight: ['obes', 'overweight'],
     parks: ['green space'], park: ['green space'], rivers: ['blue space'], water: ['blue space'],
     trains: ['station'], train: ['station'], rail: ['station'], tube: ['station', 'public transport'],
@@ -12828,7 +12986,9 @@ function _fitFocus(bounds) {
       ' only published for whole LAs, so ' + (one ? 'it is' : 'they are') +
       ' not among the indicators you can colour the map by. You can find each LA\'s figure' +
       (sections.length ? ' under ' + esc(sections.join(' or ')) : '') +
-      ' in the full profile of any ward.</div>';
+      ' in the full profile of any ward.' +
+      ((typeof laAnyCountyFigure === 'function' && laAnyCountyFigure()) ? ' In a shire district, the figure is the county’s.' : '') +
+      '</div>';
   }
 
   function render() {
@@ -13839,8 +13999,8 @@ function showLSOA(feat) {
 
     // Age profile — stacked bar + numeric rows
     const ageBar = stackedBar([
-      { k:'census_under16_pct',     l:'Under 16',    v:inds.census_under16_pct,     c:'#2A9D8F' },
-      { k:'census_working_age_pct', l:'16 to 64',    v:inds.census_working_age_pct, c:'#1F4E8C' },
+      { k:'census_under16_pct',     l:AGE_CHILD_CAP, v:inds.census_under16_pct,     c:'#2A9D8F' },
+      { k:'census_working_age_pct', l:AGE_WORK,      v:inds.census_working_age_pct, c:'#1F4E8C' },
       { k:'census_over65_pct',      l:'65 and over', v:inds.census_over65_pct,      c:'#8E6BBF' },
     ]);
     const ageRows = ['census_under5_pct', 'census_under16_pct', 'census_working_age_pct',
@@ -14153,8 +14313,8 @@ function _buildLSOAReportHtml(code) {
     { l:'Other',  v: inds.census_other_ethnic_pct, c:'#9AA6B2' },
   ], { width: 360 });
   const ageStack = _chartStack([
-    { l:'Under 16',    v: inds.census_under16_pct,     c:'#2A9D8F' },
-    { l:'16 to 64',    v: inds.census_working_age_pct, c:'#1F4E8C' },
+    { l:AGE_CHILD_CAP, v: inds.census_under16_pct,     c:'#2A9D8F' },
+    { l:AGE_WORK,      v: inds.census_working_age_pct, c:'#1F4E8C' },
     { l:'65 and over', v: inds.census_over65_pct,      c:'#8E6BBF' },
   ], { width: 360 });
   // Each row takes its direction, or none, from OV_CFG (see _chartCompare).
@@ -14320,7 +14480,7 @@ function _buildLSOAReportHtml(code) {
     decile != null ? `In national IMD decile <b>${decile} of 10</b>, where 1 is the most deprived tenth of England and 10 the least` + (decile <= 2 ? ': a Core20 area.' : '.') : '',
     rank ? `Ranks <b>${Math.round(rank).toLocaleString()} of 33,755</b> areas in England on the IMD, where 1 is the most deprived.` : '',
     (badH != null && _medBadL != null) ? `<b>${badH.toFixed(1)}%</b> of residents report bad or very bad health, ${_reportVs(badH, _medBadL, 1)} the ${PH_AREA} LSOA median of ${_medBadL.toFixed(1)}%.` : '',
-    (_claimL != null && _medClaimL != null) ? `The claimant rate is <b>${_claimL.toFixed(1)}%</b> of 16 to 64 year olds, ${_reportVs(_claimL, _medClaimL, 1)} the median of ${_medClaimL.toFixed(1)}%.` : '',
+    (_claimL != null && _medClaimL != null) ? `The claimant rate is <b>${_claimL.toFixed(1)}%</b> of residents aged ${AGE_WORK}, ${_reportVs(_claimL, _medClaimL, 1)} the median of ${_medClaimL.toFixed(1)}%.` : '',
   ]);
 
   const html = `<!doctype html>
@@ -20174,6 +20334,15 @@ var PH_SHOW = {
       Object.keys(out).forEach(function (k) {
         var v = num(boroughOvValue(ladCode, k));
         if (v !== null) out[k] = v;
+    // An LA's OHID series are OHID's published figures, read from the LA
+    // file as the map reads them, not re-averaged from the copies on its
+    // wards, which only adds rounding noise to a figure that is one number.
+    if (cmpLevel === 'borough') {
+      var code = laCodeOfName(name);
+      Object.keys(laRecOf(code) || {}).concat(Object.keys(out)).forEach(function (k) {
+        if (!isBoroughLevelKey(k)) return;
+        var v = num(boroughOvValue(code, k));
+        if (v !== null) out[k] = v; else delete out[k];
       });
     }
     _cmpAgg[key] = out;
@@ -20445,12 +20614,16 @@ var PH_SHOW = {
     var bl = cmpActive().map(function (m) { return m.k; }).filter(isBoroughLevelKey);
     // Two wards in the same borough, compared on a borough figure, come out
     // identical. That is the geography, not a finding about the wards.
-    var lads = {}, shared = false;
-    if (cmpLevel === 'ward') {
+    // Shared means the same published figure: the same LA, or for districts
+    // the same county (laFigSourceKey), not just the same LA name.
+    var srcSeen = {}, shared = false;
+    if (cmpLevel === 'ward' || cmpLevel === 'borough') {
       pinned.forEach(function (n) {
-        var lad = (wardRec(n) || {}).lad || '';
-        if (lad && lads[lad]) shared = true;
-        if (lad) lads[lad] = 1;
+        var code = cmpLevel === 'ward' ? ((wardRec(n) || {}).lad_code || laCodeOfName((wardRec(n) || {}).lad)) : laCodeOfName(n);
+        if (!code) return;
+        var keys = {};
+        bl.forEach(function (k) { keys[k + '@' + laFigSourceKey(code, k)] = 1; });
+        Object.keys(keys).forEach(function (sk) { if (srcSeen[sk]) shared = true; srcSeen[sk] = 1; });
       });
     }
     if (bl.length) {
@@ -20459,9 +20632,7 @@ var PH_SHOW = {
       // means, so the warning would be backwards. At board level it is a
       // population-weighted mean of the boroughs, which is worth saying.
       if (cmpLevel === 'borough') {
-        notes.push('<strong>' + esc(bl.map(labelOf).join(', ')) + '</strong> ' +
-          (bl.length > 1 ? 'are' : 'is') + ' published for each LA, so here ' +
-          (bl.length > 1 ? 'they are' : 'it is') + ' the published figure, not an aggregate of ward figures.');
+        notes.push(cmpLaNote(bl, shared));
       } else if (cmpLevel === 'icb') {
         notes.push('<strong>' + esc(bl.map(labelOf).join(', ')) + '</strong> ' +
           (bl.length > 1 ? 'are' : 'is') + ' published for each LA, so an ICB figure is a ' +
@@ -20469,14 +20640,15 @@ var PH_SHOW = {
       } else {
         notes.push('<strong>' + esc(bl.map(labelOf).join(', ')) + '</strong> ' +
           (bl.length > 1 ? 'are' : 'is') + ' published for each LA and written onto every ward ' +
-          'in it' +
-          (shared ? ', and two or more of your pins share an LA, so they will read as identical there' : '') +
+          'in it' + (cmpAnyCounty(bl) ? ', or for a district the county’s figure' : '') +
+          (shared ? ', and two or more of your pins share that figure, so they will read as identical there' : '') +
           '.');
       }
     }
     // Said once, where the figures are, rather than only in the drawer that
-    // has to be opened to see them.
-    if (cmpLevel !== 'ward' && pinned.length) {
+    // has to be opened to see them. At LA level with OHID's series chosen,
+    // cmpLaNote above already says it, in one note rather than two.
+    if (cmpLevel !== 'ward' && pinned.length && !(cmpLevel === 'borough' && bl.length)) {
       notes.push('These figures are calculated from the wards in each ' + esc(cmpLvl().one) +
         ', with counts summed and everything else weighted by population. They are not published ' +
         esc(cmpLvl().one) + ' statistics.');
@@ -20486,17 +20658,41 @@ var PH_SHOW = {
     }).join('');
   }
 
+  // Whether any pinned LA's figure for one of these series is its county's.
+  function cmpAnyCounty(bl) {
+    return pinned.some(function (n) {
+      var code = cmpLevel === 'ward' ? ((wardRec(n) || {}).lad_code || laCodeOfName((wardRec(n) || {}).lad)) : laCodeOfName(n);
+      return bl.some(function (k) { return !!laFigCounty(code, k); });
+    });
+  }
+  // The one note for LAs compared on OHID's series beside other figures.
+  function cmpLaNote(bl, shared) {
+    var many = bl.length > 1, others = cmpActive().some(function (m) { return !isBoroughLevelKey(m.k); });
+    return '<strong>' + esc(bl.map(labelOf).join(' and ')) + '</strong> ' + (many ? 'are' : 'is') +
+      ' OHID’s published figure' + (many ? 's' : '') +
+      (cmpAnyCounty(bl) ? ', which for a district ' + (many ? 'are' : 'is') + ' its county’s' : ' for each LA') + '.' +
+      (shared ? ' Two or more of your pins share that figure, so they read as identical there.' : '') +
+      (others ? ' The other figures are calculated from the wards in each LA, with counts added up and the rest ' +
+        'weighted by population, so they are not published LA statistics.' : '');
+  }
+  // A figure as it is shown, so highest and lowest are decided on what the
+  // reader sees and two figures that read the same get no arrow.
+  function cmpShown(v, k) { return v === null ? null : Number(v.toFixed(indDecimals(k))); }
+
   function renderCompareBar() {
     if (!cmpCardsEl) return;
     var mets = cmpActive();
-    // Highest and lowest per metric, so a card can mark its own outliers.
+    // Highest and lowest per metric, so a card can mark its own outliers,
+    // on the rounded figure, so a tie on screen is a tie here.
     var ext = {};
     mets.forEach(function (m) {
-      var vs = pinned.map(function (n) { return num(cmpIndsOf(n)[m.k]); })
+      var vs = pinned.map(function (n) { return cmpShown(num(cmpIndsOf(n)[m.k]), m.k); })
                      .filter(function (v) { return v !== null; });
       if (vs.length > 1) {
         var hi = Math.max.apply(null, vs), lo = Math.min.apply(null, vs);
-        if (hi !== lo) ext[m.k] = { hi: hi, lo: lo };
+        var nHi = vs.filter(function (v) { return v === hi; }).length;
+        var nLo = vs.filter(function (v) { return v === lo; }).length;
+        if (hi !== lo) ext[m.k] = { hi: nHi === 1 ? hi : null, lo: nLo === 1 ? lo : null };
       }
     });
 
@@ -20514,10 +20710,10 @@ var PH_SHOW = {
            takes it as a verdict rather than as a rank within the four. The
            arrows say which is highest and which is lowest, which is the only
            thing a comparison of four areas actually establishes. */
-        var cls = '';
+        var cls = '', sv = cmpShown(v, m.k);
         if (v !== null && ext[m.k]) {
-          if (v === ext[m.k].hi) cls = ' hi';
-          else if (v === ext[m.k].lo) cls = ' lo';
+          if (sv === ext[m.k].hi) cls = ' hi';
+          else if (sv === ext[m.k].lo) cls = ' lo';
         }
         // The mark is an icon, with its meaning in words for a screen reader.
         var mark = cls === ' hi' ? ico('arrow-up', 'ic-sm') + '<span class="sr-only"> (highest)</span>'
@@ -20548,6 +20744,8 @@ var PH_SHOW = {
           : cmpLevel === 'borough'
           ? 'These are the LA figures the map shows: the LA’s own published figure where the data has one, ' +
             'and otherwise a figure calculated from its wards, with counts summed and everything else weighted by population. '
+          : (cmpLevel === 'borough' && mets.some(function (m) { return isBoroughLevelKey(m.k); }))
+          ? cmpLaNote(mets.map(function (m) { return m.k; }).filter(isBoroughLevelKey), false).replace(/<\/?strong>/g, '') + ' '
           : 'These figures are calculated from the wards in each ' + esc(lvl.one) +
             ', with counts summed and everything else weighted by population. They are not published ' +
             esc(lvl.one) + ' statistics. ') +
@@ -20581,6 +20779,10 @@ var PH_SHOW = {
         if (ext[m.k] && v === ext[m.k].hi) mark = ico('arrow-up', 'ic-sm') + '<span class="sr-only"> (highest)</span>';
         else if (ext[m.k] && v === ext[m.k].lo) mark = ico('arrow-down', 'ic-sm') + '<span class="sr-only"> (lowest)</span>';
         return '<td>' + cmpFmt(v, m.k) + mark + '</td>';
+        var sv = cmpShown(v, m.k);
+        if (ext[m.k] && sv === ext[m.k].hi) mark = ico('arrow-up', 'ic-sm') + '<span class="sr-only"> (highest)</span>';
+        else if (ext[m.k] && sv === ext[m.k].lo) mark = ico('arrow-down', 'ic-sm') + '<span class="sr-only"> (lowest)</span>';
+        return '<td>' + fmtVal(v, m.k) + mark + '</td>';
       }).join('') + '</tr>';
     }).join('');
     wrap.innerHTML = '<table class="cmp-table"><thead>' + head + '</thead><tbody>' + rows + '</tbody></table>' +
@@ -22526,7 +22728,8 @@ var PH_SHOW = {
   var CB_KEY = ['census_population', 'imd_score_ward', 'imd_score', 'imd_decile_mean', 'imd_decile',
     'ft_93283', 'ft_932831', 'census_bad_health_pct', 'census_disability_any_pct', 'census_over65_pct',
     'claimant_rate_pct', 'crime_rate_per_1000', 'fuel_poverty_pct', 'no2_ugm3', 'core20_lsoa_count',
-    'ft_life_expectancy_female', 'ft_life_expectancy_male', 'ft_smoking_prevalence_adults', 'ft_obesity_adults'];
+    'ft_life_expectancy_female', 'ft_life_expectancy_male', 'ft_smoking_prevalence_adults', 'ft_obesity_adults']
+    .filter(function (k) { return !phWithheld(k); });
   /* Levels still waiting on a fetch, keyed by level. Ward and borough are in
      memory by the time this pane can be opened. LSOA figures are 7.8 MB and
      MSOA figures 600 KB, and the names, wards and boroughs for both are on
@@ -22637,7 +22840,7 @@ var PH_SHOW = {
     // OHID's England comparison (_vs) and the estimated-from-2011 flag (_est)
     // are not indicators: they ride along beside the figure they describe.
     return Object.keys(seen).filter(function (k) {
-      return k !== 'name' && k !== 'lad' && k !== 'code' && !/_(vs|est)$/.test(k);
+      return k !== 'name' && k !== 'lad' && k !== 'code' && !/_(vs|est)$/.test(k) && !phWithheld(k);
     }).sort();
   }
 
@@ -23005,6 +23208,22 @@ var PH_SHOW = {
      is, for the preview and the notes: kind is 'id' for the area's code and
      names, 'ind' for an indicator, and 'vs' or 'est' for the OHID England
      comparison or the estimated-from-2011 flag that follows an indicator. */
+  var CB_FROM_HEADER = 'Area OHID\'s LA figures describe';
+  function cbList(a) { return a.length < 2 ? (a[0] || '') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1]; }
+  // The area a row's OHID LA figures describe: its LA, or the county that
+  // OHID publishes them for, naming which series where only some are.
+  function cbFigArea(code, rec, l, laKeys) {
+    var la = cbLevel === 'borough' ? code
+      : cbLevel === 'ward' ? ((rec && rec.lad_code) || laCodeOfName(l.parent))
+      : laCodeOfName(l.parent);
+    if (!la || laMissingOhid(la)) return '';
+    var laName = cbBoroughName(la) || l.parent || l.name || '';
+    var cty = laKeys.filter(function (k) { return laFigCounty(la, k); });
+    if (!cty.length) return laName;
+    var c = laFigCounty(la, cty[0]), cn = laCountyPhrase(c, laName);
+    if (cty.length === laKeys.length) return cn;
+    return cn + ' for ' + cty.map(labelOf).join(', ') + '; ' + laName + ' for the others';
+  }
   function cbBuild() {
     var src = cbSource();
     var codes = cbRows();
@@ -23026,6 +23245,11 @@ var PH_SHOW = {
       }
       if (has('_est', k)) columns.push({ kind: 'est', key: k, header: labelOf(k) + ', estimated from 2011 areas' });
     });
+    // Where a district's OHID figures are its county's, a column names the
+    // area they describe, so the file cannot pass a county figure off as the
+    // district's own.
+    var laKeys = keys.filter(isBoroughLevelKey);
+    if (laKeys.length && laAnyCountyFigure()) columns.push({ kind: 'from', header: CB_FROM_HEADER });
     var table = [columns.map(function (c) { return c.header; })];
     codes.forEach(function (code) {
       var rec = src[code], l = cbLabels(code, rec), i = cbInds(rec);
@@ -23033,6 +23257,7 @@ var PH_SHOW = {
         if (c.kind === 'id') return String(l[c.field] || '');
         if (c.kind === 'vs') return VS_ENGLAND_TEXT[i[c.key + '_vs']] || '';
         if (c.kind === 'est') return i[c.key + '_est'] ? 'Yes' : '';
+        if (c.kind === 'from') return cbFigArea(code, rec, l, laKeys);
         return cbCell(i[c.key], c.key);
       }));
     });
@@ -23096,9 +23321,24 @@ var PH_SHOW = {
     var src = String(cbMeta(k).src || '');
     var nat = cbMeta(k).nat || ((typeof ovNativeLevel === 'function') ? ovNativeLevel(k) : '');
     if (isBoroughLevelKey(k)) {
-      return L === 'borough' ? 'OHID publishes this figure for each LA.'
+      var gone = Object.keys(BOROUGH_DATA).filter(laMissingOhid);
+      var goneText = gone.length
+        ? ' It is blank for ' + cbList(gone.map(function (c) { return cbBoroughName(c) || c; })) +
+          (gone.every(function (c) { return LA_RECODED_2024.has(c); })
+            ? ', whose council codes changed in 2024, because OHID’s files do not match the new codes yet.'
+            : ', because OHID’s figures for ' + (gone.length > 1 ? 'them' : 'it') + ' are missing from this version of the map.')
+        : '';
+      var cty = Object.keys(BOROUGH_DATA).some(function (c) { return !!laFigCounty(c, k); });
+      if (cty) {
+        return 'OHID publishes this figure for upper-tier LAs, which are unitary councils, metropolitan and ' +
+          'London boroughs, and counties. A district inside a county has no figure of its own, so its row ' +
+          'repeats the county’s figure, and the column ' + CB_FROM_HEADER + ' names that county.' +
+          (L === 'borough' ? '' : ' Every ' + one + ' in an LA has the same figure, which describes the LA ' +
+            'or county rather than the ' + one + '.') + goneText;
+      }
+      return (L === 'borough' ? 'OHID publishes this figure for each LA.'
         : 'OHID publishes this figure only for each LA, so every ' + one + ' in an LA has the same ' +
-          'figure, which describes the whole LA rather than the ' + one + '.';
+          'figure, which describes the whole LA rather than the ' + one + '.') + goneText;
     }
     if (nat === 'oa') {
       // How a ward's figure is made from them is the card's Method line.
@@ -23208,6 +23448,9 @@ var PH_SHOW = {
       'shows for that area, and the file never adds areas together, which is what Custom area is for. ' +
       'A blank cell means there is no figure for that area, because the publisher withheld it to ' +
       'protect privacy or did not publish one for that area, so please do not read it as zero.' +
+      'A blank cell means there is no figure for that area. Most are withheld by the publisher to protect ' +
+      'privacy, and the notes for each column say where a blank has another cause, so please do not read ' +
+      'a blank as zero.' +
       (laCols ? ' A column marked (LA figure) holds a figure published only for the whole LA, so every ' +
         lv.label + ' in an LA has the same value.' : ''));
 
@@ -23233,6 +23476,11 @@ var PH_SHOW = {
     out.columns.forEach(function (c, i) {
       L.push((i + 1) + '. ' + c.header);
       if (c.kind === 'id') { L.push('   ' + ID_TEXT[c.header], ''); return; }
+      if (c.kind === 'from') {
+        L.push('   The area each row’s OHID LA figures describe. That is the row’s LA, except where OHID publishes ' +
+          'a figure only for the county a district is part of, when it names that county.', '');
+        return;
+      }
       if (c.kind === 'vs') {
         L.push('   OHID’s test of each MSOA’s figure against England’s, at 95% confidence: better, worse or ' +
           'similar, or higher or lower where neither end is better. It is blank where OHID gives no result.', '');
@@ -23659,7 +23907,7 @@ var PH_SHOW = {
     var seen = {};
     allWards().forEach(function (w) {
       Object.keys(w.inds).forEach(function (k) {
-        if (num(w.inds[k]) !== null) seen[k] = 1;
+        if (num(w.inds[k]) !== null && !phWithheld(k)) seen[k] = 1;
       });
     });
     _indKeys = Object.keys(seen);
@@ -23733,7 +23981,8 @@ var PH_SHOW = {
       notes.push('<strong>' + esc(boroughKeys.map(labelOf).join(', ')) + '</strong> ' +
         (boroughKeys.length > 1 ? 'are' : 'is') + ' published for each LA and written onto every ward ' +
         'in it, so filtering on ' + (boroughKeys.length > 1 ? 'them' : 'it') +
-        ' selects whole LAs rather than wards within them.');
+        ' selects whole LAs' + (laAnyCountyFigure() ? ', or whole counties where an LA is a district,' : '') +
+        ' rather than wards within them.');
     }
     // There was a second caution here, naming the services that covered North
     // West London only. Every layer on the map covers all 33 boroughs now, so

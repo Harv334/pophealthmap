@@ -261,7 +261,30 @@ var MODEL_LABEL = "Claude Sonnet 5";
     "authority (LA) and applied to every ward in it, so it is the same figure " +
     "for all wards there. Report it as an LA figure, calling it an LA figure " +
     "rather than a borough figure, and do not describe it as a difference " +
-    "between wards.";
+    "between wards. Where the LA is a district inside a county, OHID may " +
+    "publish only the county's figure, so say it is the county's.";
+
+  /**
+   * Series the map leaves out until a data refresh rebuilds them.
+   *
+   * indicators.js lists the LA Fingertips series whose stored age is not the
+   * headline age (ft_age_mismatch). A file written before that check existed
+   * has no ft_age_checked, and its adult smoking figure is the 18 to 64
+   * breakdown OHID itself flags or withholds, so that one is left out. Ask
+   * leaves out the same ones as the map, so it cannot quote a figure the map
+   * does not show.
+   */
+  function withheldKeys() {
+    var s = (typeof PH_IND_STATS === "object" && PH_IND_STATS) ? PH_IND_STATS : {};
+    if (s.ft_age_checked) return s.ft_age_mismatch || [];
+    return ["ft_smoking_prevalence_adults"];
+  }
+  function isWithheld(key) { return withheldKeys().indexOf(key) !== -1; }
+  function shownOnly(ind) {
+    var out = {};
+    Object.keys(ind || {}).forEach(function (k) { if (!isWithheld(k)) out[k] = ind[k]; });
+    return out;
+  }
 
   /**
    * Indicator metadata, from the same table the map's own legends read.
@@ -359,7 +382,7 @@ var MODEL_LABEL = "Claude Sonnet 5";
         Object.keys(w[k].indicators || {}).forEach(function (i) { seen[i] = true; });
       });
       return {
-        indicators: Object.keys(seen).sort().map(function (k) {
+        indicators: Object.keys(seen).filter(function (k) { return !isWithheld(k); }).sort().map(function (k) {
           var m = metaFor(k);
           return {
             key: k,
@@ -384,10 +407,11 @@ var MODEL_LABEL = "Claude Sonnet 5";
       var hit = findArea(input.name, input.level);
       if (!hit) return { error: "No " + levelWord(input.level) + " found matching '" + input.name + "'." };
       if (hit.ambiguous) return { error: "Several areas match; be more specific.", candidates: hit.ambiguous };
-      var boroughLevel = Object.keys(hit.area.indicators || {}).filter(isBoroughLevel);
+      var shownInd = shownOnly(hit.area.indicators);
+      var boroughLevel = Object.keys(shownInd).filter(isBoroughLevel);
       return {
         name: hit.area.name, level: levelWord(input.level), la: hit.area.lad || undefined,
-        indicators: hit.area.indicators,
+        indicators: shownInd,
         // A ward profile mixes ward figures with borough ones. Name which are
         // which, so a borough figure is not reported as being about the ward.
         la_level_indicators: (input.level === "ward" && boroughLevel.length)
@@ -411,7 +435,7 @@ var MODEL_LABEL = "Claude Sonnet 5";
           ? input.indicators
           : ["imd_score", "imd_decile_mean", "census_population", "census_over65_pct",
              "census_non_white_pct", "census_no_car_pct"];
-        wanted.forEach(function (k) { if (ind[k] !== undefined) keep[k] = ind[k]; });
+        wanted.forEach(function (k) { if (ind[k] !== undefined && !isWithheld(k)) keep[k] = ind[k]; });
         rows.push({ name: hit.area.name, indicators: keep });
       });
       if (!rows.length) return { error: "None of those areas were found.", not_found: missing };
@@ -431,6 +455,11 @@ var MODEL_LABEL = "Claude Sonnet 5";
 
     rank_areas: function (input) {
       var areas = areasFor(input.level), key = input.indicator;
+      if (isWithheld(key)) {
+        return { error: "'" + key + "' is left out of this version of the map until the data " +
+          "is refreshed, because the published figure is not the headline one. Call " +
+          "list_indicators for valid keys." };
+      }
       var n = Math.max(1, Math.min(parseInt(input.n, 10) || 5, 20));
       var rows = [];
       Object.keys(areas).forEach(function (k) {
@@ -496,6 +525,7 @@ var MODEL_LABEL = "Claude Sonnet 5";
     labelFor: labelFor,
     higherMeans: higherMeans,
     isBoroughLevel: isBoroughLevel,
+    isWithheld: isWithheld,
     get configured() { return !!ASSISTANT_ENDPOINT; },
   };
 
