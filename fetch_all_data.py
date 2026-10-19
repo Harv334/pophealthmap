@@ -1199,6 +1199,46 @@ def bng_to_wgs84(e: float, n: float) -> tuple[float, float]:
 # ============================================================================
 # SOURCE 1: GP practices  (NHS ODS EPRACCUR)
 # ============================================================================
+# EPRACCUR files more than practices under the GP practice role: special
+# allocation schemes (for patients removed from a practice after violence or
+# aggression), PCN extended access hubs, GP federation offices, a Covid
+# medicines unit and single clinics. None is a practice a resident can join,
+# and listed as "the nearest GP practice" they misdirect people and inflate
+# the counts. A name that says so is left out, and so is any code in
+# data/curated/service_sites.csv marked drop. The practices for people who are
+# homeless are real practices and stay, labelled by the same file.
+GP_NOT_A_PRACTICE = re.compile(
+    r"special allocation|\bSAS\b|\bPCN\b.*\bhub\b|\bEA hub\b|extended access|"
+    r"federation|federated|covid|care home service|delivery unit|"
+    r"\bgynaecology\b|\bdermatology\b|\blarc clinic\b",
+    re.I)
+SERVICE_SITES = REPO_ROOT / "data" / "curated" / "service_sites.csv"
+
+def load_service_sites(path=None) -> dict:
+    """{(layer, code): {"action": "drop"|"label", "label": str}} from the
+    checked list of GP practices and pharmacies that are not what their
+    register role says."""
+    path = path or SERVICE_SITES
+    out = {}
+    if not Path(path).exists():
+        return out
+    with open(path, newline="", encoding="utf-8") as fh:
+        for r in csv.DictReader(fh):
+            out[(r["layer"].strip(), r["code"].strip().upper())] = {
+                "action": r["action"].strip(), "label": r["label"].strip()}
+    return out
+
+def gp_practice_verdict(code: str, name: str, sites: dict) -> tuple:
+    """("keep", label) or ("drop", reason) for one EPRACCUR record."""
+    hit = sites.get(("gp", str(code).upper()))
+    if hit and hit["action"] == "label":
+        return ("keep", hit["label"])
+    if hit and hit["action"] == "drop":
+        return ("drop", hit["label"] or "checked list")
+    if GP_NOT_A_PRACTICE.search(str(name)):
+        return ("drop", "name says it is not a practice")
+    return ("keep", "")
+
 def run_gp_practices() -> pd.DataFrame:
     rule("GP practices (NHS ODS EPRACCUR)")
     cache_dir = CACHE_DIR / "gp_practices"
@@ -1259,7 +1299,9 @@ def run_gp_practices() -> pd.DataFrame:
               for _, r in df.iterrows() if normalise_postcode(r["Postcode"])}
     lookup = lookup_postcodes(owners.keys(), source="gp_practices", owners=owners)
 
+    sites = load_service_sites()
     rows = []
+    dropped = 0
     for _, r in df.iterrows():
         pc = normalise_postcode(r["Postcode"])
         hit = lookup.get(pc)
@@ -1268,9 +1310,14 @@ def run_gp_practices() -> pd.DataFrame:
         lat, lng, lsoa, lad, wd = hit
         if lad not in SCOPE_LADS:
             continue
+        verdict, label = gp_practice_verdict(r["OrganisationCode"], r["Name"], sites)
+        if verdict == "drop":
+            dropped += 1
+            continue
         rows.append({
             "code": r["OrganisationCode"],
             "name": title_case(r["Name"], initials=True),
+            "kind": label,
             "addr": ", ".join(filter(None, [
                 title_case(r["AddressLine1"]),
                 title_case(r["AddressLine2"]),
@@ -1285,13 +1332,64 @@ def run_gp_practices() -> pd.DataFrame:
     out = pd.DataFrame(rows)
     out_path = DATA_DIR / "healthcare" / "gp_practices.parquet"
     out = write_parquet_guarded(out_path, out, source="gp_practices")
-    ok(f"gp_practices: {len(out):,} rows -> {out_path.relative_to(REPO_ROOT)}")
+    ok(f"gp_practices: {len(out):,} rows -> {out_path.relative_to(REPO_ROOT)} "
+       f"({dropped:,} schemes, hubs and offices left out)")
     return out
 
 
 # ============================================================================
 # SOURCE 2: Pharmacies  (NHS ODS edispensary)
 # ============================================================================
+# The dispensary extract is every contractor, and two kinds have no counter a
+# resident can walk up to: dispensing appliance contractors (role RO94, which
+# supply stoma and continence products and do not dispense medicines), and
+# distance-selling pharmacies, which NHS rules bar from serving people in
+# person. The register does not mark the second kind, so it is caught by name
+# here and by the checked list (data/curated/service_sites.csv). The NHSBSA
+# consolidated pharmaceutical list does mark them, and joining it is the
+# better rule once the pipeline fetches it.
+PHARM_APPLIANCE = re.compile(
+    r"fittleworth|bullen|stoma|appliance|salts medilink|respond healthcare|"
+    r"clinidirect|new health supplies|amcare", re.I)
+PHARM_ONLINE = re.compile(
+    r"online|www\.|\.com\b|\.co\.uk\b|\bdigital\b|chemist ?2 ?home|clickrx|"
+    r"mydirectpharmacy|medicine porter|netscripts|mail my meds|\bdelivery\b", re.I)
+PHARM_AIRSIDE = re.compile(r"\bairside\b", re.I)
+
+def pharmacy_verdict(code: str, name: str, address: str, role: str, sites: dict) -> str:
+    """"" to keep a dispensary record, or the reason it is left out."""
+    hit = sites.get(("pharmacy", str(code).upper()))
+    if hit and hit["action"] == "drop":
+        return hit["label"] or "checked list"
+    if str(role).strip() == "RO94":
+        return "dispensing appliance contractor"
+    if PHARM_APPLIANCE.search(str(name)):
+        return "appliance contractor"
+    if PHARM_ONLINE.search(str(name)):
+        return "online or delivery pharmacy"
+    if PHARM_AIRSIDE.search(str(address)):
+        return "airside, past security"
+    return ""
+
+def filter_pharmacies(df: pd.DataFrame, sites: dict) -> pd.DataFrame:
+    """The dispensary records a resident can walk into, one per address."""
+    def addr(r):
+        return " ".join(str(r.get(f"AddressLine{i}", "")) for i in range(1, 5))
+    keep = df.apply(lambda r: pharmacy_verdict(
+        r.get("OrganisationCode", ""), r.get("Name", ""), addr(r),
+        r.get("OrganisationSubTypeCode", ""), sites) == "", axis=1)
+    df = df[keep] if len(df) else df
+    if not len(df):
+        return df
+    # Two active codes at one address are one pharmacy whose code changed
+    # hands without the old one being closed: keep the newer.
+    line1 = df["AddressLine1"].str.upper().str.replace(r"[^A-Z0-9]", "", regex=True)
+    key = (line1 + "|" + df["Postcode"].map(normalise_postcode)).where(
+        line1 != "", "code|" + df["OrganisationCode"])
+    df = df.assign(_k=key, _o=df["OpenDate"].astype(str))
+    df = df.sort_values("_o").drop_duplicates("_k", keep="last")
+    return df.drop(columns=["_k", "_o"])
+
 def run_pharmacies() -> pd.DataFrame:
     rule("Pharmacies (NHS ODS edispensary)")
     cache_dir = CACHE_DIR / "pharmacies"
@@ -1314,6 +1412,10 @@ def run_pharmacies() -> pd.DataFrame:
         dtype=str, keep_default_na=False, encoding="latin-1",
     )
     df = df[df["StatusCode"].isin(["A", "ACTIVE"])]
+    n_active = len(df)
+    df = filter_pharmacies(df, load_service_sites())
+    ok(f"pharmacies: {n_active - len(df):,} of {n_active:,} active records left out "
+       f"(appliance contractors, online or delivery only, airside, duplicates)")
 
     owners = {normalise_postcode(r.get("Postcode", "")): title_case(r.get("Name"), initials=True)
               for _, r in df.iterrows() if normalise_postcode(r.get("Postcode", ""))}
@@ -1510,6 +1612,40 @@ def fetch_msoa_boundaries(out_dir: Path) -> int:
 # curated practice ODS does not know about is carried through unchanged.
 CURATED_DENTAL = REPO_ROOT / "data" / "curated" / "dental_practices_curated.json"
 
+# The dental register holds every NHS dental contract, and some of them are
+# not a practice a resident can walk into: prison dental services are left
+# out, and referral services are labelled so a reader does not mistake them
+# for a high street dentist.
+DENTAL_PRISON = re.compile(r"\bH\.? ?M\.? ?P\b|\bH ?M PRISON\b|\bPRISON\b|\bYOI\b|young offender", re.I)
+DENTAL_KINDS = [
+    (re.compile(r"out of hours|\bOOH\b|emergency dental|urgent dental", re.I),
+     "Urgent dental care, through NHS 111"),
+    (re.compile(r"orthodont", re.I), "Orthodontics only, by referral"),
+    (re.compile(r"community dental|special care|salaried dental|mobile dental", re.I),
+     "Community dental service, by referral"),
+    (re.compile(r"\bhospital\b|dental institute|\bOMFS\b", re.I),
+     "Hospital dental service, by referral"),
+]
+DENTAL_GENERIC = re.compile(r"^\s*(?:the\s+)?dental\s+(?:surgery|practice|clinic|centre)\s*$", re.I)
+
+def dental_verdict(name: str, address: str = ""):
+    """None for a record to leave out, else its label ("" for a practice)."""
+    if DENTAL_PRISON.search(f"{name} {address}"):
+        return None
+    for rx, label in DENTAL_KINDS:
+        if rx.search(str(name)):
+            return label
+    return ""
+
+def dental_display_name(name: str, lines: list) -> str:
+    """The register name, or the first address line where the name is only
+    "Dental Surgery", which tells a reader nothing about where it is."""
+    nm = title_case(name, initials=True)
+    first = next((l for l in lines if l), "")
+    if DENTAL_GENERIC.match(str(name)) and first:
+        return f"{nm}, {first}"
+    return nm
+
 def run_dentists() -> pd.DataFrame:
     rule("Dental practices (NHS ODS egdpprac)")
     cache_dir = CACHE_DIR / "dentists"
@@ -1531,7 +1667,11 @@ def run_dentists() -> pd.DataFrame:
               for _, r in df.iterrows() if normalise_postcode(r["Postcode"])}
     lookup = lookup_postcodes(owners.keys(), source="dentists", owners=owners)
 
-    by_pc: dict[str, dict] = {}
+    # Keyed by practice code. It used to be keyed by postcode and overwritten,
+    # so the practices in one health centre collapsed into whichever came
+    # last, sometimes under the building's name.
+    by_code: dict[str, dict] = {}
+    n_prison = 0
     for _, r in df.iterrows():
         pc = normalise_postcode(r["Postcode"])
         hit = lookup.get(pc)
@@ -1540,8 +1680,17 @@ def run_dentists() -> pd.DataFrame:
         lat, lng, lsoa, lad, wd = hit
         if lad not in SCOPE_LADS:
             continue
-        by_pc[pc] = {
-            "name": title_case(r["Name"], initials=True),
+        lines = [title_case(r[f"AddressLine{i}"]) for i in range(1, 5)]
+        verdict = dental_verdict(r["Name"], " ".join(lines))
+        if verdict is None:
+            n_prison += 1
+            continue
+        by_code[r["OrganisationCode"]] = {
+            "code": r["OrganisationCode"],
+            "name": dental_display_name(r["Name"], lines),
+            "addr": ", ".join(filter(None, lines)),
+            "tel": format_uk_phone(r["ContactTelephoneNumber"]),
+            "kind": verdict,
             "postcode": r["Postcode"],
             "lat": lat, "lng": lng,
             "nhs_contracted": True,          # presence in ODS means an NHS contract
@@ -1549,7 +1698,8 @@ def run_dentists() -> pd.DataFrame:
             "LSOA21CD": lsoa, "WD25CD": wd,
             "source": "ods",
         }
-    n_ods = len(by_pc)
+    n_ods = len(by_code)
+    ok(f"dentists: {n_prison:,} prison dental services left out")
 
     # ODS only. The curated overlay used to add private practices ODS does not
     # list, and a nhs_contracted flag to tell the two apart, which is what the
@@ -1560,7 +1710,7 @@ def run_dentists() -> pd.DataFrame:
     # It costs the 215 private practices the overlay contributed.
     # data/curated/dental_practices_curated.json is still in the repo, so
     # restoring the merge is a matter of putting this block back.
-    rows = list(by_pc.values())
+    rows = list(by_code.values())
 
     out = pd.DataFrame(rows)
     out_path = DATA_DIR / "healthcare" / "dental_practices.parquet"
@@ -4378,10 +4528,99 @@ def _hosp_canon(name: str) -> str:
 # ODS holds names in capitals, so they have to be recased to sit next to the
 # rest of the map. str.title alone gives "1St Ave", "Bmi" and "St Mary'S".
 HOSP_ACRONYMS = {"NHS", "BMI", "UCLH", "GOSH", "CDC", "UTC", "HMP", "RNOH",
-                 "PTS", "II", "III"}
+                 "PTS", "II", "III", "VII", "QEII", "UHCW", "CNTW"}
 
 def _hosp_title(name: str) -> str:
     return title_case(name, initials=True, acronyms={a: a for a in HOSP_ACRONYMS})
+
+# The register says only that a trust has a site there. It lists private
+# hospitals where a trust buys care, teams and offices with "hospital" in their
+# name, and sites that have closed, so a hand-checked list decides what each
+# record is in the regions it covers (London and the North East so far):
+# whether to keep it, the name a resident knows it by, its type and whether it
+# has a 24-hour A&E (yes, no, or eye for an eye A&E only).
+HOSPITAL_SITES = REPO_ROOT / "data" / "curated" / "hospital_sites.csv"
+HOSP_TYPES = {"NHS hospital", "NHS specialist hospital", "NHS community hospital",
+              "NHS mental health hospital", "NHS day hospital", "Private hospital",
+              "Listed on the NHS register of trust sites"}
+# A record that the list does not cover keeps the register's own claim.
+HOSP_UNCHECKED = "Listed on the NHS register of trust sites"
+# Outside the checked regions: brands that are always independent, and words
+# that mark a team or a service rather than a building.
+HOSP_PRIVATE = re.compile(r"\b(?:BMI|SPIRE|NUFFIELD|RAMSAY|CYGNET|PRIORY|CIRCLE|HCA|"
+                          r"SCHOEN|PRIVATE|INDEPENDENT)\b", re.I)
+HOSP_OUTPOST = re.compile(r"HOSPITAL\s*(?:AT|@)\s*HOME|VIRTUAL WARD|\bTEAM\b|"
+                          r"\bLIAISON\b|COMM HOSP WARDS|^PRIVATE HOSPITALS?$", re.I)
+
+def _hosp_site_key(postcode: str, name: str) -> tuple:
+    return (normalise_postcode(postcode), " ".join(str(name).lower().split()))
+
+def load_hospital_sites(path=None) -> dict:
+    """The checked list, keyed by (postcode without spaces, register name)."""
+    path = path or HOSPITAL_SITES
+    out = {}
+    if not Path(path).exists():
+        return out
+    with open(path, newline="", encoding="utf-8") as fh:
+        for r in csv.DictReader(fh):
+            keep = r["keep"].strip().lower() == "yes"
+            if keep and r["type"] not in HOSP_TYPES:
+                raise ValueError(f"hospital_sites.csv: unknown type {r['type']!r} "
+                                 f"for {r['register_name']}")
+            out[_hosp_site_key(r["postcode"], r["register_name"])] = {
+                "keep": keep, "name": r["display_name"].strip(),
+                "type": r["type"].strip(), "ae": r["ae"].strip().lower(),
+            }
+    return out
+
+def hosp_blob_row(r) -> dict:
+    """One record of data/map/hospitals.js. ae is true for a 24-hour A&E, false
+    for none, "eye" for an eye A&E only, and absent where nobody has checked."""
+    pc = normalise_postcode(r["postcode"])
+    # The postcode is the only address ODS gives, and it is the popup's
+    # address line, so it is spaced the way a person writes it.
+    row = {"n": r["name"], "a": f"{pc[:-3]} {pc[-3:]}" if len(pc) > 3 else pc,
+           "lat": round(float(r["lat"]), 6), "lng": round(float(r["lng"]), 6),
+           "t": r["type"]}
+    ae = str(r.get("ae") or "").strip().lower()
+    if ae in ("yes", "no"):
+        row["ae"] = ae == "yes"
+    elif ae == "eye":
+        row["ae"] = "eye"
+    return row
+
+def apply_hospital_sites(rows: list, sites: dict) -> list:
+    """Each register record as the checked list describes it.
+
+    rows carry "name" (as _hosp_title gives it) and "postcode". A record the
+    list covers is dropped or renamed and typed from it. One it does not cover
+    is matched on its postcode alone when the list has exactly one entry
+    there, since the register respells names between releases. Anything else
+    keeps the register's claim, loses records whose name marks a team or a
+    service, and is called a private hospital when it carries a private brand.
+    """
+    by_pc: dict = {}
+    for (pc, _), v in sites.items():
+        by_pc.setdefault(pc, []).append(v)
+    out = []
+    for r in rows:
+        hit = sites.get(_hosp_site_key(r["postcode"], r["name"]))
+        if hit is None and len(by_pc.get(normalise_postcode(r["postcode"]), [])) == 1:
+            hit = by_pc[normalise_postcode(r["postcode"])][0]
+        r = dict(r)
+        if hit is not None:
+            if not hit["keep"]:
+                continue
+            r["name"] = hit["name"] or r["name"]
+            r["type"] = hit["type"]
+            r["ae"] = hit["ae"]
+        else:
+            if HOSP_OUTPOST.search(r["name"]):
+                continue
+            r["type"] = "Private hospital" if HOSP_PRIVATE.search(r["name"]) else HOSP_UNCHECKED
+            r["ae"] = ""
+        out.append(r)
+    return out
 
 def run_hospitals() -> pd.DataFrame | None:
     rule("Hospitals (ODS NHS trust sites)")
@@ -4443,11 +4682,13 @@ def run_hospitals() -> pd.DataFrame | None:
         out_rows.append({
             "name": _hosp_title(name),
             "addr": "", "postcode": npc, "lat": lat, "lng": lng,
-            # Every row here comes from the NHS trust sites register, and that
-            # is the whole of what the register claims about it.
-            "type": "NHS trust site",
+            # Set from data/curated/hospital_sites.csv just below.
+            "type": HOSP_UNCHECKED, "ae": "",
             "LSOA21CD": lsoa, "WD25CD": wd, "LAD25CD": lad,
         })
+    n_before = len(out_rows)
+    out_rows = apply_hospital_sites(out_rows, load_hospital_sites())
+    ok(f"hospitals: checked list kept {len(out_rows):,} of {n_before:,} register sites")
 
     out = pd.DataFrame(out_rows).sort_values("name") if out_rows else pd.DataFrame()
     out_path = DATA_DIR / "healthcare" / "hospitals.parquet"
@@ -5961,10 +6202,15 @@ def export_map_blobs() -> None:
     gps = _read_parquet_opt(DATA_DIR / "healthcare" / "gp_practices.parquet")
     if gps is not None:
         cols = [c for c in ["name", "addr", "lat", "lng", "postcode", "code",
-                            "ward", "lad", "tel", "patients"] if c in gps.columns]
+                            "ward", "lad", "tel", "patients", "kind"] if c in gps.columns]
         gp_records = (gps[cols]
                       .rename(columns={"name": "n", "addr": "a", "postcode": "pc"})
                       .to_dict(orient="records"))
+        # kind is set only for the few practices with a label (the practices
+        # for people who are homeless), so it is left off every other record.
+        for rec in gp_records:
+            if not rec.get("kind"):
+                rec.pop("kind", None)
 
         # Splice QOF prevalence onto each practice as a compact `qof` dict.
         qof = _read_parquet_opt(DATA_DIR / "healthcare" / "qof_prevalence.parquet")
@@ -6088,15 +6334,9 @@ def export_map_blobs() -> None:
     # is written like every other one.
     hosp = _read_parquet_opt(DATA_DIR / "healthcare" / "hospitals.parquet")
     if hosp is not None and len(hosp):
-        # The postcode is the only address ODS gives, and it is the popup's
-        # address line, so it is spaced the way a person writes it.
-        fmt_pc = lambda p: f"{p[:-3]} {p[-3:]}" if len(p) > 3 else p
-        write_map_blob("HOSP", [
-            {"n": r["name"], "a": fmt_pc(r["postcode"]),
-             "lat": round(float(r["lat"]), 6),
-             "lng": round(float(r["lng"]), 6), "t": r["type"]}
-            for _, r in hosp.iterrows()
-        ], "Hospital sites, from the ODS NHS trust sites register.")
+        write_map_blob("HOSP", [hosp_blob_row(r) for _, r in hosp.iterrows()],
+                       "Hospital sites, from the ODS NHS trust sites register, "
+                       "checked against data/curated/hospital_sites.csv.")
         ok(f"map blob: {len(hosp):,} hospitals -> data/map/{MAP_BLOBS['HOSP']}")
 
 
@@ -6105,10 +6345,13 @@ def build_dental_json() -> list:
     df = _read_parquet_opt(DATA_DIR / "healthcare" / "dental_practices.parquet")
     if df is None:
         return []
-    keep = [c for c in ["name", "postcode", "lat", "lng", "nhs_contracted",
-                        "lad_code", "imd_decile"] if c in df.columns]
+    keep = [c for c in ["name", "addr", "postcode", "tel", "kind", "lat", "lng",
+                        "nhs_contracted", "lad_code", "imd_decile"] if c in df.columns]
     out = df[keep].to_dict(orient="records")
     for r in out:
+        for k in ("addr", "tel", "kind"):
+            if k in r and not r[k]:
+                del r[k]
         # loadDentalLayer treats nhs_contracted as a tri-state: true, false, or
         # null for unknown. Keep it a real bool so the filter stays meaningful.
         if "nhs_contracted" in r and r["nhs_contracted"] is not None:

@@ -1127,6 +1127,13 @@
   .pop-addr { color: var(--ink-3); margin-bottom: 5px; line-height: 1.4; }
   .pop-row { display: flex; gap: 8px; margin-bottom: 3px; }
   .pop-key { color: var(--ink-3); width: 54px; flex-shrink: 0; }
+  /* The A&E line under every hospital: in the popups, the Layers row, the
+     Directory's hospital list and the reports. */
+  .pop-note, .hosp-ae-note { margin-top: 6px; line-height: 1.4; color: var(--ink-2); }
+  .hosp-ae-note { font-size: var(--t-xs); }
+  .lsub.hosp-ae-note { margin-top: -2px; }
+  .dir-note.hosp-ae-note { margin: 0 0 8px; padding: 6px 8px; border-left: 3px solid #A32D2D; background: var(--paper-2, transparent); }
+  .dir-note.dir-dent-note { border-left-color: #7B2D8E; }
 
   /* ── Charity groups: a ring of the causes inside, round a dark centre ── */
   .vcse-ring { border-radius: 50%; padding: 5px; box-sizing: border-box; display: flex;
@@ -3318,7 +3325,8 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
         <div class="sb-sec" id="pointlayers-sec">
           <div class="sb-lbl">Places and services</div>
           <label class="lrow"><div class="sw sw-ring" style="--sw:#2F3B45"></div><span class="lname">GP practices <span class="lcount" id="gp-count">0</span></span><input type="checkbox" id="tg"></label>
-          <label class="lrow"><div class="sw sw-dot" style="--sw:#A32D2D"></div><span class="lname">Hospitals and clinics <span class="lcount" id="hosp-count">0</span></span><input type="checkbox" id="th"></label>
+          <label class="lrow"><div class="sw sw-dot" style="--sw:#A32D2D"></div><span class="lname">Hospitals <span class="lcount" id="hosp-count">0</span></span><input type="checkbox" id="th"></label>
+          <p class="lsub hosp-ae-note" id="hosp-ae-note">Not every hospital has an A&amp;E. In an emergency call 999, and for urgent help that is not an emergency use <a href="https://111.nhs.uk/" target="_blank" rel="noopener">NHS 111 online</a> or call 111.</p>
           <label class="lrow" id="greenspace-row"><div class="sw sw-dot" style="--sw:#2E7D32"></div><span class="lname">Parks and green spaces <span class="lcount" id="greenspace-count"></span></span><input type="checkbox" id="tgr"></label>
           <div id="greenspace-legend" class="lsub lkey" style="display:none">
             <div class="lsub-lbl">OS Open Greenspace categories</div>
@@ -3336,6 +3344,7 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
           <!-- VCSE toggle lives in the VCSE tab; that is the only place to enable it. -->
 
           <label class="lrow"><div class="sw sw-dot" style="--sw:#7B2D8E"></div><span class="lname">Dental practices <span class="lcount" id="dental-count"></span></span><input type="checkbox" id="td"></label>
+          <p class="lsub hosp-ae-note" id="dental-note">Practices that hold an NHS dental contract, from the NHS register. A contract does not mean a practice is taking new NHS patients, and practices that see only private patients are not shown. To find one taking NHS patients, use the <a href="https://www.nhs.uk/service-search/find-a-dentist" target="_blank" rel="noopener">dentist search on nhs.uk</a> or call NHS 111.</p>
           <label class="lrow"><div class="sw sw-dot" style="--sw:#E89B1B"></div><span class="lname">Pharmacies <span class="lcount" id="pharm-count"></span></span><input type="checkbox" id="tph"></label>
         </div>
         <div class="sb-sec">
@@ -8077,6 +8086,9 @@ const gpL = L.markerClusterGroup({
 });
 gpL.addLayers(GPS.map(d => {
   const rows = {};
+  // Set only for the practices for people who are homeless (see
+  // data/curated/service_sites.csv).
+  if (d.kind) rows['Type'] = d.kind;
   if (d.pc) rows['Postcode'] = d.pc;
   if (d.ward) rows['Ward'] = d.ward + (d.lad ? ' (' + d.lad + ')' : '');
   if (d.tel) rows['Tel'] = d.tel;
@@ -8106,10 +8118,28 @@ function enrichGPFromWardData(wardData) {
   if (allPractices.length === 0) return;
   console.log(`Loaded ${allPractices.length} GP practices from ward_data.json`);
 }
+// Hospitals. data/curated/hospital_sites.csv says what each register site is
+// and whether it has an A&E: ae is true for a 24-hour A&E, false for none,
+// "eye" for an eye A&E only, and absent where nobody has checked. A resident
+// in a hurry reads "nearest hospital" as "where to go", so every place that
+// lists hospitals says that most of them have no A&E and what to do instead.
+const HOSP_AE_NOTE = 'Not every hospital has an A&E. In an emergency call 999, and for urgent help that is not an emergency use NHS 111 online or call 111.';
+const HOSP_AE_NOTE_HTML = 'Not every hospital has an A&amp;E. In an emergency call 999, and for urgent help that is not an emergency use <a href="https://111.nhs.uk/" target="_blank" rel="noopener">NHS 111 online</a> or call 111.';
+function hospAeText(d) {
+  if (!d || d.ae == null) return '';
+  if (d.ae === true) return 'Has a 24-hour A&E';
+  if (d.ae === 'eye') return 'Eye A&E only, no general A&E';
+  return 'No A&E';
+}
 const hL  = L.layerGroup(HOSP.map(d => {
+  const nm = phTitle(d.n), ae = hospAeText(d);
+  const rows = { Type: d.t || 'Hospital' };
+  if (ae) rows['A&E'] = ae;
+  const pop = mkpop('#A32D2D', nm, d.a, rows)
+    .replace(/<\/div>$/, '<div class="pop-note">' + HOSP_AE_NOTE_HTML + '</div></div>');
   const m = L.marker([d.lat,d.lng],{icon:mkicon('#A32D2D','H')})
-    .bindPopup(mkpop('#A32D2D',d.n,d.a,{Type:d.t, Trust:d.trust||''}))
-    .bindTooltip(_esc(d.n), { direction: 'top', className: 'marker-tip' });
+    .bindPopup(pop)
+    .bindTooltip(_esc(nm), { direction: 'top', className: 'marker-tip' });
   m._lad = ladOfLatLng(d.lat, d.lng);
   return m;
 }));
@@ -8855,6 +8885,26 @@ const LAYER_SOURCES = {
                show: () => { if ((document.getElementById('tph') || {}).checked) pharmCluster.addTo(map); } },
 };
 const _layerLoads = {};
+const _layerDone = {};
+/* The header search indexes the charities, pharmacies and dental practices
+   from these files, and the index is built once and kept. Without this it
+   was built on the first keystroke, before any of them had arrived, and never
+   again, so "Boots" found nothing even with the pharmacies on the map. So the
+   index is dropped whenever one lands (or fails), and a search on screen is
+   run again to take it in. */
+function _searchLoadsPending() {
+  return Object.keys(LAYER_SOURCES).some(k => _layerLoads[k] && !_layerDone[k]);
+}
+function _searchRefreshForLayers() {
+  try { _searchIndex = null; } catch (e) { return; /* not declared yet: built later anyway */ }
+  try {
+    const si = document.getElementById('hdr-search-input');
+    const sr = document.getElementById('hdr-search-results');
+    if (si && si.value.trim().length >= 2 &&
+        (document.activeElement === si || (sr && sr.classList.contains('show'))) &&
+        typeof _runSearch === 'function') _runSearch(si.value);
+  } catch (e) { /* the next keystroke will */ }
+}
 
 function ensureLayerData(key) {
   if (_layerLoads[key]) return _layerLoads[key];
@@ -8866,10 +8916,13 @@ function ensureLayerData(key) {
     .then(data => {
       if (!data || !data.length) throw new Error(data ? 'empty' : 'not loaded');
       src.apply(data);
+      _layerDone[key] = true;
+      _searchRefreshForLayers();
       return data;
     })
     .catch(err => {
       _layerLoads[key] = null;
+      _searchRefreshForLayers();
       if (src.fail) src.fail();
       console.info(`${src.url} not loaded: ${err.message}`);
       return null;
@@ -8914,6 +8967,10 @@ const dentalCluster = L.markerClusterGroup({
   }
 });
 let dentalData = [];
+// What the dental layer is, under its Layers row, in its popups and atop the
+// Directory's dental list: the NHS contract register, which is not the same
+// as practices taking new NHS patients.
+const DENTAL_NOTE_HTML = 'Practices that hold an NHS dental contract, from the NHS register. A contract does not mean a practice is taking new NHS patients, and practices that see only private patients are not shown. To find one taking NHS patients, use the <a href="https://www.nhs.uk/service-search/find-a-dentist" target="_blank" rel="noopener">dentist search on nhs.uk</a> or call NHS 111.';
 // The layer is the NHS dental register from ODS, so there is nothing to filter
 // by any more: every practice here holds an NHS contract by virtue of being in
 // the register. The NHS/private split came from a hand-maintained overlay that
@@ -8925,7 +8982,10 @@ function loadDentalLayer(practices) {
     if (!p.lat || !p.lng) return;
     const marker = L.marker([p.lat, p.lng], {icon: mkDentalIcon()});
     const imdBadge = p.imd_decile ? `<div class="pop-row"><span class="pop-key">IMD decile</span><span>${_esc(p.imd_decile)} of 10 (1 = most deprived)</span></div>` : '';
-    marker.bindPopup(`<div class="pop-hdr" style="background:#7B2D8E">${_esc(p.name||p.n)}</div><div class="pop-body"><div class="pop-addr">${_esc(p.postcode||p.pc||'Postcode not given')}</div>${imdBadge}</div>`);
+    const kindRow = p.kind ? `<div class="pop-row"><span class="pop-key">Type</span><span>${_esc(p.kind)}</span></div>` : '';
+    const telRow = p.tel ? `<div class="pop-row"><span class="pop-key">Tel</span><span>${_esc(p.tel)}</span></div>` : '';
+    const where = [p.addr, p.postcode || p.pc].filter(Boolean).join(', ') || 'Postcode not given';
+    marker.bindPopup(`<div class="pop-hdr" style="background:#7B2D8E">${_esc(p.name||p.n)}</div><div class="pop-body"><div class="pop-addr">${_esc(where)}</div>${kindRow}${telRow}${imdBadge}<div class="pop-note">${DENTAL_NOTE_HTML}</div></div>`);
     marker.bindTooltip(_esc(p.name||p.n), { direction: 'top', className: 'marker-tip' });
     dentalData.push({ name: p.name||p.n, postcode: p.postcode||p.pc, lat: p.lat, lng: p.lng, marker });
   });
@@ -11102,7 +11162,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
       ${_locBlock('GP practices',         gps,      g => `<strong>${_esc(g.name||'')}</strong> <span class="meta">${g.postcode?_esc(g.postcode):''}</span>`)}
       ${_locBlock('Pharmacies',           phs,      p => `<strong>${_esc(p.name||'')}</strong> <span class="meta">${p.postcode?_esc(p.postcode):''}</span>`)}
       ${_locBlock('Dental practices',     _dental,  d => `<strong>${_esc(d.name||'')}</strong> <span class="meta">${d.postcode?_esc(d.postcode):''}</span>`)}
-      ${_locBlock('Hospitals and clinics', _hosp,   h => `<strong>${_esc(h.n||'')}</strong> <span class="meta">${h.t?_esc(h.t):''}</span>`)}
+      ${_locBlock('Hospitals', _hosp,   h => `<strong>${_esc(phTitle(h.n||''))}</strong> <span class="meta">${_esc([h.t, hospAeText(h)].filter(Boolean).join(' · '))}</span>`)}
       ${_locBlock('Charities',            _vcse,    v => `<strong>${_esc(v.name||'')}</strong>`)}
       ${_green ? _locBlock('Parks and green spaces', _green, greenspaceItemHtml, '', _green.reduce((a, g) => a + g.n, 0)) : '' /* no green space data: left out, not "none" */}
     </div>
@@ -13745,7 +13805,45 @@ function showLSOA(feat) {
 // LSOA report — A4 dense profile (mirrors ward report design).
 // Charts inline SVG; reference values computed across every London LSOA.
 // ─────────────────────────────────────────────────────────────────────────
+/* Built like the ward report: the report counts the pharmacies, dental
+   practices and charities in the LSOA, and those files are lazy, so a report
+   read them before they had arrived and said there were none. The tab opens
+   at once with a holding page (window.open only survives a pop-up blocker
+   while the click is still on the stack), the data is fetched, and the real
+   report is written over it. */
 window.generateLSOAReport = function(code) {
+  const ready = () => Promise.all([ensureAllLayerData(), ensureLsoaImd(), ensureLsoaData(), ensureGreenspaceData()]);
+  const safe = String(code).replace(/[<>&]/g, '');
+  const w = window.open('', '_blank');
+  if (!w) {
+    _reportBlocked(_noteAnchor(), null, () => ready().then(() => _openReportHere(_buildLSOAReportHtml(code))));
+    return;
+  }
+  w.document.write(
+    '<!DOCTYPE html><html lang="en-GB"><head><meta charset="UTF-8">' +
+    '<title>' + safe + ' | PopHealth Map</title></head>' +
+    '<body style="margin:0;display:flex;align-items:center;justify-content:center;' +
+    'height:100vh;font:15px/1.5 system-ui,sans-serif;color:#4C6272;background:#F4F7F9">' +
+    'Building the report for ' + safe + '…</body></html>');
+  return ready()
+    .then(() => {
+      const html = _buildLSOAReportHtml(code);
+      w.document.open();
+      w.document.write(html);
+      w.document.close();
+    })
+    .catch(err => {
+      console.error('LSOA report failed', err);
+      try {
+        w.document.body.innerHTML =
+          '<div style="max-width:32em;text-align:center;padding:0 24px">' +
+          '<p style="margin:0 0 8px"><b>The report for ' + safe + ' could not be built.</b></p>' +
+          '<p style="margin:0">Close this tab and try again. If it happens ' +
+          'again, some of the figures the report needs did not load.</p></div>';
+      } catch (e) { /* the tab can be closed before this lands */ }
+    });
+};
+function _buildLSOAReportHtml(code) {
   const feat = (LSOA_IMD && LSOA_IMD.features) ?
     LSOA_IMD.features.find(f => f.properties && f.properties.code === code) : null;
   const props = (feat && feat.properties) || { code };
@@ -14206,7 +14304,7 @@ window.generateLSOAReport = function(code) {
       ${_locBlock('GP practices',         _gp,      g => `<strong>${_esc(g.n||g.name||'')}</strong> <span class="meta">${_esc(g.a||g.addr||'')}${g.pc?' · '+_esc(g.pc):''}</span>`)}
       ${_locBlock('Pharmacies',           _pharm,   p => `<strong>${_esc(p.name||p.n||'')}</strong> <span class="meta">${_esc(p.addr||p.a||'')}${p.postcode||p.pc?' · '+_esc(p.postcode||p.pc):''}</span>`)}
       ${_locBlock('Dental practices',     _dental,  d => `<strong>${_esc(d.name||'')}</strong> <span class="meta">${d.postcode?_esc(d.postcode):''}</span>`)}
-      ${_locBlock('Hospitals and clinics', _hosp,    h => `<strong>${_esc(h.n||'')}</strong> <span class="meta">${_esc(h.a||'')}${h.t?' · '+_esc(h.t):''}</span>`, 'span-2')}
+      ${_locBlock('Hospitals', _hosp,    h => `<strong>${_esc(phTitle(h.n||''))}</strong> <span class="meta">${_esc([h.a, h.t, hospAeText(h)].filter(Boolean).join(' · '))}</span>`, 'span-2')}
       ${_locBlock('Charities',            _vcse,    v => `<strong>${_esc(v.name||'')}</strong> <span class="meta">${_esc(v.addr||'')}</span>`, 'span-2')}
       ${_green ? _locBlock('Parks and green spaces', _green, greenspaceItemHtml, '', _green.reduce((a, g) => a + g.n, 0)) : '' /* no green space data: left out, not "none" */}
     </div>
@@ -14228,13 +14326,8 @@ window.generateLSOAReport = function(code) {
   (${_reportChartDownloads.toString()})();
 <\/script>
 </body></html>`;
-
-  const w = window.open('', '_blank');
-  if (!w) { _reportBlocked(_noteAnchor(), null, () => _openReportHere(html)); return; }
-  w.document.open();
-  w.document.write(html);
-  w.document.close();
-};
+  return html;
+}
 
 function buildEmbeddedLSOALayer() {
   lsoaLyr = L.geoJSON(LSOA_IMD, {
@@ -16550,7 +16643,10 @@ function _buildSearchIndex() {
     }
     // Hospitals
     if (typeof HOSP !== 'undefined' && Array.isArray(HOSP)) {
-      HOSP.forEach(d => idx.push({ type:'hospital', label:d.n, sub:d.t || d.trust || '', _lc:(d.n+' '+(d.trust||'')+' '+(d.t||'')).toLowerCase(), _lat:d.lat, _lng:d.lng }));
+      HOSP.forEach(d => {
+        const sub = [d.t, hospAeText(d)].filter(Boolean).join(' · ');
+        idx.push({ type:'hospital', label:phTitle(d.n), sub:sub, _lc:(d.n+' '+sub).toLowerCase(), _lat:d.lat, _lng:d.lng });
+      });
     }
     // Dentals
     if (typeof dentalData !== 'undefined' && Array.isArray(dentalData)) {
@@ -16916,11 +17012,16 @@ function _runSearch(q) {
     if (ap !== bp) return ap - bp;
     return a.label.length - b.label.length;
   });
+  // The charities, pharmacies and dental practices arrive after the page
+  // does (see ensureLayerData), and the list is drawn again when they land.
+  const loadingRow = (typeof _searchLoadsPending === 'function' && _searchLoadsPending())
+    ? '<div class="sr-empty sr-loading" role="presentation">Loading charities and pharmacies...</div>' : '';
   if (matches.length === 0) {
-    results.innerHTML = '<div class="sr-empty" role="presentation">Nothing matches that. Try a postcode, or the name of an LA, ward, GP practice or charity.</div>';
+    results.innerHTML = loadingRow ||
+      '<div class="sr-empty" role="presentation">Nothing matches that. Try a postcode, or the name of an LA, ward, GP practice, pharmacy, dental practice or charity.</div>';
     results.classList.add('show');
     if (pq) _renderPostcodeRow(results, pq, q);
-    _searchAnnounce(pq ? 'Looking up postcode' : 'No matches');
+    _searchAnnounce(pq ? 'Looking up postcode' : (loadingRow ? 'Loading charities and pharmacies' : 'No matches'));
     return;
   }
   // Group by type, LAs and ICBs first, then wards, then at most five LSOAs
@@ -16949,7 +17050,7 @@ function _runSearch(q) {
       html += `<div class="sr-row sr-more" role="option" aria-selected="false" id="sr-opt-more" data-more="lsoa"><span class="sr-name">Show all ${g.length.toLocaleString('en-GB')} LSOAs</span></div>`;
     }
   });
-  results.innerHTML = html;
+  results.innerHTML = html + loadingRow;
   results.classList.add('show');
   results.querySelectorAll('.sr-row[data-idx]').forEach(row => {
     row.addEventListener('click', () => {
@@ -17020,6 +17121,9 @@ function _searchSetActive(row) {
     // complete by the time anybody has finished typing. _onLsoaImdReady drops
     // the cached index so the LSOAs are folded into it when they arrive.
     if (typeof ensureLsoaImd === 'function') ensureLsoaImd();
+    // The same for the charities, pharmacies and dental practices, which the
+    // placeholder also promises; each drops the index when it lands.
+    if (typeof ensureLayerData === 'function') ['vcse', 'pharmacy', 'dental'].forEach(ensureLayerData);
     if (e.target.value.length >= 2) _runSearch(e.target.value);
   });
   input.addEventListener('keydown', e => {
@@ -20501,7 +20605,8 @@ var PH_SHOW = {
   var dirPartial = false;   // the last load was missing a file that failed
   // near: { label, lat, lng, from } while the list is sorted by distance
   // from a postcode or a ward (see dirOpenNear), otherwise null.
-  var dirState = { q: '', types: {}, borough: '', near: null };
+  // ae: only hospitals with a 24-hour A&E (the chip beside Hospitals).
+  var dirState = { q: '', types: {}, borough: '', near: null, ae: false };
   var dirMarker = null;
   var dirFiltered = [];
 
@@ -20588,7 +20693,7 @@ var PH_SHOW = {
   function dirNorm(r, src) {
     // One shape out of ten. Field names differ per source and the fallbacks
     // are ordered most-specific first so a source that has both wins sensibly.
-    var addr = r.a || r.address ||
+    var addr = r.a || r.addr || r.address ||
       [r.street, r.town].filter(Boolean).join(', ') || '';
     // Names and addresses as a person would write them: the charity register
     // is all capitals and the NHS registers come through str.title().
@@ -20606,7 +20711,8 @@ var PH_SHOW = {
       pc: pc,
       lad: ladNameOf(r.lad || r.borough || r.lad_code || ''),
       lat: r.lat, lng: r.lng,
-      sub: r.type || r.phase || r.t || '',
+      sub: src.id === 'hospital' ? [r.t, hospAeText(r)].filter(Boolean).join(' · ') : (r.kind || r.type || r.phase || r.t || ''),
+      ae: src.id === 'hospital' ? r.ae : undefined,
       // Worked out once here rather than on every keystroke.
       _n: n.toLowerCase(), _a: a.toLowerCase(),
       _po: pp ? pp.out : '', _pi: pp ? pp.inw : '',
@@ -20681,6 +20787,7 @@ var PH_SHOW = {
     var anyType = Object.keys(dirState.types).some(function (k) { return dirState.types[k]; });
     var out = (dirRecords || []).filter(function (r) {
       if (anyType && !dirState.types[r.t]) return false;
+      if (dirState.ae && !(r.t === 'hospital' && r.ae === true)) return false;
       if (!scopeMatchesLad(dirState.borough, r.lad)) return false;
       if (near || !q) return true;
       // A postcode, or the start of one, is matched from the beginning, a
@@ -20736,7 +20843,7 @@ var PH_SHOW = {
   // The first screen is the search box and the types rather than twenty
   // thousand names starting with quote marks.
   function dirIsBlank() {
-    return !dirState.near && !dirState.q.trim() && !dirState.borough &&
+    return !dirState.near && !dirState.q.trim() && !dirState.borough && !dirState.ae &&
       !Object.keys(dirState.types).some(function (k) { return dirState.types[k]; });
   }
 
@@ -20776,11 +20883,17 @@ var PH_SHOW = {
         '<span class="dir-offer-msg" id="dir-offer-msg" role="status"></span></div>'
       : '';
 
-    listEl.innerHTML = offer + (shown.map(function (r, i) {
+    // Hospitals on the list: say first that most have no A&E and what to
+    // do in an emergency, since a nearest-hospital list is read in a hurry.
+    var hospNote = shown.some(function (r) { return r.t === 'hospital'; })
+      ? '<p class="dir-note hosp-ae-note" id="dir-hosp-note">' + HOSP_AE_NOTE_HTML + '</p>' : '';
+    var dentNote = shown.some(function (r) { return r.t === 'dentist'; })
+      ? '<p class="dir-note hosp-ae-note dir-dent-note" id="dir-dent-note">' + DENTAL_NOTE_HTML + '</p>' : '';
+    listEl.innerHTML = offer + hospNote + dentNote + (shown.map(function (r, i) {
       // The address is shown because it is searched. Without it, a search for
       // "wembley" returned rows with no "wembley" anywhere on them, which reads
       // as a broken filter rather than as a match on a field being hidden.
-      var meta = [near ? dirFmtDist(r._d) : '', r.one, r.sub, r.a, r.pc].filter(Boolean).join(' · ');
+      var meta = [near ? dirFmtDist(r._d) : '', (r.t === 'hospital' && r.sub) ? '' : r.one, r.sub, r.a, r.pc].filter(Boolean).join(' · ');
       var full = [r.n, r.one, r.sub, r.a, r.pc, r.lad].filter(Boolean).join(' · ');
       return '<button type="button" class="dir-item" data-i="' + i + '" title="' + esc(full) + '">' +
         '<span class="dir-dot" style="background:' + r.colour + '"></span>' +
@@ -20801,12 +20914,18 @@ var PH_SHOW = {
     var typesEl = $('dir-types');
     if (!typesEl || !dirRecords) return;
     var counts = {};
-    dirRecords.forEach(function (r) { counts[r.t] = (counts[r.t] || 0) + 1; });
+    dirRecords.forEach(function (r) {
+      counts[r.t] = (counts[r.t] || 0) + 1;
+      if (r.t === 'hospital' && r.ae === true) counts.ae = (counts.ae || 0) + 1;
+    });
     typesEl.innerHTML = DIR_SOURCES.map(function (s) {
       if (!counts[s.id]) return '';
       return '<button type="button" class="q-chip' + (dirState.types[s.id] ? ' on' : '') + '" data-dtype="' + s.id +
         '" aria-pressed="' + (dirState.types[s.id] ? 'true' : 'false') + '">' + esc(s.label) + ' ' +
-        '<span class="dir-chip-n">' + counts[s.id].toLocaleString() + '</span></button>';
+        '<span class="dir-chip-n">' + counts[s.id].toLocaleString() + '</span></button>' +
+        (s.id === 'hospital' && counts.ae ? '<button type="button" class="q-chip' + (dirState.ae ? ' on' : '') +
+          '" data-dae="1" aria-pressed="' + (dirState.ae ? 'true' : 'false') + '">Hospitals with a 24-hour A&amp;E ' +
+          '<span class="dir-chip-n">' + counts.ae.toLocaleString() + '</span></button>' : '');
     }).join('');
 
     var bEl = $('dir-borough');
@@ -20836,8 +20955,11 @@ var PH_SHOW = {
       '<div class="pop-body"><div class="pop-addr">' +
       _esc([rec.a, rec.pc].filter(Boolean).join(', ')) + '</div>' +
       '<div class="pop-row"><span class="pop-key">Type</span><span>' + _esc(rec.one || rec.label) + '</span></div>' +
+      (rec.t === 'hospital' && hospAeText(rec) ? '<div class="pop-row"><span class="pop-key">A&amp;E</span><span>' +
+        _esc(hospAeText(rec)) + '</span></div>' : '') +
       (rec.lad ? '<div class="pop-row"><span class="pop-key">LA</span><span>' +
-        _esc(rec.lad) + '</span></div>' : '') + '</div>'
+        _esc(rec.lad) + '</span></div>' : '') +
+      (rec.t === 'hospital' ? '<div class="pop-note">' + HOSP_AE_NOTE_HTML + '</div>' : '') + '</div>'
     ).openPopup();
     map.setView([rec.lat, rec.lng], Math.max(map.getZoom(), 15));
   }
@@ -20867,6 +20989,13 @@ var PH_SHOW = {
       dirState.borough = e.target.value; renderDirectory();
     });
     typesEl.addEventListener('click', function (e) {
+      if (e.target.closest('[data-dae]')) {
+        dirState.ae = !dirState.ae;
+        renderDirControls(); renderDirectory();
+        var chip = typesEl.querySelector('[data-dae]');
+        if (chip) chip.focus();
+        return;
+      }
       var c = e.target.closest('[data-dtype]');
       if (!c) return;
       var id = c.getAttribute('data-dtype');

@@ -979,7 +979,7 @@ var SOURCES = [
   { id: 'dentists',
     name: 'Dental practices',
     pub: 'NHS Organisation Data Service',
-    what: 'NHS dental practice locations, and the number in each ward.',
+    what: 'Practices that hold an NHS dental contract, and the number in each ward.',
     geo: 'Point, from the practice postcode',
     period: 'The current register',
     cadence: 'Monthly.',
@@ -997,7 +997,15 @@ var SOURCES = [
   { id: 'hospitals',
     name: 'Hospitals',
     pub: 'NHS Organisation Data Service',
-    what: 'Hospital sites run by NHS trusts, picked out from the register of trust sites.',
+    what: 'Hospital sites picked out by name from the NHS register of trust sites, ' +
+          'then checked by hand for London and the North East. The register also lists ' +
+          'private hospitals where an NHS trust runs a service, teams and offices, and ' +
+          'sites that no longer work as hospitals. In the checked regions, teams, offices ' +
+          'and closed sites are left out, each hospital is marked as NHS or private and by ' +
+          'kind, and the major hospitals with a 24-hour A&E are marked as such. Elsewhere a ' +
+          'site is shown as listed on the register, so please check before you travel. ' +
+          'Not every hospital has an A&E: in an emergency call 999, and for urgent help ' +
+          'that is not an emergency use NHS 111 online or call 111.',
     geo: 'Point, from the site postcode',
     period: 'The current register',
     cadence: 'Monthly.',
