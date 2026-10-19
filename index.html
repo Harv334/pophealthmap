@@ -11621,40 +11621,16 @@ function _generateWardReport(_reportWindow, wn, opts) {
   // ── Health & deprivation: IMD-domain radar + ward-level health bars ──
   const wardCode = (wdata && wdata.code) || '';
 
-  // The seven IMD domains, averaged up to the ward across its LSOAs. The LSOA → ward_code mapping
-  // lives in LSOA_IMD.features (built from the ONS WD24 best-fit lookup).
-  // The dot plot then places that mean among every London LSOA in LSOA_DATA.
   const _IMD_DOMAINS = REPORT_IMD_DOMAINS.map(([k, l]) => ({ k, l }));
-  const _wardLSOACodes = (() => {
-    if (!wardCode || typeof LSOA_IMD === 'undefined' || !LSOA_IMD || !LSOA_IMD.features) return [];
-    return LSOA_IMD.features
-      .filter(f => f.properties && f.properties.ward_code === wardCode)
-      .map(f => f.properties.code);
-  })();
-  const _wardDomainMean = (k) => {
-    if (typeof LSOA_DATA !== 'object' || !_wardLSOACodes.length) return null;
-    const vs = [];
-    for (const code of _wardLSOACodes) {
-      const row = LSOA_DATA[code];
-      if (!row) continue;
-      const v = parseFloat((row.indicators || row)[k]);
-      if (!isNaN(v)) vs.push(v);
-    }
-    if (!vs.length) return null;
-    return vs.reduce((a,b) => a+b, 0) / vs.length;
-  };
-  // Every London LSOA's score on a domain, to place the ward's mean among them.
-  const _londonDomainVals = (k) => {
-    if (typeof LSOA_DATA !== 'object') return [];
-    const vs = [];
-    for (const row of Object.values(LSOA_DATA)) {
-      const v = parseFloat((row.indicators || row)[k]);
-      if (!isNaN(v)) vs.push(v);
-    }
-    return vs;
-  };
+  // The ward's own domain score, which the ward file holds (weighted by its
+  // LSOAs' residents), placed among the region's wards rather than among
+  // single LSOAs: an average is pulled to the middle, so among LSOAs a ward
+  // whose every LSOA is very deprived would sit lower than any one of them.
+  const _wardDomainVals = (k) => _ALL_WARDS
+    .map(w => parseFloat((w.indicators || {})[k])).filter(v => !isNaN(v));
+  const _wardsScored = _wardDomainVals('imd_score').length;
   const _domainRows = _IMD_DOMAINS.map(d => ({
-    l: d.l, p: _reportPercentile(_londonDomainVals(d.k), _wardDomainMean(d.k)),
+    l: d.l, p: _reportPercentile(_wardDomainVals(d.k), parseFloat(inds[d.k])),
   }));
   // A ward with no LSOA of its own (most of the City's) has nothing to place,
   // so the chart is left out rather than drawn as seven empty rows.
@@ -11904,7 +11880,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
       ${domainSVG ? `<div class="panel">
         <h3>Deprivation by domain, IMD 2025</h3>
         ${domainSVG}
-        <div class="legend">Each dot places the average of the ward\u2019s ${_wardLSOACodes.length} LSOA${_wardLSOACodes.length === 1 ? '' : 's'} among all the LSOAs in ${phWhere()}, so 90% means more deprived than 90% of them. The dashed line is the ${PH_AREA} median.</div>
+        <div class="legend">Each dot places the ward among the ${_wardsScored.toLocaleString('en-GB')} ${PH_AREA} wards with a deprivation score, so 90% means more deprived than 90% of them. The dashed line is the ${PH_AREA} median.</div>
       </div>` : ''}
       <div class="panel">
         <h3>Health and economic indicators</h3>
