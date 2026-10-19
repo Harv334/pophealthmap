@@ -143,7 +143,8 @@ jobs:
         run: |
           cd "data/regions/$SCOPE"
           files="$(ls -d ward_data.json lsoa_data.json msoa_data.json borough_data.json \
-                   vcse_data.json pharmacies.json dental_practices.json map meta 2>/dev/null)"
+                   vcse_data.json pharmacies.json dental_practices.json lsoa_census_counts.json \
+                   map meta 2>/dev/null)"
           tar -czf "$GITHUB_WORKSPACE/region-$SCOPE.tar.gz" $files
           cd "$GITHUB_WORKSPACE"
           ls -la "region-$SCOPE.tar.gz"

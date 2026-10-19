@@ -32,6 +32,7 @@ FILES=(
   # London's root data files, fetched through dataUrl().
   ward_data.json borough_data.json lsoa_data.json msoa_data.json
   vcse_data.json pharmacies.json dental_practices.json greenspaces.geojson
+  lsoa_census_counts.json
 )
 for f in "${FILES[@]}"; do
   if [ ! -f "$f" ]; then echo "build_site: missing $f" >&2; exit 1; fi

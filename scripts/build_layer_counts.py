@@ -102,6 +102,19 @@ def main() -> int:
             and r.get("hq")
             and r.get("lat") is not None
             and r.get("lng") is not None
+            and not r.get("np")
+        )
+        # Based here but not pinned: a council office for an address, or a
+        # charity that only holds land (np, see charity_no_pin).
+        nopin = sum(
+            1
+            for r in vcse
+            if isinstance(r, dict)
+            and r.get("sc") == "explicit"
+            and r.get("hq")
+            and r.get("lat") is not None
+            and r.get("lng") is not None
+            and r.get("np")
         )
         wide = sum(
             1
@@ -114,6 +127,7 @@ def main() -> int:
         )
         counts["vcse"] = pinned
         counts["vcse_wide"] = wide
+        counts["vcse_nopin"] = nopin
         counts["vcse_total"] = len(vcse)
         print(f"\nVCSE:      {pinned:>7,} mappable, {wide:,} region-wide in the Directory, "
               f"of {len(vcse):,} declared")

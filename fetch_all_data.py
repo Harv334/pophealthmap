@@ -3270,6 +3270,14 @@ FT_CI_HALF_WIDTH_MAX = 5.0
 FT_WITHHELD_NOTES = ("not published", "cannot be calculated")
 
 
+def _ft_note(v) -> str:
+    """A Fingertips 'Value note' as a clean string ('' for none)."""
+    if v is None or (isinstance(v, float) and pd.isna(v)):
+        return ""
+    s = str(v).strip()
+    return "" if s.lower() in ("", "nan", "none") else s
+
+
 def _ft_blank(s: "pd.Series") -> "pd.Series":
     return s.isna() | (s.astype(str).str.strip().isin(["", "nan", "None"]))
 
@@ -3490,6 +3498,10 @@ def run_fingertips() -> pd.DataFrame:
                 "source_code": row.get("source_code", row["Area Code"]),
                 "source_name": row.get("source_name", ""),
                 "source_kind": row.get("source_kind", "own"),
+                # OHID's own caveat on the figure: provisional, combined with
+                # another area, interpret with caution. Carried through to
+                # borough_data.json (ft_notes) so the map can say so.
+                "value_note": _ft_note(row.get("Value note")),
             })
         bad = ft_sanity(added, ind_id, short)
         if bad:
@@ -3695,7 +3707,9 @@ def run_fingertips_profiles() -> pd.DataFrame:
                     "indicator_name": name,
                     "value": _tofloat(row.get("Value")),
                     "period": row.get("Time period", ""),
-                    "unit": row.get("Value note", ""),
+                    # OHID's note on the value. This column used to be
+                    # called "unit", which it never was.
+                    "value_note": _ft_note(row.get("Value note")),
                     "age": row.get("Age", ""),
                     "source_code": row.get("source_code", row["Area Code"]),
                     "source_kind": row.get("source_kind", "own"),
@@ -4458,6 +4472,74 @@ def _ptal_discover_url() -> str | None:
     return (current or urls)[0]
 
 
+# The ONS best-fit lookup from the LSOAs of 2011 to those of 2021, with its
+# change indicator: U unchanged, S split, M merged, X a complex redraw.
+LSOA11_LSOA21_LOOKUP = ("https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/"
+                        "services/LSOA11_LSOA21_LAD22_EW_LU/FeatureServer/0/query")
+
+
+def get_lsoa11_lsoa21_rows() -> list:
+    """[(LSOA11CD, LSOA21CD, CHGIND), ...] for the LSOAs in scope, cached on
+    disk. Raises when the lookup cannot be read, because a 2011-coded source
+    joined as if it were 2021-coded silently loses every LSOA drawn since."""
+    cache = CACHE_DIR / "lookups" / f"lsoa11_lsoa21_{SCOPE_KEY}.json"
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    if cache.exists():
+        try:
+            return [tuple(r) for r in json.loads(cache.read_text(encoding="utf-8"))]
+        except ValueError:
+            pass
+    codes = sorted(get_lsoa_ward_lookup())
+    rows: list = []
+    seen: set = set()
+    for i in range(0, len(codes), 120):
+        batch = codes[i:i + 120]
+        payload = {
+            "where": "LSOA21CD IN (" + ",".join(f"'{c}'" for c in batch) + ")",
+            "outFields": "LSOA11CD,LSOA21CD,CHGIND",
+            "returnGeometry": "false",
+            "f": "json",
+            "resultRecordCount": 4000,
+        }
+        r = requests.post(LSOA11_LSOA21_LOOKUP, data=payload, timeout=180)
+        r.raise_for_status()
+        for feat in r.json().get("features", []):
+            a = feat.get("attributes", {})
+            key = (a.get("LSOA11CD"), a.get("LSOA21CD"), (a.get("CHGIND") or "").strip().upper())
+            if key[0] and key[1] and key not in seen:
+                seen.add(key)
+                rows.append(key)
+    have = {r[1] for r in rows}
+    if len(have) < len(codes) * 0.99:
+        raise RuntimeError(f"lsoa11->lsoa21 lookup: only {len(have):,} of {len(codes):,} "
+                           f"LSOAs came back. Refusing to cache a partial lookup.")
+    cache.write_text(json.dumps(rows), encoding="utf-8")
+    ok(f"ONS lookup: {len(have):,} LSOAs (2021) -> 2011 parents")
+    return rows
+
+
+def lsoa11_to_lsoa21_values(values11: dict, rows: list) -> dict:
+    """{LSOA21CD: value} from {LSOA11CD: value}, through the ONS lookup rows.
+
+    An unchanged LSOA (U) and each part of a split one (S) take the figure of
+    the 2011 LSOA they come from. A merged LSOA (M) takes the mean of its 2011
+    parts, and a complex redraw (X) the mean of the 2011 LSOAs it was drawn
+    from, which is the best the lookup allows because it carries no weights.
+    A 2021 LSOA none of whose parents has a figure is left out."""
+    parents: dict = {}
+    for p11, c21, _chg in rows:
+        parents.setdefault(c21, [])
+        if p11 not in parents[c21]:
+            parents[c21].append(p11)
+    out: dict = {}
+    for c21, ps in parents.items():
+        vs = [float(values11[p]) for p in ps
+              if p in values11 and values11[p] is not None and not pd.isna(values11[p])]
+        if vs:
+            out[c21] = sum(vs) / len(vs)
+    return out
+
+
 def run_ptal() -> pd.DataFrame | None:
     rule("PTAL (GLA LSOA Atlas, average band score 0-8)")
     cache_dir = CACHE_DIR / "ptal"
@@ -4529,12 +4611,22 @@ def run_ptal() -> pd.DataFrame | None:
              f"ptal={ptal_col!r}). Columns seen: {list(df.columns)[:10]}")
         return None
 
-    out = pd.DataFrame({
-        "LSOA21CD": df[code_col].astype(str).str.strip(),
+    out11 = pd.DataFrame({
+        "LSOA11CD": df[code_col].astype(str).str.strip(),
         "ptal_score": pd.to_numeric(df[ptal_col], errors="coerce"),
-    }).dropna(subset=["LSOA21CD", "ptal_score"])
+    }).dropna(subset=["LSOA11CD", "ptal_score"])
     # Filter to well-formed E01 LSOA codes.
-    out = out[out["LSOA21CD"].str.startswith("E01")]
+    out11 = out11[out11["LSOA11CD"].str.startswith("E01")]
+    # The Atlas uses the LSOAs of 2011. Joined as if they were 2021 codes, the
+    # 176 retired codes matched nothing and the 335 LSOAs drawn in 2021 (the
+    # Royal Docks, Stratford, Wembley Park, Colindale) had no figure at all.
+    # Each 2021 LSOA takes the figure of the 2011 area it was drawn from.
+    conv = lsoa11_to_lsoa21_values(dict(zip(out11["LSOA11CD"], out11["ptal_score"])),
+                                   get_lsoa11_lsoa21_rows())
+    out = pd.DataFrame({"LSOA21CD": list(conv), "ptal_score": [round(v, 2) for v in conv.values()]})
+    in_scope = set(get_lsoa_ward_lookup())
+    n_have = len(set(out["LSOA21CD"]) & in_scope)
+    info(f"ptal: {len(out11):,} LSOAs of 2011 -> {n_have:,} of {len(in_scope):,} in-scope LSOAs of 2021")
     # A band index cannot exceed 8 (6b). Anything above it means the Atlas has
     # switched this column to the continuous PTAI, which is a different scale
     # and would need a different range in the map — better to say so than to
@@ -5443,6 +5535,10 @@ def run_charities():
             "hq_in_nwl": bool(lad and lad in SCOPE_LADS),
             "income": r.get("latest_income"),
             "income_band": _ccew_income_band(r.get("latest_income")),
+            # Whether the latest accounts are in, for the Near list's rule
+            # (charity_serves_area).
+            "reporting_status": (r.get("charity_reporting_status") or "").strip(),
+            "acc_end": (r.get("latest_acc_fin_period_end_date") or "")[:10],
             "website": (r.get("charity_contact_web") or "").strip(),
             "activities": (r.get("charity_activities") or "").strip()[:500],
             "registered": (r.get("date_of_registration") or "")[:10],
@@ -5578,6 +5674,83 @@ def census_la_figures() -> dict:
     return {la: vals for la, vals in figs.items() if vals}
 
 
+# A ward figure built from LSOAs (or from MSOAs through their LSOAs) is only
+# given when the LSOAs with a figure hold at least this share of the ward's
+# residents. Below it the figure describes a corner of the ward, not the ward.
+WARD_MIN_COVER = 0.8
+
+
+def census_pop_by_lsoa(cen: "pd.DataFrame | None") -> dict:
+    """{LSOA21CD: Census 2021 residents}. Raises when there are none, because
+    every residents-weighted ward figure would otherwise weigh each LSOA as 1
+    while the site says it follows where people live."""
+    if cen is None or cen.empty or "census_population" not in cen.columns:
+        raise RuntimeError(
+            "census2021.parquet has no census_population column, so ward "
+            "figures cannot be weighted by residents. Run the census source first.")
+    pops = dict(zip(cen["LSOA21CD"].astype(str),
+                    pd.to_numeric(cen["census_population"], errors="coerce").fillna(0)))
+    if not any(p > 0 for p in pops.values()):
+        raise RuntimeError("census2021.parquet: every census_population is zero or blank")
+    return pops
+
+
+def bridge_to_wards(per_lsoa: dict, lsoa_to_ward: dict, pop_by_lsoa: dict, *,
+                    min_cover: float = WARD_MIN_COVER) -> tuple[dict, dict]:
+    """Residents-weighted ward means of LSOA values, and how much of each ward
+    they cover.
+
+    per_lsoa is {LSOA21CD: value} for the LSOAs that have a figure. Returns
+    ({ward: mean}, {ward: cover}), where cover is the share of the ward's
+    Census residents (every LSOA the lookup puts in it) living in an LSOA
+    with a figure. A ward under min_cover has a cover but no mean.
+    """
+    if not pop_by_lsoa:
+        raise RuntimeError("bridge_to_wards: no LSOA populations to weight by")
+    total: dict = {}
+    for lc, wd in lsoa_to_ward.items():
+        if wd:
+            total[wd] = total.get(wd, 0.0) + float(pop_by_lsoa.get(lc, 0) or 0)
+    num: dict = {}
+    den: dict = {}
+    for lc, v in per_lsoa.items():
+        wd = lsoa_to_ward.get(lc)
+        if not wd or v is None or pd.isna(v):
+            continue
+        w = float(pop_by_lsoa.get(lc, 0) or 0)
+        if w <= 0:
+            continue
+        num[wd] = num.get(wd, 0.0) + float(v) * w
+        den[wd] = den.get(wd, 0.0) + w
+    vals: dict = {}
+    cover: dict = {}
+    for wd, d in den.items():
+        t = total.get(wd, 0.0)
+        c = d / t if t > 0 else 0.0
+        cover[wd] = min(c, 1.0)
+        if c >= min_cover:
+            vals[wd] = num[wd] / d
+    return vals, cover
+
+
+def record_cover(wards: dict, cover: dict, key: str, vals: dict) -> int:
+    """Write a ward's coverage for one indicator into ward["cover"][key], as a
+    whole percentage, where it has a figure that rests on less than all of its
+    residents (one that rounds to 100 is left out). Returns how many."""
+    n = 0
+    for wd, c in cover.items():
+        pct = round(100 * c)
+        w = wards.get(wd)
+        if w is None:
+            continue
+        if wd in vals and pct < 100:
+            w.setdefault("cover", {})[key] = pct
+            n += 1
+        elif "cover" in w:
+            w["cover"].pop(key, None)
+    return n
+
+
 def build_ward_data() -> dict:
     """Wrapped shape expected by index.html loadData():
          {wards: {WD25CD: {name, lad, indicators:{...}}}, metadata: {...}}
@@ -5700,25 +5873,26 @@ def build_ward_data() -> dict:
     # --- Fingertips Local Health: MSOA -> ward, via the LSOA bridge --------
     # An MSOA is a group of whole LSOAs, and a ward is a best-fit group of
     # LSOAs, so the two are joined through the LSOAs they share rather than
-    # directly. Each LSOA carries its MSOA's value and contributes its
-    # population as weight: OHID publishes rates, not the counts behind them,
-    # so a weighted average is the best available. A ward straddling two
+    # directly. Each LSOA carries its MSOA's value and contributes its Census
+    # 2021 residents as weight: OHID publishes rates, not the counts behind
+    # them, so a weighted average is the best available. A ward straddling two
     # MSOAs gets a blend in proportion to where its people are, not to how
     # much land falls in each.
+    #
+    # The weights used to be looked up in imd2025.parquet, which has no
+    # population column, so every LSOA silently weighed 1 while the site said
+    # the blend followed residents. bridge_to_wards now refuses to run without
+    # populations. Where OHID withholds an MSOA's figure, the ward's figure
+    # rests on its other LSOAs only, so the share of residents covered is
+    # recorded, and a ward under WARD_MIN_COVER gets no figure (see
+    # bridge_to_wards).
     ftm = _read_parquet_opt(DATA_DIR / "outcomes" / "fingertips_msoa.parquet")
     if ftm is not None and not ftm.empty:
         sources["health_msoa"] = "OHID Fingertips (Local Health, MSOA)"
         lsoa_to_ward = get_lsoa_to_ward()
         lsoa_to_msoa = get_lsoa_to_msoa()
-        imd = _read_parquet_opt(DATA_DIR / "demographics" / "imd2025.parquet")
-        pop_by_lsoa = {}
-        if imd is not None and "LSOA21CD" in imd.columns:
-            popcol = next((c for c in imd.columns
-                           if c.lower() in ("total_population", "population",
-                                            "pop", "total_pop")), None)
-            if popcol:
-                pop_by_lsoa = dict(zip(imd["LSOA21CD"].astype(str),
-                                       pd.to_numeric(imd[popcol], errors="coerce").fillna(0)))
+        cen_pop = _read_parquet_opt(DATA_DIR / "demographics" / "census2021.parquet")
+        pop_by_lsoa = census_pop_by_lsoa(cen_pop)
 
         by_msoa: dict = {}
         for _, row in ftm.iterrows():
@@ -5727,26 +5901,19 @@ def build_ward_data() -> dict:
                 continue
             by_msoa.setdefault(str(row["MSOA21CD"]), {})[int(row["indicator_id"])] = float(v)
 
-        from collections import defaultdict as _dd2
-        num = _dd2(lambda: _dd2(float))
-        den = _dd2(lambda: _dd2(float))
-        for lsoa, wd in lsoa_to_ward.items():
-            vals = by_msoa.get(lsoa_to_msoa.get(lsoa, ""), None)
-            if not vals:
-                continue
-            weight = float(pop_by_lsoa.get(lsoa, 0) or 0) or 1.0
-            for ind_id, v in vals.items():
-                num[wd][ind_id] += v * weight
-                den[wd][ind_id] += weight
-        n_filled = 0
-        for wd, inds in num.items():
-            w = _get(wd)
-            for ind_id, total in inds.items():
-                d = den[wd][ind_id]
-                if d > 0:
-                    w["indicators"][f"ft_{ind_id}"] = round(total / d, 4)
-                    n_filled += 1
-        info(f"fingertips msoa -> {len(num):,} wards, {n_filled:,} values")
+        n_filled = n_part = n_dropped = 0
+        for ind_id in sorted({i for vals in by_msoa.values() for i in vals}):
+            per_lsoa = {lc: by_msoa[ms][ind_id] for lc, ms in lsoa_to_msoa.items()
+                        if ind_id in by_msoa.get(ms, {})}
+            vals, cover = bridge_to_wards(per_lsoa, lsoa_to_ward, pop_by_lsoa)
+            key = f"ft_{ind_id}"
+            for wd, v in vals.items():
+                _get(wd)["indicators"][key] = round(v, 4)
+                n_filled += 1
+            n_part += record_cover(wards, cover, key, vals)
+            n_dropped += sum(1 for wd in cover if wd not in vals)
+        info(f"fingertips msoa -> {n_filled:,} ward values, {n_part:,} partly covered, "
+             f"{n_dropped:,} left blank under {WARD_MIN_COVER:.0%} of residents")
 
     # --- Census 2021: per output area (or LSOA) -> per ward, from the counts
     # Output areas when ONS's OA->ward best-fit lookup answers: they are a
@@ -5786,8 +5953,20 @@ def build_ward_data() -> dict:
     if "pop_by_lsoa" not in locals():
         pop_by_lsoa = {}
 
-    def _agg_to_wards(df, value_col, ward_key):
+    def _agg_to_wards(df, value_col, ward_key, min_cover=None):
         if df is None or df.empty or value_col not in df.columns:
+            return
+        if min_cover is not None:
+            # A source that leaves LSOAs out (PTAL's 2011 codes did) would
+            # otherwise give a ward the figure of whichever LSOAs are left.
+            per_lsoa = {str(lc): float(v) for lc, v in zip(df["LSOA21CD"], df[value_col])
+                        if pd.notna(v)}
+            vals, cover = bridge_to_wards(per_lsoa, lsoa_to_ward, pop_by_lsoa,
+                                          min_cover=min_cover)
+            for wd, v in vals.items():
+                if wd in wards:
+                    wards[wd]["indicators"][ward_key] = round(v, 2)
+            record_cover(wards, cover, ward_key, vals)
             return
         num, den = {}, {}
         for _, row in df.iterrows():
@@ -5831,7 +6010,9 @@ def build_ward_data() -> dict:
         sources["_fuel_poverty_year"] = _fuel_poverty_period(fp)
 
     pt = _read_parquet_opt(DATA_DIR / "demographics" / "ptal.parquet")
-    _agg_to_wards(pt, "ptal_score", "ptal_score")
+    # A ward with figures for under four in five of its residents is left
+    # blank rather than given the figure of a corner of it.
+    _agg_to_wards(pt, "ptal_score", "ptal_score", min_cover=WARD_MIN_COVER)
     if pt is not None:
         sources["ptal"] = "GLA LSOA Atlas (average PTAL band score, 0-8)"
 
@@ -5906,8 +6087,14 @@ def build_ward_data() -> dict:
         if wards_mo:
             sources["_claimant_month"] = wards_mo
 
-    # --- Core20: ward is Core20 if any of its LSOAs is in IMD decile 1-2 -----
-    # NHS Core20PLUS5 framework definition.
+    # --- Core20: how many of a ward's LSOAs, and residents, are Core20 -------
+    # NHS England's Core20PLUS5 defines Core20 for LSOAs: the most deprived
+    # fifth of England's, deprivation deciles 1 and 2. There is no such thing
+    # as a Core20 ward. is_core20 only means that at least one of the ward's
+    # LSOAs is Core20, so the site shows the count and the share of residents
+    # living in Core20 LSOAs (core20_pop_pct) rather than a ward badge.
+    # The deciles are the 2025 index, while NHS England's own Core20 lists may
+    # still use the 2019 one, so counts can differ from theirs.
     imd = _read_parquet_opt(DATA_DIR / "demographics" / "imd2025.parquet")
     if imd is not None and "imd_decile" in imd.columns:
         # Reuse the LSOA->ward map built for census; rebuild if census was absent.
@@ -5916,6 +6103,8 @@ def build_ward_data() -> dict:
         core20_wards: set = set()
         n_core20_lsoas: dict = {}
         n_ward_lsoas: dict = {}
+        pop_core20: dict = {}
+        pop_all: dict = {}
         for _, r in imd.iterrows():
             d = r.get("imd_decile")
             lc = str(r.get("LSOA21CD") or "")
@@ -5923,14 +6112,19 @@ def build_ward_data() -> dict:
             if not wd:
                 continue
             n_ward_lsoas[wd] = n_ward_lsoas.get(wd, 0) + 1
+            p = float(pop_by_lsoa.get(lc, 0) or 0)
+            pop_all[wd] = pop_all.get(wd, 0.0) + p
             if pd.notna(d) and int(d) in (1, 2):
                 core20_wards.add(wd)
                 n_core20_lsoas[wd] = n_core20_lsoas.get(wd, 0) + 1
+                pop_core20[wd] = pop_core20.get(wd, 0.0) + p
         for wd, w in wards.items():
             w["is_core20"] = wd in core20_wards
             if wd in n_ward_lsoas:
                 w["indicators"]["core20_lsoa_count"] = n_core20_lsoas.get(wd, 0)
                 w["indicators"]["total_lsoa_count"] = n_ward_lsoas[wd]
+                if pop_all.get(wd, 0) > 0:
+                    w["core20_pop_pct"] = round(100 * pop_core20.get(wd, 0.0) / pop_all[wd], 1)
         sources["core20"] = "IMD2025 deciles 1-2 per LSOA"
 
     # Only the scope's own wards. A practice or charity just over the scope's
@@ -5992,6 +6186,15 @@ def local_health_la_values(lh: "pd.DataFrame") -> dict:
     return out
 
 
+def ft_note_check(lad: str, short: str, note: str) -> None:
+    """Fail the build when a value OHID says it withholds reaches the LA file.
+    _ft_pick blanks those, so this is the guard on that guard."""
+    low = note.lower()
+    if any(w in low for w in FT_WITHHELD_NOTES):
+        raise RuntimeError(f"borough_data: {lad} {short} has a value although OHID's "
+                           f"note says {note!r}. It should have been left blank.")
+
+
 def build_borough_data() -> dict:
     """Indicators at borough level, which is the level they are published at.
 
@@ -6037,6 +6240,12 @@ def build_borough_data() -> dict:
         if str(row.get("source_kind", "") or "") == "county":
             ff[f"ft_{row['indicator_short']}"] = [
                 str(row.get("source_code", "") or ""), str(row.get("source_name", "") or "")]
+        # OHID's note on the figure, where it has one, so the map can mark a
+        # provisional, combined or doubtful figure as such.
+        note = _ft_note(row.get("value_note")) if "value_note" in ft.columns else ""
+        if note:
+            ft_note_check(lad, row["indicator_short"], note)
+            out[lad].setdefault("ft_notes", {})[f"ft_{row['indicator_short']}"] = note
 
     # OHID's own LA figures for the Local Health indicators, under the key
     # the MSOA and ward figures carry (ft_<id>), so the map shows OHID's LA
@@ -6317,12 +6526,100 @@ def build_vcse_json():
     })
     records = out.to_dict(orient="records")
     pcs = df["postcode"].tolist() if "postcode" in df.columns else [None] * len(records)
+    sts = df["reporting_status"].tolist() if "reporting_status" in df.columns else [None] * len(records)
+    ends = df["acc_end"].tolist() if "acc_end" in df.columns else [None] * len(records)
     n = 0
-    for rec, pc in zip(records, pcs):
+    for rec, pc, st, end in zip(records, pcs, sts, ends):
+        apply_charity_flags(rec, st, end)
         n += _generalise_small_charity(rec, pc)
     info(f"vcse: {n:,} of {len(records):,} charities shown by area only "
          f"(income under \u00a3{SMALL_CHARITY_INCOME:,} or not filed)")
+    info(f"vcse: {sum(1 for r in records if r.get('nr')):,} serve the area by the Near list's rule, "
+         f"{sum(1 for r in records if r.get('np')):,} not pinned (council office or land only)")
     return records
+
+
+# Which charities the Near list, the ward and LSOA reports and the Directory's
+# nearest-first view show. The register holds every charity that names an area,
+# and near a postcode that meant parochial church councils, school PTAs and
+# grant funds, which hide the charities a resident might go to for help. The
+# rest stay searchable in the Directory and on the Charities tab.
+#
+# A charity counts as serving the area when its latest accounts show income
+# above zero and are not overdue, it says it provides services or advice
+# (Charity Commission "how" codes 306 and 307), and its name is not that of a
+# parochial church council, a school or its parents' association, a masonic
+# lodge, an almshouse or a land or recreation ground trust.
+CHARITY_NOT_LOCAL_HELP = re.compile(
+    r"\b(PAROCHIAL CHURCH COUNCIL|P\.?C\.?C|SCHOOLS?|P\.?T\.?A|"
+    r"PARENTS?[’']? ?(?:AND|&)? ?(?:TEACHERS?|STAFF)|PARENT TEACHER|"
+    r"PARENTS[’']? (?:ASSOCIATION|ASSN)|HOME[- ]SCHOOL|MASONIC|LODGE|FREEMASONS?|"
+    r"ALMS ?HOUSES?|LAND TRUST|RECREATION GROUNDS?|PLAYING FIELDS?)\b", re.I)
+CHARITY_HELP_HOW = {"services", "advocacy_info"}
+# A council acting as trustee gives its own office as the contact address, so
+# the pin lands on the town hall, kilometres from the park it holds.
+CHARITY_COUNCIL_ADDR = re.compile(
+    r"\b(LONDON BOROUGH OF|L\.?B\.? OF|ROYAL BOROUGH OF|CITY OF LONDON CORPORATION|"
+    r"(?:BOROUGH|CITY|COUNTY|DISTRICT|METROPOLITAN BOROUGH) COUNCIL|COUNCIL OF THE)\b", re.I)
+CHARITY_COUNCIL_OFFICE = re.compile(r"\b(TOWN HALL|CIVIC CENTRE|CIVIC OFFICES?|COUNCIL OFFICES?|"
+                                    r"GUILDHALL|PO BOX)\b", re.I)
+CHARITY_LAND_NAME = re.compile(r"\b(PARK|FIELDS?|GREEN|GROUNDS?|COMMON|ALLOTMENTS?|PLAYGROUND|"
+                               r"GARDENS?|RECREATION|OPEN SPACE|WOODS?|MEADOWS?|HEATH)\b", re.I)
+
+
+def charity_accounts_overdue(status, acc_end, today=None) -> bool:
+    """Whether the register says the latest accounts are late. A status of
+    'overdue' or 'double default' says so; failing that, a financial year that
+    ended over three years ago is taken as late."""
+    s = str(status or "").lower()
+    if "overdue" in s or "default" in s:
+        return True
+    d = str(acc_end or "")[:10]
+    if len(d) == 10:
+        try:
+            end = datetime.strptime(d, "%Y-%m-%d").date()
+        except ValueError:
+            return False
+        today = today or datetime.now(timezone.utc).date()
+        return (today - end).days > 3 * 365
+    return False
+
+
+def charity_serves_area(name, income, how_tags, status=None, acc_end=None) -> bool:
+    """The rule above: true for a charity the Near list should show."""
+    try:
+        inc = float(income)
+    except (TypeError, ValueError):
+        return False
+    if pd.isna(inc) or inc <= 0:
+        return False
+    if charity_accounts_overdue(status, acc_end):
+        return False
+    if not (set(how_tags or []) & CHARITY_HELP_HOW):
+        return False
+    return not CHARITY_NOT_LOCAL_HELP.search(str(name or ""))
+
+
+def charity_no_pin(name, addr, how_tags) -> bool:
+    """True when the register's address does not show where the charity is:
+    a council's office given as the contact for a charity it is trustee of,
+    or a charity whose only activity is holding land, such as a park, which
+    the Parks layer already shows where it really is."""
+    a = str(addr or "")
+    if CHARITY_COUNCIL_ADDR.search(a) and CHARITY_COUNCIL_OFFICE.search(a):
+        return True
+    return list(how_tags or []) == ["buildings_facilities"] and bool(CHARITY_LAND_NAME.search(str(name or "")))
+
+
+def apply_charity_flags(rec: dict, status=None, acc_end=None) -> None:
+    """Set nr (serves the area, see charity_serves_area) and np (do not pin,
+    see charity_no_pin) on one vcse_data.json record, in place. Run before
+    _generalise_small_charity, which blanks the address."""
+    rec["nr"] = charity_serves_area(rec.get("n"), rec.get("inc"), rec.get("ht"), status, acc_end)
+    if charity_no_pin(rec.get("n"), rec.get("a"), rec.get("ht")):
+        rec["np"] = True
+    else:
+        rec.pop("np", None)
 
 
 # A small charity's contact address on the register is often a trustee's home.
@@ -6889,6 +7186,29 @@ def build_dental_json() -> list:
     return out
 
 
+def lsoa_census_counts(counts: "pd.DataFrame | None", codes) -> dict:
+    """The Census numerators and denominators for each LSOA, for Custom area.
+
+    A custom area is built from LSOAs in the browser. Averaging their
+    percentages by residents is wrong for a household measure (tenure, cars),
+    so the page sums these counts instead, as a ward's figures are made.
+    {"keys": [census_*_pct, ...], "rows": {LSOA21CD: [num..., den...]}}, the
+    numerators in key order and then the denominators in the same order."""
+    if counts is None or counts.empty or "LSOA21CD" not in counts.columns:
+        return {}
+    keys = sorted(c[:-5] for c in counts.columns
+                  if c.endswith("__num") and f"{c[:-5]}__den" in counts.columns)
+    want = set(codes)
+    sub = counts[counts["LSOA21CD"].astype(str).isin(want)]
+    rows: dict = {}
+    for rec in sub.to_dict("records"):
+        def iv(x):
+            return None if x is None or pd.isna(x) else int(round(float(x)))
+        rows[str(rec["LSOA21CD"])] = ([iv(rec[f"{k}__num"]) for k in keys] +
+                                      [iv(rec[f"{k}__den"]) for k in keys])
+    return {"keys": keys, "rows": rows} if rows else {}
+
+
 def export_all() -> None:
     rule("Export Leaflet JSON outputs")
     ward_data  = build_ward_data()
@@ -6907,6 +7227,11 @@ def export_all() -> None:
     write_json_atomic(OUT_ROOT / "vcse_data.json",  vcse_data)
     if dental_data:
         write_json_atomic(OUT_ROOT / "dental_practices.json", dental_data)
+    # Census counts per LSOA, fetched by Custom area only when it is used.
+    cen_counts = lsoa_census_counts(
+        _read_parquet_opt(DATA_DIR / "demographics" / "census2021_counts.parquet"), lsoa_data)
+    if cen_counts:
+        write_json_atomic(OUT_ROOT / "lsoa_census_counts.json", cen_counts)
     # Measured from the four payloads above, so it can never describe a
     # different build than the one being shipped.
     # Descriptors for anything in data/custom, so index.html can add the
