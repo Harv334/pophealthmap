@@ -3088,8 +3088,9 @@ const smallText = page => page.evaluate(() => {
     const hasAdd = await page.evaluate(() => {
       const s = document.getElementById('cmp-add-metric');
       if (!s) return false;
-      const on = [...document.querySelectorAll('#cmp-metrics [data-metric].on')].map(c => c.textContent.trim());
-      const t = [...s.options].findIndex((o, i) => i > 0 && on.indexOf(o.textContent.trim()) === -1);
+      // By key: an option's name carries its unit, a chip's does not.
+      const on = PH_COMPARE.state().metrics;
+      const t = [...s.options].findIndex((o, i) => i > 0 && on.indexOf(o.value) === -1);
       if (t < 1) return false;
       s.selectedIndex = t - 1;
       s.focus();
