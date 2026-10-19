@@ -13,22 +13,45 @@ compatibility_date = "2026-01-01"
 [vars]
 ALLOWED_ORIGINS = "https://pophealth.uk,https://www.pophealth.uk,https://harv334.github.io"
 
-# Per-IP daily counter, and the thing the 10-a-day cap is actually kept in.
+# Ceilings for the whole site, per UTC day. When either is reached Ask stops
+# for everyone until midnight UTC. Set them from the spend limit you can
+# afford: worker/README.md prices a question.
+SITE_DAILY_QUESTIONS = "500"
+SITE_DAILY_REQUESTS = "2000"
+
+# The daily counts: questions and round trips per address, and the site's
+# totals. A Durable Object, so a count is checked and taken in one step before
+# the model is called. SQLite-backed, which the free plan allows. The first
+# `wrangler deploy` creates it from the migration below; nothing to set up by
+# hand.
 #
-# THE CAP DOES NOTHING WITHOUT THIS. checkDailyCap fails open when the binding
-# is missing, so questions are answered normally, the panel still counts down
-# from its own localStorage, and there is no outward sign that nobody is being
-# limited. Check which case you are in: ask the assistant one question and look
-# at _limit.enforced in the reply, or open the Worker in the Cloudflare
-# dashboard under Settings -> Bindings and look for RATE_LIMIT.
-#
-# Create it with:
-#   npx wrangler kv namespace create RATE_LIMIT
-# then paste the id it prints below. In the dashboard the equivalent is
-# Storage & Databases -> KV -> Create, then bind it to the Worker as RATE_LIMIT.
-[[kv_namespaces]]
-binding = "RATE_LIMIT"
-id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+# The Worker FAILS CLOSED without it: every request is answered 503 "Worker is
+# not configured". That is deliberate. The KV counter this replaces failed
+# open, so a missing binding looked exactly like a working cap.
+[[durable_objects.bindings]]
+name = "ASK_COUNTER"
+class_name = "AskCounter"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["AskCounter"]
+
+# A burst limit per address (IPv4, or the IPv6 /64): 12 requests a minute,
+# which is three or four questions. Cloudflare's Workers Rate Limiting, which
+# uses no storage writes. namespace_id is any number unique to this account.
+# Needs wrangler 4.36 or later; with an older wrangler, upgrade rather than
+# remove it, because the Worker also fails closed without this binding.
+[[ratelimits]]
+name = "ASK_BURST"
+namespace_id = "1001"
+
+  [ratelimits.simple]
+  limit = 12
+  period = 60
+
+# The KV namespace RATE_LIMIT that used to hold the counts is no longer used.
+# Once this version is deployed it can be deleted in the dashboard
+# (Storage & Databases > KV).
 
 # The API key is NOT here and must never be. Set it as a secret:
 #   npx wrangler secret put ANTHROPIC_API_KEY

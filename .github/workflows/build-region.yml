@@ -23,6 +23,10 @@ on:
         description: "Publish to the site (attach to the region-data release and redeploy)"
         type: boolean
         default: false
+      allow_sources:
+        description: "Publish even though these sources failed or are partial (comma-separated; leave empty normally)"
+        required: false
+        default: ""
   # The monthly refresh (refresh-regions.yml) calls this once per region, with
   # deploy off, and redeploys the site once when every region has finished.
   workflow_call:
@@ -88,6 +92,26 @@ jobs:
             || echo "No pcn-source release: PCNs will be built without catchments."
           ls -la .cache/gp_reg
 
+      # Last run's intermediates (the parquet files under data/regions/<scope>/,
+      # which the published pack leaves out). Without them every region build
+      # started from nothing, so carry_forward_thin, which keeps last month's
+      # rows for an indicator a source returned thin or not at all, had nothing
+      # to keep and a bad refresh day went straight onto the site. Kept on
+      # their own release rather than in the Actions cache, which evicts
+      # anything unused for seven days, and a monthly run is always older.
+      - name: Restore last run's intermediates
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SCOPE: ${{ inputs.scope }}
+        run: |
+          mkdir -p "data/regions/$SCOPE" /tmp/inter
+          if gh release download region-intermediates --pattern "parquet-$SCOPE.tar.gz" --dir /tmp/inter --clobber; then
+            tar -xzf "/tmp/inter/parquet-$SCOPE.tar.gz" -C "data/regions/$SCOPE"
+            echo "restored $(find "data/regions/$SCOPE" -name '*.parquet' | wc -l) parquet files"
+          else
+            echo "No saved intermediates for $SCOPE: this build starts from nothing and cannot carry figures forward."
+          fi
+
       - name: Run pipeline for the region
         # -u: unbuffered, so the log shows each source as it runs. Buffered, a
         # slow source left the log silent for hours with no clue which it was.
@@ -130,6 +154,31 @@ jobs:
           path: data/regions/${{ inputs.scope }}
           if-no-files-found: warn
 
+      # Nothing is published from a build that lost data. The pipeline exits 0
+      # when a source fails, so this is where a failed or partial source, a
+      # pack made before the Census counts method, a Local Health series
+      # London has and this region lacks, an indicator the published pack has
+      # and this one lacks, or a fall of more than 10% in ward values stops
+      # the job. The published pack then stays as it was, and the monthly
+      # refresh opens an issue naming the region (scripts/check_region_pack.py).
+      - name: Check the build before publishing
+        if: success() && inputs.publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SCOPE: ${{ inputs.scope }}
+          ALLOW: ${{ inputs.allow_sources }}
+        run: |
+          prev=""
+          mkdir -p /tmp/prev-dl /tmp/prev
+          if gh release download region-data --pattern "region-$SCOPE.tar.gz" --dir /tmp/prev-dl --clobber; then
+            tar -xzf "/tmp/prev-dl/region-$SCOPE.tar.gz" -C /tmp/prev
+            prev="--previous /tmp/prev"
+          else
+            echo "No published pack for $SCOPE yet: nothing to compare against."
+          fi
+          python scripts/check_region_pack.py "data/regions/$SCOPE" --scope "$SCOPE" --london . \
+            --allow-sources "$ALLOW" $prev
+
       # Publishing: the served files only (no parquet intermediates, no
       # boundary GeoJSON), packed and attached to the "region-data" release,
       # replacing that region's previous pack. Release assets are not part of
@@ -152,6 +201,14 @@ jobs:
             gh release create region-data --latest=false --title "Region data" \
               --notes "Published region builds for the site, one pack per region. Replaced on each publish; not code releases."
           gh release upload region-data "region-$SCOPE.tar.gz" --clobber
+          # And the intermediates this pack was built from, for next month's
+          # carry-forward. Saved only from a build that passed its checks.
+          (cd "data/regions/$SCOPE" && find . -name '*.parquet' -print0 \
+            | tar -czf "$GITHUB_WORKSPACE/parquet-$SCOPE.tar.gz" --null -T -)
+          gh release view region-intermediates >/dev/null 2>&1 || \
+            gh release create region-intermediates --latest=false --title "Region intermediates" \
+              --notes "Each region build's parquet files, restored by the next build so figures a source returns thin are carried forward. Not served, not code releases."
+          gh release upload region-intermediates "parquet-$SCOPE.tar.gz" --clobber
 
       - name: Redeploy the site
         if: success() && inputs.publish && inputs.deploy != false

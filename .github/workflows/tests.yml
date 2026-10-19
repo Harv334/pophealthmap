@@ -36,9 +36,19 @@ jobs:
         run: |
           pip install pandas numpy pyarrow requests
           python3 tests/pipeline/test_census_counts.py
+      # What stops a region pack being published (scripts/check_region_pack.py).
+      - name: Check the region pack checks
+        run: python3 tests/pipeline/test_region_pack.py
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      # The Ask Worker under Node with fake bindings and a stubbed API: its
+      # caps, which messages count, and what it refuses and forwards.
+      - name: Check the Ask Worker
+        run: |
+          python3 tests/pipeline/test_worker_cap.py
+          python3 tests/pipeline/test_worker_followup.py
+          python3 tests/pipeline/test_worker_guard.py
       - name: Install Playwright and axe-core
         run: |
           npm install --no-save --no-package-lock playwright@1.56.1 axe-core@4.10.3

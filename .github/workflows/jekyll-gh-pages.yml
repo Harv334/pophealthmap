@@ -81,6 +81,28 @@ jobs:
           else
             echo "No regions published; no England view."
           fi
+      # Every region pack checked the way build-region.yml checks a new one:
+      # no failed or partial source, the Census counts method, and London's
+      # Local Health series unless listed as known gaps. A pack built by an
+      # older pipeline fails here until refresh-regions.yml rebuilds it. To
+      # deploy anyway while that runs, set the repository variable
+      # REGION_CHECK to "warn" (Settings > Secrets and variables > Actions >
+      # Variables); the problems are then shown as annotations only.
+      - name: Check the region packs
+        env:
+          MODE: ${{ vars.REGION_CHECK || 'strict' }}
+        run: |
+          bad=0
+          for d in data/regions/*/; do
+            scope="$(basename "$d")"
+            [ "$scope" = england ] && continue
+            [ -f "$d/map/wards.js" ] || continue
+            python3 scripts/check_region_pack.py "$d" --scope "$scope" --london . || bad=1
+          done
+          if [ "$bad" = 1 ] && [ "$MODE" != warn ]; then
+            echo "::error::One or more region packs failed their checks. Rebuild them with the Refresh regions workflow."
+            exit 1
+          fi
       - name: Setup Pages
         uses: actions/configure-pages@v6
       # No Jekyll: only the files the pages serve are copied into _site, with
@@ -100,6 +122,22 @@ jobs:
             if [ ! -e "_site/$f" ]; then echo "::error::$f is missing from _site"; exit 1; fi
           done
           echo "Regions in _site: $(ls _site/data/regions 2>/dev/null | tr '\n' ' ')"
+      # Every region opens with its wards drawn, and the England view draws
+      # more than 6,000 wards, on the folder about to be uploaded. The full
+      # smoke suite (tests.yml) covers London and the North East in depth;
+      # this is the one place each published region is opened.
+      - uses: actions/setup-node@v4
+        if: hashFiles('_site/data/regions/*/map/wards.js') != ''
+        with:
+          node-version: '22'
+      - name: Open every region
+        if: hashFiles('_site/data/regions/*/map/wards.js') != ''
+        run: |
+          npm install --no-save --no-package-lock playwright@1.56.1
+          npx playwright install --with-deps chromium
+          python3 -m http.server 8793 --directory _site >/dev/null 2>&1 &
+          sleep 2
+          node tests/smoke/regions.cjs http://localhost:8793 _site
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v5
         with:
