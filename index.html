@@ -6443,33 +6443,33 @@ const OV_PLAIN = {
   ft_self_harm_admissions_10_24: "Hospital admissions for self-harm among 10 to 24 year olds, per 100,000.",
   ft_smoking_prevalence_adults: "Adults aged 18 and over who currently smoke.",
   ft_suicide_rate: "Deaths from suicide, per 100,000 people.",
-  ft_93465: "Hospital admissions where alcohol played a part, compared with England, where 100 is average.",
-  ft_93233: "Emergency admissions for COPD, a long-term lung disease, compared with England, where 100 is average.",
-  ft_93229: "Emergency admissions for coronary heart disease, compared with England, where 100 is average.",
-  ft_93227: "Unplanned hospital admissions for any reason, compared with England, where 100 is average.",
+  ft_93465: "Hospital admissions where alcohol played a part, compared with England, where 100 is England’s level for the same ages.",
+  ft_93233: "Emergency admissions for COPD, a long-term lung disease, compared with England, where 100 is England’s level for the same ages.",
+  ft_93229: "Emergency admissions for coronary heart disease, compared with England, where 100 is England’s level for the same ages.",
+  ft_93227: "Unplanned hospital admissions for any reason, compared with England, where 100 is England’s level for the same ages.",
   ft_93115: "Unplanned hospital admissions of children under 5, per 1,000 children.",
   ft_93280: "Households on a low income living in a home that is hard to heat.",
   ft_93089: "Births per 1,000 women aged 15 to 44.",
-  ft_93232: "Emergency admissions for heart attacks, compared with England, where 100 is average.",
-  ft_93241: "Emergency admissions for hip fractures in people aged 65 and over, compared with England, where 100 is average.",
-  ft_93240: "Admissions for conditions caused wholly or mainly by alcohol, compared with England, where 100 is average.",
-  ft_93239: "Emergency admissions for self-harm, compared with England, where 100 is average.",
+  ft_93232: "Emergency admissions for heart attacks, compared with England, where 100 is England’s level for the same ages.",
+  ft_93241: "Emergency admissions for hip fractures in people aged 65 and over, compared with England, where 100 is England’s level for the same ages.",
+  ft_93240: "Admissions for conditions caused wholly or mainly by alcohol, compared with England, where 100 is England’s level for the same ages.",
+  ft_93239: "Emergency admissions for self-harm, compared with England, where 100 is England’s level for the same ages.",
   ft_93283: "How long a girl born now can expect to live, in years, for this small area.",
   ft_932831: "How long a boy born now can expect to live, in years, for this small area.",
   ft_93098: "People aged 16 to 64 claiming out-of-work benefits for more than a year, per 1,000.",
-  ft_93250: "Deaths from any cause, compared with England, where 100 is average.",
-  ft_93252: "Deaths under 75 from any cause, compared with England, where 100 is average.",
-  ft_93253: "Deaths from cancer, compared with England, where 100 is average.",
-  ft_93254: "Deaths under 75 from cancer, compared with England, where 100 is average.",
-  ft_93255: "Deaths from heart and circulatory disease, compared with England, where 100 is average.",
-  ft_93256: "Deaths under 75 from heart and circulatory disease, compared with England, where 100 is average.",
-  ft_93480: "Deaths under 75 that public health action could have avoided, compared with England, where 100 is average.",
-  ft_93257: "Deaths from coronary heart disease, compared with England, where 100 is average.",
-  ft_93260: "Deaths from lung and breathing diseases, compared with England, where 100 is average.",
-  ft_93259: "Deaths from stroke, compared with England, where 100 is average.",
+  ft_93250: "Deaths from any cause, compared with England, where 100 is England’s level for the same ages.",
+  ft_93252: "Deaths under 75 from any cause, compared with England, where 100 is England’s level for the same ages.",
+  ft_93253: "Deaths from cancer, compared with England, where 100 is England’s level for the same ages.",
+  ft_93254: "Deaths under 75 from cancer, compared with England, where 100 is England’s level for the same ages.",
+  ft_93255: "Deaths from heart and circulatory disease, compared with England, where 100 is England’s level for the same ages.",
+  ft_93256: "Deaths under 75 from heart and circulatory disease, compared with England, where 100 is England’s level for the same ages.",
+  ft_93480: "Deaths under 75 that public health action could have avoided, compared with England, where 100 is England’s level for the same ages.",
+  ft_93257: "Deaths from coronary heart disease, compared with England, where 100 is England’s level for the same ages.",
+  ft_93260: "Deaths from lung and breathing diseases, compared with England, where 100 is England’s level for the same ages.",
+  ft_93259: "Deaths from stroke, compared with England, where 100 is England’s level for the same ages.",
   ft_93105: "Children aged 4 to 5 living with obesity.",
   ft_93106: "Children aged 4 to 5 who are overweight or living with obesity.",
-  ft_93231: "Emergency admissions for stroke, compared with England, where 100 is average.",
+  ft_93231: "Emergency admissions for stroke, compared with England, where 100 is England’s level for the same ages.",
   ft_93097: "People aged 16 to 64 claiming out-of-work benefits.",
   ft_93114: "Hospital admissions of children under 5 for injuries, per 10,000.",
   ft_93219: "Hospital admissions of children under 15 for injuries, per 10,000.",
@@ -6914,7 +6914,7 @@ function ovRamp(k, t) {
    latest census there is, and flagging every census indicator would bury
    the warnings that matter.
    ═══════════════════════════════════════════════════════════════════════════ */
-const VS_ENGLAND_TEXT = { B: 'Better than England', W: 'Worse than England', S: 'Similar to England',
+const VS_ENGLAND_TEXT = { B: 'Better than England', W: 'Worse than England', S: 'Not clearly different from England',
                           H: 'Higher than England', L: 'Lower than England' };
 function ovVsEngland(level, id, k) {
   if (level !== 'msoa' || typeof MSOA_DATA === 'undefined') return '';
@@ -6981,6 +6981,8 @@ const _LEVEL_PLURAL = { ward: 'wards', lsoa: 'LSOAs', msoa: 'MSOAs', borough: 'L
    which a small ward only repeats. The rankings, the hover percentile and
    the ward reports all use this one rule. */
 const SMALL_WARD_POP = 1000;
+// Under ward rankings and in ward hovers for the Local Health indicators.
+const WARD_NO_INTERVAL = 'Ward figures are estimates from MSOA figures, so no interval is available. Wards close together in this list are often not statistically different.';
 function rankSkipsSmall(level, k) {
   if (level !== 'ward' || laSums(k) || ovNativeLevel(k) === 'borough') return false;
   // Rates and percentages of residents only: a deprivation score, air
@@ -6993,6 +6995,10 @@ function wardIsSmall(rec) {
   const p = ind ? parseFloat(ind.census_population) : NaN;
   return !(p >= SMALL_WARD_POP);
 }
+// The overall deprivation score and its seven domains, where a higher
+// score means more deprivation.
+const IMD_SCORE_KEYS = ['imd_score', 'imd_score_ward', 'income_score', 'employment_score', 'education_score',
+  'health_score', 'crime_score', 'barriers_score', 'environment_score'];
 function ovContext(level, k, v, rec) {
   const n = parseFloat(v);
   if (isNaN(n) || typeof _bivIds !== 'function') return '';
@@ -7009,17 +7015,23 @@ function ovContext(level, k, v, rec) {
   }
   let below = 0, above = 0;
   for (const x of vals) { if (x < n) below++; else if (x > n) above++; }
-  const where = 'the ' + (_LEVEL_PLURAL[level] || 'areas') + ' in ' + (typeof PH_AREA === 'string' ? phWhere() : 'the region');
+  // Labelled as a comparison within the region, so it reads apart from
+  // OHID's comparison with England on the same card.
+  const within = 'Within ' + (typeof PH_AREA === 'string' ? phWhere() : 'the region') + ': ';
+  const where = _LEVEL_PLURAL[level] || 'areas';
   // Deciles and ranks count down (1 = most deprived), so "lower" would read
-  // as better when it means more deprived. Those say which way they lean.
+  // as better when it means more deprived. Those say which way they lean, and
+  // so do the deprivation scores, which count up.
   const rev = typeof OV_CFG !== 'undefined' && OV_CFG[k] && OV_CFG[k].rev;
-  const hi = rev ? 'Less deprived than ' : 'Higher than ', lo = rev ? 'More deprived than ' : 'Lower than ';
+  const dep = !rev && IMD_SCORE_KEYS.indexOf(k) !== -1;
+  const hi = rev ? 'less deprived than ' : dep ? 'more deprived than ' : 'higher than ';
+  const lo = rev ? 'more deprived than ' : dep ? 'less deprived than ' : 'lower than ';
   if (!below && !above) return '';                    // every area has this figure
   // Held to 1 to 99, as pctileCaption is: the highest of 684 wards is higher
   // than 683 of them, which rounds to a "100%" that would include itself.
   const pc = c => Math.min(99, Math.max(1, Math.round(100 * c / vals.length)));
-  if (below >= above) return hi + pc(below) + '% of ' + where;
-  return lo + pc(above) + '% of ' + where;
+  if (below >= above) return within + hi + pc(below) + '% of ' + where;
+  return within + lo + pc(above) + '% of ' + where;
 }
 function ovEndYear(k) {
   const p = (typeof ovPeriodOf === 'function') ? ovPeriodOf(k) : '';
@@ -7641,6 +7653,10 @@ function fmtOv(v, k) {
   if (/^per /.test(u) && indLabel(key).toLowerCase().indexOf(u.toLowerCase()) === -1) return s + ' ' + u;
   return s;
 }
+// A figure as a hover card shows it: a ratio says where England sits.
+function fmtOvTip(v, k) {
+  return fmtOv(v, k) + (ovIsStdRatio(k) ? ' (England is 100)' : '');
+}
 function ovTooltipRows(valueForKey, ward, level) {
   // valueForKey: function(k) -> raw value
   // ward: optional ward record (used for suppression flag lookup)
@@ -7663,8 +7679,12 @@ function ovTooltipRows(valueForKey, ward, level) {
       return `<span class="tip-row"><b>${ovLabel(k)}:</b> <span class="tip-none">No figure</span></span>`;
     }
     const ctx = (level && !bivOn()) ? ovContext(level, k, v, ward) : '';
-    return `<span class="tip-row"><b>${ovLabel(k)}:</b> ${fmtOv(v, k)}</span>` +
-      (ctx ? `<span class="ctx">${ctx}</span>` : '');
+    // A ward's Local Health figure is our blend of MSOA figures, so it has
+    // no interval: said here, where a percentile could look precise.
+    const est = level === 'ward' && /^ft_\d+$/.test(k) && !bivOn()
+      ? 'Ward figures are estimates from MSOA figures, so no interval is available.' : '';
+    return `<span class="tip-row"><b>${ovLabel(k)}:</b> ${fmtOvTip(v, k)}</span>` +
+      (ctx ? `<span class="ctx">${ctx}</span>` : '') + (est ? `<span class="ctx">${est}</span>` : '');
   };
   if (_ovK  && _ovK  !== 'none') rows += _renderRow(_ovK);
   if (bivOn()) rows += _renderRow(curOv2);
@@ -13740,7 +13760,7 @@ const PH_PEEK = (function () {
       const vs = has ? ovVsHTML(ovVsEngland(level, code, k)) + (ovIsEstimated(level, code, k) ? EST_HTML : '') : '';
       return '<div class="ap-row"><span>' + esc(ovLabel(k)) +
         (ctx ? '<span class="ctx">' + esc(ctx) + '</span>' : '') + (vs ? '<span class="ctx">' + vs + '</span>' : '') + '</span><b>' +
-        (has ? esc(fmtOv(v, k)) : esc(level === 'msoa' ? msoaNoFigure(code, k) : 'No figure')) + '</b></div>';
+        (has ? esc(fmtOvTip(v, k)) : esc(level === 'msoa' ? msoaNoFigure(code, k) : 'No figure')) + '</b></div>';
     };
     el.innerHTML = '<div class="ap-hd"><div><div class="ap-nm">' + esc(props.name || code) + '</div>' +
       '<div class="ap-sub">' + esc([props.ward, props.borough].filter(Boolean).join(', ')) + '</div></div>' +
@@ -15387,7 +15407,7 @@ function loadMsoaBoundaries() {
             const v = msoaOvValue(p.code, curOv);
             const shown = (curOv && curOv !== 'none' && ovHasLevel(curOv, 'msoa')
                            && v != null && !isNaN(parseFloat(v)))
-              ? `<span class="tip-row"><b>${_esc(_ovLabel(curOv))}:</b> ${fmtOv(parseFloat(v), curOv)}` +
+              ? `<span class="tip-row"><b>${_esc(_ovLabel(curOv))}:</b> ${fmtOvTip(parseFloat(v), curOv)}` +
                 ovVsHTML(ovVsEngland('msoa', p.code, curOv)) +
                 (ovIsEstimated('msoa', p.code, curOv) ? EST_HTML : '') + '</span>' +
                 (bivOn() ? '' : `<span class="ctx">${ovContext('msoa', curOv, v)}</span>`)
@@ -15396,7 +15416,7 @@ function loadMsoaBoundaries() {
               : '';
             const v2 = bivOn() ? msoaOvValue(p.code, curOv2) : null;
             const shown2 = (v2 != null && !isNaN(parseFloat(v2)))
-              ? `<span class="tip-row"><b>${_esc(_ovLabel(curOv2))}:</b> ${fmtOv(parseFloat(v2), curOv2)}</span>`
+              ? `<span class="tip-row"><b>${_esc(_ovLabel(curOv2))}:</b> ${fmtOvTip(parseFloat(v2), curOv2)}</span>`
               : '';
             return `<b class="tip-nm">${_esc(p.name || 'MSOA')}</b>` +
                    `<span class="tip-meta">MSOA ${_esc(p.code || '')}</span>` + shown + shown2;
@@ -15943,6 +15963,7 @@ function renderTopBottom() {
   };
   tieNote(lowSlice, asc, true);
   tieNote(highSlice, desc, false);
+  if (level === 'ward' && /^ft_\d+$/.test(curOv)) notes.push(WARD_NO_INTERVAL);
   const hasVs = level === 'msoa' && rows.some(r => r.vs);
   if (hasVs) {
     notes.push('Only areas marked better or worse differ from England by OHID’s test, so an area can appear in these lists by chance.');
@@ -20712,7 +20733,7 @@ var PH_SHOW = {
       var v = wardOvValue(currentWard, k);
       if (v == null || v === '' || isNaN(parseFloat(v))) return '<div>' + e(ovLabel(k)) + ': <span style="color:var(--ink-3)">No figure</span></div>';
       var ctx = (typeof bivOn === 'function' && bivOn()) ? '' : ovContext('ward', k, v, (typeof WARD_DATA !== 'undefined' && WARD_DATA[currentWard]) || {});
-      return '<div>' + e(ovLabel(k)) + ': <b>' + e(fmtOv(v, k)) + '</b>' +
+      return '<div>' + e(ovLabel(k)) + ': <b>' + e(fmtOvTip(v, k)) + '</b>' +
         (ctx ? '<span class="ctx">' + e(ctx) + '</span>' : '') + '</div>';
     };
     el.innerHTML = line(curOv) + ((typeof bivOn === 'function' && bivOn()) ? line(curOv2) : '');

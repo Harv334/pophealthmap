@@ -821,7 +821,7 @@ const smallText = page => page.evaluate(() => {
     ok(fig.fmt.join('|') === '7.3 per 100,000|12.3%|101.3|2.3|85.3',
       'figures carry their own unit: "%" only on percentages, a rate per 100,000 says so, a ratio has none, and a mean decile has one place', fig.fmt.join(' | '));
     ok(!fig.desc.length, 'fertility, car to work, walk or cycle to work and unpaid care are descriptive', fig.desc.join(', '));
-    ok(/^Higher than 99% of /.test(fig.ctx[0]) && /^Lower than 99% of /.test(fig.ctx[1]) && !/100%/.test(fig.ctx.join(' ')),
+    ok(/^Within London: higher than 99% of wards$/.test(fig.ctx[0]) && /^Within London: lower than 99% of wards$/.test(fig.ctx[1]) && !/100%/.test(fig.ctx.join(' ')),
       'hover context stops at 99%, never 100%', fig.ctx.join(' | '));
     await setOv(page, 'ft_93089');
     await page.waitForTimeout(1500);
