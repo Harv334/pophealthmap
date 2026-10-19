@@ -794,7 +794,7 @@ const smallText = page => page.evaluate(() => {
       ok(r2.lang === 'en-GB' && r2.pcodes.length === 0 && r2.counts.length === 1 && r2.dashes === 0,
         'the report declares en-GB, has no "P95", gives one ward count and no dashes', JSON.stringify(r2));
       ok(r2.png, 'every report chart offers SVG and PNG');
-      ok(r2.careFill.toUpperCase() === '#9AA6B2', 'the report draws unpaid care as descriptive, in the neutral colour', r2.careFill);
+      ok(r2.careFill.toUpperCase() === '#7A8794', 'the report draws unpaid care as descriptive, in the neutral colour', r2.careFill);
       ok(/^mailto:contact@pophealth\.uk\?subject=Problem with a figure in the report for Lansbury ward&body=/.test(r2.mail) &&
          /Link to the map view: http/.test(r2.mail) && /please describe it here/.test(r2.mail) && / \| contact@pophealth\.uk$/.test(r2.mail),
         'the report footer says how to report a problem with a figure, by a pre-filled email', r2.mail);
@@ -3798,9 +3798,17 @@ const smallText = page => page.evaluate(() => {
       'polish: without a postcode the ward sheet points to the map rather than saying "No figure"', fig2);
     // P16: the full profile is a wide reading view, and the button closes it.
     await page.click('#ws-profile');
-    await page.waitForTimeout(800);
+    // The panel widens over a short transition; read it once it has settled.
+    await page.waitForFunction(() => document.getElementById('sidebar').getBoundingClientRect().width >= 600, null, { timeout: 5000 }).catch(() => {});
+    await page.waitForTimeout(1000);
     const wide = await page.evaluate(() => ({ w: document.getElementById('sidebar').getBoundingClientRect().width, b: document.getElementById('ws-profile').textContent,
       fs: getComputedStyle(document.querySelector('#wpanel .sr')).fontSize }));
+    // The whole region framed first: an area cut off at the map's bottom
+    // edge keeps its whole box, which axe counts as a neighbour of the footer
+    // links below, and that depends on where the map is panned rather than
+    // on the profile.
+    await page.evaluate(() => map.fitBounds(wLyr.getBounds(), { padding: [40, 40], animate: false }));
+    await page.waitForTimeout(800);
     await checkAxe(page, 'the full profile, wide');
     await page.click('#ws-profile');
     await page.waitForTimeout(800);

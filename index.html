@@ -21195,14 +21195,17 @@ var PH_SHOW = {
     if (!tw || !sb || !window.MutationObserver) return;
     var was = false;
     new MutationObserver(function () {
+      // Leaving the tab ends the reading view, so a later visit to it opens
+      // at the panel's own width.
+      if (!tw.classList.contains('active')) sb.classList.remove('profile-wide');
       var now = profileOpen();
       syncProfBtn();
       // The map is narrower or wider now, and Leaflet caches its size.
-      if (now !== was && typeof map !== 'undefined' && map) setTimeout(function () { map.invalidateSize({ pan: false }); }, 220);
+      if (now !== was && typeof map !== 'undefined' && map) setTimeout(function () { map.invalidateSize({ animate: false }); }, 220);
       was = now;
     }).observe(tw, { attributes: true, attributeFilter: ['class'] });
     new MutationObserver(function () { var now = profileOpen(); if (now !== was) { syncProfBtn(); was = now;
-      if (typeof map !== 'undefined' && map) setTimeout(function () { map.invalidateSize({ pan: false }); }, 220); } })
+      if (typeof map !== 'undefined' && map) setTimeout(function () { map.invalidateSize({ animate: false }); }, 220); } })
       .observe(sb, { attributes: true, attributeFilter: ['class'] });
   })();
   function closeProfile() {
