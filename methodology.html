@@ -102,9 +102,10 @@ https://pophealth.uk, accessed on <em>date</em>.</p>
 <p>For example, a citation for one of the Local Health figures would read:</p>
 
 <p class="cite">PopHealth Map, Life expectancy at birth, women, for the wards of
-Tower Hamlets, 2019 to 2023. Figures from OHID Local Health, updated on
+Tower Hamlets, 2019 to 2023, updated on
 <span class="js-updated">the date shown at the foot of the map</span>.
-https://pophealth.uk, accessed on <span class="js-today">the day you looked</span>.</p>
+https://pophealth.uk, accessed on <span class="js-today">the day you looked</span>.
+Ward estimates calculated by PopHealth Map from OHID Local Health MSOA figures.</p>
 
 <p>To show someone exactly what you saw, use Copy link at the top of the map,
 which keeps the indicator, the area and the level you had chosen. Most of the
@@ -250,7 +251,13 @@ live. Where a figure is not published for LAs, each LA's figure is calculated
 from its wards in the same way, which makes it the rate for the LA's residents
 rather than an average of unequal wards. It can differ slightly from a figure
 the council or a publisher gives for itself, which may use a different
-population or year.</p>
+population or year. For OHID's Local Health indicators the difference can be
+larger, because life expectancy and standardised ratios cannot be averaged
+exactly and OHID's own LA figures can cover a different period, so the map
+says under its key that these LA figures are our estimates, leaves the City of
+London out of their LA rankings, and the Area profile shows OHID's own LA
+figures. Where the data carries OHID's LA figure for one of these indicators,
+the map uses it instead.</p>
 
 <h4 id="la-only">Figures published only for a whole LA are not offered on the map</h4>
 
@@ -629,8 +636,10 @@ choose <strong>LA</strong> to see the figures for the City as a whole.</p>
 <p>The older Local Health figures, such as the hospital admissions for 2016/17
 to 2020/21, are published for the MSOAs of 2011, and OHID leaves out the MSOAs
 whose boundaries changed in 2021, which is about 2% of England's and 39 of
-London's. Those areas are blank for those figures rather than estimated. The
-newer figures are published for the MSOAs of 2021 and cover every one.</p>
+London's. Those areas are blank for those figures rather than estimated, and
+the map's notice and the area's hover card say so, rather than giving privacy
+as the reason. The newer figures are published for the MSOAs of 2021 and cover
+every one.</p>
 
 <h3 id="gap-ptal">Public transport accessibility is London only</h3>
 
@@ -763,6 +772,15 @@ Gray canvas used instead if CARTO's tiles cannot be loaded. The Satellite
 background is Esri's World Imagery, from Esri, Maxar, Earthstar Geographics and
 the GIS User Community, with Esri's place names drawn over it.</p>
 
+<!-- The same lines, word for word, as the map's Data credits dialog
+     (index.html #credits-dlg) and DATA_LICENCES.md. -->
+<p>Contains OS data © Crown copyright and database right 2026.<br>
+Contains Royal Mail data © Royal Mail copyright and database right 2026.<br>
+Contains National Statistics data © Crown copyright and database right 2026.</p>
+
+<p>Census 2021. Source: Office for National Statistics licensed under the
+Open Government Licence v.3.0.</p>
+
 <p>Air quality is modelled by Defra and carries its own citation:
 © Crown copyright Defra via uk-air.defra.gov.uk, licenced under the Open
 Government Licence (OGL).</p>
@@ -856,7 +874,8 @@ var SOURCES = [
     what: 'Indicators published for whole LAs, including life expectancy, healthy life ' +
           'expectancy, smoking, obesity, physical activity, suicide, child poverty, screening ' +
           'and vaccination coverage.',
-    geo: 'Upper-tier LA, so a district inside a county takes the county\'s figure',
+    geo: 'LA. A district inside a county has its own figure where OHID publishes one, and otherwise ' +
+         'shows the county\'s, which the map labels as the county\'s figure',
     period: 'The latest published period, which differs from one indicator to the next',
     cadence: 'Differs by indicator, and most are yearly.',
     manifest: 'fingertips' },
@@ -969,7 +988,7 @@ var SOURCES = [
   { id: 'dentists',
     name: 'Dental practices',
     pub: 'NHS Organisation Data Service',
-    what: 'NHS dental practice locations, and the number in each ward.',
+    what: 'Practices that hold an NHS dental contract, and the number in each ward.',
     geo: 'Point, from the practice postcode',
     period: 'The current register',
     cadence: 'Monthly.',
@@ -987,7 +1006,15 @@ var SOURCES = [
   { id: 'hospitals',
     name: 'Hospitals',
     pub: 'NHS Organisation Data Service',
-    what: 'Hospital sites run by NHS trusts, picked out from the register of trust sites.',
+    what: 'Hospital sites picked out by name from the NHS register of trust sites, ' +
+          'then checked by hand for London and the North East. The register also lists ' +
+          'private hospitals where an NHS trust runs a service, teams and offices, and ' +
+          'sites that no longer work as hospitals. In the checked regions, teams, offices ' +
+          'and closed sites are left out, each hospital is marked as NHS or private and by ' +
+          'kind, and the major hospitals with a 24-hour A&E are marked as such. Elsewhere a ' +
+          'site is shown as listed on the register, so please check before you travel. ' +
+          'Not every hospital has an A&E: in an emergency call 999, and for urgent help ' +
+          'that is not an emergency use NHS 111 online or call 111.',
     geo: 'Point, from the site postcode',
     period: 'The current register',
     cadence: 'Monthly.',
@@ -1127,7 +1154,9 @@ Array.prototype.forEach.call(document.querySelectorAll('table.stack'), labelTabl
     var when = fmtDate(s.fetched_at);
     // A failure is the thing worth reading, so it is stated rather than
     // reduced to a colour, and it says what the consequence is.
-    if (s.status === 'failed' || s.status === 'skipped') {
+    // 'skipped' is by design (a source that does not apply to this region),
+    // so only a real failure is reported as stale.
+    if (s.status === 'failed') {
       return '<span class="status-bad">Not updated' + (when ? ' on ' + esc(when) : '') + '</span>' +
         '<br><span class="small">The map is showing the last figures that did update, ' +
         'which are older than the rest.</span>';
@@ -1186,24 +1215,33 @@ Array.prototype.forEach.call(document.querySelectorAll('table.stack'), labelTabl
       }
       return;
     }
-    var bad = Object.keys(sources).filter(function (k) {
-      return sources[k].status === 'failed' || sources[k].status === 'skipped';
+    // Only a source that has a row in the table and actually failed counts.
+    // Sources skipped by design (custom, NaPTAN in London, TfL and PTAL in
+    // the regions) are expected and are not reported as stale.
+    var bad = SOURCES.filter(function (r) {
+      var s = r.manifest && sources[r.manifest];
+      return s && s.status === 'failed';
+    }).filter(function (r, i, arr) {
+      // Two rows can share one manifest key; count each source once.
+      return arr.findIndex(function (o) { return o.manifest === r.manifest; }) === i;
     });
+    var runDate = fmtDate(manifest.last_run);
+    var onDate = runDate ? ' on ' + esc(runDate) : ' on the last update';
     if (bad.length && noteEl) {
+      var words = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten'];
+      var n = words[bad.length] || String(bad.length);
       noteEl.style.display = 'block';
-      noteEl.innerHTML = '<strong>' + bad.length + ' of ' +
-        Object.keys(sources).length + ' sources did not refresh on the last run.</strong> ' +
-        'Those rows are marked below. The map still shows the last figures that ' +
-        'loaded successfully, so they are real but older than the rest, and the ' +
-        'period column tells you what they describe.' +
-        (manifest.last_run ? ' Last full run: ' + esc(String(manifest.last_run).slice(0, 10)) + '.' : '');
-    } else if (noteEl && manifest.last_run) {
+      noteEl.innerHTML = '<strong>' + n + (bad.length === 1 ? ' source' : ' sources') +
+        ' could not be updated' + onDate + '.</strong> ' +
+        (bad.length === 1 ? 'It is' : 'They are') + ' marked in the table above, and the map ' +
+        'is still showing ' + (bad.length === 1 ? 'its' : 'their') + ' most recent figures, ' +
+        'which are genuine but older than the rest.';
+    } else if (noteEl && runDate) {
       noteEl.style.display = 'block';
       noteEl.style.background = 'transparent';
       noteEl.style.border = '0';
       noteEl.style.color = 'var(--ink-3)';
-      noteEl.innerHTML = 'Every source refreshed on the last run, ' +
-        esc(String(manifest.last_run).slice(0, 10)) + '.';
+      noteEl.innerHTML = 'Every source was updated on ' + esc(runDate) + '.';
     }
   }
 

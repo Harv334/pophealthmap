@@ -26,6 +26,16 @@ import math
 import re
 import sys
 from io import BytesIO
+from pathlib import Path as _Path
+
+# The under 16 and working age figures are under 15 and 15 to 64 unless the
+# pipeline built them from single years of age (census_age_bands "0-15" in
+# indicators.js), and the chart labels say which.
+try:
+    AGE_OK = '"census_age_bands":"0-15"' in (_Path(__file__).resolve().parent.parent /
+        "data/map/indicators.js").read_text(encoding="utf-8").replace(" ", "")
+except OSError:
+    AGE_OK = False
 from pathlib import Path
 from statistics import median
 
@@ -447,8 +457,8 @@ def slide_demographics(prs, ward, wd):
 
     # Age stack
     age = chart_stacked([
-        ('<16', fnum(inds.get('census_under16_pct')), '#2ea8a0'),
-        ('16-64', fnum(inds.get('census_working_age_pct')), '#3b6eaf'),
+        ('<16' if AGE_OK else '<15', fnum(inds.get('census_under16_pct')), '#2ea8a0'),
+        ('16 to 64' if AGE_OK else '15 to 64', fnum(inds.get('census_working_age_pct')), '#3b6eaf'),
         ('65+', fnum(inds.get('census_over65_pct')), '#a05a9e'),
     ], 'Age profile', width=5.5, height=1.4)
     if age:

@@ -1027,14 +1027,16 @@ const smallText = page => page.evaluate(() => {
     // indicator says where its figures are instead of finding nothing.
     await page.click('#sbtab-overlay');
     const ind = {};
-    for (const q of ['smoking', 'pollution', 'arson', 'flu', 'no2', 'zzqx']) {
+    // Suicide rather than smoking: adult smoking is left out until a refresh
+    // rebuilds it at its headline age (FT_WITHHELD).
+    for (const q of ['suicide', 'pollution', 'arson', 'flu', 'no2', 'zzqx']) {
       await page.fill('#ov-search', q);
       await page.waitForTimeout(400);
       ind[q] = await page.evaluate(() => document.getElementById('ov-results').innerText.replace(/\s+/g, ' ').trim());
     }
     await page.fill('#ov-search', '');
-    ok(!/No indicator matches/.test(ind.smoking) && /Adults who smoke is only published for whole LAs/.test(ind.smoking) && /full profile/.test(ind.smoking),
-      'a council-only indicator says where its figures are', ind.smoking);
+    ok(!/No indicator matches/.test(ind.suicide) && /Suicide rate is only published for whole LAs/.test(ind.suicide) && /full profile/.test(ind.suicide),
+      'a council-only indicator says where its figures are', ind.suicide);
     ok(/Nitrogen dioxide/.test(ind.pollution), 'indicator search knows everyday words', ind.pollution.slice(0, 120));
     ok(/^1 match\b/.test(ind.arson), 'one result reads "1 match"', ind.arson.slice(0, 60));
     ok(/only published for whole LAs/.test(ind.flu) && !/\bmatch(es)?\b/.test(ind.flu.replace(/No indicator matches/, '')),
@@ -1208,7 +1210,7 @@ const smallText = page => page.evaluate(() => {
       const before = PH_CSV.columns().length;
       PH_CSV.pick('ft_93283');
       const one = before === 0 ? PH_CSV.notes() : '';
-      PH_CSV.pick('ft_smoking_prevalence_adults'); PH_CSV.pick('crime_total');
+      PH_CSV.pick('ft_suicide_rate'); PH_CSV.pick('crime_total');
       const o = PH_CSV.build();
       const col = i => o.table.slice(1).map(r => r[i]).filter(v => v !== '');
       const le = o.header.indexOf('Life expectancy at birth, women (years, 2019 to 2023)');
@@ -1220,7 +1222,7 @@ const smallText = page => page.evaluate(() => {
       });
       return {
         header: o.header, le, leVals: le === -1 ? [] : col(le),
-        smoke: o.header.find(h => /^Adults who smoke/.test(h)) || '',
+        smoke: o.header.find(h => /^Suicide rate/.test(h)) || '',
         crime: o.header.find(h => /^Total recorded crime/.test(h)) || '',
         crimeVals: col(o.header.findIndex(h => /^Total recorded crime/.test(h))),
         ptal: groupOf('ptal_score'), no2: groupOf('no2_ugm3'), sorted,
@@ -2143,6 +2145,204 @@ const smallText = page => page.evaluate(() => {
     await page.close();
   }
 
+  // The header search finds charities, pharmacies and dental practices on a
+  // fresh page (their files are lazy, and the index used to be built before
+  // they arrived and kept).
+  {
+    const { page, errors } = await open(browser, 'index.html?t=1', DESK);
+    await page.click('#hdr-search-input');
+    const find = async (q, type) => {
+      await page.fill('#hdr-search-input', q);
+      return page.waitForFunction(t => [...document.querySelectorAll('#hdr-search-results .sr-row .sr-type')]
+        .some(e => e.textContent === t), type, { timeout: 45000 }).then(() => true, () => false);
+    };
+    ok(await find('Boots', 'pharmacy'), 'search: a fresh page finds a pharmacy (Boots)');
+    ok(await find('Hackney Play Association', 'charity'), 'search: a fresh page finds a charity (Hackney Play Association)');
+    ok(await find('Dental', 'dental'), 'search: a fresh page finds a dental practice');
+    ok(errors.length === 0, 'no page errors (search lazy layers)', errors.join(' | '));
+    await page.close();
+  }
+
+  // Hospitals: the checked list, the A&E line and flag, and no empty Trust row.
+  {
+    const { page, errors } = await open(browser, 'index.html?t=1', DESK);
+    const data = await page.evaluate(() => ({
+      n: HOSP.length, reg: HOSP.filter(d => d.t === 'NHS trust site').length,
+      gone: HOSP.filter(d => /Samaritan|Barts Hospital at Home|^Private Hospitals$|Italian Hospital/.test(d.n)).map(d => d.n),
+      western: HOSP.some(d => d.n === 'Western Eye Hospital' && d.a === 'NW1 5QH'),
+      ae: HOSP.filter(d => d.ae === true).length,
+      rl: (HOSP.find(d => d.n === 'Royal London Hospital') || {}).ae,
+      guys: (HOSP.find(d => d.n === "Guy's Hospital") || {}).ae,
+      qm: HOSP.filter(d => /^Queen Mary's Hospital, (Roehampton|Sidcup)$/.test(d.n)).length,
+      note: (document.getElementById('hosp-ae-note') || {}).textContent || '',
+    }));
+    ok(data.reg === 0 && data.gone.length === 0 && data.western && data.qm === 2,
+      'hospitals: typed from the checked list, closed sites and services left out, names told apart', JSON.stringify(data));
+    ok(data.ae >= 20 && data.rl === true && data.guys === false, 'hospitals: the major hospitals with a 24-hour A&E are flagged', JSON.stringify(data));
+    ok(/^Not every hospital has an A&E\. In an emergency call 999, and for urgent help that is not an emergency use NHS 111 online or call 111\.$/.test(data.note.trim()),
+      'hospitals: the Layers row says not every hospital has an A&E', data.note);
+    const pop = await page.evaluate(() => {
+      let m = null;
+      hL.eachLayer(l => { if (/Royal London Hospital</.test(l.getPopup().getContent())) m = l; });
+      const div = document.createElement('div');
+      div.innerHTML = m ? m.getPopup().getContent() : '';
+      return { keys: [...div.querySelectorAll('.pop-key')].map(e => e.textContent),
+        text: div.textContent };
+    });
+    ok(!pop.keys.includes('Trust') && pop.keys.includes('A&E') && /Has a 24-hour A&E/.test(pop.text) && /In an emergency call 999/.test(pop.text),
+      'hospitals: a popup has its type, its A&E and the 999 line, and no empty Trust row', JSON.stringify(pop));
+    await page.click('.mode-btn[data-mode="directory"]');
+    await page.waitForFunction(() => document.querySelector('#dir-types [data-dtype="hospital"]'), null, { timeout: 30000 }).catch(() => {});
+    await page.click('#dir-types [data-dtype="hospital"]');
+    await page.waitForTimeout(400);
+    const dir = await page.evaluate(() => ({ note: !!document.getElementById('dir-hosp-note'),
+      chip: !!document.querySelector('#dir-types [data-dae]') }));
+    await page.click('#dir-types [data-dae]');
+    await page.waitForTimeout(400);
+    const aeRows = await page.evaluate(() => [...document.querySelectorAll('#dir-list .dir-item .dir-sub')].map(e => e.textContent));
+    ok(dir.note && dir.chip && aeRows.length === data.ae && aeRows.every(t => /24-hour A&E/.test(t)),
+      'directory: the hospital list starts with the 999 line and can be cut to hospitals with an A&E', JSON.stringify({ dir, n: aeRows.length, first: aeRows[0] }));
+    ok(errors.length === 0, 'no page errors (hospitals)', errors.join(' | '));
+    await page.close();
+  }
+
+  // GP practices, pharmacies and dentists a resident can use: no schemes,
+  // hubs or offices among the GP practices, no appliance or online-only
+  // pharmacies, and the dental layer says what an NHS contract means.
+  {
+    const { page, errors } = await open(browser, 'index.html?t=1', DESK);
+    await page.evaluate(() => Promise.all([ensureLayerData('pharmacy'), ensureLayerData('dental')]));
+    const s = await page.evaluate(() => ({
+      gpBad: GPS.filter(d => /special allocation|\bSAS\b|PCN Ea Hub|federat|covid/i.test(d.n)).map(d => d.n),
+      homeless: (GPS.find(d => d.code === 'E87772') || {}).kind || '',
+      phBad: pharmData.filter(d => /fittleworth|online|chemist 2 home/i.test(d.name)).map(d => d.name),
+      prison: dentalData.filter(d => /\bHMP\b/i.test(d.name)).map(d => d.name),
+      note: (document.getElementById('dental-note') || {}).textContent || '',
+    }));
+    ok(!s.gpBad.length && s.homeless === 'Practice for people who are homeless',
+      'GP practices: no schemes, hubs or offices, and the practices for people who are homeless are labelled', JSON.stringify(s));
+    ok(!s.phBad.length && !s.prison.length, 'pharmacies and dentists: no appliance or online-only suppliers, and no prisons', JSON.stringify(s));
+    ok(/A contract does not mean a practice is taking new NHS patients/.test(s.note), 'dental: the Layers row says what an NHS contract means', s.note);
+    ok(errors.length === 0, 'no page errors (service layers)', errors.join(' | '));
+    await page.close();
+  }
+
+  // The LSOA report waits for the pharmacies, dental practices and charities,
+  // as the ward report does, rather than counting none on a fresh page.
+  {
+    const { page, errors } = await open(browser, 'index.html?t=1', DESK);
+    const [rep] = await Promise.all([
+      page.context().waitForEvent('page'),
+      page.evaluate(() => { generateLSOAReport('E01004243'); }),
+    ]);
+    const listed = await rep.waitForFunction(() => /Britannia Pharmacy/i.test(document.body.innerText), null, { timeout: 60000 })
+      .then(() => true, () => false);
+    ok(listed, 'LSOA report: a fresh page\'s report for E01004243 lists Britannia Pharmacy');
+    await rep.close();
+    ok(errors.length === 0, 'no page errors (LSOA report)', errors.join(' | '));
+    await page.close();
+  }
+
+  /* Review items B2, B6, B7, H1, H8 and H10: one additivity rule, the
+     highest and lowest lists, the blank-area notice, Local Health LA
+     estimates, small wards in reports, and LSOA deprivation in Compare. */
+  {
+    const { page, errors } = await open(browser, 'index.html?t=1', DESK);
+    // B2: Compare's LA figure is the map's, and so is Ask's, for every key.
+    const add = await page.evaluate(async () => {
+      PH_COMPARE.setLevel('borough');
+      await new Promise(r => setTimeout(r, 800));
+      const code = { 'Tower Hamlets': 'E09000030', 'Newham': 'E09000025' };
+      const cmp = Object.keys(code).map(n => [n, PH_COMPARE.figures(n).crime_total, parseFloat(boroughOvValue(code[n], 'crime_total'))]);
+      const areas = PH_ASSISTANT.areasFor('la'), bad = [];
+      Object.values(areas).forEach(a => Object.keys(a.indicators).forEach(k => {
+        const m = parseFloat(boroughOvValue(a.lad_code, k));
+        if (!isNaN(m) && Math.abs(m - a.indicators[k]) > 0.006) bad.push(a.name + ' ' + k + ' ' + a.indicators[k] + ' vs ' + m);
+      }));
+      PH_COMPARE.setLevel('ward');
+      return { cmp, bad: bad.slice(0, 5), nBad: bad.length, n: Object.keys(areas).length,
+        sums: ['crime_total', 'crime_violence_12mo', 'claimant_count', 'census_population'].every(laSums) && !laSums('census_bad_health_pct') };
+    });
+    ok(add.cmp.every(([, c, m]) => c > 1000 && Math.abs(c - m) < 0.01), 'Compare\'s LA crime total is the map\'s figure (summed, not averaged)', JSON.stringify(add.cmp));
+    ok(add.n >= 33 && add.nBad === 0, 'every Ask LA figure matches the map\'s', add.nBad + ': ' + add.bad.join(' | '));
+    ok(add.sums, 'one additivity rule: crime counts and claimant_count are summed, rates are not');
+    // H10: an LSOA's deprivation chip reads its own decile.
+    const lsoa = await page.evaluate(async () => {
+      PH_COMPARE.setLevel('lsoa');
+      await new Promise(r => setTimeout(r, 800));
+      const f = PH_COMPARE.figures('E01004243');
+      PH_COMPARE.setLevel('ward');
+      return { dec: f.imd_decile_mean, own: (LSOA_DATA['E01004243'] || {}).imd_decile };
+    });
+    ok(lsoa.own != null && lsoa.dec === lsoa.own, 'Compare at LSOA level reads the LSOA\'s own deprivation decile', JSON.stringify(lsoa));
+    // B6: lists of buttons, small City wards left out with a note, ties said.
+    await setOv(page, 'census_bad_health_pct');
+    await page.waitForTimeout(1500);
+    await page.click('#dl-seg [data-dl="ward"]');
+    await page.waitForTimeout(2500);
+    const rk = await page.evaluate(() => ({
+      buttons: document.querySelectorAll('#rank-best ol.rank-list > li > button.rank-row[type="button"]').length,
+      ids: [...document.querySelectorAll('#rank-best .rank-row, #rank-worst .rank-row')].map(b => b.dataset.id),
+      hdr: document.getElementById('rank-best-hdr').textContent, notes: document.getElementById('rank-notes').textContent }));
+    const smallIds = await page.evaluate(ids => ids.filter(id => wardIsSmall(WARD_DATA[id])), rk.ids);
+    ok(rk.buttons === 10 && rk.hdr === 'Best 10 (lowest %)', 'the rank rows are buttons in an ordered list, and the header carries the unit', JSON.stringify(rk).slice(0, 200));
+    ok(!smallIds.length && /City of London wards with fewer than 1,000 residents are left out/.test(rk.notes),
+      'wards under 1,000 residents are left out of a percentage ranking, and the list says so', smallIds.join(', ') + ' | ' + rk.notes);
+    await setOv(page, 'core20_lsoa_count');
+    await page.waitForTimeout(2000);
+    const cnt = await page.evaluate(() => [document.getElementById('rank-best-hdr').textContent, document.getElementById('rank-notes').textContent]);
+    ok(/^Highest 10/.test(cnt[0]) && /wards in London have none, so this list shows ten of them in alphabetical order\./.test(cnt[1]),
+      'a count ranks as Highest and Lowest, and a tie at zero is said', cnt.join(' / '));
+    const clickRow = await page.evaluate(async () => {
+      const b = document.querySelector('#rank-best .rank-row'); b.focus(); b.click();
+      await new Promise(r => setTimeout(r, 800));
+      return { focused: document.activeElement === b || document.activeElement.tagName !== 'BODY', ward: (document.getElementById('ws-name') || {}).textContent, id: b.dataset.id };
+    });
+    ok(clickRow.ward === clickRow.id, 'selecting a rank row still opens that ward', JSON.stringify(clickRow));
+    // B7: the notice and the hover card give the reason the data shows.
+    await setOv(page, 'ft_93227');
+    await page.waitForTimeout(3000);
+    const b7 = await page.evaluate(() => ({
+      text: document.getElementById('fingertips-banner-text').textContent,
+      redrawn: Object.keys(MSOA_DATA).filter(msoaRedrawn2021).length,
+      card: msoaNoFigure(Object.keys(MSOA_DATA).filter(msoaRedrawn2021)[0], 'ft_93227'),
+      other: msoaNoFigure('E02000001', 'census_bad_health_pct') }));
+    ok(/^Areas left blank have no figure\. OHID’s figures for these areas leave out the MSOAs that were redrawn in 2021/.test(b7.text) && b7.redrawn === 39,
+      'the blank-area notice names the 39 MSOAs redrawn in 2021 for the hospital admissions series', JSON.stringify(b7));
+    ok(/^No figure: this MSOA was redrawn in 2021/.test(b7.card) && b7.other === 'No figure', 'a blank MSOA\'s card says why, or "No figure"', JSON.stringify(b7));
+    await setOv(page, 'ft_93105');
+    await page.waitForTimeout(1500);
+    ok(/^Areas left without colour have no figure\. OHID, the Office for Health Improvement and Disparities, withholds/.test(
+      await page.evaluate(() => document.getElementById('fingertips-banner-text').textContent)), 'other blanks are described as withheld');
+    // H1: an LA map of a Local Health indicator says it is our estimate, and
+    // its LA list leaves out the City.
+    await setOv(page, 'ft_932831');
+    await page.waitForTimeout(1500);
+    await page.click('#dl-seg [data-dl="borough"]');
+    await page.waitForTimeout(2500);
+    const h1 = await page.evaluate(() => ({ est: (document.getElementById('sc-la-est') || {}).textContent || '',
+      ids: [...document.querySelectorAll('#rank-best .rank-row, #rank-worst .rank-row')].map(b => b.dataset.id),
+      twin: indSameAs('ft_life_expectancy_male') }));
+    ok(/^These LA figures are our estimates from ward figures/.test(h1.est) && !h1.ids.includes('E09000001') && !h1.twin,
+      'Local Health LA figures are labelled as estimates from wards, without the City in the lists, and OHID\'s LA series is offered too', JSON.stringify(h1).slice(0, 300));
+    await page.click('#dl-seg [data-dl="ward"]');
+    await page.waitForTimeout(1500);
+    // H8: the report does not rank or compare a ward its Summary does not.
+    const h8 = await page.evaluate(() => {
+      const one = wn => { let html = ''; _generateWardReport({ sink: h => { html = h; } }, wn);
+        return new DOMParser().parseFromString(html, 'text/html'); };
+      const b = one('Bishopsgate'), w = one('Walbrook');
+      return { bCaps: [...b.querySelectorAll('.kpi-ctx-cap')].map(e => e.textContent),
+        wSub: w.querySelector('.hero .sub').textContent, wPanel: (w.querySelector('.no-census') || {}).textContent || '',
+        wHo: [...w.querySelectorAll('table.ho th')].map(t => t.textContent).join('|') };
+    });
+    ok(h8.bCaps.length && h8.bCaps.every(c => c === 'Too few residents to compare'), 'a ward under 1,000 residents is not placed among other wards in its report', h8.bCaps.join(' | '));
+    ok(!/deprived/.test(h8.wSub) && /^There are no Census figures for Walbrook/.test(h8.wPanel) && !/City of London ward median/.test(h8.wHo),
+      'Walbrook\'s report has no rank, one sentence for its missing Census figures and no repeated City median', JSON.stringify(h8));
+    ok(errors.length === 0, 'no page errors (review items B2 to H10)', errors.join(' | '));
+    await page.close();
+  }
+
   // A region
   if (HAS_NE) {
     const { page, errors } = await open(browser, 'index.html?r=north-east&t=1', DESK);
@@ -2162,6 +2362,16 @@ const smallText = page => page.evaluate(() => {
         sheetAsk: !!b && !b.hidden && b.getBoundingClientRect().width > 0, available: !!(window.PH_ASSISTANT && PH_ASSISTANT.available) };
     });
     ok(!askNE.toggle && !askNE.panel && !askNE.sheetAsk && !askNE.available, 'region: no Ask button or panel outside London', JSON.stringify(askNE));
+    // B6: the most deprived ten LSOAs are the ten with the lowest national
+    // rank, not the first ten in the file (which were all in Gateshead).
+    await setOv(page, 'imd_decile');
+    await page.waitForTimeout(3000);
+    const neDec = await page.evaluate(() => ({
+      lads: [...new Set([...document.querySelectorAll('#rank-worst .rank-row')].map(b =>
+        (LSOA_IMD.features.find(f => f.properties.code === b.dataset.id) || { properties: {} }).properties.borough))],
+      notes: document.getElementById('rank-notes').textContent }));
+    ok(neDec.lads.length > 1 && /LSOAs in the North East are in decile 1, the most deprived tenth of England, so this list shows the ten with the lowest national rank\./.test(neDec.notes),
+      'region: the lowest 10 LSOAs for deprivation are not all from one LA, and the tie is said', JSON.stringify(neDec));
     ok(errors.length === 0, 'no page errors (North East)', errors.join(' | '));
     await page.close();
   } else {
@@ -2172,6 +2382,201 @@ const smallText = page => page.evaluate(() => {
   {
     const { page } = await open(browser, 'index.html?r=england', DESK);
     ok(await page.evaluate(() => /England map is large/.test(document.body.innerText)), 'England warning shows');
+    await page.close();
+  }
+
+  // Only the served files are published (B11). Checked when the folder under
+  // test is the assembled site (scripts/build_site.sh), which has .nojekyll.
+  {
+    const site = (await fetch(BASE + '/.nojekyll')).ok;
+    if (site) {
+      const codes = {};
+      for (const p of ['HANDOVER.md', 'README.md', 'DOMAIN.md', 'fetch_all_data.py', 'index.html', 'data/ward_core.json']) {
+        codes[p] = (await fetch(BASE + '/' + p)).status;
+      }
+      ok(codes['HANDOVER.md'] === 404 && codes['README.md'] === 404 && codes['DOMAIN.md'] === 404 &&
+        codes['fetch_all_data.py'] === 404 && codes['index.html'] === 200 && codes['data/ward_core.json'] === 200,
+        'site: internal notes are not published, the page and its data are', JSON.stringify(codes));
+    } else console.log('SKIP site contents (not the assembled _site)');
+  }
+
+  // The ward sheet header between 900 and 1180px (B13): the name keeps room
+  // to be read and the close button stays inside the sheet.
+  for (const [w, h] of [[1024, 768], [920, 700]]) {
+    const { page } = await open(browser, 'index.html?t=1', { width: w, height: h });
+    await page.evaluate(() => { const l = wLyr.getLayers().find(l => l.feature.properties.WD24NM === 'Spitalfields & Banglatown'); if (l) l.fire('click'); });
+    await page.waitForTimeout(800);
+    const r = await page.evaluate(() => {
+      const s = document.getElementById('ward-sheet').getBoundingClientRect();
+      const n = document.getElementById('ws-name').getBoundingClientRect();
+      const c = document.getElementById('ws-close').getBoundingClientRect();
+      return { name: Math.round(n.width), inside: c.left >= s.left && c.right <= s.right && c.width > 0 };
+    });
+    ok(r.name >= 150 && r.inside, 'ward sheet at ' + w + 'x' + h + ': the name is readable and Deselect is inside the sheet', JSON.stringify(r));
+    await page.close();
+  }
+
+  // Keyboard and screen reader checks (B15, H24, H35, H36, H37).
+  {
+    const { page, errors } = await open(browser, 'index.html?t=1', DESK);
+    const act = () => page.evaluate(() => {
+      const a = document.activeElement;
+      return { body: !a || a === document.body, id: a ? a.id : '', cls: a ? String(a.className) : '', ov: a && a.dataset ? a.dataset.ov || '' : '', tag: a ? a.tagName : '' };
+    });
+    // Query: Add a condition is a button that takes focus, Enter adds a row and
+    // focus goes to its indicator, and the results are a list of buttons.
+    await page.click('.mode-btn[data-mode="query"]');
+    await page.waitForTimeout(800);
+    await page.focus('#q-add-cond');
+    const qa = await act();
+    const before = await page.evaluate(() => document.querySelectorAll('.q-cond').length);
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(300);
+    const after = await page.evaluate(() => document.querySelectorAll('.q-cond').length);
+    const qf = await act();
+    ok(qa.id === 'q-add-cond' && qa.tag === 'BUTTON' && after === before + 1 && /q-f-ind/.test(qf.cls),
+      'Query: Add a condition takes focus, Enter adds a condition and focuses its indicator', JSON.stringify([qa, before, after, qf]));
+    await page.click('#q-run');
+    await page.waitForTimeout(1500);
+    const qr = await page.evaluate(() => ({
+      btns: document.querySelectorAll('#q-results ol.q-list > li > button.q-row').length,
+      divs: document.querySelectorAll('#q-results div.q-row').length }));
+    ok(qr.btns > 0 && qr.divs === 0, 'Query: the results are an ordered list of buttons', JSON.stringify(qr));
+    await page.click('.mode-btn[data-mode="explore"]');
+    await page.waitForTimeout(600);
+
+    // Every layer checkbox is named by its own label (H37).
+    const lab = await page.evaluate(() => [...document.querySelectorAll('.lrow input[type="checkbox"]')]
+      .filter(i => !(i.labels && i.labels.length && i.labels[0].control === i && i.labels[0].textContent.trim()))
+      .map(i => i.id).concat([...document.querySelectorAll('label.lrow, .lrow > label')]
+        .filter(l => !(l.control && l.control.type === 'checkbox')).map(l => 'label:' + (l.id || l.textContent.trim().slice(0, 30)))));
+    ok(lab.length === 0, 'Layers: every layer checkbox has its label as its name, ICBs and PCNs included', lab.join(', '));
+
+    // Focus is not dropped to the top of the page (H36).
+    await page.click('#sbtab-overlay');
+    await page.waitForTimeout(400);
+    const lost = [];
+    const chip = await page.evaluate(() => { const c = [...document.querySelectorAll('#ov-chips .ov-chip')].find(b => !b.classList.contains('on')); if (c) c.focus(); return !!c; });
+    if (chip) { await page.keyboard.press('Enter'); await page.waitForTimeout(500); const a = await act(); if (a.body || !a.ov) lost.push('key indicator chip ' + JSON.stringify(a)); }
+    const th = await page.evaluate(() => { const t = document.querySelector('#ov-themes .ov-theme, .ov-theme'); if (t) t.click(); return !!t; });
+    await page.waitForTimeout(400);
+    const row = th && await page.evaluate(() => { const r = [...document.querySelectorAll('.ov-tv-row')].find(b => !b.classList.contains('on') && b.getClientRects().length); if (r) r.focus(); return !!r; });
+    if (row) { await page.keyboard.press('Enter'); await page.waitForTimeout(500); const a = await act(); if (a.body) lost.push('theme row'); }
+    const clr = await page.evaluate(() => { const c = document.getElementById('ov-clear'); if (c && c.getClientRects().length) { c.focus(); return true; } return false; });
+    if (clr) { await page.keyboard.press('Enter'); await page.waitForTimeout(500); const a = await act(); if (a.body) lost.push('Clear'); }
+    await page.evaluate(() => { const l = wLyr.getLayers().find(l => l.feature.properties.WD24NM === 'Stepney Green'); if (l) l.fire('click'); });
+    await page.waitForTimeout(800);
+    await page.focus('#ws-close');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(500);
+    { const a = await act(); if (a.body) lost.push('Deselect this ward'); }
+    const live = await page.evaluate(() => document.getElementById('sr-live').textContent);
+    await page.evaluate(() => { const l = wLyr.getLayers().find(l => l.feature.properties.WD24NM === 'Stepney Green'); if (l) l.fire('click'); });
+    await page.waitForTimeout(800);
+    await page.focus('#ws-profile');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(500);
+    const prof = await page.evaluate(() => { const a = document.activeElement; return a && a.matches('#wpanel h2.wname'); });
+    if (!prof) lost.push('Open full profile');
+    await page.click('.mode-btn[data-mode="compare"]');
+    await page.waitForTimeout(800);
+    // Placed just above an indicator that is not yet shown, so one ArrowDown
+    // lands on it.
+    const hasAdd = await page.evaluate(() => {
+      const s = document.getElementById('cmp-add-metric');
+      if (!s) return false;
+      const on = [...document.querySelectorAll('#cmp-metrics [data-metric].on')].map(c => c.textContent.trim());
+      const t = [...s.options].findIndex((o, i) => i > 0 && on.indexOf(o.textContent.trim()) === -1);
+      if (t < 1) return false;
+      s.selectedIndex = t - 1;
+      s.focus();
+      return true;
+    });
+    if (hasAdd) {
+      const n0 = await page.evaluate(() => document.querySelectorAll('#cmp-metrics [data-metric].on').length);
+      await page.keyboard.press('ArrowDown');
+      await page.waitForTimeout(400);
+      const n1 = await page.evaluate(() => document.querySelectorAll('#cmp-metrics [data-metric].on').length);
+      const a1 = await act();
+      await page.keyboard.press('Enter');
+      await page.waitForTimeout(400);
+      const n2 = await page.evaluate(() => document.querySelectorAll('#cmp-metrics [data-metric].on').length);
+      const a2 = await act();
+      ok(n1 === n0 && a1.id === 'cmp-add-metric' && n2 === n0 + 1 && a2.id === 'cmp-add-metric',
+        'Compare: an arrow key in Add an indicator only chooses, Enter adds and focus stays on the select', JSON.stringify([n0, n1, a1.id, n2, a2.id]));
+    } else console.log('SKIP Compare add an indicator (no select)');
+    await page.click('.mode-btn[data-mode="explore"]');
+    await page.waitForTimeout(600);
+    ok(lost.length === 0, 'focus stays put after a key indicator, a theme row, Clear, Deselect and Open full profile', lost.join(', '));
+    ok(/No area is selected/.test(live), 'Deselect this ward says no area is selected', live);
+
+    // The region select only chooses with an arrow key (H24).
+    await page.click('#sbtab-layers');
+    await page.waitForTimeout(400);
+    const pickShown = await page.evaluate(() => { const w = document.getElementById('region-picker-wrap'); return !!(w && !w.hidden && w.getClientRects().length); });
+    if (pickShown) {
+      const url0 = page.url();
+      const v0 = await page.evaluate(() => document.getElementById('region-picker').value);
+      await page.focus('#region-picker');
+      await page.keyboard.press('ArrowDown');
+      await page.waitForTimeout(1200);
+      const v1 = await page.evaluate(() => document.getElementById('region-picker').value);
+      ok(page.url() === url0 && v1 !== v0 && await page.evaluate(() => !!document.getElementById('region-go')),
+        'region select: an arrow key chooses without leaving the page, and Open this region goes', JSON.stringify([url0, page.url(), v0, v1]));
+      await page.evaluate(v => { document.getElementById('region-picker').value = v; }, v0);
+    } else console.log('SKIP region select (one region published)');
+
+    // The tour's keys act only inside the tour strip (H35).
+    await page.evaluate(() => { deselectWard(); PH_TOUR.start(); });
+    await page.waitForTimeout(800);
+    const ctr = () => page.evaluate(() => document.getElementById('tour-ctr').textContent);
+    const c0 = await ctr();
+    const said = await page.evaluate(() => new Promise(r => setTimeout(() => r(document.getElementById('sr-live').textContent), 200)));
+    await page.focus('#sbtab-overlay');
+    await page.keyboard.press('ArrowRight');
+    await page.waitForTimeout(500);
+    await page.evaluate(() => document.activeElement && document.activeElement.blur());
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(400);
+    const c1 = await ctr();
+    const still = await page.evaluate(() => PH_TOUR.running());
+    await page.focus('#tour-next');
+    await page.keyboard.press('ArrowRight');
+    await page.waitForTimeout(600);
+    const c2 = await ctr();
+    ok(c1 === c0 && still && c2 !== c0, 'tour: arrow keys and Escape outside the strip leave it alone; inside it they step', JSON.stringify([c0, c1, still, c2]));
+    ok(/Guided tour, chapter 1 of/.test(said), 'tour: the chapter is announced', said);
+    await page.evaluate(() => PH_TOUR.end());
+    ok(errors.length === 0, 'keyboard checks: no page errors', errors.join(' | '));
+    await page.close();
+  }
+
+  // Phone: Tab never enters the closed drawer, and never leaves it when open (H34).
+  {
+    const { page } = await open(browser, 'index.html?t=1', PHONE);
+    const walk = async n => {
+      const out = [];
+      for (let i = 0; i < n; i++) {
+        await page.keyboard.press('Tab');
+        out.push(await page.evaluate(() => {
+          const a = document.activeElement;
+          if (!a || a === document.body) return 'body';
+          return (document.getElementById('sidebar').contains(a) ? 'in:' : 'out:') + (a.id || a.className || a.tagName);
+        }));
+      }
+      return out;
+    };
+    await page.focus('#hdr-menu');
+    const closed = (await walk(20)).filter(x => x.startsWith('in:'));
+    ok(closed.length === 0, 'phone: Tab from the menu button never lands in the closed drawer', closed.slice(0, 5).join(' '));
+    await page.click('#hdr-menu');
+    await page.waitForTimeout(500);
+    const opened = (await walk(60)).filter(x => x.startsWith('out:'));
+    ok(opened.length === 0, 'phone: Tab stays inside the open drawer', opened.slice(0, 5).join(' '));
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(400);
+    const back = await page.evaluate(() => document.activeElement && document.activeElement.id);
+    ok(back === 'hdr-menu', 'phone: closing the drawer puts focus back on the menu button', back);
     await page.close();
   }
 
@@ -2385,6 +2790,223 @@ const smallText = page => page.evaluate(() => {
     ok(s.over <= 0, 'methodology: no sideways scroll on a phone', s.over + 'px');
     await checkAxe(ph.page, 'methodology.html (phone)');
     await ph.page.close();
+  }
+
+  // The source status note counts only sources that failed and have a row in
+  // the table: custom and NaPTAN are skipped by design in London, and TfL and
+  // PTAL in the regions, so they are not reported as stale (B8).
+  {
+    const real = JSON.parse(fs.readFileSync(path.join(ROOT, 'data/meta/manifest.json'), 'utf8'));
+    const notes = {};
+    for (const [name, patch] of [['skipped', { naptan: 'skipped', custom: 'skipped' }], ['failed', { naptan: 'skipped', crime: 'failed' }]]) {
+      const m = JSON.parse(JSON.stringify(real));
+      m.last_run = '2026-10-17T21:56:04+00:00';
+      Object.keys(patch).forEach(k => { m.sources[k] = Object.assign({}, m.sources[k] || {}, { status: patch[k] }); });
+      const page = await browser.newPage({ viewport: DESK });
+      await page.route('**/data/meta/manifest.json', r => r.fulfill({ contentType: 'application/json', body: JSON.stringify(m) }));
+      await page.goto(BASE + '/methodology.html');
+      await page.waitForFunction(() => (document.getElementById('src-note') || {}).textContent, null, { timeout: 10000 }).catch(() => {});
+      notes[name] = await page.evaluate(() => ({ note: document.getElementById('src-note').textContent,
+        bad: [...document.querySelectorAll('#src-rows .status-bad')].map(e => e.closest('tr').id) }));
+      await page.close();
+    }
+    ok(notes.skipped.note === 'Every source was updated on 17 October 2026.' && !notes.skipped.bad.length,
+      'methodology: sources skipped by design are not reported as failures', JSON.stringify(notes.skipped));
+    ok(/^One source could not be updated on 17 October 2026\. It is marked in the table above/.test(notes.failed.note) &&
+       notes.failed.bad.join() === 'src-crime', 'methodology: a failed source is counted and marked, with the date in words', JSON.stringify(notes.failed));
+  }
+
+  // Licences travel with the figures (B9): any export or report holding a
+  // TfL station or bus stop measure carries TfL's statements, and one with
+  // air quality carries Defra's citation. Presentation view keeps the map's
+  // credits in the picture (B10). The Ask panel promises no more than it can
+  // keep (H19).
+  {
+    const { page, errors } = await open(browser, 'index.html?t=1', DESK);
+    const lic = await page.evaluate(() => {
+      const csvWith = k => { PH_CSV.setLevel('ward'); PH_CSV.pick(k); return PH_CSV.files().map(f => f.text).join('\n'); };
+      const tfl = csvWith('bus_stops_800m');
+      const no2 = csvWith('no2_ugm3');
+      const notes = PH_CSV.notes();
+      return { tfl, no2: no2, notes,
+        plain: phCreditText(['imd_score']),
+        report: reportProvenanceHtml('Test', ['rail_station_dist_m']),
+        reportPlain: reportProvenanceHtml('Test', ['imd_score']) };
+    });
+    ok(/Powered by TfL Open Data/.test(lic.tfl) && /Geomni UK Map data/.test(lic.tfl) && /version 2\.0 of the Open Government Licence/.test(lic.tfl),
+      'licences: a Data export CSV with a TfL measure carries TfL\'s statements', lic.tfl.split('\n')[1]);
+    ok(/Crown copyright Defra via uk-air\.defra\.gov\.uk/.test(lic.no2) && /Powered by TfL Open Data/.test(lic.notes),
+      'licences: air quality carries Defra\'s citation, and the notes carry the same lines');
+    ok(/not affiliated with the NHS, with figures updated on \d{1,2} \w+ 20\d\d\. Contains public sector information licensed under the Open Government Licence v3\.0\.$/.test(lic.plain),
+      'licences: every file carries the site and OGL credit', lic.plain);
+    ok(/Powered by TfL Open Data/.test(lic.report) && !/TfL/.test(lic.reportPlain),
+      'licences: a report footer names TfL only when it shows a TfL measure');
+    const ask = await page.evaluate(() => {
+      const b = document.getElementById('ai-toggle'); if (b) b.click();
+      return new Promise(r => setTimeout(() => r({ caution: (document.getElementById('ai-caution') || {}).textContent || '',
+        intro: ((document.querySelector('.ai-intro') || {}).textContent || '') }), 600));
+    });
+    ok(!/every figure in them comes from this map|built from the figures on this map/.test(ask.caution + ask.intro) &&
+       /can still get things wrong/.test(ask.caution) && /can still make mistakes/.test(ask.intro),
+      'Ask: the panel does not promise that every figure comes from the map', ask.caution);
+    await page.keyboard.press('Escape');
+    await setOv(page, 'imd_score_ward');
+    await page.waitForTimeout(800);
+    await page.click('#tb-more');
+    await page.waitForTimeout(200);
+    await page.click('#tb-png');
+    await page.waitForTimeout(400);
+    await page.click('text=This view');
+    await page.waitForTimeout(800);
+    const shot = await page.evaluate(() => {
+      const attr = document.querySelector('.leaflet-control-attribution');
+      const cap = document.getElementById('shot-caption');
+      const banner = document.querySelector('.shot-banner');
+      return { attr: !!attr && getComputedStyle(attr).visibility !== 'hidden' && attr.getClientRects().length > 0,
+        zoom: [...document.querySelectorAll('.leaflet-control-zoom')].some(z => z.getClientRects().length && getComputedStyle(z).visibility !== 'hidden'),
+        cap: cap ? cap.textContent : '', keep: banner ? /Keep the credit line/.test(banner.textContent) : false };
+    });
+    await page.waitForTimeout(4800);
+    const later = await page.evaluate(() => {
+      const banner = document.querySelector('.shot-banner'), done = document.getElementById('screenshot-done');
+      const r = banner.getBoundingClientRect();
+      return { mini: banner.classList.contains('mini'), h: Math.round(r.height), done: !!done && done.getClientRects().length > 0 };
+    });
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(400);
+    const gone = await page.evaluate(() => !document.getElementById('shot-caption') && !document.body.classList.contains('presenting'));
+    ok(shot.attr && !shot.zoom && /Deprivation|deprivation/.test(shot.cap) && /pophealth\.uk/.test(shot.cap) &&
+       /Crown copyright/.test(shot.cap) && /OpenStreetMap|Esri/.test(shot.cap) && shot.keep,
+      'Presentation view keeps the attribution and adds a credit caption under the key', JSON.stringify(shot));
+    ok(later.mini && later.h < 60 && later.done && gone, 'Presentation view: the instructions fade to a small Done button, and Esc still leaves',
+      JSON.stringify([later, gone]));
+    ok(errors.length === 0, 'no page errors (licences and Presentation view)', errors.join(' | '));
+    await page.close();
+  }
+
+  // The statement and the privacy notice (B16, H16).
+  {
+    const texts = {};
+    for (const p of ['accessibility.html', 'privacy.html']) {
+      const page = await browser.newPage();
+      await page.goto(BASE + '/' + p);
+      texts[p] = await page.evaluate(() => document.querySelector('main').innerText.replace(/\s+/g, ' '));
+      await page.close();
+    }
+    const a = texts['accessibility.html'], pr = texts['privacy.html'];
+    ok(/last reviewed on 19 October 2026/.test(a) && !/Every control can be reached/.test(a) && !/the toolbar/i.test(a) &&
+       /the pages around it: the Methodology page, the About and privacy page and this statement/.test(a),
+      'accessibility: no false keyboard claims, and the review date is current');
+    ok(['2.1.1', '2.4.7', '4.1.2', '4.1.3'].every(c => a.includes(c)), 'accessibility: the remaining known failures are listed');
+    ok(/Your personal data and your rights/.test(pr) && /Harvey Seville is responsible/.test(pr) && /legitimate interest/.test(pr) &&
+       /United States/.test(pr) && /background map does this whenever the map is open/.test(pr) && !/optional parts/.test(pr) &&
+       /ph-ldr-swept/.test(pr) && !/devBannerDismissed/.test(pr) && /last updated on 19 October 2026/.test(pr),
+      'privacy: controller, lawful basis, rights, transfers and storage rows as the site behaves');
+  }
+
+  // OHID's LA figures: a district's county figure is labelled as the
+  // county's, an LA with none of them says so, adult smoking (stored as its
+  // 18 to 64 breakdown) is left out, and the Census age bands are labelled by
+  // the ages they cover. London has no districts, so the county and missing
+  // cases run on a fixture served in place of the LA and ward files: Tower
+  // Hamlets and Hackney carry a made-up county's figures, Barnet none.
+  {
+    const bd = JSON.parse(fs.readFileSync(path.join(ROOT, 'borough_data.json'), 'utf8'));
+    const wd = JSON.parse(fs.readFileSync(path.join(ROOT, 'ward_data.json'), 'utf8'));
+    const st = (() => { const t = fs.readFileSync(path.join(ROOT, 'data/map/indicators.js'), 'utf8');
+      return JSON.parse(t.slice(t.indexOf('var PH_IND_STATS = ') + 19, t.lastIndexOf(';'))); })();
+    const LAK = k => /^ft_/.test(k) && !/^ft_\d+$/.test(k);
+    for (const c of ['E09000030', 'E09000012']) {
+      bd[c].ft_from = {};
+      Object.keys(bd[c]).filter(LAK).forEach(k => { bd[c].ft_from[k] = ['E10009999', 'Testshire']; bd[c][k] = bd.E09000030[k]; });
+    }
+    Object.keys(bd.E09000003).filter(LAK).forEach(k => delete bd.E09000003[k]);
+    Object.values(wd.wards).forEach(w => {
+      if (w.lad_code === 'E09000003') Object.keys(w.indicators).filter(LAK).forEach(k => delete w.indicators[k]);
+      if (w.lad_code === 'E09000012') Object.keys(w.indicators).filter(LAK).forEach(k => { w.indicators[k] = bd.E09000030[k]; });
+    });
+    // The shipped files first, as they are.
+    const real = await open(browser, 'index.html', DESK);
+    const r0 = await real.page.evaluate(() => {
+      showWard('Lansbury');
+      const p = document.getElementById('wpanel');
+      return { county: /county/i.test(p.innerText) || laAnyCountyFigure(), smokeRow: !!p.querySelector('[data-k="ft_smoking_prevalence_adults"]'),
+        smokeOpt: !!document.querySelector('#ov option[value="ft_smoking_prevalence_adults"]'),
+        smokeAsk: JSON.stringify(PH_ASSISTANT.runTool('list_indicators', {})).indexOf('ft_smoking_prevalence_adults') !== -1,
+        smokeArea: 'ft_smoking_prevalence_adults' in (PH_ASSISTANT.runTool('get_area', { name: 'Lansbury', level: 'ward' }).indicators || {}),
+        u: indLabel('census_under16_pct'), w: indLabel('census_working_age_pct'), den: indicatorFacts('claimant_rate_pct').den,
+        exportSmoke: (() => { PH_CSV.setLevel('borough'); PH_CSV.pick('ft_smoking_prevalence_adults'); PH_CSV.pick('ft_suicide_rate'); return PH_CSV.build().header.join('|'); })() };
+    });
+    const bands = st.census_age_bands === '0-15';
+    ok(!r0.county, 'London: no LA figure is called a county\'s');
+    ok(!r0.smokeRow && !r0.smokeOpt && !r0.smokeAsk && !r0.smokeArea && !/smok/i.test(r0.exportSmoke),
+      'adult smoking at the wrong age is left out of the profile, the picker, the export and Ask', JSON.stringify(r0));
+    ok(bands ? (r0.u === 'Aged under 16' && /16 to 64/.test(r0.w + r0.den))
+             : (r0.u === 'Aged under 15' && r0.w === 'Aged 15 to 64' && r0.den === 'Residents aged 15 to 64 at the 2021 Census'),
+      'the Census age bands are labelled as the ages indicators.js says they cover', [st.census_age_bands, r0.u, r0.w, r0.den].join(' / '));
+    await real.page.close();
+
+    const fx = await (async () => {
+      const page = await browser.newPage({ viewport: { width: DESK.width, height: DESK.height } });
+      const errors = []; page.on('pageerror', e => errors.push(e.message));
+      await page.route(/\/borough_data\.json/, r => r.fulfill({ body: JSON.stringify(bd), contentType: 'application/json' }));
+      await page.route(/\/ward_data\.json/, r => r.fulfill({ body: JSON.stringify(wd), contentType: 'application/json' }));
+      await page.route(/ward_(core|rest)\.json/, r => r.fulfill({ status: 404, body: '' }));
+      await page.goto(BASE + '/index.html');
+      await page.waitForTimeout(SETTLE);
+      return { page, errors };
+    })();
+    const r1 = await fx.page.evaluate(() => {
+      showWard('Lansbury');
+      const p = document.getElementById('wpanel');
+      const out = { ctx: (p.querySelector('.sr-ctx') || {}).innerText || '', lh: (p.querySelector('.sr-lh .sr-sub-note') || {}).innerText || '',
+        pills: [...p.querySelectorAll('.sr-ctx .gpill')].map(e => e.textContent), key: p.querySelector('.prof-key').innerText,
+        e07: laFigCounty('E07000033', 'ft_suicide_rate') === null ? 'own' : 'county' };
+      const bn = Object.values(WARD_DATA).find(w => w.lad_code === 'E09000003');
+      showWard(bn.name);
+      out.missing = (document.querySelector('#wpanel .sr-missing') || {}).innerText || '';
+      PH_CSV.setLevel('borough'); PH_CSV.pick('ft_suicide_rate');
+      const b = PH_CSV.build();
+      out.head = b.header; out.th = (b.table.find(r => r[1] === 'Tower Hamlets') || []).slice(-1)[0];
+      out.cam = (b.table.find(r => r[1] === 'Camden') || []).slice(-1)[0];
+      return out;
+    });
+    ok(/^\s*Figures for the whole of Testshire/.test(r1.ctx) &&
+       /OHID publishes these only for Testshire as a whole, which takes in Tower Hamlets and one other district, so every ward in those districts shows the same figure\. They describe the county rather than Tower Hamlets or this ward\./.test(r1.ctx) &&
+       r1.pills.length && r1.pills.every(t => t === 'county figure'),
+      'a district\'s county figures are titled, noted and marked as the county\'s', r1.ctx.slice(0, 300) + ' / ' + r1.pills.join(','));
+    ok(/further down as OHID’s official figure for Testshire as a whole, the county Tower Hamlets is part of\./.test(r1.lh) && /county figure/.test(r1.key),
+      'the life expectancy note and the key name the county', r1.lh.slice(-160));
+    ok(/^OHID’s figures for the whole of Barnet, such as life expectancy.*are missing from this version of the map\. We are working on it\.$/.test(r1.missing.trim()),
+      'an LA with none of OHID\'s figures says so in its profile', r1.missing);
+    ok(r1.head.indexOf('Area OHID\'s LA figures describe') !== -1 && r1.th === 'Testshire' && r1.cam === 'Camden',
+      'the Data export names the area OHID\'s LA figures describe', r1.head.join('|') + ' / ' + r1.th + ' / ' + r1.cam);
+    ok(r1.e07 === 'county', 'a district in an LA file without ft_from is taken to carry its county\'s figure');
+    await fx.page.click('.mode-btn[data-mode="compare"]');
+    await fx.page.waitForTimeout(800);
+    const r2 = await fx.page.evaluate(async () => {
+      PH_COMPARE.clear(); PH_COMPARE.setLevel('borough');
+      await new Promise(r => setTimeout(r, 400));
+      const m = document.getElementById('cmp-add-metric');
+      if (m) { m.value = 'ft_suicide_rate'; m.dispatchEvent(new Event('change', { bubbles: true })); }
+      for (const n of ['Tower Hamlets', 'Hackney']) {
+        const a = document.getElementById('cmp-add-area');
+        a.value = n; a.dispatchEvent(new Event('change', { bubbles: true }));
+        await new Promise(r => setTimeout(r, 200));
+      }
+      const marks = [...document.querySelectorAll('#cmp-cards .cmp-c-row')].filter(r => /Suicide/.test(r.innerText))
+        .map(r => r.querySelector('.hi, .lo') ? 'arrow' : '');
+      return { caution: document.getElementById('cmp-caution').innerText, marks,
+        same: PH_COMPARE.figures('Tower Hamlets').ft_suicide_rate === BOROUGH_DATA.E09000030.ft_suicide_rate };
+    });
+    ok(/Suicide rate is OHID’s published figure, which for a district is its county’s\./.test(r2.caution) &&
+       /The other figures are calculated from the wards in each LA, with counts added up and the rest weighted by population, so they are not published LA statistics\./.test(r2.caution) &&
+       !/published for each LA, so here/.test(r2.caution),
+      'Compare explains OHID\'s figures and the calculated ones in one note', r2.caution);
+    ok(r2.same && r2.marks.length === 2 && r2.marks.every(x => !x),
+      'Compare reads OHID\'s LA figure as published, and a tie gets no arrow', JSON.stringify(r2.marks));
+    ok(!fx.errors.length, 'no page errors with district and missing-LA figures', fx.errors.join(' | '));
+    await fx.page.close();
   }
 
   await browser.close();

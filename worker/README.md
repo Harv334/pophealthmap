@@ -16,10 +16,12 @@ The model is never given the data. It is given four tool definitions, and the
 3. The browser executes the tools locally and sends the results back.
 4. The model writes the answer around numbers it was handed.
 
-That has three consequences worth understanding. Every figure in an answer is
-the same number the map is drawing. No dataset is ever uploaded. And the model
-cannot invent a statistic, because it has none in its context: if a tool
-returns nothing, there is nothing for it to report.
+That has two consequences worth understanding. No dataset is ever uploaded,
+and the figures the model is handed are the same numbers the map is drawing.
+It does not guarantee that every number in an answer is one of them: the only
+safeguard is the system prompt's instruction to use the looked-up figures, and
+answers can still contain derived numbers (differences, ratios, rounding) or
+mistakes, which is why the panel asks readers to check any figure.
 
 ## Deploying
 

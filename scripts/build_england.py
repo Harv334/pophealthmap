@@ -305,7 +305,11 @@ def main() -> int:
         if k in yr:
             stats[k]["yr"] = yr[k]
     write_js(OUT / "map/indicators.js", "PH_IND_STATS",
-             {"generated": datetime.now(timezone.utc).isoformat(), "stats": stats},
+             dict({"generated": datetime.now(timezone.utc).isoformat()},
+                  **ind_flags([read_js(path_in(slug, src, "map/indicators.js"), "PH_IND_STATS")
+                               for slug, src in srcs
+                               if path_in(slug, src, "map/indicators.js").exists()]),
+                  stats=stats),
              "Per-indicator facts measured across England.")
     print(f"  {len(stats)} indicators with England-wide coverage")
 
@@ -352,6 +356,13 @@ def main() -> int:
         "// The loading screen's council map for England, made by scripts/build_england.py.\n"
         f"var REGION_LOADER_MAP = {dump(loader_map(councils, dec))};\n", encoding="utf-8")
     manifest = read_json(ROOT / "data/meta/manifest.json", {}) or {}
+    # London's record of each source is the base, but a source that was not ok
+    # in some region says so here too, with that region's notes, so a gap such
+    # as an LA with none of its OHID figures is not hidden behind London's ok.
+    manifest["sources"] = merge_source_notes(
+        manifest.get("sources") or {},
+        [(slug, read_json(path_in(slug, src, "meta/manifest.json"), {}) or {})
+         for slug, src in srcs])
     manifest["england"] = {"regions": published, "not_yet_published": missing,
                            "wards": len(wards), "councils": len(councils)}
     (OUT / "meta/manifest.json").write_text(json.dumps(manifest, indent=1), encoding="utf-8")
@@ -360,6 +371,44 @@ def main() -> int:
         if p.is_file():
             print(f"    {p.relative_to(OUT)}  {p.stat().st_size / 1e6:6.1f} MB")
     return 0
+
+
+_STATUS_RANK = {"ok": 0, "skipped": 1, "partial": 2, "failed": 3}
+
+
+def merge_source_notes(base: dict, regions: list) -> dict:
+    """base's source records, each made as bad as its worst region, with the
+    notes of every region where it was not ok, named by region."""
+    out = {k: dict(v) for k, v in base.items() if isinstance(v, dict)}
+    for slug, man in regions:
+        for name, rec in ((man or {}).get("sources") or {}).items():
+            if not isinstance(rec, dict):
+                continue
+            st = rec.get("status", "ok")
+            if st == "ok":
+                continue
+            o = out.setdefault(name, {"status": "ok", "notes": "", "error": ""})
+            if _STATUS_RANK.get(st, 0) > _STATUS_RANK.get(o.get("status", "ok"), 0):
+                o["status"] = st
+            msg = "; ".join(x for x in (rec.get("error"), rec.get("notes")) if x)
+            if msg:
+                line = f"{slug}: {msg}"
+                o["notes"] = (o.get("notes") + " | " if o.get("notes") else "") + line
+    return out
+
+
+def ind_flags(region_stats: list) -> dict:
+    """The facts each region's indicators.js records about how its figures
+    were made, for England: Census age bands are 0-15 only where every region
+    built them that way, Fingertips ages count as checked only where every
+    region checked them, and a series any region left out stays out."""
+    if not region_stats:
+        return {}
+    bands = {(r or {}).get("census_age_bands") or "0-14" for r in region_stats}
+    checked = all((r or {}).get("ft_age_checked") for r in region_stats)
+    bad = sorted({k for r in region_stats for k in ((r or {}).get("ft_age_mismatch") or [])})
+    return {"census_age_bands": "0-15" if bands == {"0-15"} else "0-14",
+            "ft_age_checked": checked, "ft_age_mismatch": bad}
 
 
 if __name__ == "__main__":

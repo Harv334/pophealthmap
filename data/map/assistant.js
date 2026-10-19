@@ -3,10 +3,10 @@
  *
  * The model is never sent the whole dataset. It receives tool definitions, and
  * the four functions below run against the JSON this page has already loaded,
- * so only the figures a question looks up are sent with it. So
- * every figure in an answer is the same number the map is drawing, and the
- * model cannot invent a statistic: if a tool returns nothing, there is nothing
- * for it to report.
+ * so only the figures a question looks up are sent with it, and they are the
+ * same numbers the map is drawing. The model is told to use only those, but
+ * nothing enforces it, so an answer can still carry a derived or mistaken
+ * number, and the panel says so.
  *
  * That is not the same as nothing leaving the browser. Each question, the
  * conversation so far and every tool result go to the Worker and on to
@@ -52,9 +52,12 @@ var MODEL_LABEL = "Claude Sonnet 5";
     return "Claude " + m[1].charAt(0).toUpperCase() + m[1].slice(1)
       + " " + (m[3] ? m[2] + "." + m[3] : m[2]);
   }
+  // The model's only safeguard is its instruction to use the figures it looks
+  // up, so the panel does not promise more than that.
   function modelSentence(label) {
-    return "Answers are worded by " + label
-      + ", and every figure in them comes from this map.";
+    return label + " writes each answer from the figures on this map, but it can"
+      + " still get things wrong, so please check any figure against the map or"
+      + " its source before you rely on it.";
   }
   function reportModel(id) {
     var el = document.getElementById("ai-model-note");
@@ -85,9 +88,16 @@ var MODEL_LABEL = "Claude Sonnet 5";
    * default: a wrongly averaged count looks implausible and gets caught,
    * a wrongly summed rate looks like a number and does not.
    */
-  var ADDITIVE = { census_population: 1, crime_total: 1 };
+  //
+  // The rule itself lives in index.html as laSums, which the map, Compare and
+  // Custom area also use, so Ask adds up and averages exactly as they do. The
+  // list here is only the fallback for a page that has not defined it, and
+  // matches it: crime counts (crime_total and the *_12mo categories) and any
+  // *_count are summed.
+  var ADDITIVE = { census_population: 1, crime_total: 1, gb_total_uprn: 1 };
   function isAdditive(key) {
-    return ADDITIVE[key] === 1 || /_count$/.test(key);
+    if (typeof laSums === "function") return !!laSums(key);
+    return ADDITIVE[key] === 1 || /_count$|_12mo$/.test(key);
   }
 
   // The LA file (borough_data.json), which index.html loads into a
@@ -135,6 +145,15 @@ var MODEL_LABEL = "Claude Sonnet 5";
         if (b._den[key] > 0) b.indicators[key] = Math.round((b._num[key] / b._den[key]) * 100) / 100;
       });
       delete b._num; delete b._den;
+      // Where the map's own LA function is there, take its figure for every
+      // indicator, so Ask quotes exactly the number the map draws.
+      if (b.lad_code && typeof boroughOvValue === "function") {
+        Object.keys(b.indicators).forEach(function (key) {
+          var mv = parseFloat(boroughOvValue(b.lad_code, key));
+          if (isNaN(mv)) return;
+          b.indicators[key] = isAdditive(key) ? mv : Math.round(mv * 100) / 100;
+        });
+      }
       var own = b.lad_code && laFile()[b.lad_code];
       var rec = own && (own.indicators || own);
       if (rec) {
@@ -242,7 +261,30 @@ var MODEL_LABEL = "Claude Sonnet 5";
     "authority (LA) and applied to every ward in it, so it is the same figure " +
     "for all wards there. Report it as an LA figure, calling it an LA figure " +
     "rather than a borough figure, and do not describe it as a difference " +
-    "between wards.";
+    "between wards. Where the LA is a district inside a county, OHID may " +
+    "publish only the county's figure, so say it is the county's.";
+
+  /**
+   * Series the map leaves out until a data refresh rebuilds them.
+   *
+   * indicators.js lists the LA Fingertips series whose stored age is not the
+   * headline age (ft_age_mismatch). A file written before that check existed
+   * has no ft_age_checked, and its adult smoking figure is the 18 to 64
+   * breakdown OHID itself flags or withholds, so that one is left out. Ask
+   * leaves out the same ones as the map, so it cannot quote a figure the map
+   * does not show.
+   */
+  function withheldKeys() {
+    var s = (typeof PH_IND_STATS === "object" && PH_IND_STATS) ? PH_IND_STATS : {};
+    if (s.ft_age_checked) return s.ft_age_mismatch || [];
+    return ["ft_smoking_prevalence_adults"];
+  }
+  function isWithheld(key) { return withheldKeys().indexOf(key) !== -1; }
+  function shownOnly(ind) {
+    var out = {};
+    Object.keys(ind || {}).forEach(function (k) { if (!isWithheld(k)) out[k] = ind[k]; });
+    return out;
+  }
 
   /**
    * Indicator metadata, from the same table the map's own legends read.
@@ -340,7 +382,7 @@ var MODEL_LABEL = "Claude Sonnet 5";
         Object.keys(w[k].indicators || {}).forEach(function (i) { seen[i] = true; });
       });
       return {
-        indicators: Object.keys(seen).sort().map(function (k) {
+        indicators: Object.keys(seen).filter(function (k) { return !isWithheld(k); }).sort().map(function (k) {
           var m = metaFor(k);
           return {
             key: k,
@@ -365,10 +407,11 @@ var MODEL_LABEL = "Claude Sonnet 5";
       var hit = findArea(input.name, input.level);
       if (!hit) return { error: "No " + levelWord(input.level) + " found matching '" + input.name + "'." };
       if (hit.ambiguous) return { error: "Several areas match; be more specific.", candidates: hit.ambiguous };
-      var boroughLevel = Object.keys(hit.area.indicators || {}).filter(isBoroughLevel);
+      var shownInd = shownOnly(hit.area.indicators);
+      var boroughLevel = Object.keys(shownInd).filter(isBoroughLevel);
       return {
         name: hit.area.name, level: levelWord(input.level), la: hit.area.lad || undefined,
-        indicators: hit.area.indicators,
+        indicators: shownInd,
         // A ward profile mixes ward figures with borough ones. Name which are
         // which, so a borough figure is not reported as being about the ward.
         la_level_indicators: (input.level === "ward" && boroughLevel.length)
@@ -392,7 +435,7 @@ var MODEL_LABEL = "Claude Sonnet 5";
           ? input.indicators
           : ["imd_score", "imd_decile_mean", "census_population", "census_over65_pct",
              "census_non_white_pct", "census_no_car_pct"];
-        wanted.forEach(function (k) { if (ind[k] !== undefined) keep[k] = ind[k]; });
+        wanted.forEach(function (k) { if (ind[k] !== undefined && !isWithheld(k)) keep[k] = ind[k]; });
         rows.push({ name: hit.area.name, indicators: keep });
       });
       if (!rows.length) return { error: "None of those areas were found.", not_found: missing };
@@ -412,6 +455,11 @@ var MODEL_LABEL = "Claude Sonnet 5";
 
     rank_areas: function (input) {
       var areas = areasFor(input.level), key = input.indicator;
+      if (isWithheld(key)) {
+        return { error: "'" + key + "' is left out of this version of the map until the data " +
+          "is refreshed, because the published figure is not the headline one. Call " +
+          "list_indicators for valid keys." };
+      }
       var n = Math.max(1, Math.min(parseInt(input.n, 10) || 5, 20));
       var rows = [];
       Object.keys(areas).forEach(function (k) {
@@ -477,6 +525,7 @@ var MODEL_LABEL = "Claude Sonnet 5";
     labelFor: labelFor,
     higherMeans: higherMeans,
     isBoroughLevel: isBoroughLevel,
+    isWithheld: isWithheld,
     get configured() { return !!ASSISTANT_ENDPOINT; },
   };
 
@@ -598,12 +647,12 @@ var MODEL_LABEL = "Claude Sonnet 5";
     var left = Math.max(0, cap - readUsed());
     limitEl.textContent = left + " of " + cap + " left today";
     limitEl.classList.toggle("spent", left === 0);
-    limitEl.title = left === 0
-      ? "You have used today's questions. The count resets at midnight UTC. "
-        + "The map, Query, Compare and Directory are not capped."
-      : left + " of today's " + cap + " questions left. Resets at midnight UTC. "
-        + "The cap is counted per network address, so if you share one this may "
-        + "read higher than what is actually left until the server corrects it.";
+    limitEl.title = (left === 0
+      ? "You have used today's questions. The map, Query, Compare and Directory have no limit. "
+      : "")
+      + "You can ask " + cap + " questions a day, and the count starts again at midnight. "
+      + "If other people share your internet connection, their questions may count "
+      + "towards the same limit.";
   }
 
   /**
@@ -706,9 +755,12 @@ var MODEL_LABEL = "Claude Sonnet 5";
         writeUsed(capNow());
         renderLimit();
       }
+      // The daily limit's own words are kept. Any other refusal (403, 413,
+      // 500) carries the Worker's internal wording, which means nothing to a
+      // reader, so it is replaced with one plain sentence.
       if (!res.ok || !data) {
-        throw new Error(data && data.error ? data.error
-          : "The question service is not answering right now. Please try again later.");
+        throw new Error(res.status === 429 && data && data.error ? data.error
+          : "Sorry, the question service is not available right now. Please try again later.");
       }
       // The Worker's count is the real one. Whenever it reports, this browser's
       // running tally is set to match rather than being trusted over it.
@@ -808,9 +860,9 @@ var MODEL_LABEL = "Claude Sonnet 5";
     var intro = document.createElement("div");
     intro.className = "ai-msg ai-bot ai-intro";
     [
-      "Ask about any ward or local authority (LA) in your own words, and the " +
-        "answer will be built from the figures on this map rather than from " +
-        "memory. Your question and the figures looked up to answer it pass " +
+      "Ask about any ward or local authority (LA) in your own words. The " +
+        "assistant looks up the figures on this map to answer, rather than " +
+        "relying on what it remembers, but it can still make mistakes. Your question and the figures looked up to answer it pass " +
         "through this site's server to Anthropic's Claude model, which writes " +
         "the reply, so please leave out anything personal.",
       "You can ask " + DAILY_CAP + " questions a day, because each answer costs " +
@@ -858,8 +910,8 @@ var MODEL_LABEL = "Claude Sonnet 5";
     // verify, and then scrolled away above every answer it applied to. At the
     // bottom it stays beside them.
     //
-    // The personal data warning goes first, beside the box it is about, and
-    // the input is described by this line so a screen reader hears it too.
+    // The caution sits beside the box it is about, and the input is
+    // described by this line so a screen reader hears it too.
     // The privacy link opens a new tab so following it does not lose the
     // conversation.
     var caution = document.createElement("div");
@@ -872,25 +924,25 @@ var MODEL_LABEL = "Claude Sonnet 5";
     privacy.target = "_blank";
     privacy.rel = "noopener";
     privacy.textContent = "About and privacy";
-    caution.appendChild(warn);
-    caution.appendChild(document.createTextNode(" Answers are written by AI, so please "
-      + "check any figure against the map or its source before you rely on it. "));
-    caution.appendChild(privacy);
-
-    // Which model wrote the sentence, named on the page rather than left to be
-    // guessed. Read from the Worker's reply when it says so, and falling back
-    // to the constant below, which has to be kept in step with MODEL in
-    // worker/src/index.js by hand. A wrong name here would be worse than none,
-    // so the fallback names what that file currently deploys.
-    var modelNote = document.createElement("div");
-    modelNote.className = "ai-caution ai-model";
+    // One line under the box: who writes the answers and how far to trust
+    // them, then the personal data warning, then the privacy link.
+    // The model is named on the page rather than left to be guessed: read
+    // from the Worker's reply when it says so (reportModel), falling back to
+    // MODEL_LABEL, which has to be kept in step with MODEL in
+    // worker/src/index.js by hand.
+    var modelNote = document.createElement("span");
+    modelNote.className = "ai-model";
     modelNote.id = "ai-model-note";
     modelNote.textContent = modelSentence(MODEL_LABEL);
+    caution.appendChild(modelNote);
+    caution.appendChild(document.createTextNode(" "));
+    caution.appendChild(warn);
+    caution.appendChild(document.createTextNode(" "));
+    caution.appendChild(privacy);
 
     container.appendChild(log);
     container.appendChild(form);
     container.appendChild(caution);
-    container.appendChild(modelNote);
 
     function add(cls, text, asHtml) {
       var d = document.createElement("div");
@@ -1019,8 +1071,24 @@ var MODEL_LABEL = "Claude Sonnet 5";
     host.appendChild(panel);
     host.appendChild(toggle);
 
+    /* On a phone the panel is the whole screen (see the CSS), so everything
+       under it is made inert while it is open: Tab stays in the panel rather
+       than walking into the hidden header and map. Each element's own inert
+       state is put back on close, since the drawer sets its own. */
+    var fullScreen = window.matchMedia ? window.matchMedia("(max-width: 640px), (max-height: 500px)") : null;
+    var underneath = [];
+    function setUnderneath(on) {
+      underneath.forEach(function (u) { u[0].inert = u[1]; });
+      underneath = [];
+      if (!on) return;
+      var els = Array.prototype.slice.call(document.querySelectorAll(".skip-link, .hdr, .mode-rail, #sidebar, footer.sbar, #sb-scrim"));
+      Array.prototype.forEach.call(host.children, function (el) { if (el !== panel) els.push(el); });
+      els.forEach(function (el) { underneath.push([el, !!el.inert]); el.inert = true; });
+    }
+
     function open() {
       panel.classList.add("open");
+      if (fullScreen && fullScreen.matches) setUnderneath(true);
       toggle.hidden = true;
       toggle.setAttribute("aria-expanded", "true");
       mount(body);
@@ -1030,6 +1098,7 @@ var MODEL_LABEL = "Claude Sonnet 5";
 
     function shut() {
       panel.classList.remove("open");
+      setUnderneath(false);
       toggle.hidden = false;
       toggle.setAttribute("aria-expanded", "false");
       toggle.focus();
