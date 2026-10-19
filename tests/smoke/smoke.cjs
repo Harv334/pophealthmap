@@ -2143,6 +2143,83 @@ const smallText = page => page.evaluate(() => {
     await page.close();
   }
 
+  // The header search finds charities, pharmacies and dental practices on a
+  // fresh page (their files are lazy, and the index used to be built before
+  // they arrived and kept).
+  {
+    const { page, errors } = await open(browser, 'index.html?t=1', DESK);
+    await page.click('#hdr-search-input');
+    const find = async (q, type) => {
+      await page.fill('#hdr-search-input', q);
+      return page.waitForFunction(t => [...document.querySelectorAll('#hdr-search-results .sr-row .sr-type')]
+        .some(e => e.textContent === t), type, { timeout: 45000 }).then(() => true, () => false);
+    };
+    ok(await find('Boots', 'pharmacy'), 'search: a fresh page finds a pharmacy (Boots)');
+    ok(await find('Hackney Play Association', 'charity'), 'search: a fresh page finds a charity (Hackney Play Association)');
+    ok(await find('Dental', 'dental'), 'search: a fresh page finds a dental practice');
+    ok(errors.length === 0, 'no page errors (search lazy layers)', errors.join(' | '));
+    await page.close();
+  }
+
+  // Hospitals: the checked list, the A&E line and flag, and no empty Trust row.
+  {
+    const { page, errors } = await open(browser, 'index.html?t=1', DESK);
+    const data = await page.evaluate(() => ({
+      n: HOSP.length, reg: HOSP.filter(d => d.t === 'NHS trust site').length,
+      gone: HOSP.filter(d => /Samaritan|Barts Hospital at Home|^Private Hospitals$|Italian Hospital/.test(d.n)).map(d => d.n),
+      western: HOSP.some(d => d.n === 'Western Eye Hospital' && d.a === 'NW1 5QH'),
+      ae: HOSP.filter(d => d.ae === true).length,
+      rl: (HOSP.find(d => d.n === 'Royal London Hospital') || {}).ae,
+      guys: (HOSP.find(d => d.n === "Guy's Hospital") || {}).ae,
+      qm: HOSP.filter(d => /^Queen Mary's Hospital, (Roehampton|Sidcup)$/.test(d.n)).length,
+      note: (document.getElementById('hosp-ae-note') || {}).textContent || '',
+    }));
+    ok(data.reg === 0 && data.gone.length === 0 && data.western && data.qm === 2,
+      'hospitals: typed from the checked list, closed sites and services left out, names told apart', JSON.stringify(data));
+    ok(data.ae >= 20 && data.rl === true && data.guys === false, 'hospitals: the major hospitals with a 24-hour A&E are flagged', JSON.stringify(data));
+    ok(/^Not every hospital has an A&E\. In an emergency call 999, and for urgent help that is not an emergency use NHS 111 online or call 111\.$/.test(data.note.trim()),
+      'hospitals: the Layers row says not every hospital has an A&E', data.note);
+    const pop = await page.evaluate(() => {
+      let m = null;
+      hL.eachLayer(l => { if (/Royal London Hospital</.test(l.getPopup().getContent())) m = l; });
+      const div = document.createElement('div');
+      div.innerHTML = m ? m.getPopup().getContent() : '';
+      return { keys: [...div.querySelectorAll('.pop-key')].map(e => e.textContent),
+        text: div.textContent };
+    });
+    ok(!pop.keys.includes('Trust') && pop.keys.includes('A&E') && /Has a 24-hour A&E/.test(pop.text) && /In an emergency call 999/.test(pop.text),
+      'hospitals: a popup has its type, its A&E and the 999 line, and no empty Trust row', JSON.stringify(pop));
+    await page.click('.mode-btn[data-mode="directory"]');
+    await page.waitForFunction(() => document.querySelector('#dir-types [data-dtype="hospital"]'), null, { timeout: 30000 }).catch(() => {});
+    await page.click('#dir-types [data-dtype="hospital"]');
+    await page.waitForTimeout(400);
+    const dir = await page.evaluate(() => ({ note: !!document.getElementById('dir-hosp-note'),
+      chip: !!document.querySelector('#dir-types [data-dae]') }));
+    await page.click('#dir-types [data-dae]');
+    await page.waitForTimeout(400);
+    const aeRows = await page.evaluate(() => [...document.querySelectorAll('#dir-list .dir-item .dir-sub')].map(e => e.textContent));
+    ok(dir.note && dir.chip && aeRows.length === data.ae && aeRows.every(t => /24-hour A&E/.test(t)),
+      'directory: the hospital list starts with the 999 line and can be cut to hospitals with an A&E', JSON.stringify({ dir, n: aeRows.length, first: aeRows[0] }));
+    ok(errors.length === 0, 'no page errors (hospitals)', errors.join(' | '));
+    await page.close();
+  }
+
+  // The LSOA report waits for the pharmacies, dental practices and charities,
+  // as the ward report does, rather than counting none on a fresh page.
+  {
+    const { page, errors } = await open(browser, 'index.html?t=1', DESK);
+    const [rep] = await Promise.all([
+      page.context().waitForEvent('page'),
+      page.evaluate(() => { generateLSOAReport('E01004243'); }),
+    ]);
+    const listed = await rep.waitForFunction(() => /Britannia Pharmacy/i.test(document.body.innerText), null, { timeout: 60000 })
+      .then(() => true, () => false);
+    ok(listed, 'LSOA report: a fresh page\'s report for E01004243 lists Britannia Pharmacy');
+    await rep.close();
+    ok(errors.length === 0, 'no page errors (LSOA report)', errors.join(' | '));
+    await page.close();
+  }
+
   // A region
   if (HAS_NE) {
     const { page, errors } = await open(browser, 'index.html?r=north-east&t=1', DESK);
