@@ -912,6 +912,8 @@
             text-decoration: underline; text-underline-offset: 2px; }
   .sr-all:hover { color: var(--nhs-dark); }
   .prof-key .gpill { margin-left: 0; }
+  .prof-fit { margin: -2px 0 8px; }
+  .prof-fit .gpill { margin-left: 0; white-space: normal; text-align: left; border-radius: var(--r-sm); padding: 2px 6px; }
   .gpill { display: inline-block; font-size: var(--t-xs); padding: 1px 5px; border-radius: var(--r-pill); margin-left: 4px; vertical-align: middle; font-weight: 500; }
   .gpill-ward { background: var(--tint-green); color: #00612A; }
   .gpill-lsoa { background: var(--tint-amber); color: var(--tint-amber-ink); }
@@ -6988,6 +6990,19 @@ const _LEVEL_PLURAL = { ward: 'wards', lsoa: 'LSOAs', msoa: 'MSOAs', borough: 'L
    which a small ward only repeats. The rankings, the hover percentile and
    the ward reports all use this one rule. */
 const SMALL_WARD_POP = 1000;
+/* A ward whose LSOAs, under the ONS best-fit lookup, hold under 80% or over
+   125% of its own Census residents carries lsoa_fit (the ratio) from the
+   pipeline. Its deprivation and health figures, which are built from those
+   LSOAs, describe a noticeably different patch from the ward. */
+const WARD_FIT_PILL = 'Deprivation and health figures cover a slightly different area from the ward';
+function wardFitNote(rec) {
+  const r = rec && Number(rec.lsoa_fit);
+  if (!(r > 0) || (r >= 0.8 && r <= 1.25)) return '';
+  const how = r < 1 ? 'about ' + Math.round(r * 100) + '% as many residents as'
+    : 'about ' + (Math.round(r * 10) / 10).toLocaleString('en-GB') + ' times as many residents as';
+  return 'The LSOAs the ONS lookup gives this ward hold ' + how + ' the ward itself, so its deprivation, ' +
+    'health and other figures built from LSOAs describe a noticeably different area.';
+}
 // Under ward rankings and in ward hovers for the Local Health indicators.
 const WARD_NO_INTERVAL = 'Ward figures are estimates from MSOA figures, so no interval is available. Wards close together in this list are often not statistically different.';
 function rankSkipsSmall(level, k) {
@@ -10560,6 +10575,8 @@ function showWard(wn) {
       <button class="deselect-btn" onclick="deselectWard()" title="Deselect this ward">Deselect${ico('x')}</button>
     </div>
     <h2 class="wname">${_esc(wdata.name)} <span class="wpop">${_esc(wdata.lad || '')}</span></h2>
+    ${wardFitNote(wdata) ? `<p class="prof-fit"><span class="gpill gpill-note" title="${_esc(wardFitNote(wdata))}">${_esc(WARD_FIT_PILL)}</span>
+      <span class="sr-only">. ${_esc(wardFitNote(wdata))}</span></p>` : ''}
     ${plain}
     ${keyStats}
     <!-- No report button here: the ward sheet's "Open printable report" button stays on
@@ -11848,6 +11865,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
       <div class="sub">${[_esc(borough), population !== 'No figure' ? population + ' residents' : '',
         imdRank ? (imdRank === 1 ? 'Most deprived' : ordinal(imdRank) + ' most deprived') +
           ' of the ' + totalWards.toLocaleString('en-GB') + ' wards in ' + phWhere() + ' with a deprivation score' : ''].filter(Boolean).join(' · ')}</div>
+      ${wardFitNote(wdata) ? `<div class="sub fit-note"><b>${_esc(WARD_FIT_PILL)}.</b> ${_esc(wardFitNote(wdata))}</div>` : ''}
     </div>
     ${miniMapSVG ? `<div class="hero-map">${miniMapSVG}</div>` : ''}
   </div>

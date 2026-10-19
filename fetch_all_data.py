@@ -5765,6 +5765,50 @@ def record_cover(wards: dict, cover: dict, key: str, vals: dict) -> int:
     return n
 
 
+# A ward whose LSOAs hold under 80% or over 125% of its Census residents is
+# marked: its deprivation and health figures cover a noticeably different
+# patch from the ward.
+WARD_FIT_LOW, WARD_FIT_HIGH = 0.8, 1.25
+
+
+def ward_lsoa_fit(wards: dict, lsoa_to_ward: dict, pop_by_lsoa: dict) -> dict:
+    """{ward: residents of the LSOAs the lookup gives it / its own Census
+    residents}, to two places, for wards with a Census population. The
+    ward's own count comes from output areas, which follow its boundary much
+    more closely than LSOAs do."""
+    lsoa_pop: dict = {}
+    for lc, wd in lsoa_to_ward.items():
+        if wd:
+            lsoa_pop[wd] = lsoa_pop.get(wd, 0.0) + float(pop_by_lsoa.get(lc, 0) or 0)
+    out = {}
+    for wd, w in wards.items():
+        cen = (w.get("indicators") or {}).get("census_population")
+        if not cen or cen <= 0:
+            continue
+        out[wd] = round(lsoa_pop.get(wd, 0.0) / float(cen), 2)
+    return out
+
+
+def ward_fit_is_off(ratio) -> bool:
+    """Outside the band. A ward with no LSOA at all (0, several of the City's)
+    has no LSOA-built figures to mark."""
+    return bool(ratio) and (ratio < WARD_FIT_LOW or ratio > WARD_FIT_HIGH)
+
+
+def record_lsoa_fit(wards: dict, fit: dict) -> int:
+    """ward["lsoa_fit"] for each ward outside the band, removed elsewhere.
+    Returns how many are marked."""
+    n = 0
+    for wd, w in wards.items():
+        r = fit.get(wd)
+        if ward_fit_is_off(r):
+            w["lsoa_fit"] = r
+            n += 1
+        else:
+            w.pop("lsoa_fit", None)
+    return n
+
+
 # police.uk categories left out of the crime total (see build_ward_data).
 CRIME_TOTAL_EXCLUDES = ("anti-social-behaviour",)
 
@@ -6039,6 +6083,13 @@ def build_ward_data() -> dict:
         # it is. The per-ward Core20 counts below remain the categorical view.
         if "imd_decile" in imd_ward.columns:
             _agg_to_wards(imd_ward, "imd_decile", "imd_decile_mean")
+
+    # Wards whose LSOAs hold noticeably more or fewer people than the ward
+    # (Farringdon Without's hold 3.45 times its residents), so the map can say
+    # that their LSOA-built figures describe a different patch.
+    if pop_by_lsoa:
+        n_fit = record_lsoa_fit(wards, ward_lsoa_fit(wards, lsoa_to_ward, pop_by_lsoa))
+        info(f"ward LSOA fit: {n_fit} wards outside {WARD_FIT_LOW:.0%} to {WARD_FIT_HIGH:.0%} of their residents")
 
     _agg_to_wards(fp, "fuel_poverty_pct", "fuel_poverty_pct")
     if fp is not None:
