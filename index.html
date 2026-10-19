@@ -3194,7 +3194,7 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
       <!-- The address bar has always been live, rewritten as the view changes.
            Nobody knew, because nothing on the page said so, and a share feature
            with no affordance is not one. -->
-      <button type="button" class="tb-btn" id="tb-link" title="Copy a link that reopens this view, with its indicator, level, area, layers, selected ward and any query or custom area"><svg class="ic" aria-hidden="true"><use href="#i-link"/></svg>Copy link</button>
+      <button type="button" class="tb-btn" id="tb-link" title="Copy a link that reopens this view, with its indicator, level, area, layers, the ward or LSOA you have open, the PCN you have chosen, and any query, comparison or custom area"><svg class="ic" aria-hidden="true"><use href="#i-link"/></svg>Copy link</button>
       <!-- Presentation view and the colour-blind palette are used now and then,
            so they sit behind More and give their width to the search box. A
            disclosure (a button and the group it shows) rather than an ARIA
@@ -9912,6 +9912,7 @@ function stackedBar(parts) {
 
 function showWard(wn) {
   if (typeof _clearSearchLsoaOutline === 'function') _clearSearchLsoaOutline();
+  window._urlLastArea = 'ward';
   const n = norm(wn);
   // Find by name match
   const wdata = Object.values(WARD_DATA).find(w => norm(w.name) === n) ||
@@ -10224,6 +10225,7 @@ window.deselectWard = function() {
 };
 window.deselectLSOA = function() {
   selLSOA = null;
+  if (window.PH_URL) window.PH_URL.write();
   if (typeof _clearSearchLsoaOutline === 'function') _clearSearchLsoaOutline();
   if (typeof _syncDocTitle === 'function') _syncDocTitle();
   if (typeof PH_PEEK !== 'undefined') PH_PEEK.hide();
@@ -13220,8 +13222,22 @@ function _fitFocus(bounds) {
         : '<div class="pcn-note">The map shows where its practices are, but we do not yet have the figures to show the area its patients come from.</div>') +
       '<button type="button" class="ov-btn quiet" id="pcn-clear" style="margin-top:6px">Clear</button>';
     infoEl.hidden = false;
-    document.getElementById('pcn-clear').addEventListener('click', () => { sel.value = ''; clearFocus(); });
+    document.getElementById('pcn-clear').addEventListener('click', () => {
+      sel.value = ''; clearFocus();
+      if (window.PH_URL) window.PH_URL.write();
+    });
   }
+  // For a shared link (?pcn=): chooses the network once the list has loaded,
+  // as choosing it from the list does. False until then, so the link reader
+  // asks again; true for a code this map does not have, which it gives up on.
+  window.PH_PCN = {
+    apply: code => {
+      if (!DATA) return false;
+      if (!byCode[code]) return true;
+      if (sel.value !== code) { sel.value = code; sel.dispatchEvent(new Event('change')); }
+      return true;
+    },
+  };
 })();
 
 /* Restyle the LSOA and MSOA outlines when zooming crosses one of
@@ -13932,6 +13948,9 @@ function profSectionHead(label, icon, open, id) {
 
 function showLSOA(feat) {
   if (typeof _clearSearchLsoaOutline === 'function') _clearSearchLsoaOutline();
+  // The open profile rides in the link as ?ls=.
+  window._urlLastArea = 'lsoa';
+  if (window.PH_URL) window.PH_URL.write();
   const p = document.getElementById('wpanel');
   const props = feat.properties;
   const code = props.code;
@@ -16582,9 +16601,16 @@ _applyColourPalette();
 
 // The layers that ride in ?L=. tlsoa is deliberately not among them: it has
 // carried its own ?lsoa=1 since before this list existed, and links already in
-// circulation use it.
-const _URL_LAYERS = ['tg', 'th', 'tgr', 'td', 'tph', 'tv',
-                     'ticb', 'tb', 'tnw', 'tmsoa'];
+// circulation use it. The charities layer is vcse-tab-toggle: this list used to
+// name 'tv', which no element on the page has, so the charities were dropped
+// from every link. A link that still says tv is read as vcse-tab-toggle.
+const _URL_LAYERS = ['tg', 'th', 'tgr', 'td', 'tph', 'vcse-tab-toggle',
+                     'ticb', 'tb', 'tnw', 'tmsoa', 'tpcn'];
+/* Which of a ward and an LSOA was opened last. Opening an LSOA's profile does
+   not let go of the ward selected before it, so selW alone cannot say which
+   profile is on screen, and the link should reopen the one the sender is
+   reading. showWard and showLSOA set it. */
+window._urlLastArea = '';
 const _URL_MODES = ['query', 'compare', 'report', 'csv', 'directory'];
 
 function _urlTool() {
@@ -16638,8 +16664,18 @@ function _writeUrlState() {
     if (layersOn.length) p.set('L', layersOn.join(','));
 
     // selW is a top-level `let`, so it is not readable before its declaration
-    // is evaluated. Nothing is selected that early anyway.
-    try { if (selW) p.set('w', selW); } catch (e) { /* not initialised yet */ }
+    // is evaluated. Nothing is selected that early anyway. An open LSOA
+    // profile rides as ?ls=, the code without its E01, when it is the profile
+    // opened last.
+    try {
+      const lsNow = (typeof selLSOA !== 'undefined' && selLSOA) ? selLSOA : '';
+      if (selW && !(lsNow && window._urlLastArea === 'lsoa')) p.set('w', selW);
+      else if (lsNow) p.set('ls', lsNow.replace(/^E01/, ''));
+    } catch (e) { /* not initialised yet */ }
+
+    // The primary care network chosen under Focus by PCN.
+    const pcnEl = document.getElementById('pcn-focus');
+    if (pcnEl && pcnEl.value) p.set('pcn', pcnEl.value);
 
     const tool = _urlTool();
     if (_URL_MODES.indexOf(tool) !== -1) p.set('mode', tool);
@@ -16652,6 +16688,16 @@ function _writeUrlState() {
       (s.services || []).forEach(id => p.append('qs', id));
       if (s.scope) p.set('qw', s.scope);
       (s.conds || []).forEach(c => p.append('qc', c.join('~')));
+    }
+    /* Compare: its level when it is not Ward, each pinned area as its own
+       ?cp= (ward names can hold a full stop, so they are not packed into one),
+       and the indicators chosen, as ?cm=, when they differ from the ones
+       Compare opens with. */
+    if (tool === 'compare' && window.PH_COMPARE && window.PH_COMPARE.state) {
+      const c = window.PH_COMPARE.state();
+      if (c.level && c.level !== 'ward') p.set('cl', c.level);
+      (c.pins || []).forEach(n => p.append('cp', n));
+      if ((c.metrics || []).join('.') !== (c.defaults || []).join('.')) p.set('cm', (c.metrics || []).join('.'));
     }
     if (tool === 'report' && window.PH_REPORT && window.PH_REPORT.state) {
       const a = window.PH_REPORT.state();
@@ -16808,7 +16854,8 @@ function _readUrlState() {
        otherwise have sent a link that turns them back on. Absent means the
        defaults stand, which is the rule every other parameter here follows. */
     if (p.has('L') && !_urlReaderTook) {
-      const want = (p.get('L') || '').split(',').filter(Boolean);
+      const want = (p.get('L') || '').split(',').filter(Boolean)
+        .map(id => id === 'tv' ? 'vcse-tab-toggle' : id);
       _URL_LAYERS.forEach(id => {
         const el = document.getElementById(id);
         if (!el) return;
@@ -16825,8 +16872,17 @@ function _readUrlState() {
     // Re-applied on every pass, like the indicator: each pass re-applies the
     // indicator, which opens it at its own level again, so a level applied
     // only once was lost to the next pass and the link opened at the wrong one.
+    //
+    // Only where the indicator has figures at that level, or where the tool in
+    // the link needs it (Custom area is built from LSOAs, and Compare shows
+    // the size of area it compares). Otherwise the indicator keeps the level
+    // it opens at, so the key never describes colours that are not drawn.
     const lvl = p.get('lvl');
-    if (lvl && !_urlReaderTook && ['borough', 'ward', 'msoa', 'lsoa', 'oa'].indexOf(lvl) !== -1 &&
+    const ovIn = p.get('ov') || 'none', modeIn = p.get('mode') || '';
+    const cmpLvlIn = p.get('cl') === 'icb' ? 'borough' : (p.get('cl') || 'ward');
+    const lvlFits = !lvl || ovIn === 'none' || typeof ovHasLevel !== 'function' || ovHasLevel(ovIn, lvl) ||
+      (modeIn === 'report' && lvl === 'lsoa') || (modeIn === 'compare' && lvl === cmpLvlIn);
+    if (lvl && lvlFits && !_urlReaderTook && ['borough', 'ward', 'msoa', 'lsoa', 'oa'].indexOf(lvl) !== -1 &&
         typeof _setDataLevel === 'function') {
       _setDataLevel(lvl, { fromOverlay: true, quiet: _urlDone.lvl });
       _urlDone.lvl = true;
@@ -16871,11 +16927,9 @@ function _readUrlState() {
       if (window.PH_QUERY && window.PH_QUERY.apply && window.PH_QUERY.apply(st)) _urlDone.q = true;
     }
 
-    if (!_urlDone.a && p.get('a')) {
-      const codes = p.get('a').split('.').filter(Boolean).map(n => 'E01' + n);
-      if (window.PH_REPORT && window.PH_REPORT.apply &&
-          window.PH_REPORT.apply({ name: p.get('an') || '', codes })) _urlDone.a = true;
-    }
+    // The custom area, the comparison, the PCN and an LSOA profile, which
+    // all wait for data of their own. See _applyUrlLate.
+    if (_applyUrlLate(p)) _startUrlLate();
 
     // The ward last. It opens the bar along the bottom of the map, so it wants
     // to be the thing on top when everything else has settled.
@@ -16898,8 +16952,79 @@ function _readUrlState() {
     }
   } catch (e) { console.warn('_readUrlState failed', e); }
 }
+/* The parts of a link that wait for data the passes above do not: the LSOA
+   boundaries (a custom area, LSOA pins, an LSOA profile), the boards (ICB
+   pins) and the list of networks (a PCN). Each is applied once, when what it
+   needs has arrived, and returns true while anything is still waiting, so
+   _startUrlLate can keep asking.
+
+   The comparison, the PCN and the profile also wait for the last of the
+   timed passes, because each of those re-applies the indicator, which pulls
+   the sidebar to Indicators and moves the level, and would close a profile or
+   empty a comparison that had just been opened. */
+let _urlTimedPasses = 0;
+function _applyUrlLate(p) {
+  let waiting = false;
+  if (!_urlDone.a && p.get('a')) {
+    const codes = p.get('a').split('.').filter(Boolean).map(n => 'E01' + n);
+    if (window.PH_REPORT && window.PH_REPORT.apply &&
+        window.PH_REPORT.apply({ name: p.get('an') || '', codes })) _urlDone.a = true;
+    else waiting = true;
+  }
+  const settled = _urlLanded && _urlTimedPasses >= 2;
+  if (!_urlDone.cmp && p.get('mode') === 'compare' && (p.has('cl') || p.has('cp') || p.has('cm'))) {
+    if (settled && _urlTool() === 'compare' && window.PH_COMPARE && window.PH_COMPARE.apply &&
+        window.PH_COMPARE.apply({
+          level: p.get('cl') || 'ward',
+          pins: p.getAll('cp'),
+          metrics: p.has('cm') ? (p.get('cm') || '').split('.').filter(Boolean) : null,
+        })) _urlDone.cmp = true;
+    else waiting = true;
+  }
+  if (!_urlDone.pcn && p.get('pcn')) {
+    if (settled && window.PH_PCN && window.PH_PCN.apply(p.get('pcn'))) _urlDone.pcn = true;
+    else waiting = true;
+  }
+  if (!_urlDone.ls && p.get('ls') && !p.get('w')) {
+    if (settled && _urlOpenLsoa('E01' + p.get('ls').replace(/^E01/, ''))) _urlDone.ls = true;
+    else waiting = true;
+  }
+  return waiting;
+}
+let _urlLateTimer = null;
+function _startUrlLate() {
+  if (_urlLateTimer) return;
+  let tries = 0;
+  _urlLateTimer = setInterval(() => {
+    let more = false;
+    try { more = _applyUrlLate(new URLSearchParams(_INBOUND_URL_STATE)); } catch (e) { more = false; }
+    // A minute is longer than any of these files takes on a slow phone.
+    if (!more || ++tries > 60) { clearInterval(_urlLateTimer); _urlLateTimer = null; }
+    if (!more && window.PH_URL) window.PH_URL.write();
+  }, 1000);
+}
+/* Reopen an LSOA's profile from a link. With the LSOAs on the map it is a
+   click on the LSOA, as the reader made; at another level the profile opens
+   and the LSOA's edge is drawn on its own, as a search does. Not in Compare or
+   Custom area, where a click on an LSOA pins it or adds it to the area. */
+function _urlOpenLsoa(code) {
+  if (typeof ensureLsoaLayer !== 'function') return true;
+  if ((window.PH_REPORT && window.PH_REPORT.active()) || (window.PH_COMPARE && window.PH_COMPARE.active())) return true;
+  if (typeof lsoaLyr === 'undefined' || !lsoaLyr) { ensureLsoaLayer(); return false; }
+  const lyr = lsoaLyr.getLayers().find(l => l.feature.properties.code === code);
+  if (!lyr) return true;                       // not on this map: nothing to open
+  if (map.hasLayer(lsoaLyr)) { lyr.fire('click'); return true; }
+  selLSOA = code;
+  showLSOA(lyr.feature);
+  if (typeof _clearSearchLsoaOutline === 'function') _clearSearchLsoaOutline();
+  _searchLsoaOutline = L.geoJSON(lyr.feature, {
+    style: { color: LSOA_EDGE.selected.color, weight: LSOA_EDGE.selected.weight, opacity: 1, fillOpacity: 0 },
+    interactive: false,
+  }).addTo(map);
+  return true;
+}
 (function _wireUrlStateWriters() {
-  ['ov', 'borough-focus', 'icb-focus', 'tlsoa', 'core20-toggle']
+  ['ov', 'borough-focus', 'icb-focus', 'tlsoa', 'core20-toggle', 'pcn-focus']
     .concat(_URL_LAYERS)
     .forEach(id => {
       const el = document.getElementById(id);
@@ -16940,8 +17065,8 @@ function _applyUrlStateOnce() {
   finally { _urlApplying = false; }
   if (typeof wLyr !== 'undefined' && wLyr) _urlLanded = true;
 }
-setTimeout(_applyUrlStateOnce, 1200);
-setTimeout(_applyUrlStateOnce, 4000);
+setTimeout(() => { _urlTimedPasses++; _applyUrlStateOnce(); }, 1200);
+setTimeout(() => { _urlTimedPasses++; _applyUrlStateOnce(); }, 4000);
 (function _wireUrlReader() {
   ['pointerdown', 'keydown', 'wheel', 'touchstart'].forEach(t => {
     window.addEventListener(t, e => { if (e.isTrusted) _readerInputAt = performance.now(); },
@@ -19953,6 +20078,8 @@ var PH_SHOW = {
     }
     renderComparePane();
     renderCompareBar();
+    // The pins ride in the link while Compare is open.
+    if (window.PH_URL) window.PH_URL.write();
   }
 
   pinBtn.addEventListener('click', function (e) {
@@ -20187,6 +20314,9 @@ var PH_SHOW = {
     { k: 'census_population',         on: false },
     { k: 'census_disability_any_pct', on: false },
   ];
+  // The ones that start switched on, so a link only carries ?cm= when the
+  // sender changed them.
+  var CMP_DEFAULT_ON = cmpMetrics.filter(function (m) { return m.on; }).map(function (m) { return m.k; });
   function cmpActive() {
     return cmpMetrics.filter(function (m) { return m.on && indicatorKeys().indexOf(m.k) !== -1; });
   }
@@ -20415,6 +20545,7 @@ var PH_SHOW = {
     drawPins();
     syncPinBtn();
     closeCompareBar();
+    if (window.PH_URL) window.PH_URL.write();
   }
 
   function renderComparePane() {
@@ -20843,6 +20974,7 @@ var PH_SHOW = {
       if (indicatorKeys().indexOf(m.k) === -1) return;
       m.on = !m.on;
       renderComparePane(); renderCompareBar();
+      if (window.PH_URL) window.PH_URL.write();
     });
     cmpMetricsEl.addEventListener('keydown', function (e) {
       if ((e.key === 'Enter' || e.key === ' ') && e.target.closest('[data-metric]')) {
@@ -20862,6 +20994,7 @@ var PH_SHOW = {
       if (found) found.on = true;
       else cmpMetrics.push({ k: k, on: true });
       renderComparePane(); renderCompareBar();
+      if (window.PH_URL) window.PH_URL.write();
       var again = $('cmp-add-metric');
       if (again) again.focus({ preventScroll: true });
     }
@@ -20962,7 +21095,58 @@ var PH_SHOW = {
     setLevel: setCmpLevel,
     figures: function (name) { return cmpIndsOf(name); },
     wardsOf: cmpWardsOf,
+    // For the shared link: the level, the pins and the indicators chosen.
+    state: function () {
+      return {
+        level: cmpLevel, pins: pinned.slice(), defaults: CMP_DEFAULT_ON.slice(),
+        metrics: cmpMetrics.filter(function (m) { return m.on; }).map(function (m) { return m.k; }),
+      };
+    },
+    apply: cmpApplyLink,
   };
+
+  /* A comparison from a link (?cl=, ?cp=, ?cm=). Pins are names at their
+     level, so they can only be checked once that level's areas have loaded:
+     the wards, the LSOA boundaries, the LAs or the boards. Until then it
+     returns false and the link reader asks again; a pin this map does not
+     have is left out rather than shown as an empty card. */
+  function cmpApplyLink(st) {
+    if (!st) return true;
+    var lvl = st.level || 'ward';
+    if (!CMP_LEVELS.some(function (l) { return l.k === lvl; })) return true;
+    // The boards are offered once their lookup has loaded.
+    if (!cmpLevels().some(function (l) { return l.k === lvl; })) return false;
+    setCmpLevel(lvl);
+    var known;
+    if (lvl === 'ward') {
+      if (!allWards().length) return false;
+      known = function (n) { return !!wardRec(n); };
+    } else if (lvl === 'lsoa') {
+      if (typeof LSOA_IMD === 'undefined' || !LSOA_IMD || !LSOA_IMD.features) return false;
+      known = function (n) { return !!lsoaFeat(n); };
+    } else {
+      var list = cmpChoices();
+      if (!list.length) return false;
+      known = function (n) { return list.indexOf(n) !== -1; };
+    }
+    if (st.metrics) {
+      var want = st.metrics;
+      cmpMetrics.forEach(function (m) { m.on = want.indexOf(m.k) !== -1; });
+      want.forEach(function (k) {
+        if (!cmpMetrics.some(function (m) { return m.k === k; })) cmpMetrics.push({ k: k, on: true });
+      });
+    }
+    var seen = {};
+    pinned = (st.pins || []).filter(function (n) {
+      if (seen[n] || !known(n)) return false;
+      seen[n] = 1;
+      return true;
+    }).slice(0, PIN_MAX);
+    _cmpAgg = {};
+    refreshPins();
+    if (pinned.length >= 2) { renderCompareBar(); openCompareBar(true); }
+    return true;
+  }
 
   // The official code for a pinned area: E01 for an LSOA, E05 for a ward,
   // E09 for a borough. The boards are not coded in the data here.
@@ -22509,6 +22693,9 @@ var PH_SHOW = {
       if (el && st.name) el.value = st.name;
       renderReportPane();
       drawReportSelection();
+      // The address bar was written before the area arrived and, with nothing
+      // to write it again, a reload or a forwarded address lost the area.
+      if (window.PH_URL) window.PH_URL.write();
       return true;
     },
   };

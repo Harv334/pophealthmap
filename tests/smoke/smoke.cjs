@@ -2145,6 +2145,110 @@ const smallText = page => page.evaluate(() => {
     await page.close();
   }
 
+  // Copy link round trips: a link reopens the view it was copied from, with
+  // the custom area after a reload, Compare's level, pins and indicators, the
+  // charities layer, the PCN footprints and chosen network, and an open LSOA
+  // profile. Each compares a snapshot of the state before and after.
+  {
+    const snap = page => page.evaluate(() => {
+      _writeUrlState();
+      const q = new URLSearchParams(location.search); q.delete('z'); q.delete('c');
+      return {
+        href: location.href, q: [...q.entries()].map(e => e.join('=')).sort().join('&'),
+        tool: _urlTool(), lvl: currentDataLevel, ov: curOv,
+        area: PH_REPORT.state(), cmp: _urlTool() === 'compare' ? PH_COMPARE.state() : null,
+        ls: selLSOA, pcn: document.getElementById('pcn-focus').value,
+        layers: _URL_LAYERS.filter(id => { const e = document.getElementById(id); return e && e.checked; }).join(','),
+      };
+    });
+    const strip = s => { const o = Object.assign({}, s); delete o.href; return JSON.stringify(o); };
+    const reopen = async (href) => {
+      const p = await browser.newPage({ viewport: { width: DESK.width, height: DESK.height } });
+      const errs = [];
+      p.on('pageerror', e => errs.push(e.message));
+      await p.goto(href);
+      await p.waitForTimeout(SETTLE + 6000);
+      return { p, errs };
+    };
+
+    // A custom area link keeps its area in the address bar, so a reload has it.
+    const { page, errors } = await open(browser, 'index.html?mode=report&a=004243.004244&an=Test&t=1', DESK);
+    await page.waitForTimeout(3000);
+    const a1 = await snap(page);
+    await page.reload();
+    await page.waitForTimeout(SETTLE + 3000);
+    const a2 = await snap(page);
+    ok(a1.area.codes.length === 2 && a1.area.name === 'Test' && /[?&]a=004243\.004244/.test(a1.href) && /[?&]an=Test/.test(a1.href),
+      'a custom area link keeps the area in the address bar once it is drawn', a1.href);
+    ok(strip(a1) === strip(a2), 'a custom area link survives a reload', strip(a1) + ' / ' + strip(a2));
+
+    // Compare at LSOA level, two pins and an extra indicator.
+    await page.goto(BASE + '/index.html?t=1');
+    await page.waitForTimeout(SETTLE);
+    await page.click('.mode-btn[data-mode="compare"]');
+    await page.waitForTimeout(800);
+    await page.evaluate(() => PH_COMPARE.setLevel('lsoa'));
+    await page.waitForFunction(() => typeof LSOA_IMD !== 'undefined' && LSOA_IMD && LSOA_IMD.features, null, { timeout: 30000 }).catch(() => {});
+    await page.evaluate(() => { PH_COMPARE.pinFromLsoa({ code: 'E01004243' }); PH_COMPARE.pinFromLsoa({ code: 'E01004244' }); });
+    await page.evaluate(() => document.querySelector('#cmp-metrics [data-metric="3"]').click());
+    await page.waitForTimeout(800);
+    const c1 = await snap(page);
+    const c = await reopen(c1.href);
+    const c2 = await snap(c.p);
+    const cOpen = await c.p.evaluate(() => document.getElementById('cmp-bar').classList.contains('open') &&
+      !/Nothing is pinned/.test(document.getElementById('cmp-pins').innerText));
+    ok(c1.cmp.pins.length === 2 && c1.cmp.metrics.length === 4 && strip(c1) === strip(c2) && cOpen,
+      'a Compare link reopens with its level, pins and indicators', strip(c1) + ' / ' + strip(c2));
+    ok(c.errs.length === 0, 'no page errors (Compare link)', c.errs.join(' | '));
+    await c.p.close();
+
+    // Ward pins at the default level and indicators.
+    await page.evaluate(() => PH_COMPARE.setLevel('ward'));
+    await page.waitForTimeout(1500);
+    await page.evaluate(() => wLyr.getLayers().slice(0, 2).forEach(l => l.fire('click')));
+    await page.waitForTimeout(800);
+    const w1 = await snap(page);
+    const w = await reopen(w1.href);
+    const w2 = await snap(w.p);
+    ok(w1.cmp.pins.length === 2 && strip(w1) === strip(w2), 'a Compare link with pinned wards reopens with them', strip(w1) + ' / ' + strip(w2));
+    await w.p.close();
+
+    // The charities layer, the PCN footprints and chosen network, and an LSOA profile.
+    await page.click('.mode-btn[data-mode="explore"]');
+    await page.waitForTimeout(800);
+    await page.evaluate(() => {
+      ['vcse-tab-toggle', 'tpcn'].forEach(id => { const e = document.getElementById(id); e.checked = true; e.dispatchEvent(new Event('change')); });
+      const s = document.getElementById('pcn-focus'); s.value = s.options[3].value; s.dispatchEvent(new Event('change'));
+    });
+    await page.waitForTimeout(2500);
+    await page.evaluate(() => _searchPickResult({ type: 'lsoa', _code: 'E01000907', label: 'Camden 001A', sub: '' }));
+    await page.waitForTimeout(4000);
+    const l1 = await snap(page);
+    const l = await reopen(l1.href);
+    const l2 = await snap(l.p);
+    const vc = await l.p.evaluate(() => !!(vcseCluster && vcseCluster._map));
+    ok(/vcse-tab-toggle/.test(l1.layers) && /tpcn/.test(l1.layers) && l1.pcn && l1.ls === 'E01000907' && strip(l1) === strip(l2) && vc,
+      'a link reopens the charities layer, the PCN chosen and the LSOA profile open', strip(l1) + ' / ' + strip(l2));
+    ok(l.errs.length === 0, 'no page errors (layers link)', l.errs.join(' | '));
+    await l.p.close();
+
+    // A link from before the charities layer was named right still turns it on.
+    const old = await reopen(BASE + '/index.html?L=tv&t=1');
+    ok(await old.p.evaluate(() => document.getElementById('vcse-tab-toggle').checked), 'an older link with L=tv turns the charities layer on');
+    await old.p.close();
+
+    // A level the indicator has no figures at is not applied, so the key
+    // never describes colours that are not drawn.
+    await page.goto(BASE + '/index.html?ov=crime_rate_per_1000&lvl=lsoa&t=1');
+    await page.waitForTimeout(SETTLE);
+    const lv = await page.evaluate(() => ({ lvl: currentDataLevel, has: ovHasLevel('crime_rate_per_1000', 'lsoa'), land: _ovLandingLevel('crime_rate_per_1000') }));
+    ok(!lv.has && lv.lvl === lv.land, 'a link level the indicator has no figures at falls back to where it opens', JSON.stringify(lv));
+    ok(await page.evaluate(() => /comparison or custom area/.test(document.getElementById('tb-link').title)),
+      'the Copy link tooltip names what the link carries');
+    ok(errors.length === 0, 'no page errors (Copy link round trips)', errors.join(' | '));
+    await page.close();
+  }
+
   // The header search finds charities, pharmacies and dental practices on a
   // fresh page (their files are lazy, and the index used to be built before
   // they arrived and kept).
