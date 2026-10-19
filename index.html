@@ -403,13 +403,13 @@
      they are, and they turn red on hover because each one takes something
      away. 32px square; where one sits in a corner, a negative margin of its
      own keeps the card it closes from growing to fit it. */
-  .btn-icon, .sb-close, .ws-close, .load-note-x, #fingertips-banner-close, .help-pop-x, .ap-x,
+  .btn-icon, .sb-close, .ws-close, .load-note-x, .help-pop-x, .ap-x,
   .cmp-pin .cmp-x, .rb-item .x, .ws-pin-x, .q-del, #ai-close, #dev-banner .dev-x {
     appearance: none; display: inline-flex; align-items: center; justify-content: center;
     flex: none; width: 32px; height: 32px; padding: 0; margin: 0; border: 0;
     border-radius: var(--r-sm); background: none; color: var(--ink-3); cursor: pointer;
     line-height: 0; opacity: 1; float: none; }
-  .btn-icon:hover, .sb-close:hover, .ws-close:hover, .load-note-x:hover, #fingertips-banner-close:hover,
+  .btn-icon:hover, .sb-close:hover, .ws-close:hover, .load-note-x:hover,
   .help-pop-x:hover, .ap-x:hover, .cmp-pin .cmp-x:hover, .rb-item .x:hover, .ws-pin-x:hover,
   .q-del:hover, #ai-close:hover, #dev-banner .dev-x:hover { background: var(--nhs-light); color: var(--nhs-red); }
 
@@ -444,7 +444,7 @@
      back to the bottom, since nothing is left for it to rise above. */
   body.presenting .ws-sheet, body.presenting #cmp-bar, body.presenting .tour-strip,
   body.presenting .area-peek, body.presenting #ai-panel, body.presenting #load-note,
-  body.presenting #fingertips-banner, body.presenting footer.sbar { display: none !important; }
+  body.presenting footer.sbar { display: none !important; }
   body.presenting .map-wrap { --sheet-lift: 0px !important; }
   body.presenting .main { grid-template-columns: minmax(0, 1fr); }
   /* The picture keeps its credits: the map's attribution stays in its corner,
@@ -505,33 +505,16 @@
     box-shadow: var(--shadow); }
   .search-pin-dot { position: absolute; left: 10.5px; top: 7.5px;
     width: 7px; height: 7px; border-radius: 50%; background: var(--paper); }
+  /* Its label keeps Leaflet's own margin (the other popups draw their own
+     padding), and removing the pin is a button a thumb can hit. */
+  .search-pin-pop .leaflet-popup-content { margin: 10px 12px !important; min-width: 0; }
+  .search-pin-pop .search-pin-clear { display: inline-flex; align-items: center; min-height: 44px;
+    margin: 4px 0 -6px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--r-sm);
+    background: var(--paper); color: var(--nhs-blue); font: inherit; font-size: var(--t-sm); font-weight: 600; cursor: pointer; }
+  .search-pin-pop .search-pin-clear:hover { border-color: var(--nhs-blue); }
 
-  /* ── Fingertips suppression notice ──
-     Bottom right, which is where it belongs: it is a footnote about the
-     shading, and the top-left corner is where people are reading the map.
-
-     It shares that corner with the Ask panel and its button, so it hides
-     itself while the panel is open rather than being stacked behind it or
-     fighting it for the space. See _wireFingertipsBanner.
-
-     Styled from here rather than from a style attribute on the element. An
-     inline style beats an id selector, so the narrow-screen rule below it was
-     dead and had never once applied. */
-  #fingertips-banner { position: absolute; right: 12px; bottom: 104px; max-width: 300px;
-    background: var(--tint-amber); border: 1px solid var(--tint-amber-line); color: var(--tint-amber-ink);
-    padding: 9px var(--s-3); border-radius: var(--r-md); box-shadow: var(--shadow);
-    font-size: var(--t-sm); line-height: 1.45; z-index: 560; display: none;
-    pointer-events: none; }
-  /* Above the Ask button, not under it. At bottom:54px it shared the corner
-     with that button (bottom:34px, about 44px tall, and drawn on top), which
-     covered the notice and its close button on some screen sizes. */
-  .map-wrap.has-sheet #fingertips-banner { bottom: calc(var(--sheet-lift) + 104px); }
-  #fingertips-banner .ft-i { display: inline-block; background: #b88030; color: var(--on-accent);
-    border-radius: 50%; width: 18px; height: 18px; text-align: center;
-    line-height: 18px; font-weight: 700; margin-right: 6px; font-size: var(--t-xs);
-    vertical-align: middle; }
-  #fingertips-banner-close { float: right; margin: -6px -6px 0 4px; color: var(--tint-amber-ink);
-    pointer-events: auto; }
+  /* The missing-figure note is a line of the map's key now (.mls-note),
+     rather than a floating card of its own: see _wireBlankNote. */
 
   /* ── Something failed to load (see PH_LOAD) ───────────────────────────────
      On the map, not only in the status bar, where a failure used to be
@@ -579,6 +562,14 @@
   .map-chip:hover { background: var(--nhs-light); color: var(--nhs-dark); }
   /* The unit, on its own line under the name, when it is too long to go on
      each end value. Set by _syncScaleNumbers. */
+  /* The missing-figure note: one line under the scale, as wide as the key
+     and no wider (it hangs in the padding the key makes for it), with the
+     whole of it in the title and read out with the key. */
+  .map-legend-strip.has-note:not(.is-biv) { padding-bottom: calc(6px + 1.5em); }
+  .map-legend-strip .mls-note { position: absolute; left: var(--s-3); right: var(--s-3); bottom: 5px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.5;
+    color: var(--tint-amber-ink); font-weight: 600; }
+  .map-legend-strip .mls-note[hidden] { display: none; }
   .map-legend-strip .mls-unit { display: block; font-weight: 400; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; }
   .map-legend-strip .mls-min, .map-legend-strip .mls-max { font-variant-numeric: tabular-nums; color: var(--ink-2); min-width: 34px; }
   .map-legend-strip .mls-min { text-align: right; }
@@ -2096,9 +2087,9 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
     box-shadow: var(--shadow-lg); padding: 10px var(--s-3) var(--s-3); font-size: var(--t-md); color: var(--ink-2); }
   .area-peek[hidden] { display: none; }
   .ap-row .vs { margin-left: 0; margin-top: 2px; }
-  /* One thing at a time in that corner: the notice and the Ask button come
-     back when the card is closed. */
-  .map-wrap.has-peek #fingertips-banner, .map-wrap.has-peek #ai-toggle { display: none !important; }
+  /* One thing at a time in that corner: the Ask button comes back when the
+     card is closed. */
+  .map-wrap.has-peek #ai-toggle { display: none !important; }
   .ap-hd { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 6px; }
   .ap-hd > div { flex: 1; min-width: 0; }
   .ap-nm { font-weight: 700; color: var(--ink); font-size: var(--t-lg); }
@@ -2755,20 +2746,48 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
        left above it. The panel has its own "Ask about this ward", and the
        button comes back when the panel drops to its head. */
     .map-wrap.touring #ai-toggle, .map-wrap.sheet-full #ai-toggle { display: none; }
-    .map-wrap.has-sheet #fingertips-banner { bottom: calc(var(--sheet-lift) + 120px); }
+    .map-wrap.cmp-full #ai-toggle, .map-wrap.cmp-full .map-chip { display: none; }
     /* One short line in the corner, on a light ground, read as a caption. */
     .leaflet-control-attribution { font-size: var(--t-xs); line-height: 1.4; white-space: nowrap;
       padding: 1px 6px; background: color-mix(in srgb, var(--paper) 80%, transparent); }
-    /* Full width along the bottom instead: at this width there is no room for
-       300px of notice beside anything and still a map. */
-    #fingertips-banner { left: 8px; right: 8px; bottom: 120px; max-width: none;
-      font-size: var(--t-xs); padding: var(--s-2) 10px; }
     .map-legend-strip { left: 8px; right: 8px; transform: none; max-width: none;
       font-size: var(--t-xs); padding: 5px 9px; }
     .map-legend-strip .mls-label { max-width: 45%; }
+    .map-legend-strip .mls-note { left: 9px; right: 9px; bottom: 4px; }
+    .map-legend-strip.has-note:not(.is-biv) { padding-bottom: calc(5px + 1.5em); }
+    /* The key with its missing-figure line is a line taller, so the Ask
+       button and the chip above it go up by a line too. */
+    .map-wrap.has-note #ai-toggle, .map-wrap.has-note .map-chip { bottom: 90px; }
+    .map-wrap.has-note.has-sheet #ai-toggle, .map-wrap.has-note.has-sheet .map-chip { bottom: calc(var(--sheet-lift) + 90px); }
+    /* A fully open ward sheet leaves a strip of map for seeing where the
+       ward is. The key and the basemap switch wait until it drops back
+       (the credits stay, one line on the sheet's edge, as the licences
+       ask), rather than piling up over that strip and each other. */
+    .map-wrap.sheet-full .map-legend-strip { display: none !important; }
+    .map-wrap.sheet-full .basemap-ctl { display: none; }
+    /* Two lines for the borough, residents and deprivation, rather than
+       one ending in "average deprivation decil...". */
+    .ws-title .ws-meta { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical; }
     /* The viewing strip is scope only now; keep it to one line. */
     .viewing-strip { padding: 4px 10px 5px; font-size: var(--t-xs); }
   }
+  /* A phone on its side: the Indicators chip and the Satellite button
+     share the map's left edge, so the switch waits while the chip shows
+     (Map style in the panel does the same job). */
+  @media (max-width: 900px) and (max-height: 500px) {
+    .app:has(.mode-btn[data-mode="explore"][aria-selected="true"]) .map-wrap:not(.touring):not(.sheet-full):not(.has-peek) .basemap-ctl { display: none; }
+    /* And the chip stands right of the zoom buttons, which reach down to
+       its row on a screen this short. */
+    .map-chip { left: 66px; }
+  }
+  /* Reading down a fully open sheet on a phone, the head is one line: the
+     ward's name with the size and close buttons (see panWardIntoView's
+     neighbour in the sheet's script). */
+  .ws-sheet.ws-compact .ws-lbl, .ws-sheet.ws-compact .ws-meta, .ws-sheet.ws-compact .ws-fig,
+  .ws-sheet.ws-compact .ws-pinnote, .ws-sheet.ws-compact .ws-acts > .ws-btn { display: none !important; }
+  .ws-sheet.ws-compact .ws-head { flex-wrap: nowrap; padding-top: 12px; padding-bottom: 6px; }
+  .ws-sheet.ws-compact .ws-acts { display: flex !important; width: auto; }
 
   /* Coarse pointers get bigger targets, whatever the width. A 25px row is a
      comfortable click and an awkward tap. */
@@ -2800,12 +2819,12 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
     .dl-seg button { min-width: 44px; min-height: 36px; }
     .dl-help { width: 28px; height: 28px; line-height: 28px; }
     .sb-modebar-back { min-height: 44px; }
-    .btn-icon, .sb-close, .ws-close, .load-note-x, #fingertips-banner-close, .help-pop-x, .ap-x,
+    .btn-icon, .sb-close, .ws-close, .load-note-x, .help-pop-x, .ap-x,
     .cmp-pin .cmp-x, .rb-item .x, .ws-pin-x, .q-del, #ai-close, #dev-banner .dev-x,
     .hdr-menu, .hdr-search-btn, .chip-x, .lhelp, .dl-seg button, .tour-hd .tour-end, .q-example,
     .sb-lbl.collapsible, .sidebar .sbar a, .sidebar .sbar button {
       position: relative; }
-    .btn-icon::after, .sb-close::after, .ws-close::after, .load-note-x::after, #fingertips-banner-close::after,
+    .btn-icon::after, .sb-close::after, .ws-close::after, .load-note-x::after,
     .help-pop-x::after, #ai-close::after, #dev-banner .dev-x::after, .cmp-pin .cmp-x::after,
     .rb-item .x::after, .hdr-menu::after, .hdr-search-btn::after {
       content: ''; position: absolute; inset: -6px; }
@@ -2867,11 +2886,9 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
     .map-wrap.side-r .leaflet-right { right: var(--side-r); }
     .map-wrap.side-r #ai-toggle { right: calc(var(--side-r) + 8px); }
     .map-wrap.side-r .dl-badge { right: calc(var(--side-r) + 8px); }
-    .map-wrap.side-r #fingertips-banner { right: calc(var(--side-r) + 8px); }
     /* Two panels up at once (the tour and a ward) leave too little map for
        the switches and the key, so they wait; the credits wrap to fit. */
-    .map-wrap.side-cramped .dl-badge, .map-wrap.side-cramped #ai-toggle,
-    .map-wrap.side-cramped #fingertips-banner { display: none; }
+    .map-wrap.side-cramped .dl-badge, .map-wrap.side-cramped #ai-toggle { display: none; }
     /* !important because the key's own display is written inline. */
     .map-wrap.side-cramped .map-legend-strip { display: none !important; }
     .map-wrap.side-cramped .leaflet-control-attribution { white-space: normal;
@@ -2898,6 +2915,14 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
     .tour-prog .seg { height: 2px; }
     .tour-narr { margin-bottom: 6px; line-height: 1.5; }
     .tour-ctrls { gap: 8px; }
+  }
+  /* Too short for a sheet beside the map that starts under the area level
+     switch: the side sheet runs from under the page header to the bottom of
+     the screen, over the tabs and the Viewing line, so its figures get the
+     height. (--hdr-b is written by sideSync.) */
+  @media (max-height: 420px) {
+    .ws-sheet, .map-wrap.touring .ws-sheet { position: fixed; top: calc(var(--hdr-b, 44px) + 6px); bottom: 6px; z-index: 1300; }
+    .ws-sheet.peek, .ws-sheet.collapsed { bottom: auto; max-height: calc(100vh - var(--hdr-b, 44px) - 12px); }
   }
 
   /* ── Ask, on a phone, is the whole screen ─────────────────────────────────
@@ -4047,13 +4072,14 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
            scale-bar via the same data, so users can read the choropleth without scrolling. -->
       <!-- A tap or click on it opens the indicator's card (workplan 2.10). -->
       <div id="map-legend-strip" class="map-legend-strip" style="display:none" role="button" tabindex="0"
-           aria-label="About this indicator" aria-describedby="mls-min mls-max"
+           aria-label="About this indicator" aria-describedby="mls-min mls-max mls-note"
            title="Select to read about this indicator">
         <span class="mls-label" id="mls-label"></span>
         <span class="mls-min" id="mls-min"></span>
         <span class="mls-grad" id="mls-grad"></span>
         <span class="mls-max" id="mls-max"></span>
         <span class="mls-biv" id="mls-biv"></span>
+        <span class="mls-note" id="mls-note" hidden></span>
       </div>
       <!-- Loading screen. A map rather than a spinner: see _paintLoaderMap
            below for why, and for where the geometry comes from. The copy used
@@ -4088,17 +4114,6 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
       <!-- Phones only: the indicator list lives in the drawer, out of sight,
            so this floats over the map and opens it (workplan 2.10). -->
       <button type="button" class="map-chip" id="map-colour-chip"><svg class="ic" aria-hidden="true"><use href="#i-palette"/></svg>Indicators</button>
-      <!-- Fingertips suppression banner: shown when a Fingertips overlay is selected -->
-      <!-- Top left, under the zoom control. It used to sit bottom right, where
-           the Ask button covers it and the Ask panel hides it completely: the
-           notice explaining why wards are blank was itself invisible exactly
-           when someone had a blank ward in front of them. Nothing else lives
-           in this corner below the zoom buttons. -->
-      <div id="fingertips-banner">
-        <span class="ft-i">i</span>
-        <span id="fingertips-banner-text">Areas left without colour have no figure. OHID, the Office for Health Improvement and Disparities, withholds figures where so few people are counted that someone could be identified, so a blank area does not mean zero.</span>
-        <button id="fingertips-banner-close" title="Dismiss this notice for this session" aria-label="Dismiss this notice"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button>
-      </div>
       <!-- "Area level", not "Viewing". The strip in the top-left corner of the
            same map is already labelled Viewing, and it answers a different
            question: that one is WHERE (All of London, or one borough), this
@@ -12320,7 +12335,7 @@ function _fitFocus(bounds) {
         strip.removeAttribute('aria-describedby');
         return;
       }
-      strip.setAttribute('aria-describedby', 'mls-min mls-max');
+      strip.setAttribute('aria-describedby', 'mls-min mls-max mls-note');
       strip.setAttribute('aria-label', 'About this indicator: ' + (lbl ? [...lbl.childNodes]
         .filter(n => !(n.classList && n.classList.contains('mls-unit'))).map(n => n.textContent).join('').trim() : ''));
     };
@@ -16253,73 +16268,44 @@ document.addEventListener('change', e => {
   });
 })();
 
-// ── Fingertips suppression banner ────────────────────────────────────────
-// Show the warning banner whenever a Fingertips overlay (ft_*) is the active
-// overlay on either dropdown, and the user hasn't dismissed it for this
-// session. The banner explains that some wards may be greyed out because
-// OHID Fingertips suppresses MSOA values where small counts could risk
-// re-identification.
-(function _wireFingertipsBanner() {
-  const banner = document.getElementById('fingertips-banner');
-  const closeBtn = document.getElementById('fingertips-banner-close');
-  if (!banner) return;
-  let dismissed = false;
+// ── The missing-figure note ──────────────────────────────────────────────
+// A line in the map's key whenever an OHID (Fingertips) indicator is drawn,
+// saying why some areas are blank. It was a floating card of its own, which
+// on a phone landed under the zoom buttons and the level switch, and could
+// be dismissed and forgotten; as part of the key it goes where the key goes.
+(function _wireBlankNote() {
+  const note = document.getElementById('mls-note');
+  const strip = document.getElementById('map-legend-strip');
+  if (!note || !strip) return;
   const isFt = k => typeof k === 'string' && k.startsWith('ft_');
-
-  /**
-   * The notice and the Ask panel share the bottom-right corner.
-   *
-   * Rather than stack them or shuffle one sideways, the notice stands down
-   * while the panel is open. It is a footnote about the shading and it will
-   * still be there when the panel closes; the panel is what the person is
-   * actively using. Overlapping them was the original complaint and moving the
-   * notice to the opposite corner solved it by putting a footnote in the part
-   * of the map people read first.
-   *
-   * The panel is built by assistant.js after this runs and toggles a class on
-   * itself, so this watches the DOM rather than listening for an event that
-   * would have to be added there and kept in step.
-   */
-  function askOpen() {
-    const p = document.getElementById('ai-panel');
-    return !!(p && p.classList.contains('open'));
-  }
-
-  const textEl = document.getElementById('fingertips-banner-text');
   const update = () => {
     const ftActive = (typeof curOv !== 'undefined' && isFt(curOv));
     // The reason is read from the data: the MSOAs redrawn in 2021 for the
     // older Local Health series, and withheld figures otherwise. Until the
-    // MSOA figures arrive for an MSOA series, the notice waits for them.
+    // MSOA figures arrive for an MSOA series, the note waits for them.
     let cause = ftActive ? ftBlankCause(curOv) : '';
     if (ftActive && !cause && ovHasLevel(curOv, 'msoa') && typeof ensureMsoaData === 'function') {
       ensureMsoaData().then(() => { if (ftBlankCause(curOv)) update(); });
     }
-    // Only when it changes: the observer below watches the document, so an
-    // unconditional write would wake it again, for ever.
-    const want = cause === 'redrawn' ? BLANK_NOTE_REDRAWN : BLANK_NOTE_WITHHELD;
-    if (textEl && cause && textEl.textContent !== want) textEl.textContent = want;
-    const show = ftActive && !dismissed && !askOpen() && (cause === 'redrawn' || cause === 'withheld' ||
-      (!cause && !ovHasLevel(curOv, 'msoa')));
-    banner.style.display = show ? 'block' : 'none';
+    const show = ftActive && (cause === 'redrawn' || cause === 'withheld' || (!cause && !ovHasLevel(curOv, 'msoa')));
+    const want = !show ? '' : cause === 'redrawn' ? BLANK_NOTE_REDRAWN : BLANK_NOTE_WITHHELD;
+    if (note.textContent !== want) note.textContent = want;
+    note.hidden = !show;
+    if (show) note.title = want; else note.removeAttribute('title');
+    strip.classList.toggle('has-note', show);
+    const wrap = strip.closest('.map-wrap');
+    if (wrap) wrap.classList.toggle('has-note', show);
   };
-
-  // The Ask panel appears late and its open state is a class, so this observes
-  // the document for it rather than assuming it exists at wiring time.
-  const obs = new MutationObserver(update);
-  obs.observe(document.body, {
-    subtree: true, attributes: true, attributeFilter: ['class'], childList: true,
-  });
-
-  if (closeBtn) closeBtn.addEventListener('click', () => {
-    dismissed = true;
-    banner.style.display = 'none';
-  });
   const ovEl = document.getElementById('ov');
   // Deferred a tick so curOv has been updated by the existing handler first.
   if (ovEl) ovEl.addEventListener('change', () => setTimeout(update, 0));
-  // Also surface on initial page load (in case of URL state restoration).
+  // Whatever else changes the indicator (a link, a card, the rankings)
+  // redraws the key's label, so that is watched too.
+  const lblEl = document.getElementById('mls-label');
+  if (lblEl) new MutationObserver(() => setTimeout(update, 0)).observe(lblEl, { childList: true, characterData: true, subtree: true });
+  // Also on first load, in case the link chose the indicator.
   setTimeout(update, 100);
+  setTimeout(update, 2500);
 })();
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -17208,7 +17194,7 @@ function _clearSearchPin() {
   }
   _searchPin = null;
 }
-function _dropSearchPin(item) {
+function _dropSearchPin(item, opts) {
   if (typeof map === 'undefined' || !map) return;
   _clearSearchPin();
   const lat = item && item._lat, lng = item && item._lng;
@@ -17228,17 +17214,31 @@ function _dropSearchPin(item) {
     }),
   }).addTo(map);
   const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  /* The label opens once the map has finished moving, kept clear of the
+     zoom buttons and the level switch at the top left and of the ward sheet
+     along the bottom. Opened before the move, it landed under them. */
+  const sheetEl = document.getElementById('ward-sheet');
+  const sheetH = sheetEl && sheetEl.classList.contains('open') ? Math.round(sheetEl.getBoundingClientRect().height) : 0;
   _searchPin.bindPopup(
     '<div style="font-weight:600;margin-bottom:2px">' + esc(label) + '</div>' +
     (kind ? '<div style="font-size:var(--t-xs);color:var(--ink-2)">' + esc(kind) +
             (sub ? ' · ' + esc(sub) : '') + '</div>' : '') +
-    '<div style="margin-top:5px"><a href="#" class="search-pin-clear" ' +
-    'style="font-size:var(--t-xs);color:var(--nhs-blue)">Remove this pin</a></div>'
-  ).openPopup();
+    '<button type="button" class="search-pin-clear">Remove pin</button>',
+    { className: 'search-pin-pop', autoPanPaddingTopLeft: L.point(90, 150),
+      autoPanPaddingBottomRight: L.point(10, sheetH + 40) });
   _searchPin.on('popupopen', e => {
     const a = e.popup.getElement() && e.popup.getElement().querySelector('.search-pin-clear');
     if (a) a.addEventListener('click', ev => { ev.preventDefault(); _clearSearchPin(); });
   });
+  // On a phone a postcode needs no label: the ward sheet already says
+  // "Near" the postcode, and the pin marks the spot.
+  if (opts && opts.noPopup) return;
+  const pin = _searchPin;
+  let opened = false;
+  const show = () => { if (!opened && _searchPin === pin) { opened = true; pin.openPopup(); } };
+  map.once('moveend', show);
+  // In case the map was already where it needed to be and never moves.
+  setTimeout(show, 900);
 }
 /* On a phone the search box sits beside the More button in the drawer and
    is too narrow for the full prompt, which was cut to "...GP or charit".
@@ -17404,7 +17404,8 @@ function _pickPostcode(pq, res) {
     _searchFlyTo(res.latitude, res.longitude, 15);
   }
   _dropSearchPin({ type: 'postcode', label: res.postcode, sub: res.admin_ward || '',
-                   _lat: res.latitude, _lng: res.longitude });
+                   _lat: res.latitude, _lng: res.longitude },
+                 { noPopup: !!lyr && window.matchMedia('(max-width: 900px)').matches });
 }
 function _renderPostcodeRow(results, pq, q) {
   const id = 'sr-pc-row';
@@ -19284,6 +19285,10 @@ var PH_SHOW = {
   function isShort() { return shortMq.matches; }
   function sideSync() {
     if (!mapWrap) return;
+    // Where the page header ends, for the side sheet on a very short screen,
+    // which runs from there to the bottom (see max-height: 420px).
+    var hdrEl = document.querySelector('.hdr');
+    if (hdrEl) document.documentElement.style.setProperty('--hdr-b', Math.round(hdrEl.getBoundingClientRect().bottom) + 'px');
     var w = 0;
     if (isShort()) {
       var right = mapWrap.getBoundingClientRect().right, left = Infinity;
@@ -19313,6 +19318,12 @@ var PH_SHOW = {
   function lift() {
     if (!mapWrap) return;
     var open = sheet.classList.contains('open');
+    // With the sheet put away for the comparison, the comparison is what
+    // stands along the bottom, so the map's furniture rises for it instead.
+    // (The sheet's own resize, as it is put away, lands here too, and used
+    // to drop the lift from under the comparison.)
+    if (!open && cmpBar && cmpBar.classList.contains('open')) { liftFor(cmpBar); return; }
+    mapWrap.classList.remove('cmp-full');
     var touring = mapWrap.classList.contains('touring');
     mapWrap.classList.toggle('has-sheet', open || touring);
     mapWrap.classList.toggle('sheet-full', open && sheetState === 0);
@@ -19330,6 +19341,8 @@ var PH_SHOW = {
     document.documentElement.style.setProperty('--sheet-lift', px);
   }
   function applyState() {
+    if (sheetState !== 0) sheet.classList.remove('ws-compact');
+    if (sheetState === 0) setTimeout(panWardIntoView, 320);
     sheet.classList.toggle('peek', sheetState === 1);
     sheet.classList.toggle('collapsed', sheetState === 2);
     var sizeBtn = $('ws-size');
@@ -19358,6 +19371,47 @@ var PH_SHOW = {
   sheet.addEventListener('transitionend', function (e) {
     if (e.propertyName === 'max-height') lift();
   });
+
+  /* On a phone the fully open sheet leaves a strip of map above it (or, on
+     a phone on its side, beside it), and the ward chosen was often under
+     the sheet. The map pans, at the same zoom, so the ward's middle sits in
+     the part of the map still showing, unless it is already there. */
+  function panWardIntoView() {
+    if (!currentWard || sheetState !== 0 || !sheet.classList.contains('open')) return;
+    if (!(isNarrow() || isShort()) || typeof map === 'undefined' || !map || typeof wLyr === 'undefined' || !wLyr) return;
+    var lyr = null;
+    wLyr.eachLayer(function (l) { if (!lyr && l.feature && l.feature.properties && l.feature.properties.WD24NM === currentWard) lyr = l; });
+    if (!lyr) return;
+    var mb = map.getContainer().getBoundingClientRect(), sb = sheet.getBoundingClientRect();
+    var free = isShort() ? { l: 60, t: 50, r: sb.left - mb.left - 12, b: mb.height - 30 }
+                         : { l: 16, t: 64, r: mb.width - 16, b: sb.top - mb.top - 26 };
+    if (free.r - free.l < 60 || free.b - free.t < 24) return;
+    var c = map.latLngToContainerPoint(lyr.getBounds().getCenter());
+    if (c.x >= free.l && c.x <= free.r && c.y >= free.t && c.y <= free.b) return;
+    try { map.panBy([c.x - (free.l + free.r) / 2, c.y - (free.t + free.b) / 2], { animate: true, duration: 0.35 }); } catch (e) { /* map not ready */ }
+  }
+  /* Reading down a fully open sheet on a phone, the head drops to one line,
+     the ward's name with the size and close buttons, so the summary gets
+     the room. It comes back at the top. The body's scroll is moved by the
+     same amount as the head changes, so the text does not jump. */
+  if (bodyEl) bodyEl.addEventListener('scroll', function () {
+    var compact = sheet.classList.contains('ws-compact');
+    if (sheetState !== 0 || !(isNarrow() || isShort())) {
+      if (compact) sheet.classList.remove('ws-compact');
+      return;
+    }
+    var h0 = headEl.offsetHeight, st = bodyEl.scrollTop;
+    if (!compact) {
+      // Read before the change: a taller body can clamp the scroll.
+      sheet.classList.add('ws-compact');
+      var d = h0 - headEl.offsetHeight;
+      if (d <= 0 || st < d + 8) { sheet.classList.remove('ws-compact'); return; }
+      bodyEl.scrollTop = st - d;
+    } else if (st <= 0) {
+      sheet.classList.remove('ws-compact');
+      bodyEl.scrollTop += Math.max(0, headEl.offsetHeight - h0);
+    }
+  }, { passive: true });
 
   // One tap opens the sheet fully and the next puts it back. It cycled through
   // three sizes, so from peek the first tap only shrank it a little and the
@@ -19835,6 +19889,7 @@ var PH_SHOW = {
     // was about that ward, not this one.
     if (currentWard !== wn) sheet.querySelectorAll(':scope > .ph-note').forEach(function (n) { n.remove(); });
     if (wn !== currentWard) pinNote(false);
+    if (wn !== currentWard) sheet.classList.remove('ws-compact');
     currentWard = wn;
     // A "Near ..." list from a search belongs to the ward the search opened.
     if (window._phNear && window._phNear.ward !== wn) window._phNear = null;
@@ -20903,6 +20958,7 @@ var PH_SHOW = {
   function closeCompareBar() {
     if (!cmpBar) return;
     cmpBar.classList.remove('open', 'peek');
+    if (mapWrap) mapWrap.classList.remove('cmp-full');
     // lift() works out what is left along the bottom: the sheet if it is
     // open, the tour if it is running, or nothing.
     if (!sheet.classList.contains('open') && mapWrap) lift();
@@ -20911,6 +20967,13 @@ var PH_SHOW = {
   function liftFor(el) {
     if (!mapWrap) return;
     mapWrap.classList.add('has-sheet');
+    // The comparison open past its peek: on a phone the Ask button and the
+    // Indicators chip wait, as they do over a fully open ward sheet, rather
+    // than sitting on the figures being compared.
+    if (el === cmpBar) {
+      mapWrap.classList.toggle('cmp-full', !el.classList.contains('peek'));
+      mapWrap.classList.remove('sheet-full');
+    }
     sideSync();
     var px = liftPx(el.offsetHeight) + 'px';
     mapWrap.style.setProperty('--sheet-lift', px);
@@ -20980,6 +21043,13 @@ var PH_SHOW = {
     $('cmp-bar-csv').addEventListener('click', cmpCsv);
     $('cmp-bar-close').addEventListener('click', closeCompareBar);
     $('cmp-bar-see').addEventListener('click', function () { openCompareBar(false); });
+    // Its height follows what it holds (two areas or four, a table or
+    // cards), so the furniture above it follows the height.
+    if (typeof ResizeObserver === 'function') {
+      new ResizeObserver(function () {
+        if (cmpBar.classList.contains('open') && !sheet.classList.contains('open')) liftFor(cmpBar);
+      }).observe(cmpBar);
+    }
     $('cmp-bar-less').addEventListener('click', function () { openCompareBar(true); });
 
     // The level chips and the area picker are both rebuilt by

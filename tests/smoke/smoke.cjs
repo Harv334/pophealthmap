@@ -2303,7 +2303,7 @@ const smallText = page => page.evaluate(() => {
     await setOv(page, 'ft_93227');
     await page.waitForTimeout(3000);
     const b7 = await page.evaluate(() => ({
-      text: document.getElementById('fingertips-banner-text').textContent,
+      text: document.getElementById('mls-note').textContent,
       redrawn: Object.keys(MSOA_DATA).filter(msoaRedrawn2021).length,
       card: msoaNoFigure(Object.keys(MSOA_DATA).filter(msoaRedrawn2021)[0], 'ft_93227'),
       other: msoaNoFigure('E02000001', 'census_bad_health_pct') }));
@@ -2313,7 +2313,7 @@ const smallText = page => page.evaluate(() => {
     await setOv(page, 'ft_93105');
     await page.waitForTimeout(1500);
     ok(/^Areas left without colour have no figure\. OHID, the Office for Health Improvement and Disparities, withholds/.test(
-      await page.evaluate(() => document.getElementById('fingertips-banner-text').textContent)), 'other blanks are described as withheld');
+      await page.evaluate(() => document.getElementById('mls-note').textContent)), 'other blanks are described as withheld');
     // H1: an LA map of a Local Health indicator says it is our estimate, and
     // its LA list leaves out the City.
     await setOv(page, 'ft_932831');
@@ -2413,6 +2413,101 @@ const smallText = page => page.evaluate(() => {
       }
     }
     ok(errors.length === 0, 'no page errors (report layout checks)', errors.join(' | '));
+    await page.close();
+  }
+
+  // H30: a ward sheet fully open on a phone. The missing-figure note is a
+  // line of the key, the floating controls do not pile up, the ward is in
+  // the map left showing, and reading down the sheet the head drops to a line.
+  for (const vp of [{ width: 390, height: 664 }, { width: 360, height: 740 }, { width: 390, height: 844 }, { width: 750, height: 342 }]) {
+    const tag = vp.width + 'x' + vp.height;
+    const { page, errors } = await open(browser, 'index.html?ov=ft_93227&t=1', { ...vp, isMobile: true, hasTouch: true });
+    await page.waitForTimeout(1500);
+    const FLOAT = ['#map-legend-strip', '.leaflet-control-zoom', '#dl-badge', '.basemap-ctl', '#map-colour-chip', '#ai-toggle', '.leaflet-control-attribution'];
+    const piled = async extra => {
+      const rs = {};
+      for (const s of FLOAT.concat(extra || [])) {
+        const r = await rectOf(page, s);
+        if (r && await page.evaluate(s => getComputedStyle(document.querySelector(s)).visibility !== 'hidden', s)) rs[s] = r;
+      }
+      const ks = Object.keys(rs), hit = [];
+      for (let i = 0; i < ks.length; i++) for (let j = i + 1; j < ks.length; j++) if (overlaps(rs[ks[i]], rs[ks[j]])) hit.push(ks[i] + ' x ' + ks[j]);
+      return hit;
+    };
+    const note = await page.evaluate(() => { const n = document.getElementById('mls-note');
+      return { inKey: !!n && n.parentNode.id === 'map-legend-strip', shown: !!n && !n.hidden && n.getClientRects().length > 0,
+        old: !!document.getElementById('fingertips-banner'), text: n ? n.textContent : '' }; });
+    ok(note.inKey && note.shown && !note.old && /^Areas left blank have no figure\./.test(note.text),
+      'phone ' + tag + ': the missing-figure note is a line of the key, not a floating card', JSON.stringify(note).slice(0, 200));
+    let hit = await piled();
+    ok(!hit.length, 'phone ' + tag + ': the key, the zoom buttons, the level switch and the chips do not overlap', hit.join(', '));
+    await page.evaluate(() => { showWard('Lansbury'); PH_SHEET.setState(0); });
+    await page.waitForTimeout(1600);
+    hit = await piled(['#ward-sheet']);
+    ok(!hit.length, 'phone ' + tag + ': with the ward sheet fully open nothing floats over it or over each other', hit.join(', '));
+    const seen = await page.evaluate(() => {
+      let lyr = null; wLyr.eachLayer(l => { if (l.feature.properties.WD24NM === 'Lansbury') lyr = l; });
+      const c = map.latLngToContainerPoint(lyr.getBounds().getCenter()), m = map.getContainer().getBoundingClientRect();
+      const s = document.getElementById('ward-sheet').getBoundingClientRect(), x = m.left + c.x, y = m.top + c.y;
+      return { inMap: x > m.left && x < m.right && y > m.top && y < m.bottom, underSheet: x > s.left && x < s.right && y > s.top && y < s.bottom };
+    });
+    ok(seen.inMap && !seen.underSheet, 'phone ' + tag + ': the chosen ward is in the map left showing, not under the sheet', JSON.stringify(seen));
+    const head = await page.evaluate(async () => {
+      const b = document.getElementById('ws-body'), h = document.getElementById('ws-head'), h0 = h.offsetHeight;
+      if (b.scrollHeight - b.clientHeight < h0) return { skip: true };
+      b.scrollTop = b.scrollHeight; await new Promise(r => setTimeout(r, 300));
+      const h1 = h.offsetHeight, name = document.getElementById('ws-name').getBoundingClientRect().height > 0,
+        size = document.getElementById('ws-size').getBoundingClientRect().height > 0;
+      b.scrollTop = 0; await new Promise(r => setTimeout(r, 300));
+      b.scrollTop = 0; await new Promise(r => setTimeout(r, 300));
+      return { h0, h1, name, size, back: h.offsetHeight };
+    });
+    ok(head.skip || (head.h1 < 70 && head.name && head.size && head.back === head.h0),
+      'phone ' + tag + ': reading down the open sheet, its head drops to one line, and comes back at the top', JSON.stringify(head));
+    ok(errors.length === 0, 'no page errors (phone sheet ' + tag + ')', errors.join(' | '));
+    await page.close();
+  }
+
+  // H31: a postcode on a phone marks the spot without a label under the
+  // map's buttons; on a desktop the label opens clear of them, with a
+  // Remove pin button big enough to tap.
+  for (const vp of [PHONE, DESK]) {
+    const { page, errors } = await open(browser, 'index.html?t=1', vp);
+    const res = { postcode: 'E1 6AN', latitude: 51.5203, longitude: -0.0727, admin_ward: 'Spitalfields & Banglatown',
+      codes: { admin_ward: 'E05009336' } };
+    await page.evaluate(res => _pickPostcode({ kind: 'postcode', text: 'E1 6AN' }, res), res);
+    await page.waitForTimeout(2500);
+    const pop = await rectOf(page, '.leaflet-popup'), pin = await page.evaluate(() => !!document.querySelector('.search-pin'));
+    if (vp === PHONE) {
+      ok(pin && !pop, 'phone: a postcode drops its pin without a popup (the sheet says "Near")', JSON.stringify(pop));
+    } else {
+      const hit = [];
+      for (const s of ['.leaflet-control-zoom', '.basemap-ctl', '#ward-sheet', '.dl-badge']) if (overlaps(pop, await rectOf(page, s))) hit.push(s);
+      const btn = await page.evaluate(() => { const b = document.querySelector('.leaflet-popup .search-pin-clear');
+        return b ? { tag: b.tagName, text: b.textContent, h: Math.round(b.getBoundingClientRect().height) } : null; });
+      ok(!!pop && !hit.length && btn && btn.tag === 'BUTTON' && btn.text === 'Remove pin' && btn.h >= 44,
+        'desktop: the postcode label opens clear of the map buttons and the sheet, with a 44px Remove pin', JSON.stringify({ pop, hit, btn }));
+    }
+    ok(errors.length === 0, 'no page errors (postcode pin)', errors.join(' | '));
+    await page.close();
+  }
+
+  // H32: the Ask button and the chip stay off an open comparison.
+  for (const [vp, wards] of [[PHONE, ['Lansbury', 'Bow West']], [{ width: 1280, height: 720 }, ['Lansbury', 'Bow West', 'Hornsey', 'Sudbury']], [DESK, ['Lansbury', 'Bow West', 'Hornsey', 'Sudbury']]]) {
+    const { page, errors } = await open(browser, 'index.html?t=1', vp);
+    for (const wn of wards) {
+      await page.evaluate(wn => showWard(wn), wn);
+      await page.waitForTimeout(500);
+      await page.evaluate(() => document.getElementById('ws-pin').click());
+      await page.waitForTimeout(500);
+    }
+    await page.evaluate(() => { const b = document.getElementById('cmp-bar-see'); if (b && b.getClientRects().length) b.click();
+      if (!document.getElementById('cmp-bar').classList.contains('open')) document.getElementById('cmp-open').click(); });
+    await page.waitForTimeout(1200);
+    const bar = await rectOf(page, '#cmp-bar'), ask = await rectOf(page, '#ai-toggle'), chip = await rectOf(page, '#map-colour-chip');
+    ok(!!bar && !overlaps(ask, bar) && !overlaps(chip, bar), 'the Ask button and the chip are clear of the open comparison at ' + vp.width + 'x' + vp.height,
+      JSON.stringify({ bar, ask, chip }));
+    ok(errors.length === 0, 'no page errors (comparison and Ask)', errors.join(' | '));
     await page.close();
   }
 
