@@ -88,9 +88,16 @@ var MODEL_LABEL = "Claude Sonnet 5";
    * default: a wrongly averaged count looks implausible and gets caught,
    * a wrongly summed rate looks like a number and does not.
    */
-  var ADDITIVE = { census_population: 1, crime_total: 1 };
+  //
+  // The rule itself lives in index.html as laSums, which the map, Compare and
+  // Custom area also use, so Ask adds up and averages exactly as they do. The
+  // list here is only the fallback for a page that has not defined it, and
+  // matches it: crime counts (crime_total and the *_12mo categories) and any
+  // *_count are summed.
+  var ADDITIVE = { census_population: 1, crime_total: 1, gb_total_uprn: 1 };
   function isAdditive(key) {
-    return ADDITIVE[key] === 1 || /_count$/.test(key);
+    if (typeof laSums === "function") return !!laSums(key);
+    return ADDITIVE[key] === 1 || /_count$|_12mo$/.test(key);
   }
 
   // The LA file (borough_data.json), which index.html loads into a
@@ -138,6 +145,15 @@ var MODEL_LABEL = "Claude Sonnet 5";
         if (b._den[key] > 0) b.indicators[key] = Math.round((b._num[key] / b._den[key]) * 100) / 100;
       });
       delete b._num; delete b._den;
+      // Where the map's own LA function is there, take its figure for every
+      // indicator, so Ask quotes exactly the number the map draws.
+      if (b.lad_code && typeof boroughOvValue === "function") {
+        Object.keys(b.indicators).forEach(function (key) {
+          var mv = parseFloat(boroughOvValue(b.lad_code, key));
+          if (isNaN(mv)) return;
+          b.indicators[key] = isAdditive(key) ? mv : Math.round(mv * 100) / 100;
+        });
+      }
       var own = b.lad_code && laFile()[b.lad_code];
       var rec = own && (own.indicators || own);
       if (rec) {

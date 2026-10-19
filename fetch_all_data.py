@@ -3657,6 +3657,99 @@ def run_fingertips_msoa() -> pd.DataFrame:
     return out
 
 
+# ============================================================================
+# SOURCE 5c: Fingertips Local Health at LA level
+# ============================================================================
+# The same Local Health indicators as above, fetched for whole LAs (districts
+# and unitary authorities, area type 501). Without them the map's LA figure
+# for a Local Health indicator is a population-weighted mean of ward figures,
+# which for life expectancy and standardised ratios is not a valid average and
+# disagreed with OHID's own LA figure by over two years for Newham. With them,
+# borough_data.json carries OHID's figure under the same key (ft_<id>), and the
+# map's boroughOvValue prefers it. OHID marks some LA figures (the City of
+# London's life expectancy, for one) as not calculable; _ft_value_with_ci
+# turns those placeholders into a missing value rather than a zero.
+FINGERTIPS_LA_LOWER_TIER = 501   # districts and UAs, April 2023 boundaries
+
+
+def _ft_la_latest(df: "pd.DataFrame", ind_id: int) -> list:
+    """The latest LA figure per area from one Local Health indicator's CSV.
+
+    Returns dicts of LAD25CD, indicator_id, value and period. Persons where
+    published; for life expectancy, which has only Female and Male, women keep
+    the id and men take FT_MALE_ID(id), as in the MSOA series, so both levels
+    share one key.
+    """
+    if df is None or df.empty or "Area Code" not in df.columns:
+        return []
+    if "Area Type" in df.columns:
+        at = df["Area Type"].astype(str)
+        keep = ~at.str.contains("MSOA|England|Region", case=False, na=False)
+        df = df[keep]
+    variants = [(int(ind_id), df)]
+    if "Sex" in df.columns:
+        sexes = set(df["Sex"].dropna().astype(str))
+        if "Persons" in sexes:
+            variants = [(int(ind_id), df[df["Sex"] == "Persons"])]
+        elif {"Female", "Male"} <= sexes:
+            variants = [(int(ind_id), df[df["Sex"] == "Female"]),
+                        (FT_MALE_ID(int(ind_id)), df[df["Sex"] == "Male"])]
+    out = []
+    for out_id, d in variants:
+        if d.empty:
+            continue
+        if "Time period Sortable" in d.columns:
+            d = d.sort_values("Time period Sortable", kind="stable")
+        d = d.groupby("Area Code", as_index=False).tail(1)
+        for _, row in d.iterrows():
+            value, _lo, _hi = _ft_value_with_ci(row)
+            out.append({"LAD25CD": str(row["Area Code"]), "indicator_id": int(out_id),
+                        "value": value, "period": row.get("Time period", "")})
+    return out
+
+
+def run_fingertips_msoa_la() -> pd.DataFrame:
+    rule("OHID Fingertips Local Health (LA)")
+    cache_dir = CACHE_DIR / "fingertips_msoa_la"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    rows: list = []
+    for ind_id in FINGERTIPS_MSOA_INDICATORS:
+        cache = cache_dir / f"ind_{ind_id}_la{FINGERTIPS_LA_LOWER_TIER}.csv"
+        if not cache.exists():
+            url = (f"https://fingertips.phe.org.uk/api/all_data/csv/by_indicator_id"
+                   f"?indicator_ids={ind_id}"
+                   f"&child_area_type_id={FINGERTIPS_LA_LOWER_TIER}"
+                   f"&parent_area_type_id=15")
+            try:
+                r = _ft_get(url, timeout=120)
+                if len(r.content.splitlines()) < 2:
+                    warn(f"fingertips local health LA {ind_id}: no rows; not caching")
+                    continue
+                cache.write_bytes(r.content)
+                time.sleep(0.5)
+            except Exception as e:
+                warn(f"fingertips local health LA {ind_id}: {e}")
+                continue
+        try:
+            df = pd.read_csv(cache, dtype=str, low_memory=False)
+        except pd.errors.EmptyDataError:
+            continue
+        if df.empty or "Area Code" not in df.columns:
+            continue
+        df = df[df["Area Code"].isin(SCOPE_LADS)]
+        rows.extend(_ft_la_latest(df, ind_id))
+    out = pd.DataFrame(rows, columns=["LAD25CD", "indicator_id", "value", "period"])
+    out_path = DATA_DIR / "outcomes" / "fingertips_msoa_la.parquet"
+    out = carry_forward_thin(out_path, out, key="indicator_id", source="fingertips_msoa_la",
+                             requested=set(FINGERTIPS_MSOA_INDICATORS),
+                             cache_file=lambda k: cache_dir / f"ind_{int(k)}_la{FINGERTIPS_LA_LOWER_TIER}.csv")
+    out = write_parquet_guarded(out_path, out, source="fingertips_msoa_la")
+    n_ind = out["indicator_id"].nunique() if not out.empty else 0
+    ok(f"fingertips local health LA: {len(out):,} rows, {n_ind} indicators "
+       f"-> {out_path.relative_to(REPO_ROOT)}")
+    return out
+
+
 def _tofloat(v):
     try: return float(v)
     except (TypeError, ValueError): return None
@@ -5523,6 +5616,21 @@ def _month_range_label(first: str, last: str) -> str:
     return f if f == l else f"{f} to {l}"
 
 
+def local_health_la_values(lh: "pd.DataFrame") -> dict:
+    """{LAD25CD: {ft_<id>: value}} from fingertips_msoa_la.parquet, missing
+    values (OHID's 'cannot be calculated') left out rather than written."""
+    out: dict = {}
+    for _, row in lh.iterrows():
+        v = row.get("value")
+        if v is None or (isinstance(v, float) and pd.isna(v)):
+            continue
+        lad = str(row.get("LAD25CD") or "")
+        if not lad:
+            continue
+        out.setdefault(lad, {})[f"ft_{int(row['indicator_id'])}"] = float(v)
+    return out
+
+
 def build_borough_data() -> dict:
     """Indicators at borough level, which is the level they are published at.
 
@@ -5558,6 +5666,15 @@ def build_borough_data() -> dict:
         # Same key the ward copies carry, so one overlay can be drawn at
         # either level without a second name for the same indicator.
         out.setdefault(lad, {})[f"ft_{row['indicator_short']}"] = float(v)
+
+    # OHID's own LA figures for the Local Health indicators, under the key
+    # the MSOA and ward figures carry (ft_<id>), so the map shows OHID's LA
+    # figure rather than its estimate from wards (run_fingertips_msoa_la).
+    lh = _read_parquet_opt(DATA_DIR / "outcomes" / "fingertips_msoa_la.parquet")
+    if lh is not None and not lh.empty:
+        out_la_lh = local_health_la_values(lh)
+        for lad, vals in out_la_lh.items():
+            out.setdefault(lad, {}).update(vals)
 
     n_vals = sum(len(v) for v in out.values())
     # Census percentages for each LA, from the summed counts of its output
@@ -7624,6 +7741,7 @@ SOURCES = {
     "qof":         run_qof,
     "fingertips":  run_fingertips,
     "fingertips_msoa": run_fingertips_msoa,
+    "fingertips_msoa_la": run_fingertips_msoa_la,
     "fingertips_profiles": run_fingertips_profiles,
     "fuel_poverty": run_fuel_poverty,
     "ptal":        run_ptal,

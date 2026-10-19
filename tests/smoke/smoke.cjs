@@ -2241,6 +2241,106 @@ const smallText = page => page.evaluate(() => {
     await page.close();
   }
 
+  /* Review items B2, B6, B7, H1, H8 and H10: one additivity rule, the
+     highest and lowest lists, the blank-area notice, Local Health LA
+     estimates, small wards in reports, and LSOA deprivation in Compare. */
+  {
+    const { page, errors } = await open(browser, 'index.html?t=1', DESK);
+    // B2: Compare's LA figure is the map's, and so is Ask's, for every key.
+    const add = await page.evaluate(async () => {
+      PH_COMPARE.setLevel('borough');
+      await new Promise(r => setTimeout(r, 800));
+      const code = { 'Tower Hamlets': 'E09000030', 'Newham': 'E09000025' };
+      const cmp = Object.keys(code).map(n => [n, PH_COMPARE.figures(n).crime_total, parseFloat(boroughOvValue(code[n], 'crime_total'))]);
+      const areas = PH_ASSISTANT.areasFor('la'), bad = [];
+      Object.values(areas).forEach(a => Object.keys(a.indicators).forEach(k => {
+        const m = parseFloat(boroughOvValue(a.lad_code, k));
+        if (!isNaN(m) && Math.abs(m - a.indicators[k]) > 0.006) bad.push(a.name + ' ' + k + ' ' + a.indicators[k] + ' vs ' + m);
+      }));
+      PH_COMPARE.setLevel('ward');
+      return { cmp, bad: bad.slice(0, 5), nBad: bad.length, n: Object.keys(areas).length,
+        sums: ['crime_total', 'crime_violence_12mo', 'claimant_count', 'census_population'].every(laSums) && !laSums('census_bad_health_pct') };
+    });
+    ok(add.cmp.every(([, c, m]) => c > 1000 && Math.abs(c - m) < 0.01), 'Compare\'s LA crime total is the map\'s figure (summed, not averaged)', JSON.stringify(add.cmp));
+    ok(add.n >= 33 && add.nBad === 0, 'every Ask LA figure matches the map\'s', add.nBad + ': ' + add.bad.join(' | '));
+    ok(add.sums, 'one additivity rule: crime counts and claimant_count are summed, rates are not');
+    // H10: an LSOA's deprivation chip reads its own decile.
+    const lsoa = await page.evaluate(async () => {
+      PH_COMPARE.setLevel('lsoa');
+      await new Promise(r => setTimeout(r, 800));
+      const f = PH_COMPARE.figures('E01004243');
+      PH_COMPARE.setLevel('ward');
+      return { dec: f.imd_decile_mean, own: (LSOA_DATA['E01004243'] || {}).imd_decile };
+    });
+    ok(lsoa.own != null && lsoa.dec === lsoa.own, 'Compare at LSOA level reads the LSOA\'s own deprivation decile', JSON.stringify(lsoa));
+    // B6: lists of buttons, small City wards left out with a note, ties said.
+    await setOv(page, 'census_bad_health_pct');
+    await page.waitForTimeout(1500);
+    await page.click('#dl-seg [data-dl="ward"]');
+    await page.waitForTimeout(2500);
+    const rk = await page.evaluate(() => ({
+      buttons: document.querySelectorAll('#rank-best ol.rank-list > li > button.rank-row[type="button"]').length,
+      ids: [...document.querySelectorAll('#rank-best .rank-row, #rank-worst .rank-row')].map(b => b.dataset.id),
+      hdr: document.getElementById('rank-best-hdr').textContent, notes: document.getElementById('rank-notes').textContent }));
+    const smallIds = await page.evaluate(ids => ids.filter(id => wardIsSmall(WARD_DATA[id])), rk.ids);
+    ok(rk.buttons === 10 && rk.hdr === 'Best 10 (lowest %)', 'the rank rows are buttons in an ordered list, and the header carries the unit', JSON.stringify(rk).slice(0, 200));
+    ok(!smallIds.length && /City of London wards with fewer than 1,000 residents are left out/.test(rk.notes),
+      'wards under 1,000 residents are left out of a percentage ranking, and the list says so', smallIds.join(', ') + ' | ' + rk.notes);
+    await setOv(page, 'core20_lsoa_count');
+    await page.waitForTimeout(2000);
+    const cnt = await page.evaluate(() => [document.getElementById('rank-best-hdr').textContent, document.getElementById('rank-notes').textContent]);
+    ok(/^Highest 10/.test(cnt[0]) && /wards in London have none, so this list shows ten of them in alphabetical order\./.test(cnt[1]),
+      'a count ranks as Highest and Lowest, and a tie at zero is said', cnt.join(' / '));
+    const clickRow = await page.evaluate(async () => {
+      const b = document.querySelector('#rank-best .rank-row'); b.focus(); b.click();
+      await new Promise(r => setTimeout(r, 800));
+      return { focused: document.activeElement === b || document.activeElement.tagName !== 'BODY', ward: (document.getElementById('ws-name') || {}).textContent, id: b.dataset.id };
+    });
+    ok(clickRow.ward === clickRow.id, 'selecting a rank row still opens that ward', JSON.stringify(clickRow));
+    // B7: the notice and the hover card give the reason the data shows.
+    await setOv(page, 'ft_93227');
+    await page.waitForTimeout(3000);
+    const b7 = await page.evaluate(() => ({
+      text: document.getElementById('fingertips-banner-text').textContent,
+      redrawn: Object.keys(MSOA_DATA).filter(msoaRedrawn2021).length,
+      card: msoaNoFigure(Object.keys(MSOA_DATA).filter(msoaRedrawn2021)[0], 'ft_93227'),
+      other: msoaNoFigure('E02000001', 'census_bad_health_pct') }));
+    ok(/^Areas left blank have no figure\. OHID’s figures for these areas leave out the MSOAs that were redrawn in 2021/.test(b7.text) && b7.redrawn === 39,
+      'the blank-area notice names the 39 MSOAs redrawn in 2021 for the hospital admissions series', JSON.stringify(b7));
+    ok(/^No figure: this MSOA was redrawn in 2021/.test(b7.card) && b7.other === 'No figure', 'a blank MSOA\'s card says why, or "No figure"', JSON.stringify(b7));
+    await setOv(page, 'ft_93105');
+    await page.waitForTimeout(1500);
+    ok(/^Areas left without colour have no figure\. OHID, the Office for Health Improvement and Disparities, withholds/.test(
+      await page.evaluate(() => document.getElementById('fingertips-banner-text').textContent)), 'other blanks are described as withheld');
+    // H1: an LA map of a Local Health indicator says it is our estimate, and
+    // its LA list leaves out the City.
+    await setOv(page, 'ft_932831');
+    await page.waitForTimeout(1500);
+    await page.click('#dl-seg [data-dl="borough"]');
+    await page.waitForTimeout(2500);
+    const h1 = await page.evaluate(() => ({ est: (document.getElementById('sc-la-est') || {}).textContent || '',
+      ids: [...document.querySelectorAll('#rank-best .rank-row, #rank-worst .rank-row')].map(b => b.dataset.id),
+      twin: indSameAs('ft_life_expectancy_male') }));
+    ok(/^These LA figures are our estimates from ward figures/.test(h1.est) && !h1.ids.includes('E09000001') && !h1.twin,
+      'Local Health LA figures are labelled as estimates from wards, without the City in the lists, and OHID\'s LA series is offered too', JSON.stringify(h1).slice(0, 300));
+    await page.click('#dl-seg [data-dl="ward"]');
+    await page.waitForTimeout(1500);
+    // H8: the report does not rank or compare a ward its Summary does not.
+    const h8 = await page.evaluate(() => {
+      const one = wn => { let html = ''; _generateWardReport({ sink: h => { html = h; } }, wn);
+        return new DOMParser().parseFromString(html, 'text/html'); };
+      const b = one('Bishopsgate'), w = one('Walbrook');
+      return { bCaps: [...b.querySelectorAll('.kpi-ctx-cap')].map(e => e.textContent),
+        wSub: w.querySelector('.hero .sub').textContent, wPanel: (w.querySelector('.no-census') || {}).textContent || '',
+        wHo: [...w.querySelectorAll('table.ho th')].map(t => t.textContent).join('|') };
+    });
+    ok(h8.bCaps.length && h8.bCaps.every(c => c === 'Too few residents to compare'), 'a ward under 1,000 residents is not placed among other wards in its report', h8.bCaps.join(' | '));
+    ok(!/deprived/.test(h8.wSub) && /^There are no Census figures for Walbrook/.test(h8.wPanel) && !/City of London ward median/.test(h8.wHo),
+      'Walbrook\'s report has no rank, one sentence for its missing Census figures and no repeated City median', JSON.stringify(h8));
+    ok(errors.length === 0, 'no page errors (review items B2 to H10)', errors.join(' | '));
+    await page.close();
+  }
+
   // A region
   if (HAS_NE) {
     const { page, errors } = await open(browser, 'index.html?r=north-east&t=1', DESK);
@@ -2260,6 +2360,16 @@ const smallText = page => page.evaluate(() => {
         sheetAsk: !!b && !b.hidden && b.getBoundingClientRect().width > 0, available: !!(window.PH_ASSISTANT && PH_ASSISTANT.available) };
     });
     ok(!askNE.toggle && !askNE.panel && !askNE.sheetAsk && !askNE.available, 'region: no Ask button or panel outside London', JSON.stringify(askNE));
+    // B6: the most deprived ten LSOAs are the ten with the lowest national
+    // rank, not the first ten in the file (which were all in Gateshead).
+    await setOv(page, 'imd_decile');
+    await page.waitForTimeout(3000);
+    const neDec = await page.evaluate(() => ({
+      lads: [...new Set([...document.querySelectorAll('#rank-worst .rank-row')].map(b =>
+        (LSOA_IMD.features.find(f => f.properties.code === b.dataset.id) || { properties: {} }).properties.borough))],
+      notes: document.getElementById('rank-notes').textContent }));
+    ok(neDec.lads.length > 1 && /LSOAs in the North East are in decile 1, the most deprived tenth of England, so this list shows the ten with the lowest national rank\./.test(neDec.notes),
+      'region: the lowest 10 LSOAs for deprivation are not all from one LA, and the tie is said', JSON.stringify(neDec));
     ok(errors.length === 0, 'no page errors (North East)', errors.join(' | '));
     await page.close();
   } else {
