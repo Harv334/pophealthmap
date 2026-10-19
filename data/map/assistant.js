@@ -808,7 +808,7 @@ var MODEL_LABEL = "Claude Sonnet 5";
     var intro = document.createElement("div");
     intro.className = "ai-msg ai-bot ai-intro";
     [
-      "Ask about any ward or local authority (LA) in plain English, and the " +
+      "Ask about any ward or local authority (LA) in your own words, and the " +
         "answer will be built from the figures on this map rather than from " +
         "memory. Your question and the figures looked up to answer it pass " +
         "through this site's server to Anthropic's Claude model, which writes " +

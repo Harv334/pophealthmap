@@ -640,9 +640,6 @@
   .sb-modebar-back:hover { color: var(--nhs-dark); text-decoration: underline;
     text-underline-offset: 2px; }
   .sb-modebar-back:focus-visible { outline: 2px solid var(--nhs-blue); outline-offset: 2px; }
-  .sb-modebar-sep { color: var(--line); flex-shrink: 0; }
-  .sb-modebar-name { font-size: var(--t-md); font-weight: 600; color: var(--ink);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   /* One rule for all five modes: the tools own the panel, so the tab strip
      stands down and the mode bar stands up. The per-mode `display:none` rules
      that used to do the first half of this are gone. */
@@ -3266,16 +3263,13 @@
            reads as a rendering fault the first time, not as a mode change.
 
            It occupies the same grid area, so the height never changes, and it
-           says which tool is open and how to leave it. That back button is the
-           only one now: there used to be five, one in each mode's own pane
-           header, all labelled "Back to Explore" and all running the same two
-           lines of code from five different places. -->
+           holds the way back to Explore. It does not name the tool, because
+           the heading at the top of the pane just below already does, and the
+           name twice in a row read as a fault. -->
       <div class="sb-modebar" id="sb-modebar">
         <button type="button" class="sb-modebar-back" id="sb-mode-back">
-          <svg class="ic" aria-hidden="true"><use href="#i-arrow-left"/></svg>Explore
+          <svg class="ic" aria-hidden="true"><use href="#i-arrow-left"/></svg>Back to Explore
         </button>
-        <span class="sb-modebar-sep" aria-hidden="true">/</span>
-        <span class="sb-modebar-name" id="sb-modebar-name"></span>
       </div>
 
       <!-- Layers tab -->
@@ -18057,24 +18051,6 @@ var PH_SHOW = {
         sidebar.classList.toggle('report-mode', rp);
         sidebar.classList.toggle('csv-mode', cv);
       }
-      /* Name the tool in the bar that has taken the tab strip's row. Read off
-         the rail's own button rather than a second list of labels here, so
-         renaming a mode in one place renames it everywhere: this is exactly
-         how "Report builder" came to be two different things. */
-      var modeName = document.getElementById('sb-modebar-name');
-      if (modeName) {
-        var active = q ? 'query' : c ? 'compare' : dr ? 'directory'
-                   : rp ? 'report' : cv ? 'csv' : null;
-        if (active) {
-          var railBtn = rail.querySelector('.mode-btn[data-mode="' + active + '"]');
-          // The aria-label where there is one: Custom area and Data export
-          // carry a long and a short label inside the button, and their text
-          // together read "Data exportExport".
-          modeName.textContent = railBtn
-            ? (railBtn.getAttribute('aria-label') || railBtn.textContent.trim()) : active;
-        }
-      }
-
       if (q) markRail('query');
       else if (c) markRail('compare');
       else if (dr) markRail('directory');
@@ -21039,8 +21015,8 @@ var PH_SHOW = {
       // "A panel opens", with no side named: it is along the bottom on a
       // desktop and an upright phone, and beside the map on a phone held
       // sideways.
-      n: 'Select any ward and a panel opens with a short summary in plain ' +
-         'English and its main figures. Its buttons let you pin the ward to compare it with ' +
+      n: 'Select any ward and a panel opens with a short summary ' +
+         'and its main figures. Its buttons let you pin the ward to compare it with ' +
          'others, open a printable report or see its full profile. To go straight to a place, ' +
          'type a postcode, a ward or LA name, or a GP practice into the <strong>search</strong> ' +
          'at the top of the page.',
@@ -21114,7 +21090,7 @@ var PH_SHOW = {
          'build yourself from LSOAs. <strong>Data export</strong> makes a spreadsheet of the ' +
          'areas and indicators you choose. <strong>Directory</strong> finds a GP practice, ' +
          'pharmacy or charity by name or postcode. <strong>Ask about this data</strong> answers ' +
-         'questions in plain English: your question and the figures looked up to answer it pass ' +
+         'your questions about an area. What you ask and the figures looked up to answer it pass ' +
          'through this site\'s server to Anthropic\'s Claude model, which writes the reply, so ' +
          'please leave out anything personal. You can ask 10 questions a day, and replying when ' +
          'it asks you to narrow a question down does not use one up.',
