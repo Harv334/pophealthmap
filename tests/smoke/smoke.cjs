@@ -2175,6 +2175,201 @@ const smallText = page => page.evaluate(() => {
     await page.close();
   }
 
+  // Only the served files are published (B11). Checked when the folder under
+  // test is the assembled site (scripts/build_site.sh), which has .nojekyll.
+  {
+    const site = (await fetch(BASE + '/.nojekyll')).ok;
+    if (site) {
+      const codes = {};
+      for (const p of ['HANDOVER.md', 'README.md', 'DOMAIN.md', 'fetch_all_data.py', 'index.html', 'data/ward_core.json']) {
+        codes[p] = (await fetch(BASE + '/' + p)).status;
+      }
+      ok(codes['HANDOVER.md'] === 404 && codes['README.md'] === 404 && codes['DOMAIN.md'] === 404 &&
+        codes['fetch_all_data.py'] === 404 && codes['index.html'] === 200 && codes['data/ward_core.json'] === 200,
+        'site: internal notes are not published, the page and its data are', JSON.stringify(codes));
+    } else console.log('SKIP site contents (not the assembled _site)');
+  }
+
+  // The ward sheet header between 900 and 1180px (B13): the name keeps room
+  // to be read and the close button stays inside the sheet.
+  for (const [w, h] of [[1024, 768], [920, 700]]) {
+    const { page } = await open(browser, 'index.html?t=1', { width: w, height: h });
+    await page.evaluate(() => { const l = wLyr.getLayers().find(l => l.feature.properties.WD24NM === 'Spitalfields & Banglatown'); if (l) l.fire('click'); });
+    await page.waitForTimeout(800);
+    const r = await page.evaluate(() => {
+      const s = document.getElementById('ward-sheet').getBoundingClientRect();
+      const n = document.getElementById('ws-name').getBoundingClientRect();
+      const c = document.getElementById('ws-close').getBoundingClientRect();
+      return { name: Math.round(n.width), inside: c.left >= s.left && c.right <= s.right && c.width > 0 };
+    });
+    ok(r.name >= 150 && r.inside, 'ward sheet at ' + w + 'x' + h + ': the name is readable and Deselect is inside the sheet', JSON.stringify(r));
+    await page.close();
+  }
+
+  // Keyboard and screen reader checks (B15, H24, H35, H36, H37).
+  {
+    const { page, errors } = await open(browser, 'index.html?t=1', DESK);
+    const act = () => page.evaluate(() => {
+      const a = document.activeElement;
+      return { body: !a || a === document.body, id: a ? a.id : '', cls: a ? String(a.className) : '', ov: a && a.dataset ? a.dataset.ov || '' : '', tag: a ? a.tagName : '' };
+    });
+    // Query: Add a condition is a button that takes focus, Enter adds a row and
+    // focus goes to its indicator, and the results are a list of buttons.
+    await page.click('.mode-btn[data-mode="query"]');
+    await page.waitForTimeout(800);
+    await page.focus('#q-add-cond');
+    const qa = await act();
+    const before = await page.evaluate(() => document.querySelectorAll('.q-cond').length);
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(300);
+    const after = await page.evaluate(() => document.querySelectorAll('.q-cond').length);
+    const qf = await act();
+    ok(qa.id === 'q-add-cond' && qa.tag === 'BUTTON' && after === before + 1 && /q-f-ind/.test(qf.cls),
+      'Query: Add a condition takes focus, Enter adds a condition and focuses its indicator', JSON.stringify([qa, before, after, qf]));
+    await page.click('#q-run');
+    await page.waitForTimeout(1500);
+    const qr = await page.evaluate(() => ({
+      btns: document.querySelectorAll('#q-results ol.q-list > li > button.q-row').length,
+      divs: document.querySelectorAll('#q-results div.q-row').length }));
+    ok(qr.btns > 0 && qr.divs === 0, 'Query: the results are an ordered list of buttons', JSON.stringify(qr));
+    await page.click('.mode-btn[data-mode="explore"]');
+    await page.waitForTimeout(600);
+
+    // Every layer checkbox is named by its own label (H37).
+    const lab = await page.evaluate(() => [...document.querySelectorAll('.lrow input[type="checkbox"]')]
+      .filter(i => !(i.labels && i.labels.length && i.labels[0].control === i && i.labels[0].textContent.trim()))
+      .map(i => i.id).concat([...document.querySelectorAll('label.lrow, .lrow > label')]
+        .filter(l => !(l.control && l.control.type === 'checkbox')).map(l => 'label:' + (l.id || l.textContent.trim().slice(0, 30)))));
+    ok(lab.length === 0, 'Layers: every layer checkbox has its label as its name, ICBs and PCNs included', lab.join(', '));
+
+    // Focus is not dropped to the top of the page (H36).
+    await page.click('#sbtab-overlay');
+    await page.waitForTimeout(400);
+    const lost = [];
+    const chip = await page.evaluate(() => { const c = [...document.querySelectorAll('#ov-chips .ov-chip')].find(b => !b.classList.contains('on')); if (c) c.focus(); return !!c; });
+    if (chip) { await page.keyboard.press('Enter'); await page.waitForTimeout(500); const a = await act(); if (a.body || !a.ov) lost.push('key indicator chip ' + JSON.stringify(a)); }
+    const th = await page.evaluate(() => { const t = document.querySelector('#ov-themes .ov-theme, .ov-theme'); if (t) t.click(); return !!t; });
+    await page.waitForTimeout(400);
+    const row = th && await page.evaluate(() => { const r = [...document.querySelectorAll('.ov-tv-row')].find(b => !b.classList.contains('on') && b.getClientRects().length); if (r) r.focus(); return !!r; });
+    if (row) { await page.keyboard.press('Enter'); await page.waitForTimeout(500); const a = await act(); if (a.body) lost.push('theme row'); }
+    const clr = await page.evaluate(() => { const c = document.getElementById('ov-clear'); if (c && c.getClientRects().length) { c.focus(); return true; } return false; });
+    if (clr) { await page.keyboard.press('Enter'); await page.waitForTimeout(500); const a = await act(); if (a.body) lost.push('Clear'); }
+    await page.evaluate(() => { const l = wLyr.getLayers().find(l => l.feature.properties.WD24NM === 'Stepney Green'); if (l) l.fire('click'); });
+    await page.waitForTimeout(800);
+    await page.focus('#ws-close');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(500);
+    { const a = await act(); if (a.body) lost.push('Deselect this ward'); }
+    const live = await page.evaluate(() => document.getElementById('sr-live').textContent);
+    await page.evaluate(() => { const l = wLyr.getLayers().find(l => l.feature.properties.WD24NM === 'Stepney Green'); if (l) l.fire('click'); });
+    await page.waitForTimeout(800);
+    await page.focus('#ws-profile');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(500);
+    const prof = await page.evaluate(() => { const a = document.activeElement; return a && a.matches('#wpanel h2.wname'); });
+    if (!prof) lost.push('Open full profile');
+    await page.click('.mode-btn[data-mode="compare"]');
+    await page.waitForTimeout(800);
+    // Placed just above an indicator that is not yet shown, so one ArrowDown
+    // lands on it.
+    const hasAdd = await page.evaluate(() => {
+      const s = document.getElementById('cmp-add-metric');
+      if (!s) return false;
+      const on = [...document.querySelectorAll('#cmp-metrics [data-metric].on')].map(c => c.textContent.trim());
+      const t = [...s.options].findIndex((o, i) => i > 0 && on.indexOf(o.textContent.trim()) === -1);
+      if (t < 1) return false;
+      s.selectedIndex = t - 1;
+      s.focus();
+      return true;
+    });
+    if (hasAdd) {
+      const n0 = await page.evaluate(() => document.querySelectorAll('#cmp-metrics [data-metric].on').length);
+      await page.keyboard.press('ArrowDown');
+      await page.waitForTimeout(400);
+      const n1 = await page.evaluate(() => document.querySelectorAll('#cmp-metrics [data-metric].on').length);
+      const a1 = await act();
+      await page.keyboard.press('Enter');
+      await page.waitForTimeout(400);
+      const n2 = await page.evaluate(() => document.querySelectorAll('#cmp-metrics [data-metric].on').length);
+      const a2 = await act();
+      ok(n1 === n0 && a1.id === 'cmp-add-metric' && n2 === n0 + 1 && a2.id === 'cmp-add-metric',
+        'Compare: an arrow key in Add an indicator only chooses, Enter adds and focus stays on the select', JSON.stringify([n0, n1, a1.id, n2, a2.id]));
+    } else console.log('SKIP Compare add an indicator (no select)');
+    await page.click('.mode-btn[data-mode="explore"]');
+    await page.waitForTimeout(600);
+    ok(lost.length === 0, 'focus stays put after a key indicator, a theme row, Clear, Deselect and Open full profile', lost.join(', '));
+    ok(/No area is selected/.test(live), 'Deselect this ward says no area is selected', live);
+
+    // The region select only chooses with an arrow key (H24).
+    await page.click('#sbtab-layers');
+    await page.waitForTimeout(400);
+    const pickShown = await page.evaluate(() => { const w = document.getElementById('region-picker-wrap'); return !!(w && !w.hidden && w.getClientRects().length); });
+    if (pickShown) {
+      const url0 = page.url();
+      const v0 = await page.evaluate(() => document.getElementById('region-picker').value);
+      await page.focus('#region-picker');
+      await page.keyboard.press('ArrowDown');
+      await page.waitForTimeout(1200);
+      const v1 = await page.evaluate(() => document.getElementById('region-picker').value);
+      ok(page.url() === url0 && v1 !== v0 && await page.evaluate(() => !!document.getElementById('region-go')),
+        'region select: an arrow key chooses without leaving the page, and Open this region goes', JSON.stringify([url0, page.url(), v0, v1]));
+      await page.evaluate(v => { document.getElementById('region-picker').value = v; }, v0);
+    } else console.log('SKIP region select (one region published)');
+
+    // The tour's keys act only inside the tour strip (H35).
+    await page.evaluate(() => { deselectWard(); PH_TOUR.start(); });
+    await page.waitForTimeout(800);
+    const ctr = () => page.evaluate(() => document.getElementById('tour-ctr').textContent);
+    const c0 = await ctr();
+    const said = await page.evaluate(() => new Promise(r => setTimeout(() => r(document.getElementById('sr-live').textContent), 200)));
+    await page.focus('#sbtab-overlay');
+    await page.keyboard.press('ArrowRight');
+    await page.waitForTimeout(500);
+    await page.evaluate(() => document.activeElement && document.activeElement.blur());
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(400);
+    const c1 = await ctr();
+    const still = await page.evaluate(() => PH_TOUR.running());
+    await page.focus('#tour-next');
+    await page.keyboard.press('ArrowRight');
+    await page.waitForTimeout(600);
+    const c2 = await ctr();
+    ok(c1 === c0 && still && c2 !== c0, 'tour: arrow keys and Escape outside the strip leave it alone; inside it they step', JSON.stringify([c0, c1, still, c2]));
+    ok(/Guided tour, chapter 1 of/.test(said), 'tour: the chapter is announced', said);
+    await page.evaluate(() => PH_TOUR.end());
+    ok(errors.length === 0, 'keyboard checks: no page errors', errors.join(' | '));
+    await page.close();
+  }
+
+  // Phone: Tab never enters the closed drawer, and never leaves it when open (H34).
+  {
+    const { page } = await open(browser, 'index.html?t=1', PHONE);
+    const walk = async n => {
+      const out = [];
+      for (let i = 0; i < n; i++) {
+        await page.keyboard.press('Tab');
+        out.push(await page.evaluate(() => {
+          const a = document.activeElement;
+          if (!a || a === document.body) return 'body';
+          return (document.getElementById('sidebar').contains(a) ? 'in:' : 'out:') + (a.id || a.className || a.tagName);
+        }));
+      }
+      return out;
+    };
+    await page.focus('#hdr-menu');
+    const closed = (await walk(20)).filter(x => x.startsWith('in:'));
+    ok(closed.length === 0, 'phone: Tab from the menu button never lands in the closed drawer', closed.slice(0, 5).join(' '));
+    await page.click('#hdr-menu');
+    await page.waitForTimeout(500);
+    const opened = (await walk(60)).filter(x => x.startsWith('out:'));
+    ok(opened.length === 0, 'phone: Tab stays inside the open drawer', opened.slice(0, 5).join(' '));
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(400);
+    const back = await page.evaluate(() => document.activeElement && document.activeElement.id);
+    ok(back === 'hdr-menu', 'phone: closing the drawer puts focus back on the menu button', back);
+    await page.close();
+  }
+
   // The pages around the map share one frame (workplan 2.14): one stylesheet,
   // light even when the device is set to dark, the same header and footer,
   // titles in the form "Page | PopHealth Map", and no dashes.

@@ -12660,7 +12660,7 @@ function _fitFocus(bounds) {
     }).join('');
   }
 
-  function choose(value) {
+  function choose(value, fromEl) {
     // Through the select, so the level gate, the legend, the URL writer and
     // everything else downstream behave exactly as they did for the dropdown.
     sel.value = value;
@@ -12668,6 +12668,20 @@ function _fitFocus(bounds) {
     if (filter) { filter = ''; searchEl.value = ''; }
     // The gate can refuse the change and put the value back; render after it.
     setTimeout(render, 0);
+    /* The render replaces the button that was pressed, which sent keyboard
+       focus back to the top of the page. Put it on the same indicator's
+       button in its new markup (a chip, a theme row), or on the search box
+       when there is none, unless focus has already gone somewhere real. */
+    const cls = fromEl && fromEl.classList ? fromEl.classList[0] : '';
+    setTimeout(() => {
+      const a = document.activeElement;
+      if (a && a !== document.body && a.isConnected && a.getClientRects().length) return;
+      const picker = document.getElementById('ov-picker');
+      const cands = picker ? [...picker.querySelectorAll('[data-ov="' + CSS.escape(sel.value) + '"]')]
+        .filter(el => el.getClientRects().length) : [];
+      const t = cands.find(el => cls && el.classList.contains(cls)) || cands[0] || searchEl;
+      if (t && t.focus) t.focus({ preventScroll: true });
+    }, 30);
     // On a phone the drawer covers the map, so the choice recoloured a map
     // nobody could see. Close it once the pick has landed.
     if (window.PH_DRAWER && PH_DRAWER.narrow() && PH_DRAWER.isOpen() && value && value !== 'none') {
@@ -12679,7 +12693,7 @@ function _fitFocus(bounds) {
     const th = e.target.closest('[data-th]');
     if (th) { openLib(model[+th.getAttribute('data-th')].label); return; }
     const pick = e.target.closest('[data-ov]');
-    if (pick) choose(pick.getAttribute('data-ov'));
+    if (pick) choose(pick.getAttribute('data-ov'), pick);
   });
   document.getElementById('ov-change').addEventListener('click', () => {
     const cur = byVal[sel.value];
@@ -12691,6 +12705,7 @@ function _fitFocus(bounds) {
     clearTimeout(searchT);
     searchT = setTimeout(() => { filter = searchEl.value; render(); }, 100);
   });
+  // Clear hides itself, so focus goes to the search box (see choose).
   clearBtn.addEventListener('click', () => choose('none'));
 
   // Anything else that changes the overlay re-syncs the picker.
@@ -19448,12 +19463,23 @@ var PH_SHOW = {
     // closed drawer and on a desktop it may be collapsed, and either way the
     // profile would fill in where nobody can see it.
     if (window.PH_DRAWER && window.PH_DRAWER.reveal) window.PH_DRAWER.reveal();
+    // Focus follows the profile it opened, to its heading, so the next Tab
+    // reads on from there instead of from the sheet.
+    var h = wp && wp.querySelector('h2.wname');
+    if (h) { h.setAttribute('tabindex', '-1'); h.focus({ preventScroll: true }); }
   });
 
   closeBtn.addEventListener('click', function (e) {
     e.stopPropagation();
     if (typeof deselectWard === 'function') deselectWard();
     else hide();
+    /* The button has just gone with the sheet. Focus goes to the search box,
+       or to the map where the search box is in the closed drawer, and the
+       live region stops saying the ward is selected. */
+    var s = $('hdr-search-input');
+    var t = (s && s.getClientRects().length && !s.closest('[inert]')) ? s : $('map');
+    if (t) t.focus({ preventScroll: true });
+    if (typeof _announce === 'function') { _lastAnnouncement = ''; _announce('No area is selected.'); }
   });
 
   bodyEl.addEventListener('click', function (e) {
@@ -20156,13 +20182,32 @@ var PH_SHOW = {
         e.preventDefault(); e.target.click();
       }
     });
-    cmpMetricsEl.addEventListener('change', function (e) {
-      if (e.target.id !== 'cmp-add-metric' || !e.target.value) return;
-      var k = e.target.value;
+    /* Add an indicator adds on a choice from the open list, or on Enter.
+       An arrow key in the closed select fires change in Chrome and Edge, and
+       each one used to add an indicator and rebuild the pane, which dropped
+       focus to the top of the page. After an add, focus goes to the new
+       select. */
+    var cmpArrowed = false;
+    function cmpAddMetric(selEl) {
+      if (!selEl.value) return;
+      var k = selEl.value;
       var found = cmpMetrics.filter(function (m) { return m.k === k; })[0];
       if (found) found.on = true;
       else cmpMetrics.push({ k: k, on: true });
       renderComparePane(); renderCompareBar();
+      var again = $('cmp-add-metric');
+      if (again) again.focus({ preventScroll: true });
+    }
+    cmpMetricsEl.addEventListener('keydown', function (e) {
+      if (e.target.id !== 'cmp-add-metric') return;
+      if (e.key === 'Enter') { e.preventDefault(); cmpArrowed = false; cmpAddMetric(e.target); return; }
+      cmpArrowed = !e.altKey && (/^(Arrow|Page|Home|End)/.test(e.key) || (e.key.length === 1 && e.key !== ' '));
+    });
+    cmpMetricsEl.addEventListener('mousedown', function () { cmpArrowed = false; });
+    cmpMetricsEl.addEventListener('change', function (e) {
+      if (e.target.id !== 'cmp-add-metric' || !e.target.value) return;
+      if (cmpArrowed) { cmpArrowed = false; return; }
+      cmpAddMetric(e.target);
     });
     $('cmp-open').addEventListener('click', function () {
       // Disabled below two pins; the quick view says so.
@@ -21417,14 +21462,19 @@ var PH_SHOW = {
     tourTaskClear();
     tourSpotClear();
     tourResetStage();
-    // Said aloud, since the strip does not take focus as chapters change.
-    if (typeof _announce === 'function') {
-      _announce((tourOpenedNote ? 'A guided tour has opened at the bottom of the map. ' : '') +
-        'Guided tour, chapter ' + (tourAt + 1) + ' of ' + TOUR.length + ': ' + c.t);
-      tourOpenedNote = false;
-    }
     try { c.go(); } catch (e) { /* a chapter must never strand the tour */ }
     tourLift();
+    // Said aloud, since the strip does not take focus as chapters change.
+    // After the chapter's own changes, whose "Now showing" would replace it.
+    var note = (tourOpenedNote ? 'A guided tour has opened at the bottom of the map. ' : '') +
+      'Guided tour, chapter ' + (tourAt + 1) + ' of ' + TOUR.length + ': ' + c.t;
+    var at = tourAt;
+    tourOpenedNote = false;
+    setTimeout(function () {
+      if (tourAt !== at || typeof _announce !== 'function') return;
+      _lastAnnouncement = '';
+      _announce(note);
+    }, 350);
   }
   var tourOpenedNote = false;
 
