@@ -4138,7 +4138,7 @@
       <!-- Guided tour, the design file's story strip. -->
       <div class="tour-strip" id="tour-strip" role="region" aria-label="Guided tour">
         <div class="tour-hd">
-          <h3 class="tour-title" id="tour-title"></h3>
+          <h3 class="tour-title" id="tour-title" tabindex="-1"></h3>
           <div><span class="tour-ctr" id="tour-ctr"></span><button type="button" class="tour-end"
                id="tour-end">End tour<svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button></div>
         </div>
@@ -17995,7 +17995,7 @@ var PH_SHOW = {
     // extra steps, and a comparison you cannot locate is a list of names.
     if (mode === 'tour') {
       panel.hidden = true;
-      if (window.PH_TOUR) window.PH_TOUR.start();
+      if (window.PH_TOUR) window.PH_TOUR.start(true);
       return;
     }
 
@@ -21417,15 +21417,25 @@ var PH_SHOW = {
     tourTaskClear();
     tourSpotClear();
     tourResetStage();
+    // Said aloud, since the strip does not take focus as chapters change.
+    if (typeof _announce === 'function') {
+      _announce((tourOpenedNote ? 'A guided tour has opened at the bottom of the map. ' : '') +
+        'Guided tour, chapter ' + (tourAt + 1) + ' of ' + TOUR.length + ': ' + c.t);
+      tourOpenedNote = false;
+    }
     try { c.go(); } catch (e) { /* a chapter must never strand the tour */ }
     tourLift();
   }
+  var tourOpenedNote = false;
 
-  function tourStart() {
+  function tourStart(focusIt) {
     if (!tourStrip) return;
     // The chapters visit named London wards; a region has none of them.
     if (!PH_IS_LONDON) return;
     tourAt = 0;
+    // Started by the page on a first visit, so a screen reader is told it
+    // is there; started from Take a tour, focus goes to its title instead.
+    tourOpenedNote = focusIt !== true;
     tourStrip.classList.add('open');
     // The development banner is a separate fixed element that shows itself on
     // load, so on a first visit both landed at once and between them covered
@@ -21434,6 +21444,7 @@ var PH_SHOW = {
     // waits its turn now and appears when the tour ends.
     try { window.dispatchEvent(new CustomEvent('ph:tour-start')); } catch (e) {}
     renderTour();
+    if (focusIt === true) { var tt = $('tour-title'); if (tt) tt.focus(); }
   }
   function tourEnd() {
     if (!tourStrip) return;
@@ -21489,8 +21500,13 @@ var PH_SHOW = {
     $('tour-next').addEventListener('click', function () { tourStep(1); });
     $('tour-prev').addEventListener('click', function () { tourStep(-1); });
     $('tour-end').addEventListener('click', tourEnd);
+    // Only while focus is in the strip. Page-wide, the arrows changed the
+    // chapter (and the map's indicator) as people moved through the tabs or
+    // panned the map, and Escape on any popup ended the whole tour.
     document.addEventListener('keydown', function (e) {
       if (tourAt < 0) return;
+      if (!e.target.closest || !e.target.closest('#tour-strip')) return;
+      if (e.defaultPrevented) return;
       var tag = (e.target.tagName || '').toLowerCase();
       if (tag === 'input' || tag === 'select' || tag === 'textarea') return;
       if (e.key === 'ArrowRight') { e.preventDefault(); tourStep(1); }
@@ -21502,7 +21518,7 @@ var PH_SHOW = {
   // here rather than in the rail, which is now only the four working modes.
   var sbarTour = document.getElementById('sbar-tour');
   if (sbarTour) sbarTour.addEventListener('click', function () {
-    if (tourAt >= 0) tourEnd(); else tourStart();
+    if (tourAt >= 0) tourEnd(); else tourStart(true);
   });
 
   window.PH_TOUR = {
