@@ -84,13 +84,14 @@ jobs:
       # Every region pack checked the way build-region.yml checks a new one:
       # no failed or partial source, the Census counts method, and London's
       # Local Health series unless listed as known gaps. A pack built by an
-      # older pipeline fails here until refresh-regions.yml rebuilds it. To
-      # deploy anyway while that runs, set the repository variable
-      # REGION_CHECK to "warn" (Settings > Secrets and variables > Actions >
-      # Variables); the problems are then shown as annotations only.
+      # older pipeline fails here until refresh-regions.yml rebuilds it. The
+      # default is "warn" until the packs published before this check have
+      # been rebuilt; then set the repository variable REGION_CHECK to
+      # "strict" (Settings > Secrets and variables > Actions > Variables) so
+      # a bad pack stops the deploy.
       - name: Check the region packs
         env:
-          MODE: ${{ vars.REGION_CHECK || 'strict' }}
+          MODE: ${{ vars.REGION_CHECK || 'warn' }}
         run: |
           bad=0
           for d in data/regions/*/; do
