@@ -4050,7 +4050,7 @@
            in this corner below the zoom buttons. -->
       <div id="fingertips-banner">
         <span class="ft-i">i</span>
-        Unshaded areas indicate suppressed data (withheld by OHID to protect privacy where counts are small), not a value of zero.
+        <span id="fingertips-banner-text">Areas left without colour have no figure. OHID, the Office for Health Improvement and Disparities, withholds figures where so few people are counted that someone could be identified, so a blank area does not mean zero.</span>
         <button id="fingertips-banner-close" title="Dismiss this notice for this session" aria-label="Dismiss this notice"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button>
       </div>
       <!-- "Area level", not "Viewing". The strip in the top-left corner of the
@@ -5542,10 +5542,10 @@ const IND_NAMES = {
    or an older copy beside the current one. Lists people choose from (Query,
    Compare) offer the second only, so nobody lines up two columns of the same
    thing; the profile and the Data export keep both, under their own names. */
+// Life expectancy and Year 6 obesity are not twins: OHID's LA series and the
+// Local Health MSOA series cover different periods (and an LA figure made
+// from wards is only our estimate), so Compare and Query offer both.
 const IND_SAME_AS = {
-  ft_life_expectancy_female: 'ft_93283',
-  ft_life_expectancy_male:   'ft_932831',
-  ft_obesity_year6:          'ft_93107',
   ft_93280:                  'fuel_poverty_pct',
 };
 
@@ -6660,6 +6660,43 @@ function ovVsEngland(level, id, k) {
   const d = MSOA_DATA[id];
   return (d && d[k + '_vs']) || '';
 }
+/* MSOAs redrawn in 2021. ONS gave every MSOA whose boundary changed at the
+   2021 Census (split, merged or moved) a new code, and the 2011 codes end at
+   E02006934, so a code above that is a redrawn MSOA: London's 39 (the set
+   methodology.html#gap-2011-msoas describes) and the same rule in any region.
+   OHID's older Local Health series are published for the 2011 MSOAs and
+   leave these out, so they are blank on those maps. */
+const MSOA_LAST_2011 = 'E02006934';
+function msoaRedrawn2021(code) {
+  return /^E02\d{6}$/.test(code || '') && code > MSOA_LAST_2011;
+}
+/* Why an indicator's MSOAs are blank, read from the data: 'redrawn' when
+   every blank MSOA is one redrawn in 2021, 'none' when none is blank,
+   'withheld' otherwise, and '' while the MSOA figures have not loaded. */
+const _blankCause = {};
+function ftBlankCause(k) {
+  if (_blankCause[k]) return _blankCause[k];
+  if (typeof MSOA_DATA === 'undefined' || !Object.keys(MSOA_DATA).length) return '';
+  if (!(typeof ovHasLevel === 'function' && ovHasLevel(k, 'msoa'))) return 'withheld';
+  // msoa_data.json holds a row for every MSOA in the region, so its keys
+  // are the MSOAs the map draws.
+  const codes = Object.keys(MSOA_DATA);
+  const f = resolveOvField(k);
+  const blank = codes.filter(c => { const v = (MSOA_DATA[c] || {})[f]; return v == null || v === '' || isNaN(parseFloat(v)); });
+  const cause = !blank.length ? 'none' : blank.every(msoaRedrawn2021) ? 'redrawn' : 'withheld';
+  _blankCause[k] = cause;
+  return cause;
+}
+// What an MSOA's hover card says in place of a figure it does not have.
+function msoaNoFigure(code, k) {
+  if (typeof k === 'string' && k.startsWith('ft_')) {
+    if (msoaRedrawn2021(code)) return 'No figure: this MSOA was redrawn in 2021 and OHID’s figures leave it out';
+    if (ftBlankCause(k) === 'withheld') return 'No figure (withheld to protect privacy)';
+  }
+  return 'No figure';
+}
+const BLANK_NOTE_REDRAWN ='Areas left blank have no figure. OHID’s figures for these areas leave out the MSOAs that were redrawn in 2021, so a blank is a gap in what was published rather than a zero.';
+const BLANK_NOTE_WITHHELD = 'Areas left without colour have no figure. OHID, the Office for Health Improvement and Disparities, withholds figures where so few people are counted that someone could be identified, so a blank area does not mean zero.';
 /* Figures carried from 2011 MSOA codes to a 2021 MSOA by the ONS lookup are
    estimates for the 2021 area; the pipeline marks them ft_<id>_est. */
 function ovIsEstimated(level, id, k) {
@@ -7331,10 +7368,10 @@ function ovTooltipRows(valueForKey, ward, level) {
     const isMissing = (v == null || v === '' || (typeof v === 'number' && isNaN(v)));
     const isFt = typeof k === 'string' && k.startsWith('ft_');
     if (isMissing && isFt && _suppList.indexOf(k) >= 0) {
-      return `<span class="tip-row"><b>${ovLabel(k)}:</b> <span class="tip-note">Suppressed by Fingertips (small numbers, privacy)</span></span>`;
+      return `<span class="tip-row"><b>${ovLabel(k)}:</b> <span class="tip-note">No figure (withheld to protect privacy)</span></span>`;
     }
     if (isMissing) {
-      return `<span class="tip-row"><b>${ovLabel(k)}:</b> <span class="tip-none">no data</span></span>`;
+      return `<span class="tip-row"><b>${ovLabel(k)}:</b> <span class="tip-none">No figure</span></span>`;
     }
     const ctx = (level && !bivOn()) ? ovContext(level, k, v, ward) : '';
     return `<span class="tip-row"><b>${ovLabel(k)}:</b> ${fmtOv(v, k)}</span>` +
@@ -8507,6 +8544,23 @@ function boroughOvValue(code, k) {
   const agg = laAggregate(k)[code];
   return agg == null ? null : agg;
 }
+/* Whether the LA figures for an indicator are our estimate from its wards
+   rather than OHID's own LA figure: true for OHID's Local Health series
+   (published for MSOAs) until the LA file carries them. Life expectancy and
+   standardised ratios do not average exactly, and the periods can differ
+   from OHID's LA series, so the key says so and the City of London, whose
+   figure rests on very small numbers, is left out of their LA rankings. */
+function laIsWardEstimate(k) {
+  if (!/^ft_\d+$/.test(k || '')) return false;
+  const f = resolveOvField(k);
+  for (const code in BOROUGH_DATA) {
+    const d = BOROUGH_DATA[code];
+    const v = d ? (d.indicators || d)[f] : null;
+    if (v != null && v !== '') return false;
+  }
+  return true;
+}
+const LA_CITY_OF_LONDON = 'E09000001';
 function _laCodes() {
   return (typeof BOROUGH_GJ !== 'undefined' && BOROUGH_GJ.features)
     ? BOROUGH_GJ.features.map(f => (f.properties || {}).LAD25CD).filter(Boolean) : [];
@@ -10108,7 +10162,7 @@ function _reportDotPlot(rows, opts) {
     s += `<text x="${x0 - 10}" y="${y + 3.5}" font-size="10" fill="#334155" text-anchor="end">${String(r.l).replace(/[<>&]/g, '')}</text>`;
     s += `<line x1="${x0}" y1="${y}" x2="${x1}" y2="${y}" stroke="#E2E8F0" stroke-width="5" stroke-linecap="round"/>`;
     if (r.p == null) {
-      s += `<text x="${x1 + 6}" y="${y + 3.5}" font-size="9" fill="#64748B">no figure</text>`;
+      s += `<text x="${x1 + 6}" y="${y + 3.5}" font-size="9" fill="#64748B">No figure</text>`;
       return;
     }
     const c = r.p >= 50 ? REPORT_CMP.worse : REPORT_CMP.better;
@@ -10523,7 +10577,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
         const valTxt = (r.k ? fmtNum(r.v, indDecimals(r.k)) : _fmtN(r.v, dp)) + (u ? ' ' + u : '');
         svg += `<text x="${_reportLabelX(padL + Math.max(w, 6) + 4, tickX, valTxt)}" y="${y + 3.5}" font-size="10" fill="#0B1F33" font-variant-numeric="tabular-nums">${valTxt}</text>`;
       } else {
-        svg += `<text x="${_reportLabelX(padL + 4, tickX, 'no figure')}" y="${y + 3.5}" font-size="10" fill="#64748B">no figure</text>`;
+        svg += `<text x="${_reportLabelX(padL + 4, tickX, 'No figure')}" y="${y + 3.5}" font-size="10" fill="#64748B">No figure</text>`;
       }
       // London median reference tick
       if (r.ref != null && !isNaN(r.ref)) {
@@ -10575,7 +10629,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
         const valTxt = (r.k ? fmtNum(r.v, indDecimals(r.k)) : _fmtN(r.v, dp)) + u;
         svg += `<text x="${_reportLabelX(padL + Math.max(wv, 6) + 4, wr != null ? padL + wr : null, valTxt)}" y="${y + 3.5}" font-size="10" fill="#0B1F33" font-variant-numeric="tabular-nums">${valTxt}</text>`;
       } else {
-        svg += `<text x="${_reportLabelX(padL + 4, wr != null ? padL + wr : null, 'no figure')}" y="${y + 3.5}" font-size="10" fill="#64748B">no figure</text>`;
+        svg += `<text x="${_reportLabelX(padL + 4, wr != null ? padL + wr : null, 'No figure')}" y="${y + 3.5}" font-size="10" fill="#64748B">No figure</text>`;
       }
       if (wr != null) {
         svg += `<line x1="${padL + wr}" y1="${y - 8}" x2="${padL + wr}" y2="${y + 7}" stroke="#0B1F33" stroke-width="1.6"/>`;
@@ -12846,7 +12900,7 @@ const PH_PEEK = (function () {
       const vs = has ? ovVsHTML(ovVsEngland(level, code, k)) + (ovIsEstimated(level, code, k) ? EST_HTML : '') : '';
       return '<div class="ap-row"><span>' + esc(ovLabel(k)) +
         (ctx ? '<span class="ctx">' + esc(ctx) + '</span>' : '') + (vs ? '<span class="ctx">' + vs + '</span>' : '') + '</span><b>' +
-        (has ? esc(fmtOv(v, k)) : 'no figure') + '</b></div>';
+        (has ? esc(fmtOv(v, k)) : esc(level === 'msoa' ? msoaNoFigure(code, k) : 'No figure')) + '</b></div>';
     };
     el.innerHTML = '<div class="ap-hd"><div><div class="ap-nm">' + esc(props.name || code) + '</div>' +
       '<div class="ap-sub">' + esc([props.ward, props.borough].filter(Boolean).join(', ')) + '</div></div>' +
@@ -13705,7 +13759,7 @@ window.generateLSOAReport = function(code) {
         const tickX = (r.ref != null && !isNaN(r.ref)) ? padL + (Math.max(0, r.ref) / dmax) * barW : null;
         svg += `<text x="${_reportLabelX(padL + Math.max(w, 6) + 4, tickX, valTxt)}" y="${y + 3.5}" font-size="10" fill="#0B1F33" font-variant-numeric="tabular-nums">${valTxt}</text>`;
       } else {
-        svg += `<text x="${padL + 4}" y="${y + 3.5}" font-size="10" fill="#64748B">no figure</text>`;
+        svg += `<text x="${padL + 4}" y="${y + 3.5}" font-size="10" fill="#64748B">No figure</text>`;
       }
       if (r.ref != null && !isNaN(r.ref)) {
         const rx = padL + (Math.max(0, r.ref) / dmax) * barW;
@@ -13748,7 +13802,7 @@ window.generateLSOAReport = function(code) {
         const valTxt = (r.k ? fmtNum(r.v, indDecimals(r.k)) : _fmtN(r.v, dp)) + u;
         svg += `<text x="${_reportLabelX(padL + Math.max(wv, 6) + 4, wr != null ? padL + wr : null, valTxt)}" y="${y + 3.5}" font-size="10" fill="#0B1F33" font-variant-numeric="tabular-nums">${valTxt}</text>`;
       } else {
-        svg += `<text x="${_reportLabelX(padL + 4, wr != null ? padL + wr : null, 'no figure')}" y="${y + 3.5}" font-size="10" fill="#64748B">no figure</text>`;
+        svg += `<text x="${_reportLabelX(padL + 4, wr != null ? padL + wr : null, 'No figure')}" y="${y + 3.5}" font-size="10" fill="#64748B">No figure</text>`;
       }
       if (wr != null) {
         svg += `<line x1="${padL + wr}" y1="${y - 8}" x2="${padL + wr}" y2="${y + 7}" stroke="#0B1F33" stroke-width="1.6"/>`;
@@ -14406,6 +14460,8 @@ function loadMsoaBoundaries() {
                 ovVsHTML(ovVsEngland('msoa', p.code, curOv)) +
                 (ovIsEstimated('msoa', p.code, curOv) ? EST_HTML : '') + '</span>' +
                 (bivOn() ? '' : `<span class="ctx">${ovContext('msoa', curOv, v)}</span>`)
+              : (curOv && curOv !== 'none' && ovHasLevel(curOv, 'msoa'))
+              ? `<span class="tip-row"><b>${_esc(_ovLabel(curOv))}:</b> <span class="tip-none">${_esc(msoaNoFigure(p.code, curOv))}</span></span>`
               : '';
             const v2 = bivOn() ? msoaOvValue(p.code, curOv2) : null;
             const shown2 = (v2 != null && !isNaN(parseFloat(v2)))
@@ -14799,6 +14855,9 @@ function renderTopBottom() {
   };
   // Rates and percentages leave out wards under 1,000 residents (SMALL_WARD_POP).
   const skipSmall = rankSkipsSmall(level, curOv);
+  // An LA figure estimated from Local Health ward figures (laIsWardEstimate)
+  // leaves out the City of London, whose figure rests on very small numbers.
+  const cityOut = level === 'borough' && laIsWardEstimate(curOv);
   let rows = [];
   for (const [id, row] of Object.entries(pool)) {
     if (useLsoa && mapCodes && !mapCodes.has(id)) continue;
@@ -14806,7 +14865,8 @@ function renderTopBottom() {
     if (v == null || v === '' || isNaN(parseFloat(v))) continue;
     const name = (mapNames && mapNames[id]) || row.name || row.lsoa_name || row.LSOA21NM || id;
     const lad = level === 'ward' ? (row.lad || (typeof ladOf === 'function' ? ladOf(id) : '')) : (mapLads[id] || '');
-    rows.push({ id, name, lad, v: parseFloat(v), tb: tbOf(row), small: skipSmall && wardIsSmall(row),
+    rows.push({ id, name, lad, v: parseFloat(v), tb: tbOf(row),
+                small: skipSmall ? wardIsSmall(row) : (cityOut && id === LA_CITY_OF_LONDON),
                 vs: level === 'msoa' ? ovVsEngland('msoa', id, fieldKey) : '' });
   }
   // The lists follow a focused LA or ICB, and say so in their title. A focus
@@ -14881,7 +14941,10 @@ function renderTopBottom() {
 
   // What the lists cannot show by themselves, said under them.
   const notes = [];
-  if (smallOut.length) {
+  if (smallOut.length && level === 'borough') {
+    notes.push('The City of London is left out, because its figure rests on very small numbers. ' +
+      'These LA figures are our estimates from ward figures, and OHID’s own LA figures are on each Area profile.');
+  } else if (smallOut.length) {
     const lads = Array.from(new Set(smallOut.map(r => r.lad).filter(Boolean)));
     const one = smallOut.length === 1;
     notes.push(capWord(smallOut.length) + ' ' + (lads.length === 1 ? lads[0] + ' ' : '') +
@@ -15154,7 +15217,12 @@ function _syncScaleNumbers() {
       ? _e(`${meta.g} · ${meta.src}${fmtPeriod(meta.yr) ? ` (${fmtPeriod(meta.yr)})` : ''}${avgNote}`) +
         (age ? ' · <span class="ov-old">' + _e(age) + '</span>' : '') +
         (caution ? '<span class="ov-caution">' + _e(caution) + '</span>' : '') +
-        (nativeG === 'msoa' && drawnLvl === 'msoa' ? '<span class="ctx">Select an MSOA to see whether its figure differs from England\'s, by OHID\'s test.</span>' : '')
+        (nativeG === 'msoa' && drawnLvl === 'msoa' ? '<span class="ctx">Select an MSOA to see whether its figure differs from England\'s, by OHID\'s test.</span>' : '') +
+        (drawnLvl === 'borough' && laIsWardEstimate(curOv)
+          ? '<span class="ctx" id="sc-la-est">' + _e('These LA figures are our estimates from ward figures' +
+              (fmtPeriod(meta.yr) ? ' for ' + fmtPeriod(meta.yr) : '') +
+              ', and can differ from OHID’s own LA figures, which are shown on each Area profile.') + '</span>'
+          : '')
       : '';
   }
 }
@@ -15723,9 +15791,23 @@ document.addEventListener('change', e => {
     return !!(p && p.classList.contains('open'));
   }
 
+  const textEl = document.getElementById('fingertips-banner-text');
   const update = () => {
     const ftActive = (typeof curOv !== 'undefined' && isFt(curOv));
-    banner.style.display = (ftActive && !dismissed && !askOpen()) ? 'block' : 'none';
+    // The reason is read from the data: the MSOAs redrawn in 2021 for the
+    // older Local Health series, and withheld figures otherwise. Until the
+    // MSOA figures arrive for an MSOA series, the notice waits for them.
+    let cause = ftActive ? ftBlankCause(curOv) : '';
+    if (ftActive && !cause && ovHasLevel(curOv, 'msoa') && typeof ensureMsoaData === 'function') {
+      ensureMsoaData().then(() => { if (ftBlankCause(curOv)) update(); });
+    }
+    // Only when it changes: the observer below watches the document, so an
+    // unconditional write would wake it again, for ever.
+    const want = cause === 'redrawn' ? BLANK_NOTE_REDRAWN : BLANK_NOTE_WITHHELD;
+    if (textEl && cause && textEl.textContent !== want) textEl.textContent = want;
+    const show = ftActive && !dismissed && !askOpen() && (cause === 'redrawn' || cause === 'withheld' ||
+      (!cause && !ovHasLevel(curOv, 'msoa')));
+    banner.style.display = show ? 'block' : 'none';
   };
 
   // The Ask panel appears late and its open state is a class, so this observes
@@ -19240,7 +19322,7 @@ var PH_SHOW = {
     var e = function (t) { return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;'); };
     var line = function (k) {
       var v = wardOvValue(currentWard, k);
-      if (v == null || v === '' || isNaN(parseFloat(v))) return '<div>' + e(ovLabel(k)) + ': <span style="color:var(--ink-3)">no figure</span></div>';
+      if (v == null || v === '' || isNaN(parseFloat(v))) return '<div>' + e(ovLabel(k)) + ': <span style="color:var(--ink-3)">No figure</span></div>';
       var ctx = (typeof bivOn === 'function' && bivOn()) ? '' : ovContext('ward', k, v, (typeof WARD_DATA !== 'undefined' && WARD_DATA[currentWard]) || {});
       return '<div>' + e(ovLabel(k)) + ': <b>' + e(fmtOv(v, k)) + '</b>' +
         (ctx ? '<span class="ctx">' + e(ctx) + '</span>' : '') + '</div>';
@@ -21259,9 +21341,10 @@ var PH_SHOW = {
       n: 'Every figure describes an area as a whole rather than the individual people who live ' +
          'there. Some health figures are only published for a whole LA, so the map repeats the ' +
          'LA\'s figure in each of its wards and says so where it does, which means those figures ' +
-         'cannot tell one ward from another. A grey area usually means the figure has been ' +
-         'withheld to protect privacy rather than that it is zero, so please check anything ' +
-         'important against its source before you act on it.',
+         'cannot tell one ward from another. An area left without colour has no figure, which ' +
+         'does not mean zero: the figure may have been withheld to protect privacy, or not ' +
+         'published for that area at all, so please check anything important against its ' +
+         'source before you act on it.',
       go: function () {
         // Also reachable by pressing Back from the end, so it cannot rely on
         // the chapter before it having run.
@@ -22657,8 +22740,8 @@ var PH_SHOW = {
       (out.cols === 1 ? 'one column for the indicator you chose' : 'a column for each of the ' + cbNum(out.cols) + ' indicators you chose') +
       '. Each figure is the one the map ' +
       'shows for that area, and the file never adds areas together, which is what Custom area is for. ' +
-      'A blank cell means there is no figure for that area, often because the publisher withheld it to ' +
-      'protect privacy, so please do not read it as zero.' +
+      'A blank cell means there is no figure for that area, because the publisher withheld it to ' +
+      'protect privacy or did not publish one for that area, so please do not read it as zero.' +
       (laCols ? ' A column marked (LA figure) holds a figure published only for the whole LA, so every ' +
         lv.label + ' in an LA has the same value.' : ''));
 
