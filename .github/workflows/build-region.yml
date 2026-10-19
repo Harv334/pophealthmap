@@ -130,6 +130,17 @@ jobs:
         continue-on-error: true
         run: python scripts/build_icb_boundaries.py --region "${{ inputs.scope }}"
 
+      # The same two steps the monthly London refresh runs: the ward figures
+      # cut into the first-paint and on-demand halves (ward_core.json,
+      # ward_rest.json), and the counts the Layers panel shows before a
+      # layer is loaded (meta/layer_counts.json). Without them a region page
+      # spent a 404 on ward_core.json before every load and showed no count
+      # beside Dental practices, Pharmacies or the boundaries.
+      - name: Split the ward figures and count the layers
+        run: |
+          python scripts/split_ward_data.py --region "${{ inputs.scope }}"
+          python scripts/build_layer_counts.py --region "${{ inputs.scope }}"
+
       - name: Summarise the manifest
         if: always()
         run: |
@@ -191,9 +202,12 @@ jobs:
           SCOPE: ${{ inputs.scope }}
         run: |
           cd "data/regions/$SCOPE"
-          files="$(ls -d ward_data.json lsoa_data.json msoa_data.json borough_data.json \
-                   vcse_data.json pharmacies.json dental_practices.json lsoa_census_counts.json \
-                   map meta 2>/dev/null)"
+          files="$(ls -d ward_data.json ward_core.json ward_rest.json lsoa_data.json msoa_data.json \
+                   borough_data.json vcse_data.json pharmacies.json dental_practices.json \
+                   lsoa_census_counts.json map meta 2>/dev/null)"
+          # The pack's own file list, in its manifest, so the page asks for
+          # nothing the pack does not hold (scripts/write_pack_files.py).
+          python "$GITHUB_WORKSPACE/scripts/write_pack_files.py" . $files
           tar -czf "$GITHUB_WORKSPACE/region-$SCOPE.tar.gz" $files
           cd "$GITHUB_WORKSPACE"
           ls -la "region-$SCOPE.tar.gz"

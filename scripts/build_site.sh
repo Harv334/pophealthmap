@@ -59,6 +59,20 @@ fi
 
 : > "$OUT/.nojekyll"
 
+# The developer comments out of the published page (about a third of
+# index.html); the repository keeps them. Needs node and the typescript
+# package, which the workflows install pinned; without them the page is
+# published as it is.
+if command -v node >/dev/null 2>&1; then
+  node "$ROOT/scripts/strip_comments.cjs" "$OUT/index.html"
+else
+  echo "build_site: node not found, so index.html keeps its comments" >&2
+fi
+
+# The sitemap (one entry per published region) and the Dataset dateModified,
+# dated from the manifests rather than typed by hand.
+python3 "$ROOT/scripts/stamp_site.py" "$OUT"
+
 # What must be there, and what must not.
 fail=0
 for f in index.html 404.html CNAME .nojekyll data/map/wards.js data/meta/manifest.json \

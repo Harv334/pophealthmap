@@ -127,6 +127,32 @@
       window.regionPath(window.PH_HEAD_DATA[k]) + '">');
   }
 
+  /* The manifest, and the ward figures chained from it, started here rather
+     than from loadData, which cannot run until the data scripts above and
+     the main block have been read. loadManifest and _fetchWardFigures take
+     these promises over. Each settles rather than rejects, so nothing is
+     reported as unhandled if the page stops before it reads them. A region
+     manifest that lists its files (meta/manifest.json "files") and leaves
+     out ward_core.json skips the request that would only 404. */
+  if (window.fetch && window.Promise) {
+    var early = window.PH_EARLY = {};
+    early.manifest = fetch(window.regionPath('data/meta/manifest.json'), { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .catch(function () { return null; });
+    early.wardCore = early.manifest.then(function (m) {
+      if (m && m.files && m.files.indexOf('ward_core.json') === -1) {
+        var e = new Error('not in the manifest'); e.status = 404;
+        return { err: e };
+      }
+      var u = window.regionPath('data/ward_core.json') +
+        (m && m.last_run ? '?v=' + encodeURIComponent(m.last_run) : '');
+      return fetch(u).then(function (r) {
+        if (!r.ok) { var e = new Error('HTTP ' + r.status); e.status = r.status; throw e; }
+        return r.json();
+      }).then(function (json) { return { json: json }; }, function (err) { return { err: err }; });
+    });
+  }
+
   /* A region's own loading map (REGION_LOADER_MAP, made by
      scripts/build_loader_map.py --region), loaded before the loader script
      reads it. London's is inlined in the page as LOADER_MAP. */
@@ -163,6 +189,36 @@
 <meta name="twitter:description" content="Explore health, deprivation and local services across every neighbourhood in England, free and with no sign-in. Life expectancy, hospital admissions, crime, air quality, transport and more, from open NHS and government data.">
 <meta name="twitter:image" content="https://pophealth.uk/og.png">
 <meta name="twitter:image:alt" content="A map of London wards shaded by deprivation score, beside the name PopHealth Map and the words Free, no sign-in">
+<!-- A region's own address, title and description. Without this every
+     ?r= page declared https://pophealth.uk/ as its canonical, so search
+     engines folded each region into the London page and a shared North East
+     link previewed as London. London (no ?r=) keeps the tags above. -->
+<script>
+(function () {
+  var R = window.PH_REGION;
+  if (!R || R.isLondon) return;
+  var place = (R.isEngland || /^Yorkshire/.test(R.name) ? '' : 'the ') + R.name;
+  var url = 'https://pophealth.uk/?r=' + R.id;
+  var title = 'PopHealth Map: health and deprivation by ward in ' + place;
+  var desc = 'A free map of health, deprivation and local services for every ward and ' +
+    'neighbourhood in ' + place + ', from open NHS and government data.';
+  var set = function (sel, attr, v) {
+    var el = document.querySelector(sel);
+    if (el) el.setAttribute(attr, v);
+  };
+  document.title = title;
+  set('link[rel="canonical"]', 'href', url);
+  set('meta[property="og:url"]', 'content', url);
+  set('meta[property="og:title"]', 'content', title);
+  set('meta[name="twitter:title"]', 'content', title);
+  set('meta[name="description"]', 'content', desc);
+  set('meta[property="og:description"]', 'content', desc);
+  set('meta[name="twitter:description"]', 'content', desc);
+  var alt = 'The PopHealth Map logo and the words Free, no sign-in';
+  set('meta[property="og:image:alt"]', 'content', alt);
+  set('meta[name="twitter:image:alt"]', 'content', alt);
+})();
+</script>
 
 <!-- Inline so it costs no request and cannot 404. The site mark, the same
      four blues as the header. The PNG icons and og.png are drawn from it by
@@ -186,6 +242,9 @@
      Regenerate the fonts with scripts/build_fonts.py. The libraries are
      pinned by directory name and updated by hand. -->
 <link rel="stylesheet" href="vendor/fonts.css">
+<!-- The body text's file, asked for now rather than once the stylesheet is
+     read. One file covers every weight (it is a variable font). -->
+<link rel="preload" href="vendor/fonts/Inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="vendor/leaflet-1.9.4/leaflet.css">
 <link rel="stylesheet" href="vendor/leaflet.markercluster-1.5.3/MarkerCluster.css">
 <link rel="stylesheet" href="vendor/leaflet.markercluster-1.5.3/MarkerCluster.Default.css">
@@ -3053,9 +3112,11 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
      The Dataset entry is the one that earns its keep: it makes the map
      eligible for Google Dataset Search, a far less crowded index than
      general web search and the one an analyst looking for London ward
-     health data is most likely to be using. `dateModified` below is a
-     starting value and is refreshed from the pipeline manifest at runtime,
-     so it cannot drift out of step with the data. -->
+     health data is most likely to be using. `dateModified` below is
+     stamped from the manifest's last_run when the deploy assembles _site
+     (scripts/stamp_site.py), and the London page refreshes it from the
+     manifest at runtime too. Region pages leave it alone, because the
+     dataset it describes is the site's, not one region's. -->
 <script type="application/ld+json" id="ld-dataset">
 {
   "@context": "https://schema.org",
@@ -3080,7 +3141,7 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
       "@type": "Dataset",
       "@id": "https://pophealth.uk/#dataset",
       "name": "Population health in England by local authority, ward and LSOA",
-      "description": "Population health, deprivation and service access indicators for every region of England, at local authority (LA), ward, MSOA and LSOA level. In London, it covers 704 wards, 4,994 LSOAs, 1,146 GP practices, 1,737 pharmacies and 1,877 dental practices. Sources include OHID Fingertips, ONS Census 2021, IMD 2025, NHS ODS registers, QOF prevalence, police.uk recorded crime, DWP claimant count, fuel poverty, Charity Commission registers, Defra UK-AIR modelled background air quality and the Transport for London stop and station register. Every figure comes from a published source, named in the methodology. The air quality layers are Defra model output rather than measurements, and are labelled as such.",
+      "description": "Population health, deprivation and service access indicators for every region of England, at local authority (LA), ward, MSOA and LSOA level. It covers every ward, MSOA and LSOA in each published region, together with the GP practices, pharmacies, dental practices and hospitals in each. Sources include OHID Fingertips, ONS Census 2021, IMD 2025, NHS ODS registers, QOF prevalence, police.uk recorded crime, DWP claimant count, fuel poverty, Charity Commission registers, Defra UK-AIR modelled background air quality and the Transport for London stop and station register. Every figure comes from a published source, named in the methodology. The air quality layers are Defra model output rather than measurements, and are labelled as such.",
       "url": "https://pophealth.uk/",
       "sameAs": "https://github.com/Harv334/pophealthmap",
       "isAccessibleForFree": true,
@@ -4759,13 +4820,32 @@ let DATA_VERSION = '';
 // and have to say which data they hold: export filenames and report footers.
 let DATA_DATE = '';
 let _manifestPromise = null;
+/* The files a region manifest says its pack holds (its "files" list, written
+   by build-region.yml), or null when it gives none, as London's does. Paths
+   are relative to the region's folder: "ward_core.json", "map/pcn.json". */
+let _manifestFiles = null;
+
+/* Whether a data path is worth requesting: false only when the manifest lists
+   its files and this one is not among them, which spares a region the 404s
+   for London-only files (greenspaces, PCNs, output areas, the split ward
+   file, layer counts). Takes the path as written for London. */
+function dataListed(path) {
+  if (!_manifestFiles || PH_IS_LONDON) return true;
+  const full = regionPath(String(path).split('?')[0]);
+  const base = window.PH_REGION.base;
+  if (full.indexOf(base) !== 0) return true;
+  return _manifestFiles.has(full.slice(base.length));
+}
 
 function loadManifest() {
   if (_manifestPromise) return _manifestPromise;
-  _manifestPromise = fetch(regionPath('data/meta/manifest.json'), { cache: 'no-store' })
+  // Started in the head (PH_EARLY) where the browser allowed it.
+  const early = window.PH_EARLY && window.PH_EARLY.manifest;
+  _manifestPromise = (early || fetch(regionPath('data/meta/manifest.json'), { cache: 'no-store' })
     .then(r => (r.ok ? r.json() : null))
-    .catch(() => null)
+    .catch(() => null))
     .then(m => {
+      _manifestFiles = (m && Array.isArray(m.files)) ? new Set(m.files) : null;
       if (m && m.last_run) {
         DATA_VERSION = encodeURIComponent(m.last_run);
         DATA_DATE = String(m.last_run).slice(0, 10);
@@ -4788,6 +4868,10 @@ function dataUrl(path) {
 /* A file's JSON, or a rejection that says why not. err.status carries the
    HTTP status when there was an answer, and is 0 when there was none. */
 function _getJson(url) {
+  if (!dataListed(url)) {
+    const e = new Error('not in the manifest'); e.status = 404;
+    return Promise.reject(e);
+  }
   return fetch(url).then(r => {
     if (!r.ok) { const e = new Error('HTTP ' + r.status); e.status = r.status; throw e; }
     return r.json();
@@ -5077,8 +5161,9 @@ const PH_WHERE_ARIA = PH_IS_LONDON
 
   // Green space is a London build so far. Asked once, cheaply, so the layer
   // is only offered where its file exists.
-  fetch(regionPath('greenspaces.geojson'), { method: 'HEAD' })
-    .then(r => r.ok)
+  loadManifest()
+    .then(() => dataListed('greenspaces.geojson')
+      ? fetch(regionPath('greenspaces.geojson'), { method: 'HEAD' }).then(r => r.ok) : false)
     .catch(() => false)
     .then(ok => {
       if (ok) return;
@@ -8515,8 +8600,8 @@ function ensureGreenspaceData() {
   if (_gsData) return Promise.resolve(_gsData);
   if (_gsDataLoading) return _gsDataLoading;
   _gsDataLoading = loadManifest()
-    .then(() => fetch(dataUrl('greenspaces.geojson')))
-    .then(r => r.ok ? r.json() : null)
+    .then(() => dataListed('greenspaces.geojson') ? fetch(dataUrl('greenspaces.geojson')) : null)
+    .then(r => r && r.ok ? r.json() : null)
     .then(gj => {
       if (gj && Array.isArray(gj.features)) _gsData = gj; else _gsDataLoading = null;
       return _gsData;
@@ -8702,7 +8787,7 @@ function _updateLayerCounts() {
    The point layers, VCSE and the LSOA boundaries are fetched on demand,
    which left their counts blank until the reader ticked the box. Blank was at
    least honest, but it withheld the one number that helps somebody decide
-   whether to switch a layer on at all: "1,737" next to Pharmacies is wanted
+   whether to switch a layer on at all: the count next to Pharmacies is wanted
    before the click, not after it.
 
    So the counts are measured from the payloads at build time by
@@ -8722,8 +8807,8 @@ function applyPrefetchedCounts() {
   // a refreshed dataset would be reported with counts out of the browser cache,
   // which is the one way this file could tell a lie.
   return loadManifest()
-    .then(() => fetch(dataUrl('data/meta/layer_counts.json')))
-    .then(r => (r.ok ? r.json() : null))
+    .then(() => dataListed('data/meta/layer_counts.json') ? fetch(dataUrl('data/meta/layer_counts.json')) : null)
+    .then(r => (r && r.ok ? r.json() : null))
     .catch(() => null)
     .then(payload => {
       const c = payload && payload.counts;
@@ -9366,7 +9451,7 @@ function wireVCSE(records) {
    Every single one of their toggles is off by default.
 
    A cold load pulled about 14 MB of JSON to put nothing on the screen:
-   11,134 VCSE organisations, 1,737 pharmacies and 1,663 dental practices,
+   about 11,000 VCSE organisations, 1,700 pharmacies and 1,700 dental practices,
    none of them drawn.
 
    They are fetched when something actually needs them now, following
@@ -18981,7 +19066,16 @@ function _restyleAll() {
    generated (a 404), a server error, no answer at all, or a file cut off half
    way. Resolves { json, whole }, or rejects when neither file can be read. */
 function _fetchWardFigures() {
-  return _getJson(dataUrl('data/ward_core.json'))
+  // The first call takes over the request the head started (PH_EARLY); a
+  // retry from the loading screen fetches afresh.
+  const early = window.PH_EARLY && window.PH_EARLY.wardCore;
+  if (early) window.PH_EARLY.wardCore = null;
+  const core = early
+    ? early.then(r => { if (r.err) throw r.err; return r.json; })
+    : (dataListed('data/ward_core.json')
+        ? _getJson(dataUrl('data/ward_core.json'))
+        : Promise.reject(Object.assign(new Error('not in the manifest'), { status: 404 })));
+  return core
     .then(json => ({ json, whole: false }))
     .catch(err => {
       console.info('data/ward_core.json not loaded (' + err.message + '), so reading ward_data.json');
@@ -19088,7 +19182,7 @@ async function loadData() {
 
     // Keep the Dataset structured data in step with the data itself, so the
     // dateModified a crawler reads is never the one hardcoded in the head.
-    if (manifest && manifest.last_run) {
+    if (manifest && manifest.last_run && PH_IS_LONDON) {
       try {
         const ldEl = document.getElementById('ld-dataset');
         const ld = JSON.parse(ldEl.textContent);
