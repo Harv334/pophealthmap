@@ -76,9 +76,11 @@ region.</p>
     site, not from Google or a code library service.</li>
   <li>The map runs in your browser, on data files downloaded from this site. Selecting
     areas, filtering, comparing and exporting all happen on your own device.</li>
-  <li>Three optional parts of the page do send something elsewhere: the
-    <a href="#ask">Ask panel</a>, <a href="#postcodes">postcode search</a> and the
-    <a href="#tiles">background map</a>. Each is described below.</li>
+  <li>Three parts of the map send something to another service. The
+    <a href="#tiles">background map</a> does this whenever the map is open, because
+    its street map or satellite images are loaded from CARTO or Esri, while
+    <a href="#postcodes">postcode search</a> and the <a href="#ask">Ask panel</a>
+    send something only when you use them. Each is described below.</li>
 </ul>
 
 <h2 id="ask">The Ask panel</h2>
@@ -104,19 +106,19 @@ on the map. When you send a question:</p>
     clears it.</li>
   <li>You can ask 10 questions a day, and replying when the model asks you to narrow
     a question down does not use one up. To keep to that limit, the server on
-    Cloudflare records your IP address with a count of the questions asked today,
-    and it deletes that record automatically after 48 hours.</li>
+    Cloudflare records your IP address with a count of the questions and requests
+    sent from it today, and it deletes that record automatically after 48 hours.</li>
   <li>If you never send a question, nothing is sent to that server or to Anthropic,
     and opening the panel on its own sends nothing.</li>
 </ul>
 
-<p>Anthropic and Cloudflare handle what they receive under their own policies:
+<p>You can read more in
 <a href="https://www.anthropic.com/legal/privacy">Anthropic's privacy policy</a> and
 <a href="https://www.cloudflare.com/privacypolicy/">Cloudflare's privacy policy</a>.</p>
 
-<p>Answers are written by an AI model, so while the figures in them come from the
-map's own data, the wording does not, and you should check anything that matters
-before acting on it.</p>
+<p>Answers are written by an AI model. It is told to use only the figures it looks
+up in the map's own data, but it can still make mistakes, so check anything that
+matters before acting on it.</p>
 
 <h2 id="postcodes">Postcode search</h2>
 
@@ -169,8 +171,9 @@ clearing this site's data in your browser removes them.</p>
       <tr><td><code class="name">phAskUsed</code></td><td>Local storage</td>
         <td>Today's date and how many Ask questions this browser has used, so the panel
           can show how many are left. Your questions themselves are not stored.</td></tr>
-      <tr><td><code class="name">devBannerDismissed</code></td><td>Session storage</td>
-        <td>That you closed the strip saying the figures are provisional. Cleared when you close the tab.</td></tr>
+      <tr><td><code class="name">ph-ldr-swept</code></td><td>Session storage</td>
+        <td>That the map's opening animation has already played during this visit, so
+          it does not play again on the next page. Cleared when you close the tab.</td></tr>
       <tr><td><code class="name">ph-england-ok</code></td><td>Session storage</td>
         <td>That you chose to open the map of all of England, which is a large download,
           so it does not ask again. Cleared when you close the tab.</td></tr>
@@ -199,14 +202,32 @@ They are not records about individuals. GP practices, pharmacies, dentists and
 hospitals come from published NHS registers. The
 <a href="methodology.html">methodology and technical notes</a> list every source.</p>
 
+<h2 id="rights">Your personal data and your rights</h2>
+
+<p>Harvey Seville is responsible for the personal data this site handles. The only
+personal data the site keeps itself is your IP address with a count of the Ask
+questions sent from it, which is deleted after 48 hours. We keep it because we have
+a legitimate interest in sharing the Ask panel fairly and keeping its cost within
+what the project can carry.</p>
+
+<p>Cloudflare and Anthropic process your question for us as service providers, and
+either may handle it outside the UK, including in the United States, under the
+safeguards in their data processing terms. Under Anthropic's commercial terms,
+questions sent to its models this way are not used to train them, and Anthropic
+keeps them only for a limited time, mainly to check for misuse.</p>
+
+<p>You can ask for a copy of any personal data we hold about you, ask us to correct
+or delete it, or object to how we use it, by emailing
+<a href="mailto:contact@pophealth.uk">contact@pophealth.uk</a>.</p>
+
 <h2>Questions and requests</h2>
 
 <p>For a question about this page, a correction, or a removal request, email
-<a href="mailto:contact@pophealth.uk">contact@pophealth.uk</a>. If you are not happy
-with the reply, you can also contact the
-<a href="https://ico.org.uk/">Information Commissioner's Office</a>.</p>
+<a href="mailto:contact@pophealth.uk">contact@pophealth.uk</a>. You can also complain
+to the <a href="https://ico.org.uk/">Information Commissioner's Office</a> at any
+time.</p>
 
-<p class="updated">This page was last updated on 13 October 2026, and the
+<p class="updated">This page was last updated on 19 October 2026, and the
 <a href="accessibility.html">accessibility statement</a> covers how the site works
 with assistive technology.</p>
 

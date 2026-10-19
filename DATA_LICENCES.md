@@ -8,6 +8,11 @@ mirrored on the map itself, in the "Data credits" dialog opened from the map's
 attribution corner (index.html, `#credits-dlg`), and on methodology.html.
 
 If you reuse this project's outputs, carry these attributions with them.
+Every CSV the site writes carries them in its Source column, and every printed
+report in its footer, built from the indicators the file or report holds
+(`phCreditText` and `phLicenceExtras` in index.html): the TfL statements
+whenever a London station or bus stop measure is present, and the Defra
+citation whenever an air quality measure is.
 
 ## Required attribution statements
 
@@ -69,7 +74,7 @@ uk-air.defra.gov.uk; the site asks for the domain as well as the department.
 | Street crime | data.police.uk (Home Office) | OGL v3 | |
 | Charity register | Charity Commission for England and Wales | OGL v3 | |
 | NHS trust sites (hospitals) | NHS Organisation Data Service | OGL v3 | |
-| Basemap tiles | OpenStreetMap contributors | ODbL 1.0 | Attribution rendered by the map itself |
+| Basemap tiles | CARTO, from OpenStreetMap contributors; Esri (World Light Gray fallback, World Imagery satellite) | ODbL 1.0 (OSM); CARTO and Esri terms | Attribution rendered by the map itself, and kept in Presentation view with a caption naming the tile provider |
 
 ## Hand-compiled layers
 

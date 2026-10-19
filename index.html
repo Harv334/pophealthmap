@@ -447,6 +447,14 @@
   body.presenting #fingertips-banner, body.presenting footer.sbar { display: none !important; }
   body.presenting .map-wrap { --sheet-lift: 0px !important; }
   body.presenting .main { grid-template-columns: minmax(0, 1fr); }
+  /* The picture keeps its credits: the map's attribution stays in its corner,
+     and a caption under the key says what is shown, for when, from whom, and
+     whose map it is drawn on (_shotCaptionText). The key rises to make room. */
+  body.presenting .map-legend-strip, body.presenting .map-wrap.has-sheet .map-legend-strip { bottom: 66px !important; }
+  .shot-caption { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 541;
+    width: max-content; max-width: min(820px, calc(100% - 32px)); padding: 5px 10px; text-align: center;
+    background: color-mix(in srgb, var(--paper) 92%, transparent); border-radius: var(--r-sm);
+    font-size: 11.5px; line-height: 1.4; color: var(--ink-2); pointer-events: none; }
   body.presenting .map-wrap { grid-template-rows: minmax(0, 1fr); }
 
   /* ── Header search ── */
@@ -1075,7 +1083,14 @@
     max-width: min(560px, calc(100vw - 32px)); padding: 10px var(--s-4); background: var(--paper);
     color: var(--ink-2); border: 1px solid var(--line); border-radius: var(--r-md);
     box-shadow: var(--shadow-lg); font-size: var(--t-md); line-height: 1.5; }
-  .shot-banner { top: 14px; display: flex; align-items: center; gap: 14px; width: max-content; }
+  .shot-banner { top: 14px; display: flex; align-items: center; gap: 14px; width: max-content;
+    transition: opacity .4s; }
+  /* After four seconds the instructions fade, and only a small Done button
+     stays, in the top right corner, out of the way of the map. */
+  .shot-banner.mini { left: auto; right: 14px; transform: none; padding: 4px; gap: 0; }
+  .shot-banner.mini > span { display: none; }
+  .shot-banner.mini #screenshot-done { padding: 4px 10px; font-size: var(--t-sm); min-height: 0; }
+  .shot-banner.fading > span { opacity: 0; transition: opacity .4s; }
   .shot-banner strong, .toast b { color: var(--ink); font-weight: 600; }
   .shot-banner kbd { font: inherit; font-size: var(--t-sm); font-weight: 600; color: var(--ink);
     white-space: nowrap; padding: 0 6px; background: var(--paper-2); border: 1px solid var(--line);
@@ -1541,7 +1556,7 @@
 /* Which model is answering, under the caution it belongs with. Quieter again
    and without a second rule above it, so the two read as one footer rather
    than as two separate warnings. */
-.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs)}
+div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs)}
 @media (max-width:640px){#ai-panel{width:calc(100% - 24px)}}
 
     /* Layers whose coverage is narrower than the map. Flagged rather than
@@ -3734,6 +3749,8 @@
         <div class="rb-acts">
           <button type="button" class="ws-btn primary" id="rb-report" disabled>Open printable report</button>
           <button type="button" class="ws-btn" id="rb-csv" disabled>Download CSV</button>
+          <button type="button" class="ws-btn" id="rb-notes" disabled
+                  title="Notes on each figure, its source and the licence lines to keep with it">Download notes</button>
           <!-- An area is built by hand, so it is the one thing here somebody
                would be sorry to lose or have to describe over the phone. -->
           <button type="button" class="ws-btn" id="rb-link" disabled
@@ -9922,7 +9939,7 @@ window.deselectLSOA = function() {
    The point layers have no entry in that metadata. Each comes from a single
    register, named here as its layer in the sidebar names it. */
 const REPORT_CREDITS = {
-  census:       { meta: 'census',       use: 'Demographics, health and work', label: 'Office for National Statistics (ONS), Census 2021, from Nomis' },
+  census:       { meta: 'census',       use: 'Demographics, health and work', label: 'Census 2021. Source: Office for National Statistics licensed under the Open Government Licence v.3.0' },
   imd:          { meta: 'imd',          use: 'Deprivation and Core20', label: 'Ministry of Housing, Communities and Local Government, English Indices of Deprivation 2025' },
   crime:        { meta: 'crime',        use: 'Recorded crime', period: 'crime_period', label: 'data.police.uk' },
   fuel_poverty: { meta: 'fuel_poverty', use: 'Fuel poverty', period: 'fuel_poverty_period', label: 'Department for Energy Security and Net Zero, sub-regional fuel poverty statistics' },
@@ -9934,7 +9951,7 @@ const REPORT_CREDITS = {
   dental:       { meta: 'dental',       use: 'Dental practices', label: 'NHS Organisation Data Service, NHS dental practices' },
   hospitals:    { name: 'NHS Organisation Data Service, register of NHS trust sites', use: 'Hospitals' },
   vcse:         { name: 'Charity Commission register',      use: 'Charities' },
-  greenspace:   { name: 'OS Open Greenspace, contains OS data \u00a9 Crown copyright and database right 2025', use: 'Parks and green spaces' },
+  greenspace:   { name: 'OS Open Greenspace, contains OS data \u00a9 Crown copyright and database right', os: true, use: 'Parks and green spaces' },
 };
 function reportCredits(keys) {
   const src = (WARD_META && WARD_META.sources) || {};
@@ -9945,6 +9962,8 @@ function reportCredits(keys) {
     // codes and file names, so it only decides whether there is a source to
     // credit, and the label says who it is.
     let who = c.name || (c.meta && src[c.meta] ? (c.label || src[c.meta]) : '') || '';
+    // The OS year is the year of the data, not a typed one.
+    if (c.os) who += ' ' + ((DATA_DATE || '').slice(0, 4) || new Date().getFullYear());
     let when = c.period ? monthWords(WARD_META[c.period] || '') : '';
     if (c.ov && OV_META[c.ov]) {
       who = (typeof _cardSource === 'function' ? _cardSource(c.ov) : '') || OV_META[c.ov].src || who;
@@ -9953,6 +9972,36 @@ function reportCredits(keys) {
     // A figure the pipeline recorded no source for is not credited to a guess.
     return who ? c.use + (when ? ', ' + fmtPeriod(when) : '') + ': ' + who : '';
   }).filter(Boolean);
+}
+/* The licence lines that must travel with a file or report, built from the
+   indicator keys it holds. Everything carries the OGL v3 line. The London
+   station and bus stop measures come from TfL under OGL v2 with TfL's
+   amendments, which end automatically if its three statements are left out,
+   so any export holding one says them word for word (as #credits-dlg does).
+   Outside London the same keys come from NaPTAN under OGL v3, so the TfL
+   lines are London only. Defra's UK-AIR asks for its own citation. */
+const PH_TFL_KEYS = ['rail_station_dist_m', 'rail_stations_1km', 'bus_stop_dist_m', 'bus_stops_800m'];
+const PH_DEFRA_AIR_KEYS = ['no2_ugm3', 'pm25_ugm3', 'pm10_ugm3'];
+const PH_CREDIT_TFL = 'Station and bus stop measures: Powered by TfL Open Data. ' +
+  'Contains OS data © Crown copyright and database rights 2016. ' +
+  'Geomni UK Map data © and database rights 2019. ' +
+  'Licensed under version 2.0 of the Open Government Licence with amendments for Transport for London.';
+const PH_CREDIT_DEFRA = 'Air quality: © Crown copyright Defra via uk-air.defra.gov.uk, ' +
+  'licenced under the Open Government Licence (OGL).';
+function phCreditBase() {
+  return 'PopHealth Map (pophealth.uk), an independent project not affiliated with the NHS' +
+    (DATA_DATE ? ', with figures updated on ' + fmtDate(DATA_DATE) : '') + '. ' +
+    'Contains public sector information licensed under the Open Government Licence v3.0.';
+}
+function phLicenceExtras(keys) {
+  const has = k => (keys || []).indexOf(k) !== -1;
+  const out = [];
+  if (PH_IS_LONDON && PH_TFL_KEYS.some(has)) out.push(PH_CREDIT_TFL);
+  if (PH_DEFRA_AIR_KEYS.some(has)) out.push(PH_CREDIT_DEFRA);
+  return out;
+}
+function phCreditText(keys) {
+  return [phCreditBase()].concat(phLicenceExtras(keys)).join(' ');
 }
 // The crime period for a heading, falling back to the same words the sidebar
 // uses when the metadata does not carry one.
@@ -9963,7 +10012,7 @@ function reportCrimePeriod() {
 // it came from, the licence most of it is published under, and how to tell us
 // about a figure that looks wrong (an email with the report and the map view
 // it came from already written in; see indicatorReportHref).
-function reportProvenanceHtml(area) {
+function reportProvenanceHtml(area, keys) {
   const what = area ? 'the report for ' + area : 'a report';
   const mail = _mailtoHref('Problem with a figure in ' + what, [
     'Report: ' + (area || 'PopHealth Map report'),
@@ -9972,17 +10021,12 @@ function reportProvenanceHtml(area) {
     'Which figure looks wrong, and why (please describe it here):',
     '',
   ]).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
-  let when = '';
-  if (DATA_DATE) {
-    const d = new Date(DATA_DATE + 'T00:00:00Z');
-    if (!isNaN(d.getTime())) {
-      when = 'Data updated ' + d.toLocaleDateString('en-GB',
-        { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }) + '. ';
-    }
-  }
-  return '<div style="margin-top:6px">' + when +
-    'Made with PopHealth Map, <a href="https://pophealth.uk">https://pophealth.uk</a>. ' +
-    'Contains public sector information licensed under the Open Government Licence v3.0. ' +
+  // The same credit every CSV carries, plus the TfL and Defra statements when
+  // the report shows one of their figures (see phLicenceExtras).
+  const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const extras = phLicenceExtras(keys).map(s => '<br>' + esc(s)).join('');
+  return '<div style="margin-top:6px">' + esc(phCreditBase()) + extras + '<br>' +
+    'Map and full source notes: <a href="https://pophealth.uk">https://pophealth.uk</a>. ' +
     'To report a problem with a figure, email <a href="' + mail + '">' + PH_CONTACT + '</a>.</div>';
 }
 /* "Where this area sits in London" in words: "Higher than 95% of London
@@ -11066,7 +11110,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
 
   <div class="footer">
     <div class="indep">PopHealth Map is an independent open-data project, not affiliated with the NHS. Figures are published statistics for planning and discussion; check the source before relying on one.</div>
-    <strong>Sources:</strong> ${reportCredits(['census', 'imd', crimeRows.length ? 'crime' : '', 'fuel_poverty', 'claimant', 'gp', 'pharmacy', 'dental', 'hospitals', 'vcse', _green ? 'greenspace' : '']).map(_esc).join(' · ')}. Each median and comparison is taken across the ${PH_AREA} wards with a figure for that measure.
+    <strong>Sources:</strong> ${reportCredits(['census', 'imd', crimeRows.length ? 'crime' : '', 'fuel_poverty', 'claimant', 'health', 'gp', 'pharmacy', 'dental', 'hospitals', 'vcse', _green ? 'greenspace' : '']).map(_esc).join(' · ')}. Each median and comparison is taken across the ${PH_AREA} wards with a figure for that measure.
     ${reportProvenanceHtml((wdata ? wdata.name : wn) + ' ward')}
   </div>
 </div>
@@ -14170,7 +14214,7 @@ window.generateLSOAReport = function(code) {
 
   <div class="footer">
     <div class="indep">PopHealth Map is an independent open-data project, not affiliated with the NHS. Figures are published statistics for planning and discussion; check the source before relying on one.</div>
-    <strong>Data sources:</strong> ${reportCredits(['imd', 'census', crimeRows.length ? 'crime' : '', 'fuel_poverty', 'claimant', 'greenblue', 'gp', 'pharmacy', 'dental', 'hospitals', 'vcse', _green ? 'greenspace' : '']).map(_esc).join(' · ')}.
+    <strong>Data sources:</strong> ${reportCredits(['imd', 'census', crimeRows.length ? 'crime' : '', 'fuel_poverty', 'claimant', 'health', 'greenblue', 'gp', 'pharmacy', 'dental', 'hospitals', 'vcse', _green ? 'greenspace' : '']).map(_esc).join(' · ')}.
     <div style="margin-top:6px">Services and green spaces are listed when they sit inside this LSOA\u2019s boundary, and each median and comparison is taken across the ${PH_AREA} LSOAs with a figure for that measure.</div>
     ${reportProvenanceHtml((props.name ? props.name + ', ' : '') + 'LSOA ' + code)}
   </div>
@@ -17147,6 +17191,40 @@ function _exportDialog(title, options, extras, sub) {
 // screenshot of the actual rendered map — no rasterisation, no
 // projection mismatch.
 let _screenshotState = null;
+/* The credit line drawn into Presentation view, under the key, e.g. "Year 6
+   children with obesity, 2022/23 to 2024/25. Ward figures are estimates from
+   OHID Local Health MSOA figures. Map: PopHealth Map, pophealth.uk. Contains
+   OS data (c) Crown copyright and database right 2026. Map data (c)
+   OpenStreetMap contributors, (c) CARTO." The tile credit follows the
+   background actually showing. */
+function _shotCaptionText() {
+  const parts = [];
+  const k = (typeof curOv === 'string') ? curOv : 'none';
+  if (k && k !== 'none' && typeof OV_META === 'object' && OV_META[k]) {
+    const yr = OV_META[k].yr ? fmtPeriod(String(OV_META[k].yr)) : '';
+    parts.push(ovLabel(k) + (yr ? ', ' + yr : '') + '.');
+    const lvl = (typeof currentDataLevel === 'string') ? currentDataLevel : '';
+    if (/^ft_\d+$/.test(k) && lvl === 'ward') parts.push('Ward figures are estimates from OHID Local Health MSOA figures.');
+    else {
+      const src = (typeof _cardSource === 'function') ? _cardSource(k) : '';
+      if (src) parts.push('Source: ' + src + '.');
+    }
+    if (typeof PH_IS_LONDON !== 'undefined' && PH_IS_LONDON && PH_TFL_KEYS.indexOf(k) !== -1) {
+      parts.push('Powered by TfL Open Data. Contains OS data \u00a9 Crown copyright and database rights 2016. ' +
+        'Geomni UK Map data \u00a9 and database rights 2019.');
+    }
+    if (PH_DEFRA_AIR_KEYS.indexOf(k) !== -1) parts.push('\u00a9 Crown copyright Defra via uk-air.defra.gov.uk.');
+  }
+  parts.push('Map: PopHealth Map, pophealth.uk.');
+  const year = (DATA_DATE || '').slice(0, 4) || String(new Date().getFullYear());
+  parts.push('Contains OS data \u00a9 Crown copyright and database right ' + year + '.');
+  const sat = typeof _satBase !== 'undefined' && _satBase && map.hasLayer(_satBase);
+  const esri = !sat && typeof _streetBase !== 'undefined' && _streetBase && /arcgisonline/.test(_streetBase._url || '');
+  parts.push(sat ? 'Imagery \u00a9 Esri, Maxar, Earthstar Geographics and the GIS User Community.'
+    : esri ? 'Tiles \u00a9 Esri, HERE, Garmin. Map data \u00a9 OpenStreetMap contributors.'
+    : 'Map data \u00a9 OpenStreetMap contributors, \u00a9 CARTO.');
+  return parts.join(' ');
+}
 async function _prepareScreenForScreenshot(opts) {
   opts = opts || { mode: 'nwl', whiteOutside: true };
   if (_screenshotState) return; // already in screenshot mode
@@ -17162,8 +17240,10 @@ async function _prepareScreenForScreenshot(opts) {
   try { map.invalidateSize({ animate: false }); } catch (e) { /* no-op */ }
   const dlBadge = document.getElementById('dl-badge');
   const dlPrevVis = dlBadge ? dlBadge.style.visibility : '';
+  // The zoom and other controls go, but the attribution stays: the tile and
+  // data credits have to be in the picture.
   const ctrlCorners = Array.from(document.querySelectorAll(
-    '.leaflet-top, .leaflet-bottom, .leaflet-control-attribution'
+    '.leaflet-top, .leaflet-bottom .leaflet-control:not(.leaflet-control-attribution)'
   ));
   const ctrlPrevVis = ctrlCorners.map(el => el.style.visibility);
   if (dlBadge) dlBadge.style.visibility = 'hidden';
@@ -17191,7 +17271,9 @@ async function _prepareScreenForScreenshot(opts) {
     }
     if (scopeBounds) {
       try {
-        map.fitBounds(scopeBounds, { padding: [40, 40], animate: false });
+        // Room at the top for the instruction card, and at the bottom for
+        // the key and the credit caption, so neither covers the area.
+        map.fitBounds(scopeBounds, { paddingTopLeft: [40, 110], paddingBottomRight: [40, 120], animate: false });
         movedMap = true;
         await new Promise(r => setTimeout(r, 250));
       } catch (e) { /* no-op */ }
@@ -17241,15 +17323,29 @@ async function _prepareScreenForScreenshot(opts) {
   banner.innerHTML = '<span>' + (touch
     ? 'The map is ready for your screenshot, so take one in the usual way on your device and then select Done.'
     : 'The map is ready for your screenshot. Press <kbd>Win + Shift + S</kbd> on Windows or ' +
-      '<kbd>Cmd + Shift + 4</kbd> on a Mac, and then select Done or press <kbd>Esc</kbd>.') + '</span>' +
+      '<kbd>Cmd + Shift + 4</kbd> on a Mac, and then select Done or press <kbd>Esc</kbd>.') +
+    ' Keep the credit line at the bottom in your picture.</span>' +
     '<button type="button" id="screenshot-done" class="btn btn-primary">Done</button>';
   document.body.appendChild(banner);
+  // The card fades after four seconds so it is not in the picture, leaving a
+  // small Done button; Esc still works throughout.
+  const fadeT1 = setTimeout(() => banner.classList.add('fading'), 4000);
+  const fadeT2 = setTimeout(() => banner.classList.add('mini'), 4400);
+  // The caption under the key: indicator, period, source and tile credit.
+  const caption = document.createElement('div');
+  caption.className = 'shot-caption';
+  caption.id = 'shot-caption';
+  caption.textContent = _shotCaptionText();
+  const mapWrap = document.getElementById('map-wrap');
+  if (mapWrap) mapWrap.appendChild(caption);
 
   const onKey = e => { if (e.key === 'Escape' && _screenshotState) { e.preventDefault(); _screenshotState.cleanup(); } };
   document.addEventListener('keydown', onKey);
   _screenshotState = {
     cleanup: () => {
       document.removeEventListener('keydown', onKey);
+      clearTimeout(fadeT1); clearTimeout(fadeT2);
+      if (caption.parentNode) caption.parentNode.removeChild(caption);
       try { if (whiteOverlay) map.removeLayer(whiteOverlay); } catch(e) {}
       if (tipStyle.parentNode) tipStyle.parentNode.removeChild(tipStyle);
       if (dlBadge) dlBadge.style.visibility = dlPrevVis;
@@ -19501,12 +19597,14 @@ var PH_SHOW = {
     var s = v == null ? '' : String(v);
     return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
   }
-  function download(filename, text, mime) {
+  // keys: the indicator keys the file holds, so its Source column carries
+  // the licence lines they need (phLicenceExtras).
+  function download(filename, text, mime, keys) {
     // Every file this page writes carries the date of the data in its name,
     // so two downloads either side of a monthly refresh neither overwrite each
     // other nor pass for the same figures.
     if (DATA_DATE) filename = filename.replace(/(\.[A-Za-z0-9]+)?$/, '-' + DATA_DATE + '$1');
-    if (/^text\/csv/.test(mime || '')) text = withSourceCol(text);
+    if (/^text\/csv/.test(mime || '')) text = withSourceCol(text, keys);
     saveBlob(filename, new Blob([text], { type: mime || 'text/plain;charset=utf-8' }));
   }
   function saveBlob(filename, blob) {
@@ -19516,15 +19614,23 @@ var PH_SHOW = {
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setTimeout(function () { URL.revokeObjectURL(url); }, 500);
   }
-  function withSourceCol(text) {
+  function withSourceCol(text, keys) {
     // Every CSV (Data export, Compare, Query, Directory, Custom area) also says
     // where it came from, so a file passed on without its email still names
     // its source. As a last column rather than trailing rows: rows after the
     // data load as data in pandas, Excel and Power BI and break the join a
     // CSV exists for, while an extra column is ignored by anything that does
     // not ask for it. Line ends inside quoted cells are respected.
-    var src = csvCell('PopHealth Map (pophealth.uk), an independent open-data project not affiliated with the NHS' +
-      (DATA_DATE ? ', with figures updated on ' + fmtDate(DATA_DATE) : ''));
+    // The credit is built from the keys present: a file with a TfL station
+    // or bus stop measure must say TfL's three statements, and one with
+    // Defra's air quality says Defra's citation. A caller that passes no
+    // keys is covered by looking for the indicators' names in the text.
+    keys = (keys || []).slice();
+    PH_TFL_KEYS.concat(PH_DEFRA_AIR_KEYS).forEach(function (k) {
+      if (keys.indexOf(k) === -1 && (String(text).indexOf(k) !== -1 ||
+          String(text).indexOf(labelOf(k)) !== -1 || String(text).indexOf(headerOf(k)) !== -1)) keys.push(k);
+    });
+    var src = csvCell(phCreditText(keys));
     var out = '', q = false, row = 0, start = 0, body = String(text).replace(/\n+$/, '');
     for (var ci = 0; ci <= body.length; ci++) {
       var ch = body[ci];
@@ -20345,7 +20451,8 @@ var PH_SHOW = {
       });
       lines.push(row.map(csvCell).join(','));
     });
-    download('pophealth-' + lvl.one + '-comparison.csv', lines.join('\n'), 'text/csv;charset=utf-8');
+    download('pophealth-' + lvl.one + '-comparison.csv', lines.join('\n'), 'text/csv;charset=utf-8',
+             mets.map(function (m) { return m.k; }));
   }
 
   /* ─────────────────────────────────────────────────────────────────────────
@@ -21709,7 +21816,7 @@ var PH_SHOW = {
       : 'No LSOAs added yet';
     clearBtn.hidden = !rbSelected.length;
     // The buttons wait for an LSOA; the empty state below says how to add one.
-    ['rb-report', 'rb-csv', 'rb-link'].forEach(function (id) {
+    ['rb-report', 'rb-csv', 'rb-notes', 'rb-link'].forEach(function (id) {
       var b = $(id);
       if (b) b.disabled = !rbSelected.length;
     });
@@ -21838,6 +21945,11 @@ var PH_SHOW = {
     });
     $('rb-csv').addEventListener('click', rbCsv);
     $('rb-report').addEventListener('click', rbReport);
+    $('rb-notes').addEventListener('click', function () {
+      if (!rbSelected.length) return;
+      download((rbAreaName().replace(/[^A-Za-z0-9 _-]+/g, '') || 'area') + '-notes.txt',
+               rbNotes(), 'text/plain;charset=utf-8');
+    });
   }
 
   function rbCsv() {
@@ -21864,7 +21976,53 @@ var PH_SHOW = {
                   num_(i.census_population) || ''].map(csvCell).join(','));
     });
     download((rbAreaName().replace(/[^A-Za-z0-9 _-]+/g, '') || 'area') + '.csv',
-             lines.join('\n'), 'text/csv;charset=utf-8');
+             lines.join('\n'), 'text/csv;charset=utf-8', keys);
+  }
+
+  /* The Sources line for a custom area, from the keys it holds: the
+     publishers REPORT_CREDITS knows by name through reportCredits, and any
+     other publisher as the indicator card names it. */
+  function rbSources(keys) {
+    var cats = [], extra = [];
+    keys.forEach(function (k) {
+      var s = (typeof _cardSource === 'function' ? _cardSource(k) : '') || '';
+      var c = /police/.test(s) ? 'crime'
+        : /^ONS, Census/.test(s) ? 'census'
+        : /^MHCLG/.test(s) ? 'imd'
+        : /claimant/.test(s) ? 'claimant'
+        : /DESNZ/.test(s) ? 'fuel_poverty'
+        : /green and blue/.test(s) ? 'greenblue'
+        : /Local Health/.test(s) ? 'health' : '';
+      if (c) { if (cats.indexOf(c) === -1) cats.push(c); }
+      else if (s && extra.indexOf(s) === -1) extra.push(s);
+    });
+    return reportCredits(cats).concat(extra);
+  }
+  // Notes to go with the Custom area CSV: what the area is, how it was
+  // combined, each figure as the Data export notes describe it, and the
+  // licence lines the figures need.
+  function rbNotes() {
+    var agg = rbAggregate();
+    var keys = Object.keys(agg.indicators).sort();
+    var L = [];
+    var para = function (t) { L.push(t, ''); };
+    var dataDate = DATA_DATE ? cbDate(DATA_DATE) : '';
+    L.push('PopHealth Map: notes for your custom area', '');
+    para('These notes go with the CSV for ' + rbAreaName() + ', a custom area made from PopHealth Map ' +
+      '(https://pophealth.uk) on ' + cbDate(new Date()) + (dataDate ? ' from the figures updated on ' + dataDate : '') + '.');
+    para('The area is made of ' + agg.lsoas + ' LSOA' + (agg.lsoas === 1 ? '' : 's') + ' chosen by hand. It is not an ' +
+      'official geography and no one else publishes figures for it. Counts are summed, and everything else is ' +
+      'an average weighted by each LSOA\u2019s population.');
+    L.push('The figures');
+    keys.forEach(function (k, n) {
+      L.push((n + 1) + '. ' + headerOf(k));
+      L.push.apply(L, cbWith('lsoa', function () { return cbIndicatorLines(k); }));
+      L.push('');
+    });
+    L.push('Licences');
+    para(phCreditText(keys));
+    para('If something in the figures looks wrong, please tell us at contact@pophealth.uk.');
+    return L.join('\n');
   }
 
   function rbReport() {
@@ -21935,7 +22093,9 @@ var PH_SHOW = {
       'Figures are the same ones the map draws; see the <a href="' +
       esc(new URL('methodology.html', location.href).href) + '" target="_blank" rel="noopener">' +
       'methodology page</a> for where each comes from and what it cannot tell you.' +
-      reportProvenanceHtml(rbAreaName()) + '</div>' +
+      '<div style="margin-top:6px"><strong>Sources:</strong> ' +
+      rbSources(Object.keys(agg.indicators)).map(esc).join(' &middot; ') + '.</div>' +
+      reportProvenanceHtml(rbAreaName(), Object.keys(agg.indicators)) + '</div>' +
       '</div><div class="actions">' +
       '<button onclick="window.print()">Print or save as PDF</button>' +
       '<button onclick="window.close()">Close</button></div></body></html>';
@@ -22619,6 +22779,27 @@ var PH_SHOW = {
     return ('pophealth-' + (cbLevel === 'borough' ? 'la' : cbLevel) +
       (cbScope ? '-' + cbScope.replace(/[^A-Za-z0-9]+/g, '-') : '')).toLowerCase().replace(/-+$/, '');
   }
+  // What one indicator is, as the notes describe it: shared by the Data
+  // export notes and the Custom area notes (rbNotes).
+  function cbIndicatorLines(k) {
+    var L = [];
+    var m = cbMeta(k), f = indicatorFacts(k) || {};
+    var plain = (typeof OV_PLAIN === 'object' && OV_PLAIN[k]) || m.desc || '';
+    var u = cbUnit(k), uw = CB_UNIT_WORDS[u] || u, dp = CB_DP_WORDS[indDecimals(k)] || '';
+    var per = cbPeriod(k);
+    var row = function (t, v) { v = cbPlain(v); if (v) L.push('   ' + t + ': ' + v.replace(/([^.])$/, '$1.')); };
+    row('What it measures', plain);
+    if (indTitle(k)) row('Official title', indTitle(k));
+    if (uw) row('Unit', uw + ', ' + dp); else row('Rounding', cbCap(dp));
+    row('Period', per ? cbCap(per) : '');
+    row('Geography', cbGeoText(k));
+    row('Counted', f.num);
+    row('Out of', f.den);
+    row('Method', f.method);
+    row('Caution', typeof ovCaution === 'function' ? ovCaution(k) : '');
+    row('Source', cbSourceText(k));
+    return L;
+  }
   function cbNotes(out) {
     var lv = CB_LEVELS[cbLevel], today = new Date();
     var dataDate = DATA_DATE ? cbDate(DATA_DATE) : '';
@@ -22675,21 +22856,7 @@ var PH_SHOW = {
           'calculated from it, weighted by how many people lived in each part.', '');
         return;
       }
-      var k = c.key, m = cbMeta(k), f = indicatorFacts(k) || {};
-      var plain = (typeof OV_PLAIN === 'object' && OV_PLAIN[k]) || m.desc || '';
-      var u = cbUnit(k), uw = CB_UNIT_WORDS[u] || u, dp = CB_DP_WORDS[indDecimals(k)] || '';
-      var per = cbPeriod(k);
-      var row = function (t, v) { v = cbPlain(v); if (v) L.push('   ' + t + ': ' + v.replace(/([^.])$/, '$1.')); };
-      row('What it measures', plain);
-      if (indTitle(k)) row('Official title', indTitle(k));
-      if (uw) row('Unit', uw + ', ' + dp); else row('Rounding', cbCap(dp));
-      row('Period', per ? cbCap(per) : '');
-      row('Geography', cbGeoText(k));
-      row('Counted', f.num);
-      row('Out of', f.den);
-      row('Method', f.method);
-      row('Caution', typeof ovCaution === 'function' ? ovCaution(k) : '');
-      row('Source', cbSourceText(k));
+      L.push.apply(L, cbIndicatorLines(c.key));
       L.push('');
     });
     L.push((out.columns.length + 1) + '. Source');
@@ -22697,10 +22864,9 @@ var PH_SHOW = {
       'from if it is passed on.', '');
 
     L.push('Licences');
-    var lic = ['Contains public sector information licensed under the Open Government Licence v3.0.'];
-    var srcs = out.keys.map(function (k) { return String(cbMeta(k).src || ''); }).join(' | ');
-    if (/UK-AIR|PCM/.test(srcs)) lic.push('Air quality: © Crown copyright Defra via uk-air.defra.gov.uk, licenced under the Open Government Licence (OGL).');
-    if (/TfL Unified/.test(srcs) && PH_IS_LONDON) lic.push('Station and bus stop measures: Powered by TfL Open Data. Contains OS data © Crown copyright and database rights 2016. Geomni UK Map data © and database rights 2019.');
+    // The same lines as the file's Source column (phLicenceExtras).
+    var lic = ['Contains public sector information licensed under the Open Government Licence v3.0.']
+      .concat(phLicenceExtras(out.keys));
     para(lic.join(' '));
 
     L.push('Opening the file');
@@ -22816,7 +22982,7 @@ var PH_SHOW = {
         var out = cbBuild();
         if (!out.rows || !out.cols) return;
         var base = cbFileBase() + (DATA_DATE ? '-' + DATA_DATE : '');
-        files.push({ name: base + '.csv', text: withSourceCol(out.text) });
+        files.push({ name: base + '.csv', text: withSourceCol(out.text, out.keys) });
         files.push({ name: base + '-notes.txt', text: cbNotes(out) });
       });
     });
@@ -22919,7 +23085,7 @@ var PH_SHOW = {
       }
       var out = cbBuild();
       if (!out.rows || !out.cols) return;
-      download(cbFileBase() + '.csv', out.text, 'text/csv;charset=utf-8');
+      download(cbFileBase() + '.csv', out.text, 'text/csv;charset=utf-8', out.keys);
     });
     $('cb-notes').addEventListener('click', function () {
       var out = cbBuild();
@@ -23516,7 +23682,7 @@ var PH_SHOW = {
         .concat(condKeys.map(function (k) { return indCsvValue(num(inds[k]), k); }))
         .map(csvCell).join(','));
     });
-    download('pophealth-query.csv', lines.join('\n'), 'text/csv;charset=utf-8');
+    download('pophealth-query.csv', lines.join('\n'), 'text/csv;charset=utf-8', [q.sort].concat(condKeys));
   });
 
   // The example from the brief: services plus a borough plus two indicator

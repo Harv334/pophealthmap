@@ -102,9 +102,10 @@ https://pophealth.uk, accessed on <em>date</em>.</p>
 <p>For example, a citation for one of the Local Health figures would read:</p>
 
 <p class="cite">PopHealth Map, Life expectancy at birth, women, for the wards of
-Tower Hamlets, 2019 to 2023. Figures from OHID Local Health, updated on
+Tower Hamlets, 2019 to 2023, updated on
 <span class="js-updated">the date shown at the foot of the map</span>.
-https://pophealth.uk, accessed on <span class="js-today">the day you looked</span>.</p>
+https://pophealth.uk, accessed on <span class="js-today">the day you looked</span>.
+Ward estimates calculated by PopHealth Map from OHID Local Health MSOA figures.</p>
 
 <p>To show someone exactly what you saw, use Copy link at the top of the map,
 which keeps the indicator, the area and the level you had chosen. Most of the
@@ -763,6 +764,15 @@ Gray canvas used instead if CARTO's tiles cannot be loaded. The Satellite
 background is Esri's World Imagery, from Esri, Maxar, Earthstar Geographics and
 the GIS User Community, with Esri's place names drawn over it.</p>
 
+<!-- The same lines, word for word, as the map's Data credits dialog
+     (index.html #credits-dlg) and DATA_LICENCES.md. -->
+<p>Contains OS data © Crown copyright and database right 2026.<br>
+Contains Royal Mail data © Royal Mail copyright and database right 2026.<br>
+Contains National Statistics data © Crown copyright and database right 2026.</p>
+
+<p>Census 2021. Source: Office for National Statistics licensed under the
+Open Government Licence v.3.0.</p>
+
 <p>Air quality is modelled by Defra and carries its own citation:
 © Crown copyright Defra via uk-air.defra.gov.uk, licenced under the Open
 Government Licence (OGL).</p>
@@ -1127,7 +1137,9 @@ Array.prototype.forEach.call(document.querySelectorAll('table.stack'), labelTabl
     var when = fmtDate(s.fetched_at);
     // A failure is the thing worth reading, so it is stated rather than
     // reduced to a colour, and it says what the consequence is.
-    if (s.status === 'failed' || s.status === 'skipped') {
+    // 'skipped' is by design (a source that does not apply to this region),
+    // so only a real failure is reported as stale.
+    if (s.status === 'failed') {
       return '<span class="status-bad">Not updated' + (when ? ' on ' + esc(when) : '') + '</span>' +
         '<br><span class="small">The map is showing the last figures that did update, ' +
         'which are older than the rest.</span>';
@@ -1186,24 +1198,33 @@ Array.prototype.forEach.call(document.querySelectorAll('table.stack'), labelTabl
       }
       return;
     }
-    var bad = Object.keys(sources).filter(function (k) {
-      return sources[k].status === 'failed' || sources[k].status === 'skipped';
+    // Only a source that has a row in the table and actually failed counts.
+    // Sources skipped by design (custom, NaPTAN in London, TfL and PTAL in
+    // the regions) are expected and are not reported as stale.
+    var bad = SOURCES.filter(function (r) {
+      var s = r.manifest && sources[r.manifest];
+      return s && s.status === 'failed';
+    }).filter(function (r, i, arr) {
+      // Two rows can share one manifest key; count each source once.
+      return arr.findIndex(function (o) { return o.manifest === r.manifest; }) === i;
     });
+    var runDate = fmtDate(manifest.last_run);
+    var onDate = runDate ? ' on ' + esc(runDate) : ' on the last update';
     if (bad.length && noteEl) {
+      var words = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten'];
+      var n = words[bad.length] || String(bad.length);
       noteEl.style.display = 'block';
-      noteEl.innerHTML = '<strong>' + bad.length + ' of ' +
-        Object.keys(sources).length + ' sources did not refresh on the last run.</strong> ' +
-        'Those rows are marked below. The map still shows the last figures that ' +
-        'loaded successfully, so they are real but older than the rest, and the ' +
-        'period column tells you what they describe.' +
-        (manifest.last_run ? ' Last full run: ' + esc(String(manifest.last_run).slice(0, 10)) + '.' : '');
-    } else if (noteEl && manifest.last_run) {
+      noteEl.innerHTML = '<strong>' + n + (bad.length === 1 ? ' source' : ' sources') +
+        ' could not be updated' + onDate + '.</strong> ' +
+        (bad.length === 1 ? 'It is' : 'They are') + ' marked in the table above, and the map ' +
+        'is still showing ' + (bad.length === 1 ? 'its' : 'their') + ' most recent figures, ' +
+        'which are genuine but older than the rest.';
+    } else if (noteEl && runDate) {
       noteEl.style.display = 'block';
       noteEl.style.background = 'transparent';
       noteEl.style.border = '0';
       noteEl.style.color = 'var(--ink-3)';
-      noteEl.innerHTML = 'Every source refreshed on the last run, ' +
-        esc(String(manifest.last_run).slice(0, 10)) + '.';
+      noteEl.innerHTML = 'Every source was updated on ' + esc(runDate) + '.';
     }
   }
 

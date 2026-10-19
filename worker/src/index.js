@@ -6,8 +6,10 @@
  *
  * The model is deliberately not given the data. It is given tools, and the
  * browser executes them against the JSON it has already loaded. That means
- * every figure in an answer comes from the same numbers the map is drawing,
- * the model cannot invent a statistic, and no dataset has to be uploaded.
+ * the figures it is handed are the same numbers the map is drawing and no
+ * dataset has to be uploaded. It does not guarantee every number in an answer
+ * is one of them: the system prompt tells the model to use only looked-up
+ * figures, but it can still derive or misstate one.
  */
 
 /**
