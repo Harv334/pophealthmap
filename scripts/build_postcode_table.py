@@ -71,6 +71,20 @@ import zipfile
 from datetime import datetime
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
+
+
+def _census_age_ok() -> bool:
+    """True when indicators.js says the under 16 and working age figures were
+    built from single years of age (census_age_bands "0-15"); otherwise they
+    are TS007A's under 15 and 15 to 64, and are labelled so."""
+    try:
+        t = (REPO / "data/map/indicators.js").read_text(encoding="utf-8")
+        return '"census_age_bands":"0-15"' in t.replace(" ", "")
+    except OSError:
+        return False
+
+
+_AGE_OK = _census_age_ok()
 ONSPD_ZIP = REPO / ".cache" / "onspd" / "ONSPD_FEB_2026_UK.zip"
 ONSPD_MEMBER = "Data/ONSPD_FEB_2026_UK.csv"
 
@@ -91,8 +105,10 @@ NATIVE = [
 
     ("census_population",      "Population",                    "Census 2021 (TS001)", "2021"),
     ("census_under5_pct",      "Under 5 (%)",                   "Census 2021 (TS007A)", "2021"),
-    ("census_under16_pct",     "Under 16 (%)",                  "Census 2021 (TS007A)", "2021"),
-    ("census_working_age_pct", "Working age 16-64 (%)",         "Census 2021 (TS007A)", "2021"),
+    ("census_under16_pct",     "Under 16 (%)" if _AGE_OK else "Under 15 (%)",
+     "Census 2021 (TS007)" if _AGE_OK else "Census 2021 (TS007A)", "2021"),
+    ("census_working_age_pct", "Working age 16 to 64 (%)" if _AGE_OK else "Aged 15 to 64 (%)",
+     "Census 2021 (TS007)" if _AGE_OK else "Census 2021 (TS007A)", "2021"),
     ("census_over65_pct",      "Aged 65 and over (%)",          "Census 2021 (TS007A)", "2021"),
     ("census_over85_pct",      "Aged 85 and over (%)",          "Census 2021 (TS007A)", "2021"),
 

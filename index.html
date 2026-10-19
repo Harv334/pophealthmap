@@ -3589,9 +3589,9 @@
               <option value="census_black_pct">Black / Black British % · Output area</option>
               <option value="census_mixed_pct">Mixed / Multiple % · Output area</option>
               <option value="census_other_ethnic_pct">Other ethnic group % · Output area</option>
-              <option value="census_under16_pct">Under 16 % · Output area</option>
+              <option value="census_under16_pct">Under 15 % · Output area</option>
               <option value="census_under5_pct">Under 5 % · Output area</option>
-              <option value="census_working_age_pct">Working age (16 to 64) % · Output area</option>
+              <option value="census_working_age_pct">Aged 15 to 64 % · Output area</option>
               <option value="census_over65_pct">65+ % · Output area</option>
               <option value="census_over85_pct">85+ % · Output area</option>
               <option value="census_english_hh_all_pct">Households where all adults have English as main language % · Output area</option>
@@ -5295,9 +5295,9 @@ const CATS = [
   { key: "people", label: "People and communities", ico: "users", fields: [
     { k: "census_non_white_pct",             l: "Non-White (%)",                 g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_born_outside_uk_pct",       l: "Born outside UK (%)",           g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
-    { k: "census_under16_pct",               l: "Under 16 (%)",                  g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
+    { k: "census_under16_pct",               l: "Under 15 (%)",                  g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_under5_pct",                l: "Under 5 (%)",                   g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
-    { k: "census_working_age_pct",           l: "Working age, 16 to 64 (%)",    g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
+    { k: "census_working_age_pct",           l: "Aged 15 to 64 (%)",            g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_over65_pct",                l: "65 and over (%)",               g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_over85_pct",                l: "85 and over (%)",               g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_white_pct",                 l: "White (%)",                     g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
@@ -5387,6 +5387,18 @@ const CATS = [
    Internal keys and data are untouched. Anything not listed here (a custom
    indicator from data/custom) keeps the label it arrived with.
    ═══════════════════════════════════════════════════════════════════════════ */
+/* The ages census_under16_pct and census_working_age_pct cover. The pipeline
+   writes census_age_bands into indicators.js: "0-15" when they were built from
+   single years of age (TS007), so they are under 16 and 16 to 64. Anything
+   else, including a file written before the flag existed, means TS007A's
+   five-year bands, which give under 15 and 15 to 64, and every label says
+   so. The keys stay as they are, so links and saved views keep working, and
+   the labels flip back when a refresh rebuilds the bands. */
+const CENSUS_AGE_OK = !!(typeof PH_IND_STATS === 'object' && PH_IND_STATS &&
+  PH_IND_STATS.census_age_bands === '0-15');
+const AGE_CHILD = CENSUS_AGE_OK ? 'under 16' : 'under 15';
+const AGE_WORK = CENSUS_AGE_OK ? '16 to 64' : '15 to 64';
+const AGE_CHILD_CAP = CENSUS_AGE_OK ? 'Under 16' : 'Under 15';
 const IND_NAMES = {
   // At a glance
   census_population:               ['Population', 'Usual residents, Census 2021'],
@@ -5470,9 +5482,9 @@ const IND_NAMES = {
   // People and communities, Census 2021
   census_non_white_pct:       ['Ethnic groups other than White', 'Ethnic group: all groups other than White'],
   census_born_outside_uk_pct: ['Born outside the UK', 'Country of birth: born outside the UK'],
-  census_under16_pct:         ['Aged under 16', 'Age: under 16'],
+  census_under16_pct:         ['Aged ' + AGE_CHILD, 'Age: ' + AGE_CHILD],
   census_under5_pct:          ['Aged under 5', 'Age: under 5'],
-  census_working_age_pct:     ['Working age (16 to 64)', 'Age: 16 to 64'],
+  census_working_age_pct:     [CENSUS_AGE_OK ? 'Working age (16 to 64)' : 'Aged 15 to 64', 'Age: ' + AGE_WORK],
   census_over65_pct:          ['Aged 65 and over', 'Age: 65 and over'],
   census_over85_pct:          ['Aged 85 and over', 'Age: 85 and over'],
   census_white_pct:           ['White', 'Ethnic group: White'],
@@ -5489,7 +5501,7 @@ const IND_NAMES = {
   census_level4_qual_pct:          ['Degree-level qualifications', 'Highest level of qualification: Level 4 qualifications and above'],
   census_no_qual_pct:              ['No qualifications', 'Highest level of qualification: no qualifications'],
   claimant_count:                  ['Claimant count', 'Claimant count'],
-  claimant_rate_pct:               ['Claimant rate, working age', 'Claimant count as a proportion of residents aged 16 to 64'],
+  claimant_rate_pct:               ['Claimant rate, working age', 'Claimant count as a proportion of residents aged ' + AGE_WORK],
   // Housing and transport
   census_owned_pct:            ['Home ownership', 'Tenure of household: owned'],
   census_social_rented_pct:    ['Social renting', 'Tenure of household: social rented'],
@@ -5893,9 +5905,9 @@ const OV_META = {
   census_black_pct:               { src: "Census 2021 (TS021)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of residents who identified as Black, Black British, Black Welsh, Caribbean or African." },
   census_mixed_pct:               { src: "Census 2021 (TS021)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of residents who identified with a mixed or multiple ethnic group." },
   census_other_ethnic_pct:        { src: "Census 2021 (TS021)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of residents who identified with another ethnic group, such as Arab." },
-  census_under16_pct:             { src: "Census 2021 (TS007A)", yr: "2021", g: "Output area", u: "%",       desc: "The share of residents aged under 16." },
+  census_under16_pct:             { src: CENSUS_AGE_OK ? "Census 2021 (TS007)" : "Census 2021 (TS007A)", yr: "2021", g: "Output area", u: "%",       desc: "The share of residents aged " + AGE_CHILD + "." + (CENSUS_AGE_OK ? "" : " The Census tables this version of the map uses group ages in fives, so the youngest bands stop at 14.") },
   census_under5_pct:              { src: "Census 2021 (TS007A)", yr: "2021", g: "Output area", u: "%",       desc: "The share of residents aged under 5." },
-  census_working_age_pct:         { src: "Census 2021 (TS007A)", yr: "2021", g: "Output area", u: "%",       desc: "The share of residents aged 16 to 64, the ages usually counted as working age." },
+  census_working_age_pct:         { src: CENSUS_AGE_OK ? "Census 2021 (TS007)" : "Census 2021 (TS007A)", yr: "2021", g: "Output area", u: "%",       desc: CENSUS_AGE_OK ? "The share of residents aged 16 to 64, the ages usually counted as working age." : "The share of residents aged 15 to 64. Working age is usually counted from 16, but the Census tables this version of the map uses group ages in fives, so this band starts at 15." },
   census_over65_pct:              { src: "Census 2021 (TS007A)", yr: "2021", g: "Output area", u: "%",       desc: "The share of residents aged 65 and over." },
   census_over85_pct:              { src: "Census 2021 (TS007A)", yr: "2021", g: "Output area", u: "%",       desc: "The share of residents aged 85 and over." },
   census_higher_managerial_pct:   { src: "Census 2021 (TS062)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of residents aged 16 and over in higher managerial, administrative and professional jobs, using the socio-economic classification ONS publishes." },
@@ -5939,7 +5951,7 @@ const OV_META = {
   ft_smoking_prevalence_adults: { src: "OHID Fingertips", yr: "2024", g: "LA (upper tier)", u: "%", desc: "The share of adults aged 18 and over who currently smoke, published only for the whole LA." },
   ft_suicide_rate: { src: "OHID Fingertips", yr: "2022 - 24", g: "LA (upper tier)", u: "per 100,000", desc: "Deaths from suicide per 100,000 people, published only for the whole LA." },
   core20_lsoa_count:              { src: "NHSE Core20PLUS5",     yr: "2025", g: "Ward", u: "LSOAs",  desc: "The number of the ward's LSOAs that are among the most deprived 20% in England, meaning deprivation deciles 1 and 2, which NHS England calls Core20 in its Core20PLUS5 approach." },
-  claimant_rate_pct:              { src: "NOMIS CLA01",          yr: "August 2026", g: "Ward/LSOA", u: "%", desc: "People aged 16 to 64 claiming Universal Credit or Jobseeker's Allowance mainly because they are out of work, as a share of residents of that age at the 2021 Census." },
+  claimant_rate_pct:              { src: "NOMIS CLA01",          yr: "August 2026", g: "Ward/LSOA", u: "%", desc: "People aged 16 to 64 claiming Universal Credit or Jobseeker's Allowance mainly because they are out of work, as a share of residents aged " + AGE_WORK + " at the 2021 Census." },
 
   // Environment + access
   fuel_poverty_pct:               { src: "DESNZ LILEE",          yr: "2022", g: "LSOA", u: "%",       desc: "The share of households in fuel poverty, which means they have a low income and live in a home that is costly to heat, with an energy efficiency rating of D or below." },
@@ -6228,9 +6240,9 @@ const OV_PLAIN = {
   census_black_pct: "People from a Black or Black British ethnic group.",
   census_mixed_pct: "People from a Mixed or Multiple ethnic group.",
   census_other_ethnic_pct: "People from another ethnic group, such as Arab.",
-  census_under16_pct: "Residents aged under 16.",
+  census_under16_pct: "Residents aged " + AGE_CHILD + ".",
   census_under5_pct: "Residents aged under 5.",
-  census_working_age_pct: "Residents aged 16 to 64.",
+  census_working_age_pct: "Residents aged " + AGE_WORK + ".",
   census_over65_pct: "Residents aged 65 and over.",
   census_over85_pct: "Residents aged 85 and over.",
   census_english_hh_all_pct: "Households where every adult's main language is English.",
@@ -6868,9 +6880,9 @@ function indicatorFacts(k) {
   }
   if (/NOMIS CLA01/.test(src)) {
     f.num = 'People claiming Universal Credit or Jobseeker\'s Allowance mainly because they are out of work';
-    f.den = 'Residents aged 16 to 64 at the 2021 Census';
+    f.den = 'Residents aged ' + AGE_WORK + ' at the 2021 Census';
     f.cadence = 'ONS publishes the claimant count every month, and we refresh it here on the 15th of each month.';
-    f.method = 'ONS does not publish a rate for LSOAs, so we divide each LSOA\'s count by its residents aged 16 to 64 at the 2021 Census. ONS rounds each LSOA\'s count to the nearest 5, so where there are few claimants the rate is only approximate.';
+    f.method = 'ONS does not publish a rate for LSOAs, so we divide each LSOA\'s count by its residents aged ' + AGE_WORK + ' at the 2021 Census. ONS rounds each LSOA\'s count to the nearest 5, so where there are few claimants the rate is only approximate.';
     return f;
   }
   if (/DESNZ/.test(src)) {
@@ -9651,8 +9663,8 @@ function showWard(wn) {
     { k:'census_other_ethnic_pct', l:'Other',  v:inds.census_other_ethnic_pct, c:'#999999' },
   ]);
   const ageBar = stackedBar([
-    { k:'census_under16_pct',      l:'Under 16',    v:inds.census_under16_pct,      c:'#2ea8a0' },
-    { k:'census_working_age_pct',  l:'16 to 64',    v:inds.census_working_age_pct,  c:'#3b6eaf' },
+    { k:'census_under16_pct',      l:AGE_CHILD_CAP, v:inds.census_under16_pct,      c:'#2ea8a0' },
+    { k:'census_working_age_pct',  l:AGE_WORK,      v:inds.census_working_age_pct,  c:'#3b6eaf' },
     { k:'census_over65_pct',       l:'65 and over', v:inds.census_over65_pct,       c:'#a05a9e' },
   ]);
 
@@ -10705,8 +10717,8 @@ function _generateWardReport(_reportWindow, wn, opts) {
     { l:'Other', v: inds.census_other_ethnic_pct, c:'#9AA6B2' },
   ], { width: 360 });
   const ageStack = _chartStack([
-    { l:'Under 16',    v: inds.census_under16_pct,     c:'#2A9D8F' },
-    { l:'16 to 64',    v: inds.census_working_age_pct, c:'#1F4E8C' },
+    { l:AGE_CHILD_CAP, v: inds.census_under16_pct,     c:'#2A9D8F' },
+    { l:AGE_WORK,      v: inds.census_working_age_pct, c:'#1F4E8C' },
     { l:'65 and over', v: inds.census_over65_pct,      c:'#8E6BBF' },
   ], { width: 360 });
 
@@ -12475,8 +12487,8 @@ function _fitFocus(bounds) {
     unemployment: ['claimant', 'out-of-work'], unemployed: ['claimant', 'out-of-work', 'unemployment'],
     jobless: ['claimant', 'out-of-work', 'unemployment'], benefits: ['claimant', 'out-of-work'],
     elderly: ['65 and over', '85 and over'], older: ['65 and over', '85 and over'], pensioners: ['65 and over'],
-    children: ['under 16', 'under 5', 'reception', 'year 6', 'child'], kids: ['under 16', 'under 5', 'reception', 'year 6', 'child'],
-    babies: ['under 5', 'fertility'], births: ['fertility'], young: ['under 16', '15 to 24', '10 to 24'],
+    children: ['under 16', 'under 15', 'under 5', 'reception', 'year 6', 'child'], kids: ['under 16', 'under 15', 'under 5', 'reception', 'year 6', 'child'],
+    babies: ['under 5', 'fertility'], births: ['fertility'], young: ['under 16', 'under 15', '15 to 24', '10 to 24'],
     obesity: ['obes', 'overweight'], overweight: ['obes', 'overweight'], weight: ['obes', 'overweight'],
     parks: ['green space'], park: ['green space'], rivers: ['blue space'], water: ['blue space'],
     trains: ['station'], train: ['station'], rail: ['station'], tube: ['station', 'public transport'],
@@ -13545,8 +13557,8 @@ function showLSOA(feat) {
 
     // Age profile — stacked bar + numeric rows
     const ageBar = stackedBar([
-      { k:'census_under16_pct',     l:'Under 16',    v:inds.census_under16_pct,     c:'#2A9D8F' },
-      { k:'census_working_age_pct', l:'16 to 64',    v:inds.census_working_age_pct, c:'#1F4E8C' },
+      { k:'census_under16_pct',     l:AGE_CHILD_CAP, v:inds.census_under16_pct,     c:'#2A9D8F' },
+      { k:'census_working_age_pct', l:AGE_WORK,      v:inds.census_working_age_pct, c:'#1F4E8C' },
       { k:'census_over65_pct',      l:'65 and over', v:inds.census_over65_pct,      c:'#8E6BBF' },
     ]);
     const ageRows = ['census_under5_pct', 'census_under16_pct', 'census_working_age_pct',
@@ -13821,8 +13833,8 @@ window.generateLSOAReport = function(code) {
     { l:'Other',  v: inds.census_other_ethnic_pct, c:'#9AA6B2' },
   ], { width: 360 });
   const ageStack = _chartStack([
-    { l:'Under 16',    v: inds.census_under16_pct,     c:'#2A9D8F' },
-    { l:'16 to 64',    v: inds.census_working_age_pct, c:'#1F4E8C' },
+    { l:AGE_CHILD_CAP, v: inds.census_under16_pct,     c:'#2A9D8F' },
+    { l:AGE_WORK,      v: inds.census_working_age_pct, c:'#1F4E8C' },
     { l:'65 and over', v: inds.census_over65_pct,      c:'#8E6BBF' },
   ], { width: 360 });
   // Each row takes its direction, or none, from OV_CFG (see _chartCompare).
@@ -13988,7 +14000,7 @@ window.generateLSOAReport = function(code) {
     decile != null ? `In national IMD decile <b>${decile} of 10</b>, where 1 is the most deprived tenth of England and 10 the least` + (decile <= 2 ? ': a Core20 area.' : '.') : '',
     rank ? `Ranks <b>${Math.round(rank).toLocaleString()} of 33,755</b> areas in England on the IMD, where 1 is the most deprived.` : '',
     (badH != null && _medBadL != null) ? `<b>${badH.toFixed(1)}%</b> of residents report bad or very bad health, ${_reportVs(badH, _medBadL, 1)} the ${PH_AREA} LSOA median of ${_medBadL.toFixed(1)}%.` : '',
-    (_claimL != null && _medClaimL != null) ? `The claimant rate is <b>${_claimL.toFixed(1)}%</b> of 16 to 64 year olds, ${_reportVs(_claimL, _medClaimL, 1)} the median of ${_medClaimL.toFixed(1)}%.` : '',
+    (_claimL != null && _medClaimL != null) ? `The claimant rate is <b>${_claimL.toFixed(1)}%</b> of residents aged ${AGE_WORK}, ${_reportVs(_claimL, _medClaimL, 1)} the median of ${_medClaimL.toFixed(1)}%.` : '',
   ]);
 
   const html = `<!doctype html>
