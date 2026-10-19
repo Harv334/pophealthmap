@@ -82,8 +82,9 @@
         '<div style="max-width:32em;background:#fff;border:1px solid #D8DDE0;border-radius:10px;padding:28px 24px">' +
         '<h1 id="eng-h" style="margin:0 0 10px;font-size:21px">The England map is large</h1>' +
         '<p id="eng-p" style="margin:0 0 10px;color:#4C6272">It loads every ward in England, about ' +
-        '7,000 areas and tens of megabytes of data. That can take a while and use a lot of memory, ' +
-        'especially on a phone or a slow connection.</p>' +
+        '7,000 areas and around 40 MB of figures, and neighbourhood (LSOA) maps for the whole country ' +
+        'are not available here because they are too large for most phones. Loading it can still take ' +
+        'a while and use a lot of memory, especially on a phone or a slow connection.</p>' +
         '<p style="margin:0 0 20px;color:#4C6272">If you are looking at one place, its region map ' +
         'is much quicker and has the same detail.</p>' +
         '<button type="button" onclick="PH_ENGLAND_GO()" autofocus style="' + btn +
@@ -5785,7 +5786,18 @@ function ovNativeLevel(k) { const f = ovField(k); return (f && f.g) || ''; }
 // published. Census figures are published by output area but open at LSOA:
 // all of a region's output areas is a heavier first load than most people
 // need, and OA stays one tap away.
-function ovOpenLevel(k) { const f = ovField(k); return (f && (f.open || f.g)) || ''; }
+// The England map opens them at ward instead (or LA, without ward figures):
+// its LSOAs load one LA at a time, once an LA is in focus (lsoaLevelOpen).
+function ovOpenLevel(k) {
+  const f = ovField(k);
+  const lv = (f && (f.open || f.g)) || '';
+  if ((lv === 'lsoa' || lv === 'oa') && window.PH_REGION && PH_REGION.isEngland &&
+      typeof lsoaLevelOpen === 'function' && !lsoaLevelOpen()) {
+    if (ovHasLevel(k, 'ward')) return 'ward';
+    if (ovHasLevel(k, 'borough')) return 'borough';
+  }
+  return lv;
+}
 
 // Overlay keys with no ward figure, so choosing one has to bring the LSOA
 // layer up or the map stays a grey ward layer.
@@ -7810,7 +7822,60 @@ let _lsoaDataLoading = null;
    or not anybody went near an LSOA. Paired with the boundaries below rather
    than given its own triggers: every question that needs one needs the other,
    since the boundaries carry the geography and this carries the numbers. */
+/* England's LSOAs, one LA at a time.
+
+   The whole country is about 34,000 LSOAs: 38 MB of boundaries and 54 MB of
+   figures, which took a phone's tab from about 380 MB to about 760 MB the
+   moment a Census indicator opened at LSOA. So the England map has no
+   country-wide LSOA files. scripts/build_england.py writes one file per LA,
+   map/lsoa/<LA code>.json, holding that LA's LSOA shapes and figures, and the
+   LSOA level is offered once an LA is in focus, loading just that LA. Each LA
+   loaded is added to LSOA_IMD, LSOA_DATA and the LSOA layer, so moving to the
+   next LA adds it rather than starting again. */
+function _englandLsoaLads() {
+  if (!(window.PH_REGION && PH_REGION.isEngland)) return null;
+  if (!focusedBorough || focusedBorough === 'all') return [];
+  const c = laCodeOfName(focusedBorough);
+  return c ? [c] : [];
+}
+// Whether this map can draw LSOAs at the moment: always on a region map, and
+// on the England map once an LA is in focus.
+function lsoaLevelOpen() {
+  const lads = _englandLsoaLads();
+  return lads === null || lads.length > 0;
+}
+const ENGLAND_LSOA_NOTE = 'Neighbourhood (LSOA) maps for the whole of England are too large for most phones, ' +
+  'so choose an LA under Focus by LA and its LSOAs will load.';
+const _englandLsoaGot = {};
+function _ensureEnglandLsoas() {
+  const have = () => (typeof LSOA_IMD !== 'undefined' && LSOA_IMD && LSOA_IMD.features && LSOA_IMD.features.length) ? LSOA_IMD : null;
+  const lads = _englandLsoaLads() || [];
+  if (!lads.length) return Promise.resolve(have());
+  return Promise.all(lads.map(code => _englandLsoaGot[code] || (_englandLsoaGot[code] =
+    loadJson(regionPath('data/map/lsoa/' + code + '.json'), 'the LSOAs for this LA', _ensureEnglandLsoas)
+      .then(d => {
+        if (!d || !d.features) { delete _englandLsoaGot[code]; return false; }
+        if (typeof LSOA_IMD === 'undefined' || !LSOA_IMD || !LSOA_IMD.features) {
+          window.LSOA_IMD = { type: 'FeatureCollection', features: [] };
+        }
+        Array.prototype.push.apply(LSOA_IMD.features, d.features);
+        Object.assign(LSOA_DATA, d.data || {});
+        d.features.forEach(f => {
+          const p = f.properties;
+          (WARD_LSOA_IMD[p.ward] = WARD_LSOA_IMD[p.ward] || []).push({
+            code: p.code, name: p.name, decile: p.imd_decile, rank: p.imd_rank,
+          });
+        });
+        for (const k in _lsoaRange) delete _lsoaRange[k];
+        if (lsoaLyr) { lsoaLyr.addData({ type: 'FeatureCollection', features: d.features }); applyLSOAFilter(); }
+        try { _onLsoaImdReady(); } catch (e) { console.warn('post-LSOA refresh failed:', e); }
+        return true;
+      })
+      .catch(() => { delete _englandLsoaGot[code]; return false; })))).then(have);
+}
+
 function ensureLsoaData() {
+  if (_englandLsoaLads()) return _ensureEnglandLsoas().then(() => LSOA_DATA);
   if (typeof LSOA_DATA === 'object' && LSOA_DATA && Object.keys(LSOA_DATA).length) {
     return Promise.resolve(LSOA_DATA);
   }
@@ -7833,6 +7898,7 @@ function ensureLsoaData() {
 }
 
 function ensureLsoaImd() {
+  if (_englandLsoaLads()) return _ensureEnglandLsoas();
   // Started here rather than awaited, so the boundaries are not held up behind
   // the figures. Each redraws what it needs to when it lands.
   ensureLsoaData();
@@ -7930,6 +7996,9 @@ const map = L.map('map', {
   center: _regionStartBounds ? _regionStartBounds.getCenter() : [51.540,-0.300],
   zoom: _regionStartBounds ? 8 : 10, zoomControl:true,
   zoomSnap: 0.25,
+  // The England map draws on a canvas: about 7,000 wards and their outlines
+  // are 14,000 SVG elements otherwise, each with its own DOM node and memory.
+  preferCanvas: !!(window.PH_REGION && PH_REGION.isEngland),
 });
 if (_regionStartBounds) {
   try { map.fitBounds(_regionStartBounds, { padding: [18, 18], animate: false }); } catch (e) {}
@@ -14671,6 +14740,15 @@ function buildEmbeddedLSOALayer() {
    layer that is not there would move the failure somewhere less obvious. */
 let _lsoaLayerReady = null;
 function ensureLsoaLayer() {
+  // England adds the LA in focus to a layer that may already exist.
+  if (_englandLsoaLads()) {
+    return _ensureEnglandLsoas().then(gj => {
+      if (!gj) return lsoaLyr || null;
+      if (!lsoaLyr) buildEmbeddedLSOALayer();
+      if (typeof _updateLayerCounts === 'function') _updateLayerCounts();
+      return lsoaLyr;
+    });
+  }
   if (lsoaLyr) return Promise.resolve(lsoaLyr);
   if (_lsoaLayerReady) return _lsoaLayerReady;
   _lsoaLayerReady = ensureLsoaImd().then(gj => {
@@ -14777,6 +14855,34 @@ function applyLSOAFilter() {
     }
   });
 }
+
+/* England: focusing an LA while the LSOAs are up loads that LA's, and letting
+   go of the focus puts the map back on wards, since there are no LSOAs for
+   the whole country to show. See _englandLsoaLads. */
+(function _englandLsoaOnFocus() {
+  if (!(window.PH_REGION && PH_REGION.isEngland)) return;
+  const onFocus = () => setTimeout(() => {
+    const atLsoa = lsoaActive || currentDataLevel === 'lsoa';
+    if (!atLsoa) return;
+    if (lsoaLevelOpen()) {
+      ensureLsoaLayer().then(lyr => {
+        if (!lyr || !lsoaActive) return;
+        if (!map.hasLayer(lyr)) lyr.addTo(map);
+        applyLSOAFilter();
+      });
+      return;
+    }
+    const ov = (typeof curOv !== 'undefined') ? curOv : 'none';
+    const back = (ov && ov !== 'none' && !ovHasLevel(ov, 'ward') && ovHasLevel(ov, 'borough')) ? 'borough' : 'ward';
+    if (window.PH_REPORT && PH_REPORT.active()) return;   // Custom area says so itself
+    _setDataLevel(back, { fromMode: true, quiet: true });
+    _dlHint('The map is back to ' + _levelPlural(back) + ', because the England map shows LSOAs one LA at a time.', 5000);
+  }, 0);
+  ['borough-focus', 'icb-focus'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', onFocus);
+  });
+})();
 
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -15032,6 +15138,16 @@ document.getElementById('tmsoa').addEventListener('change', e => {
 });
 
 document.getElementById('tlsoa').addEventListener('change', e => {
+  // The England map has LSOAs for the LA in focus only. Without one, the box
+  // stays off and says how to get them.
+  if (e.target.checked && typeof lsoaLevelOpen === 'function' && !lsoaLevelOpen()) {
+    e.target.checked = false;
+    // A tick made by code (an indicator, Compare) is followed by a level
+    // change that says this itself, so it is said once.
+    if (!e.target.__skipLevelGate) _levelToast(ENGLAND_LSOA_NOTE);
+    delete e.target.__skipLevelGate;
+    return;
+  }
   // Block the toggle if the current overlay isn't available at the level
   // the user is trying to switch to. Revert the checkbox + show a toast.
   // The auto-enable inside the #ov change handler bypasses this gate via
@@ -15912,6 +16028,14 @@ function _setDataLevel(level, opts) {
     return;
   }
   if (['borough', 'ward', 'msoa', 'lsoa', 'oa'].indexOf(level) === -1) return;
+
+  // The England map draws LSOAs for the LA in focus only (lsoaLevelOpen), and
+  // every route to the LSOA level, the badge, an indicator, Compare or Custom
+  // area, stops here without one.
+  if (level === 'lsoa' && typeof lsoaLevelOpen === 'function' && !lsoaLevelOpen()) {
+    _dlHint(ENGLAND_LSOA_NOTE, 7000);
+    return;
+  }
 
   // ── Compatibility gate ───────────────────────────────────────────────
   // When the user clicks a Ward/LSOA badge button (i.e. not via the

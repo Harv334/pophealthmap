@@ -17,6 +17,7 @@ const BASE = (process.argv[2] || 'http://localhost:8792').replace(/\/$/, '');
 const ROOT = path.resolve(__dirname, '..', '..');
 const HAS_NE = fs.existsSync(path.join(ROOT, 'data/regions/north-east/ward_data.json'));
 const HAS_OA = fs.existsSync(path.join(ROOT, 'data/map/oa/index.json'));
+const HAS_ENG = fs.existsSync(path.join(ROOT, 'data/regions/england/ward_data.json'));
 const SETTLE = +(process.env.SMOKE_SETTLE_MS || 9000);
 
 let failed = 0;
@@ -2489,7 +2490,42 @@ const smallText = page => page.evaluate(() => {
   {
     const { page } = await open(browser, 'index.html?r=england', DESK);
     ok(await page.evaluate(() => /England map is large/.test(document.body.innerText)), 'England warning shows');
+    ok(await page.evaluate(() => /around 40 MB of figures, and neighbourhood \(LSOA\) maps for the whole country are not available here/.test(document.body.innerText)),
+      'the England warning says how much it loads and that there are no country-wide LSOA maps');
     await page.close();
+  }
+
+  // The England map on a phone (built by scripts/build_england.py, so only
+  // where data/regions/england/ exists): drawn on a canvas, a Census
+  // indicator opens at ward, LSOAs are refused until an LA is in focus, and
+  // then only that LA's file loads.
+  if (HAS_ENG) {
+    const { page, errors } = await open(browser, 'index.html?r=england&go=1&t=1', PHONE);
+    await page.waitForFunction(() => typeof wLyr !== 'undefined' && wLyr, null, { timeout: 120000 }).catch(() => {});
+    await page.waitForTimeout(3000);
+    const lsoaReq = [];
+    page.on('request', r => { if (/lsoa_imd\.js|lsoa_data\.json|\/map\/lsoa\//.test(r.url())) lsoaReq.push(r.url().replace(/^.*\/data\/regions\/england\//, '')); });
+    await setOv(page, 'census_bad_health_pct');
+    await page.waitForTimeout(2500);
+    await page.evaluate(() => document.querySelector('#dl-seg button[data-dl="lsoa"]').click());
+    await page.waitForTimeout(1500);
+    const e1 = await page.evaluate(() => ({ lvl: currentDataLevel, svg: document.querySelectorAll('.leaflet-overlay-pane path').length,
+      canvas: document.querySelectorAll('.leaflet-overlay-pane canvas').length, hint: document.getElementById('dl-hint').textContent }));
+    ok(e1.lvl === 'ward' && e1.canvas > 0 && e1.svg === 0 && !lsoaReq.length && /choose an LA under Focus by LA/.test(e1.hint),
+      'England: a Census indicator opens at ward on a canvas, and LSOAs wait for an LA', JSON.stringify({ ...e1, lsoaReq }));
+    const la = await page.evaluate(() => [...document.getElementById('borough-focus').options].map(o => o.value).filter(v => v && v !== 'all' && !/^icb:/.test(v))[0]);
+    await page.evaluate(v => { const s = document.getElementById('borough-focus'); s.value = v; s.dispatchEvent(new Event('change')); }, la);
+    await page.waitForTimeout(2000);
+    await page.evaluate(() => document.querySelector('#dl-seg button[data-dl="lsoa"]').click());
+    await page.waitForTimeout(5000);
+    const e2 = await page.evaluate(la => ({ lvl: currentDataLevel, n: LSOA_IMD.features.length,
+      all: LSOA_IMD.features.every(f => _sameLad(f.properties.borough, la)), onMap: map.hasLayer(lsoaLyr) }), la);
+    ok(e2.lvl === 'lsoa' && e2.n > 0 && e2.all && e2.onMap && lsoaReq.length === 1 && /^map\/lsoa\/E\d{8}\.json$/.test(lsoaReq[0]),
+      'England: with an LA in focus its LSOAs load from their own file', JSON.stringify({ ...e2, lsoaReq }));
+    ok(errors.length === 0, 'no page errors (England on a phone)', errors.join(' | '));
+    await page.close();
+  } else {
+    console.log('SKIP England map (no data/regions/england)');
   }
 
   // Only the served files are published (B11). Checked when the folder under

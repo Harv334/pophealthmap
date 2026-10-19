@@ -27,6 +27,12 @@ Merging is mostly concatenation, with four things done on the way:
 
 The charities directory (vcse_data.json) is not merged: at about 100 MB for
 England it is over GitHub Pages' file limit, and it stays in each region.
+
+LSOAs are not written as one country-wide file either. For the whole of
+England that was 38 MB of boundaries and 54 MB of figures, which took a phone's
+tab to about 760 MB once a Census indicator opened at LSOA. They are written
+one file per LA, map/lsoa/<LA code>.json, with that LA's LSOA shapes and
+figures, and the page loads the LA in focus (see write_lsoa_by_la).
 """
 
 from __future__ import annotations
@@ -197,6 +203,10 @@ def main() -> int:
     print(f"regions: {', '.join(published)}; not published yet: {missing or 'none'}")
     (OUT / "map").mkdir(parents=True, exist_ok=True)
     (OUT / "meta").mkdir(parents=True, exist_ok=True)
+    # The country-wide LSOA files an older build wrote; the page no longer asks
+    # for them, and a stale copy should not be published.
+    for stale in (OUT / "lsoa_data.json", OUT / "map" / "lsoa_imd.js"):
+        stale.unlink(missing_ok=True)
 
     # Wards, with names made unique across England.
     wards = merge_features(srcs, "map/wards.js", "GJ", "WD24CD", TOL_SMALL)
@@ -243,8 +253,6 @@ def main() -> int:
             p["ward"] = renamed[p["ward_code"]]
         if p.get("borough") and isinstance(p.get("imd_decile"), (int, float)):
             deciles.setdefault(p["borough"], []).append(p["imd_decile"])
-    write_js(OUT / "map/lsoa_imd.js", "LSOA_IMD", {"type": "FeatureCollection", "features": lsoas},
-             "LSOA boundaries for England with IMD decile and rank, and their ward.")
     msoas = merge_features(srcs, "map/msoa_boundaries.json", None, "code", TOL_SMALL)
     for f in msoas:
         f["properties"].pop("_region", None)
@@ -252,14 +260,20 @@ def main() -> int:
         dump({"type": "FeatureCollection", "features": msoas}), encoding="utf-8")
     print(f"  {len(lsoas):,} LSOAs, {len(msoas):,} MSOAs")
 
-    # Figures keyed by code: a straight merge.
+    # Figures keyed by code: a straight merge. The LSOA figures go out per LA,
+    # with their boundaries, rather than as one file.
     merged = {}
     for rel in ("lsoa_data.json", "msoa_data.json", "borough_data.json"):
         m: dict = {}
         for slug, src in srcs:
             m.update(read_json(path_in(slug, src, rel), {}) or {})
         merged[rel] = m
-        (OUT / rel).write_text(dump(m), encoding="utf-8")
+        if rel != "lsoa_data.json":
+            (OUT / rel).write_text(dump(m), encoding="utf-8")
+    ward_lad = {code: w.get("lad_code") for code, w in ward_data["wards"].items() if w.get("lad_code")}
+    name_lad = {f["properties"].get("name"): f["properties"].get("LAD25CD") for f in councils}
+    n_las, unplaced = write_lsoa_by_la(lsoas, merged["lsoa_data.json"], ward_lad, name_lad, OUT / "map" / "lsoa")
+    print(f"  LSOAs written for {n_las} LAs" + (f" ({unplaced} with no LA left out)" if unplaced else ""))
 
     # Points, de-duplicated where two regions both list a site near their edge.
     def points(rel: str, var: str | None):
@@ -371,6 +385,34 @@ def main() -> int:
         if p.is_file():
             print(f"    {p.relative_to(OUT)}  {p.stat().st_size / 1e6:6.1f} MB")
     return 0
+
+
+def write_lsoa_by_la(lsoas: list, lsoa_data: dict, ward_lad: dict, name_lad: dict,
+                     out_dir: Path) -> tuple[int, int]:
+    """One file per LA, out_dir/<LA code>.json:
+    {"type": "FeatureCollection", "features": [...], "data": {LSOA code: figures}}.
+
+    An LSOA's LA is its ward's (ward_lad, ward code to LA code), or failing
+    that the LA named in its borough property (name_lad). Returns the number of
+    LA files and the number of LSOAs that could be placed in none."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for old in out_dir.glob("*.json"):
+        old.unlink()
+    by_la: dict = {}
+    unplaced = 0
+    for f in lsoas:
+        p = f.get("properties") or {}
+        lad = ward_lad.get(p.get("ward_code")) or name_lad.get(p.get("borough"))
+        if not lad:
+            unplaced += 1
+            continue
+        e = by_la.setdefault(lad, {"type": "FeatureCollection", "features": [], "data": {}})
+        e["features"].append(f)
+        if p.get("code") in lsoa_data:
+            e["data"][p["code"]] = lsoa_data[p["code"]]
+    for lad, e in by_la.items():
+        (out_dir / f"{lad}.json").write_text(dump(e), encoding="utf-8")
+    return len(by_la), unplaced
 
 
 _STATUS_RANK = {"ok": 0, "skipped": 1, "partial": 2, "failed": 3}
