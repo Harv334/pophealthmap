@@ -73,24 +73,39 @@
       };
       var btn = 'display:inline-block;padding:9px 18px;border-radius:6px;font-weight:600;' +
         'text-decoration:none;font-size:15px;font-family:inherit;line-height:1.4;cursor:pointer;margin:4px;';
+      // Every other region, as links, so a direct visit has somewhere to go
+      // besides London. London is the bare page.
+      var regs = '';
+      for (var ri = 0; ri < REGIONS.length; ri++) {
+        if (REGIONS[ri][0] === 'england' || LIVE.indexOf(REGIONS[ri][0]) === -1) continue;
+        var rh = location.pathname + (REGIONS[ri][0] === 'london' ? '' : '?r=' + REGIONS[ri][0]);
+        regs += '<li style="display:inline;margin:0 6px;line-height:2"><a href="' + rh.replace(/"/g, '&quot;') +
+          '" style="color:#005EB8;font-weight:600">' + REGIONS[ri][1] + '</a></li>';
+      }
+      var fromSite = back !== location.pathname;
       document.write(
-        '<title>PopHealth Map - England</title>' +
+        '<title>PopHealth Map: England</title>' +
         '<meta name="viewport" content="width=device-width, initial-scale=1">' +
         '<div role="alertdialog" aria-labelledby="eng-h" aria-describedby="eng-p" style="position:fixed;inset:0;' +
-        'display:flex;align-items:center;justify-content:center;padding:16px;background:#F4F7F9;' +
+        'display:flex;overflow:auto;padding:16px;background:#F4F7F9;' +
         'font:15px/1.55 Inter,system-ui,-apple-system,sans-serif;color:#212B32;text-align:center">' +
-        '<div style="max-width:32em;background:#fff;border:1px solid #D8DDE0;border-radius:10px;padding:28px 24px">' +
+        '<div style="margin:auto;max-width:32em;background:#fff;border:1px solid #D8DDE0;border-radius:10px;padding:28px 24px">' +
+        '<p style="margin:0 0 6px;font-weight:700;color:#005EB8;font-size:15px">PopHealth Map</p>' +
         '<h1 id="eng-h" style="margin:0 0 10px;font-size:21px">The England map is large</h1>' +
         '<p id="eng-p" style="margin:0 0 10px;color:#4C6272">It loads every ward in England, about ' +
         '7,000 areas and around 40 MB of figures, and neighbourhood (LSOA) maps for the whole country ' +
         'are not available here because they are too large for most phones. Loading it can still take ' +
         'a while and use a lot of memory, especially on a phone or a slow connection.</p>' +
-        '<p style="margin:0 0 20px;color:#4C6272">If you are looking at one place, its region map ' +
+        '<p style="margin:0 0 10px;color:#4C6272">If you are looking at one place, its region map ' +
         'is much quicker and has the same detail.</p>' +
+        '<p style="margin:0 0 20px;color:#4C6272">The England map has no charity listings or Ask panel, ' +
+        'which you can find on each region\'s map.</p>' +
         '<button type="button" onclick="PH_ENGLAND_GO()" autofocus style="' + btn +
         'border:0;background:#005EB8;color:#fff">Load England</button>' +
-        '<a href="' + back.replace(/"/g, '&quot;') + '" style="' + btn +
-        'border:1px solid #005EB8;color:#005EB8;background:#fff">Choose a region instead</a>' +
+        (fromSite ? '<a href="' + back.replace(/"/g, '&quot;') + '" style="' + btn +
+          'border:1px solid #005EB8;color:#005EB8;background:#fff">Go back</a>' : '') +
+        '<h2 style="margin:22px 0 6px;font-size:16px">Or open one region</h2>' +
+        '<ul style="margin:0;padding:0;list-style:none">' + regs + '</ul>' +
         '</div></div><plaintext style="display:none">');
       return;
     }
@@ -492,7 +507,7 @@
   .hdr-search { position: relative; }
   /* .hdr-right in front, so this outranks the general input[type=text] rule
      further down, which had been taking the width and the search icon away. */
-  .hdr-right .hdr-search input { width: 220px; padding: 5px 10px 5px 28px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--t-sm); color: var(--ink); background: var(--paper) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'><circle cx='11' cy='11' r='7'/><path d='m21 21-4.35-4.35'/></svg>") no-repeat 8px center; outline: none; transition: border-color .12s, box-shadow .12s; }
+  .hdr-right .hdr-search input { width: 220px; padding: 5px 10px 5px 28px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--t-sm); color: var(--ink); background: var(--paper) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'><circle cx='11' cy='11' r='7'/><path d='m21 21-4.35-4.35'/></svg>") no-repeat 8px center; transition: border-color .12s, box-shadow .12s; }
   .hdr-right .hdr-search input:focus { border-color: var(--nhs-blue); box-shadow: none; }
   .hdr-search-results { position: absolute; top: 100%; left: 0; margin-top: 4px; width: 320px; max-height: 360px; overflow-y: auto; background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-md); box-shadow: var(--shadow-lg); display: none; z-index: 3000; }
   /* Search now lives in the sidebar footer — make it full-width and open the dropdown UPWARD so it doesn't go off-screen. */
@@ -507,13 +522,18 @@
   .sr-row { padding: 7px 10px; font-size: var(--t-sm); color: var(--ink); cursor: pointer; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--line-2); }
   .sr-row:hover, .sr-row.active { background: var(--line-2); }
   .sr-row:last-child { border-bottom: 0; }
-  .sr-row .sr-type { font-size: var(--t-xs); text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); font-weight: 600; min-width: 54px; }
+  .sr-row .sr-type { font-size: var(--t-xs); text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); font-weight: 600; min-width: max-content; flex-shrink: 0; }
+  /* Under a group heading the row's own tag says the heading again, so it is
+     kept for screen readers (the heading is presentation only) and hidden on
+     screen. */
+  .hdr-search-results .sr-grp ~ .sr-row .sr-type { position: absolute; width: 1px; height: 1px; padding: 0;
+    margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; min-width: 0; }
   .sr-row .sr-name { flex: 1; color: var(--ink); }
   /* Show all, at the end of the five LSOAs: a link-like row, not a result. */
-  .sr-row.sr-more .sr-name { color: var(--nhs-blue); font-weight: 600; padding-left: 62px; }
+  .sr-row.sr-more .sr-name { color: var(--nhs-blue); font-weight: 600; }
   .sr-row .sr-sub { font-size: var(--t-xs); color: var(--ink-3); }
   .sr-empty { padding: 12px; font-size: var(--t-sm); color: var(--ink-3); text-align: center; }
-  .sr-grp { padding: 4px 10px; font-size: var(--t-xs); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); background: var(--paper-2); font-weight: 600; border-bottom: 1px solid var(--line-2); }
+  .sr-grp { padding: 4px 10px; font-size: var(--t-xs); color: var(--ink-3); background: var(--paper-2); font-weight: 600; border-bottom: 1px solid var(--line-2); }
   .hsr-group { font-size: var(--t-xs); text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); padding: 6px 10px 3px; background: var(--paper-2); border-bottom: 1px solid var(--line-2); }
   .hsr-item { display: flex; align-items: baseline; gap: 8px; padding: 6px 10px; font-size: var(--t-sm); color: var(--ink); cursor: pointer; border-bottom: 1px solid var(--paper-2); }
   .hsr-item:hover { background: var(--nhs-light); }
@@ -638,6 +658,8 @@
     width: 20px; height: 20px; padding: 0; background: transparent; border: none; color: inherit;
     opacity: .7; cursor: pointer; line-height: 0; border-radius: var(--r-pill); }
   .chip-x:hover { opacity: 1; background: rgba(0,0,0,.06); }
+  /* The strip's own remove button is for phones; a desktop has the chip. */
+  .vs-ov-x { display: none; color: var(--ink-2); }
   .main { display: grid; grid-template-columns: auto minmax(0, 1fr); overflow: hidden; min-height: 0; min-width: 0; }
 
   /* ── Sidebar ── CSS Grid: native layout guarantees [focus] [tabs] [flexible pane] [footer] stack. No JS measurement needed. */
@@ -1895,6 +1917,18 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
     line-height: 1.35; color: var(--nhs-dark); }
   .ws-insight p { margin: 0; }
   #wpanel .ws-insight { margin: 0 0 12px; }
+  /* The full profile, opened from the ward sheet, is a reading view: on a
+     desktop the panel widens while it is the tab on show, its text steps up to
+     13px and the figures run in two columns. Choosing any other tab, or
+     "Close full profile", puts the panel back to its own width. */
+  @media (min-width: 901px) {
+    .sidebar.profile-wide:has(#tab-ward.active):not(.collapsed) {
+      width: max(var(--sb-w, 268px), min(640px, calc(100vw - 520px))); }
+    .sidebar.profile-wide:has(#tab-ward.active) #wpanel { --t-xs: 13px; --t-sm: 13px; --t-md: 14px; line-height: 1.5; }
+    .sidebar.profile-wide:has(#tab-ward.active) #wpanel .cat-body.open {
+      display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 20px; }
+    .sidebar.profile-wide:has(#tab-ward.active) #wpanel .cat-body.open > :not(.sr) { grid-column: 1 / -1; }
+  }
   .ws-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 7px; margin-top: 10px; }
   /* A column, so a label that wraps to two lines pushes the figure down in
@@ -2137,6 +2171,10 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
     background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-md);
     box-shadow: var(--shadow-lg); padding: 10px var(--s-3) var(--s-3); font-size: var(--t-md); color: var(--ink-2); }
   .area-peek[hidden] { display: none; }
+  .rb-peek { display: flex; align-items: center; gap: 10px; padding: 8px var(--s-3); }
+  .rb-peek[hidden] { display: none; }
+  .rb-peek .rb-peek-t { margin: 0; flex: 1; font-size: var(--t-md); color: var(--ink); line-height: 1.4; }
+  .rb-peek .rb-peek-open { flex-shrink: 0; min-height: 44px; margin: 0; width: auto; }
   .ap-row .vs { margin-left: 0; margin-top: 2px; }
   /* One thing at a time in that corner: the Ask button comes back when the
      card is closed. */
@@ -2834,6 +2872,39 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
     .map-legend-strip .mls-label:not(:has(.mls-unit)) { display: none; }
     /* The viewing strip is scope only now; keep it to one line. */
     .viewing-strip { padding: 4px 10px 5px; font-size: var(--t-xs); }
+    /* One line, cut with an ellipsis, and the indicator's remove button at
+       its end in place of the amber chip, so the name appears once. */
+    .viewing-strip { grid-template-columns: auto minmax(0, 1fr) auto; }
+    .viewing-strip .vs-digest { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+    .viewing-strip .chip.overlay { display: none; }
+    .viewing-strip .vs-ov-x:not([hidden]) { display: inline-flex; width: 24px; height: 24px; }
+    /* The tour narrates the map, so the Satellite switch, which sits over
+       the key on a phone, waits until it ends. */
+    .map-wrap.touring .basemap-ctl { display: none; }
+  }
+  /* Reading text on a touch screen. Residents read how their ward compares
+     here, and pinch zoom fights the map, so the blocks that are read rather
+     than scanned (the ward summary, the indicator card's description and
+     definitions, the Area profile's rows) are 15px with room between lines.
+     The key, the Viewing strip and the sheet head keep the small scale. */
+  @media (max-width: 899px) and (pointer: coarse) {
+    .ws-insight, .ws-insight .ws-insight-h { font-size: 15px; line-height: 1.5; }
+    #ov-info-panel .ic-d, #ov-info-panel .ic-t, #ov-info-panel dl.ic { font-size: 15px; line-height: 1.5; }
+    #wpanel .sr, #wpanel .cat-hdr-l { font-size: 15px; line-height: 1.5; }
+  }
+  /* An upright phone's tour: the narration at a size people read without
+     zooming, in a strip that grows to fit it up to 60% of the screen, so a
+     chapter is read rather than scrolled. A stronger fade at the foot says
+     when there is still more below. */
+  @media (max-width: 900px) and (min-height: 501px) {
+    .tour-strip { max-height: 60vh; max-height: 60dvh; }
+    .tour-narr { font-size: 15px; line-height: 1.5;
+      background:
+        linear-gradient(var(--paper) 30%, rgba(255,255,255,0)) top / 100% 22px no-repeat local,
+        linear-gradient(rgba(255,255,255,0), var(--paper) 70%) bottom / 100% 28px no-repeat local,
+        linear-gradient(rgba(33,43,50,.13), rgba(33,43,50,0)) top / 100% 10px no-repeat scroll,
+        linear-gradient(rgba(33,43,50,0), rgba(33,43,50,.3)) bottom / 100% 18px no-repeat scroll,
+        var(--paper); }
   }
   /* A phone on its side: the Indicators chip and the Satellite button
      share the map's left edge, so the switch waits while the chip shows
@@ -2911,6 +2982,14 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
     .q-step-opt input, .lrow input { width: 20px; height: 20px; }
     /* Markers carry a 44px box with the dot drawn in its middle (_touchIcon). */
     .mk-hit { display: flex; align-items: center; justify-content: center; }
+    /* The tool tabs and the near list are what people tap most after a
+       search, so each gets a full fingertip, and the near list's rows stop
+       sitting 25px apart. */
+    .mode-btn { min-height: 44px; }
+    .ws-near-item { display: inline-flex; align-items: center; min-height: 44px; padding: 4px 0; }
+    .ws-near-col li { margin-bottom: 0; }
+    .leaflet-container a.leaflet-popup-close-button { width: 32px; height: 32px; line-height: 32px; }
+    .leaflet-container a.leaflet-popup-close-button::after { content: ''; position: absolute; inset: -6px; }
   }
 
   /* ── A short screen: panels down the side (workplan 2.10) ─────────────────
@@ -3277,6 +3356,7 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
              polygons are not focusable, so it is the last control here that
              should be reaching a user unnamed. -->
         <input type="text" id="hdr-search-input" autocomplete="off"
+               enterkeyhint="search" autocorrect="off" autocapitalize="off" spellcheck="false"
                role="combobox" aria-autocomplete="list" aria-expanded="false"
                aria-controls="hdr-search-results"
                aria-label="Search for a postcode, LA, ward, LSOA, GP practice or charity"
@@ -3601,9 +3681,13 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
                 <button type="button" class="ov-btn quiet" id="ov-clear">Clear</button>
                 <button type="button" class="ov-btn quiet" id="ov-about" aria-controls="ov-info-panel" aria-expanded="false">About this indicator</button>
               </div>
+              <!-- The indicator card, opened by About this indicator just above
+                   and closed by its own button at the top. Straight after the
+                   button in the page, so Tab moves from one into the other. -->
+              <div id="ov-info-panel" class="ov-info-panel" role="region" aria-labelledby="ov-about" hidden></div>
               <!-- Two-variable map: a second indicator drawn against the first. -->
               <div class="ov-biv" id="ov-biv" hidden>
-                <button type="button" class="ov-biv-add" id="ov-biv-add"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg>Compare with a second indicator</button>
+                <button type="button" class="ov-biv-add" id="ov-biv-add"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg>Add a second indicator</button>
                 <label class="ov-biv-pick" id="ov-biv-pick" hidden>
                   <span>Second indicator, to compare with the first</span>
                   <select id="ov2"></select>
@@ -3614,12 +3698,10 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
                 </div>
               </div>
             </div>
-            <!-- The indicator card, opened by About this indicator just above
-                 and closed by its own button at the top. -->
-            <div id="ov-info-panel" class="ov-info-panel" role="region" aria-labelledby="ov-about" hidden></div>
             <input type="search" class="ov-search" id="ov-search" autocomplete="off"
                    placeholder="Search indicators" aria-label="Search indicators">
             <div class="ov-results" id="ov-results" hidden></div>
+            <p class="sr-only" role="status" id="ov-results-status"></p>
             <div id="ov-theme-view" class="ov-tv" hidden>
               <div class="ov-tv-top">
               <button type="button" class="ov-back" id="ov-back">
@@ -3976,7 +4058,7 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
           </div>
           <div class="dir-types" id="dir-types"></div>
         </div>
-        <div class="dir-count" id="dir-count"></div>
+        <div class="dir-count" id="dir-count" role="status"></div>
         <div class="dir-list" id="dir-list"></div>
       </div>
 
@@ -4081,12 +4163,12 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
           <div class="q-sortrow">
             <span>Sort by</span>
             <select id="q-sort" aria-label="Sort the wards by"></select>
-            <select id="q-sortdir" aria-label="Sort order" style="flex:0 0 84px">
+            <select id="q-sortdir" aria-label="Sort order" style="flex:0 0 auto;min-width:7.5em">
               <option value="desc">Highest</option>
               <option value="asc">Lowest</option>
             </select>
           </div>
-          <div class="q-resultbar" id="q-resultbar"><span class="q-empty" id="q-csv-why">Run the query to see the wards that match.</span></div>
+          <div class="q-resultbar" id="q-resultbar" role="status"><span class="q-empty" id="q-csv-why">Run the query to see the wards that match.</span></div>
           <div id="q-results"></div>
         </div>
       </div>
@@ -4204,7 +4286,7 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
         <button type="button" class="lhelp dl-help" id="dl-help"
                 aria-label="What these area levels mean" aria-expanded="false"
                 title="The map can colour five sizes of area. The largest is the local authority (LA), the area run by one council, and London has 33 of them: the 32 boroughs and the City of London. These are divided into 704 wards, which are the areas councillors are elected for. MSOAs, of about 7,500 people, and LSOAs, of about 1,500 people, are statistical areas that fit inside LAs but do not follow ward boundaries. Output areas, of about 125 households, are the smallest and carry Census figures only. Until you choose a level yourself, each indicator opens at a level it is published for. After that the map stays at the level you chose whenever the indicator has figures for it, and greys out any level it has none for."><span class="dl-help-word">Area level</span><span class="dl-help-mark" aria-hidden="true">?</span></button>
-        <div class="dl-seg" id="dl-seg">
+        <div class="dl-seg" id="dl-seg" role="group" aria-label="Area level">
           <button type="button" data-dl="borough" title="Show figures by local authority (LA), the area run by one council. Where an indicator is not published for LAs, each LA's figure is calculated from its wards, with counts summed and rates population-weighted.">LA</button>
           <button type="button" data-dl="ward" class="active" title="Show figures by ward, the 704 areas councillors are elected for.">Ward</button>
           <button type="button" data-dl="msoa" title="Show figures by MSOA, the statistical areas of about 7,500 people that sit between wards and LSOAs and do not follow ward boundaries. OHID publishes its Local Health figures for MSOAs.">MSOA</button>
@@ -10689,19 +10771,54 @@ function ordinal(n) {
 
 /* Bar colours for the "vs London median" charts in both reports.
 
-   Blue for the better side of the median and orange for the worse. A red and
-   green pair sits at one lightness and runs together for anyone with red/green
-   colour blindness, and in greyscale print. These three differ in lightness as
-   well as hue, so they still separate on paper.
+   Dark navy for the better side of the median and light amber, with a thin
+   dark outline, for the worse. A red and green pair sits at one lightness and
+   runs together for anyone with red/green colour blindness, and so did the
+   earlier blue and orange once printed in black and white. These three sit
+   far apart in lightness (dark, middle and light), so they still separate on
+   a greyscale printer, and the outline keeps the light bar visible on white.
 
    Neutral is for descriptive rows (OV_CFG descriptive:true). Being above the
    median on "born outside the UK" or "routine occupations" is a difference,
    not a strength or a concern, so those bars are one colour and the median
    tick does the work. */
-const REPORT_CMP = { better: '#1F4E8C', worse: '#C2410C', neutral: '#9AA6B2' };
+const REPORT_CMP = { better: '#1F3A68', worse: '#F2B05E', neutral: '#7A8794', worseLine: '#8A4B00' };
 function _reportSwatch(c) {
-  return `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${c};vertical-align:middle;margin:0 3px 0 4px"></span>`;
+  const edge = c === REPORT_CMP.worse ? 'box-shadow:inset 0 0 0 1px ' + REPORT_CMP.worseLine + ';' : '';
+  return `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${c};${edge}vertical-align:middle;margin:0 3px 0 4px"></span>`;
 }
+/* Text alternatives for the stacked and median-comparison charts, as the
+   location map and the domain chart already have: the figures they draw. */
+function _reportStackAlt(parts) {
+  return (parts || []).filter(p => p.v != null && !isNaN(parseFloat(p.v)))
+    .map(p => p.l + ' ' + parseFloat(p.v).toFixed(0) + '%').join(', ') || 'No figures';
+}
+function _reportCompareAlt(data, dp, u) {
+  return (data || []).map(r => {
+    const f = v => (r.k ? fmtNum(v, indDecimals(r.k)) : (v == null ? '' : (+v).toFixed(dp == null ? 1 : dp))) + (u || '');
+    if (r.v == null || isNaN(r.v)) return r.l + ': no figure';
+    return r.l + ': ' + f(r.v) + (r.ref != null && !isNaN(r.ref) ? ', against a median of ' + f(r.ref) : '');
+  }).join('; ');
+}
+// The outline a light amber bar needs to stand out from the white page.
+function _reportBarEdge(c) {
+  return c === REPORT_CMP.worse ? ` stroke="${REPORT_CMP.worseLine}" stroke-width="0.8"` : '';
+}
+// Text on a stacked bar segment: white on a dark one, ink on a light one.
+function _reportOnFill(hex) {
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex || '');
+  if (!m) return '#fff';
+  const l = 0.299 * parseInt(m[1], 16) + 0.587 * parseInt(m[2], 16) + 0.114 * parseInt(m[3], 16);
+  return l > 150 ? '#0B1F33' : '#fff';
+}
+// A white halo under a median tick, so it shows on a dark bar as well as a light one.
+function _reportTickHalo(x, y1, y2) {
+  return `<line x1="${x}" y1="${y1}" x2="${x}" y2="${y2}" stroke="#fff" stroke-width="3.6"/>`;
+}
+/* The stacked bars' colours, ordered so that neighbouring segments differ
+   clearly in lightness and still part in greyscale. */
+const REPORT_ETH = { white: '#1F3A68', asian: '#F2C46D', black: '#1F7A70', mixed: '#C9B3E6', other: '#4A5563' };
+const REPORT_AGE = { child: '#7FCDBF', work: '#1F3A68', old: '#C9B3E6' };
 
 /* The report design system, shared by the ward and LSOA reports.
 
@@ -10843,7 +10960,8 @@ function _reportDotPlot(rows, opts) {
     }
     const c = r.p >= 50 ? REPORT_CMP.worse : REPORT_CMP.better;
     s += `<line x1="${X(50)}" y1="${y}" x2="${X(r.p)}" y2="${y}" stroke="${c}" stroke-width="5" stroke-linecap="round" opacity=".35"/>`;
-    s += `<circle cx="${X(r.p)}" cy="${y}" r="5.5" fill="${c}" stroke="#fff" stroke-width="1.5"/>`;
+    // A light amber dot gets a dark ring, so it shows on the pale track.
+    s += `<circle cx="${X(r.p)}" cy="${y}" r="5.5" fill="${c}" stroke="${c === REPORT_CMP.worse ? REPORT_CMP.worseLine : '#fff'}" stroke-width="${c === REPORT_CMP.worse ? 1.2 : 1.5}"/>`;
     // The share of LSOAs this one is more deprived than, as the legend says.
     s += `<text x="${x1 + 8}" y="${y + fsVal * 0.35}" font-size="${fsVal}" fill="${REPORT_INK}" font-weight="600">${Math.min(99, Math.max(1, Math.round(r.p)))}%</text>`;
   });
@@ -10961,7 +11079,7 @@ const REPORT_CSS = `
   .kpi-sub { margin-top: 4px; font-size: 9.5px; color: var(--ink-3); }
   .kpi-ctx { margin-top: 9px; }
   .kpi-ctx-bar { position: relative; height: 3px; }
-  .kpi-ctx-tick { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--ink); }
+  .kpi-ctx-tick { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--ink); box-shadow: 0 0 0 1.5px #fff; }
   .kpi-ctx-cap { margin-top: 4px; font-size: 9px; color: var(--ink-3); }
 
   .keypoints { margin: 26px 40px 4px; padding: 16px 20px 14px 22px; border-left: 3px solid var(--accent); background: #F0F7F7; }
@@ -10979,7 +11097,7 @@ const REPORT_CSS = `
   .svc { padding: 12px 0 11px; }
   .svc + .svc { padding-left: 14px; border-left: 1px solid var(--rule); }
   .svc-val { font-size: 20px; font-weight: 700; line-height: 1.05; color: var(--ink); }
-  .svc-val.dim { color: #A9B4C2; font-weight: 500; }
+  .svc-val.dim { color: var(--ink-3); font-weight: 500; }
   .svc-lbl { margin-top: 3px; font-size: 9px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
 
   .content { padding: 4px 40px 12px; }
@@ -11019,7 +11137,7 @@ const REPORT_CSS = `
   .locblock li { margin-bottom: 4px; line-height: 1.4; }
   .locblock li strong { color: var(--ink); font-weight: 600; }
   .locblock li .meta { color: var(--ink-3); font-size: 9.5px; }
-  .locblock .empty { font-size: 10px; color: #A9B4C2; }
+  .locblock .empty { font-size: 10px; color: var(--ink-3); }
 
   .footer { padding: 18px 40px 26px; border-top: 3px solid var(--ink); font-size: 9.5px; line-height: 1.55; color: var(--ink-3); }
   .footer strong { color: var(--ink); }
@@ -11037,6 +11155,9 @@ const REPORT_CSS = `
               font: 500 10px/1.2 'Inter', system-ui, sans-serif; color: var(--ink-3); cursor: pointer; opacity: .8; }
   /* Room for the two download buttons beside a chart's heading on screen. */
   @media screen { .panel h3 { padding-right: 104px; } }
+  /* On screen the small print is 11px, which 9px was too faint to read;
+     paper keeps the sizes the layout was set for. */
+  @media screen { .kpi-lbl, .minimap-cap, table.ho th, .footer, .panel .note, .legend, .svc-lbl { font-size: 11px; } }
   .chart-dl:hover { opacity: 1; border-color: var(--ink); color: var(--ink); }
 
   @media print {
@@ -11300,7 +11421,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
     const { fs, lines, padL, ys, bottom } = _chartRows(data, W, opts);
     const H = bottom + 8;
     const barW = W - padL - padR;
-    let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" class="ch-hbar">`;
+    let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" class="ch-hbar" role="img" aria-label="${_esc(_reportCompareAlt(data, dp, u ? (u === '%' ? u : ' ' + u) : ''))}">`;
     data.forEach((r, i) => {
       const y = ys[i];
       const v = r.v == null ? 0 : Math.max(0, r.v);
@@ -11319,7 +11440,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
       // London median reference tick
       if (r.ref != null && !isNaN(r.ref)) {
         const rx = padL + (Math.max(0, r.ref) / dmax) * barW;
-        svg += `<line x1="${rx}" y1="${y - 8}" x2="${rx}" y2="${y + 7}" stroke="#0B1F33" stroke-width="1.4" stroke-dasharray="2,1.5"/>`;
+        svg += _reportTickHalo(rx, y - 8, y + 7) + `<line x1="${rx}" y1="${y - 8}" x2="${rx}" y2="${y + 7}" stroke="#0B1F33" stroke-width="1.4" stroke-dasharray="2,1.5"/>`;
       }
     });
     svg += `</svg>`;
@@ -11345,7 +11466,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
     const { fs, lines, padL, ys, bottom } = _chartRows(data, W, Object.assign({ rowH: 22 }, opts));
     const H = bottom + 12;
     const barW = W - padL - padR;
-    let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" class="ch-compare">`;
+    let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" class="ch-compare" role="img" aria-label="${_esc(_reportCompareAlt(data, dp, u))}">`;
     data.forEach((r, i) => {
       const y = ys[i];
       const wv = r.v != null ? (Math.max(0, r.v) / dmax) * barW : 0;
@@ -11356,19 +11477,19 @@ function _generateWardReport(_reportWindow, wn, opts) {
       // wh:true → higher = worse (orange when above), lower = better (blue)
       // wh:false → higher = better (blue when above)
       const c = r.descriptive ? REPORT_CMP.neutral
-              : above == null ? '#94A3B8'
+              : above == null ? REPORT_CMP.neutral
               : (isWh === above ? REPORT_CMP.worse : REPORT_CMP.better);
       svg += _reportLabelSvg(lines[i], padL - 8, y, fs);
       svg += `<rect x="${padL}" y="${y - 6}" width="${barW}" height="11" fill="#EDF1F5" rx="2"/>`;
       if (r.v != null) {
-        svg += `<rect x="${padL}" y="${y - 6}" width="${wv}" height="11" fill="${c}" rx="2"/>`;
+        svg += `<rect x="${padL}" y="${y - 6}" width="${wv}" height="11" fill="${c}" rx="2"${_reportBarEdge(c)}/>`;
         const valTxt = (r.k ? fmtNum(r.v, indDecimals(r.k)) : _fmtN(r.v, dp)) + u;
         svg += `<text x="${_reportLabelX(padL + Math.max(wv, 6) + 4, wr != null ? padL + wr : null, valTxt, fs)}" y="${y + fs * 0.35}" font-size="${fs}" fill="#0B1F33" font-variant-numeric="tabular-nums">${valTxt}</text>`;
       } else {
         svg += `<text x="${_reportLabelX(padL + 4, wr != null ? padL + wr : null, 'No figure', fs)}" y="${y + fs * 0.35}" font-size="${fs}" fill="#64748B">No figure</text>`;
       }
       if (wr != null) {
-        svg += `<line x1="${padL + wr}" y1="${y - 8}" x2="${padL + wr}" y2="${y + 7}" stroke="#0B1F33" stroke-width="1.6"/>`;
+        svg += _reportTickHalo(padL + wr, y - 8, y + 7) + `<line x1="${padL + wr}" y1="${y - 8}" x2="${padL + wr}" y2="${y + 7}" stroke="#0B1F33" stroke-width="1.6"/>`;
       }
     });
     svg += `</svg>`;
@@ -11390,7 +11511,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
       const w = (v / total) * W;
       bars += `<rect x="${x}" y="0" width="${w}" height="${H}" fill="${p.c}"/>`;
       if (w > fsIn * 3) {
-        bars += `<text x="${x + w/2}" y="${H/2 + fsIn * 0.35}" text-anchor="middle" font-size="${fsIn}" fill="#fff" font-weight="600">${v.toFixed(0)}%</text>`;
+        bars += `<text x="${x + w/2}" y="${H/2 + fsIn * 0.35}" text-anchor="middle" font-size="${fsIn}" fill="${_reportOnFill(p.c)}" font-weight="600">${v.toFixed(0)}%</text>`;
       }
       x += w;
     });
@@ -11407,7 +11528,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
       bars += `<text x="${lx + 12}" y="${ly + 4.5 + fs * 0.35}" font-size="${fs}" fill="#334155">${_esc(lblTxt)}</text>`;
       lx += lblW;
     });
-    const svg = `<svg viewBox="0 0 ${W} ${ly + Math.max(11, fs + 2)}" xmlns="http://www.w3.org/2000/svg" class="ch-stack">` + bars + `</svg>`;
+    const svg = `<svg viewBox="0 0 ${W} ${ly + Math.max(11, fs + 2)}" xmlns="http://www.w3.org/2000/svg" class="ch-stack" role="img" aria-label="${_esc(_reportStackAlt(parts))}">` + bars + `</svg>`;
     return svg;
   }
 
@@ -11533,16 +11654,16 @@ function _generateWardReport(_reportWindow, wn, opts) {
   const _noCensus = ['census_population', 'census_white_pct', 'census_under16_pct', 'census_over65_pct']
     .every(k => _fmt(inds[k]) == null);
   const ethStack = _chartStack([
-    { l:'White', v: inds.census_white_pct,        c:'#1F4E8C' },
-    { l:'Asian', v: inds.census_asian_pct,        c:'#E0A030' },
-    { l:'Black', v: inds.census_black_pct,        c:'#2A9D8F' },
-    { l:'Mixed', v: inds.census_mixed_pct,        c:'#8E6BBF' },
-    { l:'Other', v: inds.census_other_ethnic_pct, c:'#9AA6B2' },
+    { l:'White', v: inds.census_white_pct, c: REPORT_ETH.white },
+    { l:'Asian', v: inds.census_asian_pct, c: REPORT_ETH.asian },
+    { l:'Black', v: inds.census_black_pct, c: REPORT_ETH.black },
+    { l:'Mixed', v: inds.census_mixed_pct, c: REPORT_ETH.mixed },
+    { l:'Other', v: inds.census_other_ethnic_pct, c: REPORT_ETH.other },
   ], { width: 320, fs: 11 });
   const ageStack = _chartStack([
-    { l:AGE_CHILD_CAP, v: inds.census_under16_pct,     c:'#2A9D8F' },
-    { l:AGE_WORK,      v: inds.census_working_age_pct, c:'#1F4E8C' },
-    { l:'65 and over', v: inds.census_over65_pct,      c:'#8E6BBF' },
+    { l:AGE_CHILD_CAP, v: inds.census_under16_pct, c: REPORT_AGE.child },
+    { l:AGE_WORK, v: inds.census_working_age_pct, c: REPORT_AGE.work },
+    { l:'65 and over', v: inds.census_over65_pct, c: REPORT_AGE.old },
   ], { width: 320, fs: 11 });
 
   // Each row takes its direction, or none, from OV_CFG (see _chartCompare).
@@ -11762,13 +11883,13 @@ function _generateWardReport(_reportWindow, wn, opts) {
   function _locBlock(title, items, fmt, extra, count) {
     const cls = 'locblock' + (extra ? ' ' + extra : '');
     if (!items || !items.length) {
-      return `<div class="${cls}"><h4>${_esc(title)} <span class="count">0</span></h4><div class="empty">none</div></div>`;
+      return `<div class="${cls}"><h4 role="heading" aria-level="3">${_esc(title)} <span class="count">0</span></h4><div class="empty">none</div></div>`;
     }
     // On screen every item; on paper the first four and a count of the
     // rest, so the second page holds the lists however busy the ward is.
     const lis = items.map((d, i) => `<li${i >= 4 ? ' class="extra"' : ''}>${fmt(d)}</li>`).join('') +
       (items.length > 4 ? `<li class="more">and ${items.length - 4} more</li>` : '');
-    return `<div class="${cls}"><h4>${_esc(title)} <span class="count">${count != null ? count : items.length}</span></h4><ol>${lis}</ol></div>`;
+    return `<div class="${cls}"><h4 role="heading" aria-level="3">${_esc(title)} <span class="count">${count != null ? count : items.length}</span></h4><ol>${lis}</ol></div>`;
   }
 
   // Build IMD composite KPI with rank-in-London context
@@ -11800,7 +11921,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
 <link rel="stylesheet" href="${_reportFontsHref()}">
 <style>${REPORT_CSS}${WARD_ONEPAGE_CSS}</style>
 </head><body>
-<div class="report onepage">
+<main class="report onepage">
   ${_reportMasthead('Ward report')}
 
   <div class="hero">
@@ -11847,7 +11968,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
       <div class="panel">
         <h3>Health and economic indicators</h3>
         ${healthBars}
-        <div class="legend"><span class="legend-tick"></span> ${PH_AREA} ward median,${_reportSwatch(REPORT_CMP.better)}better than the median,${_reportSwatch(REPORT_CMP.worse)}worse</div>
+        <div class="legend"><span class="legend-tick"></span> ${PH_AREA} ward median,${_reportSwatch(REPORT_CMP.better)}better than the median,${_reportSwatch(REPORT_CMP.worse)}worse,${_reportSwatch(REPORT_CMP.neutral)}neither better nor worse</div>
       </div>
     </div>
   </div>
@@ -11887,7 +12008,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
     <strong>Sources:</strong> ${reportCredits(['census', 'imd', crimeRows.length ? 'crime' : '', 'fuel_poverty', 'claimant', 'health', 'gp', 'pharmacy', 'dental', 'hospitals', 'vcse', _green ? 'greenspace' : '']).map(_esc).join(' · ')}. Each median and comparison is taken across the ${PH_AREA} wards with a figure for that measure.
     ${reportProvenanceHtml((wdata ? wdata.name : wn) + ' ward')}
   </div>
-</div>
+</main>
 <div class="actions">
   <button onclick="window.print()">Print or save as PDF</button>
   <button onclick="window.close()">Close</button>
@@ -13231,9 +13352,11 @@ function _fitFocus(bounds) {
 
   /* Key indicators: four that are published per LSOA, so they vary
      neighbourhood by neighbourhood rather than repeating one figure across a
-     council. Only those this build carries are shown. */
+     council. Bad or very bad health leads the health side because anyone can
+     read a percentage, where the IMD health domain is a score around zero.
+     Only those this build carries are shown. */
   // Named by their display labels, like every other place they appear.
-  const KEY = ['imd_decile', 'health_score', 'fuel_poverty_pct', 'no2_ugm3']
+  const KEY = ['imd_decile', 'census_bad_health_pct', 'fuel_poverty_pct', 'no2_ugm3']
     .filter(k => byVal[k]).map(k => [k, byVal[k].name]);
 
   // Many descriptions open by restating the name ("Suicide rate. Published
@@ -13296,7 +13419,7 @@ function _fitFocus(bounds) {
     const g = model.find(x => x.label === libTheme);
     if (!g) return;
     tvH.innerHTML = iconOf(g.label) + esc(g.label) +
-      '<span class="ov-tv-n">' + g.opts.length + '</span>';
+      '<span class="ov-tv-n">' + g.opts.length + '<span class="sr-only"> indicators</span></span>';
     // The Core20 highlight sits under the Deprivation theme's indicators.
     const c20 = document.getElementById('ov-c20');
     if (c20) c20.hidden = g.label !== 'Deprivation';
@@ -13447,6 +13570,19 @@ function _fitFocus(bounds) {
             '<span class="ov-res-nm">' + esc(o.name) + '</span>' +
             '<span class="ov-res-sub">' + esc(o.theme) + ' · ' + levelsHTML(o) + '</span></button>').join('')
         : (council ? '' : '<div class="ov-empty">No indicator matches that, so try another word, or clear the search to browse the indicators by theme.</div>')) + council;
+    }
+    // The count, or why nothing matches, for a screen reader.
+    const stEl = document.getElementById('ov-results-status');
+    if (stEl) {
+      let msg = '';
+      if (q) {
+        const n = scoreHits(q).slice(0, 15).length;
+        const cn = councilOnlyNote(q);
+        msg = n ? n + (n === 15 ? ' or more' : '') + (n === 1 ? ' indicator matches' : ' indicators match')
+          : cn ? (() => { const d = document.createElement('div'); d.innerHTML = cn; return d.textContent; })()
+          : 'No indicator matches that.';
+      }
+      if (stEl.textContent !== msg) stEl.textContent = msg;
     }
     resultsEl.hidden = !q;
     homeEl.hidden = !!q || !!libTheme;
@@ -13982,6 +14118,8 @@ window.PH_OA = (function () {
     curOv2 = (k && k !== curOv && sel.querySelector('option[value="' + k + '"]')) ? k : 'none';
     pick.hidden = true;
     apply();
+    // The strip and the live region name the pair, or the one left.
+    if (typeof _refreshUI === 'function') _refreshUI();
   };
 
   add.addEventListener('click', () => {
@@ -14617,7 +14755,7 @@ function _buildLSOAReportHtml(code) {
     const dmax = opts.max != null ? opts.max :
                  Math.max(0.0001, ...data.map(r => Math.max(r.v || 0, r.ref || 0)));
     const H = padT + data.length * rowH + 8, barW = W - padL - padR;
-    let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" class="ch-hbar">`;
+    let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" class="ch-hbar" role="img" aria-label="${_esc(_reportCompareAlt(data, dp, u ? (u === '%' ? u : ' ' + u) : ''))}">`;
     data.forEach((r, i) => {
       const y = padT + i * rowH + rowH/2;
       const v = r.v == null ? 0 : Math.max(0, r.v);
@@ -14634,7 +14772,7 @@ function _buildLSOAReportHtml(code) {
       }
       if (r.ref != null && !isNaN(r.ref)) {
         const rx = padL + (Math.max(0, r.ref) / dmax) * barW;
-        svg += `<line x1="${rx}" y1="${y - 8}" x2="${rx}" y2="${y + 7}" stroke="#0B1F33" stroke-width="1.4" stroke-dasharray="2,1.5"/>`;
+        svg += _reportTickHalo(rx, y - 8, y + 7) + `<line x1="${rx}" y1="${y - 8}" x2="${rx}" y2="${y + 7}" stroke="#0B1F33" stroke-width="1.4" stroke-dasharray="2,1.5"/>`;
       }
     });
     svg += `</svg>`;
@@ -14655,7 +14793,7 @@ function _buildLSOAReportHtml(code) {
     });
     const dmax = Math.max(0.0001, ...data.map(r => Math.max(r.v || 0, r.ref || 0)), opts.minMax || 1);
     const H = 6 + data.length * rowH + 12, barW = W - padL - padR;
-    let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" class="ch-compare">`;
+    let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" class="ch-compare" role="img" aria-label="${_esc(_reportCompareAlt(data, dp, u))}">`;
     data.forEach((r, i) => {
       const y = 6 + i * rowH + rowH/2;
       const wv = r.v != null ? (Math.max(0, r.v) / dmax) * barW : 0;
@@ -14665,18 +14803,18 @@ function _buildLSOAReportHtml(code) {
       // Descriptive rows are one neutral colour; the rest blue when on the
       // better side of the median and orange when on the worse.
       const c = r.descriptive ? REPORT_CMP.neutral
-              : above == null ? '#94A3B8' : (isWh === above ? REPORT_CMP.worse : REPORT_CMP.better);
+              : above == null ? REPORT_CMP.neutral : (isWh === above ? REPORT_CMP.worse : REPORT_CMP.better);
       svg += `<text x="${padL - 8}" y="${y + 3.5}" text-anchor="end" font-size="10" fill="#334155">${_esc(r.l)}</text>`;
       svg += `<rect x="${padL}" y="${y - 6}" width="${barW}" height="11" fill="#EDF1F5" rx="2"/>`;
       if (r.v != null) {
-        svg += `<rect x="${padL}" y="${y - 6}" width="${wv}" height="11" fill="${c}" rx="2"/>`;
+        svg += `<rect x="${padL}" y="${y - 6}" width="${wv}" height="11" fill="${c}" rx="2"${_reportBarEdge(c)}/>`;
         const valTxt = (r.k ? fmtNum(r.v, indDecimals(r.k)) : _fmtN(r.v, dp)) + u;
         svg += `<text x="${_reportLabelX(padL + Math.max(wv, 6) + 4, wr != null ? padL + wr : null, valTxt)}" y="${y + 3.5}" font-size="10" fill="#0B1F33" font-variant-numeric="tabular-nums">${valTxt}</text>`;
       } else {
         svg += `<text x="${_reportLabelX(padL + 4, wr != null ? padL + wr : null, 'No figure')}" y="${y + 3.5}" font-size="10" fill="#64748B">No figure</text>`;
       }
       if (wr != null) {
-        svg += `<line x1="${padL + wr}" y1="${y - 8}" x2="${padL + wr}" y2="${y + 7}" stroke="#0B1F33" stroke-width="1.6"/>`;
+        svg += _reportTickHalo(padL + wr, y - 8, y + 7) + `<line x1="${padL + wr}" y1="${y - 8}" x2="${padL + wr}" y2="${y + 7}" stroke="#0B1F33" stroke-width="1.6"/>`;
       }
     });
     svg += `</svg>`;
@@ -14687,11 +14825,11 @@ function _buildLSOAReportHtml(code) {
     const W = opts.width || 360, H = 18;
     const total = parts.reduce((a, b) => a + (parseFloat(b.v) || 0), 0) || 1;
     let x = 0;
-    let svg = `<svg viewBox="0 0 ${W} ${H + 16}" xmlns="http://www.w3.org/2000/svg" class="ch-stack">`;
+    let svg = `<svg viewBox="0 0 ${W} ${H + 16}" xmlns="http://www.w3.org/2000/svg" class="ch-stack" role="img" aria-label="${_esc(_reportStackAlt(parts))}">`;
     parts.forEach(p => {
       const v = parseFloat(p.v) || 0, w = (v / total) * W;
       svg += `<rect x="${x}" y="0" width="${w}" height="${H}" fill="${p.c}"/>`;
-      if (w > 28) svg += `<text x="${x + w/2}" y="${H/2 + 3.2}" text-anchor="middle" font-size="9.5" fill="#fff" font-weight="600">${v.toFixed(0)}%</text>`;
+      if (w > 28) svg += `<text x="${x + w/2}" y="${H/2 + 3.2}" text-anchor="middle" font-size="9.5" fill="${_reportOnFill(p.c)}" font-weight="600">${v.toFixed(0)}%</text>`;
       x += w;
     });
     let lx = 0;
@@ -14773,16 +14911,16 @@ function _buildLSOAReportHtml(code) {
 
   // ── Charts: demographics ──
   const ethStack = _chartStack([
-    { l:'White',  v: inds.census_white_pct,        c:'#1F4E8C' },
-    { l:'Asian',  v: inds.census_asian_pct,        c:'#E0A030' },
-    { l:'Black',  v: inds.census_black_pct,        c:'#2A9D8F' },
-    { l:'Mixed',  v: inds.census_mixed_pct,        c:'#8E6BBF' },
-    { l:'Other',  v: inds.census_other_ethnic_pct, c:'#9AA6B2' },
+    { l:'White', v: inds.census_white_pct, c: REPORT_ETH.white },
+    { l:'Asian', v: inds.census_asian_pct, c: REPORT_ETH.asian },
+    { l:'Black', v: inds.census_black_pct, c: REPORT_ETH.black },
+    { l:'Mixed', v: inds.census_mixed_pct, c: REPORT_ETH.mixed },
+    { l:'Other', v: inds.census_other_ethnic_pct, c: REPORT_ETH.other },
   ], { width: 360 });
   const ageStack = _chartStack([
-    { l:AGE_CHILD_CAP, v: inds.census_under16_pct,     c:'#2A9D8F' },
-    { l:AGE_WORK,      v: inds.census_working_age_pct, c:'#1F4E8C' },
-    { l:'65 and over', v: inds.census_over65_pct,      c:'#8E6BBF' },
+    { l:AGE_CHILD_CAP, v: inds.census_under16_pct, c: REPORT_AGE.child },
+    { l:AGE_WORK, v: inds.census_working_age_pct, c: REPORT_AGE.work },
+    { l:'65 and over', v: inds.census_over65_pct, c: REPORT_AGE.old },
   ], { width: 360 });
   // Each row takes its direction, or none, from OV_CFG (see _chartCompare).
   const compareCensus = _chartCompare([
@@ -14842,9 +14980,9 @@ function _buildLSOAReportHtml(code) {
   // ── Locations block helper ──
   function _locBlock(title, items, fmt, extra, count) {
     const cls = 'locblock' + (extra ? ' ' + extra : '');
-    if (!items || !items.length) return `<div class="${cls}"><h4>${_esc(title)} <span class="count">0</span></h4><div class="empty">none</div></div>`;
+    if (!items || !items.length) return `<div class="${cls}"><h4 role="heading" aria-level="3">${_esc(title)} <span class="count">0</span></h4><div class="empty">none</div></div>`;
     const lis = items.map(d => `<li>${fmt(d)}</li>`).join('');
-    return `<div class="${cls}"><h4>${_esc(title)} <span class="count">${count != null ? count : items.length}</span></h4><ol>${lis}</ol></div>`;
+    return `<div class="${cls}"><h4 role="heading" aria-level="3">${_esc(title)} <span class="count">${count != null ? count : items.length}</span></h4><ol>${lis}</ol></div>`;
   }
 
   // KPI rendering helpers
@@ -14958,7 +15096,7 @@ function _buildLSOAReportHtml(code) {
 <link rel="stylesheet" href="${_reportFontsHref()}">
 <style>${REPORT_CSS}</style>
 </head><body>
-<div class="report">
+<main class="report">
   ${_reportMasthead('LSOA report')}
 
   <div class="hero">
@@ -15010,7 +15148,7 @@ function _buildLSOAReportHtml(code) {
       <div class="panel" style="flex:1">
         <h3>Health and economic indicators</h3>
         ${healthBars}
-        <div class="legend"><span class="legend-tick"></span> ${PH_AREA} LSOA median,${_reportSwatch(REPORT_CMP.better)}better than the median,${_reportSwatch(REPORT_CMP.worse)}worse</div>
+        <div class="legend"><span class="legend-tick"></span> ${PH_AREA} LSOA median,${_reportSwatch(REPORT_CMP.better)}better than the median,${_reportSwatch(REPORT_CMP.worse)}worse,${_reportSwatch(REPORT_CMP.neutral)}neither better nor worse</div>
       </div>
     </div>
 
@@ -15051,7 +15189,7 @@ function _buildLSOAReportHtml(code) {
     <div style="margin-top:6px">Services and green spaces are listed when they sit inside this LSOA\u2019s boundary, and each median and comparison is taken across the ${PH_AREA} LSOAs with a figure for that measure.</div>
     ${reportProvenanceHtml((props.name ? props.name + ', ' : '') + 'LSOA ' + code)}
   </div>
-</div>
+</main>
 <div class="actions">
   <button onclick="window.print()">Print or save as PDF</button>
   <button onclick="window.close()">Close</button>
@@ -16344,6 +16482,16 @@ function _markLevelButtons() {
       : b.dataset.baseTitle + (isNat ? ' The box around this button shows that the indicator is published at this level.' : '');
   });
 }
+/* The level on show is said in aria-pressed as well as by its colour, kept
+   in step with the active class whichever code moves it. */
+(function _syncLevelPressed() {
+  const btns = document.querySelectorAll('#dl-seg button');
+  const sync = b => { const v = b.classList.contains('active') ? 'true' : 'false'; if (b.getAttribute('aria-pressed') !== v) b.setAttribute('aria-pressed', v); };
+  btns.forEach(sync);
+  if (!window.MutationObserver) return;
+  const mo = new MutationObserver(recs => recs.forEach(r => sync(r.target)));
+  btns.forEach(b => mo.observe(b, { attributes: true, attributeFilter: ['class'] }));
+})();
 // Output areas arrive after the buttons are first marked, and add a level.
 document.addEventListener('ph-levels-changed', () => _markLevelButtons());
 
@@ -16540,7 +16688,12 @@ function _whenLevelDrawn(level) {
 // The hint for a level, shown once that level is drawn and only if the map is
 // still at it by then.
 function _dlHintWhenDrawn(level, msg, ms) {
-  _whenLevelDrawn(level).then(ok => { if (ok && currentDataLevel === level) _dlHint(msg, ms); });
+  // A hint about one indicator is dropped if another has been chosen while
+  // the areas were drawing, so it never names the indicator before.
+  const ov0 = (typeof curOv !== 'undefined') ? curOv : '';
+  _whenLevelDrawn(level).then(ok => {
+    if (ok && currentDataLevel === level && ((typeof curOv !== 'undefined') ? curOv : '') === ov0) _dlHint(msg, ms);
+  });
 }
 // The tour narrates every change it makes, so the level hints stay out of it.
 function _touring() { return !!document.querySelector('.map-wrap.touring'); }
@@ -16730,6 +16883,12 @@ document.addEventListener('change', e => {
     const k = ovSel.value;
     const from = _levelBeforeOv;
     const quiet = _urlBusy() || _touring();
+    // Whatever the hint said was about the indicator before. Put it away
+    // first, and write a new one below only if the level moves. A hint that
+    // the areas are still loading is about the map, not the indicator, so it
+    // stays until they arrive.
+    const hEl = document.getElementById('dl-hint');
+    if (hEl && !/^(Loading|Drawing) /.test(hEl.textContent)) { hEl.classList.remove('show'); hEl.textContent = ''; clearTimeout(_setDataLevel._t); }
     if (!k || k === 'none') {
       // Clear: back to the level the reader chose, or to wards if they never
       // chose one, rather than staying wherever the last indicator took the
@@ -16949,19 +17108,42 @@ function _refreshUI() {
     const dig = document.getElementById('vs-digest');
     if (dig) {
       const parts = [];
-      parts.push(focusActive() ? `<b>${focusLabel()}</b>` : 'All of ' + phWhere());
+      // While a custom area is being built, the area is what is being viewed.
+      const rbN = (window.PH_REPORT && PH_REPORT.active()) ? PH_REPORT.selected().length : 0;
+      parts.push(rbN ? 'Custom area: <b>' + rbN + ' LSOA' + (rbN === 1 ? '' : 's') + '</b>'
+        : focusActive() ? `<b>${focusLabel()}</b>` : 'All of ' + phWhere());
       // The level is not repeated here. The Viewing badge in the corner of the
       // map is the control for it and shows which one is active, so the strip
       // saying "Ward mode" a second time under the word "Viewing" was the same
       // fact twice, in the two places most likely to be read together.
       // The strip's job is the scope: where you are and what is drawn on it.
       if (typeof curOv !== 'undefined' && curOv && curOv !== 'none') {
-        parts.push(`coloured by <b>${_ovLabel(curOv)}</b>`);
+        parts.push(`coloured by <b>${_ovLabel(curOv)}</b>` +
+          ((typeof bivOn === 'function' && bivOn()) ? ` compared with <b>${_ovLabel(curOv2)}</b>` : ''));
       }
       if (typeof showCore20Overlay !== 'undefined' && showCore20Overlay) {
         parts.push('<b>Core20</b> only');
       }
-      dig.innerHTML = parts.join(' · ');
+      dig.innerHTML = parts.join(', ');
+      // On a phone the strip carries the indicator's remove button itself, in
+      // place of the separate chip, so the name is on screen once.
+      let vx = document.getElementById('vs-ov-x');
+      if (!vx) {
+        vx = document.createElement('button');
+        vx.type = 'button';
+        vx.id = 'vs-ov-x';
+        vx.className = 'chip-x vs-ov-x';
+        vx.innerHTML = ico('x', 'ic-sm');
+        vx.title = 'Remove this indicator';
+        vx.setAttribute('aria-label', 'Remove this indicator');
+        vx.addEventListener('click', () => {
+          const sel = document.getElementById('ov');
+          if (sel) { sel.value = 'none'; sel.dispatchEvent(new Event('change')); }
+          _refreshUI();
+        });
+        dig.after(vx);
+      }
+      vx.hidden = !(typeof curOv !== 'undefined' && curOv && curOv !== 'none');
       // The same sentence, out loud. _refreshUI runs after every change to
       // scope, indicator or Core20, so this is already the one place that
       // knows the whole state; the strip and the announcement cannot disagree
@@ -17947,7 +18129,9 @@ function _searchPickResult(item) {
   if (input) input.value = item.label;
   if (results) results.classList.remove('show');
   // On a phone the box is in the drawer, which would sit over the result.
-  if (window.PH_DRAWER && PH_DRAWER.narrow()) PH_DRAWER.close();
+  // Focus leaves the box first, or it stays in the closed drawer and iOS
+  // keeps the keyboard up over the result.
+  if (window.PH_DRAWER && PH_DRAWER.narrow()) { if (input) input.blur(); PH_DRAWER.close(); }
   if (item.type === 'LA' || item.type === 'ICB') {
     // Focus it, which fits the map to it, exactly as the Focus by LA and
     // Focus by ICB lists in Layers do.
@@ -18077,7 +18261,11 @@ function regionHref(id) {
 function _pickPostcode(pq, res) {
   const results = document.getElementById('hdr-search-results');
   if (results) results.classList.remove('show');
-  if (window.PH_DRAWER && PH_DRAWER.narrow()) PH_DRAWER.close();
+  if (window.PH_DRAWER && PH_DRAWER.narrow()) {
+    const inp = document.getElementById('hdr-search-input');
+    if (inp) inp.blur();
+    PH_DRAWER.close();
+  }
   if (!res || !Number.isFinite(res.latitude)) return;
   if (pq.kind === 'outcode') { _searchFlyTo(res.latitude, res.longitude, 14); return; }
   const codes = res.codes || {};
@@ -18085,7 +18273,8 @@ function _pickPostcode(pq, res) {
   if (lyr) {
     // The ward sheet lists what is near the postcode itself.
     window._phNear = { label: res.postcode || pq.text, lat: res.latitude, lng: res.longitude,
-                       ward: lyr.feature.properties.WD24NM, from: 'postcode' };
+                       ward: lyr.feature.properties.WD24NM, from: 'postcode',
+                       lsoa: codes.lsoa || '', lsoaName: res.lsoa || '' };
     lyr.fire('click');
     _fitVisible(lyr.getBounds(), 14);
   } else {
@@ -18100,7 +18289,7 @@ function _renderPostcodeRow(results, pq, q) {
   let row = document.getElementById(id);
   if (!row) {
     results.insertAdjacentHTML('afterbegin',
-      '<div class="sr-grp" role="presentation">postcode</div><div class="sr-row" role="option" aria-selected="false" id="' + id + '">' +
+      '<div class="sr-grp" role="presentation">Postcode</div><div class="sr-row" role="option" aria-selected="false" id="' + id + '">' +
       '<span class="sr-type">postcode</span><span class="sr-name"></span>' +
       '<span class="sr-sub">Looking up…</span></div>');
     row = document.getElementById(id);
@@ -18127,6 +18316,7 @@ function _renderPostcodeRow(results, pq, q) {
       sub.textContent = pq.kind === 'postcode' ? 'Postcode not found' : 'Postcode area not found';
       row.style.cursor = 'default';
       row.onclick = null;
+      _searchAnnounce(pq.kind === 'postcode' ? 'Postcode not found.' : 'Postcode area not found.');
       return;
     }
     // postcodes.io names the English region ("London", "North East", ...).
@@ -18144,10 +18334,16 @@ function _renderPostcodeRow(results, pq, q) {
     row.onclick = (!inArea && other && other.live)
       ? () => { location.href = regionHref(other.id); }
       : () => _pickPostcode(pq, res);
+    // Said out loud as well, or the status stays at "Looking up postcode".
+    _searchAnnounce(pq.kind !== 'postcode' ? 'Postcode area ' + (res.outcode || pq.text) + '. Press Enter to go there.'
+      : inArea ? 'Postcode ' + (res.postcode || pq.text) + ', ' + [res.admin_ward, res.admin_district].filter(Boolean).join(', ') + '. Press Enter to go there.'
+      : other ? 'This postcode is in ' + phRegionPhrase(other.name) + '.' + (other.live ? ' Press Enter to open that map.' : ' That map is not available yet.')
+      : 'This postcode is outside ' + phWhere() + '.');
   }, () => {
     if (!current()) return;
     const sub = row.querySelector('.sr-sub');
     sub.textContent = 'We could not reach the postcode lookup, so select this to try again.';
+    _searchAnnounce('We could not reach the postcode lookup. Press Enter to try again.');
     row.style.cursor = '';
     row.onclick = () => {
       sub.textContent = 'Looking up…';
@@ -18188,9 +18384,12 @@ function _otherRegionMatches(q) {
 }
 // The rows for those LAs: "Leeds is on the Yorkshire and The Humber map",
 // and selecting one opens that map.
+// The search list's group headings, in sentence case.
+const _SR_GROUP = { LA: 'LAs', ICB: 'ICBs', ward: 'Wards', lsoa: 'LSOAs', GP: 'GP practices', hospital: 'Hospitals',
+  dental: 'Dental practices', pharmacy: 'Pharmacies', charity: 'Charities' };
 function _otherRegionRowsHTML(list) {
   if (!list.length) return '';
-  return '<div class="sr-grp" role="presentation">other regions</div>' + list.map((e, i) =>
+  return '<div class="sr-grp" role="presentation">Other regions</div>' + list.map((e, i) =>
     `<div class="sr-row sr-region" role="option" aria-selected="false" id="sr-reg-${i}" data-region="${_esc(e.id)}">` +
     `<span class="sr-type">LA</span><span class="sr-name">${_esc(e.la)}</span>` +
     `<span class="sr-sub">${_esc(e.la)} is on the ${_esc(e.region)} map. Open ${_esc(phRegionPhrase(e.region))}</span></div>`).join('');
@@ -18247,7 +18446,7 @@ function _runSearch(q) {
     let shown = t === 'lsoa' ? (allLsoas ? g.slice(0, 200) : g.slice(0, 5)) : g;
     if (!(t === 'lsoa' && allLsoas)) shown = shown.slice(0, Math.max(0, 40 - top.length));
     if (!shown.length) return;
-    html += `<div class="sr-grp" role="presentation">${t} (${g.length})</div>`;
+    html += `<div class="sr-grp" role="presentation">${_SR_GROUP[t] || t} (${g.length})</div>`;
     shown.forEach(m => {
       const idx = top.push(m) - 1;
       // Labels and subtitles are register text (practice, charity and venue
@@ -18749,9 +18948,23 @@ setTimeout(_refreshUI, 0);
   pane.querySelectorAll('.sb-sec > .sb-lbl').forEach(lbl => {
     if (lbl.classList.contains('collapsible')) return;
     lbl.classList.add('collapsible');
-    lbl.addEventListener('click', () => {
+    const toggle = () => {
       const sec = lbl.parentElement;
-      if (sec) sec.classList.toggle('collapsed');
+      if (!sec) return;
+      sec.classList.toggle('collapsed');
+      if (lbl.getAttribute('role') === 'button') lbl.setAttribute('aria-expanded', String(!sec.classList.contains('collapsed')));
+    };
+    lbl.addEventListener('click', toggle);
+    // Reachable from the keyboard too, as Map style is (_wireMapControlsFold),
+    // unless the heading is a label or holds a control of its own.
+    if (lbl.tagName !== 'DIV' || lbl.querySelector('button, a, input, select')) return;
+    lbl.setAttribute('role', 'button');
+    lbl.setAttribute('tabindex', '0');
+    lbl.setAttribute('aria-expanded', String(!(lbl.parentElement && lbl.parentElement.classList.contains('collapsed'))));
+    lbl.addEventListener('keydown', e => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      e.preventDefault();
+      toggle();
     });
   });
 })();
@@ -18870,9 +19083,21 @@ document.querySelectorAll('.sb-tab').forEach(t => {
 
     const hostBox = host.getBoundingClientRect();
     const btnBox = btn.getBoundingClientRect();
-    pop.style.left = '10px';
-    pop.style.right = '10px';
-    pop.style.maxWidth = 'none';
+    if (host === document.body && window.innerWidth >= 600) {
+      // A button out on the map (Area level): a card under the button, its
+      // right edge in line with the button's, rather than a bar the width of
+      // the window with lines too long to read.
+      const w = Math.min(340, window.innerWidth - 20);
+      pop.style.width = w + 'px';
+      pop.style.maxWidth = 'none';
+      pop.style.fontSize = '13px';
+      const left = Math.max(10, Math.min(btnBox.right - w, window.innerWidth - 10 - w));
+      pop.style.left = Math.round(left - hostBox.left) + 'px';
+    } else {
+      pop.style.left = '10px';
+      pop.style.right = '10px';
+      pop.style.maxWidth = 'none';
+    }
     // Below the button normally, above it if there is no room below.
     const below = btnBox.bottom - hostBox.top + 8;
     if (below + pop.offsetHeight > hostBox.height - 8) {
@@ -20683,12 +20908,41 @@ var PH_SHOW = {
     var e = function (t) { return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;'); };
     var line = function (k) {
       var v = wardOvValue(currentWard, k);
-      if (v == null || v === '' || isNaN(parseFloat(v))) return '<div>' + e(ovLabel(k)) + ': <span style="color:var(--ink-3)">No figure</span></div>';
+      if (v == null || v === '' || isNaN(parseFloat(v))) return '<div>' + belowWard(k) + '</div>';
       var ctx = (typeof bivOn === 'function' && bivOn()) ? '' : ovContext('ward', k, v, (typeof WARD_DATA !== 'undefined' && WARD_DATA[currentWard]) || {});
       return '<div>' + e(ovLabel(k)) + ': <b>' + e(fmtOv(v, k)) + '</b>' +
         (ctx ? '<span class="ctx">' + e(ctx) + '</span>' : '') + '</div>';
     };
     el.innerHTML = line(curOv) + ((typeof bivOn === 'function' && bivOn()) ? line(curOv2) : '');
+  }
+  /* A ward with no figure for an indicator that is only published for
+     smaller areas. "No figure" would read as a gap in the data, so the sheet
+     says where the figures are instead: the reader's own LSOA after a postcode
+     search, or a pointer to the map's hover otherwise. */
+  function belowWard(k) {
+    var e = function (t) { return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;'); };
+    var none = e(ovLabel(k)) + ': <span style="color:var(--ink-3)">No figure</span>';
+    if (typeof ovLevels !== 'function' || ovHasLevel(k, 'ward')) return none;
+    var small = ['lsoa', 'msoa', 'oa'];
+    var lv = small.indexOf(typeof currentDataLevel === 'string' ? currentDataLevel : '') !== -1 ? currentDataLevel
+      : (small.filter(function (l) { return ovHasLevel(k, l); })[0] || '');
+    if (!lv) return none;
+    var near = window._phNear;
+    if (near && near.ward === currentWard && near.lsoa && ovHasLevel(k, 'lsoa')) {
+      var lv2 = (typeof LSOA_DATA === 'object' && LSOA_DATA && LSOA_DATA[near.lsoa]) ? lsoaOvValue(near.lsoa, k) : null;
+      if (lv2 != null && lv2 !== '' && !isNaN(parseFloat(lv2))) {
+        var nm = near.lsoaName || near.lsoa;
+        return /decile/i.test(ovLabel(k))
+          ? 'Your neighbourhood, ' + e(nm) + ', is in <b>decile ' + e(fmtOv(lv2, k)) + '</b> for ' + e(ovLabel(k)) + '.'
+          : e(ovLabel(k)) + ' in your neighbourhood, ' + e(nm) + ': <b>' + e(fmtOv(lv2, k)) + '</b>';
+      }
+      // The LSOA figures load with the LSOA layer; write the line again when they arrive.
+      if (currentDataLevel === 'lsoa' && typeof ensureLsoaLayer === 'function' && !(LSOA_DATA && LSOA_DATA[near.lsoa])) {
+        ensureLsoaLayer().then(function () { setTimeout(renderFig, 0); }).catch(function () {});
+      }
+    }
+    var touch = window.matchMedia && window.matchMedia('(hover: none)').matches;
+    return e(ovLabel(k)) + ' is published for ' + e(_levelPlural(lv)) + ', so ' + (touch ? 'tap' : 'hover over') + ' the map to see each one.';
   }
   var _ovSelForFig = document.getElementById('ov');
   if (_ovSelForFig) _ovSelForFig.addEventListener('change', function () { setTimeout(renderFig, 0); });
@@ -20924,9 +21178,50 @@ var PH_SHOW = {
     PH_ASSISTANT.askAbout(currentWard);
   });
 
+  /* Whether the full profile is the wide reading view on show, and the
+     sheet's button kept in step with it: "Close full profile" while it is. */
+  var profPrevTab = 'overlay';
+  function profileOpen() {
+    var sb = $('sidebar'), tw = $('tab-ward');
+    return !!(sb && tw && sb.classList.contains('profile-wide') && tw.classList.contains('active') && !isNarrow());
+  }
+  function syncProfBtn() {
+    var open = profileOpen();
+    profBtn.textContent = open ? 'Close full profile' : 'Open full profile';
+    profBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  (function () {
+    var tw = $('tab-ward'), sb = $('sidebar');
+    if (!tw || !sb || !window.MutationObserver) return;
+    var was = false;
+    new MutationObserver(function () {
+      var now = profileOpen();
+      syncProfBtn();
+      // The map is narrower or wider now, and Leaflet caches its size.
+      if (now !== was && typeof map !== 'undefined' && map) setTimeout(function () { map.invalidateSize({ pan: false }); }, 220);
+      was = now;
+    }).observe(tw, { attributes: true, attributeFilter: ['class'] });
+    new MutationObserver(function () { var now = profileOpen(); if (now !== was) { syncProfBtn(); was = now;
+      if (typeof map !== 'undefined' && map) setTimeout(function () { map.invalidateSize({ pan: false }); }, 220); } })
+      .observe(sb, { attributes: true, attributeFilter: ['class'] });
+  })();
+  function closeProfile() {
+    var sb = $('sidebar');
+    if (sb) sb.classList.remove('profile-wide');
+    var back = document.querySelector('.sb-tab[data-tab="' + profPrevTab + '"]') || document.querySelector('.sb-tab[data-tab="overlay"]');
+    if (back) back.click();
+    if (sheetState === 2) { sheetState = 0; applyState(); }
+    syncProfBtn();
+    profBtn.focus({ preventScroll: true });
+  }
+
   profBtn.addEventListener('click', function (e) {
     e.stopPropagation();
     if (!currentWard) return;
+    if (profileOpen()) { closeProfile(); return; }
+    var act = document.querySelector('.sb-tab.active');
+    if (act && act.dataset.tab && act.dataset.tab !== 'ward') profPrevTab = act.dataset.tab;
+    if (!isNarrow() && $('sidebar')) $('sidebar').classList.add('profile-wide');
     document.querySelectorAll('.sb-tab').forEach(function (t) {
       t.classList.toggle('active', t.dataset.tab === 'ward');
     });
@@ -21391,7 +21686,7 @@ var PH_SHOW = {
       var have = indicatorKeys().indexOf(m.k) !== -1;
       return '<span class="q-chip' + (m.on && have ? ' on' : '') + '" data-metric="' + i + '"' +
         (have ? '' : ' style="opacity:.45;cursor:not-allowed" title="There are no figures for this indicator here"') +
-        ' role="button" tabindex="0">' + esc(cmpLabel(m.k)) + '</span>';
+        ' role="button" tabindex="0" aria-pressed="' + !!(m.on && have) + '">' + esc(cmpLabel(m.k)) + '</span>';
     }).join('') +
       '<select class="q-chip outline" id="cmp-add-metric" aria-label="Add an indicator">' +
       '<option value="">Add an indicator</option>' + indicatorOptions(null) + '</select>';
@@ -22776,11 +23071,10 @@ var PH_SHOW = {
           where + ' changes from one neighbourhood to the next. You can look at its ' +
           (la ? '<strong>' + la + ' local authorities (LAs)</strong>' : 'local authorities (LAs)') +
           ', its ' + (wd ? '<strong>' + wd + ' wards</strong>' : 'wards') +
-          ', which are the areas councillors are elected for, or smaller statistical areas. ' +
-          (PH_REGION.isEngland ? ''
-            : 'The map covers every region of England, and you can switch to yours with the ' +
-              '<strong>region button</strong> at the top or by searching for a postcode. ') +
-          'It is free, with no sign-in, and the next five chapters show you around.';
+          ', which are the areas councillors are elected for, or smaller statistical areas' +
+          (PH_REGION.isEngland ? '. '
+            : ', and switch to another region with the <strong>region button</strong> at the top. ') +
+          'The next five chapters show you around.';
       },
       go: function () {
         railClick('explore');
@@ -22788,18 +23082,16 @@ var PH_SHOW = {
         // tab, so setting the tab before it would be immediately undone.
         setOverlay('none');
         sidebarTab('overlay');
+        tourFitAll();
       },
     },
     {
       t: 'Choose an indicator',
       n: 'Open the <strong>Indicators</strong> tab and choose an indicator, and the map shades ' +
          'every area by its figure, with the key along the bottom showing what each colour means. ' +
-         'This example is the <strong>Deprivation score (IMD 2025)</strong>, so the darker a ward ' +
-         'is, the more deprived it is. Darker usually means a higher figure, but deprivation ' +
-         'deciles and ranks count down from 1 for the most deprived, so on those maps the colours ' +
-         'are turned round and darker still means more deprived. The <strong>Area level</strong> ' +
-         'switch on the map shows the same indicator by LA, ward, MSOA or LSOA wherever it has ' +
-         'figures for them.',
+         'In this example, the <strong>Deprivation score (IMD 2025)</strong>, the darker a ward ' +
+         'is, the more deprived it is. The <strong>Area level</strong> switch on the map shows the ' +
+         'same indicator for larger or smaller areas wherever it has figures for them.',
       go: function () {
         railClick('explore');
         // Back to wards with nothing drawn, so the example opens at the level
@@ -22807,6 +23099,7 @@ var PH_SHOW = {
         wardLevel();
         sidebarTab('overlay');
         setOverlay('imd_score_ward');
+        tourFitAll();
       },
     },
     {
@@ -22814,9 +23107,9 @@ var PH_SHOW = {
       // "A panel opens", with no side named: it is along the bottom on a
       // desktop and an upright phone, and beside the map on a phone held
       // sideways.
-      n: 'Select any ward and a panel opens with a short summary ' +
-         'and its main figures. Its buttons let you pin the ward to compare it with ' +
-         'others, open a printable report or see its full profile. To go straight to a place, ' +
+      n: 'Select any ward and a panel opens with a short summary and its main figures, and ' +
+         'from there you can pin the ward to compare it, open a printable report or see its ' +
+         'full profile. To go straight to a place, ' +
          'type a postcode, a ward or LA name, or a GP practice into the <strong>search</strong> ' +
          'at the top of the page.',
       go: function () {
@@ -22885,15 +23178,14 @@ var PH_SHOW = {
       t: 'The tools',
       // The Ask sentences only where this map has the Ask button.
       n: function () {
-        return 'The tabs along the top do the deeper work. <strong>Query</strong> finds every ward ' +
-         'that meets the conditions you set, and <strong>Compare</strong> lines up to four ' +
-         'places side by side. <strong>Custom area</strong> adds up the figures for an area you ' +
-         'build yourself from LSOAs. <strong>Data export</strong> makes a spreadsheet of the ' +
-         'areas and indicators you choose. <strong>Directory</strong> finds a GP practice, ' +
-         'pharmacy or charity by name or postcode.' + (!tourHasAsk() ? '' :
-         ' <strong>Ask about this data</strong> answers ' +
-         'your questions about an area. What you ask and the figures looked up to answer it pass ' +
-         'through this site\'s server to Anthropic\'s Claude model, which writes the reply, so ' +
+        return 'The tabs along the top do the deeper work. <strong>Query</strong> finds the wards ' +
+         'that meet conditions you set, <strong>Compare</strong> lines up to four places side by ' +
+         'side, <strong>Custom area</strong> adds up the figures for an area you build from LSOAs, ' +
+         '<strong>Data export</strong> makes a spreadsheet, and <strong>Directory</strong> finds ' +
+         'a GP practice, pharmacy or charity by name or postcode.' + (!tourHasAsk() ? '' :
+         ' <strong>Ask about this data</strong><span class="tour-phone-only"> (the button appears ' +
+         'when the tour ends)</span> answers questions about an area. What you ask, and the figures ' +
+         'looked up to answer it, go through this site\'s server to Anthropic\'s Claude model, so ' +
          'please leave out anything personal. You can ask 10 questions a day, and replying when ' +
          'it asks you to narrow a question down does not use one up.');
       },
@@ -22907,13 +23199,12 @@ var PH_SHOW = {
     },
     {
       t: 'What the figures cannot tell you',
-      n: 'Every figure describes an area as a whole rather than the individual people who live ' +
-         'there. Some health figures are only published for a whole LA, so the map repeats the ' +
-         'LA\'s figure in each of its wards and says so where it does, which means those figures ' +
-         'cannot tell one ward from another. An area left without colour has no figure, which ' +
-         'does not mean zero: the figure may have been withheld to protect privacy, or not ' +
-         'published for that area at all, so please check anything important against its ' +
-         'source before you act on it.',
+      n: 'Every figure describes an area as a whole rather than the people who live there. ' +
+         'A few health figures, such as smoking and suicide, are only published for a whole LA, ' +
+         'so you will find them in each ward\'s full profile, marked as LA figures, rather than ' +
+         'on the map. An area left without colour has no figure, usually because it was withheld ' +
+         'to protect privacy, so please check anything important against its source before you ' +
+         'act on it.',
       go: function () {
         // Also reachable by pressing Back from the end, so it cannot rely on
         // the chapter before it having run.
@@ -22937,7 +23228,7 @@ var PH_SHOW = {
         var grp = tourFirstGroup(), chip = tourFirstChip();
         var eg = (grp && chip) ? ', for example <strong>' + tourEsc(chip) + '</strong> under <em>' + tourEsc(grp) + '</em>,'
                : grp ? ', for example one under <em>' + tourEsc(grp) + '</em>,' : '';
-        return '<span class="tour-task-ask">Now it is your turn. Choose any indicator' + eg +
+        return '<span class="tour-task-ask">Choose any indicator' + eg +
           ' on the <strong>Indicators</strong> tab<span class="tour-phone-only"> (tap the ' +
           MENU_ICON + ' menu button first)</span> to colour the map by it.</span>' +
           '<span class="tour-task-done">That is it: the map is now coloured by ' +
@@ -23567,7 +23858,37 @@ var PH_SHOW = {
     drawReportSelection();
   }
 
+  /* On a phone the drawer that holds the area's figures covers most of the
+     screen, so while it is closed and the area is being built a small bar
+     above the credits keeps count, with a button back to the figures. The
+     same idea as the comparison bar's peek. */
+  function syncRbPeek() {
+    var el = $('rb-peek');
+    var narrow = !!(window.PH_DRAWER && PH_DRAWER.narrow());
+    var on = narrow && currentMode === 'report' && rbSelected.length > 0;
+    if (!el && !on) return;
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'area-peek rb-peek'; el.id = 'rb-peek'; el.hidden = true;
+      el.setAttribute('role', 'status');
+      el.innerHTML = '<p class="rb-peek-t"></p><button type="button" class="ov-btn rb-peek-open">Open your area</button>';
+      el.querySelector('.rb-peek-open').addEventListener('click', function () {
+        if (window.PH_DRAWER && PH_DRAWER.reveal) PH_DRAWER.reveal();
+      });
+      (mapWrap || document.body).appendChild(el);
+    }
+    if (on) {
+      var n = rbSelected.length;
+      el.querySelector('.rb-peek-t').textContent = 'Your area has ' + n + ' LSOA' + (n === 1 ? '' : 's') +
+        ' so far. Open it to see the combined figures.';
+    }
+    el.hidden = !on;
+    if (mapWrap) mapWrap.classList.toggle('has-peek', on || !!($('area-peek') && !$('area-peek').hidden));
+    if (typeof _refreshUI === 'function') _refreshUI();
+  }
+
   function drawReportSelection() {
+    syncRbPeek();
     if (rbLyr && typeof map !== 'undefined') { map.removeLayer(rbLyr); rbLyr = null; }
     if (currentMode !== 'report' || !rbSelected.length) return;
     if (typeof LSOA_IMD === 'undefined' || !LSOA_IMD.features || typeof map === 'undefined') return;
@@ -25065,7 +25386,7 @@ var PH_SHOW = {
   function renderServices() {
     qServicesEl.innerHTML = SERVICES.map(function (s) {
       var on = q.services.indexOf(s.id) !== -1;
-      return '<span class="q-chip' + (on ? ' on' : '') + '" data-svc="' + s.id + '" role="button" tabindex="0">' +
+      return '<span class="q-chip' + (on ? ' on' : '') + '" data-svc="' + s.id + '" role="button" tabindex="0" aria-pressed="' + on + '">' +
         esc(s.label) + '</span>';
     }).join('<span class="q-join">+</span>');
   }

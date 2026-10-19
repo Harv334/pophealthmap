@@ -17,6 +17,16 @@
 <link rel="manifest" href="https://pophealth.uk/site.webmanifest">
 <link rel="stylesheet" href="https://pophealth.uk/vendor/fonts.css">
 <link rel="stylesheet" href="https://pophealth.uk/pages.css">
+<!-- An address that names a region, such as /north-east or /north-east/,
+     goes straight to that region's map, since that is what it was a guess at. -->
+<script>
+(function () {
+  var ids = ['england', 'london', 'north-east', 'north-west', 'yorkshire-and-the-humber',
+             'east-midlands', 'west-midlands', 'east-of-england', 'south-east', 'south-west'];
+  var seg = location.pathname.replace(/^\/+|\/+$/g, '').toLowerCase();
+  if (ids.indexOf(seg) !== -1) location.replace('https://pophealth.uk/' + (seg === 'london' ? '' : '?r=' + seg));
+})();
+</script>
 </head>
 <body>
 
@@ -41,7 +51,18 @@
   <h1>That page is not here</h1>
   <p>We could not find a page at this address. It may have been mistyped, or the
   link you followed may point to something that has moved.</p>
-  <p><a class="btn" href="https://pophealth.uk/">Go back to the map</a></p>
+  <p><a class="btn" href="https://pophealth.uk/">Open the map</a></p>
+  <p>Or open a region:
+    <a href="https://pophealth.uk/?r=north-east">North East</a>,
+    <a href="https://pophealth.uk/?r=north-west">North West</a>,
+    <a href="https://pophealth.uk/?r=yorkshire-and-the-humber">Yorkshire and The Humber</a>,
+    <a href="https://pophealth.uk/?r=east-midlands">East Midlands</a>,
+    <a href="https://pophealth.uk/?r=west-midlands">West Midlands</a>,
+    <a href="https://pophealth.uk/?r=east-of-england">East of England</a>,
+    <a href="https://pophealth.uk/">London</a>,
+    <a href="https://pophealth.uk/?r=south-east">South East</a>,
+    <a href="https://pophealth.uk/?r=south-west">South West</a>
+    or <a href="https://pophealth.uk/?r=england">all of England</a>.</p>
 
 </main>
 
