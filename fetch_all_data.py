@@ -252,6 +252,11 @@ def write_parquet_guarded(path: Path, df: "pd.DataFrame", *, source: str) -> "pd
 # missing or thin. main() reads it to mark the source "partial", which the
 # refresh workflow reports in an issue like a failure.
 _SOURCE_PARTIAL: dict[str, str] = {}
+# Sources whose output was written but failed a check that means part of it is
+# wrong or missing for this pack (an LA with none of its figures, an indicator
+# at the wrong age). main() marks them "failed" with this message, so the
+# refresh workflow raises them, while the rows that passed are still used.
+_SOURCE_ERROR: dict[str, str] = {}
 
 def carry_forward_thin(path: Path, df: "pd.DataFrame", *, key: str, source: str,
                        requested, cache_file=None,
@@ -2844,15 +2849,31 @@ FINGERTIPS_INDICATORS = [
     #                   and a plausible-looking guess is what caused this mess.
 ]
 
-# Fingertips publishes these at upper-tier local authority (area type 502):
-# counties, unitaries, metropolitan and London boroughs. A district (E07) in a
-# shire county has no row of its own, so outside London and the big cities a
-# third of England's authorities would match nothing. Each such district takes
-# its county's published figure instead, found through Fingertips' own
-# county-to-district lookup. The figure is the county's, as the indicator's
-# metadata already says ("upper-tier local authority"); nothing is estimated.
+# Fingertips publishes most of these for districts and unitaries (area type
+# 501) as well as for upper-tier LAs (502): counties, unitaries, metropolitan
+# and London boroughs. run_fingertips asks for 501 first, so a district (E07)
+# in a shire county gets its own figure wherever OHID publishes one. Only where
+# it does not does the district take its county's 502 figure, found through
+# Fingertips' own county-to-district lookup, and the row then records the
+# county as the area the figure describes (source_code and source_name), so
+# the map can say it is the county's figure rather than present it as the
+# district's own. Until April 2026 every district got its county's figure for
+# all 18 series under its own name, which put Kent's life expectancy on Thanet
+# and Sevenoaks alike.
 FT_PARENTS_URL = ("https://fingertips.phe.org.uk/api/parent_to_child_areas"
                   "?child_area_type_id=501&parent_area_type_id=502")
+
+# Councils whose code changed after a boundary change, mapped to the code they
+# replaced, from the ONS Code History Database. Fingertips can lag a year or
+# more behind a new code, and an LA that matches nothing has no OHID figures at
+# all: Barnsley and Sheffield were redrawn in 2024 (E08000016 and E08000019
+# became E08000038 and E08000039), and their 49 wards showed none of the 18
+# series. The predecessor's figure is the same council's, so it is not a
+# county figure and is not marked as one.
+CODE_PREDECESSORS = {
+    "E08000038": "E08000016",   # Barnsley
+    "E08000039": "E08000019",   # Sheffield
+}
 
 @lru_cache(maxsize=1)
 def _ft_district_parents() -> dict:
@@ -2880,25 +2901,202 @@ def _ft_district_parents() -> dict:
     return out
 
 
-def _ft_in_scope(df: "pd.DataFrame") -> "pd.DataFrame":
-    """Rows for the scope's authorities, districts filled from their county."""
-    own = df[df["Area Code"].isin(SCOPE_LADS)]
-    missing = SCOPE_LADS - set(own["Area Code"])
-    if not missing:
-        return own
-    parents = {d: c for d, c in _ft_district_parents().items() if d in missing}
-    if not parents:
-        return own
-    extra = []
-    for d, c in parents.items():
-        rows = df[df["Area Code"] == c]
-        if rows.empty:
+def _ft_num(v):
+    """A float, or None for a blank, unreadable or NaN cell."""
+    f = _tofloat(v)
+    return f if f is not None and f == f else None
+
+
+def _ft_has_value(row) -> bool:
+    return _ft_num(row.get("Value")) is not None
+
+
+def _ft_in_scope(df: "pd.DataFrame", upper: "pd.DataFrame | None" = None,
+                 parents: "dict | None" = None,
+                 lads: "set | None" = None) -> "pd.DataFrame":
+    """One row per in-scope LA, keyed by its own code in "Area Code".
+
+    df is one row per published area (see _ft_pick), normally at area type 501;
+    upper is the same indicator at area type 502, or None when df is the only
+    download. For each LA the first of these with a figure is used:
+
+      1. its own row in df, then in upper;
+      2. the row of the code it replaced (CODE_PREDECESSORS), the same council;
+      3. its county's row in upper (or df), for a district OHID does not
+         publish on its own.
+
+    "Area Name" keeps the published area's name, so a county's row still says
+    the county, and three columns record what the figure describes:
+    source_code, source_name and source_kind ("own", "predecessor" or
+    "county")."""
+    lads = SCOPE_LADS if lads is None else lads
+    if parents is None:
+        parents = _ft_district_parents()
+    frames = [f for f in (df, upper) if f is not None and not f.empty]
+    if not frames:
+        return pd.DataFrame()
+
+    def first(code):
+        hit = None
+        for f in frames:
+            rows = f[f["Area Code"] == code]
+            if rows.empty:
+                continue
+            r = rows.iloc[-1]
+            if _ft_has_value(r):
+                return r
+            hit = r if hit is None else hit
+        return hit
+
+    out = []
+    for lad in sorted(lads):
+        tries = [(lad, "own")]
+        if lad in CODE_PREDECESSORS:
+            tries.append((CODE_PREDECESSORS[lad], "predecessor"))
+        if parents.get(lad):
+            tries.append((parents[lad], "county"))
+        chosen, blank = None, None
+        for code, kind in tries:
+            r = first(code)
+            if r is None:
+                continue
+            if _ft_has_value(r):
+                chosen = (r, code, kind)
+                break
+            blank = blank or (r, code, kind)
+        chosen = chosen or blank
+        if chosen is None:
             continue
-        rows = rows.copy()
-        rows["Area Code"] = d
-        rows["Area Name"] = LAD_NAMES.get(d, d)
-        extra.append(rows)
-    return pd.concat([own] + extra, ignore_index=True) if extra else own
+        r, code, kind = chosen
+        r = r.copy()
+        r["source_code"] = code
+        r["source_name"] = str(r.get("Area Name", "") or "")
+        r["source_kind"] = kind
+        r["Area Code"] = lad
+        out.append(r)
+    return pd.DataFrame(out).reset_index(drop=True) if out else pd.DataFrame()
+
+
+# The age each indicator is published for as its headline. Fingertips sends
+# every breakdown in one file, by age and by category (deprivation decile,
+# ethnic group and so on), and keeping whichever row sorted last put the
+# 18 to 64 breakdown of adult smoking on the map as if it were the 18 and over
+# figure: intervals ten points wide, and nine of London's 33 values ones OHID
+# marks "not published for data quality reasons". Measured from the October
+# 2026 data; every id but 92443 already came through at its headline age.
+FT_HEADLINE_AGE = {
+    90366: "All ages", 90362: "All ages", 92443: "18+ yrs", 93088: "18+ yrs",
+    90323: "10-11 yrs", 93014: "19+ yrs", 219: "All ages", 848: "18+ yrs",
+    90581: "All ages", 41001: "10+ yrs", 93700: "<16 yrs", 90813: "10-24 yrs",
+    93930: "0-4 yrs", 30311: "5 yrs", 30314: "65+ yrs", 93560: "25-49 yrs",
+}
+# Survey prevalences, whose LA intervals say whether the right breakdown came
+# through: the 18 and over smoking figure has a median half-width of about 3
+# points, physical activity 3.6, the 18 to 64 breakdown 9.4.
+FT_PREVALENCE_IDS = {92443, 93088, 93014}
+FT_CI_HALF_WIDTH_MAX = 5.0
+# A value whose note says this is a placeholder, not a figure.
+FT_WITHHELD_NOTES = ("not published", "cannot be calculated")
+
+
+def _ft_blank(s: "pd.Series") -> "pd.Series":
+    return s.isna() | (s.astype(str).str.strip().isin(["", "nan", "None"]))
+
+
+def _ft_headline_age(df: "pd.DataFrame", want: "str | None") -> "str | None":
+    """The age to keep: the one asked for, else the only one, else All ages,
+    else the broadest open-ended band ("18+ yrs"). None when it cannot tell."""
+    if "Age" not in df.columns:
+        return None
+    ages = [a for a in df["Age"].dropna().astype(str).unique()]
+    if want:
+        return want
+    if len(ages) <= 1:
+        return ages[0] if ages else None
+    if "All ages" in ages:
+        return "All ages"
+    plus = sorted((a for a in ages if a.endswith("+ yrs")),
+                  key=lambda a: _tofloat(a.split("+")[0]) or 999)
+    return plus[0] if plus else None
+
+
+def _ft_pick(df: "pd.DataFrame", short: str, want_age: "str | None" = None,
+             label: str = "") -> "pd.DataFrame":
+    """One headline row per area: the right sex, no category breakdown, the
+    headline age, and the latest period. A value OHID withholds is blanked.
+
+    Raises ValueError when the headline age is not in the file, so a wrong
+    breakdown is never kept in its place."""
+    if df is None or df.empty:
+        return pd.DataFrame()
+    df = df.copy()
+    # Fingertips returns Male, Female and Persons rows for the same
+    # indicator. The indicator name says what it wants, and everything else
+    # wants Persons.
+    if "Sex" in df.columns:
+        if short.endswith("_male"):
+            want = "Male"
+        elif short.endswith("_female"):
+            want = "Female"
+        else:
+            want = "Persons"
+        sub = df[df["Sex"] == want]
+        if sub.empty and want == "Persons":
+            sub = df          # some indicators are single-sex by nature
+        if sub.empty:
+            raise ValueError(f"no '{want}' rows")
+        df = sub
+    # A row with a Category Type is a breakdown (by deprivation decile, ethnic
+    # group and so on), never the area's headline figure.
+    if "Category Type" in df.columns:
+        df = df[_ft_blank(df["Category Type"])]
+    if "Age" in df.columns and not df.empty:
+        age = _ft_headline_age(df, want_age)
+        if age is None:
+            raise ValueError(f"several ages ({', '.join(sorted(df['Age'].dropna().astype(str).unique()))}) "
+                             f"and no headline age known")
+        sub = df[df["Age"].astype(str) == age]
+        if sub.empty:
+            raise ValueError(f"headline age {age!r} not in the file "
+                             f"(it has {', '.join(sorted(df['Age'].dropna().astype(str).unique()))})")
+        df = sub
+    if df.empty:
+        return df
+    if "Time period Sortable" in df.columns:
+        df = df.sort_values("Time period Sortable", kind="stable")
+    df = df.groupby("Area Code", as_index=False, sort=False).tail(1).copy()
+    if "Value note" in df.columns:
+        note = df["Value note"].fillna("").astype(str).str.lower()
+        withheld = note.apply(lambda n: any(w in n for w in FT_WITHHELD_NOTES))
+        df.loc[withheld, "Value"] = None
+        for c in ("Lower CI 95.0 limit", "Upper CI 95.0 limit"):
+            if c in df.columns:
+                df.loc[withheld, c] = None
+    return df
+
+
+def ft_sanity(rows: list, ind_id: int, short: str) -> "str | None":
+    """Why one indicator's rows cannot be trusted, or None. Checks the stored
+    age is the headline age, and that a survey prevalence has intervals narrow
+    enough to be the headline rather than a breakdown."""
+    want = FT_HEADLINE_AGE.get(ind_id)
+    mine = [r for r in rows if r.get("indicator_short") == short]
+    if want:
+        bad = sorted({str(r.get("age")) for r in mine
+                      if r.get("age") not in (None, "", want)})
+        if bad:
+            return f"{short}: age {', '.join(bad)} where {want} was expected"
+    if ind_id in FT_PREVALENCE_IDS:
+        hw = [(r["upper_ci"] - r["lower_ci"]) / 2 for r in mine
+              if r.get("upper_ci") is not None and r.get("lower_ci") is not None
+              and r.get("value") is not None]
+        if len(hw) >= 3:
+            med = sorted(hw)[len(hw) // 2] if len(hw) % 2 else \
+                (sorted(hw)[len(hw) // 2 - 1] + sorted(hw)[len(hw) // 2]) / 2
+            if med > FT_CI_HALF_WIDTH_MAX:
+                return (f"{short}: median interval half-width {med:.1f} points, over "
+                        f"{FT_CI_HALF_WIDTH_MAX:g}; probably a breakdown, not the headline")
+    return None
 
 
 def _ft_value_with_ci(row) -> tuple:
@@ -2910,52 +3108,68 @@ def _ft_value_with_ci(row) -> tuple:
     value it put 0% smoking on the map for every City ward, where the honest
     answer is that there is no published figure.
     """
-    value = _tofloat(row.get("Value"))
-    lower = _tofloat(row.get("Lower CI 95.0 limit"))
-    upper = _tofloat(row.get("Upper CI 95.0 limit"))
+    value = _ft_num(row.get("Value"))
+    lower = _ft_num(row.get("Lower CI 95.0 limit"))
+    upper = _ft_num(row.get("Upper CI 95.0 limit"))
     if lower is not None and upper is not None and upper < lower:
         return None, None, None
     return value, lower, upper
+
+
+def _ft_download(cache: "Path", ind_id: int, area_type: int, short: str,
+                 quiet: bool = False) -> "pd.DataFrame | None":
+    """One indicator at one area type, cache first. None when there is nothing."""
+    if not cache.exists():
+        url = (
+            f"https://fingertips.phe.org.uk/api/all_data/csv/by_indicator_id"
+            f"?indicator_ids={ind_id}"
+            f"&child_area_type_id={area_type}"
+            f"&parent_area_type_id=15"
+        )
+        try:
+            r = _ft_get(url, timeout=60)
+            # A non-existent indicator id answers 200 with a header row and
+            # nothing under it. Caching that makes the gap permanent: the
+            # file exists, so no rerun ever asks again, and the indicator
+            # is simply absent from the map with nothing to say why. Five
+            # of them sat like that until someone counted the outputs. At
+            # area type 501 an empty answer is normal for a series OHID
+            # publishes only for upper-tier LAs, so it is not a warning there.
+            if len(r.content.splitlines()) < 2:
+                if not quiet:
+                    warn(f"fingertips {ind_id} ({short}): no rows returned; "
+                         f"not caching. Check the id exists and is published "
+                         f"for area type {area_type}.")
+                return None
+            cache.write_bytes(r.content)
+            time.sleep(1.0)  # be polite
+        except Exception as e:
+            warn(f"fingertips {ind_id} (area type {area_type}): {e}")
+            return None
+    try:
+        df = pd.read_csv(cache, dtype=str, low_memory=False)
+    except pd.errors.EmptyDataError:
+        return None
+    if df.empty or "Area Code" not in df.columns:
+        return None
+    return df
 
 
 def run_fingertips() -> pd.DataFrame:
     rule("OHID Fingertips (public health outcomes)")
     cache_dir = CACHE_DIR / "fingertips"
     cache_dir.mkdir(parents=True, exist_ok=True)
-    AREA_TYPE_LA = 502  # Upper-tier LAs (post Apr 2023)
+    AREA_TYPE_DISTRICT = 501  # Districts and unitaries (post Apr 2023)
+    AREA_TYPE_LA = 502        # Upper-tier LAs (post Apr 2023)
 
     rows: list = []
+    problems: list = []
     for ind_id, short, desc in FINGERTIPS_INDICATORS:
-        cache = cache_dir / f"ind_{ind_id}.csv"
-        if not cache.exists():
-            url = (
-                f"https://fingertips.phe.org.uk/api/all_data/csv/by_indicator_id"
-                f"?indicator_ids={ind_id}"
-                f"&child_area_type_id={AREA_TYPE_LA}"
-                f"&parent_area_type_id=15"
-            )
-            try:
-                r = _ft_get(url, timeout=60)
-                # A non-existent indicator id answers 200 with a header row and
-                # nothing under it. Caching that makes the gap permanent: the
-                # file exists, so no rerun ever asks again, and the indicator
-                # is simply absent from the map with nothing to say why. Five
-                # of them sat like that until someone counted the outputs.
-                if len(r.content.splitlines()) < 2:
-                    warn(f"fingertips {ind_id} ({short}): no rows returned; "
-                         f"not caching. Check the id exists and is published "
-                         f"for area type {AREA_TYPE_LA}.")
-                    continue
-                cache.write_bytes(r.content)
-                time.sleep(1.0)  # be polite
-            except Exception as e:
-                warn(f"fingertips {ind_id}: {e}")
-                continue
-        try:
-            df = pd.read_csv(cache, dtype=str, low_memory=False)
-        except pd.errors.EmptyDataError:
-            continue
-        if df.empty or "Area Code" not in df.columns:
+        # 502 keeps its old cache name, so a rerun does not fetch it again.
+        df_up = _ft_download(cache_dir / f"ind_{ind_id}.csv", ind_id, AREA_TYPE_LA, short)
+        df_501 = _ft_download(cache_dir / f"ind_{ind_id}_501.csv", ind_id,
+                              AREA_TYPE_DISTRICT, short, quiet=True)
+        if df_up is None and df_501 is None:
             continue
 
         # Check the id is the indicator we think it is. An id that points at
@@ -2963,39 +3177,33 @@ def run_fingertips() -> pd.DataFrame:
         # under our own label, which is the one failure mode nothing else here
         # can catch: hypertension prevalence published as smoking prevalence
         # was 10.8%, and looked entirely reasonable, for months.
-        if "Indicator Name" in df.columns and not df["Indicator Name"].empty:
-            actual = str(df["Indicator Name"].iloc[0])
+        first = df_501 if df_501 is not None else df_up
+        if "Indicator Name" in first.columns and not first["Indicator Name"].empty:
+            actual = str(first["Indicator Name"].iloc[0])
             if _ft_name_mismatch(desc, actual):
                 warn(f"fingertips {ind_id}: asked for {desc!r} but the data is "
                      f"{actual!r}. Verify the id before trusting this column.")
-        df = _ft_in_scope(df)
+        # Sex, no category breakdown, the headline age and the latest period,
+        # chosen explicitly. Keeping whichever row sorted last once produced
+        # Female figures for the two _male indicators, and the 18 to 64
+        # breakdown of adult smoking in place of the 18 and over figure.
+        try:
+            pick_501 = _ft_pick(df_501, short, FT_HEADLINE_AGE.get(ind_id))
+            pick_up = _ft_pick(df_up, short, FT_HEADLINE_AGE.get(ind_id))
+        except ValueError as e:
+            msg = f"fingertips {ind_id} ({short}): {e}; skipping"
+            warn(msg)
+            problems.append(f"{short}: {e}")
+            continue
+        df = _ft_in_scope(pick_501, pick_up)
         if df.empty:
             continue
-        # Fingertips returns Male, Female and Persons rows for the same
-        # indicator. Without choosing, the tail(1) below takes whichever sorts
-        # last, which silently produced Female figures for the two _male
-        # indicators. Pick explicitly: the indicator name says what it wants,
-        # and everything else wants Persons.
-        if "Sex" in df.columns:
-            if short.endswith("_male"):
-                want = "Male"
-            elif short.endswith("_female"):
-                want = "Female"
-            else:
-                want = "Persons"
-            sub = df[df["Sex"] == want]
-            if sub.empty and want == "Persons":
-                sub = df          # some indicators are single-sex by nature
-            if sub.empty:
-                warn(f"fingertips {ind_id} ({short}): no '{want}' rows; skipping")
-                continue
-            df = sub
-        df = df.sort_values("Time period Sortable").groupby("Area Code", as_index=False).tail(1)
+        added = []
         for _, row in df.iterrows():
             value, lower_ci, upper_ci = _ft_value_with_ci(row)
-            rows.append({
+            added.append({
                 "LAD25CD": row["Area Code"],
-                "lad_name": row.get("Area Name", ""),
+                "lad_name": LAD_NAMES.get(row["Area Code"], row.get("Area Name", "")),
                 "indicator_id": ind_id,
                 "indicator_short": short,
                 "indicator_name":  desc,
@@ -3005,7 +3213,22 @@ def run_fingertips() -> pd.DataFrame:
                 "period":   row.get("Time period", ""),
                 "sex":      row.get("Sex", ""),
                 "age":      row.get("Age", ""),
+                # The area the figure describes: the LA itself, the code it
+                # replaced, or for a district OHID does not publish on its own,
+                # its county.
+                "source_code": row.get("source_code", row["Area Code"]),
+                "source_name": row.get("source_name", ""),
+                "source_kind": row.get("source_kind", "own"),
             })
+        bad = ft_sanity(added, ind_id, short)
+        if bad:
+            # Kept as rows with no value, so carry_forward_thin does not put
+            # last run's figures back, and the run is marked failed below.
+            warn(f"fingertips: {bad}; its values are left blank")
+            problems.append(bad)
+            for r in added:
+                r["value"] = r["lower_ci"] = r["upper_ci"] = None
+        rows.extend(added)
 
     out = pd.DataFrame(rows)
     out_path = DATA_DIR / "outcomes" / "fingertips.parquet"
@@ -3015,22 +3238,31 @@ def run_fingertips() -> pd.DataFrame:
                              cache_file=lambda k: cache_dir / f"ind_{ft_id[k]}.csv")
     out = write_parquet_guarded(out_path, out, source="fingertips")
     ok(f"fingertips: {len(out):,} rows -> {out_path.relative_to(REPO_ROOT)}")
+    if not out.empty and "source_kind" in out.columns:
+        cty = out[out["source_kind"] == "county"]
+        if len(cty):
+            info(f"fingertips: {cty['LAD25CD'].nunique()} district(s) carry their county's "
+                 f"figure for at least one series ({len(cty)} values), marked as such")
     # Council codes are checked, not assumed. A council reorganised since the
     # boundaries Fingertips uses (or the other way round) matches nothing and
     # would otherwise just be blank. ONS's Code History Database records which
-    # codes replaced which; anything listed here needs looking up there.
+    # codes replaced which (CODE_PREDECESSORS); an LA still unmatched is an
+    # error for this pack, because the map then has none of its OHID figures.
     if not out.empty and "LAD25CD" in out.columns:
-        have = set(out["LAD25CD"].astype(str))
-        parents = _ft_district_parents()
-        missing = sorted(l for l in SCOPE_LADS if l not in have and parents.get(l) not in have)
+        have = set(out.loc[out["value"].notna(), "LAD25CD"].astype(str))
+        missing = sorted(l for l in SCOPE_LADS if l not in have)
         if missing:
             names = ", ".join(f"{LAD_NAMES.get(l, l)} ({l})" for l in missing)
-            msg = (f"{len(missing)} {LA_WORD}(s) matched no Fingertips area code, directly or "
-                   f"through their county: {names}. Check the ONS Code History Database.")
+            msg = (f"{len(missing)} {LA_WORD}(s) have no Fingertips figure, directly, "
+                   f"under a predecessor code or through their county: {names}. "
+                   f"Look the codes up in the ONS Code History Database and add them "
+                   f"to CODE_PREDECESSORS.")
             warn(f"fingertips: {msg}")
-            _SOURCE_PARTIAL["fingertips"] = msg
+            problems.append(msg)
         else:
             ok(f"fingertips: all {len(SCOPE_LADS)} {LA_WORD}s matched a Fingertips area code")
+    if problems:
+        _SOURCE_ERROR["fingertips"] = "; ".join(problems)
     return out
 
 # ============================================================================
@@ -3164,22 +3396,27 @@ def run_fingertips_profiles() -> pd.DataFrame:
                 continue
             if df.empty or "Area Code" not in df.columns:
                 continue
+            # Persons, no category breakdown, the headline age and the latest
+            # period. The age is known for the ids FT_HEADLINE_AGE lists, and
+            # otherwise is the only one, All ages, or the broadest "N+ yrs";
+            # an indicator with several ages and none of those is left out
+            # rather than shown as whichever breakdown sorted last.
+            try:
+                df = _ft_pick(df, f"{prefix}_{ind_id}", FT_HEADLINE_AGE.get(ind_id))
+            except ValueError as e:
+                info(f"  {label}: {ind_id} left out ({e})")
+                requested.discard(f"{prefix}_{ind_id}")
+                continue
             df = _ft_in_scope(df)
             if df.empty:
                 continue
-            if "Sex" in df.columns:
-                persons = df[df["Sex"] == "Persons"]
-                df = persons if not persons.empty else df
-            if "Time period Sortable" in df.columns:
-                df = df.sort_values("Time period Sortable")
-            df = df.groupby("Area Code", as_index=False).tail(1)
             # The name comes from the API, so the label on the map is the
             # publisher's and cannot disagree with the id it was fetched under.
             name = inds[ind_id]
             for _, row in df.iterrows():
                 rows.append({
                     "LAD25CD": row["Area Code"],
-                    "lad_name": row.get("Area Name", ""),
+                    "lad_name": LAD_NAMES.get(row["Area Code"], row.get("Area Name", "")),
                     "profile_id": profile_id,
                     "profile": label,
                     "indicator_id": ind_id,
@@ -3188,6 +3425,9 @@ def run_fingertips_profiles() -> pd.DataFrame:
                     "value": _tofloat(row.get("Value")),
                     "period": row.get("Time period", ""),
                     "unit": row.get("Value note", ""),
+                    "age": row.get("Age", ""),
+                    "source_code": row.get("source_code", row["Area Code"]),
+                    "source_kind": row.get("source_kind", "own"),
                 })
             kept += 1
         ok(f"  {label}: {kept} indicators with {SCOPE_NAME} figures")
@@ -5317,6 +5557,12 @@ def build_borough_data() -> dict:
         # Same key the ward copies carry, so one overlay can be drawn at
         # either level without a second name for the same indicator.
         out.setdefault(lad, {})[f"ft_{row['indicator_short']}"] = float(v)
+        # A district's figure that is its county's says so, with the county's
+        # code and name, so the map can label it as the county's rather than
+        # present it as the district's own.
+        if str(row.get("source_kind", "") or "") == "county":
+            out[lad].setdefault("ft_from", {})[f"ft_{row['indicator_short']}"] = [
+                str(row.get("source_code", "") or ""), str(row.get("source_name", "") or "")]
 
     n_vals = sum(len(v) for v in out.values())
     # Census percentages for each LA, from the summed counts of its output
@@ -5903,6 +6149,8 @@ def build_indicator_stats(ward_data: dict, lsoa_data: dict,
     info(f"indicator stats: {len(stats):,} indicators measured across "
          f"{sum(1 for _ in LEVELS)} levels; polarity carried for {carried}; "
          f"period carried for {dated}")
+    age_bands = census_age_bands()
+    ft_bad = ft_age_mismatches()
     return {
         "generated": datetime.now(timezone.utc).isoformat(),
         # How the Census ward figures were made, for the methodology page,
@@ -5915,8 +6163,48 @@ def build_indicator_stats(ward_data: dict, lsoa_data: dict,
             k.startswith("census_") and k.endswith("_pct")
             for rec in (borough_data or {}).values() if isinstance(rec, dict)
             for k in (rec.get("indicators") or rec)) else "",
+        # Which ages census_under16_pct and census_working_age_pct cover:
+        # "0-15" when they were built from single years of age (TS007), so
+        # the map labels them under 16 and 16 to 64. Anything else means the
+        # five-year bands of TS007A, which give 0 to 14 and 15 to 64, and the
+        # map says so.
+        "census_age_bands": age_bands,
+        # The LA Fingertips series whose stored age is not the headline age
+        # (FT_HEADLINE_AGE). The map leaves these out; ft_age_checked says the
+        # check ran, so a file written before it existed is treated with care.
+        "ft_age_checked": ft_bad is not None,
+        "ft_age_mismatch": sorted(ft_bad or []),
         "stats": stats,
     }
+
+
+def census_age_bands() -> str:
+    """'0-15' when every census level on disk built its under 16 and working
+    age bands from single years of age, else '0-14' (see _census_frame)."""
+    p = DATA_DIR / "demographics" / "census2021_age_bands.json"
+    try:
+        rec = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return "0-14"
+    vals = {v for v in (rec or {}).values() if isinstance(v, str)}
+    return "0-15" if vals == {"0-15"} else "0-14"
+
+
+def ft_age_mismatches() -> "list | None":
+    """ft_ keys whose stored age is not the headline age, or None when the
+    Fingertips file has no age column to check."""
+    ft = _read_parquet_opt(DATA_DIR / "outcomes" / "fingertips.parquet")
+    if ft is None or ft.empty or "age" not in ft.columns:
+        return None
+    bad = []
+    for (ind_id, short), g in ft.groupby(["indicator_id", "indicator_short"]):
+        want = FT_HEADLINE_AGE.get(int(ind_id))
+        if not want:
+            continue
+        ages = {str(a) for a in g["age"].dropna() if str(a)}
+        if ages and ages != {want}:
+            bad.append(f"ft_{short}")
+    return bad
 
 
 def export_msoa_outline(feats: list) -> None:
@@ -7462,6 +7750,7 @@ def main() -> int:
             _MANIFEST_SOURCE = s
             _MANIFEST_WRITES.pop(s, None)
             _SOURCE_PARTIAL.pop(s, None)
+            _SOURCE_ERROR.pop(s, None)
             t0 = time.time()
             rec: dict = {"status": "ok", "error": "", "notes": "",
                          "fetched_at": datetime.now(timezone.utc).isoformat(),
@@ -7486,6 +7775,9 @@ def main() -> int:
                         rec["status"] = "failed"
                         rec["error"] = ("source produced no rows; see the run "
                                         "log for the upstream error")
+                    elif s in _SOURCE_ERROR:
+                        rec["status"] = "failed"
+                        rec["error"] = _SOURCE_ERROR[s]
                     elif s in _SOURCE_PARTIAL:
                         # Usable, but some of it is last run's. Not ok, so the
                         # refresh workflow raises it; not failed, because the
