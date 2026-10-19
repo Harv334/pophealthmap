@@ -2204,6 +2204,27 @@ const smallText = page => page.evaluate(() => {
     await page.close();
   }
 
+  // GP practices, pharmacies and dentists a resident can use: no schemes,
+  // hubs or offices among the GP practices, no appliance or online-only
+  // pharmacies, and the dental layer says what an NHS contract means.
+  {
+    const { page, errors } = await open(browser, 'index.html?t=1', DESK);
+    await page.evaluate(() => Promise.all([ensureLayerData('pharmacy'), ensureLayerData('dental')]));
+    const s = await page.evaluate(() => ({
+      gpBad: GPS.filter(d => /special allocation|\bSAS\b|PCN Ea Hub|federat|covid/i.test(d.n)).map(d => d.n),
+      homeless: (GPS.find(d => d.code === 'E87772') || {}).kind || '',
+      phBad: pharmData.filter(d => /fittleworth|online|chemist 2 home/i.test(d.name)).map(d => d.name),
+      prison: dentalData.filter(d => /\bHMP\b/i.test(d.name)).map(d => d.name),
+      note: (document.getElementById('dental-note') || {}).textContent || '',
+    }));
+    ok(!s.gpBad.length && s.homeless === 'Practice for people who are homeless',
+      'GP practices: no schemes, hubs or offices, and the practices for people who are homeless are labelled', JSON.stringify(s));
+    ok(!s.phBad.length && !s.prison.length, 'pharmacies and dentists: no appliance or online-only suppliers, and no prisons', JSON.stringify(s));
+    ok(/A contract does not mean a practice is taking new NHS patients/.test(s.note), 'dental: the Layers row says what an NHS contract means', s.note);
+    ok(errors.length === 0, 'no page errors (service layers)', errors.join(' | '));
+    await page.close();
+  }
+
   // The LSOA report waits for the pharmacies, dental practices and charities,
   // as the ward report does, rather than counting none on a fresh page.
   {

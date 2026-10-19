@@ -1113,6 +1113,7 @@
   .hosp-ae-note { font-size: var(--t-xs); }
   .lsub.hosp-ae-note { margin-top: -2px; }
   .dir-note.hosp-ae-note { margin: 0 0 8px; padding: 6px 8px; border-left: 3px solid #A32D2D; background: var(--paper-2, transparent); }
+  .dir-note.dir-dent-note { border-left-color: #7B2D8E; }
 
   /* ── Charity groups: a ring of the causes inside, round a dark centre ── */
   .vcse-ring { border-radius: 50%; padding: 5px; box-sizing: border-box; display: flex;
@@ -3308,6 +3309,7 @@
           <!-- VCSE toggle lives in the VCSE tab; that is the only place to enable it. -->
 
           <label class="lrow"><div class="sw sw-dot" style="--sw:#7B2D8E"></div><span class="lname">Dental practices <span class="lcount" id="dental-count"></span></span><input type="checkbox" id="td"></label>
+          <p class="lsub hosp-ae-note" id="dental-note">Practices that hold an NHS dental contract, from the NHS register. A contract does not mean a practice is taking new NHS patients, and practices that see only private patients are not shown. To find one taking NHS patients, use the <a href="https://www.nhs.uk/service-search/find-a-dentist" target="_blank" rel="noopener">dentist search on nhs.uk</a> or call NHS 111.</p>
           <label class="lrow"><div class="sw sw-dot" style="--sw:#E89B1B"></div><span class="lname">Pharmacies <span class="lcount" id="pharm-count"></span></span><input type="checkbox" id="tph"></label>
         </div>
         <div class="sb-sec">
@@ -8032,6 +8034,9 @@ const gpL = L.markerClusterGroup({
 });
 gpL.addLayers(GPS.map(d => {
   const rows = {};
+  // Set only for the practices for people who are homeless (see
+  // data/curated/service_sites.csv).
+  if (d.kind) rows['Type'] = d.kind;
   if (d.pc) rows['Postcode'] = d.pc;
   if (d.ward) rows['Ward'] = d.ward + (d.lad ? ' (' + d.lad + ')' : '');
   if (d.tel) rows['Tel'] = d.tel;
@@ -8910,6 +8915,10 @@ const dentalCluster = L.markerClusterGroup({
   }
 });
 let dentalData = [];
+// What the dental layer is, under its Layers row, in its popups and atop the
+// Directory's dental list: the NHS contract register, which is not the same
+// as practices taking new NHS patients.
+const DENTAL_NOTE_HTML = 'Practices that hold an NHS dental contract, from the NHS register. A contract does not mean a practice is taking new NHS patients, and practices that see only private patients are not shown. To find one taking NHS patients, use the <a href="https://www.nhs.uk/service-search/find-a-dentist" target="_blank" rel="noopener">dentist search on nhs.uk</a> or call NHS 111.';
 // The layer is the NHS dental register from ODS, so there is nothing to filter
 // by any more: every practice here holds an NHS contract by virtue of being in
 // the register. The NHS/private split came from a hand-maintained overlay that
@@ -8921,7 +8930,10 @@ function loadDentalLayer(practices) {
     if (!p.lat || !p.lng) return;
     const marker = L.marker([p.lat, p.lng], {icon: mkDentalIcon()});
     const imdBadge = p.imd_decile ? `<div class="pop-row"><span class="pop-key">IMD decile</span><span>${_esc(p.imd_decile)} of 10 (1 = most deprived)</span></div>` : '';
-    marker.bindPopup(`<div class="pop-hdr" style="background:#7B2D8E">${_esc(p.name||p.n)}</div><div class="pop-body"><div class="pop-addr">${_esc(p.postcode||p.pc||'Postcode not given')}</div>${imdBadge}</div>`);
+    const kindRow = p.kind ? `<div class="pop-row"><span class="pop-key">Type</span><span>${_esc(p.kind)}</span></div>` : '';
+    const telRow = p.tel ? `<div class="pop-row"><span class="pop-key">Tel</span><span>${_esc(p.tel)}</span></div>` : '';
+    const where = [p.addr, p.postcode || p.pc].filter(Boolean).join(', ') || 'Postcode not given';
+    marker.bindPopup(`<div class="pop-hdr" style="background:#7B2D8E">${_esc(p.name||p.n)}</div><div class="pop-body"><div class="pop-addr">${_esc(where)}</div>${kindRow}${telRow}${imdBadge}<div class="pop-note">${DENTAL_NOTE_HTML}</div></div>`);
     marker.bindTooltip(_esc(p.name||p.n), { direction: 'top', className: 'marker-tip' });
     dentalData.push({ name: p.name||p.n, postcode: p.postcode||p.pc, lat: p.lat, lng: p.lng, marker });
   });
@@ -20461,7 +20473,7 @@ var PH_SHOW = {
   function dirNorm(r, src) {
     // One shape out of ten. Field names differ per source and the fallbacks
     // are ordered most-specific first so a source that has both wins sensibly.
-    var addr = r.a || r.address ||
+    var addr = r.a || r.addr || r.address ||
       [r.street, r.town].filter(Boolean).join(', ') || '';
     // Names and addresses as a person would write them: the charity register
     // is all capitals and the NHS registers come through str.title().
@@ -20479,7 +20491,7 @@ var PH_SHOW = {
       pc: pc,
       lad: ladNameOf(r.lad || r.borough || r.lad_code || ''),
       lat: r.lat, lng: r.lng,
-      sub: src.id === 'hospital' ? [r.t, hospAeText(r)].filter(Boolean).join(' · ') : (r.type || r.phase || r.t || ''),
+      sub: src.id === 'hospital' ? [r.t, hospAeText(r)].filter(Boolean).join(' · ') : (r.kind || r.type || r.phase || r.t || ''),
       ae: src.id === 'hospital' ? r.ae : undefined,
       // Worked out once here rather than on every keystroke.
       _n: n.toLowerCase(), _a: a.toLowerCase(),
@@ -20655,7 +20667,9 @@ var PH_SHOW = {
     // do in an emergency, since a nearest-hospital list is read in a hurry.
     var hospNote = shown.some(function (r) { return r.t === 'hospital'; })
       ? '<p class="dir-note hosp-ae-note" id="dir-hosp-note">' + HOSP_AE_NOTE_HTML + '</p>' : '';
-    listEl.innerHTML = offer + hospNote + (shown.map(function (r, i) {
+    var dentNote = shown.some(function (r) { return r.t === 'dentist'; })
+      ? '<p class="dir-note hosp-ae-note dir-dent-note" id="dir-dent-note">' + DENTAL_NOTE_HTML + '</p>' : '';
+    listEl.innerHTML = offer + hospNote + dentNote + (shown.map(function (r, i) {
       // The address is shown because it is searched. Without it, a search for
       // "wembley" returned rows with no "wembley" anywhere on them, which reads
       // as a broken filter rather than as a match on a field being hidden.
