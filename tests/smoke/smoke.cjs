@@ -2322,8 +2322,11 @@ const smallText = page => page.evaluate(() => {
     await page.waitForTimeout(2500);
     const h1 = await page.evaluate(() => ({ est: (document.getElementById('sc-la-est') || {}).textContent || '',
       ids: [...document.querySelectorAll('#rank-best .rank-row, #rank-worst .rank-row')].map(b => b.dataset.id),
-      twin: indSameAs('ft_life_expectancy_male') }));
-    ok(/^These LA figures are our estimates from ward figures/.test(h1.est) && !h1.ids.includes('E09000001') && !h1.twin,
+      twin: indSameAs('ft_life_expectancy_male'), wardEst: laIsWardEstimate('ft_932831') }));
+    // Once the refresh has fetched OHID's own LA figures, the key carries no
+    // estimate label; until then it says so and leaves the City out.
+    ok((h1.wardEst ? (/^These LA figures are our estimates from ward figures/.test(h1.est) && !h1.ids.includes('E09000001'))
+                   : !/estimates from ward figures/.test(h1.est)) && !h1.twin,
       'Local Health LA figures are labelled as estimates from wards, without the City in the lists, and OHID\'s LA series is offered too', JSON.stringify(h1).slice(0, 300));
     await page.click('#dl-seg [data-dl="ward"]');
     await page.waitForTimeout(1500);
@@ -2939,8 +2942,13 @@ const smallText = page => page.evaluate(() => {
     });
     const bands = st.census_age_bands === '0-15';
     ok(!r0.county, 'London: no LA figure is called a county\'s');
-    ok(!r0.smokeRow && !r0.smokeOpt && !r0.smokeAsk && !r0.smokeArea && !/smok/i.test(r0.exportSmoke),
-      'adult smoking at the wrong age is left out of the profile, the picker, the export and Ask', JSON.stringify(r0));
+    // Adult smoking is left out while the stored series is not at its
+    // headline age, and comes back once the refresh has checked it.
+    const smokeHeld = !st.ft_age_checked || (st.ft_age_mismatch || []).includes('ft_smoking_prevalence_adults');
+    ok(smokeHeld ? (!r0.smokeRow && !r0.smokeOpt && !r0.smokeAsk && !r0.smokeArea && !/smok/i.test(r0.exportSmoke))
+                 : (r0.smokeRow && r0.smokeAsk && r0.smokeArea && /Adults who smoke/.test(r0.exportSmoke)),
+      smokeHeld ? 'adult smoking at the wrong age is left out of the profile, the picker, the export and Ask'
+                : 'adult smoking at its headline age is back in the profile, the export and Ask', JSON.stringify(r0));
     ok(bands ? (r0.u === 'Aged under 16' && /16 to 64/.test(r0.w + r0.den))
              : (r0.u === 'Aged under 15' && r0.w === 'Aged 15 to 64' && r0.den === 'Residents aged 15 to 64 at the 2021 Census'),
       'the Census age bands are labelled as the ages indicators.js says they cover', [st.census_age_bands, r0.u, r0.w, r0.den].join(' / '));
