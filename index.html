@@ -5640,7 +5640,7 @@ const IND_NAMES = {
   census_disability_lot_pct:       ['Disabled residents (limited a lot)', 'Disabled under the Equality Act: day-to-day activities limited a lot'],
   census_provides_unpaid_care_pct: ['Unpaid carers', 'Provision of unpaid care: provides any unpaid care'],
   // Health, OHID Local Health (published for MSOAs)
-  ft_93280:  ['Fuel poverty (Local Health)', 'Fuel poverty (low income, low energy efficiency methodology)'],
+  ft_93280:  ['Fuel poverty (OHID, 2023)', 'Fuel poverty (low income, low energy efficiency methodology)'],
   ft_93097:  ['Out-of-work benefit claimants', 'Unemployment: people claiming out of work benefit (aged 16 to 64)'],
   ft_93098:  ['Long-term out-of-work claimants', 'Long-term unemployment: people claiming out of work benefit for over 12 months (aged 16 to 64)'],
   ft_93105:  ['Reception children with obesity', 'Reception prevalence of obesity (including severe obesity), 3 years data combined'],
@@ -5694,8 +5694,8 @@ const IND_NAMES = {
   ft_smoking_prevalence_adults:      ['Adults who smoke', 'Smoking prevalence in adults (18+), current smokers (APS)'],
   ft_suicide_rate:                   ['Suicide rate', 'Suicide rate'],
   // Deprivation, English Indices of Deprivation 2025
-  imd_score_ward:    ['Deprivation score (IMD 2025)', 'Index of Multiple Deprivation 2025: score'],
-  imd_score:         ['Deprivation score (IMD 2025)', 'Index of Multiple Deprivation 2025: score'],
+  imd_score_ward:    ['Deprivation score by ward (IMD 2025)', 'Index of Multiple Deprivation 2025: score'],
+  imd_score:         ['Deprivation score by LSOA (IMD 2025)', 'Index of Multiple Deprivation 2025: score'],
   imd_decile_mean:   ['Average deprivation decile', ''],
   imd_decile:        ['Deprivation decile (IMD 2025)', 'Index of Multiple Deprivation 2025: decile'],
   imd_rank:          ['Deprivation rank (IMD 2025)', 'Index of Multiple Deprivation 2025: rank'],
@@ -5779,6 +5779,9 @@ const IND_NAMES = {
 // from wards is only our estimate), so Compare and Query offer both.
 const IND_SAME_AS = {
   ft_93280:                  'fuel_poverty_pct',
+  // OHID's 2024/25 MSOA series and ONS's current claimant rate both divide
+  // claimants by working-age residents (Stonebridge reads 11.3% on each).
+  ft_93097:                  'claimant_rate_pct',
 };
 
 function indLabel(k) {

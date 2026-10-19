@@ -753,7 +753,7 @@ const smallText = page => page.evaluate(() => {
     ok(prof.captions >= 6 && /output areas/.test(prof.key) && !/~/.test(prof.name), 'each section has a caption, the key covers output areas, no "~"', prof.name);
     ok(prof.shownBefore === 8 && prof.shownAfter === prof.total && prof.total > 10, 'a long section shows eight rows and then all of them',
       prof.shownBefore + ' then ' + prof.shownAfter + ' of ' + prof.total);
-    ok(prof.imd.indexOf('Deprivation score (IMD 2025)') !== -1 && prof.work.indexOf('Claimant rate, working age') !== -1 &&
+    ok(prof.imd.indexOf('Deprivation score by ward (IMD 2025)') !== -1 && prof.work.indexOf('Claimant rate, working age') !== -1 &&
        prof.work.indexOf('Out-of-work benefit claimants') !== -1 && prof.work.indexOf('Unemployment (Census 2021)') !== -1,
       'profile shows the IMD score, and the claimant rate and unemployment measures under Work', prof.imd.join(', ') + ' / ' + prof.work.join(', '));
     ok(prof.cols === 2 && !prof.dashes, 'profile key figures two by two, and no dashes in the profile');
