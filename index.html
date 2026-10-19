@@ -5399,6 +5399,15 @@ const CENSUS_AGE_OK = !!(typeof PH_IND_STATS === 'object' && PH_IND_STATS &&
 const AGE_CHILD = CENSUS_AGE_OK ? 'under 16' : 'under 15';
 const AGE_WORK = CENSUS_AGE_OK ? '16 to 64' : '15 to 64';
 const AGE_CHILD_CAP = CENSUS_AGE_OK ? 'Under 16' : 'Under 15';
+/* LA series left out until a data refresh rebuilds them. The pipeline lists
+   in indicators.js each OHID LA series whose stored age is not its headline
+   age (ft_age_mismatch). A file written before that check (no
+   ft_age_checked) holds adult smoking as OHID's 18 to 64 breakdown, which
+   OHID itself withholds or flags for most LAs, so that one is left out.
+   The picker, the profile, Compare, the Data export and Ask all skip these. */
+const FT_WITHHELD = new Set((typeof PH_IND_STATS === 'object' && PH_IND_STATS && PH_IND_STATS.ft_age_checked)
+  ? (PH_IND_STATS.ft_age_mismatch || []) : ['ft_smoking_prevalence_adults']);
+function phWithheld(k) { return FT_WITHHELD.has(k); }
 const IND_NAMES = {
   // At a glance
   census_population:               ['Population', 'Usual residents, Census 2021'],
@@ -5948,7 +5957,7 @@ const OV_META = {
   ft_obesity_year6: { src: "OHID Fingertips", yr: "2024/25", g: "LA (upper tier)", u: "%", desc: "The share of children in Year 6, aged 10 to 11, living with obesity, including severe obesity, published only for the whole LA." },
   ft_physical_activity_adults: { src: "OHID Fingertips", yr: "2024/25", g: "LA (upper tier)", u: "%", desc: "The share of adults doing at least 150 minutes of moderate activity a week, published only for the whole LA." },
   ft_self_harm_admissions_10_24: { src: "OHID Fingertips", yr: "2023/24", g: "LA (upper tier)", u: "per 100,000", desc: "Hospital admissions for self-harm among people aged 10 to 24, per 100,000, published only for the whole LA." },
-  ft_smoking_prevalence_adults: { src: "OHID Fingertips", yr: "2024", g: "LA (upper tier)", u: "%", desc: "The share of adults aged 18 and over who currently smoke, published only for the whole LA." },
+  ft_smoking_prevalence_adults: { src: "OHID Fingertips", yr: "2025", g: "LA (upper tier)", u: "%", desc: "The share of adults aged 18 and over who currently smoke, published only for the whole LA." },
   ft_suicide_rate: { src: "OHID Fingertips", yr: "2022 - 24", g: "LA (upper tier)", u: "per 100,000", desc: "Deaths from suicide per 100,000 people, published only for the whole LA." },
   core20_lsoa_count:              { src: "NHSE Core20PLUS5",     yr: "2025", g: "Ward", u: "LSOAs",  desc: "The number of the ward's LSOAs that are among the most deprived 20% in England, meaning deprivation deciles 1 and 2, which NHS England calls Core20 in its Core20PLUS5 approach." },
   claimant_rate_pct:              { src: "NOMIS CLA01",          yr: "August 2026", g: "Ward/LSOA", u: "%", desc: "People aged 16 to 64 claiming Universal Credit or Jobseeker's Allowance mainly because they are out of work, as a share of residents aged " + AGE_WORK + " at the 2021 Census." },
@@ -6158,6 +6167,21 @@ const OV_META = {
   if (dropped.length) {
     console.info('[region] ' + dropped.length + ' indicator(s) not in the ' +
       PH_AREA + ' build left out: ' + dropped.join(', '));
+  }
+})();
+/* The withheld LA series (FT_WITHHELD) come out of the themes and the
+   hidden select, in every region, so nothing that lists indicators from
+   either offers them. */
+(function _withheldIndicatorFilter() {
+  if (!FT_WITHHELD.size) return;
+  CATS.forEach(function (c) {
+    c.fields = c.fields.filter(function (f) { return !phWithheld(f.k); });
+  });
+  var sel = document.getElementById('ov');
+  if (sel) {
+    Array.prototype.slice.call(sel.querySelectorAll('option')).forEach(function (o) {
+      if (phWithheld(o.value)) o.remove();
+    });
   }
 })();
 /* One plain-English line per indicator: what the number measures, for the
@@ -21857,7 +21881,8 @@ var PH_SHOW = {
   var CB_KEY = ['census_population', 'imd_score_ward', 'imd_score', 'imd_decile_mean', 'imd_decile',
     'ft_93283', 'ft_932831', 'census_bad_health_pct', 'census_disability_any_pct', 'census_over65_pct',
     'claimant_rate_pct', 'crime_rate_per_1000', 'fuel_poverty_pct', 'no2_ugm3', 'core20_lsoa_count',
-    'ft_life_expectancy_female', 'ft_life_expectancy_male', 'ft_smoking_prevalence_adults', 'ft_obesity_adults'];
+    'ft_life_expectancy_female', 'ft_life_expectancy_male', 'ft_smoking_prevalence_adults', 'ft_obesity_adults']
+    .filter(function (k) { return !phWithheld(k); });
   /* Levels still waiting on a fetch, keyed by level. Ward and borough are in
      memory by the time this pane can be opened. LSOA figures are 7.8 MB and
      MSOA figures 600 KB, and the names, wards and boroughs for both are on
@@ -21968,7 +21993,7 @@ var PH_SHOW = {
     // OHID's England comparison (_vs) and the estimated-from-2011 flag (_est)
     // are not indicators: they ride along beside the figure they describe.
     return Object.keys(seen).filter(function (k) {
-      return k !== 'name' && k !== 'lad' && k !== 'code' && !/_(vs|est)$/.test(k);
+      return k !== 'name' && k !== 'lad' && k !== 'code' && !/_(vs|est)$/.test(k) && !phWithheld(k);
     }).sort();
   }
 
@@ -22984,7 +23009,7 @@ var PH_SHOW = {
     var seen = {};
     allWards().forEach(function (w) {
       Object.keys(w.inds).forEach(function (k) {
-        if (num(w.inds[k]) !== null) seen[k] = 1;
+        if (num(w.inds[k]) !== null && !phWithheld(k)) seen[k] = 1;
       });
     });
     _indKeys = Object.keys(seen);
