@@ -5225,21 +5225,21 @@ const OV_CFG = {
   // scores, the decile layer and every published IMD map. The legend keeps the
   // low figure on the left, so it reads "more deprived" dark to "less deprived"
   // light.
-  imd_score:                       { lo:"Lower", hi:"Higher", wh:true,  min:5,    max:60   },
+  imd_score:                       { lo:"Less deprived", hi:"More deprived", wh:true,  min:5,    max:60   },
   imd_decile_mean:                 { lo:"More deprived", hi:"Less deprived", wh:false, rev:true, min:1, max:10 },
   // Ward-level IMD composite, weighted by Census 2021 residents.
   // Aliases to each ward's imd_score field via OV_FIELD_ALIAS.
-  imd_score_ward:                  { lo:"Lower", hi:"Higher", wh:true,  min:5,    max:45   },
+  imd_score_ward:                  { lo:"Less deprived", hi:"More deprived", wh:true,  min:5,    max:45   },
   imd_decile:                      { lo:"More deprived", hi:"Less deprived", wh:false, rev:true, min:1, max:10 },
   // Not in the picker. Here so that whatever draws it gets the direction right.
   imd_rank:                        { lo:"More deprived", hi:"Less deprived", wh:false, rev:true, min:1, max:33755 },
-  income_score:                    { lo:"Lower", hi:"Higher", wh:true,  min:0,    max:0.5  },
-  employment_score:                { lo:"Lower", hi:"Higher", wh:true,  min:0,    max:0.4  },
-  education_score:                 { lo:"Lower", hi:"Higher", wh:true,  min:0,    max:60   },
-  health_score:                    { lo:"Lower", hi:"Higher", wh:true,  min:-2,   max:2    },
-  crime_score:                     { lo:"Lower", hi:"Higher", wh:true,  min:-2,   max:2    },
-  barriers_score:                  { lo:"Lower", hi:"Higher", wh:true,  min:0,    max:60   },
-  environment_score:               { lo:"Lower", hi:"Higher", wh:true,  min:-2,   max:2    },
+  income_score:                    { lo:"Less deprived", hi:"More deprived", wh:true,  min:0,    max:50   },
+  employment_score:                { lo:"Less deprived", hi:"More deprived", wh:true,  min:0,    max:40   },
+  education_score:                 { lo:"Less deprived", hi:"More deprived", wh:true,  min:0,    max:60   },
+  health_score:                    { lo:"Less deprived", hi:"More deprived", wh:true,  min:-2,   max:2    },
+  crime_score:                     { lo:"Less deprived", hi:"More deprived", wh:true,  min:-2,   max:2    },
+  barriers_score:                  { lo:"Less deprived", hi:"More deprived", wh:true,  min:0,    max:60   },
+  environment_score:               { lo:"Less deprived", hi:"More deprived", wh:true,  min:-2,   max:2    },
   // Claimant count (NOMIS CLA01). Rate is claimants per working-age resident.
   claimant_rate_pct:               { lo:"Lower", hi:"Higher", wh:true,  min:1,    max:10   },
   claimant_count:                  { lo:"Fewer", hi:"More",   wh:true,  min:0,    max:300  },
@@ -5699,8 +5699,8 @@ const IND_NAMES = {
   imd_decile_mean:   ['Average deprivation decile', ''],
   imd_decile:        ['Deprivation decile (IMD 2025)', 'Index of Multiple Deprivation 2025: decile'],
   imd_rank:          ['Deprivation rank (IMD 2025)', 'Index of Multiple Deprivation 2025: rank'],
-  income_score:      ['Income deprivation', 'Income Deprivation domain'],
-  employment_score:  ['Employment deprivation', 'Employment Deprivation domain'],
+  income_score:      ['Income deprivation (% of residents)', 'Income Deprivation domain'],
+  employment_score:  ['Employment deprivation (% of working-age residents)', 'Employment Deprivation domain'],
   education_score:   ['Education, skills and training deprivation', 'Education, Skills and Training Deprivation domain'],
   health_score:      ['Health deprivation and disability', 'Health Deprivation and Disability domain'],
   crime_score:       ['Crime deprivation', 'Crime domain'],
@@ -5835,7 +5835,7 @@ const IND_DECIMALS = {};
     'crime_drug_offences_12mo', 'crime_public_order_12mo', 'crime_arson_12mo', 'crime_weapons_12mo',
     'crime_misc_society_12mo', 'core20_lsoa_count', 'total_lsoa_count', 'claimant_count',
     'gb_total_uprn', 'imd_decile', 'imd_rank', 'rail_station_dist_m', 'bus_stop_dist_m'];
-  const two = ['income_score', 'employment_score', 'education_score', 'health_score', 'crime_score',
+  const two = ['education_score', 'health_score', 'crime_score',
     'barriers_score', 'environment_score', 'ptal_score'];
   Object.keys(IND_NAMES).forEach(k => { IND_DECIMALS[k] = 1; });
   whole.forEach(k => { IND_DECIMALS[k] = 0; });
@@ -6224,8 +6224,8 @@ const OV_META = {
   imd_decile_mean:                { src: "MHCLG IMD 2025", yr: "2025", g: "Ward, population-weighted mean of its LSOAs", u: "decile", desc: "The average of the national deprivation deciles of the ward's LSOAs, weighted by population, where decile 1 is the most deprived tenth of England. It is an average rather than a decile, so a ward at 3 has a typical LSOA in the third tenth rather than sitting in that tenth itself." },
   imd_score_ward:                 { src: "MHCLG IMD 2025", yr: "2025", g: "Ward", u: "score",  desc: "The Index of Multiple Deprivation 2025 score for the ward, calculated as an average of the scores of the LSOAs inside it weighted by their Census 2021 residents, where a higher score means more deprivation." },
   imd_decile:                     { src: "MHCLG IMD 2025",       yr: "2025", g: "LSOA", u: "decile", desc: "Which tenth of England the LSOA falls in when all 33,755 LSOAs are ranked by deprivation, where decile 1 is the most deprived tenth and decile 10 the least." },
-  income_score:                   { src: "MHCLG IMD 2025",       yr: "2025", g: "LSOA", u: "score",  desc: "The share of residents on a low income, counted from the benefits and tax credits paid to people on low incomes. It is given as a proportion, so 0.25 means 25% of residents, and a higher figure means more deprivation." },
-  employment_score:               { src: "MHCLG IMD 2025",       yr: "2025", g: "LSOA", u: "score",  desc: "The share of working-age residents who would like to work but cannot because of unemployment, sickness, disability or caring responsibilities. It is given as a proportion, so 0.12 means 12% of working-age residents, and a higher figure means more deprivation." },
+  income_score:                   { src: "MHCLG IMD 2025",       yr: "2025", g: "LSOA", u: "%",  desc: "The share of residents on a low income, counted from income-related benefits and tax credits, where a higher figure means more deprivation." },
+  employment_score:               { src: "MHCLG IMD 2025",       yr: "2025", g: "LSOA", u: "%",  desc: "The share of working-age residents who would like to work but cannot because of unemployment, sickness, disability or caring responsibilities, where a higher figure means more deprivation." },
   education_score:                { src: "MHCLG IMD 2025",       yr: "2025", g: "LSOA", u: "score",  desc: "A score for the lack of qualifications and skills among children, young people and adults, where a higher score means more deprivation." },
   health_score:                   { src: "MHCLG IMD 2025",       yr: "2025", g: "LSOA", u: "score",  desc: "A score for the risk of dying early and of poor physical or mental health, including disability, where a higher score means more deprivation." },
   crime_score:                    { src: "MHCLG IMD 2025",       yr: "2025", g: "LSOA", u: "score",  desc: "A score for the risk of being a victim of crime, built from recorded violence, burglary, theft and criminal damage, where a higher score means more deprivation." },
@@ -7278,7 +7278,7 @@ function indicatorFacts(k) {
         ? 'Residents on a low income, counted from income-related benefits and tax credits'
         : 'Working-age residents kept out of work by unemployment, sickness, disability or caring';
       f.den = k === 'income_score' ? 'All residents' : 'All residents of working age';
-      f.method = 'Unlike the other domains this one is a rate, the number of people deprived in this way divided by the population, so it can be read as a share.';
+      f.method = 'Unlike the other domains this one is a rate, the number of people deprived in this way divided by the population, so it is shown as a percentage. MHCLG publishes it as a proportion from 0 to 1.';
     } else {
       f.method = 'MHCLG combines several indicators into this score, so it is not a count or a rate and is best used to compare one area with another.';
     }
@@ -7402,8 +7402,8 @@ function _methAnchor(k) {
 }
 function _cardUnit(k) {
   if (typeof ovIsStdRatio === 'function' && ovIsStdRatio(k)) return 'ratio, where England is 100';
-  if (k === 'income_score') return 'proportion of residents, from 0 to 1';
-  if (k === 'employment_score') return 'proportion of working-age residents, from 0 to 1';
+  if (k === 'income_score') return '% of residents';
+  if (k === 'employment_score') return '% of working-age residents';
   return indUnit(k);
 }
 /* Each acronym is spelled out the first time a card uses it, and only then.
@@ -8074,6 +8074,7 @@ function _ensureEnglandLsoas() {
           window.LSOA_IMD = { type: 'FeatureCollection', features: [] };
         }
         Array.prototype.push.apply(LSOA_IMD.features, d.features);
+        scaleShareDomainsIn(d.data);
         Object.assign(LSOA_DATA, d.data || {});
         d.features.forEach(f => {
           const p = f.properties;
@@ -8098,6 +8099,7 @@ function ensureLsoaData() {
   _lsoaDataLoading = loadJson(dataUrl('lsoa_data.json'), 'the LSOA figures', ensureLsoaData)
     .then(ld => {
       if (!ld) { _lsoaDataLoading = null; return null; }
+      scaleShareDomainsIn(ld);
       LSOA_DATA = ld;
       // Any range cached while the figures were missing was computed over
       // nothing, so it has to go or the choropleth stays flat.
@@ -15706,6 +15708,27 @@ const CRIME_CATEGORY_KEYS = {
 const CRIME_THEFT_CATEGORIES =
   ['other-theft', 'shoplifting', 'bicycle-theft', 'theft-from-the-person'];
 
+/* Income and employment deprivation are shares of residents, which MHCLG
+   publishes (and the data files keep) as proportions from 0 to 1. Every
+   view shows them as percentages, so they are turned into percentages once,
+   as the figures arrive: the key, the hover, Query, Compare and the export
+   then all read "27%" rather than "0.27 score". */
+const SHARE_DOMAINS = ['income_score', 'employment_score'];
+const _shareScaled = new WeakSet();
+function scaleShareDomains(bag) {
+  if (!bag || typeof bag !== 'object' || _shareScaled.has(bag)) return;
+  _shareScaled.add(bag);
+  SHARE_DOMAINS.forEach(k => {
+    const v = bag[k];
+    if (v == null || v === '') return;
+    const n = Number(v);
+    if (isFinite(n)) bag[k] = Math.round(n * 1000) / 10;
+  });
+}
+function scaleShareDomainsIn(map) {
+  if (!map) return;
+  Object.values(map).forEach(r => { if (r) scaleShareDomains(r.indicators || r); });
+}
 function injectCrimeCategories() {
   if (typeof WARD_DATA_BY_CODE === 'undefined') return;
   let filled = 0;
@@ -19193,6 +19216,8 @@ async function loadData() {
     enrichGPFromWardData(wards);
     injectWardIMD();
     injectCrimeCategories();
+    scaleShareDomainsIn(WARD_DATA_BY_CODE);
+    scaleShareDomainsIn(WARD_DATA);
 
 
     // lsoa_data.json is no longer fetched here. At 7.8 MB it was the largest

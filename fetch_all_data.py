@@ -5984,7 +5984,7 @@ def build_ward_data() -> dict:
     if "pop_by_lsoa" not in locals():
         pop_by_lsoa = {}
 
-    def _agg_to_wards(df, value_col, ward_key, min_cover=None):
+    def _agg_to_wards(df, value_col, ward_key, min_cover=None, ndigits=2):
         if df is None or df.empty or value_col not in df.columns:
             return
         if min_cover is not None:
@@ -6012,7 +6012,7 @@ def build_ward_data() -> dict:
             den[wd] = den.get(wd, 0.0) + weight
         for wd, w in wards.items():
             if den.get(wd, 0) > 0:
-                w["indicators"][ward_key] = round(num[wd] / den[wd], 2)
+                w["indicators"][ward_key] = round(num[wd] / den[wd], ndigits)
 
     fp = _read_parquet_opt(DATA_DIR / "demographics" / "fuel_poverty.parquet")
     # --- IMD: LSOA scores rolled up to wards, population weighted ------------
@@ -6029,7 +6029,12 @@ def build_ward_data() -> dict:
                     "education_score", "health_score", "crime_score",
                     "barriers_score", "environment_score"):
             if col in imd_ward.columns:
-                _agg_to_wards(imd_ward, col, col)
+                # Income and employment are shares from 0 to 1, which the page
+                # shows as percentages: two places would leave 27 distinct
+                # employment figures across 684 wards, so they keep three, as
+                # MHCLG publishes them.
+                _agg_to_wards(imd_ward, col, col,
+                              ndigits=3 if col in ("income_score", "employment_score") else 2)
         # An average of deciles is not itself a decile, so it is named for what
         # it is. The per-ward Core20 counts below remain the categorical view.
         if "imd_decile" in imd_ward.columns:
