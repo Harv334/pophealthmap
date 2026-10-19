@@ -1036,7 +1036,7 @@ const smallText = page => page.evaluate(() => {
       ind[q] = await page.evaluate(() => document.getElementById('ov-results').innerText.replace(/\s+/g, ' ').trim());
     }
     await page.fill('#ov-search', '');
-    ok(!/No indicator matches/.test(ind.suicide) && /Suicide rate is only published for whole LAs/.test(ind.suicide) && /full profile/.test(ind.suicide),
+    ok(!/No indicator matches/.test(ind.suicide) && /Suicide rate is only published for whole LAs/.test(ind.suicide) && /full profile/.test(ind.suicide) && /plan to add it to the LA map/.test(ind.suicide),
       'a council-only indicator says where its figures are', ind.suicide);
     ok(/Nitrogen dioxide/.test(ind.pollution), 'indicator search knows everyday words', ind.pollution.slice(0, 120));
     ok(/^1 match\b/.test(ind.arson), 'one result reads "1 match"', ind.arson.slice(0, 60));
