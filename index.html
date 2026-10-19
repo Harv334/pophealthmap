@@ -1312,10 +1312,13 @@
       position: fixed; top: 0; bottom: 0; left: 0;
       width: min(86vw, 330px); z-index: 4000;
       display: flex; flex-direction: column;
-      transform: translateX(-100%); transition: transform .22s ease;
+      transform: translateX(-100%); transition: transform .22s ease, visibility 0s .22s;
       box-shadow: var(--shadow-lg); border-right: 1px solid var(--line-2);
+      /* Closed, the drawer is hidden once it has slid away (and inert, see
+         syncInert), so Tab never walks through controls nobody can see. */
+      visibility: hidden;
     }
-    .sidebar.open { transform: none; }
+    .sidebar.open { transform: none; visibility: visible; transition: transform .22s ease; }
 
     /* The tour goes over the drawer, not under it.
        The drawer is fixed at z-index 4000 and the tour strip sits at 1300, so
@@ -11589,15 +11592,47 @@ function _fitFocus(bounds) {
     if (lbl) lbl.textContent = name;
   }
 
+  /* Focus stays where it can be seen. Closed, the drawer is inert, so Tab
+     skips it. Open, it is the only thing Tab reaches: the header, the mode
+     rail and the map under the scrim are inert until it closes. The tour
+     strip is left alone, because the tour opens the drawer to show Query and
+     Compare and sits over it while it does. */
+  let outside = [];
+  function syncInert() {
+    const open = narrow() && isOpen();
+    sidebar.inert = narrow() && !open;
+    outside.forEach(el => { el.inert = false; });
+    outside = [];
+    if (open) {
+      const mw = document.getElementById('map-wrap');
+      outside = [...document.querySelectorAll('.skip-link, .hdr, .mode-rail')]
+        .concat(mw ? [...mw.children].filter(el => el.id !== 'tour-strip') : []);
+      outside.forEach(el => { el.inert = true; });
+    }
+  }
+
   function setOpen(on) {
     if (!narrow()) on = false;
+    const was = isOpen();
     // One at a time. The drawer and a full-height ward sheet are both trying
     // to be the thing on screen, and on a phone there is only room for one.
     if (on && window.PH_SHEET && window.PH_SHEET.shrink) window.PH_SHEET.shrink();
     if (!on && moreReady) setMore(false);
+    const a = document.activeElement;
+    const wasInside = a && sidebar.contains(a);
     sidebar.classList.toggle('open', on);
     scrim.classList.toggle('on', on);
     scrim.hidden = !on;
+    syncInert();
+    // Opening moves focus into the drawer, unless something in it already
+    // has it (search, a tab) or the tour is talking; closing hands it back to
+    // the menu button rather than to the top of the page.
+    if (on && !was && !wasInside && !(a && a.closest && a.closest('#tour-strip'))) {
+      const first = document.getElementById('sb-close');
+      if (first) first.focus();
+    } else if (!on && was && (wasInside || a === document.body || !a)) {
+      btn.focus();
+    }
     syncBtn();
     // Leaflet caches the container size; without this the map keeps the
     // dimensions it had before the layout changed under it.
@@ -11689,6 +11724,7 @@ function _fitFocus(bounds) {
       setOpen(false);
     }
     placeTools();
+    syncInert();
     if (!narrow() && foot && footMark && foot.parentNode === sidebar) {
       footMark.parentNode.insertBefore(foot, footMark);
     }

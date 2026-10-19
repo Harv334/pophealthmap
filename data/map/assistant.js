@@ -1019,8 +1019,24 @@ var MODEL_LABEL = "Claude Sonnet 5";
     host.appendChild(panel);
     host.appendChild(toggle);
 
+    /* On a phone the panel is the whole screen (see the CSS), so everything
+       under it is made inert while it is open: Tab stays in the panel rather
+       than walking into the hidden header and map. Each element's own inert
+       state is put back on close, since the drawer sets its own. */
+    var fullScreen = window.matchMedia ? window.matchMedia("(max-width: 640px), (max-height: 500px)") : null;
+    var underneath = [];
+    function setUnderneath(on) {
+      underneath.forEach(function (u) { u[0].inert = u[1]; });
+      underneath = [];
+      if (!on) return;
+      var els = Array.prototype.slice.call(document.querySelectorAll(".skip-link, .hdr, .mode-rail, #sidebar, footer.sbar, #sb-scrim"));
+      Array.prototype.forEach.call(host.children, function (el) { if (el !== panel) els.push(el); });
+      els.forEach(function (el) { underneath.push([el, !!el.inert]); el.inert = true; });
+    }
+
     function open() {
       panel.classList.add("open");
+      if (fullScreen && fullScreen.matches) setUnderneath(true);
       toggle.hidden = true;
       toggle.setAttribute("aria-expanded", "true");
       mount(body);
@@ -1030,6 +1046,7 @@ var MODEL_LABEL = "Claude Sonnet 5";
 
     function shut() {
       panel.classList.remove("open");
+      setUnderneath(false);
       toggle.hidden = false;
       toggle.setAttribute("aria-expanded", "false");
       toggle.focus();
