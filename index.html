@@ -351,9 +351,39 @@
      the line the name already takes, so the header is no taller for it. */
   .hdr-logo { display: flex; align-items: center; white-space: nowrap; }
   .hdr-mark { flex: none; display: block; margin-right: 8px; }
-  .hdr-region { font-size: var(--t-xs); font-weight: 600; color: var(--ink-2);
-    margin-top: 1px; white-space: nowrap; }
-  .hdr-region[hidden] { display: none; }
+  /* The name and the region button on one line, so the header is no taller
+     for it. */
+  .hdr-name { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .hdr-region-wrap { position: relative; min-width: 0; }
+  /* Below 360px there is no room beside the name for even "London", so the
+     button goes under it, at the cost of a few pixels of header. */
+  @media (max-width: 360px) {
+    .hdr-name { flex-direction: column; align-items: flex-start; gap: 0; }
+    .hdr-region-wrap { max-width: 230px; }
+    .hdr-name .hdr-region { min-height: 20px; padding: 0 6px; margin-left: -6px; max-width: calc(100% + 6px); }
+  }
+  /* A small button under the name: the region and a chevron. 24px tall, the
+     smallest target WCAG 2.2 allows, so the header grows by very little. */
+  .hdr-region { display: inline-flex; align-items: center; gap: 3px; min-height: 24px;
+    max-width: 100%; padding: 2px 6px; font: inherit; font-size: var(--t-xs); font-weight: 600;
+    color: var(--nhs-blue); background: none; border: 1px solid transparent; border-radius: var(--r-sm);
+    cursor: pointer; white-space: nowrap; }
+  .hdr-region:hover { border-color: var(--line); background: var(--paper-2); }
+  .hdr-region:focus-visible { outline: 2px solid var(--nhs-blue); outline-offset: 1px; }
+  .hdr-region .ic { width: 12px; height: 12px; flex: none; transition: transform .12s; }
+  .hdr-region > span { overflow: hidden; text-overflow: ellipsis; }
+  .hdr-region[aria-expanded="true"] .ic { transform: rotate(180deg); }
+  .hdr-region-menu { position: absolute; left: 0; top: calc(100% + 4px); z-index: 3300;
+    display: flex; flex-direction: column; gap: 2px; padding: 6px; min-width: 230px;
+    background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-md);
+    box-shadow: var(--shadow-lg); }
+  .hdr-region-menu[hidden] { display: none; }
+  .hdr-region-menu a { display: block; padding: 7px 10px; min-height: 24px; border-radius: var(--r-sm);
+    color: var(--ink); text-decoration: none; font-size: var(--t-sm); white-space: nowrap; }
+  .hdr-region-menu a:hover, .hdr-region-menu a:focus-visible { background: var(--paper-2); }
+  .hdr-region-menu a[aria-current="page"] { font-weight: 600; color: var(--nhs-blue); }
+  .hdr-region-menu .hrm-note { margin: 2px 10px 4px; font-size: var(--t-xs); color: var(--ink-3);
+    white-space: normal; max-width: 240px; }
   .hdr-tag { display: none; white-space: nowrap; color: var(--ink-3); font-size: var(--t-xs); }
   /* The tagline is a full sentence, so where the header is tight it wraps to
      two lines rather than squeezing the name or pushing the tools off screen. */
@@ -2790,6 +2820,18 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
        one ending in "average deprivation decil...". */
     .ws-title .ws-meta { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2;
       -webkit-box-orient: vertical; }
+    /* The ends never clip: they keep their width and the bar gives way, and
+       if the two ends still do not fit the strip wraps rather than running
+       off the map. */
+    .map-legend-strip { flex-wrap: wrap; row-gap: 4px; max-width: calc(100% - 16px); }
+    .map-legend-strip .mls-min, .map-legend-strip .mls-max { flex: none; white-space: nowrap; min-width: 0; }
+    .map-legend-strip .mls-grad { flex: 1 1 60px; width: auto; min-width: 40px; }
+    /* The Viewing strip at the top already names the indicator, so a phone's
+       key drops the name and keeps only its unit, if it has one. The name is
+       still the key's accessible name, which its click wiring sets. */
+    .map-legend-strip .mls-label { font-size: 0; max-width: none; flex: 0 1 auto; }
+    .map-legend-strip .mls-label .mls-unit { font-size: var(--t-xs); }
+    .map-legend-strip .mls-label:not(:has(.mls-unit)) { display: none; }
     /* The viewing strip is scope only now; keep it to one line. */
     .viewing-strip { padding: 4px 10px 5px; font-size: var(--t-xs); }
   }
@@ -3202,10 +3244,18 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
            used to say "London Population Health Mapping" while the tab, the
            link preview and the methodology page said PopHealth Map, so a
            shared link previewed under one name and opened under another. -->
-      <div>
+      <div class="hdr-name">
         <h1 class="hdr-logo"><svg class="hdr-mark" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><rect width="9" height="9" rx="2" fill="#003087"/><rect x="11" width="9" height="9" rx="2" fill="#8BBDEA"/><rect y="11" width="9" height="9" rx="2" fill="#005EB8"/><rect x="11" y="11" width="9" height="9" rx="2" fill="#3D8FDA"/></svg>PopHealth Map<span class="dev-badge" title="Figures are provisional while the site is being checked.">Beta</span></h1>
-        <!-- The region, shown only when it is not London (the default). -->
-        <div class="hdr-region" id="hdr-region" hidden></div>
+        <!-- The region this map shows, on every map, London included: the
+             tagline beside it says England, so the name says which part of
+             it is on screen, and pressing it lists the other regions. A
+             disclosure of links, like More, so each region is an ordinary
+             link that can be opened in a new tab. Filled by initRegionUi. -->
+        <div class="hdr-region-wrap" id="hdr-region-wrap">
+          <button type="button" class="hdr-region" id="hdr-region-btn" aria-expanded="false"
+                  aria-controls="hdr-region-menu" aria-label="London, change region"><span id="hdr-region">London</span><svg class="ic hdr-region-chev" aria-hidden="true"><use href="#i-chevron-down"/></svg></button>
+          <div class="hdr-region-menu" id="hdr-region-menu" role="group" aria-label="Regions of England" hidden></div>
+        </div>
       </div>
       <!-- A one-line description beside the name on wide screens, where the
            header otherwise leaves a gap. Outside the h1 so the page's
@@ -3327,10 +3377,10 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
              handler that names it keep working, exactly as data-tab stayed
              "ward" when that tab became Area profile. Body copy still says
              overlay, which is still what it is. -->
-        <button type="button" class="sb-tab" id="sbtab-overlay" role="tab"
-                aria-selected="false" aria-controls="tab-overlay" data-tab="overlay">Indicators</button>
-        <button type="button" class="sb-tab active" id="sbtab-layers" role="tab"
-                aria-selected="true" aria-controls="tab-layers" data-tab="layers">Layers</button>
+        <button type="button" class="sb-tab active" id="sbtab-overlay" role="tab"
+                aria-selected="true" aria-controls="tab-overlay" data-tab="overlay">Indicators</button>
+        <button type="button" class="sb-tab" id="sbtab-layers" role="tab"
+                aria-selected="false" aria-controls="tab-layers" data-tab="layers">Layers</button>
         <button type="button" class="sb-tab" id="sbtab-vcse" role="tab"
                 aria-selected="false" aria-controls="tab-vcse" data-tab="vcse">Charities</button>
         <!-- Query is not a tab. It is a mode, reached from the rail at the
@@ -3364,13 +3414,13 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
       </div>
 
       <!-- Layers tab -->
-      <div class="tab-pane active" id="tab-layers" role="tabpanel" aria-labelledby="sbtab-layers">
+      <div class="tab-pane" id="tab-layers" role="tabpanel" aria-labelledby="sbtab-layers">
         <!-- Which region the map shows. Hidden while London is the only one
              published; see PH_REGIONS_LIVE in the head and initRegionUi. -->
         <div class="sb-sec" id="region-picker-wrap" hidden>
-          <label class="sb-lbl" for="region-picker">Area</label>
+          <label class="sb-lbl" for="region-picker">Region</label>
           <div style="display:flex;gap:6px;align-items:center">
-            <select id="region-picker" aria-label="Area: which region the map shows" style="flex:1;min-width:0"></select>
+            <select id="region-picker" aria-label="Region: which part of England the map shows" style="flex:1;min-width:0"></select>
             <button type="button" id="region-go" class="btn">Open this region</button>
           </div>
         </div>
@@ -3532,7 +3582,7 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
       </div>
 
       <!-- Overlay tab -->
-      <div class="tab-pane" id="tab-overlay" role="tabpanel" aria-labelledby="sbtab-overlay">
+      <div class="tab-pane active" id="tab-overlay" role="tabpanel" aria-labelledby="sbtab-overlay">
         <div class="sb-sec" style="flex:1;border-bottom:none;overflow-y:auto">
           <div class="sb-lbl" style="display:flex;align-items:center;gap:6px">
             <span>Indicators</span>
@@ -3664,7 +3714,7 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
             </optgroup>
             <optgroup label="Deprivation">
               <option value="core20_lsoa_count">Core20 LSOAs in ward · Ward</option>
-              <option value="imd_score_ward">IMD composite score (ward, pop-weighted) · Ward</option>
+              <option value="imd_score_ward">IMD composite score, ward average · Ward</option>
               <option value="imd_score">IMD composite score · LSOA</option>
               <option value="imd_decile_mean">IMD decile, ward mean (1 = most deprived) · Ward</option>
               <option value="imd_decile">IMD decile (1 = most deprived) · LSOA</option>
@@ -3699,7 +3749,7 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
               <option value="census_level4_qual_pct">Level 4+ qualifications % · Output area</option>
               <option value="census_higher_managerial_pct">Higher managerial/professional % · Output area</option>
               <option value="census_routine_semi_routine_pct">Routine/semi-routine % · Output area</option>
-              <option value="claimant_rate_pct">Claimant count rate % (NOMIS CLA01) · LSOA</option>
+              <option value="claimant_rate_pct">Claimant rate, working age (%) · LSOA</option>
             </optgroup>
             <optgroup label="Housing and transport">
               <option value="census_no_car_pct">No car/van % · Output area</option>
@@ -4381,8 +4431,9 @@ var LOADER_MAP = {w:1000,h:771,n:704,d:'IAAAAAAAAAAAAAJAAIAAFAAAIDFEECDGGCFDCCIC
       return false;
     }
     if (R0 && !R0.isLondon) {
-      svg.setAttribute('aria-label', 'A map of ' + R0.name +
-        "'s wards, filling in with deprivation colour while the page loads");
+      svg.setAttribute('aria-label', 'A map of the wards in ' +
+        (/^(London|England|Yorkshire)/.test(R0.name) ? '' : 'the ') + R0.name +
+        ', filling in with deprivation colour while the page loads');
     }
     var nums = decode(LM.p), i = 0, w = 0;
     var frag = document.createDocumentFragment();
@@ -4875,7 +4926,7 @@ function ladNoun(n) {
 // The aria-label every "where" picker carries.
 const PH_WHERE_ARIA = PH_IS_LONDON
   ? 'Where: all of London, an ICB, or an LA'
-  : 'Where: all of ' + PH_AREA + ', or one LA';
+  : 'Where: all of ' + phWhere() + ', or one LA';
 
 /* The region picker, and the static wording a region build has to change.
    London's markup already says the right thing, so for London this only
@@ -4916,6 +4967,57 @@ const PH_WHERE_ARIA = PH_IS_LONDON
   // One choice is not a choice: hidden until a second region is published.
   if (wrap) wrap.hidden = opts.length < 2;
 
+  /* The region button in the header, on every map. Its list is the same as
+     the picker's, as links, and it opens and closes like More: Escape or a
+     press elsewhere closes it, and Tab out of it closes it too. */
+  const hb = $('hdr-region-btn'), hm = $('hdr-region-menu'), hn = $('hdr-region');
+  if (hn) hn.textContent = R.name;
+  if (hb && hm) {
+    hb.setAttribute('aria-label', R.name + ', change region');
+    hb.title = 'This map shows ' + phWhere() + '. Choose another region of England.';
+    if (opts.length < 2) {
+      // Nothing to change to: the name stays, as plain text.
+      hb.disabled = true;
+      hb.removeAttribute('aria-expanded');
+      hb.setAttribute('aria-label', R.name);
+    }
+    opts.forEach(r => {
+      const a = document.createElement('a');
+      // regionHref is in a later script, so its rule is spelled out here.
+      a.href = location.pathname + (r.id !== 'london' ? '?r=' + encodeURIComponent(r.id) : '');
+      a.textContent = r.name + (live.indexOf(r.id) === -1 ? ' (preview)' : '');
+      if (r.id === R.id) a.setAttribute('aria-current', 'page');
+      hm.appendChild(a);
+    });
+    const note = document.createElement('p');
+    note.className = 'hrm-note';
+    note.textContent = 'Or search for a postcode, and the map will tell you which region it is in.';
+    hm.appendChild(note);
+    const set = on => { hm.hidden = !on; hb.setAttribute('aria-expanded', String(on)); };
+    hb.addEventListener('click', () => {
+      const on = hm.hidden;
+      set(on);
+      if (on) { const cur = hm.querySelector('a[aria-current]') || hm.querySelector('a'); if (cur) cur.focus(); }
+    });
+    hm.addEventListener('keydown', e => {
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); set(false); hb.focus(); }
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        const links = [...hm.querySelectorAll('a')];
+        const i = links.indexOf(document.activeElement);
+        if (i === -1) return;
+        e.preventDefault();
+        links[(i + (e.key === 'ArrowDown' ? 1 : links.length - 1)) % links.length].focus();
+      }
+    });
+    document.addEventListener('click', e => {
+      if (!hm.hidden && !hm.contains(e.target) && !hb.contains(e.target)) set(false);
+    });
+    hm.addEventListener('focusout', e => {
+      if (e.relatedTarget && !hm.contains(e.relatedTarget) && e.relatedTarget !== hb) set(false);
+    });
+    window.PH_REGION_MENU = { open: () => set(true), close: () => set(false) };
+  }
+
   if (R.isLondon) return;
 
   const setText = (id, t) => { const e = $(id); if (e) e.textContent = t; };
@@ -4924,15 +5026,11 @@ const PH_WHERE_ARIA = PH_IS_LONDON
   const nWards = (typeof GJ !== 'undefined' && GJ.features) ? GJ.features.length : 0;
   const nLads = (typeof BOROUGH_GJ !== 'undefined' && BOROUGH_GJ.features) ? BOROUGH_GJ.features.length : 0;
 
-  const hr = $('hdr-region');
-  if (hr) { hr.textContent = R.name; hr.hidden = false; }
 
   // The boards come from the region's own icb_lookup.json. Hidden until it
   // loads (initIcbFocus shows them), so a region without one has no dead
   // control.
   hide('icb-row'); hide('icb-focus-wrap');
-  // The tour visits named London wards.
-  hide('sbar-tour');
 
   setText('tb-name', 'LA boundaries');
   setText('borough-focus-label', 'Focus by LA');
@@ -4940,18 +5038,18 @@ const PH_WHERE_ARIA = PH_IS_LONDON
     const s = $(id);
     if (s && s.options.length) s.options[0].textContent = t;
   };
-  firstOpt('borough-focus', 'All of ' + R.name);
-  firstOpt('vcse-area-filter', 'All of ' + R.name);
-  firstOpt('cb-scope', 'All of ' + R.name);
-  firstOpt('dir-borough', 'All of ' + R.name);
+  firstOpt('borough-focus', 'All of ' + phWhere());
+  firstOpt('vcse-area-filter', 'All of ' + phWhere());
+  firstOpt('cb-scope', 'All of ' + phWhere());
+  firstOpt('dir-borough', 'All of ' + phWhere());
   setAttr('dir-borough', 'aria-label', PH_WHERE_ARIA);
   const cbh = document.querySelector('#cb-scope') && document.querySelector('#cb-scope').previousElementSibling;
   if (cbh && cbh.classList.contains('cb-help')) {
-    cbh.textContent = 'Choose all of ' + R.name + ', or one LA.';
+    cbh.textContent = 'Choose all of ' + phWhere() + ', or one LA.';
   }
-  setText('vs-digest', 'All of ' + R.name);
-  setText('q-scope-hint', 'Choose one LA, or search all of ' + R.name + '.');
-  setAttr('map', 'aria-label', 'Map of ' + R.name + ' by ward, with no indicator chosen.');
+  setText('vs-digest', 'All of ' + phWhere());
+  setText('q-scope-hint', 'Choose one LA, or search all of ' + phWhere() + '.');
+  setAttr('map', 'aria-label', 'Map of ' + phWhere() + ' by ward, with no indicator chosen.');
   if (nWards) setText('ward-count', nWards.toLocaleString());
   // Four sizes of area, or five once this region's output areas arrive (the
   // OA button is unhidden then, and ph-levels-changed fires).
@@ -5400,7 +5498,7 @@ const CATS = [
     { k: "ft_suicide_rate", l: "Suicide rate", g: "borough", lv: ["borough","ward"] },
   ]},
   { key: "imd2025", label: "Deprivation", ico: "scale", fields: [
-    { k: "imd_score_ward",                   l: "IMD composite score (ward, pop-weighted)", g: "ward" },
+    { k: "imd_score_ward",                   l: "IMD composite score, ward average", g: "ward" },
     { k: "imd_score",                        l: "IMD composite score",           g: "lsoa" },
     { k: "imd_decile_mean",                  l: "IMD decile, ward mean (1 = most deprived)", g: "ward" },
     { k: "imd_decile",                       l: "IMD decile (1 = most deprived)",g: "lsoa" },
@@ -5434,7 +5532,7 @@ const CATS = [
     { k: "census_routine_semi_routine_pct",  l: "Routine/semi-routine (%)",      g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_level4_qual_pct",           l: "Level 4+ qualifications (%)",   g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_no_qual_pct",               l: "No qualifications (%)",         g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
-    { k: "claimant_count",                   l: "Claimant count (NOMIS CLA01)",  g: "lsoa" },
+    { k: "claimant_count",                   l: "Claimant count",                g: "lsoa" },
     { k: "claimant_rate_pct",                l: "Claimant rate, working-age (%)", g: "lsoa" },
   ]},
   { key: "housing", label: "Housing and transport", ico: "home", fields: [
@@ -6601,7 +6699,7 @@ function scopeLabel(scope) {
    so the two kinds are never mistaken for one list. */
 function scopeOptionsHtml(selected, esc) {
   const e = esc || function (s) { return String(s); };
-  let html = '<option value=""' + (!selected ? ' selected' : '') + '>All of ' + e(PH_AREA) + '</option>';
+  let html = '<option value=""' + (!selected ? ' selected' : '') + '>All of ' + e(phWhere()) + '</option>';
   if (ICB_ORDER && ICB_ORDER.length) {
     html += '<optgroup label="Integrated care boards (ICBs)">';
     ICB_ORDER.forEach(function (name) {
@@ -6908,7 +7006,7 @@ function ovContext(level, k, v, rec) {
   }
   let below = 0, above = 0;
   for (const x of vals) { if (x < n) below++; else if (x > n) above++; }
-  const where = (typeof PH_AREA === 'string' ? PH_AREA : 'the region') + '’s ' + (_LEVEL_PLURAL[level] || 'areas');
+  const where = 'the ' + (_LEVEL_PLURAL[level] || 'areas') + ' in ' + (typeof PH_AREA === 'string' ? phWhere() : 'the region');
   // Deciles and ranks count down (1 = most deprived), so "lower" would read
   // as better when it means more deprived. Those say which way they lean.
   const rev = typeof OV_CFG !== 'undefined' && OV_CFG[k] && OV_CFG[k].rev;
@@ -7324,7 +7422,7 @@ function _viewArea() {
     const s = document.getElementById(id);
     return (s && s.value && s.value !== 'all' && s.selectedIndex >= 0) ? s.options[s.selectedIndex].text.trim() : '';
   };
-  return pick('borough-focus') || pick('icb-focus') || 'All of ' + PH_AREA;
+  return pick('borough-focus') || pick('icb-focus') || 'All of ' + phWhere();
 }
 function _mailtoHref(subject, lines) {
   return 'mailto:' + PH_CONTACT + '?subject=' + encodeURIComponent(subject) +
@@ -7688,8 +7786,10 @@ function phSortKey(name) {
 }
 // The region as it reads after "in" or "across": "London", "the North
 // East", "Yorkshire and The Humber".
-function phWhere() {
-  return /^(London|England|Yorkshire)/.test(PH_AREA) ? PH_AREA : 'the ' + PH_AREA;
+function phWhere() { return phRegionPhrase(PH_AREA); }
+// Any region's name as it reads after "in": "the North West", "London".
+function phRegionPhrase(name) {
+  return /^(London|England|Yorkshire)/.test(name) ? name : 'the ' + name;
 }
 // An LA's name inside a sentence: "the City of London", but "Brent".
 function ladPhrase(lad) { return (/^City of /.test(lad || '') ? 'the ' : '') + (lad || ''); }
@@ -10450,7 +10550,7 @@ window.deselectWard = function() {
   const p = document.getElementById('wpanel');
   if (p) p.innerHTML = `<div class="ph"><div class="ph-icon">${ico('pointer')}</div>Select any area on the map to see its health, deprivation, crime and local services.</div>`;
   const vsd = document.getElementById('vs-digest');
-  if (vsd) vsd.textContent = 'All of ' + PH_AREA;
+  if (vsd) vsd.textContent = 'All of ' + phWhere();
   if (window.PH_URL) window.PH_URL.write();
 };
 window.deselectLSOA = function() {
@@ -10463,7 +10563,7 @@ window.deselectLSOA = function() {
   const p = document.getElementById('wpanel');
   if (p) p.innerHTML = `<div class="ph"><div class="ph-icon">${ico('pointer')}</div>Select any area on the map to see its health, deprivation, crime and local services.</div>`;
   const vsd = document.getElementById('vs-digest');
-  if (vsd) vsd.textContent = 'All of ' + PH_AREA;
+  if (vsd) vsd.textContent = 'All of ' + phWhere();
 };
 
 /* What a printed report credits.
@@ -10573,7 +10673,7 @@ function reportProvenanceHtml(area, keys) {
    Held between 1% and 99%, so no caption says 0% or 100%; the tick on the
    bar still sits at the true position. many: "wards" or "LSOAs". */
 function pctileCaption(p, many) {
-  const of = '% of ' + PH_AREA + ' ' + (many || 'areas');
+  const of = '% of the ' + (many || 'areas') + ' in ' + phWhere();
   const clamp = x => Math.min(99, Math.max(1, Math.round(x)));
   return p >= 50 ? 'Higher than ' + clamp(p) + of : 'Lower than ' + clamp(100 - p) + of;
 }
@@ -10727,7 +10827,7 @@ function _reportDotPlot(rows, opts) {
   const H = top + rows.length * rowH + 6;
   const X = p => x0 + span * Math.max(0, Math.min(100, p)) / 100;
   let s = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" class="ch-dots" role="img" ` +
-          `aria-label="Deprivation by IMD domain, as a position among ${PH_AREA} LSOAs">`;
+          `aria-label="Deprivation by IMD domain, as a position among the LSOAs in ${phWhere()}">`;
   s += `<text x="${x0}" y="${fsSmall + 2}" font-size="${fsSmall}" fill="#64748B">Less deprived</text>`;
   // At the larger size the two ends of the scale need the width of the
   // figures' column too, or they run into each other.
@@ -11709,7 +11809,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
       <h1>${_esc(wdata ? wdata.name : wn)}</h1>
       <div class="sub">${[_esc(borough), population !== 'No figure' ? population + ' residents' : '',
         imdRank ? (imdRank === 1 ? 'Most deprived' : ordinal(imdRank) + ' most deprived') +
-          ' of the ' + totalWards.toLocaleString('en-GB') + ' ' + PH_AREA + ' wards with a deprivation score' : ''].filter(Boolean).join(' · ')}</div>
+          ' of the ' + totalWards.toLocaleString('en-GB') + ' wards in ' + phWhere() + ' with a deprivation score' : ''].filter(Boolean).join(' · ')}</div>
     </div>
     ${miniMapSVG ? `<div class="hero-map">${miniMapSVG}</div>` : ''}
   </div>
@@ -11742,7 +11842,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
       ${domainSVG ? `<div class="panel">
         <h3>Deprivation by domain, IMD 2025</h3>
         ${domainSVG}
-        <div class="legend">Each dot places the average of the ward\u2019s ${_wardLSOACodes.length} LSOA${_wardLSOACodes.length === 1 ? '' : 's'} among all ${PH_AREA}\u2019s LSOAs, so 90% means more deprived than 90% of them. The dashed line is the ${PH_AREA} median.</div>
+        <div class="legend">Each dot places the average of the ward\u2019s ${_wardLSOACodes.length} LSOA${_wardLSOACodes.length === 1 ? '' : 's'} among all the LSOAs in ${phWhere()}, so 90% means more deprived than 90% of them. The dashed line is the ${PH_AREA} median.</div>
       </div>` : ''}
       <div class="panel">
         <h3>Health and economic indicators</h3>
@@ -11859,6 +11959,7 @@ function buildWardLayer() {
   // Guarded for a region opened before its data exists, which has no wards.
   // Tighter on a phone, where 18px each side is a tenth of the width.
   const _fitPad = window.matchMedia('(max-width: 600px)').matches ? 4 : 18;
+  if (wLyr.getBounds().isValid() && typeof _markHomeView === 'function') _markHomeView();
   if (wLyr.getBounds().isValid()) map.fitBounds(wLyr.getBounds(), { padding:[_fitPad,_fitPad], maxZoom:12 });
   if (typeof _updateLayerCounts === 'function') _updateLayerCounts();
 }
@@ -12137,7 +12238,7 @@ function _fitFocus(bounds) {
     if (typeof _announce === 'function') {
       _announce(focusActive()
         ? ('Focused on ' + focusLabel() + '.')
-        : 'Showing all of ' + PH_AREA + '.');
+        : 'Showing all of ' + phWhere() + '.');
     }
   });
 
@@ -12182,7 +12283,7 @@ function _fitFocus(bounds) {
         // A board reaching beyond the region counts only its councils here.
         const part = (d.partial || []).indexOf(name) !== -1;
         opt.textContent = (ICB_LABEL[name] || name) + ' (' + n + ' ' + unit(n) +
-          (part ? ' in ' + PH_AREA : '') + ')';
+          (part ? ' in ' + phWhere() : '') + ')';
         sel.appendChild(opt);
       });
       // The search lists ICBs, and names each LA's ICB, from what just arrived.
@@ -12195,9 +12296,9 @@ function _fitFocus(bounds) {
         const cnt = document.getElementById('icb-count');
         if (cnt) cnt.textContent = ICB_ORDER.length;
         const help = document.querySelector('#icb-row .lhelp');
-        if (help) help.title = 'The integrated care boards (ICBs) covering ' + PH_AREA +
+        if (help) help.title = 'The integrated care boards (ICBs) covering ' + phWhere() +
           ', the NHS bodies that plan and pay for health services across an area. An ICB that ' +
-          'reaches beyond ' + PH_AREA + ' is drawn for the part inside it, and you can switch ' +
+          'reaches beyond ' + phWhere() + ' is drawn for the part inside it, and you can switch ' +
           'this on and select an ICB to zoom to it.';
       }
     });
@@ -12245,7 +12346,7 @@ function _fitFocus(bounds) {
 
     applyBoroughLock();
     if (typeof _announce === 'function') {
-      _announce(focusActive() ? ('Focused on ' + focusLabel() + '.') : 'Showing all of ' + PH_AREA + '.');
+      _announce(focusActive() ? ('Focused on ' + focusLabel() + '.') : 'Showing all of ' + phWhere() + '.');
     }
   });
 })();
@@ -12890,18 +12991,22 @@ function _fitFocus(bounds) {
    * by the GLA and measured by TfL, and the publisher is the attribution, so
    * GLA is tested first. The full string stays in the tooltip either way.
    */
+  // The publisher, as the indicator card names it: ONS for the Census and
+  // the claimant count (which Nomis only distributes), OHID for Fingertips,
+  // MHCLG for deprivation and Core20 (the most deprived fifth of its LSOAs),
+  // and police.uk. Police first, since its crime rate also names ONS.
   const SRC_TAGS = [
-    [/census/i,             'Census'],
-    [/fingertips|ohid/i,    'Fingertips'],
-    [/police/i,             'Police'],
-    [/mhclg|\bimd\b/i,      'MHCLG'],
+    [/police/i,             'police.uk'],
+    [/census/i,             'ONS'],
+    [/fingertips|ohid/i,    'OHID'],
+    [/mhclg|\bimd\b|core20/i, 'MHCLG'],
     [/defra/i,              'Defra'],
     [/\bgla\b/i,            'GLA'],
-    [/\btfl\b/i,            'TfL'],
+    [/\btfl\b/i,            PH_IS_LONDON ? 'TfL' : 'DfT'],
     [/desnz/i,              'DESNZ'],
-    [/nhs/i,                'NHS'],
-    [/nomis/i,              'NOMIS'],
+    [/nomis/i,              'ONS'],
     [/\bons\b/i,            'ONS'],
+    [/nhs/i,                'NHS'],
     [/charity commission/i, 'Charities'],
   ];
   function srcTag(o) {
@@ -13538,7 +13643,7 @@ function _fitFocus(bounds) {
     try { const b = grp.getBounds(); if (b.isValid()) map.fitBounds(b, { padding: [30, 30], maxZoom: 14 }); } catch (e) {}
     const nL = Object.keys(lsoas).length;
     const more = p.all_practices - p.practices.length;
-    const outside = more > 0 ? ' A further ' + more + ' of its practices ' + (more === 1 ? 'is' : 'are') + ' outside ' + esc(PH_AREA) + '.' : '';
+    const outside = more > 0 ? ' A further ' + more + ' of its practices ' + (more === 1 ? 'is' : 'are') + ' outside ' + esc(phWhere()) + '.' : '';
     infoEl.innerHTML = '<b>' + esc(p.name) + '</b> has ' + p.practices.length + ' GP practice' + (p.practices.length === 1 ? '' : 's') +
       (p.patients ? ' and ' + p.patients.toLocaleString() + ' registered patients' : '') + '.' + outside +
       (DATA.has_catchments
@@ -13971,16 +14076,33 @@ function applyBoroughLock() {
 //
 // Turning wards off does mean losing ward colouring and ward clicks while it
 // is off. That is the point of the switch.
+//
+// Except while the level the map is moving to is still loading. The first
+// LSOA indicator fetches a few megabytes of boundaries and figures, and taking
+// the wards off at once left an empty map for seconds, which looks like a
+// crash. So the wards stay until the new level is drawn (or the level moves
+// on again), and the hint beside the level buttons says what is loading.
 document.getElementById('tnw').addEventListener('change', e => {
+  const removeWards = () => {
+    map.removeLayer(wardBoundaryLyr);
+    if (typeof wLyr !== 'undefined' && wLyr && wLyr._map) map.removeLayer(wLyr);
+  };
   if (e.target.checked) {
     if (typeof wLyr !== 'undefined' && wLyr && !wLyr._map) wLyr.addTo(map);
     wardBoundaryLyr.addTo(map);
     wardBoundaryLyr.bringToFront();
     if (boroughL && boroughL._map) boroughL.bringToFront();
-  } else {
-    map.removeLayer(wardBoundaryLyr);
-    if (typeof wLyr !== 'undefined' && wLyr && wLyr._map) map.removeLayer(wLyr);
+    return;
   }
+  let lvl = 'ward';
+  try { lvl = currentDataLevel; } catch (err) { /* not declared yet */ }
+  const pending = (lvl === 'lsoa' && !(typeof lsoaLyr !== 'undefined' && lsoaLyr && lsoaLyr._map)) ||
+                  (lvl === 'msoa' && !(typeof msoaLyr !== 'undefined' && msoaLyr && msoaLyr._map));
+  if (!pending || typeof _whenLevelDrawn !== 'function') { removeWards(); return; }
+  _whenLevelDrawn(lvl).then(() => {
+    // Still off: the reader may have gone back to wards in the meantime.
+    if (!document.getElementById('tnw').checked) removeWards();
+  });
 });
 // Ward boundaries on by default — layer is added once the map is ready
 if (document.getElementById('tnw').checked) {
@@ -14883,7 +15005,7 @@ function _buildLSOAReportHtml(code) {
       <div class="panel" style="flex:0 0 340px">
         <h3>Deprivation by domain, IMD 2025</h3>
         ${domainSVG}
-        <div class="legend">Each dot places this LSOA among all ${PH_AREA}\u2019s LSOAs on that domain, so 90% means more deprived than 90% of them. The dashed line is the ${PH_AREA} median.</div>
+        <div class="legend">Each dot places this LSOA among all the LSOAs in ${phWhere()} on that domain, so 90% means more deprived than 90% of them. The dashed line is the ${PH_AREA} median.</div>
       </div>
       <div class="panel" style="flex:1">
         <h3>Health and economic indicators</h3>
@@ -15324,7 +15446,7 @@ function loadIcbRegions() {
             `<b class="tip-nm">${_esc(p.label || p.name || 'ICB')}</b>` +
             `<span class="tip-meta">` +
             `${p.n_boroughs} ${ladNoun(p.n_boroughs)}` +
-            `${p.partial ? ' in ' + _esc(PH_AREA) : ''} · select to zoom in</span>`,
+            `${p.partial ? ' in ' + _esc(phWhere()) : ''} · select to zoom in</span>`,
             { sticky: true, opacity: 0.94 });
           // Click zooms to the region. Deliberately not a filter: borough
           // focus filters the whole app by a single LAD name in a dozen
@@ -15395,6 +15517,20 @@ document.getElementById('tmsoa').addEventListener('change', e => {
   });
 });
 
+/* "Loading 4,994 LSOAs, which takes a few seconds the first time.", counted
+   from the ward figures already on the page (each ward records how many
+   LSOAs it holds), or without a number if they do not say. */
+function _lsoaLoadingText() {
+  let n = 0;
+  try {
+    for (const w of Object.values(WARD_DATA_BY_CODE || {})) {
+      const v = +(((w && w.indicators) || {}).total_lsoa_count);
+      if (Number.isFinite(v) && v > 0) n += v;
+    }
+  } catch (e) { n = 0; }
+  return 'Loading ' + (n ? n.toLocaleString('en-GB') + ' LSOAs' : 'the LSOAs') +
+    ', which takes a few seconds the first time.';
+}
 document.getElementById('tlsoa').addEventListener('change', e => {
   // The England map has LSOAs for the LA in focus only. Without one, the box
   // stays off and says how to get them.
@@ -15444,13 +15580,23 @@ document.getElementById('tlsoa').addEventListener('change', e => {
   // The boundaries are fetched on demand, so this is the first point at which
   // there may be no layer to add yet. Re-reading lsoaActive after the wait
   // stops a quick tick-untick leaving 4,994 polygons on the map.
+  //
+  // The first time, that wait is a few seconds, so the hint says so at once,
+  // with this map's own count, and is cleared when the layer is drawn.
+  const loadingMsg = lsoaLyr ? '' : _lsoaLoadingText();
+  if (loadingMsg && typeof _dlHint === 'function') _dlHint(loadingMsg, 60000);
+  const clearLoading = () => {
+    const h = document.getElementById('dl-hint');
+    if (loadingMsg && h && h.textContent === loadingMsg) h.classList.remove('show');
+  };
   ensureLsoaLayer().then(lyr => {
+    clearLoading();
     if (!lyr || !lsoaActive) return;
     lyr.addTo(map);
     lyr.bringToFront();
     applyLSOAFilter();
     if (boroughL._map) boroughL.bringToFront();
-  });
+  }, clearLoading);
 });
 
 document.getElementById('tlsoa-imd').addEventListener('change', e => {
@@ -15672,7 +15818,7 @@ function renderTopBottom() {
     if (inFocus.length >= 6) { rows = inFocus; where = focusedIcb ? focusLabel() : ladPhrase(focusLabel()); }
   }
   // "in the North East", "in London".
-  const inWhere = (where === PH_AREA && /^(North|South|East|West)\b/.test(where)) ? 'the ' + where : where;
+  const inWhere = where === PH_AREA ? phWhere() : where;
   const smallOut = rows.filter(r => r.small);
   rows = rows.filter(r => !r.small);
   if (rows.length < 3) { panel.style.display = 'none'; return; }
@@ -15960,19 +16106,30 @@ function _syncScaleNumbers() {
   const range = ovRangeForDisplay(curOv);
   const meta = ovMeta(curOv);
   const unit = _legendUnit(meta);
-  const ends = _legendEnds(range, unit.inline);
+  // A unit the indicator's name already ends with ("Crime rate per 1,000
+  // residents") is not said a second time under it.
+  const name = (typeof _ovLabel === 'function' ? _ovLabel(curOv) : '') || '';
+  if (unit.below && name.toLowerCase().indexOf(unit.below.toLowerCase()) !== -1) unit.below = '';
+  const ends = _legendEnds(range, unit.inline, _legendIsCount(meta));
   const lo = document.getElementById('sc-lo');
   const hi = document.getElementById('sc-hi');
   if (lo) lo.textContent = `${cfg.lo} (${ends ? ends.lo : cfg.lo})`;
   if (hi) hi.textContent = `${cfg.hi} (${ends ? ends.hi : cfg.hi})`;
+  /* No middle number. It was the midpoint of the two ends, printed without a
+     label beside a summary that quotes the median, so it read as a median it
+     was not, and on a count it could be half a person. */
   const midEl = document.getElementById('sc-mid');
-  if (midEl) midEl.textContent = range ? fmtNum((range.lo + range.hi) / 2, _legendDecimals({ lo: (range.lo + range.hi) / 2, hi: 0 })) + unit.inline : '';
+  if (midEl) midEl.textContent = '';
   const scUnit = document.getElementById('sc-unit');
   if (scUnit) scUnit.textContent = unit.below;
   const mlsMin = document.getElementById('mls-min');
   const mlsMax = document.getElementById('mls-max');
-  if (mlsMin) mlsMin.textContent = ends ? ends.lo : '';
-  if (mlsMax) mlsMax.textContent = ends ? ends.hi : '';
+  // A decile key says which end is which in words: the numbers are the
+  // tenths of England, and "2" and "9" at the ends say less than the words.
+  const dec = meta && meta.u === 'decile';
+  // Decile 1 is the most deprived tenth, and the low end is on the left.
+  if (mlsMin) mlsMin.textContent = dec ? 'Most deprived' : (ends ? ends.lo : '');
+  if (mlsMax) mlsMax.textContent = dec ? 'Least deprived' : (ends ? ends.hi : '');
   _syncEnglandMark(range);
   // Inside the strip's label rather than beside it, so that anything else
   // that writes the label (a plain textContent) takes the unit with it.
@@ -15998,24 +16155,16 @@ function _syncScaleNumbers() {
     // currentDataLevel is a later `let`; read it guarded in case this runs first.
     let drawnLvl = 'ward';
     try { drawnLvl = currentDataLevel || 'ward'; } catch (e) { /* not declared yet */ }
-    const avgNote = drawnLvl === 'oa'
-      ? ' · Shown by output area, as published by ONS'
-      : (drawnLvl === 'ward' && nativeG === 'output area')
-      ? ' · Ward values are built from output areas (ONS best-fit lookup)'
-      : ((drawnLvl === 'lsoa' || drawnLvl === 'msoa') && nativeG === 'output area')
-      ? ' · ' + (drawnLvl === 'lsoa' ? 'LSOA' : 'MSOA') + ' figures as published by ONS'
-      : (drawnLvl === 'ward' && (nativeG === 'lsoa' || nativeG === 'msoa'))
-      ? ` · Ward values are population-weighted averages of ${nativeG === 'lsoa' ? 'LSOAs' : 'MSOAs'}`
-      : '';
     const _e = t => String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
     const age = ovAgeNote(curOv);
     const caution = [ovCaution(curOv), laNotesCaution(curOv)].filter(Boolean).join(' ');
+    const estLa = drawnLvl === 'borough' && laIsWardEstimate(curOv);
     metaEl.innerHTML = meta
-      ? _e(`${meta.g} · ${meta.src}${fmtPeriod(meta.yr) ? ` (${fmtPeriod(meta.yr)})` : ''}${avgNote}`) +
-        (age ? ' · <span class="ov-old">' + _e(age) + '</span>' : '') +
+      ? _e(_keySourceLine(curOv, drawnLvl, estLa)) +
+        (age ? ' <span class="ov-old">' + _e(age) + '.</span>' : '') +
         (caution ? '<span class="ov-caution">' + _e(caution) + '</span>' : '') +
         (nativeG === 'msoa' && drawnLvl === 'msoa' ? '<span class="ctx">Select an MSOA to see whether its figure differs from England\'s, by OHID\'s test.</span>' : '') +
-        (drawnLvl === 'borough' && laIsWardEstimate(curOv)
+        (estLa
           ? '<span class="ctx" id="sc-la-est">' + _e('These LA figures are our estimates from ward figures' +
               (fmtPeriod(meta.yr) ? ' for ' + fmtPeriod(meta.yr) : '') +
               ', and can differ from OHID’s own LA figures, which are shown on each Area profile.') + '</span>'
@@ -16074,6 +16223,60 @@ function _syncEnglandMark(range) {
   if (strip) strip.classList.toggle('has-eng', !!st);
 }
 
+/* The line under the key: who publishes the figures, for which areas and for
+   when, and how the level on the map was made from them, in sentences rather
+   than the source codes the indicator registry keeps (CLA01, TS021, "LSOA
+   bridge"). estLa: the LA figures are our estimate, which the key says in a
+   line of its own (#sc-la-est), so it is not said here as well. */
+function _keySourceLine(k, drawn, estLa) {
+  const m = ovMeta(k) || {};
+  const src = String(m.src || '');
+  const nat = (typeof ovNativeLevel === 'function' && ovNativeLevel(k)) || drawn;
+  const per = (typeof ovPeriodOf === 'function' && ovPeriodOf(k)) || '';
+  const PLURAL = { borough: 'LAs', ward: 'wards', msoa: 'MSOAs', lsoa: 'LSOAs', oa: 'output areas' };
+  const at = per ? ', ' + per : '';
+  let first;
+  if (typeof OV_CFG === 'object' && OV_CFG[k] && OV_CFG[k]._custom) {
+    // An indicator from data/map/custom.js names its own source.
+    first = src + ', for ' + (PLURAL[nat] || 'these areas') + at + '.';
+  } else if (/\(TS\d+A?\)/.test(src)) {
+    first = 'Census 2021, published by ONS for output areas' +
+      (drawn === 'lsoa' || drawn === 'msoa' ? ' and shown here as ONS publishes it for ' + PLURAL[drawn] : '') + '.';
+  } else if (/police/i.test(src)) {
+    first = 'Counted from police.uk crime locations' + at +
+      (k === 'crime_rate_per_1000' ? ', for every 1,000 residents at the 2021 Census' : '') + '.';
+  } else if (k === 'imd_score_ward' || k === 'imd_decile_mean') {
+    first = 'Calculated for each ward from MHCLG\u2019s LSOA ' + (k === 'imd_decile_mean' ? 'deciles' : 'scores') +
+      ', weighted by residents at the 2021 Census.';
+  } else if (k === 'core20_lsoa_count') {
+    first = 'Counted for each ward from the deprivation deciles MHCLG publishes for LSOAs.';
+  } else if (/UK-AIR|PCM/.test(src)) {
+    first = 'Modelled by Defra on a 1 kilometre grid and averaged over each LSOA' + at + '.';
+  } else if (/NaPTAN|TfL Unified/.test(src)) {
+    first = 'Counted for each LSOA from the register of stops' + at + '.';
+  } else {
+    const who = /^ft_\d+$/.test(k) ? 'OHID (Local Health)'
+      : /^ft_/.test(k) ? 'OHID'
+      : /IMD|Core20/.test(src) ? 'MHCLG'
+      : /NOMIS|CLA01/.test(src) ? 'ONS'
+      : /PTAL/.test(src) ? 'the GLA'
+      : String(_cardSource(k) || src).split(',')[0];
+    first = 'Published by ' + who + ' for ' + (PLURAL[nat] || 'these areas') + at + '.';
+  }
+  const out = [first];
+  // How the level drawn was made, when it is not the one published. Census
+  // MSOAs and LSOAs are ONS's own, which the first sentence already says.
+  if (drawn !== nat && !estLa && !(nat === 'oa' && drawn !== 'ward' && drawn !== 'borough')) {
+    if (drawn === 'ward' && nat === 'msoa') {
+      out.push('Ward figures are our estimates, blended from the MSOAs each ward overlaps.');
+    } else if (typeof _publishedAt === 'function') {
+      const by = _publishedBy(k);
+      _publishedAt(k, nat, [drawn]).filter(x => x && x !== by).forEach(x => out.push(x));
+    }
+  }
+  return out.join(' ').replace(/\s+/g, ' ').trim();
+}
+
 /* The unit on both legends. Up to six characters it rides on every number
    ("7.3 score"). A longer one ("per 1,000", "ratio (England = 100)") would
    push the end values off a phone, so it is said once, under the legend's
@@ -16081,8 +16284,16 @@ function _syncEnglandMark(range) {
    misreading the unit is there to stop. */
 function _legendUnit(meta) {
   const u = (meta && meta.u) ? String(meta.u) : '';
+  // "score" and "decile" are not units a number needs ("7.3 score"), and a
+  // per cent sign sits against its number.
+  if (u === 'score' || u === 'decile') return { inline: '', below: '' };
+  if (u === '%') return { inline: '%', below: '' };
   return u.length <= 6 ? { inline: u ? '\u00a0' + u : '', below: '' }
                        : { inline: '', below: u };
+}
+// Counts (people, crimes, stops, LSOAs) end on whole numbers.
+function _legendIsCount(meta) {
+  return !!meta && /^(people|crimes|stops|stations|LSOAs|addresses)$/.test(String(meta.u || ''));
 }
 
 /* The end values are the 5th and 95th percentiles of the areas drawn, and
@@ -16097,9 +16308,9 @@ function _legendDecimals(range) {
   return (Number.isInteger(range.lo) && Number.isInteger(range.hi)) ? 0 : 1;
 }
 
-function _legendEnds(range, inline) {
+function _legendEnds(range, inline, whole) {
   if (!range) return null;
-  const d = _legendDecimals(range);
+  const d = whole ? 0 : _legendDecimals(range);
   const lo = fmtNum(range.lo, d) + inline;
   const hi = fmtNum(range.hi, d) + inline;
   return {
@@ -16690,7 +16901,7 @@ function _syncMapAria() {
   const el = document.getElementById('map');
   if (!el) return;
   try {
-    const where = (typeof focusActive === 'function' && focusActive() && focusLabel()) || PH_AREA;
+    const where = (typeof focusActive === 'function' && focusActive() && focusLabel()) || phWhere();
     const lv = _activeLevel();
     const ov = _activeOv();
     let t = 'Map of ' + where + ' by ' + _levelName(lv);
@@ -16738,7 +16949,7 @@ function _refreshUI() {
     const dig = document.getElementById('vs-digest');
     if (dig) {
       const parts = [];
-      parts.push(focusActive() ? `<b>${focusLabel()}</b>` : 'All of ' + PH_AREA);
+      parts.push(focusActive() ? `<b>${focusLabel()}</b>` : 'All of ' + phWhere());
       // The level is not repeated here. The Viewing badge in the corner of the
       // map is the control for it and shows which one is active, so the strip
       // saying "Ward mode" a second time under the word "Viewing" was the same
@@ -16884,6 +17095,7 @@ function _resetAll() {
     if (typeof _applyBoroughSolo === 'function') _applyBoroughSolo();
     if (typeof applyBoroughLock === 'function') applyBoroughLock();
     if (typeof BOROUGH_GJ !== 'undefined' && BOROUGH_GJ.features && typeof boroughL !== 'undefined' && boroughL) {
+      if (typeof _markHomeView === 'function') _markHomeView();
       map.fitBounds(boroughL.getBounds(), { padding: [20, 20] });
     }
   } finally {
@@ -17019,6 +17231,26 @@ const _URL_LAYERS = ['tg', 'th', 'tgr', 'td', 'tph', 'vcse-tab-toggle',
    profile is on screen, and the link should reopen the one the sender is
    reading. showWard and showLSOA set it. */
 window._urlLastArea = '';
+/* The opening view, which the address leaves out. An untouched home page
+   keeps a bare address, so someone who copies it sends a link that opens the
+   map as anyone would see it, rather than one that looks like a chosen view.
+   The layers are the ones ticked in the markup; the position is wherever the
+   map's own fit to the region lands (see _markHomeView). */
+const _URL_LAYERS_HOME = _URL_LAYERS.filter(id => {
+  const el = document.getElementById(id);
+  return el && el.defaultChecked;
+}).join(',');
+let _urlHomeView = null, _urlHomePending = false;
+// Called just before the map fits itself to the region, on load and on Reset:
+// the view that fit lands on is the opening view.
+function _markHomeView() {
+  try { _urlHomePending = true; _urlHomeView = null; } catch (e) { /* not declared yet */ }
+}
+function _urlViewNow() {
+  if (typeof map === 'undefined' || !map) return null;
+  const c = map.getCenter();
+  return { z: map.getZoom().toString(), c: `${c.lat.toFixed(4)},${c.lng.toFixed(4)}` };
+}
 const _URL_MODES = ['query', 'compare', 'report', 'csv', 'directory'];
 
 function _urlTool() {
@@ -17069,7 +17301,7 @@ function _writeUrlState() {
       const el = document.getElementById(id);
       return el && el.checked;
     });
-    if (layersOn.length) p.set('L', layersOn.join(','));
+    if (layersOn.length && layersOn.join(',') !== _URL_LAYERS_HOME) p.set('L', layersOn.join(','));
 
     // selW is a top-level `let`, so it is not readable before its declaration
     // is evaluated. Nothing is selected that early anyway. An open LSOA
@@ -17117,10 +17349,10 @@ function _writeUrlState() {
       }
     }
 
-    if (typeof map !== 'undefined' && map) {
-      const c = map.getCenter();
-      p.set('z', map.getZoom().toString());
-      p.set('c', `${c.lat.toFixed(4)},${c.lng.toFixed(4)}`);
+    const v = _urlViewNow();
+    if (v && !(_urlHomeView && v.z === _urlHomeView.z && v.c === _urlHomeView.c)) {
+      p.set('z', v.z);
+      p.set('c', v.c);
     }
     const qs = p.toString();
     const url = location.pathname + (qs ? '?' + qs : '');
@@ -17445,6 +17677,10 @@ function _urlOpenLsoa(code) {
   if (typeof map !== 'undefined' && map) {
     let t = null;
     const sched = () => { clearTimeout(t); t = setTimeout(_writeUrlState, 400); };
+    // The first move to end after the map fits itself is the opening view.
+    map.on('moveend', () => {
+      if (_urlHomePending) { _urlHomePending = false; _urlHomeView = _urlViewNow(); }
+    });
     map.on('moveend zoomend', sched);
   }
 })();
@@ -17900,10 +18136,10 @@ function _renderPostcodeRow(results, pq, q) {
     sub.textContent = pq.kind === 'postcode'
       ? (res.admin_ward || '') + (res.admin_district ? ' · ' + res.admin_district : '')
         + (inArea ? '' : (other
-            ? ' · This postcode is in ' + other.name + (other.live
-                ? '; open ' + other.name
-                : '; the ' + other.name + ' map is not available yet')
-            : ' (outside ' + PH_AREA + ')'))
+            ? ' · This postcode is in ' + phRegionPhrase(other.name) + (other.live
+                ? ', so select it to open the ' + other.name + ' map.'
+                : ', and the ' + other.name + ' map is not available yet.')
+            : ' (outside ' + phWhere() + ')'))
       : 'Postcode area';
     row.onclick = (!inArea && other && other.live)
       ? () => { location.href = regionHref(other.id); }
@@ -17917,6 +18153,51 @@ function _renderPostcodeRow(results, pq, q) {
       sub.textContent = 'Looking up…';
       _renderPostcodeRow(results, pq, q);
     };
+  });
+}
+/* Every English LA and the region whose map it is on, so a search for a
+   place on another map can say which one, rather than "nothing matches".
+   Region slug to LA names joined by "|", written from scopes/ by
+   scripts/build_la_regions.py. */
+/* LA_REGIONS:BEGIN (scripts/build_la_regions.py writes this line) */
+const PH_LA_REGIONS = {"east-midlands":"Amber Valley|Ashfield|Bassetlaw|Blaby|Bolsover|Boston|Broxtowe|Charnwood|Chesterfield|Derby|Derbyshire Dales|East Lindsey|Erewash|Gedling|Harborough|High Peak|Hinckley and Bosworth|Leicester|Lincoln|Mansfield|Melton|Newark and Sherwood|North East Derbyshire|North Kesteven|North Northamptonshire|North West Leicestershire|Nottingham|Oadby and Wigston|Rushcliffe|Rutland|South Derbyshire|South Holland|South Kesteven|West Lindsey|West Northamptonshire","east-of-england":"Babergh|Basildon|Bedford|Braintree|Breckland|Brentwood|Broadland|Broxbourne|Cambridge|Castle Point|Central Bedfordshire|Chelmsford|Colchester|Dacorum|East Cambridgeshire|East Hertfordshire|East Suffolk|Epping Forest|Fenland|Great Yarmouth|Harlow|Hertsmere|Huntingdonshire|Ipswich|King's Lynn and West Norfolk|Luton|Maldon|Mid Suffolk|North Hertfordshire|North Norfolk|Norwich|Peterborough|Rochford|South Cambridgeshire|South Norfolk|Southend-on-Sea|St Albans|Stevenage|Tendring|Three Rivers|Thurrock|Uttlesford|Watford|Welwyn Hatfield|West Suffolk","london":"Barking and Dagenham|Barnet|Bexley|Brent|Bromley|Camden|City of London|Croydon|Ealing|Enfield|Greenwich|Hackney|Hammersmith and Fulham|Haringey|Harrow|Havering|Hillingdon|Hounslow|Islington|Kensington and Chelsea|Kingston upon Thames|Lambeth|Lewisham|Merton|Newham|Redbridge|Richmond upon Thames|Southwark|Sutton|Tower Hamlets|Waltham Forest|Wandsworth|Westminster","north-east":"County Durham|Darlington|Gateshead|Hartlepool|Middlesbrough|Newcastle upon Tyne|North Tyneside|Northumberland|Redcar and Cleveland|South Tyneside|Stockton-on-Tees|Sunderland","north-west":"Blackburn with Darwen|Blackpool|Bolton|Burnley|Bury|Cheshire East|Cheshire West and Chester|Chorley|Cumberland|Fylde|Halton|Hyndburn|Knowsley|Lancaster|Liverpool|Manchester|Oldham|Pendle|Preston|Ribble Valley|Rochdale|Rossendale|Salford|Sefton|South Ribble|St. Helens|Stockport|Tameside|Trafford|Warrington|West Lancashire|Westmorland and Furness|Wigan|Wirral|Wyre","south-east":"Adur|Arun|Ashford|Basingstoke and Deane|Bracknell Forest|Brighton and Hove|Buckinghamshire|Canterbury|Cherwell|Chichester|Crawley|Dartford|Dover|East Hampshire|Eastbourne|Eastleigh|Elmbridge|Epsom and Ewell|Fareham|Folkestone and Hythe|Gosport|Gravesham|Guildford|Hart|Hastings|Havant|Horsham|Isle of Wight|Lewes|Maidstone|Medway|Mid Sussex|Milton Keynes|Mole Valley|New Forest|Oxford|Portsmouth|Reading|Reigate and Banstead|Rother|Runnymede|Rushmoor|Sevenoaks|Slough|South Oxfordshire|Southampton|Spelthorne|Surrey Heath|Swale|Tandridge|Test Valley|Thanet|Tonbridge and Malling|Tunbridge Wells|Vale of White Horse|Waverley|Wealden|West Berkshire|West Oxfordshire|Winchester|Windsor and Maidenhead|Woking|Wokingham|Worthing","south-west":"Bath and North East Somerset|Bournemouth, Christchurch and Poole|Bristol|Cheltenham|Cornwall|Cotswold|Dorset|East Devon|Exeter|Forest of Dean|Gloucester|Isles of Scilly|Mid Devon|North Devon|North Somerset|Plymouth|Somerset|South Gloucestershire|South Hams|Stroud|Swindon|Teignbridge|Tewkesbury|Torbay|Torridge|West Devon|Wiltshire","west-midlands":"Birmingham|Bromsgrove|Cannock Chase|Coventry|Dudley|East Staffordshire|Herefordshire|Lichfield|Malvern Hills|Newcastle-under-Lyme|North Warwickshire|Nuneaton and Bedworth|Redditch|Rugby|Sandwell|Shropshire|Solihull|South Staffordshire|Stafford|Staffordshire Moorlands|Stoke-on-Trent|Stratford-on-Avon|Tamworth|Telford and Wrekin|Walsall|Warwick|Wolverhampton|Worcester|Wychavon|Wyre Forest","yorkshire-and-the-humber":"Barnsley|Bradford|Calderdale|Doncaster|East Riding of Yorkshire|Kingston upon Hull|Kirklees|Leeds|North East Lincolnshire|North Lincolnshire|North Yorkshire|Rotherham|Sheffield|Wakefield|York"};
+/* LA_REGIONS:END */
+let _laRegionList = null;
+/* LAs on other regions' maps whose name starts with what was typed, or has a
+   word that does: "leeds", "manch", "tyne". Three letters at least, so two
+   letters typed on the way to a local name do not fill the list with the
+   rest of England. None on the England map, which has every LA. */
+function _otherRegionMatches(q) {
+  if (!q || q.length < 3 || (window.PH_REGION && PH_REGION.isEngland)) return [];
+  if (!_laRegionList) {
+    _laRegionList = [];
+    const names = {};
+    (window.PH_REGIONS || []).forEach(r => { names[r.id] = r.name; });
+    Object.keys(PH_LA_REGIONS).forEach(id => {
+      String(PH_LA_REGIONS[id] || '').split('|').filter(Boolean).forEach(la => {
+        _laRegionList.push({ la, lc: la.toLowerCase(), id, region: names[id] || id });
+      });
+    });
+  }
+  const here = (window.PH_REGION && PH_REGION.id) || 'london';
+  const live = window.PH_REGIONS_LIVE || [];
+  return _laRegionList.filter(e => e.id !== here && live.indexOf(e.id) !== -1 &&
+      (e.lc.startsWith(q) || e.lc.split(/[\s-]+/).some(w => w.startsWith(q))))
+    .sort((a, b) => (a.lc.startsWith(q) ? 0 : 1) - (b.lc.startsWith(q) ? 0 : 1) || a.la.length - b.la.length)
+    .slice(0, 6);
+}
+// The rows for those LAs: "Leeds is on the Yorkshire and The Humber map",
+// and selecting one opens that map.
+function _otherRegionRowsHTML(list) {
+  if (!list.length) return '';
+  return '<div class="sr-grp" role="presentation">other regions</div>' + list.map((e, i) =>
+    `<div class="sr-row sr-region" role="option" aria-selected="false" id="sr-reg-${i}" data-region="${_esc(e.id)}">` +
+    `<span class="sr-type">LA</span><span class="sr-name">${_esc(e.la)}</span>` +
+    `<span class="sr-sub">${_esc(e.la)} is on the ${_esc(e.region)} map. Open ${_esc(phRegionPhrase(e.region))}</span></div>`).join('');
+}
+function _wireOtherRegionRows(results) {
+  results.querySelectorAll('.sr-row.sr-region').forEach(row => {
+    row.addEventListener('click', () => { location.href = regionHref(row.getAttribute('data-region')); });
   });
 }
 function _runSearch(q) {
@@ -17938,12 +18219,17 @@ function _runSearch(q) {
   // does (see ensureLayerData), and the list is drawn again when they land.
   const loadingRow = (typeof _searchLoadsPending === 'function' && _searchLoadsPending())
     ? '<div class="sr-empty sr-loading" role="presentation">Loading charities and pharmacies...</div>' : '';
+  const elsewhere = pq ? [] : _otherRegionMatches(q);
   if (matches.length === 0) {
-    results.innerHTML = loadingRow ||
-      '<div class="sr-empty" role="presentation">Nothing matches that. Try a postcode, or the name of an LA, ward, GP practice, pharmacy, dental practice or charity.</div>';
+    results.innerHTML = elsewhere.length ? _otherRegionRowsHTML(elsewhere) + loadingRow : (loadingRow ||
+      '<div class="sr-empty" role="presentation">We could not find that in ' + _esc(phWhere()) +
+      '. Try a postcode, or choose another region from the region button at the top.</div>');
     results.classList.add('show');
+    _wireOtherRegionRows(results);
     if (pq) _renderPostcodeRow(results, pq, q);
-    _searchAnnounce(pq ? 'Looking up postcode' : (loadingRow ? 'Loading charities and pharmacies' : 'No matches'));
+    _searchAnnounce(pq ? 'Looking up postcode'
+      : elsewhere.length ? (elsewhere.length === 1 ? '1 result' : elsewhere.length + ' results') + ' on other regions\' maps'
+      : (loadingRow ? 'Loading charities and pharmacies' : 'No matches'));
     return;
   }
   // Group by type, LAs and ICBs first, then wards, then at most five LSOAs
@@ -17972,8 +18258,9 @@ function _runSearch(q) {
       html += `<div class="sr-row sr-more" role="option" aria-selected="false" id="sr-opt-more" data-more="lsoa"><span class="sr-name">Show all ${g.length.toLocaleString('en-GB')} LSOAs</span></div>`;
     }
   });
-  results.innerHTML = html + loadingRow;
+  results.innerHTML = html + _otherRegionRowsHTML(elsewhere) + loadingRow;
   results.classList.add('show');
+  _wireOtherRegionRows(results);
   results.querySelectorAll('.sr-row[data-idx]').forEach(row => {
     row.addEventListener('click', () => {
       const i = parseInt(row.getAttribute('data-idx'), 10);
@@ -18419,9 +18706,9 @@ async function _prepareScreenForScreenshot(opts) {
     const focused = (typeof focusLabel === 'function') ? focusLabel() : null;
     const opts = [
       { key: 'prepare-current', label: 'This view',
-        desc: 'Keeps the map where it is now, with everything outside ' + PH_AREA + ' turned white.' },
-      { key: 'prepare-london', label: 'All of ' + PH_AREA + ', framed',
-        desc: 'Fits the whole of ' + PH_AREA + ' to the screen, with everything outside it turned white.' },
+        desc: 'Keeps the map where it is now, with everything outside ' + phWhere() + ' turned white.' },
+      { key: 'prepare-london', label: 'All of ' + phWhere() + ', framed',
+        desc: 'Fits the whole of ' + phWhere() + ' to the screen, with everything outside it turned white.' },
     ];
     if (focused) opts.push({
       key: 'prepare-borough', label: `Just ${focused}, framed`,
@@ -18863,6 +19150,10 @@ async function loadData() {
     // 600ms timer hoping the fetch above had finished.
     if (typeof _applyUrlStateOnce === 'function') _applyUrlStateOnce();
     done();
+    // A first-time visitor can be shown round now the wards are on the map,
+    // once, and only if they have not already started using the page.
+    window._phWardsReady = true;
+    setTimeout(() => { if (window.PH_TOUR && PH_TOUR.maybeAutoStart) PH_TOUR.maybeAutoStart(); }, 0);
 
     /* The map is drawn and the loading screen has gone, so the far side of the
        split can be fetched with nothing waiting behind it. Started here rather
@@ -20067,7 +20358,7 @@ var PH_SHOW = {
       var pc = function (c) { return Math.min(99, Math.max(1, Math.round(100 * c / share.n))); };
       var more = share.below >= share.above;
       var lead = name + ' is ' + (more ? 'more' : 'less') + ' deprived than <strong>' +
-        pc(more ? share.below : share.above) + '%</strong> of ' + esc(PH_AREA) + "'s wards";
+        pc(more ? share.below : share.above) + '%</strong> of the wards in ' + esc(phWhere());
       var c20 = num(i.core20_lsoa_count), nl = num(i.total_lsoa_count);
       if (c20 && nl) {
         lead += (more ? ', and ' : ', although ') + (c20 >= nl
@@ -22456,6 +22747,8 @@ var PH_SHOW = {
     if (typeof wLyr === 'undefined' || !wLyr || !wLyr.getBounds) return;
     try { tourFit(wLyr.getBounds(), 11); } catch (e) { /* no layer yet */ }
   }
+  // Whether this map has the Ask panel, which assistant.js builds.
+  function tourHasAsk() { return !!document.getElementById('ai-toggle'); }
   function closeAsk() {
     var c = document.getElementById('ai-close');
     var p = document.getElementById('ai-panel');
@@ -22475,14 +22768,18 @@ var PH_SHOW = {
       t: 'What PopHealth Map is',
       n: function () {
         var ind = tourCount('ind'), la = tourCount('la'), wd = tourCount('ward');
+        // The region this map shows, as it reads in a sentence: "London",
+        // "the North East". A capital letter where it opens one.
+        var where = phWhere();
         return 'PopHealth Map brings together ' + (ind ? '<strong>' + ind + ' indicators</strong>' : 'indicators') +
           ' of health, deprivation and daily life from official sources, so you can see how ' +
-          'London changes from one neighbourhood to the next. London is made up of ' +
+          where + ' changes from one neighbourhood to the next. You can look at its ' +
           (la ? '<strong>' + la + ' local authorities (LAs)</strong>' : 'local authorities (LAs)') +
-          ', each run by one council and divided into ' +
-          (wd ? '<strong>' + wd + ' wards</strong>' : 'wards') +
-          ', the areas councillors are elected for, and the map can also show smaller ' +
-          'statistical areas called MSOAs, of about 7,500 people, and LSOAs, of about 1,500 people. ' +
+          ', its ' + (wd ? '<strong>' + wd + ' wards</strong>' : 'wards') +
+          ', which are the areas councillors are elected for, or smaller statistical areas. ' +
+          (PH_REGION.isEngland ? ''
+            : 'The map covers every region of England, and you can switch to yours with the ' +
+              '<strong>region button</strong> at the top or by searching for a postcode. ') +
           'It is free, with no sign-in, and the next five chapters show you around.';
       },
       go: function () {
@@ -22490,7 +22787,7 @@ var PH_SHOW = {
         // The indicator first: changing #ov pulls the sidebar to the Indicators
         // tab, so setting the tab before it would be immediately undone.
         setOverlay('none');
-        sidebarTab('layers');
+        sidebarTab('overlay');
       },
     },
     {
@@ -22586,21 +22883,25 @@ var PH_SHOW = {
          whom, and the daily limit. No counts of places here: the Directory's
          heading and the Charities tab give the live ones. */
       t: 'The tools',
-      n: 'The tabs along the top do the deeper work. <strong>Query</strong> finds every ward ' +
+      // The Ask sentences only where this map has the Ask button.
+      n: function () {
+        return 'The tabs along the top do the deeper work. <strong>Query</strong> finds every ward ' +
          'that meets the conditions you set, and <strong>Compare</strong> lines up to four ' +
          'places side by side. <strong>Custom area</strong> adds up the figures for an area you ' +
          'build yourself from LSOAs. <strong>Data export</strong> makes a spreadsheet of the ' +
          'areas and indicators you choose. <strong>Directory</strong> finds a GP practice, ' +
-         'pharmacy or charity by name or postcode. <strong>Ask about this data</strong> answers ' +
+         'pharmacy or charity by name or postcode.' + (!tourHasAsk() ? '' :
+         ' <strong>Ask about this data</strong> answers ' +
          'your questions about an area. What you ask and the figures looked up to answer it pass ' +
          'through this site\'s server to Anthropic\'s Claude model, which writes the reply, so ' +
          'please leave out anything personal. You can ask 10 questions a day, and replying when ' +
-         'it asks you to narrow a question down does not use one up.',
+         'it asks you to narrow a question down does not use one up.');
+      },
       go: function () {
         railClick('explore');
         setOverlay('imd_score_ward');
         tourSpot('.mode-tabs');
-        tourSpot('#ai-toggle');
+        if (tourHasAsk()) tourSpot('#ai-toggle');
         tourFitAll();
       },
     },
@@ -22636,9 +22937,9 @@ var PH_SHOW = {
         var grp = tourFirstGroup(), chip = tourFirstChip();
         var eg = (grp && chip) ? ', for example <strong>' + tourEsc(chip) + '</strong> under <em>' + tourEsc(grp) + '</em>,'
                : grp ? ', for example one under <em>' + tourEsc(grp) + '</em>,' : '';
-        return '<span class="tour-task-ask">Now it is your turn. Open the <strong>Indicators</strong> ' +
-          'tab<span class="tour-phone-only"> (tap the ' + MENU_ICON + ' menu button first)</span> ' +
-          'and choose any indicator' + eg + ' to colour the map by it.</span>' +
+        return '<span class="tour-task-ask">Now it is your turn. Choose any indicator' + eg +
+          ' on the <strong>Indicators</strong> tab<span class="tour-phone-only"> (tap the ' +
+          MENU_ICON + ' menu button first)</span> to colour the map by it.</span>' +
           '<span class="tour-task-done">That is it: the map is now coloured by ' +
           '<strong class="tour-task-ov">the indicator you chose</strong>, and the key along the ' +
           'bottom shows what each shade means. Select any area to see its figures, and press ' +
@@ -22650,7 +22951,7 @@ var PH_SHOW = {
         // Back to plain wards, so choosing an indicator is all it takes.
         lsoaLayer(false, false);
         wardLevel();
-        sidebarTab('layers');
+        sidebarTab('overlay');
         closeAsk();
         tourFitAll();
         tourTaskArm();
@@ -22728,22 +23029,49 @@ var PH_SHOW = {
    *
    * It also stays out of the way of a shared link. A URL carrying state was
    * sent to show someone a particular view, and opening a tour over it would
-   * throw away the thing they were sent.
+   * throw away the thing they were sent. Only the page's own keys make a
+   * shared view: campaign tags (utm_*, fbclid, gclid, ref), a region on its
+   * own (?r=) and a bare map position do not, since they are how most
+   * newcomers arrive. ?t=1 is the test switch that keeps the tour away, and
+   * ?tour=1 starts it whatever else the address says, for campaign links and
+   * QR codes.
+   *
+   * Started once, when the ward data is on the map (loadData), and not on the
+   * visitor's first click: on a slow line the data can land after they have
+   * started using the page, and a tour taking over then undoes what they did.
    */
   var TOUR_SEEN = 'phTourSeen';
   var TOUR_AUTOSTART = true;
+  var TOUR_VIEW_KEYS = ['ov', 'ov2', 'w', 'a', 'an', 'b', 'icb', 'mode', 'qs', 'qw', 'qc',
+                        'lvl', 'c20', 'lsoa', 'cb', 'bg'];
+  // Whether the visitor has pressed or typed on the map, the search, the
+  // rail or the panel before the tour could start.
+  var tourUserActed = false;
+  ['pointerdown', 'keydown'].forEach(function (t) {
+    window.addEventListener(t, function (e) {
+      if (!e.isTrusted || !e.target || !e.target.closest) return;
+      if (e.target.closest('#map, .hdr-search, .mode-rail, #sidebar, #hdr-region-btn, #hdr-region-menu')) tourUserActed = true;
+    }, { capture: true, passive: true });
+  });
+  var tourAutoTried = false;
   function maybeAutoStart() {
     // A switch, so the landing tour can be turned off without unpicking it.
     if (!TOUR_AUTOSTART) return;
-    if (tourAt >= 0) return;
+    if (tourAt >= 0 || tourAutoTried) return;
+    tourAutoTried = true;
     // The address as it arrived, not as it is now: the page writes its own
     // state into the URL as the map moves, which would otherwise look like a
     // shared link and stop the tour on a first visit.
     var inbound = (typeof _INBOUND_URL_STATE === 'string') ? _INBOUND_URL_STATE : window.location.search;
-    if (inbound && inbound.length > 1) return;
+    var p = new URLSearchParams(inbound || '');
+    var forced = p.get('tour') === '1';
+    if (!forced) {
+      if (p.has('t') || TOUR_VIEW_KEYS.some(function (k) { return p.has(k); })) return;
+      if (tourUserActed) return;
+    }
     var seen = null;
-    try { seen = window.localStorage.getItem(TOUR_SEEN); } catch (e) { return; }
-    if (seen) return;
+    try { seen = window.localStorage.getItem(TOUR_SEEN); } catch (e) { if (!forced) return; }
+    if (seen && !forced) return;
     try { window.localStorage.setItem(TOUR_SEEN, '1'); } catch (e) { /* private mode */ }
     tourStart();
   }
@@ -22870,8 +23198,8 @@ var PH_SHOW = {
 
   function tourStart(focusIt) {
     if (!tourStrip) return;
-    // The chapters visit named London wards; a region has none of them.
-    if (!PH_IS_LONDON) return;
+    // Every region gets the tour: the chapters read their place, counts and
+    // example ward from the data this map has loaded.
     tourAt = 0;
     // Started by the page on a first visit, so a screen reader is told it
     // is there; started from Take a tour, focus goes to its title instead.
@@ -22962,11 +23290,13 @@ var PH_SHOW = {
   });
 
   window.PH_TOUR = {
-    start: tourStart, end: tourEnd,
+    start: tourStart, end: tourEnd, maybeAutoStart: maybeAutoStart,
     running: function () { return tourAt >= 0; },
     at: function () { return tourAt; },
     length: TOUR.length,
   };
+  // The wards may already be on the map if this script ran late.
+  if (window._phWardsReady) setTimeout(maybeAutoStart, 0);
 
   /* ─────────────────────────────────────────────────────────────────────────
      REPORT BUILDER
@@ -23745,7 +24075,7 @@ var PH_SHOW = {
   var CB_NUM = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
   function cbNum(n) { return n >= 0 && n < 10 ? CB_NUM[n] : n.toLocaleString('en-GB'); }
   function cbCap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
-  function cbWhere() { return cbScope ? scopeLabel(cbScope) : 'All of ' + PH_AREA; }
+  function cbWhere() { return cbScope ? scopeLabel(cbScope) : 'All of ' + phWhere(); }
 
   // "wards, LSOAs and LAs"
   function cbList(words) {
@@ -24223,7 +24553,7 @@ var PH_SHOW = {
   function cbNotes(out) {
     var lv = CB_LEVELS[cbLevel], today = new Date();
     var dataDate = DATA_DATE ? cbDate(DATA_DATE) : '';
-    var where = cbScope ? scopeLabel(cbScope) : PH_AREA;
+    var where = cbScope ? scopeLabel(cbScope) : phWhere();
     var csvName = cbFileBase() + (DATA_DATE ? '-' + DATA_DATE : '') + '.csv';
     var year = DATA_DATE ? DATA_DATE.slice(0, 4) : String(today.getFullYear());
     var laCols = out.keys.filter(cbLaWide).length;
@@ -24235,7 +24565,7 @@ var PH_SHOW = {
 
     L.push('What the file holds');
     para('The file has ' + cbNum(out.rows) + ' row' + (out.rows === 1 ? '' : 's') + ', one for each ' + lv.label +
-      ' in ' + (cbScope ? where : 'all of ' + PH_AREA) + ' in alphabetical order, and ' +
+      ' in ' + (cbScope ? where : 'all of ' + phWhere()) + ' in alphabetical order, and ' +
       (out.cols === 1 ? 'one column for the indicator you chose' : 'a column for each of the ' + cbNum(out.cols) + ' indicators you chose') +
       '. Each figure is the one the map ' +
       'shows for that area, and the file never adds areas together, which is what Custom area is for. ' +
@@ -24801,7 +25131,7 @@ var PH_SHOW = {
     var el = $('q-readback');
     if (!el) return;
     var parts = ['Wards'];
-    parts.push(q.scope ? 'in <strong>' + esc(scopeLabel(q.scope)) + '</strong>' : 'anywhere in ' + PH_AREA);
+    parts.push(q.scope ? 'in <strong>' + esc(scopeLabel(q.scope)) + '</strong>' : 'anywhere in ' + phWhere());
 
     if (q.services.length) {
       parts.push('containing at least one ' + q.services.map(function (id) {
@@ -25145,10 +25475,9 @@ var PH_SHOW = {
     if (indicatorKeys().indexOf(q.sort) === -1) q.sort = indicatorKeys()[0];
     renderSort();
     renderBuilder();
-    // The ward data has arrived, so a first-time visitor can be shown round.
-    // Hooked here rather than to a timer because chapter 4 picks its ward out
-    // of the data and there is nothing to pick from before this point.
-    maybeAutoStart();
+    // The landing tour is not started from here. This also runs on the
+    // visitor's first ward click, Query or Compare, which on a slow line was
+    // the tour's cue to take over the page; loadData starts it instead.
   }
   var _poll = setInterval(function () {
     buildOnce();
