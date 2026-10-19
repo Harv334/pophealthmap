@@ -7129,6 +7129,27 @@ const FT_DATA_FROM = {
 };
 const FT_PERIOD_WORD = { Calendar: 'calendar year', Financial: 'financial year, from April to March', Academic: 'school year' };
 
+/* Local Health periods that take in the pandemic. Deaths and life
+   expectancy pooled over 2019 to 2023 include 2020 and 2021, and the older
+   admissions series ends in 2020/21, its first year. */
+function ftCovidNote(k) {
+  if (!/^ft_\d+$/.test(k)) return '';
+  const id = k.slice(3), info = FT_INFO[id];
+  if (!info) return '';
+  const m = (typeof OV_META === 'object' && OV_META[k]) || {};
+  const words = ((typeof indTitle === 'function' && indTitle(k)) || '') + ' ' + (m.desc || '') + ' ' + indLabel(k);
+  const per = ovPeriodOf(k);
+  const yrs = (per.match(/\d{4}/g) || []).map(Number);
+  if (!yrs.length) return '';
+  const start = Math.min.apply(null, yrs), end = ovEndYear(k) || Math.max.apply(null, yrs);
+  if ((/life expectancy/i.test(info[0]) || /mortality|death/i.test(words)) && start <= 2021 && end >= 2020) {
+    return 'The period includes 2020 and 2021, when COVID-19 raised deaths most in more deprived areas, so gaps between places may be wider than in a normal year.';
+  }
+  if (/admission/i.test(words) && /2020\/21$/.test(per)) {
+    return 'The last year, 2020/21, was the first year of the pandemic, when emergency admissions fell sharply.';
+  }
+  return '';
+}
 function indicatorFacts(k) {
   const m = (typeof OV_META === 'object' && OV_META[k]) || {};
   const src = String(m.src || '');
@@ -7160,6 +7181,8 @@ function indicatorFacts(k) {
       if (ds && /Child Measurement/.test(ds)) f.method = 'Children are weighed and measured at school in Reception and Year 6, and three school years are pooled because the areas are small.';
     }
     if (ds) f.method = (f.method ? f.method + ' ' : '') + 'OHID builds these figures from ' + (FT_DATA_FROM[ds] || ds) + '.';
+    const covid = ftCovidNote(k);
+    if (covid) f.method = (f.method ? f.method + ' ' : '') + covid;
     return f;
   }
   const ts = (src.match(/\((TS\d+A?)\)/) || [])[1];
@@ -10443,7 +10466,8 @@ function showWard(wn) {
           (leCounty
             ? ', and further down as OHID’s official figure for ' + _esc(laCountyPhrase(leCounty, bor)) + ' as a whole' +
               (leCounty.name ? ', the county ' + _esc(ladPhrase(bor)) + ' is part of.' : '.')
-            : ', and further down as the official figure for the whole of ' + _esc(ladPhrase(bor)) + '.') : ''}</div></div>
+            : ', and further down as the official figure for the whole of ' + _esc(ladPhrase(bor)) + '.') +
+          ' The two cover different years, so the difference between them is not a change in this ward.' : ''}</div></div>
       ${msoaRows}` : '';
     const ctx = ctxRows ? `<div class="sr-ctx${hideFrom(ctxStart)}">
       <div class="sr-sub">Figures for the whole of ${_esc(allCty ? ctyName : ladPhrase(bor))}</div>
