@@ -17,6 +17,7 @@ const BASE = (process.argv[2] || 'http://localhost:8792').replace(/\/$/, '');
 const ROOT = path.resolve(__dirname, '..', '..');
 const HAS_NE = fs.existsSync(path.join(ROOT, 'data/regions/north-east/ward_data.json'));
 const HAS_OA = fs.existsSync(path.join(ROOT, 'data/map/oa/index.json'));
+const HAS_ENG = fs.existsSync(path.join(ROOT, 'data/regions/england/ward_data.json'));
 const SETTLE = +(process.env.SMOKE_SETTLE_MS || 9000);
 
 let failed = 0;
@@ -671,11 +672,11 @@ const smallText = page => page.evaluate(() => {
     const P = plain.out;
     ok(Object.values(P).every(x => x.sheetFirst && x.profFirst && x.sheet === x.prof),
       '"Summary" comes first in the ward sheet and the profile, and they match', JSON.stringify(P).slice(0, 300));
-    ok(/^Stonebridge is more deprived than 99% of London's wards, and \d+ of its \d+ LSOAs are among the most deprived fifth of England\./.test(P.Stonebridge.sheet),
+    ok(/^Stonebridge is more deprived than 99% of the wards in London, and \d+ of its \d+ LSOAs are among the most deprived fifth of England\./.test(P.Stonebridge.sheet),
       'Stonebridge leads with its ranking and its Core20 count', P.Stonebridge.sheet);
-    ok(/^Holloway is (more|less) deprived than \d+% of London's wards\./.test(P.Holloway.sheet) && !/deprived fifth/.test(P.Holloway.sheet),
+    ok(/^Holloway is (more|less) deprived than \d+% of the wards in London\./.test(P.Holloway.sheet) && !/deprived fifth/.test(P.Holloway.sheet),
       'Holloway, with no Core20 LSOAs, has no Core20 clause', P.Holloway.sheet);
-    ok(/^Barnes is less deprived than \d+% of London's wards/.test(P.Barnes.sheet), 'a Richmond ward says "less deprived than"', P.Barnes.sheet);
+    ok(/^Barnes is less deprived than \d+% of the wards in London/.test(P.Barnes.sheet), 'a Richmond ward says "less deprived than"', P.Barnes.sheet);
     ok(/^Bishopsgate is home to only 345 residents/.test(P.Bishopsgate.sheet) && !/median|deprived than/.test(P.Bishopsgate.sheet),
       'Bishopsgate opens with its residents and makes no comparison with the median', P.Bishopsgate.sheet);
     ok(/^Walbrook\b/.test(P.Walbrook.sheet) && /no Census figures of its own/.test(P.Walbrook.sheet) && !/median|deprived than|can expect/.test(P.Walbrook.sheet) && P.Walbrook.prof === P.Walbrook.sheet,
@@ -1372,7 +1373,10 @@ const smallText = page => page.evaluate(() => {
       d: [...document.querySelectorAll('#dir-list .dir-item .dir-sub')].slice(0, 30).map(e => e.textContent.split(' · ')[0]),
     }));
     const metres = t => /km$/.test(t) ? parseFloat(t) * 1000 : /^under/.test(t) ? 0 : parseFloat(t);
-    ok(/^Near E1 6AN, nearest first/.test(dnear.head) && dnear.d.length === 30 && dnear.d.every((t, i) => !i || metres(t) >= metres(dnear.d[i - 1])),
+    // A charity placed only by its postcode sector reads "in E1 6" rather
+    // than a distance, so the order is checked over the distances.
+    const dists = l => l.filter(t => !/^in [A-Z]/.test(t));
+    ok(/^Near E1 6AN, nearest first/.test(dnear.head) && dnear.d.length === 30 && dists(dnear.d).every((t, i, l) => !i || metres(t) >= metres(l[i - 1])),
       'directory: a full postcode lists the places nearest to it, nearest first', JSON.stringify(dnear).slice(0, 200));
     await checkAxe(page, 'Directory near a postcode');
     await page.click('#dir-near-x');
@@ -1406,11 +1410,12 @@ const smallText = page => page.evaluate(() => {
       const num = re => { const m = t.match(re); return m ? +m[1].replace(/,/g, '') : NaN; };
       const ring = document.querySelector('.leaflet-marker-icon.vcse-cluster .vcse-ring');
       return { t, pinned: num(/Showing ([\d,]+) registered charities/), wide: num(/The Directory also lists ([\d,]+)/),
+        nopin: /more without a dot/.test(t) ? num(/It lists ([\d,]+) more without a dot/) : 0,
         tab: +document.getElementById('vcse-tab-count').textContent.replace(/,/g, ''),
         key: !document.getElementById('vcse-key').hidden && document.querySelectorAll('#vcse-key li').length,
         ring: ring ? getComputedStyle(ring).backgroundImage : '' };
     });
-    ok(ch.pinned === ch.tab && ch.pinned + ch.wide === az.n && !/[–—]/.test(ch.t),
+    ok(ch.pinned === ch.tab && ch.pinned + ch.wide + ch.nopin === az.n && !/[–—]/.test(ch.t),
       'charities: the tab and the Directory agree on one count, explained once', ch.t + ' / Directory ' + az.n);
     ok(ch.key === 11 && /conic-gradient/.test(ch.ring), 'charities: a key to the dots, and groups drawn as a ring of causes',
       ch.key + ' / ' + ch.ring.slice(0, 40));
@@ -1434,9 +1439,26 @@ const smallText = page => page.evaluate(() => {
         cols: [...n.querySelectorAll('.ws-near-col h4')].map(e => e.textContent),
         d: [...n.querySelectorAll('.ws-near-col')].map(c => [...c.querySelectorAll('.ws-near-d')].map(e => e.textContent)) } : null;
     });
-    ok(!!near && near.h === 'Near E1 6AN' && near.cols.join() === 'GP practices,Pharmacies,Charities' &&
-       near.d.every(l => l.length === 3 && l.every((t, i) => !i || metres(t) >= metres(l[i - 1]))),
+    ok(!!near && near.h === 'Near E1 6AN' && near.cols.join() === 'GP practices,Pharmacies,Registered charities nearby' &&
+       near.d.every(l => l.length === 3 && dists(l).every((t, i, d) => !i || metres(t) >= metres(d[i - 1]))),
       'a postcode search lists the nearest GP practices, pharmacies and charities by distance', JSON.stringify(near));
+    // Review H15: the charities column holds charities that serve the area,
+    // says where they come from, and gives a sector, not a distance, for one
+    // placed only by its postcode sector.
+    const nearV = await page.evaluate(() => {
+      const col = [...document.querySelectorAll('#ws-body .ws-near-col')].find(c => /charities/.test(c.querySelector('h4').textContent));
+      const vcse = (typeof VCSE_ALL !== 'undefined' ? VCSE_ALL : []);
+      const byName = {};
+      vcse.forEach(r => { byName[phTitle(r.n)] = r; });
+      const items = col ? [...col.querySelectorAll('li')].map(li => ({ n: li.querySelector('.ws-near-item').textContent,
+        d: li.querySelector('.ws-near-d').textContent })) : [];
+      return { note: col ? (col.querySelector('.ws-near-vnote') || {}).textContent || '' : '',
+        items: items.map(it => ({ ...it, nr: byName[it.n] ? byName[it.n].nr : null, sec: byName[it.n] ? (!byName[it.n].a && !!byName[it.n].pc) : null })) };
+    });
+    ok(/^From the Charity Commission register\. A charity listed here may not offer help to the public, so check its website first\.$/.test(nearV.note) &&
+       nearV.items.length === 3 && nearV.items.every(it => it.nr !== false) &&
+       nearV.items.every(it => it.sec === null || (it.sec ? /^in [A-Z0-9]+ \d$/.test(it.d) : !/^in /.test(it.d))),
+      'the near list\'s charities serve the area, carry the register note, and give a sector for sector-placed ones', JSON.stringify(nearV));
     await checkAxe(page, 'ward sheet with its near list');
     await page.evaluate(() => showWard('Lansbury'));
     await page.waitForTimeout(500);
@@ -1594,6 +1616,133 @@ const smallText = page => page.evaluate(() => {
        !/[–—]/.test(intro.text + intro.caution) && /check any figure/.test(intro.caution),
       vpName + ': the Ask panel opens with two paragraphs that describe the same route as the tour', intro.text);
     ok(errors.length === 0, 'no page errors (tour, ' + vpName + ')', errors.join(' | '));
+    await page.close();
+  }
+
+  // First visit (review round 2, H22 to H28 and onboarding-02): the map opens
+  // on Indicators, names its region in a header button that lists the
+  // others, finds LAs on other regions' maps, starts the tour for campaign
+  // links but not over a shared view, keeps a bare address until the view
+  // changes, says when the LSOAs are loading, and writes its key in words.
+  {
+    const { page, errors } = await open(browser, 'index.html?utm_source=linkedin&utm_medium=social&fbclid=IwAR0abc', DESK);
+    const first = await page.evaluate(() => ({ tour: PH_TOUR.running(), url: location.search,
+      tab: document.querySelector('.sb-tab.active').id, sel: document.getElementById('sbtab-overlay').getAttribute('aria-selected'),
+      pane: document.getElementById('tab-overlay').classList.contains('active') && !document.getElementById('tab-layers').classList.contains('active') }));
+    ok(first.tour, 'a campaign link (utm_*, fbclid) still gets the tour on a first visit', JSON.stringify(first));
+    ok(first.tab === 'sbtab-overlay' && first.sel === 'true' && first.pane, 'the map opens on the Indicators tab', JSON.stringify(first));
+    await page.evaluate(() => PH_TOUR.end());
+    await page.waitForTimeout(1500);
+    const q0 = await page.evaluate(() => location.search);
+    ok(!/[?&](L|z|c)=/.test(q0), 'an untouched map keeps a bare address, without the opening layers or position', q0);
+    await page.evaluate(() => map.setZoom(map.getZoom() + 1));
+    await page.waitForTimeout(1200);
+    const q1 = await page.evaluate(() => location.search);
+    ok(/[?&]z=/.test(q1) && /[?&]c=/.test(q1), 'the position is written once the map has moved', q1);
+    // The first key indicator keeps the wards on the map and says what is loading.
+    await page.route('**/lsoa_imd.js', async r => { await new Promise(x => setTimeout(x, 2500)); r.continue(); });
+    await setOv(page, 'imd_decile');
+    await page.waitForTimeout(400);
+    const loading = await page.evaluate(() => ({ hint: document.getElementById('dl-hint').classList.contains('show') ? document.getElementById('dl-hint').textContent : '',
+      wards: !!(wLyr && map.hasLayer(wLyr)), lsoa: !!(lsoaLyr && map.hasLayer(lsoaLyr)) }));
+    ok(/^Loading [\d,]+ LSOAs, which takes a few seconds the first time\.$/.test(loading.hint) && loading.wards && !loading.lsoa,
+      'the first LSOA indicator keeps the wards drawn and says the LSOAs are loading', JSON.stringify(loading));
+    await page.waitForFunction(() => lsoaLyr && map.hasLayer(lsoaLyr), null, { timeout: 30000 }).catch(() => {});
+    await page.waitForTimeout(800);
+    const loaded = await page.evaluate(() => ({ wards: !!(wLyr && map.hasLayer(wLyr)), hint: document.getElementById('dl-hint').textContent }));
+    ok(!loaded.wards, 'the wards make way once the LSOAs are drawn', JSON.stringify(loaded));
+    await page.unroute('**/lsoa_imd.js');
+    // The region button in the header.
+    const hb = await page.evaluate(() => { const b = document.getElementById('hdr-region-btn');
+      return { name: b.getAttribute('aria-label'), text: b.innerText.trim(), exp: b.getAttribute('aria-expanded'),
+        label: document.querySelector('label[for="region-picker"]').textContent }; });
+    await page.click('#hdr-region-btn');
+    await page.waitForTimeout(300);
+    const menu = await page.evaluate(() => { const m = document.getElementById('hdr-region-menu');
+      return { shown: !m.hidden && m.getBoundingClientRect().height > 100, links: [...m.querySelectorAll('a')].map(a => a.textContent + '=' + a.getAttribute('href')),
+        current: (m.querySelector('a[aria-current="page"]') || {}).textContent, focus: document.activeElement && document.activeElement.textContent }; });
+    ok(hb.name === 'London, change region' && hb.text === 'London' && hb.label === 'Region' && menu.shown &&
+       menu.links.some(l => /^North East=.*\?r=north-east$/.test(l)) && menu.current === 'London' && menu.focus === 'London',
+      'the header names the region in a button that lists the other regions, and the Layers select is called Region', JSON.stringify([hb, menu]));
+    await checkAxe(page, 'region list open');
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
+    ok(await page.evaluate(() => document.getElementById('hdr-region-menu').hidden && document.activeElement.id === 'hdr-region-btn'),
+      'Escape closes the region list and returns to its button');
+    // A search for a place on another region's map.
+    const search = async q => { await page.fill('#hdr-search-input', q); await page.waitForTimeout(900);
+      return page.evaluate(() => ({ text: document.getElementById('hdr-search-results').innerText,
+        row: (document.querySelector('#hdr-search-results .sr-region') || {}).dataset || null })); };
+    const leeds = await search('Leeds'), manc = await search('Manchester'), none = await search('zzqxv');
+    ok(/Leeds is on the Yorkshire and The Humber map\. Open Yorkshire and The Humber/.test(leeds.text) && leeds.row && leeds.row.region === 'yorkshire-and-the-humber' &&
+       /Manchester is on the North West map\. Open the North West/.test(manc.text),
+      'a search for an LA on another map says which map, and offers to open it', JSON.stringify([leeds, manc]));
+    ok(/^We could not find that in London\. Try a postcode, or choose another region from the region button at the top\.$/.test(none.text.trim()),
+      'a search that finds nothing says where it looked and how to change region', none.text);
+    await page.fill('#hdr-search-input', '');
+    // The key under the scale is written in words, for every level.
+    const BAD = /TS0\d|CLA01|bridge|→|pop-weighted|best-fit|NOMIS|Fingertips \(|Ward\/LSOA|·/;
+    const keys = [];
+    for (const [k, lv] of [['imd_decile', ''], ['ft_93283', 'msoa'], ['ft_93283', 'ward'], ['ft_93283', 'borough'], ['census_bad_health_pct', 'lsoa'],
+                           ['census_bad_health_pct', 'ward'], ['claimant_rate_pct', ''], ['imd_score_ward', ''], ['crime_rate_per_1000', ''], ['census_population', 'ward']]) {
+      await setOv(page, k);
+      await page.waitForTimeout(1200);
+      if (lv) { await page.evaluate(lv => _setDataLevel(lv), lv); await page.waitForTimeout(1500); }
+      keys.push(await page.evaluate(k => ({ k, lv: currentDataLevel, meta: document.getElementById('sc-meta').innerText,
+        mid: document.getElementById('sc-mid').textContent, min: document.getElementById('mls-min').textContent, max: document.getElementById('mls-max').textContent,
+        label: document.getElementById('mls-label').innerText }), k));
+    }
+    ok(keys.every(x => x.meta && !BAD.test(x.meta) && !/[–—]/.test(x.meta)), 'the key under the scale has no source codes, arrows or dots', keys.map(x => x.k + '@' + x.lv + ': ' + x.meta).join(' | '));
+    ok(/^Published by OHID \(Local Health\) for MSOAs, 2019 to 2023\. Ward figures are our estimates, blended from the MSOAs each ward overlaps\./.test(keys[2].meta) &&
+       /^Calculated for each ward from MHCLG/.test(keys[7].meta) && /^Published by ONS for LSOAs, /.test(keys[6].meta) && /^Counted from police\.uk crime locations/.test(keys[8].meta),
+      'the key says who publishes the figures and how the level drawn was made from them', [keys[2].meta, keys[6].meta, keys[7].meta, keys[8].meta].join(' | '));
+    ok(keys.every(x => x.mid === '') && keys[0].min === 'Most deprived' && keys[0].max === 'Least deprived' &&
+       keys.filter(x => x.k === 'census_bad_health_pct').every(x => /\d%$/.test(x.min) && !/ %/.test(x.min)) &&
+       keys.filter(x => x.k === 'census_population').every(x => /^\D*[\d,]+ people$/.test(x.min)) &&
+       !/per 1,000 residents\s*per 1,000/.test(keys[8].label) && !keys.some(x => /score|decile/.test(x.min + x.max) && x.k !== 'imd_decile'),
+      'the key has no unlabelled middle number, words for the decile ends, whole counts and no doubled units', JSON.stringify(keys.map(x => [x.k, x.mid, x.min, x.max, x.label])));
+    ok(errors.length === 0, 'no page errors (first visit)', errors.join(' | '));
+    await page.close();
+  }
+  // A shared view still opens without the tour, and ?tour=1 forces it.
+  for (const [url, want] of [['index.html?ov=imd_score_ward', false], ['index.html?ov=imd_score_ward&tour=1', true], ['index.html?ref=producthunt', true]]) {
+    const { page } = await open(browser, url, DESK);
+    const run = await page.evaluate(() => PH_TOUR.running());
+    ok(run === want, url + (want ? ' opens the tour' : ' opens without the tour'), String(run));
+    await page.close();
+  }
+  // On a slow line the tour does not take over the visitor's first click
+  // (onboarding-02): the wards land after they have started using the page.
+  {
+    const page = await browser.newPage({ viewport: { width: DESK.width, height: DESK.height } });
+    const errors = []; page.on('pageerror', e => errors.push(e.message));
+    await page.route(/ward_(core|data)\.json/, async r => { await new Promise(x => setTimeout(x, 6000)); r.continue(); });
+    await page.goto(BASE + '/index.html');
+    await page.waitForTimeout(2500);
+    // The loading screen covers the page, but the keyboard still reaches the
+    // search box behind it.
+    await page.focus('#hdr-search-input');
+    await page.keyboard.type('Stone');
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => typeof wLyr !== 'undefined' && wLyr && wLyr.getLayers().length > 600, null, { timeout: 40000 }).catch(() => {});
+    await page.waitForTimeout(2500);
+    const slow1 = await page.evaluate(() => PH_TOUR.running());
+    await page.evaluate(() => { const l = wLyr.getLayers().find(l => l.feature.properties.WD24NM === 'Stonebridge'); if (l) l.fire('click'); });
+    await page.waitForTimeout(1200);
+    const slow2 = await page.evaluate(() => ({ tour: PH_TOUR.running(), ward: selW }));
+    ok(!slow1 && !slow2.tour && slow2.ward === 'Stonebridge', 'on a slow load the tour stays away once the visitor has started, and a ward click opens the ward', JSON.stringify([slow1, slow2]));
+    ok(errors.length === 0, 'no page errors (slow first visit)', errors.join(' | '));
+    await page.close();
+  }
+  // The key on a phone keeps its ends whole (H28).
+  for (const w of [390, 320]) {
+    const { page } = await open(browser, 'index.html?ov=census_bad_health_pct&t=1', { width: w, height: 760, isMobile: true, hasTouch: true });
+    const fit = await page.evaluate(() => {
+      const s = document.getElementById('map-legend-strip'), m = document.getElementById('map').getBoundingClientRect(), r = s.getBoundingClientRect();
+      const end = id => { const e = document.getElementById(id); return e.scrollWidth <= e.clientWidth + 1 && e.getBoundingClientRect().right <= m.right; };
+      return { min: end('mls-min'), max: end('mls-max'), inMap: r.left >= m.left && r.right <= m.right, name: getComputedStyle(document.getElementById('mls-label')).fontSize };
+    });
+    ok(fit.min && fit.max && fit.inMap, w + 'px phone: the key\'s end values are not clipped and the key stays on the map', JSON.stringify(fit));
     await page.close();
   }
 
@@ -2145,6 +2294,110 @@ const smallText = page => page.evaluate(() => {
     await page.close();
   }
 
+  // Copy link round trips: a link reopens the view it was copied from, with
+  // the custom area after a reload, Compare's level, pins and indicators, the
+  // charities layer, the PCN footprints and chosen network, and an open LSOA
+  // profile. Each compares a snapshot of the state before and after.
+  {
+    const snap = page => page.evaluate(() => {
+      _writeUrlState();
+      const q = new URLSearchParams(location.search); q.delete('z'); q.delete('c');
+      return {
+        href: location.href, q: [...q.entries()].map(e => e.join('=')).sort().join('&'),
+        tool: _urlTool(), lvl: currentDataLevel, ov: curOv,
+        area: PH_REPORT.state(), cmp: _urlTool() === 'compare' ? PH_COMPARE.state() : null,
+        ls: selLSOA, pcn: document.getElementById('pcn-focus').value,
+        layers: _URL_LAYERS.filter(id => { const e = document.getElementById(id); return e && e.checked; }).join(','),
+      };
+    });
+    const strip = s => { const o = Object.assign({}, s); delete o.href; return JSON.stringify(o); };
+    const reopen = async (href) => {
+      const p = await browser.newPage({ viewport: { width: DESK.width, height: DESK.height } });
+      const errs = [];
+      p.on('pageerror', e => errs.push(e.message));
+      await p.goto(href);
+      await p.waitForTimeout(SETTLE + 6000);
+      return { p, errs };
+    };
+
+    // A custom area link keeps its area in the address bar, so a reload has it.
+    const { page, errors } = await open(browser, 'index.html?mode=report&a=004243.004244&an=Test&t=1', DESK);
+    await page.waitForTimeout(3000);
+    const a1 = await snap(page);
+    await page.reload();
+    await page.waitForTimeout(SETTLE + 3000);
+    const a2 = await snap(page);
+    ok(a1.area.codes.length === 2 && a1.area.name === 'Test' && /[?&]a=004243\.004244/.test(a1.href) && /[?&]an=Test/.test(a1.href),
+      'a custom area link keeps the area in the address bar once it is drawn', a1.href);
+    ok(strip(a1) === strip(a2), 'a custom area link survives a reload', strip(a1) + ' / ' + strip(a2));
+
+    // Compare at LSOA level, two pins and an extra indicator.
+    await page.goto(BASE + '/index.html?t=1');
+    await page.waitForTimeout(SETTLE);
+    await page.click('.mode-btn[data-mode="compare"]');
+    await page.waitForTimeout(800);
+    await page.evaluate(() => PH_COMPARE.setLevel('lsoa'));
+    await page.waitForFunction(() => typeof LSOA_IMD !== 'undefined' && LSOA_IMD && LSOA_IMD.features, null, { timeout: 30000 }).catch(() => {});
+    await page.evaluate(() => { PH_COMPARE.pinFromLsoa({ code: 'E01004243' }); PH_COMPARE.pinFromLsoa({ code: 'E01004244' }); });
+    await page.evaluate(() => document.querySelector('#cmp-metrics [data-metric="3"]').click());
+    await page.waitForTimeout(800);
+    const c1 = await snap(page);
+    const c = await reopen(c1.href);
+    const c2 = await snap(c.p);
+    const cOpen = await c.p.evaluate(() => document.getElementById('cmp-bar').classList.contains('open') &&
+      !/Nothing is pinned/.test(document.getElementById('cmp-pins').innerText));
+    ok(c1.cmp.pins.length === 2 && c1.cmp.metrics.length === 4 && strip(c1) === strip(c2) && cOpen,
+      'a Compare link reopens with its level, pins and indicators', strip(c1) + ' / ' + strip(c2));
+    ok(c.errs.length === 0, 'no page errors (Compare link)', c.errs.join(' | '));
+    await c.p.close();
+
+    // Ward pins at the default level and indicators.
+    await page.evaluate(() => PH_COMPARE.setLevel('ward'));
+    await page.waitForTimeout(1500);
+    await page.evaluate(() => wLyr.getLayers().slice(0, 2).forEach(l => l.fire('click')));
+    await page.waitForTimeout(800);
+    const w1 = await snap(page);
+    const w = await reopen(w1.href);
+    const w2 = await snap(w.p);
+    ok(w1.cmp.pins.length === 2 && strip(w1) === strip(w2), 'a Compare link with pinned wards reopens with them', strip(w1) + ' / ' + strip(w2));
+    await w.p.close();
+
+    // The charities layer, the PCN footprints and chosen network, and an LSOA profile.
+    await page.click('.mode-btn[data-mode="explore"]');
+    await page.waitForTimeout(800);
+    await page.evaluate(() => {
+      ['vcse-tab-toggle', 'tpcn'].forEach(id => { const e = document.getElementById(id); e.checked = true; e.dispatchEvent(new Event('change')); });
+      const s = document.getElementById('pcn-focus'); s.value = s.options[3].value; s.dispatchEvent(new Event('change'));
+    });
+    await page.waitForTimeout(2500);
+    await page.evaluate(() => _searchPickResult({ type: 'lsoa', _code: 'E01000907', label: 'Camden 001A', sub: '' }));
+    await page.waitForTimeout(4000);
+    const l1 = await snap(page);
+    const l = await reopen(l1.href);
+    const l2 = await snap(l.p);
+    const vc = await l.p.evaluate(() => !!(vcseCluster && vcseCluster._map));
+    ok(/vcse-tab-toggle/.test(l1.layers) && /tpcn/.test(l1.layers) && l1.pcn && l1.ls === 'E01000907' && strip(l1) === strip(l2) && vc,
+      'a link reopens the charities layer, the PCN chosen and the LSOA profile open', strip(l1) + ' / ' + strip(l2));
+    ok(l.errs.length === 0, 'no page errors (layers link)', l.errs.join(' | '));
+    await l.p.close();
+
+    // A link from before the charities layer was named right still turns it on.
+    const old = await reopen(BASE + '/index.html?L=tv&t=1');
+    ok(await old.p.evaluate(() => document.getElementById('vcse-tab-toggle').checked), 'an older link with L=tv turns the charities layer on');
+    await old.p.close();
+
+    // A level the indicator has no figures at is not applied, so the key
+    // never describes colours that are not drawn.
+    await page.goto(BASE + '/index.html?ov=crime_rate_per_1000&lvl=lsoa&t=1');
+    await page.waitForTimeout(SETTLE);
+    const lv = await page.evaluate(() => ({ lvl: currentDataLevel, has: ovHasLevel('crime_rate_per_1000', 'lsoa'), land: _ovLandingLevel('crime_rate_per_1000') }));
+    ok(!lv.has && lv.lvl === lv.land, 'a link level the indicator has no figures at falls back to where it opens', JSON.stringify(lv));
+    ok(await page.evaluate(() => /comparison or custom area/.test(document.getElementById('tb-link').title)),
+      'the Copy link tooltip names what the link carries');
+    ok(errors.length === 0, 'no page errors (Copy link round trips)', errors.join(' | '));
+    await page.close();
+  }
+
   // The header search finds charities, pharmacies and dental practices on a
   // fresh page (their files are lazy, and the index used to be built before
   // they arrived and kept).
@@ -2303,7 +2556,7 @@ const smallText = page => page.evaluate(() => {
     await setOv(page, 'ft_93227');
     await page.waitForTimeout(3000);
     const b7 = await page.evaluate(() => ({
-      text: document.getElementById('fingertips-banner-text').textContent,
+      text: document.getElementById('mls-note').textContent,
       redrawn: Object.keys(MSOA_DATA).filter(msoaRedrawn2021).length,
       card: msoaNoFigure(Object.keys(MSOA_DATA).filter(msoaRedrawn2021)[0], 'ft_93227'),
       other: msoaNoFigure('E02000001', 'census_bad_health_pct') }));
@@ -2313,7 +2566,7 @@ const smallText = page => page.evaluate(() => {
     await setOv(page, 'ft_93105');
     await page.waitForTimeout(1500);
     ok(/^Areas left without colour have no figure\. OHID, the Office for Health Improvement and Disparities, withholds/.test(
-      await page.evaluate(() => document.getElementById('fingertips-banner-text').textContent)), 'other blanks are described as withheld');
+      await page.evaluate(() => document.getElementById('mls-note').textContent)), 'other blanks are described as withheld');
     // H1: an LA map of a Local Health indicator says it is our estimate, and
     // its LA list leaves out the City.
     await setOv(page, 'ft_932831');
@@ -2346,6 +2599,279 @@ const smallText = page => page.evaluate(() => {
     await page.close();
   }
 
+  // Ask against the real Worker code (worker/src/index.js, run here in Node
+  // with fake bindings) and a scripted model: tables are drawn as tables
+  // (H21), an answer cut off at the output limit says so and the next
+  // question still works (H20), a refusal is answered plainly, and a long
+  // session stays under the Worker's 64 KB limit, or starts again with a
+  // plain message if refused as too long (H18, H17).
+  {
+    const os = require('os');
+    const { pathToFileURL } = require('url');
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'phworker-'));
+    fs.copyFileSync(path.join(ROOT, 'worker/src/index.js'), path.join(tmp, 'worker.mjs'));
+    const W = await import(pathToFileURL(path.join(tmp, 'worker.mjs')).href);
+    const store = new Map();
+    const storage = { get: async k => store.get(k), put: async (k, v) => { if (typeof k === 'object') Object.entries(k).forEach(([a, b]) => store.set(a, b)); else store.set(k, v); },
+      deleteAll: async () => store.clear(), getAlarm: async () => 1, setAlarm: async () => {} };
+    const obj = new W.AskCounter({ storage }, {});
+    const env = { ANTHROPIC_API_KEY: 'sk-test', ALLOWED_ORIGINS: new URL(BASE).origin,
+      ASK_COUNTER: { idFromName: n => n, get: () => ({ fetch: (u, i) => obj.fetch(new Request(u, i)) }) },
+      ASK_BURST: { limit: async () => ({ success: true }) } };
+    let ids = 0, force413 = false;
+    const seen = [];
+    const realFetch = globalThis.fetch, realLog = console.log;
+    // The Worker logs each call's usage; not wanted in this output.
+    console.log = (...a) => { if (!(typeof a[0] === 'string' && a[0].startsWith('{"q"'))) realLog(...a); };
+    // The scripted model: what it says depends on the reader's last words.
+    globalThis.fetch = async (url, init) => {
+      const body = JSON.parse(init.body), msgs = body.messages, last = msgs[msgs.length - 1];
+      const said = last.content.map(b => b.text || '').join(' ');
+      const reply = (stop, content) => new Response(JSON.stringify({ model: 'claude-sonnet-5', stop_reason: stop, content,
+        usage: { input_tokens: 1, output_tokens: 1 } }), { status: 200, headers: { 'content-type': 'application/json' } });
+      if (last.content[0].type === 'tool_result') return reply('end_turn', [{ type: 'text', text: 'Done with the figures.' }]);
+      if (/COMPARE/.test(said)) return reply('end_turn', [{ type: 'text', text: 'Here they are.\n\n| Ward | IMD score |\n|---|---|\n| Notting Dale | 41.2 |\n| **Stonebridge** | 38.5 |\n\n- Higher means more deprived.' }]);
+      if (/CUTTOOL/.test(said)) return reply('max_tokens', [{ type: 'text', text: 'Let me compare those.' }, { type: 'tool_use', id: 'cut' + (++ids), name: 'compare_areas', input: {} }]);
+      if (/CUTTEXT/.test(said)) return reply('max_tokens', [{ type: 'text', text: 'Brent: IMD score 30.3\nBromley: IMD' }]);
+      if (/REFUSE/.test(said)) return reply('refusal', []);
+      if (/PROFILE/.test(said)) return reply('tool_use', [{ type: 'tool_use', id: 'p' + (++ids), name: 'get_area', input: { name: 'Lansbury', level: 'ward' } },
+        { type: 'tool_use', id: 'p' + (++ids), name: 'get_area', input: { name: 'Stonebridge', level: 'ward' } }]);
+      return reply('end_turn', [{ type: 'text', text: 'Fine.' }]);
+    };
+    const { page, errors } = await open(browser, 'index.html?t=1', DESK);
+    await page.route(/workers\.dev/, async route => {
+      const r = route.request();
+      const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'content-type', 'content-type': 'application/json' };
+      if (r.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+      const post = r.postData() || '';
+      let res;
+      if (force413) { force413 = false; res = { status: 413, text: '{"error":"Payload too large"}' }; }
+      else {
+        const out = await W.default.fetch(new Request('https://worker.test/', { method: 'POST', body: post,
+          headers: { 'content-type': 'application/json', Origin: new URL(BASE).origin, 'CF-Connecting-IP': '10.9.' + (seen.length >> 8) + '.' + (seen.length & 255) } }), env);
+        res = { status: out.status, text: await out.text() };
+      }
+      seen.push({ size: post.length, status: res.status, n: (JSON.parse(post).messages || []).length });
+      return route.fulfill({ status: res.status, headers: cors, body: res.text });
+    });
+    await page.click('#ai-toggle');
+    await page.waitForTimeout(300);
+    const ask = async q => {
+      const before = await page.evaluate(() => document.querySelectorAll('#ai-log .ai-msg').length);
+      await page.fill('#ai-input', q);
+      await page.keyboard.press('Enter');
+      await page.waitForFunction(b => document.querySelectorAll('#ai-log .ai-msg').length >= b + 2 &&
+        !document.querySelector('#ai-log .ai-thinking'), before, { timeout: 15000 }).catch(() => {});
+      return page.evaluate(() => { const m = [...document.querySelectorAll('#ai-log .ai-msg.ai-bot')].pop();
+        return { text: m.innerText, html: m.innerHTML, error: m.classList.contains('ai-error') }; });
+    };
+    const t = await ask('COMPARE Notting Dale and Stonebridge');
+    const tbl = await page.evaluate(() => { const m = [...document.querySelectorAll('#ai-log .ai-msg.ai-bot')].pop();
+      return { th: [...m.querySelectorAll('table th[scope="col"]')].map(e => e.textContent), rows: m.querySelectorAll('tbody tr').length,
+        strong: !!m.querySelector('td strong'), li: m.querySelectorAll('ul li').length }; });
+    ok(tbl.th.join('|') === 'Ward|IMD score' && tbl.rows === 2 && tbl.strong && tbl.li === 1 && !/\|/.test(t.text),
+      'Ask: a Markdown table is drawn as a table with column headers, not pipes (H21)', JSON.stringify({ tbl, text: t.text }));
+    await page.addScriptTag({ content: AXE });
+    const axeAsk = await page.evaluate(tags => axe.run('#ai-panel', { runOnly: tags, resultTypes: ['violations'] })
+      .then(r => r.violations.map(v => v.id + ' (' + v.nodes[0].target.join(' ') + ')')), AXE_TAGS);
+    ok(axeAsk.length === 0, 'accessibility: the Ask panel with a table answer', axeAsk.join(', '));
+    ok(await page.evaluate(() => PH_ASSISTANT.render('<img src=x onerror=alert(1)>\n| <b>a</b> | b |\n|---|---|\n| <i>c</i> | d |').indexOf('<img') === -1 &&
+      PH_ASSISTANT.render('| <b>a</b> | b |\n|---|---|\n| c | d |').indexOf('&lt;b&gt;') !== -1), 'Ask: text in tables is escaped like the rest of the answer');
+    const c1 = await ask('CUTTOOL compare everything');
+    const c2 = await ask('and the next one?');
+    ok(/Let me compare those\.\s+This answer was cut short, so please ask about fewer places at once\.$/.test(c1.text) && !c1.error &&
+       c2.text === 'Fine.' && !c2.error, 'Ask: an answer cut off mid tool call says so, and the next question still works (H20)', JSON.stringify([c1.text, c2.text]));
+    const c3 = await ask('CUTTEXT compare Brent and Bromley');
+    ok(/Bromley: IMD\s+This answer was cut short/.test(c3.text), 'Ask: an answer cut off mid text keeps what was written and says it was cut short', c3.text);
+    const rf = await ask('REFUSE this');
+    const rf2 = await ask('and now?');
+    ok(rf.text === 'I cannot answer that one. Please ask about the figures on the map.' && rf2.text === 'Fine.', 'Ask: a refusal gets a plain reply and the next question works', JSON.stringify([rf.text, rf2.text]));
+    const profiles = [];
+    for (let i = 0; i < 8; i++) profiles.push(await ask('PROFILE ' + i + ' Lansbury and Stonebridge'));
+    const maxSize = Math.max(...seen.map(s => s.size)), bad = seen.filter(s => s.status !== 200);
+    ok(profiles.every(p => p.text === 'Done with the figures.') && !bad.length && maxSize < 64 * 1024,
+      'Ask: a long session of profile lookups stays under the Worker\'s 64 KB limit and every request is accepted (H18)',
+      JSON.stringify({ maxSize, bad, last: profiles[profiles.length - 1].text }));
+    ok(await page.evaluate(() => JSON.stringify(PH_ASSISTANT.runTool('list_indicators', {})).length) < 16 * 1024,
+      'Ask: the indicator list fits in one tool result (under 16 KB)');
+    force413 = true;
+    const big = await ask('one more');
+    const after = await ask('again');
+    ok(big.text === 'That conversation has grown too long for me to follow, so I have cleared the earlier questions. Please ask again.' &&
+       after.text === 'Fine.' && seen[seen.length - 1].n === 1,
+      'Ask: a conversation refused as too long is cleared with a plain message, and the next question starts afresh', JSON.stringify([big.text, after.text, seen[seen.length - 1]]));
+    ok(!DASH.test(big.text + c1.text + rf.text), 'Ask: the new messages have no dashes');
+    ok(errors.length === 0, 'no page errors (Ask with the Worker)', errors.join(' | '));
+    await page.close();
+    globalThis.fetch = realFetch;
+    console.log = realLog;
+  }
+
+  // H33, H38, H39: the printable reports on paper and on a phone.
+  {
+    const { page, errors } = await open(browser, 'index.html?t=1', DESK);
+    const H = await page.evaluate(async () => {
+      await Promise.all([ensureAllLayerData(), ensureLsoaImd(), ensureLsoaData(), ensureWardDetail(), ensureGreenspaceData()]);
+      const ward = wn => { let h = ''; _generateWardReport({ sink: x => { h = x; } }, wn); return h; };
+      let custom = '';
+      const realOpen = window.open;
+      window.open = () => ({ document: { open() {}, write(h) { custom += h; }, close() {} } });
+      try {
+        PH_REPORT.apply({ codes: ['E01004243', 'E01004244', 'E01004245'] });
+        const b = document.getElementById('rb-report'); b.disabled = false; b.click();
+      } finally { window.open = realOpen; }
+      return { Lansbury: ward('Lansbury'), Bishopsgate: ward('Bishopsgate'), lsoa: _buildLSOAReportHtml('E01004243'), custom };
+    });
+    // On paper: two A4 pages, nothing under 8pt, no chart label cut off at
+    // the left edge, and the English language row named as the Census does.
+    for (const wn of ['Lansbury', 'Bishopsgate']) {
+      const p = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+      await p.goto(BASE + '/robots.txt');
+      await p.setContent(H[wn]);
+      await p.waitForTimeout(600);
+      await p.emulateMedia({ media: 'print' });
+      const m = await p.evaluate(() => {
+        let min = 99, where = '';
+        for (const el of document.querySelectorAll('.report *')) {
+          if (!el.getClientRects().length || ![...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) continue;
+          let px = parseFloat(getComputedStyle(el).fontSize);
+          const svg = el.closest('svg');
+          if (svg && svg.viewBox.baseVal && svg.viewBox.baseVal.width) px *= svg.getBoundingClientRect().width / svg.viewBox.baseVal.width;
+          if (px < min) { min = px; where = el.textContent.slice(0, 30); }
+        }
+        const cut = [...document.querySelectorAll('.report svg text')].filter(t => t.getBBox().x < -0.5).map(t => t.textContent);
+        const labels = [...document.querySelectorAll('svg.ch-compare text')].map(t => t.textContent.replace(/\s+/g, ''));
+        return { pt: +(min * 0.75).toFixed(2), where, cut, zoom: getComputedStyle(document.querySelector('.report')).zoom,
+          english: labels.includes('NoonewithEnglishasmainlanguage') && !/speaks English/.test(document.body.textContent) };
+      });
+      const pdf = await p.pdf({ format: 'A4', preferCSSPageSize: true });
+      const pages = (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) || []).length;
+      ok(pages === 2 && m.pt >= 8 && String(m.zoom) === '1', 'the ' + wn + ' report prints on two A4 pages with nothing under 8pt',
+        pages + ' pages, smallest ' + m.pt + 'pt (' + m.where + '), zoom ' + m.zoom);
+      ok(!m.cut.length, 'no chart label in the ' + wn + ' report starts left of the chart', m.cut.join(' | '));
+      ok(m.english, 'the ' + wn + ' report names the language row "No one with English as main language"');
+      await p.close();
+    }
+    {
+      const p = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+      await p.goto(BASE + '/robots.txt');
+      await p.setContent(H.lsoa);
+      await p.waitForTimeout(600);
+      const cut = await p.evaluate(() => [...document.querySelectorAll('.report svg text')].filter(t => t.getBBox().x < -0.5).map(t => t.textContent));
+      ok(!cut.length, 'no chart label in the LSOA report starts left of the chart', cut.join(' | '));
+      await p.close();
+    }
+    // On a phone each report fits the screen's width.
+    for (const vp of [{ width: 390, height: 664 }, { width: 360, height: 740 }]) {
+      for (const k of ['Lansbury', 'lsoa', 'custom']) {
+        const p = await browser.newPage({ viewport: vp, isMobile: true, hasTouch: true });
+        await p.goto(BASE + '/robots.txt');
+        await p.setContent(H[k] || '<p>missing</p>');
+        await p.waitForTimeout(400);
+        const m = await p.evaluate(() => ({ vp: !!document.querySelector('meta[name="viewport"]'), iw: innerWidth, sw: document.documentElement.scrollWidth }));
+        ok(m.vp && m.iw === vp.width && m.sw <= m.iw, 'phone ' + vp.width + 'px: the ' + k + ' report fits the screen', JSON.stringify(m));
+        await p.close();
+      }
+    }
+    ok(errors.length === 0, 'no page errors (report layout checks)', errors.join(' | '));
+    await page.close();
+  }
+
+  // H30: a ward sheet fully open on a phone. The missing-figure note is a
+  // line of the key, the floating controls do not pile up, the ward is in
+  // the map left showing, and reading down the sheet the head drops to a line.
+  for (const vp of [{ width: 390, height: 664 }, { width: 360, height: 740 }, { width: 390, height: 844 }, { width: 750, height: 342 }]) {
+    const tag = vp.width + 'x' + vp.height;
+    const { page, errors } = await open(browser, 'index.html?ov=ft_93227&t=1', { ...vp, isMobile: true, hasTouch: true });
+    await page.waitForTimeout(1500);
+    const FLOAT = ['#map-legend-strip', '.leaflet-control-zoom', '#dl-badge', '.basemap-ctl', '#map-colour-chip', '#ai-toggle', '.leaflet-control-attribution'];
+    const piled = async extra => {
+      const rs = {};
+      for (const s of FLOAT.concat(extra || [])) {
+        const r = await rectOf(page, s);
+        if (r && await page.evaluate(s => getComputedStyle(document.querySelector(s)).visibility !== 'hidden', s)) rs[s] = r;
+      }
+      const ks = Object.keys(rs), hit = [];
+      for (let i = 0; i < ks.length; i++) for (let j = i + 1; j < ks.length; j++) if (overlaps(rs[ks[i]], rs[ks[j]])) hit.push(ks[i] + ' x ' + ks[j]);
+      return hit;
+    };
+    const note = await page.evaluate(() => { const n = document.getElementById('mls-note');
+      return { inKey: !!n && n.parentNode.id === 'map-legend-strip', shown: !!n && !n.hidden && n.getClientRects().length > 0,
+        old: !!document.getElementById('fingertips-banner'), text: n ? n.textContent : '' }; });
+    ok(note.inKey && note.shown && !note.old && /^Areas left blank have no figure\./.test(note.text),
+      'phone ' + tag + ': the missing-figure note is a line of the key, not a floating card', JSON.stringify(note).slice(0, 200));
+    let hit = await piled();
+    ok(!hit.length, 'phone ' + tag + ': the key, the zoom buttons, the level switch and the chips do not overlap', hit.join(', '));
+    await page.evaluate(() => { showWard('Lansbury'); PH_SHEET.setState(0); });
+    await page.waitForTimeout(1600);
+    hit = await piled(['#ward-sheet']);
+    ok(!hit.length, 'phone ' + tag + ': with the ward sheet fully open nothing floats over it or over each other', hit.join(', '));
+    const seen = await page.evaluate(() => {
+      let lyr = null; wLyr.eachLayer(l => { if (l.feature.properties.WD24NM === 'Lansbury') lyr = l; });
+      const c = map.latLngToContainerPoint(lyr.getBounds().getCenter()), m = map.getContainer().getBoundingClientRect();
+      const s = document.getElementById('ward-sheet').getBoundingClientRect(), x = m.left + c.x, y = m.top + c.y;
+      return { inMap: x > m.left && x < m.right && y > m.top && y < m.bottom, underSheet: x > s.left && x < s.right && y > s.top && y < s.bottom };
+    });
+    ok(seen.inMap && !seen.underSheet, 'phone ' + tag + ': the chosen ward is in the map left showing, not under the sheet', JSON.stringify(seen));
+    const head = await page.evaluate(async () => {
+      const b = document.getElementById('ws-body'), h = document.getElementById('ws-head'), h0 = h.offsetHeight;
+      if (b.scrollHeight - b.clientHeight < h0) return { skip: true };
+      b.scrollTop = b.scrollHeight; await new Promise(r => setTimeout(r, 300));
+      const h1 = h.offsetHeight, name = document.getElementById('ws-name').getBoundingClientRect().height > 0,
+        size = document.getElementById('ws-size').getBoundingClientRect().height > 0;
+      b.scrollTop = 0; await new Promise(r => setTimeout(r, 300));
+      b.scrollTop = 0; await new Promise(r => setTimeout(r, 300));
+      return { h0, h1, name, size, back: h.offsetHeight };
+    });
+    ok(head.skip || (head.h1 < 70 && head.name && head.size && head.back === head.h0),
+      'phone ' + tag + ': reading down the open sheet, its head drops to one line, and comes back at the top', JSON.stringify(head));
+    ok(errors.length === 0, 'no page errors (phone sheet ' + tag + ')', errors.join(' | '));
+    await page.close();
+  }
+
+  // H31: a postcode on a phone marks the spot without a label under the
+  // map's buttons; on a desktop the label opens clear of them, with a
+  // Remove pin button big enough to tap.
+  for (const vp of [PHONE, DESK]) {
+    const { page, errors } = await open(browser, 'index.html?t=1', vp);
+    const res = { postcode: 'E1 6AN', latitude: 51.5203, longitude: -0.0727, admin_ward: 'Spitalfields & Banglatown',
+      codes: { admin_ward: 'E05009336' } };
+    await page.evaluate(res => _pickPostcode({ kind: 'postcode', text: 'E1 6AN' }, res), res);
+    await page.waitForTimeout(2500);
+    const pop = await rectOf(page, '.leaflet-popup'), pin = await page.evaluate(() => !!document.querySelector('.search-pin'));
+    if (vp === PHONE) {
+      ok(pin && !pop, 'phone: a postcode drops its pin without a popup (the sheet says "Near")', JSON.stringify(pop));
+    } else {
+      const hit = [];
+      for (const s of ['.leaflet-control-zoom', '.basemap-ctl', '#ward-sheet', '.dl-badge']) if (overlaps(pop, await rectOf(page, s))) hit.push(s);
+      const btn = await page.evaluate(() => { const b = document.querySelector('.leaflet-popup .search-pin-clear');
+        return b ? { tag: b.tagName, text: b.textContent, h: Math.round(b.getBoundingClientRect().height) } : null; });
+      ok(!!pop && !hit.length && btn && btn.tag === 'BUTTON' && btn.text === 'Remove pin' && btn.h >= 44,
+        'desktop: the postcode label opens clear of the map buttons and the sheet, with a 44px Remove pin', JSON.stringify({ pop, hit, btn }));
+    }
+    ok(errors.length === 0, 'no page errors (postcode pin)', errors.join(' | '));
+    await page.close();
+  }
+
+  // H32: the Ask button and the chip stay off an open comparison.
+  for (const [vp, wards] of [[PHONE, ['Lansbury', 'Bow West']], [{ width: 1280, height: 720 }, ['Lansbury', 'Bow West', 'Hornsey', 'Sudbury']], [DESK, ['Lansbury', 'Bow West', 'Hornsey', 'Sudbury']]]) {
+    const { page, errors } = await open(browser, 'index.html?t=1', vp);
+    for (const wn of wards) {
+      await page.evaluate(wn => showWard(wn), wn);
+      await page.waitForTimeout(500);
+      await page.evaluate(() => document.getElementById('ws-pin').click());
+      await page.waitForTimeout(500);
+    }
+    await page.evaluate(() => { const b = document.getElementById('cmp-bar-see'); if (b && b.getClientRects().length) b.click();
+      if (!document.getElementById('cmp-bar').classList.contains('open')) document.getElementById('cmp-open').click(); });
+    await page.waitForTimeout(1200);
+    const bar = await rectOf(page, '#cmp-bar'), ask = await rectOf(page, '#ai-toggle'), chip = await rectOf(page, '#map-colour-chip');
+    ok(!!bar && !overlaps(ask, bar) && !overlaps(chip, bar), 'the Ask button and the chip are clear of the open comparison at ' + vp.width + 'x' + vp.height,
+      JSON.stringify({ bar, ask, chip }));
+    ok(errors.length === 0, 'no page errors (comparison and Ask)', errors.join(' | '));
+    await page.close();
+  }
+
   // A region
   if (HAS_NE) {
     const { page, errors } = await open(browser, 'index.html?r=north-east&t=1', DESK);
@@ -2375,8 +2901,47 @@ const smallText = page => page.evaluate(() => {
       notes: document.getElementById('rank-notes').textContent }));
     ok(neDec.lads.length > 1 && /LSOAs in the North East are in decile 1, the most deprived tenth of England, so this list shows the ten with the lowest national rank\./.test(neDec.notes),
       'region: the lowest 10 LSOAs for deprivation are not all from one LA, and the tie is said', JSON.stringify(neDec));
+    // "the North East" wherever the region follows "of", "in" or "across" (H29).
+    await setOv(page, 'imd_score_ward');
+    await page.waitForTimeout(1500);
+    const neWords = await page.evaluate(async () => {
+      const digest = document.getElementById('vs-digest').textContent;
+      const w = Object.keys(WARD_DATA).find(n => { const i = WARD_DATA[n].indicators || {};
+        return i.imd_decile_mean != null && i.census_population > 2000; });
+      showWard(w);
+      await new Promise(r => setTimeout(r, 600));
+      const t = document.body.innerText + ' ' + [...document.querySelectorAll('option, [aria-label], [title]')]
+        .map(e => e.textContent + ' ' + (e.getAttribute('aria-label') || '') + ' ' + (e.getAttribute('title') || '')).join(' ');
+      return { bad: (t.match(/.{0,30}\b(of|in|across|outside) North East.{0,20}/g) || []).slice(0, 4), poss: (t.match(/North East's/g) || []).length,
+        digest, sheet: (document.querySelector('#ws-body .ws-insight') || {}).innerText || '',
+        hdr: document.getElementById('hdr-region-btn').getAttribute('aria-label') };
+    });
+    ok(!neWords.bad.length && !neWords.poss && /^All of the North East/.test(neWords.digest) && /of the wards in the North East/.test(neWords.sheet) &&
+       neWords.hdr === 'North East, change region',
+      'region: the wording says "the North East", with no possessive', JSON.stringify(neWords));
+    // The tour, on the region's own counts and without Ask (H25).
+    const neTour = await page.evaluate(async () => {
+      PH_TOUR.start();
+      const o = [];
+      for (let i = 0; i < PH_TOUR.length; i++) {
+        await new Promise(r => setTimeout(r, 500));
+        o.push(document.getElementById('tour-narr').innerText);
+        if (i < PH_TOUR.length - 1) document.getElementById('tour-next').click();
+      }
+      PH_TOUR.end();
+      return { o, link: getComputedStyle(document.getElementById('sbar-tour')).display };
+    });
+    ok(neTour.o.length === 6 && /how the North East changes from one neighbourhood to the next\. You can look at its 12 local authorities \(LAs\)/.test(neTour.o[0]) &&
+       !/London/.test(neTour.o.join(' ')) && !/Ask about this data/.test(neTour.o[3]) && neTour.link !== 'none',
+      'region: the tour runs on the region\'s own counts, with Take a tour, and leaves out Ask where there is none', JSON.stringify(neTour).slice(0, 600));
     ok(errors.length === 0, 'no page errors (North East)', errors.join(' | '));
     await page.close();
+    // A first visit to a region gets the tour too, since ?r= alone is not a shared view.
+    {
+      const { page: p2 } = await open(browser, 'index.html?r=north-east', DESK);
+      ok(await p2.evaluate(() => PH_TOUR.running()), 'region: a first visit to ?r=north-east opens the tour');
+      await p2.close();
+    }
   } else {
     console.log('SKIP North East (no data/regions/north-east)');
   }
@@ -2385,7 +2950,42 @@ const smallText = page => page.evaluate(() => {
   {
     const { page } = await open(browser, 'index.html?r=england', DESK);
     ok(await page.evaluate(() => /England map is large/.test(document.body.innerText)), 'England warning shows');
+    ok(await page.evaluate(() => /around 40 MB of figures, and neighbourhood \(LSOA\) maps for the whole country are not available here/.test(document.body.innerText)),
+      'the England warning says how much it loads and that there are no country-wide LSOA maps');
     await page.close();
+  }
+
+  // The England map on a phone (built by scripts/build_england.py, so only
+  // where data/regions/england/ exists): drawn on a canvas, a Census
+  // indicator opens at ward, LSOAs are refused until an LA is in focus, and
+  // then only that LA's file loads.
+  if (HAS_ENG) {
+    const { page, errors } = await open(browser, 'index.html?r=england&go=1&t=1', PHONE);
+    await page.waitForFunction(() => typeof wLyr !== 'undefined' && wLyr, null, { timeout: 120000 }).catch(() => {});
+    await page.waitForTimeout(3000);
+    const lsoaReq = [];
+    page.on('request', r => { if (/lsoa_imd\.js|lsoa_data\.json|\/map\/lsoa\//.test(r.url())) lsoaReq.push(r.url().replace(/^.*\/data\/regions\/england\//, '')); });
+    await setOv(page, 'census_bad_health_pct');
+    await page.waitForTimeout(2500);
+    await page.evaluate(() => document.querySelector('#dl-seg button[data-dl="lsoa"]').click());
+    await page.waitForTimeout(1500);
+    const e1 = await page.evaluate(() => ({ lvl: currentDataLevel, svg: document.querySelectorAll('.leaflet-overlay-pane path').length,
+      canvas: document.querySelectorAll('.leaflet-overlay-pane canvas').length, hint: document.getElementById('dl-hint').textContent }));
+    ok(e1.lvl === 'ward' && e1.canvas > 0 && e1.svg === 0 && !lsoaReq.length && /choose an LA under Focus by LA/.test(e1.hint),
+      'England: a Census indicator opens at ward on a canvas, and LSOAs wait for an LA', JSON.stringify({ ...e1, lsoaReq }));
+    const la = await page.evaluate(() => [...document.getElementById('borough-focus').options].map(o => o.value).filter(v => v && v !== 'all' && !/^icb:/.test(v))[0]);
+    await page.evaluate(v => { const s = document.getElementById('borough-focus'); s.value = v; s.dispatchEvent(new Event('change')); }, la);
+    await page.waitForTimeout(2000);
+    await page.evaluate(() => document.querySelector('#dl-seg button[data-dl="lsoa"]').click());
+    await page.waitForTimeout(5000);
+    const e2 = await page.evaluate(la => ({ lvl: currentDataLevel, n: LSOA_IMD.features.length,
+      all: LSOA_IMD.features.every(f => _sameLad(f.properties.borough, la)), onMap: map.hasLayer(lsoaLyr) }), la);
+    ok(e2.lvl === 'lsoa' && e2.n > 0 && e2.all && e2.onMap && lsoaReq.length === 1 && /^map\/lsoa\/E\d{8}\.json$/.test(lsoaReq[0]),
+      'England: with an LA in focus its LSOAs load from their own file', JSON.stringify({ ...e2, lsoaReq }));
+    ok(errors.length === 0, 'no page errors (England on a phone)', errors.join(' | '));
+    await page.close();
+  } else {
+    console.log('SKIP England map (no data/regions/england)');
   }
 
   // Only the served files are published (B11). Checked when the folder under
@@ -2968,7 +3568,7 @@ const smallText = page => page.evaluate(() => {
       showWard('Lansbury');
       const p = document.getElementById('wpanel');
       const out = { ctx: (p.querySelector('.sr-ctx') || {}).innerText || '', lh: (p.querySelector('.sr-lh .sr-sub-note') || {}).innerText || '',
-        pills: [...p.querySelectorAll('.sr-ctx .gpill')].map(e => e.textContent), key: p.querySelector('.prof-key').innerText,
+        pills: [...p.querySelectorAll('.sr-ctx .gpill:not(.gpill-note)')].map(e => e.textContent), key: p.querySelector('.prof-key').innerText,
         e07: laFigCounty('E07000033', 'ft_suicide_rate') === null ? 'own' : 'county' };
       const bn = Object.values(WARD_DATA).find(w => w.lad_code === 'E09000003');
       showWard(bn.name);
@@ -3015,6 +3615,127 @@ const smallText = page => page.evaluate(() => {
       'Compare reads OHID\'s LA figure as published, and a tie gets no arrow', JSON.stringify(r2.marks));
     ok(!fx.errors.length, 'no page errors with district and missing-LA figures', fx.errors.join(' | '));
     await fx.page.close();
+  }
+
+  // Review round 2: OHID's notes (H2), ward figures weighted by residents and
+  // their coverage (H3, H4), PTAL's gap (H5), England's 100 on ratio keys
+  // (H6), no Core20 ward badge (H7) and Custom area's arithmetic (H9).
+  {
+    const { page, errors } = await open(browser, 'index.html', DESK);
+    const files = await page.evaluate(async () => {
+      const g = u => fetch(u).then(r => r.json());
+      const [bd, wd, cnt] = await Promise.all([g('borough_data.json'), g('ward_data.json'), g('lsoa_census_counts.json')]);
+      const W = Object.values(wd.wards);
+      const byName = n => W.find(w => w.name === n) || {};
+      const covered = W.filter(w => w.cover && Object.keys(w.cover).some(k => /^ft_\d+$/.test(k)));
+      const notes = Object.values(bd).filter(r => r.ft_notes).map(r => r.ft_notes);
+      return {
+        hackney: (bd.E09000012 && bd.E09000012.ft_notes) || {},
+        nLe: notes.filter(n => /provisional/i.test(n.ft_life_expectancy_male || '')).length,
+        withheld: Object.values(bd).some(r => Object.keys(r.ft_notes || {}).some(k => /not published|cannot be calculated/i.test(r.ft_notes[k]) && typeof r[k] === 'number')),
+        coverOk: covered.length > 0 && covered.every(w => Object.keys(w.cover).every(k => w.cover[k] >= 80 && w.cover[k] < 100 && w.indicators[k] != null)),
+        ncg: byName('New Cross Gate').indicators ? byName('New Cross Gate').indicators.ft_932831 : 'missing',
+        poplar: byName('Poplar').indicators ? byName('Poplar').indicators.ft_93259 : null,
+        rv: byName('Royal Victoria').indicators ? byName('Royal Victoria').indicators.ptal_score : 'missing',
+        c20: byName('Hornsey').core20_pop_pct,
+        cnt: !!(cnt && cnt.keys && cnt.keys.indexOf('census_social_rented_pct') !== -1 && Object.keys(cnt.rows).length > 4000),
+      };
+    });
+    ok(/Hackney and City of London combined/.test(files.hackney.ft_mmr_2_doses_age5 || '') && files.nLe >= 30 && !files.withheld,
+      'borough_data.json carries OHID\'s notes, and no withheld value', JSON.stringify(files).slice(0, 300));
+    ok(files.coverOk && files.ncg == null && Math.abs(files.poplar - 197.67) < 0.05,
+      'ward Local Health figures are weighted by residents, marked when partly covered, and blank under 80%', JSON.stringify(files));
+    ok(files.rv == null && typeof files.c20 === 'number' && files.cnt,
+      'PTAL is blank for a ward mostly without figures, wards carry a Core20 share, and the Census counts ship', JSON.stringify(files));
+
+    const r = await page.evaluate(async () => {
+      await ensureWardDetail();
+      const out = {};
+      const hk = Object.values(WARD_DATA).find(w => w.lad_code === 'E09000012');
+      showWard(hk.name);
+      const pills = sel => [...document.querySelectorAll('#wpanel ' + sel)].map(e => e.closest('.sr').getAttribute('data-k') + '=' + e.textContent.replace(/\..*$/, ''));
+      out.hk = pills('.sr-ctx .gpill-note');
+      const part = Object.values(WARD_DATA).find(w => w.cover && Object.keys(w.cover).some(k => /^ft_\d+$/.test(k)));
+      showWard(part.name);
+      out.part = pills('.sr-lh ~ .sr .gpill-note, .sr-lh .gpill-note, .gpill-note');
+      out.partNote = (document.querySelector('#wpanel .sr-lh .sr-sub-note') || {}).textContent || '';
+      out.card = indicatorCardHTML('ft_life_expectancy_male');
+      out.ptal = indicatorCardHTML('ptal_score');
+      out.c20card = indicatorCardHTML('core20_lsoa_count');
+      return out;
+    });
+    ok(r.hk.some(t => /^ft_mmr_2_doses_age5=combined figure/.test(t)) && r.hk.some(t => /^ft_life_expectancy_(fe)?male=provisional/.test(t)),
+      'the profile marks Hackney\'s combined and provisional LA figures', r.hk.join(', '));
+    ok(r.part.some(t => /based on \d\d% of residents/.test(t)) && /rests on that part of the ward only/.test(r.partNote),
+      'a ward health figure on part of the ward says what share of residents it rests on', r.part.join(', ') + ' / ' + r.partNote.slice(-120));
+    ok(/Provisional: OHID based this on provisional death and population figures, for \d+ of the \d+ LAs\./.test(r.card),
+      'the life expectancy card\'s Caution row gives OHID\'s note', r.card.replace(/<[^>]+>/g, ' ').slice(0, 400));
+    ok(/LSOAs of 2011/.test(r.ptal) && /fewer than four in five of its residents is left blank/.test(r.ptal),
+      'the PTAL card explains the 2011 LSOAs and the ward rule', r.ptal.replace(/<[^>]+>/g, ' ').slice(0, 500));
+    ok(/NHS England’s own Core20 figures may still use the 2019 index/.test(r.c20card),
+      'the Core20 card says which deciles it uses', r.c20card.replace(/<[^>]+>/g, ' ').slice(0, 300));
+
+    // H6: a tick at England's 100 on both keys for a ratio, and none otherwise.
+    await setOv(page, 'ft_93250');
+    await page.waitForTimeout(1500);
+    const eng = await page.evaluate(() => ({
+      side: !!document.querySelector('#sc-grad .eng-tick'), strip: !!document.querySelector('#mls-grad .eng-tick'),
+      label: (document.querySelector('#mls-grad .eng-tick') || {}).textContent || '',
+    }));
+    await setOv(page, 'imd_score_ward');
+    await page.waitForTimeout(1200);
+    const none = await page.evaluate(() => !document.querySelector('.eng-tick') && !(document.getElementById('mls-eng') || {}).textContent);
+    ok(eng.side && eng.strip && eng.label === 'England' && none,
+      'a standardised ratio\'s keys mark England\'s 100, and other indicators\' do not', JSON.stringify(eng) + ' / ' + none);
+    const st = await page.evaluate(() => [
+      _englandMarkState('ft_93250', { lo: 80, hi: 95, min: 70, max: 99 }),
+      _englandMarkState('ft_93250', { lo: 101, hi: 140, min: 101, max: 150 }),
+      _englandMarkState('ft_93250', { lo: 50, hi: 150, min: 40, max: 160 }),
+      _englandMarkState('imd_score_ward', { lo: 50, hi: 150, min: 40, max: 160 }),
+      _englandMarkState('ft_93239', { lo: 19.9, hi: 82.4, min: 5, max: 140 })]);
+    ok(st[0].note === 'Every area shown is below England’s level of 100' && st[1].note === 'Every area shown is above England’s level of 100' &&
+       st[2].pos === 50 && !st[2].note && st[3] === null &&
+       st[4].pos === 100 && st[4].note === 'Most areas shown are below England’s level of 100',
+      'when 100 is beyond every area, the key says so instead', JSON.stringify(st));
+
+    // H7: no Core20 ward badge; the tile gives the count and the residents' share.
+    const rep = await page.evaluate(async () => {
+      await Promise.all([ensureAllLayerData(), ensureLsoaImd(), ensureLsoaData(), ensureWardDetail(), ensureGreenspaceData()]);
+      let html = '';
+      _generateWardReport({ sink: h => { html = h; } }, 'Hornsey', {});
+      const d = new DOMParser().parseFromString(html, 'text/html');
+      const kpi = [...d.querySelectorAll('.kpi')].map(k => k.textContent.replace(/\s+/g, ' ').trim()).find(t => /Core20|most deprived fifth/.test(t)) || '';
+      return { kicker: (d.querySelector('.kicker') || {}).textContent || '', kpi };
+    });
+    ok(rep.kicker && !/Core20/i.test(rep.kicker) && /1 of 11/.test(rep.kpi) && /home to [\d.]+% of residents/.test(rep.kpi),
+      'the ward report has no Core20 ward badge, and its tile gives the count and the residents\' share', JSON.stringify(rep));
+
+    // H9: Custom area reports an average decile, sums the Census counts and
+    // leaves out the address count.
+    await page.click('.mode-btn[data-mode="report"]').catch(() => {});
+    await page.waitForTimeout(1500);
+    const rb = await page.evaluate(async () => {
+      const codes = LSOA_IMD.features.filter(f => f.properties.ward === 'Lansbury').map(f => f.properties.code);
+      PH_REPORT.apply({ name: 'Lansbury test', codes });
+      for (let i = 0; i < 40 && !(PH_REPORT.aggregate().method || {}).census_social_rented_pct; i++) await new Promise(r => setTimeout(r, 250));
+      for (let i = 0; i < 40 && PH_REPORT.aggregate().method.census_social_rented_pct !== 'counts'; i++) await new Promise(r => setTimeout(r, 250));
+      const a = PH_REPORT.aggregate();
+      const tiles = [...document.querySelectorAll('#rb-summary .rb-stat')].map(e => e.innerText.replace(/\s+/g, ' '));
+      return { keys: Object.keys(a.indicators), m: a.method, dec: a.indicators.imd_decile_mean, tiles };
+    });
+    ok(rb.keys.indexOf('imd_decile') === -1 && rb.keys.indexOf('gb_total_uprn') === -1 && typeof rb.dec === 'number' &&
+       rb.m.census_social_rented_pct === 'counts' && rb.m.census_population === 'summed' && rb.m.fuel_poverty_pct === 'households' &&
+       rb.tiles.some(t => /^Average deprivation decile \(IMD 2025\) \d\.\d$/.test(t)),
+      'Custom area gives an average decile to one place, sums the Census counts and weights fuel poverty by households', JSON.stringify(rb).slice(0, 400));
+    ok(!errors.length, 'no page errors (review round 2 checks)', errors.join(' | '));
+    await page.close();
+
+    const meth = await open(browser, 'methodology.html', DESK);
+    const mt = await meth.page.evaluate(() => document.body.innerText);
+    ok(!/cover\s+every one/.test(mt) && /fewer than four in five of its residents, we show no figure for the ward/.test(mt) &&
+       /Census day, 21 March 2021/.test(mt) && !/mid-2022/.test(mt) && /measures of households|summed counts\s+behind it, as a ward's is/.test(mt),
+      'the methodology describes the ward coverage rule, the Census population and Custom area\'s arithmetic', '');
+    await meth.page.close();
   }
 
   await browser.close();
