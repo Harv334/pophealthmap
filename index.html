@@ -3644,8 +3644,8 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
               <option value="census_working_age_pct">Aged 15 to 64 % · Output area</option>
               <option value="census_over65_pct">65+ % · Output area</option>
               <option value="census_over85_pct">85+ % · Output area</option>
-              <option value="census_english_hh_all_pct">Households where all adults have English as main language % · Output area</option>
-              <option value="census_english_hh_none_pct">Households where no adults have English as main language % · Output area</option>
+              <option value="census_english_hh_all_pct">All adults in the household have English as a main language % · Output area</option>
+              <option value="census_english_hh_none_pct">No one in the household has English as a main language % · Output area</option>
             </optgroup>
             <optgroup label="Work, money and education">
               <option value="census_unemployed_pct">Unemployed % · Output area</option>
@@ -5373,8 +5373,8 @@ const CATS = [
     { k: "census_black_pct",                 l: "Black / Black British (%)",     g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_mixed_pct",                 l: "Mixed / Multiple (%)",          g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_other_ethnic_pct",          l: "Other ethnic group (%)",        g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
-    { k: "census_english_hh_all_pct",        l: "Households: all adults English first language (%)", g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
-    { k: "census_english_hh_none_pct",       l: "Households: no adults English first language (%)",  g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
+    { k: "census_english_hh_all_pct",        l: "All adults in the household have English as a main language (%)", g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
+    { k: "census_english_hh_none_pct",       l: "No one in the household has English as a main language (%)", g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
   ]},
   { key: "economy", label: "Work, money and education", ico: "briefcase", fields: [
     { k: "census_unemployed_pct",            l: "Unemployed (%)",                g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
@@ -5569,8 +5569,8 @@ const IND_NAMES = {
   census_black_pct:           ['Black or Black British', 'Ethnic group: Black, Black British, Black Welsh, Caribbean or African'],
   census_mixed_pct:           ['Mixed or multiple ethnic groups', 'Ethnic group: Mixed or Multiple ethnic groups'],
   census_other_ethnic_pct:    ['Other ethnic group', 'Ethnic group: Other ethnic group'],
-  census_english_hh_all_pct:  ['Households: all adults speak English as a main language', 'Household language: all adults in household have English as a main language'],
-  census_english_hh_none_pct: ['Households: no one speaks English as a main language', 'Household language: no people in household have English as a main language'],
+  census_english_hh_all_pct:  ['All adults in the household have English as a main language', 'Household language: all adults in household have English as a main language'],
+  census_english_hh_none_pct: ['No one in the household has English as a main language', 'Household language: no people in household have English as a main language'],
   // Work, money and education
   census_unemployed_pct:           ['Unemployment (Census 2021)', 'Economic activity status: unemployed'],
   census_higher_managerial_pct:    ['Higher managerial and professional', 'Socio-economic classification: higher managerial, administrative and professional occupations'],
@@ -6337,8 +6337,8 @@ const OV_PLAIN = {
   census_working_age_pct: "Residents aged " + AGE_WORK + ".",
   census_over65_pct: "Residents aged 65 and over.",
   census_over85_pct: "Residents aged 85 and over.",
-  census_english_hh_all_pct: "Households where every adult's main language is English.",
-  census_english_hh_none_pct: "Households where no adult's main language is English. They may still speak English well.",
+  census_english_hh_all_pct: "Households where every adult has English as a main language.",
+  census_english_hh_none_pct: "Households where no one has English as a main language. They may still speak English well.",
   census_unemployed_pct: "People aged 16 and over who are looking for work.",
   census_no_qual_pct: "People aged 16 and over with no qualifications.",
   census_level4_qual_pct: "People aged 16 and over with a degree or equivalent.",
@@ -10420,10 +10420,49 @@ function _reportVs(v, m, dp) {
    would print over the tick starts just after it instead. x is the bar's end
    plus a gap, tickX the tick's x (or null), txt the figure as printed. Text
    width is estimated at 10px Inter. */
-function _reportLabelX(x, tickX, txt) {
+function _reportLabelX(x, tickX, txt, fs) {
   if (tickX == null || isNaN(tickX)) return x;
-  const w = String(txt).length * 5.7;
+  const w = String(txt).length * 0.57 * (fs || 10);
   return (tickX >= x - 3 && tickX <= x + w + 2) ? tickX + 4 : x;
+}
+/* How wide a chart label prints, in SVG units at font size fs. Measured in
+   the report's own type face where a canvas is to hand (the page has Inter
+   loaded, as the report does), with a little to spare, and estimated at a
+   generous 0.6em a character where it is not. */
+let _reportMeasureCtx = null;
+function _reportTextW(txt, fs) {
+  try {
+    if (!_reportMeasureCtx) _reportMeasureCtx = document.createElement('canvas').getContext('2d');
+    _reportMeasureCtx.font = fs + "px Inter, system-ui, sans-serif";
+    const w = _reportMeasureCtx.measureText(String(txt)).width;
+    if (w > 0) return w * 1.06;
+  } catch (e) { /* no canvas: estimate below */ }
+  return String(txt).length * 0.6 * fs;
+}
+/* A chart label on one line, or on two where it is wider than maxW, broken
+   between words. A label is never cut short: the chart sizes its left
+   margin to the longest line it gets back. */
+function _reportLabelLines(txt, maxW, fs) {
+  const s = String(txt);
+  if (_reportTextW(s, fs) <= maxW) return [s];
+  // A bracket goes onto the second line whole: "Unemployment" over
+  // "(Census 2021)" rather than "Unemployment (Census" over "2021)".
+  const br = s.indexOf(' (');
+  if (br > 0 && _reportTextW(s.slice(0, br), fs) <= maxW && _reportTextW(s.slice(br + 1), fs) <= maxW) {
+    return [s.slice(0, br), s.slice(br + 1)];
+  }
+  const words = s.split(' ');
+  let a = words.shift();
+  while (words.length > 1 && _reportTextW(a + ' ' + words[0], fs) <= maxW) a += ' ' + words.shift();
+  return words.length ? [a, words.join(' ')] : [a];
+}
+/* An SVG label, its lines centred on y and ending at x. */
+function _reportLabelSvg(lines, x, y, fs, fill) {
+  const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const lh = Math.round(fs * 1.15 * 10) / 10;
+  const y0 = y + fs * 0.35 - (lines.length - 1) * lh / 2;
+  return `<text x="${x}" y="${y0}" text-anchor="end" font-size="${fs}" fill="${fill || '#334155'}">` +
+    lines.map((l, i) => i ? `<tspan x="${x}" dy="${lh}">${esc(l)}</tspan>` : esc(l)).join('') + '</text>';
 }
 // The IMD domains as the reports' charts name them.
 const REPORT_IMD_DOMAINS = [
@@ -10445,28 +10484,36 @@ function _reportPercentile(vals, v) {
    every London LSOA (left least deprived, right most), the tick is the London
    median. rows: [{ l, p }] with p from _reportPercentile. */
 function _reportDotPlot(rows, opts) {
-  const W = 380, padL = 118, padR = 48, rowH = (opts && opts.rowH) || 23, top = 22;
+  opts = opts || {};
+  // opts.fs sets every label's size (the ward report prints them at 11);
+  // without it the smaller sizes the other reports use.
+  const fs = opts.fs || 10, fsSmall = opts.fs || 8.5, fsVal = opts.fs || 9.5;
+  const W = opts.width || 380, padR = opts.fs ? 44 : 48, rowH = opts.rowH || 23, top = opts.fs ? 24 : 22;
+  // The left margin fits the longest domain name, so none is cut short.
+  const padL = Math.ceil(Math.max(90, ...rows.map(r => _reportTextW(r.l, fs)))) + 12;
   const x0 = padL, x1 = W - padR, span = x1 - x0;
   const H = top + rows.length * rowH + 6;
   const X = p => x0 + span * Math.max(0, Math.min(100, p)) / 100;
   let s = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" class="ch-dots" role="img" ` +
           `aria-label="Deprivation by IMD domain, as a position among ${PH_AREA} LSOAs">`;
-  s += `<text x="${x0}" y="11" font-size="8.5" fill="#64748B">Less deprived</text>`;
-  s += `<text x="${x1}" y="11" font-size="8.5" fill="#64748B" text-anchor="end">More deprived</text>`;
+  s += `<text x="${x0}" y="${fsSmall + 2}" font-size="${fsSmall}" fill="#64748B">Less deprived</text>`;
+  // At the larger size the two ends of the scale need the width of the
+  // figures' column too, or they run into each other.
+  s += `<text x="${opts.fs ? W : x1}" y="${fsSmall + 2}" font-size="${fsSmall}" fill="#64748B" text-anchor="end">More deprived</text>`;
   s += `<line x1="${X(50)}" y1="${top - 6}" x2="${X(50)}" y2="${H - 4}" stroke="${REPORT_INK}" stroke-width="1" stroke-dasharray="2,2"/>`;
   rows.forEach((r, i) => {
     const y = top + i * rowH + rowH / 2;
-    s += `<text x="${x0 - 10}" y="${y + 3.5}" font-size="10" fill="#334155" text-anchor="end">${String(r.l).replace(/[<>&]/g, '')}</text>`;
+    s += _reportLabelSvg([r.l], x0 - 10, y, fs);
     s += `<line x1="${x0}" y1="${y}" x2="${x1}" y2="${y}" stroke="#E2E8F0" stroke-width="5" stroke-linecap="round"/>`;
     if (r.p == null) {
-      s += `<text x="${x1 + 6}" y="${y + 3.5}" font-size="9" fill="#64748B">No figure</text>`;
+      s += `<text x="${x1 + 6}" y="${y + 3.5}" font-size="${opts.fs || 9}" fill="#64748B">No figure</text>`;
       return;
     }
     const c = r.p >= 50 ? REPORT_CMP.worse : REPORT_CMP.better;
     s += `<line x1="${X(50)}" y1="${y}" x2="${X(r.p)}" y2="${y}" stroke="${c}" stroke-width="5" stroke-linecap="round" opacity=".35"/>`;
     s += `<circle cx="${X(r.p)}" cy="${y}" r="5.5" fill="${c}" stroke="#fff" stroke-width="1.5"/>`;
     // The share of LSOAs this one is more deprived than, as the legend says.
-    s += `<text x="${x1 + 8}" y="${y + 3.5}" font-size="9.5" fill="${REPORT_INK}" font-weight="600">${Math.min(99, Math.max(1, Math.round(r.p)))}%</text>`;
+    s += `<text x="${x1 + 8}" y="${y + fsVal * 0.35}" font-size="${fsVal}" fill="${REPORT_INK}" font-weight="600">${Math.min(99, Math.max(1, Math.round(r.p)))}%</text>`;
   });
   return s + '</svg>';
 }
@@ -10667,70 +10714,116 @@ const REPORT_CSS = `
     .actions, .chart-dl, .chart-dl-wrap { display: none; }
     .hero, .kpis, .keypoints, .services, .panel, .locblock { break-inside: avoid; page-break-inside: avoid; }
     .keypoints { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .badge, .kpi-ctx-bar, svg { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .badge, .kpi-ctx-bar, svg, .legend span, .legend-tick, .mm-dot { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+  /* A phone: the page is the screen's width, in one column, with the key
+     figures two to a row. Print is untouched. */
+  @media screen and (max-width: 700px) {
+    body { padding: 56px 0 0; }
+    .report { width: 100%; box-shadow: none; }
+    .report .masthead { flex-wrap: wrap; gap: 4px 12px; padding-left: 16px; padding-right: 16px; }
+    .report .hero { flex-direction: column; align-items: stretch; gap: 14px; padding-left: 16px; padding-right: 16px; }
+    .report .hero-map { flex: none; }
+    .report .hero-text h1 { font-size: 30px; }
+    .report .keypoints { margin-left: 16px; margin-right: 16px; }
+    .report .kpis { grid-template-columns: 1fr 1fr; padding-left: 16px; padding-right: 16px; }
+    .report .kpi, .report .kpi + .kpi { padding: 12px 10px 12px 0; border-left: 0; border-top: 1px solid var(--rule); }
+    .report .kpi:nth-child(-n+2) { border-top: 0; }
+    .report .kpi:nth-child(2n) { padding-left: 12px; border-left: 1px solid var(--rule); }
+    .report .services-wrap { padding-left: 16px; padding-right: 16px; }
+    .report .services { grid-template-columns: 1fr 1fr; }
+    .report .svc, .report .svc + .svc { padding-left: 0; border-left: 0; }
+    .report .content, .report .content.cols { display: block; padding-left: 16px; padding-right: 16px; overflow-x: auto; }
+    .report .row { flex-direction: column; gap: 0; }
+    .report table.ho th, .report table.ho td { white-space: normal; }
+    .report .locations { padding-left: 16px; padding-right: 16px; }
+    .report .locations-grid { grid-template-columns: 1fr; }
+    .report .locblock.span-2 { grid-column: auto; }
+    .report .footer { padding-left: 16px; padding-right: 16px; }
+    .actions { top: 10px; right: 16px; left: 16px; }
   }
 `;
-/* The ward report is one A4 sheet: a compact header, the figures in two
-   columns, and the lists cut to three names each when printed. The LSOA and
-   area reports keep the longer single-column flow. */
+/* The ward report prints on two A4 pages, with nothing smaller than 11px
+   (8.25pt) so it can be read on paper. The first page has the header, the
+   Summary, the key figures, who lives here and the deprivation charts; the
+   second has crime, health outcomes, the services in the ward and the
+   sources. It was once zoomed out to fit one page, which printed the
+   smallest text at about 4pt and still ran onto a second page. The figures
+   sit in two columns on screen and on paper; a phone has one. */
 const WARD_ONEPAGE_CSS = `
-  .onepage .masthead { padding: 10px 32px; }
-  .onepage .hero { padding: 14px 32px 12px; gap: 22px; align-items: flex-start; }
-  .onepage .kicker .badge { font-size: 8.5px; padding: 2px 6px; margin: 0; }
-  .onepage .hero-text h1 { font-size: 30px; margin-top: 4px; }
-  .onepage .hero-text .sub { margin-top: 6px; font-size: 11.5px; }
+  .onepage .masthead { padding: 10px 32px; font-size: 11px; }
+  .onepage .hero { padding: 12px 32px 10px; gap: 22px; align-items: flex-start; }
+  .onepage .hero-text .kicker { font-size: 11px; }
+  .onepage .kicker .badge { font-size: 11px; padding: 2px 6px; margin: 0; }
+  .onepage .hero-text h1 { font-size: 28px; margin-top: 3px; }
+  .onepage .hero-text .sub { margin-top: 6px; font-size: 12px; }
   .onepage .svcline { margin-top: 6px; font-size: 11px; color: var(--ink-2); }
   .onepage .svcline span { color: var(--ink-3); }
   .onepage .hero-text .badges { margin-top: 8px; }
   .onepage .hero-map { flex: 0 0 150px; }
-  .onepage .minimap { width: 150px; height: 88px; }
+  .onepage .minimap { width: 150px; height: 80px; }
   .onepage .minimap-cap { display: none; }
-  .onepage .keypoints.plain { margin: 12px 32px 2px; padding: 9px 14px 9px 16px; }
-  .onepage .keypoints.plain h2 { margin-bottom: 4px; }
-  .onepage .keypoints.plain p { font-size: 11px; line-height: 1.5; }
+  .onepage .keypoints.plain { margin: 10px 32px 2px; padding: 8px 14px 8px 16px; }
+  .onepage .keypoints.plain h2 { margin-bottom: 4px; font-size: 11px; }
+  .onepage .keypoints.plain p { font-size: 12px; line-height: 1.45; }
   .onepage .kpis { padding: 0 32px; }
-  .onepage .kpi { padding: 8px 10px 8px 0; }
-  .onepage .kpi-sub { margin-top: 2px; }
-  .onepage .kpi + .kpi { padding-left: 12px; }
+  .onepage .kpi { padding: 7px 8px 7px 0; }
+  .onepage .kpi + .kpi { padding-left: 10px; }
+  .onepage .kpi-lbl { font-size: 11px; letter-spacing: .03em; line-height: 1.3; }
   .onepage .kpi-val { font-size: 20px; margin-top: 3px; }
   .onepage .kpi-val.dim { font-size: 13px; }
+  .onepage .kpi-sub, .onepage .kpi-ctx-cap { margin-top: 2px; font-size: 11px; line-height: 1.35; }
   .onepage .kpi-ctx { margin-top: 6px; }
   .onepage .content.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 28px; padding: 0 32px 4px; }
   .onepage .col { min-width: 0; }
-  .onepage .section-h, .onepage .locations h2 { margin: 16px 0 8px; padding-bottom: 6px; font-size: 13.5px; }
+  .onepage .section-h, .onepage .locations h2 { margin: 14px 0 8px; padding-bottom: 5px; font-size: 14px; }
   .onepage .panel { padding: 0 0 4px; margin-bottom: 8px; }
-  .onepage .panel h3 { margin-bottom: 5px; font-size: 10.5px; }
-  .onepage .legend { margin-top: 3px; font-size: 8.5px; }
-  .onepage table.ho { font-size: 10px; }
-  .onepage table.ho th { white-space: normal; vertical-align: bottom; line-height: 1.25; }
-  .onepage table.ho { table-layout: fixed; }
+  .onepage .panel h3 { margin-bottom: 5px; font-size: 12px; }
+  .onepage .legend, .onepage .no-census { margin-top: 3px; font-size: 11px; line-height: 1.4; }
+  .onepage .no-census { margin: 0; color: var(--ink-2); }
+  .onepage table.ho { font-size: 11px; table-layout: fixed; }
+  .onepage table.ho th { padding: 0 0 4px 8px; font-size: 11px; letter-spacing: .02em; white-space: normal; vertical-align: bottom; line-height: 1.25; }
+  .onepage table.ho td { padding: 4px 0 4px 8px; }
   .onepage table.ho th:first-child, .onepage table.ho td:first-child { width: 34%; white-space: normal; }
-  .onepage table.ho th:last-child, .onepage table.ho td:last-child { width: 19%; white-space: normal; font-size: 9px; }
+  .onepage table.ho th:last-child, .onepage table.ho td:last-child { width: 21%; white-space: normal; }
   .onepage table.ho .u { display: none; }
-  .onepage table.ho td { padding: 4px 0 4px 10px; }
-  .onepage table.ho th { padding: 0 0 4px 10px; }
   .onepage .locations { padding: 0 32px 10px; }
   .onepage .locations-grid { gap: 8px 22px; }
-  .onepage .locblock h4 { margin-bottom: 4px; padding-bottom: 3px; font-size: 9px; }
-  .onepage .locblock ol { font-size: 9.5px; }
+  .onepage .locblock h4 { margin-bottom: 4px; padding-bottom: 3px; font-size: 11px; letter-spacing: .04em; }
+  .onepage .locblock h4 .count { font-size: 11px; }
+  .onepage .locblock ol { font-size: 11px; list-style-position: inside; padding-left: 0; }
   .onepage .locblock li { margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .onepage .locblock ol { list-style-position: inside; padding-left: 0; }
+  .onepage .locblock li .meta { font-size: 11px; }
+  .onepage .locblock .empty { font-size: 11px; color: var(--ink-3); }
   .onepage .locblock li.more { display: none; list-style: none; color: var(--ink-3); }
-  .onepage .footer { padding: 10px 32px 14px; font-size: 8.5px; line-height: 1.45; }
-  .onepage .footer .indep { font-size: 9.5px; margin-bottom: 4px; }
-  .onepage.measure .locblock li.extra { display: none; }
-  .onepage.measure .panel h3 { padding-right: 0; }
-  .onepage.measure .locblock li.more { display: list-item; }
+  .onepage .footer { padding: 10px 32px 14px; font-size: 11px; line-height: 1.45; }
+  .onepage .footer .indep { font-size: 11.5px; margin-bottom: 4px; }
   @media print {
-    @page { size: A4 portrait; margin: 8mm; }
-    .onepage { zoom: var(--fit, 1); }
+    @page { size: A4 portrait; margin: 9mm 10mm 10mm; }
+    /* The page margins do the work of the side padding on paper. */
+    .onepage .masthead, .onepage .hero, .onepage .kpis, .onepage .content.cols,
+    .onepage .locations, .onepage .footer { padding-left: 0; padding-right: 0; }
+    .onepage .masthead { padding-top: 0; }
+    .onepage .keypoints.plain { margin-left: 0; margin-right: 0; }
+    /* Crime and health outcomes start the second page. */
+    .onepage .content.p2 { break-before: page; page-break-before: always; }
+    .onepage .content.p2 > .col > .section-h:first-child { margin-top: 0; }
     .onepage .locblock li.extra { display: none; }
     .onepage .locblock li.more { display: list-item; }
-    .onepage .section-h, .onepage .locations h2 { margin-top: 12px; }
+  }
+  @media screen and (max-width: 700px) {
+    .onepage .masthead, .onepage .hero, .onepage .kpis, .onepage .locations, .onepage .footer { padding-left: 16px; padding-right: 16px; }
+    .onepage .content.cols { display: block; padding-left: 16px; padding-right: 16px; }
+    .onepage .keypoints.plain { margin-left: 16px; margin-right: 16px; }
+    .onepage .hero { flex-direction: column; align-items: stretch; }
+    .onepage .hero-map { flex: none; }
+    .onepage .kpi, .onepage .kpi + .kpi { padding: 10px 8px 10px 0; }
+    .onepage .kpi:nth-child(2n) { padding-left: 12px; }
+    .onepage .locblock li { white-space: normal; }
   }
 `;
 // ─────────────────────────────────────────────────────────────────────────
-// Ward report — A4 at-a-glance profile (single printable page).
+// Ward report: an A4 profile, two printed pages.
 // All charts inline SVG (no external libraries) so the popup remains
 // fully self-contained.
 // ─────────────────────────────────────────────────────────────────────────
@@ -10851,36 +10944,45 @@ function _generateWardReport(_reportWindow, wn, opts) {
   // ── Inline-SVG chart primitives ────────────────────────────────────────
   // Horizontal bar chart with optional reference tick (London median).
   // rows: [{ l: label, v: value, ref?: median, c?: bar-colour, sub?: trailing text }]
-  // opts: { width, rowH, padL, max, unit, dp, refLabel }
+  // opts: { width, rowH, fs, labelMax, max, unit, dp, refLabel }
+  /* The labels' column is as wide as the longest label needs (up to
+     labelMax, past which a label breaks onto a second line), so no label
+     runs off the chart's left edge. A two-line row is taller by a line. */
+  const _chartRows = (data, W, opts) => {
+    const fs = opts.fs || 10, rowH = opts.rowH || 18, lh = Math.round(fs * 1.15 * 10) / 10;
+    const lines = data.map(r => _reportLabelLines(r.l, opts.labelMax || W * 0.5, fs));
+    const padL = Math.ceil(Math.max(40, ...lines.flat().map(l => _reportTextW(l, fs)))) + 10;
+    let y = opts.padT || 6;
+    const ys = lines.map(ls => { const h = rowH + (ls.length - 1) * lh; const c = y + h / 2; y += h; return c; });
+    return { fs, lines, padL, ys, bottom: y };
+  };
   function _chartHbar(rows, opts) {
     opts = opts || {};
     const W = opts.width || 360;
-    const rowH = opts.rowH || 18;
-    const padL = opts.padL || 130;
     const padR = opts.padR || 56;
-    const padT = opts.padT || 6;
     const dp   = opts.dp == null ? 1 : opts.dp;
     const u    = opts.unit || '';
     const data = (rows || []).map(r => ({...r, v: r.v == null ? null : parseFloat(r.v)}));
     const dmax = opts.max != null ? opts.max :
                  Math.max(0.0001, ...data.map(r => Math.max(r.v || 0, r.ref || 0)));
-    const H = padT + data.length * rowH + 8;
+    const { fs, lines, padL, ys, bottom } = _chartRows(data, W, opts);
+    const H = bottom + 8;
     const barW = W - padL - padR;
     let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" class="ch-hbar">`;
     data.forEach((r, i) => {
-      const y = padT + i * rowH + rowH/2;
+      const y = ys[i];
       const v = r.v == null ? 0 : Math.max(0, r.v);
       const w = (v / dmax) * barW;
       const c = r.c || '#1F4E8C';
-      svg += `<text x="${padL - 8}" y="${y + 3.5}" text-anchor="end" font-size="10" fill="#334155">${_esc(r.l)}</text>`;
+      svg += _reportLabelSvg(lines[i], padL - 8, y, fs);
       svg += `<rect x="${padL}" y="${y - 6}" width="${barW}" height="11" fill="#EDF1F5" rx="2"/>`;
       const tickX = (r.ref != null && !isNaN(r.ref)) ? padL + (Math.max(0, r.ref) / dmax) * barW : null;
       if (r.v != null) {
         svg += `<rect x="${padL}" y="${y - 6}" width="${w}" height="11" fill="${c}" rx="2"/>`;
         const valTxt = (r.k ? fmtNum(r.v, indDecimals(r.k)) : _fmtN(r.v, dp)) + (u ? ' ' + u : '');
-        svg += `<text x="${_reportLabelX(padL + Math.max(w, 6) + 4, tickX, valTxt)}" y="${y + 3.5}" font-size="10" fill="#0B1F33" font-variant-numeric="tabular-nums">${valTxt}</text>`;
+        svg += `<text x="${_reportLabelX(padL + Math.max(w, 6) + 4, tickX, valTxt, fs)}" y="${y + fs * 0.35}" font-size="${fs}" fill="#0B1F33" font-variant-numeric="tabular-nums">${valTxt}</text>`;
       } else {
-        svg += `<text x="${_reportLabelX(padL + 4, tickX, 'No figure')}" y="${y + 3.5}" font-size="10" fill="#64748B">No figure</text>`;
+        svg += `<text x="${_reportLabelX(padL + 4, tickX, 'No figure', fs)}" y="${y + fs * 0.35}" font-size="${fs}" fill="#64748B">No figure</text>`;
       }
       // London median reference tick
       if (r.ref != null && !isNaN(r.ref)) {
@@ -10896,9 +10998,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
   function _chartCompare(rows, opts) {
     opts = opts || {};
     const W = opts.width || 360;
-    const rowH = opts.rowH || 22;
-    const padL = opts.padL || 150;
-    const padR = 60;
+    const padR = opts.fs ? 50 : 60;
     const dp   = opts.dp == null ? 1 : opts.dp;
     const u    = opts.unit || '%';
     // Direction and descriptive come from OV_CFG, the one place they are
@@ -10910,11 +11010,12 @@ function _generateWardReport(_reportWindow, wn, opts) {
               v: r.v == null ? null : parseFloat(r.v), ref: r.ref == null ? null : parseFloat(r.ref)};
     });
     const dmax = Math.max(0.0001, ...data.map(r => Math.max(r.v || 0, r.ref || 0)) , opts.minMax || 1);
-    const H = 6 + data.length * rowH + 12;
+    const { fs, lines, padL, ys, bottom } = _chartRows(data, W, Object.assign({ rowH: 22 }, opts));
+    const H = bottom + 12;
     const barW = W - padL - padR;
     let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" class="ch-compare">`;
     data.forEach((r, i) => {
-      const y = 6 + i * rowH + rowH/2;
+      const y = ys[i];
       const wv = r.v != null ? (Math.max(0, r.v) / dmax) * barW : 0;
       const wr = r.ref != null ? (Math.max(0, r.ref) / dmax) * barW : null;
       const above = (r.v != null && r.ref != null) ? (r.v > r.ref) : null;
@@ -10925,14 +11026,14 @@ function _generateWardReport(_reportWindow, wn, opts) {
       const c = r.descriptive ? REPORT_CMP.neutral
               : above == null ? '#94A3B8'
               : (isWh === above ? REPORT_CMP.worse : REPORT_CMP.better);
-      svg += `<text x="${padL - 8}" y="${y + 3.5}" text-anchor="end" font-size="10" fill="#334155">${_esc(r.l)}</text>`;
+      svg += _reportLabelSvg(lines[i], padL - 8, y, fs);
       svg += `<rect x="${padL}" y="${y - 6}" width="${barW}" height="11" fill="#EDF1F5" rx="2"/>`;
       if (r.v != null) {
         svg += `<rect x="${padL}" y="${y - 6}" width="${wv}" height="11" fill="${c}" rx="2"/>`;
         const valTxt = (r.k ? fmtNum(r.v, indDecimals(r.k)) : _fmtN(r.v, dp)) + u;
-        svg += `<text x="${_reportLabelX(padL + Math.max(wv, 6) + 4, wr != null ? padL + wr : null, valTxt)}" y="${y + 3.5}" font-size="10" fill="#0B1F33" font-variant-numeric="tabular-nums">${valTxt}</text>`;
+        svg += `<text x="${_reportLabelX(padL + Math.max(wv, 6) + 4, wr != null ? padL + wr : null, valTxt, fs)}" y="${y + fs * 0.35}" font-size="${fs}" fill="#0B1F33" font-variant-numeric="tabular-nums">${valTxt}</text>`;
       } else {
-        svg += `<text x="${_reportLabelX(padL + 4, wr != null ? padL + wr : null, 'No figure')}" y="${y + 3.5}" font-size="10" fill="#64748B">No figure</text>`;
+        svg += `<text x="${_reportLabelX(padL + 4, wr != null ? padL + wr : null, 'No figure', fs)}" y="${y + fs * 0.35}" font-size="${fs}" fill="#64748B">No figure</text>`;
       }
       if (wr != null) {
         svg += `<line x1="${padL + wr}" y1="${y - 8}" x2="${padL + wr}" y2="${y + 7}" stroke="#0B1F33" stroke-width="1.6"/>`;
@@ -10944,32 +11045,37 @@ function _generateWardReport(_reportWindow, wn, opts) {
 
 
   // Stacked horizontal bar (e.g. ethnicity, age). parts: [{l, v, c}]
+  // opts.fs sets the legend's type size; the legend runs onto a second
+  // line rather than past the chart's right edge.
   function _chartStack(parts, opts) {
     opts = opts || {};
-    const W = opts.width || 360, H = 18;
+    const W = opts.width || 360, H = 18, fs = opts.fs || 9, fsIn = opts.fs || 9.5;
     const total = parts.reduce((a, b) => a + (parseFloat(b.v) || 0), 0) || 1;
     let x = 0;
-    let svg = `<svg viewBox="0 0 ${W} ${H + 16}" xmlns="http://www.w3.org/2000/svg" class="ch-stack">`;
+    let bars = '';
     parts.forEach(p => {
       const v = parseFloat(p.v) || 0;
       const w = (v / total) * W;
-      svg += `<rect x="${x}" y="0" width="${w}" height="${H}" fill="${p.c}"/>`;
-      if (w > 28) {
-        svg += `<text x="${x + w/2}" y="${H/2 + 3.2}" text-anchor="middle" font-size="9.5" fill="#fff" font-weight="600">${v.toFixed(0)}%</text>`;
+      bars += `<rect x="${x}" y="0" width="${w}" height="${H}" fill="${p.c}"/>`;
+      if (w > fsIn * 3) {
+        bars += `<text x="${x + w/2}" y="${H/2 + fsIn * 0.35}" text-anchor="middle" font-size="${fsIn}" fill="#fff" font-weight="600">${v.toFixed(0)}%</text>`;
       }
       x += w;
     });
-    // Legend underneath
-    let lx = 0;
+    // Legend underneath, wrapping to a new line where the next entry
+    // would not fit.
+    let lx = 0, ly = H + 5;
+    const lh = Math.max(13, Math.round(fs * 1.35));
     parts.forEach(p => {
       const v = parseFloat(p.v);
       const lblTxt = p.l + (isNaN(v) ? '' : ' ' + v.toFixed(0) + '%');
-      const lblW = lblTxt.length * 5.0 + 16;
-      svg += `<rect x="${lx}" y="${H + 5}" width="9" height="9" fill="${p.c}" rx="1"/>`;
-      svg += `<text x="${lx + 12}" y="${H + 13}" font-size="9" fill="#334155">${_esc(lblTxt)}</text>`;
+      const lblW = (opts.fs ? _reportTextW(lblTxt, fs) : lblTxt.length * 5.0) + 16;
+      if (lx > 0 && lx + lblW - 4 > W) { lx = 0; ly += lh; }
+      bars += `<rect x="${lx}" y="${ly}" width="9" height="9" fill="${p.c}" rx="1"/>`;
+      bars += `<text x="${lx + 12}" y="${ly + 4.5 + fs * 0.35}" font-size="${fs}" fill="#334155">${_esc(lblTxt)}</text>`;
       lx += lblW;
     });
-    svg += `</svg>`;
+    const svg = `<svg viewBox="0 0 ${W} ${ly + Math.max(11, fs + 2)}" xmlns="http://www.w3.org/2000/svg" class="ch-stack">` + bars + `</svg>`;
     return svg;
   }
 
@@ -11100,12 +11206,12 @@ function _generateWardReport(_reportWindow, wn, opts) {
     { l:'Black', v: inds.census_black_pct,        c:'#2A9D8F' },
     { l:'Mixed', v: inds.census_mixed_pct,        c:'#8E6BBF' },
     { l:'Other', v: inds.census_other_ethnic_pct, c:'#9AA6B2' },
-  ], { width: 360 });
+  ], { width: 320, fs: 11 });
   const ageStack = _chartStack([
     { l:AGE_CHILD_CAP, v: inds.census_under16_pct,     c:'#2A9D8F' },
     { l:AGE_WORK,      v: inds.census_working_age_pct, c:'#1F4E8C' },
     { l:'65 and over', v: inds.census_over65_pct,      c:'#8E6BBF' },
-  ], { width: 360 });
+  ], { width: 320, fs: 11 });
 
   // Each row takes its direction, or none, from OV_CFG (see _chartCompare).
   const compareCensus = _chartCompare([
@@ -11114,8 +11220,9 @@ function _generateWardReport(_reportWindow, wn, opts) {
     { k: 'census_level4_qual_pct', l: indLabel('census_level4_qual_pct'),     v: inds.census_level4_qual_pct,        ref: _median(_wardVals('census_level4_qual_pct')),        dp: 0 },
     { k: 'census_higher_managerial_pct', l: indLabel('census_higher_managerial_pct'), v: inds.census_higher_managerial_pct,  ref: _median(_wardVals('census_higher_managerial_pct')),  dp: 0 },
     { k: 'census_routine_semi_routine_pct', l: indLabel('census_routine_semi_routine_pct'),      v: inds.census_routine_semi_routine_pct, ref: _median(_wardVals('census_routine_semi_routine_pct')), dp: 0 },
-    { k: 'census_english_hh_none_pct', l: indLabel('census_english_hh_none_pct'), v: inds.census_english_hh_none_pct, ref: _median(_wardVals('census_english_hh_none_pct')), dp: 0 },
-  ], { width: 376, padL: 196, rowH: 18 });   // room for the display labels
+    // A short form of the indicator's name, which is long for a chart row.
+    { k: 'census_english_hh_none_pct', l: 'No one with English as main language', v: inds.census_english_hh_none_pct, ref: _median(_wardVals('census_english_hh_none_pct')), dp: 0 },
+  ], { width: 320, fs: 11, rowH: 20 });   // the label column fits the longest label
 
   // ── Health & deprivation: IMD-domain radar + ward-level health bars ──
   const wardCode = (wdata && wdata.code) || '';
@@ -11157,7 +11264,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
   }));
   // A ward with no LSOA of its own (most of the City's) has nothing to place,
   // so the chart is left out rather than drawn as seven empty rows.
-  const domainSVG = _domainRows.some(r => r.p != null) ? _reportDotPlot(_domainRows, { rowH: 19 }) : '';
+  const domainSVG = _domainRows.some(r => r.p != null) ? _reportDotPlot(_domainRows, { rowH: 18, fs: 11, width: 320 }) : '';
 
   const healthBars = _chartCompare([
     { k: 'census_good_health_pct', l: indLabel('census_good_health_pct'), v: inds.census_good_health_pct,        ref: _median(_wardVals('census_good_health_pct')),        dp: 0 },
@@ -11168,7 +11275,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
     { k: 'fuel_poverty_pct', l: indLabel('fuel_poverty_pct'),          v: inds.fuel_poverty_pct,              ref: _median(_wardVals('fuel_poverty_pct')),              dp: 1 },
     { k: 'census_unemployed_pct', l: indLabel('census_unemployed_pct'),            v: inds.census_unemployed_pct,         ref: _median(_wardVals('census_unemployed_pct')),         dp: 1 },
     { k: 'claimant_rate_pct', l: indLabel('claimant_rate_pct'), v: inds.claimant_rate_pct,             ref: _median(_wardVals('claimant_rate_pct')),             dp: 1 },
-  ], { width: 376, padL: 164, rowH: 16 });   // room for the display labels
+  ], { width: 320, fs: 11, rowH: 18 });
 
   // ── Health outcomes: Local Health estimates, as a table ──
   // A table rather than more bars: the census bars are percentages on one
@@ -11223,7 +11330,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
     ref: _median(_wardVals(k)),
     c: '#7a3a3a',
   })).filter(r => r.v != null).sort((a,b) => (b.v||0) - (a.v||0));
-  const crimeSVG = crimeRows.length ? _chartHbar(crimeRows, { width: 376, padL: 146, rowH: 15, dp: 0, unit: '' }) : '';
+  const crimeSVG = crimeRows.length ? _chartHbar(crimeRows, { width: 320, fs: 11, rowH: 18, dp: 0, unit: '' }) : '';
   const crimeTotal = _fmt(inds.crime_total);
 
   // ── Mini-map SVG: ward polygon on a borough-context backdrop ────────────
@@ -11323,10 +11430,10 @@ function _generateWardReport(_reportWindow, wn, opts) {
     if (!items || !items.length) {
       return `<div class="${cls}"><h4>${_esc(title)} <span class="count">0</span></h4><div class="empty">none</div></div>`;
     }
-    // On screen every item; on paper the first two and a count of the rest,
-    // so the report still fits one A4 sheet however busy the ward is.
-    const lis = items.map((d, i) => `<li${i >= 2 ? ' class="extra"' : ''}>${fmt(d)}</li>`).join('') +
-      (items.length > 2 ? `<li class="more">and ${items.length - 2} more</li>` : '');
+    // On screen every item; on paper the first four and a count of the
+    // rest, so the second page holds the lists however busy the ward is.
+    const lis = items.map((d, i) => `<li${i >= 4 ? ' class="extra"' : ''}>${fmt(d)}</li>`).join('') +
+      (items.length > 4 ? `<li class="more">and ${items.length - 4} more</li>` : '');
     return `<div class="${cls}"><h4>${_esc(title)} <span class="count">${count != null ? count : items.length}</span></h4><ol>${lis}</ol></div>`;
   }
 
@@ -11354,6 +11461,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
   const html = `<!doctype html>
 <html lang="en-GB"><head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${_esc(wdata ? wdata.name : wn)} | Ward report | PopHealth Map</title>
 <link rel="stylesheet" href="${_reportFontsHref()}">
 <style>${REPORT_CSS}${WARD_ONEPAGE_CSS}</style>
@@ -11394,12 +11502,6 @@ function _generateWardReport(_reportWindow, wn, opts) {
         ${compareCensus}
         <div class="legend"><span class="legend-tick"></span> ${PH_AREA} ward median,${_reportSwatch(REPORT_CMP.better)}better than the median,${_reportSwatch(REPORT_CMP.worse)}worse,${_reportSwatch(REPORT_CMP.neutral)}neither better nor worse</div>
       </div>`}
-      ${crimeRows.length ? `<div class="section-h">Crime</div>
-      <div class="panel">
-        <h3>${crimeTotal != null ? Math.round(crimeTotal).toLocaleString('en-GB') + ' crimes recorded' : 'Crimes recorded'} from ${_esc(monthWords(reportCrimePeriod()))}</h3>
-        ${crimeSVG}
-        <div class="legend"><span class="legend-tick"></span> ${PH_AREA} ward median. Source: police.uk.</div>
-      </div>` : ''}
     </div>
     <div class="col">
       <div class="section-h">Health and deprivation</div>
@@ -11413,13 +11515,26 @@ function _generateWardReport(_reportWindow, wn, opts) {
         ${healthBars}
         <div class="legend"><span class="legend-tick"></span> ${PH_AREA} ward median,${_reportSwatch(REPORT_CMP.better)}better than the median,${_reportSwatch(REPORT_CMP.worse)}worse</div>
       </div>
-      ${healthOutcomesTable ? `<div class="panel">
-        <h3>Health outcomes</h3>
-        ${healthOutcomesTable}
-        <div class="legend">OHID\u2019s Local Health estimates for MSOAs, weighted onto the ward by where its residents live. A ratio compares deaths or admissions with England, where 100 is the England level once age is allowed for.</div>
-      </div>` : ''}
     </div>
   </div>
+
+  ${(crimeRows.length || healthOutcomesTable) ? `<div class="content cols p2">
+    ${crimeRows.length ? `<div class="col">
+      <div class="section-h">Crime</div>
+      <div class="panel">
+        <h3>${crimeTotal != null ? Math.round(crimeTotal).toLocaleString('en-GB') + ' crimes recorded' : 'Crimes recorded'} from ${_esc(monthWords(reportCrimePeriod()))}</h3>
+        ${crimeSVG}
+        <div class="legend"><span class="legend-tick"></span> ${PH_AREA} ward median. Source: police.uk.</div>
+      </div>
+    </div>` : ''}
+    ${healthOutcomesTable ? `<div class="col">
+      <div class="section-h">Health outcomes</div>
+      <div class="panel">
+        ${healthOutcomesTable}
+        <div class="legend">OHID\u2019s Local Health estimates for MSOAs, weighted onto the ward by where its residents live. A ratio compares deaths or admissions with England, where 100 is the England level once age is allowed for.</div>
+      </div>
+    </div>` : ''}
+  </div>` : ''}
 
   <div class="locations">
     <h2>Services and places in this ward</h2>
@@ -11443,27 +11558,6 @@ function _generateWardReport(_reportWindow, wn, opts) {
   <button onclick="window.print()">Print or save as PDF</button>
   <button onclick="window.close()">Close</button>
 </div>
-<script>
-  // One A4 sheet, whatever the ward. Measured at the printed width with the
-  // print-only list rules applied, then scaled down for print if it would run
-  // onto a second page. A4 less 8 mm margins is 733 x 1062 CSS px.
-  (function _fitOnePage() {
-    const r = document.querySelector('.report.onepage');
-    if (!r) return;
-    const measure = () => {
-      const w = r.style.width;
-      r.style.width = '733px';
-      r.classList.add('measure');
-      const h = r.getBoundingClientRect().height;
-      r.classList.remove('measure');
-      r.style.width = w;
-      document.documentElement.style.setProperty('--fit', String(Math.min(1, 1050 / h)));
-    };
-    if (document.fonts && document.fonts.ready) document.fonts.ready.then(measure); else measure();
-    window.addEventListener('load', measure);
-    window.addEventListener('beforeprint', measure);
-  })();
-<\/script>
 <script>
   // "↓ SVG" and "↓ PNG" on every chart (see _reportChartDownloads).
   (${_reportChartDownloads.toString()})();
@@ -14486,6 +14580,7 @@ function _buildLSOAReportHtml(code) {
   const html = `<!doctype html>
 <html lang="en-GB"><head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${_esc(props.name || code)} | LSOA report | PopHealth Map</title>
 <link rel="stylesheet" href="${_reportFontsHref()}">
 <style>${REPORT_CSS}</style>
@@ -22648,6 +22743,7 @@ var PH_SHOW = {
     // same kind of document as a ward or LSOA profile.
     var multi = Object.keys(bs).length > 1;
     var html = '<!DOCTYPE html><html lang="en-GB"><head><meta charset="utf-8">' +
+      '<meta name="viewport" content="width=device-width, initial-scale=1">' +
       '<title>' + esc(rbAreaName()) + ' | Custom area report | PopHealth Map</title>' +
       '<link rel="stylesheet" href="' + esc(_reportFontsHref()) + '">' +
       '<style>' + REPORT_CSS +

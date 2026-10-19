@@ -119,8 +119,8 @@ NATIVE = [
     ("census_other_ethnic_pct",  "Other ethnic group (%)",      "Census 2021 (TS021)", "2021"),
     ("census_non_white_pct",     "Not White (%)",               "Census 2021 (TS021)", "2021"),
     ("census_born_outside_uk_pct", "Born outside the UK (%)",   "Census 2021 (TS004)", "2021"),
-    ("census_english_hh_all_pct",  "Households where all adults speak English as a first language (%)", "Census 2021 (TS025)", "2021"),
-    ("census_english_hh_none_pct", "Households where no adults speak English as a first language (%)",  "Census 2021 (TS025)", "2021"),
+    ("census_english_hh_all_pct",  "All adults in the household have English as a main language (%)", "Census 2021 (TS025)", "2021"),
+    ("census_english_hh_none_pct", "No one in the household has English as a main language (%)", "Census 2021 (TS025)", "2021"),
 
     ("census_good_health_pct",  "Good or very good health (%)", "Census 2021 (TS037)", "2021"),
     ("census_bad_health_pct",   "Bad or very bad health (%)",   "Census 2021 (TS037)", "2021"),

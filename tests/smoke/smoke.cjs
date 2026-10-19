@@ -2346,6 +2346,76 @@ const smallText = page => page.evaluate(() => {
     await page.close();
   }
 
+  // H33, H38, H39: the printable reports on paper and on a phone.
+  {
+    const { page, errors } = await open(browser, 'index.html?t=1', DESK);
+    const H = await page.evaluate(async () => {
+      await Promise.all([ensureAllLayerData(), ensureLsoaImd(), ensureLsoaData(), ensureWardDetail(), ensureGreenspaceData()]);
+      const ward = wn => { let h = ''; _generateWardReport({ sink: x => { h = x; } }, wn); return h; };
+      let custom = '';
+      const realOpen = window.open;
+      window.open = () => ({ document: { open() {}, write(h) { custom += h; }, close() {} } });
+      try {
+        PH_REPORT.apply({ codes: ['E01004243', 'E01004244', 'E01004245'] });
+        const b = document.getElementById('rb-report'); b.disabled = false; b.click();
+      } finally { window.open = realOpen; }
+      return { Lansbury: ward('Lansbury'), Bishopsgate: ward('Bishopsgate'), lsoa: _buildLSOAReportHtml('E01004243'), custom };
+    });
+    // On paper: two A4 pages, nothing under 8pt, no chart label cut off at
+    // the left edge, and the English language row named as the Census does.
+    for (const wn of ['Lansbury', 'Bishopsgate']) {
+      const p = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+      await p.goto(BASE + '/robots.txt');
+      await p.setContent(H[wn]);
+      await p.waitForTimeout(600);
+      await p.emulateMedia({ media: 'print' });
+      const m = await p.evaluate(() => {
+        let min = 99, where = '';
+        for (const el of document.querySelectorAll('.report *')) {
+          if (!el.getClientRects().length || ![...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) continue;
+          let px = parseFloat(getComputedStyle(el).fontSize);
+          const svg = el.closest('svg');
+          if (svg && svg.viewBox.baseVal && svg.viewBox.baseVal.width) px *= svg.getBoundingClientRect().width / svg.viewBox.baseVal.width;
+          if (px < min) { min = px; where = el.textContent.slice(0, 30); }
+        }
+        const cut = [...document.querySelectorAll('.report svg text')].filter(t => t.getBBox().x < -0.5).map(t => t.textContent);
+        const labels = [...document.querySelectorAll('svg.ch-compare text')].map(t => t.textContent.replace(/\s+/g, ''));
+        return { pt: +(min * 0.75).toFixed(2), where, cut, zoom: getComputedStyle(document.querySelector('.report')).zoom,
+          english: labels.includes('NoonewithEnglishasmainlanguage') && !/speaks English/.test(document.body.textContent) };
+      });
+      const pdf = await p.pdf({ format: 'A4', preferCSSPageSize: true });
+      const pages = (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) || []).length;
+      ok(pages === 2 && m.pt >= 8 && String(m.zoom) === '1', 'the ' + wn + ' report prints on two A4 pages with nothing under 8pt',
+        pages + ' pages, smallest ' + m.pt + 'pt (' + m.where + '), zoom ' + m.zoom);
+      ok(!m.cut.length, 'no chart label in the ' + wn + ' report starts left of the chart', m.cut.join(' | '));
+      ok(m.english, 'the ' + wn + ' report names the language row "No one with English as main language"');
+      await p.close();
+    }
+    {
+      const p = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+      await p.goto(BASE + '/robots.txt');
+      await p.setContent(H.lsoa);
+      await p.waitForTimeout(600);
+      const cut = await p.evaluate(() => [...document.querySelectorAll('.report svg text')].filter(t => t.getBBox().x < -0.5).map(t => t.textContent));
+      ok(!cut.length, 'no chart label in the LSOA report starts left of the chart', cut.join(' | '));
+      await p.close();
+    }
+    // On a phone each report fits the screen's width.
+    for (const vp of [{ width: 390, height: 664 }, { width: 360, height: 740 }]) {
+      for (const k of ['Lansbury', 'lsoa', 'custom']) {
+        const p = await browser.newPage({ viewport: vp, isMobile: true, hasTouch: true });
+        await p.goto(BASE + '/robots.txt');
+        await p.setContent(H[k] || '<p>missing</p>');
+        await p.waitForTimeout(400);
+        const m = await p.evaluate(() => ({ vp: !!document.querySelector('meta[name="viewport"]'), iw: innerWidth, sw: document.documentElement.scrollWidth }));
+        ok(m.vp && m.iw === vp.width && m.sw <= m.iw, 'phone ' + vp.width + 'px: the ' + k + ' report fits the screen', JSON.stringify(m));
+        await p.close();
+      }
+    }
+    ok(errors.length === 0, 'no page errors (report layout checks)', errors.join(' | '));
+    await page.close();
+  }
+
   // A region
   if (HAS_NE) {
     const { page, errors } = await open(browser, 'index.html?r=north-east&t=1', DESK);
