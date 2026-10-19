@@ -8420,10 +8420,14 @@ let BOROUGH_DATA = {};
 const _laAgg = {};
 const LA_SUM_UNITS = new Set(['crimes', 'people', 'LSOAs']);
 // Whether an LA figure adds up its wards (a count) rather than averaging
-// them by population. The indicator card says the same, from here.
+// them by population. The indicator card says the same, from here. This is
+// the one additivity rule for the whole site: Compare, Custom area and Ask
+// (data/map/assistant.js) all call it, so a count is summed, and a rate is
+// averaged, the same way wherever it is shown.
 function laSums(k) {
   const meta = (typeof OV_META === 'object' && OV_META[k]) || {};
-  return LA_SUM_UNITS.has(meta.u) || /_12mo$|^crime_total$|^census_population$|_lsoa_count$/.test(resolveOvField(k));
+  return LA_SUM_UNITS.has(meta.u) ||
+    /_12mo$|^crime_total$|^census_population$|_count$|^gb_total_uprn$/.test(resolveOvField(k));
 }
 // How the Census figures on screen were made, so the card, the profile key
 // and the Data export notes describe the data that is loaded. A ward file
@@ -19596,19 +19600,35 @@ var PH_SHOW = {
       return f.properties && f.properties.code === code;
     })[0] || null;
   }
+  // An LSOA's deprivation chip is the LSOA's own decile, a whole number, not
+  // the average decile a ward or LA carries, so it is named and shown as one.
+  function cmpLsoaDecile(k) { return cmpLevel === 'lsoa' && k === 'imd_decile_mean'; }
+  function cmpLabel(k) { return cmpLsoaDecile(k) ? 'Deprivation decile (IMD 2025)' : labelOf(k); }
+  function cmpFmt(v, k) {
+    if (v == null) return 'No figure';
+    return cmpLsoaDecile(k) ? String(Math.round(v)) : fmtVal(v, k);
+  }
   function cmpIndsOf(name) {
     // An LSOA's figures are published for the LSOA, so nothing is added up and
     // nothing is weighted. It is the only level below a ward.
     if (cmpLevel === 'lsoa') {
       var d = (typeof LSOA_DATA !== 'undefined') ? LSOA_DATA[name] : null;
-      return d ? (d.indicators || d) : {};
+      var rec = d ? (d.indicators || d) : {};
+      // The deprivation chip is imd_decile_mean, the ward and LA average. An
+      // LSOA has its own decile, so the chip reads that (and labelOf names it
+      // as the LSOA's own decile at this level).
+      if (rec.imd_decile_mean == null && rec.imd_decile != null) {
+        rec = Object.assign({}, rec, { imd_decile_mean: rec.imd_decile });
+      }
+      return rec;
     }
     if (cmpLevel === 'ward') return indsOf(name);
     var key = cmpLevel + ' ' + name;
     if (_cmpAgg[key]) return _cmpAgg[key];
-    var sum = {}, wnum = {}, wden = {};
+    var sum = {}, wnum = {}, wden = {}, ladCode = '';
     cmpWardsOf(name).forEach(function (wn) {
       var i = indsOf(wn);
+      if (!ladCode) { var wr = wardRec(wn); ladCode = (wr && wr.lad_code) || ''; }
       var p = num(i.census_population) || 0;
       Object.keys(i).forEach(function (k) {
         if (RB_SKIP[k]) return;              // a mean of ranks is not a rank
@@ -19625,6 +19645,14 @@ var PH_SHOW = {
     var out = {};
     Object.keys(sum).forEach(function (k) { out[k] = sum[k]; });
     Object.keys(wnum).forEach(function (k) { if (wden[k] > 0) out[k] = wnum[k] / wden[k]; });
+    // An LA shows exactly the figure the map draws for it: the LA file's own
+    // figure where it has one, and otherwise laAggregate's ward roll-up.
+    if (cmpLevel === 'borough' && ladCode && typeof boroughOvValue === 'function') {
+      Object.keys(out).forEach(function (k) {
+        var v = num(boroughOvValue(ladCode, k));
+        if (v !== null) out[k] = v;
+      });
+    }
     _cmpAgg[key] = out;
     return out;
   }
@@ -19767,7 +19795,7 @@ var PH_SHOW = {
       var have = indicatorKeys().indexOf(m.k) !== -1;
       return '<span class="q-chip' + (m.on && have ? ' on' : '') + '" data-metric="' + i + '"' +
         (have ? '' : ' style="opacity:.45;cursor:not-allowed" title="There are no figures for this indicator here"') +
-        ' role="button" tabindex="0">' + esc(labelOf(m.k)) + '</span>';
+        ' role="button" tabindex="0">' + esc(cmpLabel(m.k)) + '</span>';
     }).join('') +
       '<select class="q-chip outline" id="cmp-add-metric" aria-label="Add an indicator">' +
       '<option value="">Add an indicator</option>' + indicatorOptions(null) + '</select>';
@@ -19796,7 +19824,8 @@ var PH_SHOW = {
         ? 'Pin one more ' + lvl.one + ' to compare it with the first, and each one keeps its colour on the map.'
         : 'Pin two or more ' + lvl.many + ' to compare them, and each one keeps its colour on the map.';
     }
-    var bits = [], byDec = esc(phraseFor('imd_decile_mean'));
+    var lsoaDec = cmpLsoaDecile('imd_decile_mean');
+    var bits = [], byDec = esc(lsoaDec ? 'deprivation decile (IMD 2025)' : phraseFor('imd_decile_mean'));
     var decs = pinned.map(function (n) { return num(cmpIndsOf(n).imd_decile_mean); })
                      .filter(function (v) { return v !== null; });
     if (decs.length === pinned.length) {
@@ -19812,12 +19841,14 @@ var PH_SHOW = {
       var leastDep = Math.max.apply(null, decs);
       var mostDep  = Math.min.apply(null, decs);
       var allOf = pinned.length === 2 ? 'Both pinned ' : 'All ' + cbNum(pinned.length) + ' pinned ';
-      var d1 = function (v) { return v.toFixed(1); };
+      // An LSOA's decile is its own, a whole number, so it is given as one.
+      var d1 = function (v) { return lsoaDec ? String(Math.round(v)) : v.toFixed(1); };
+      var aDec = lsoaDec ? 'a deprivation decile' : 'an average deprivation decile';
       if (leastDep <= 5.5) {
-        bits.push(allOf + lvl.many + ' have an average deprivation decile of <strong>' + d1(leastDep) +
+        bits.push(allOf + lvl.many + ' have ' + aDec + ' of <strong>' + d1(leastDep) +
           '</strong> or lower, where 1 is the most deprived tenth of England.');
       } else if (mostDep > 5.5) {
-        bits.push(allOf + lvl.many + ' have an average deprivation decile of <strong>' + d1(mostDep) +
+        bits.push(allOf + lvl.many + ' have ' + aDec + ' of <strong>' + d1(mostDep) +
           '</strong> or higher, where 10 is the least deprived tenth of England.');
       } else {
         // Straddling the middle, where neither framing says anything: one of
@@ -19840,7 +19871,7 @@ var PH_SHOW = {
       rows.sort(function (a, b) { return b.v - a.v; });
       var top = rows[0];
       if (Math.abs(top.v - rows[rows.length - 1].v) < 1e-9) return;   // all identical
-      var vs = fmtVal(top.v, m.k);
+      var vs = cmpFmt(top.v, m.k);
       /* The anchor is the London ward median, so it is only an anchor while
          wards are what is being compared. Setting a borough or a board beside
          it would read as a like-for-like comparison and is not one: half of
@@ -19968,8 +19999,8 @@ var PH_SHOW = {
         // The mark is an icon, with its meaning in words for a screen reader.
         var mark = cls === ' hi' ? ico('arrow-up', 'ic-sm') + '<span class="sr-only"> (highest)</span>'
           : cls === ' lo' ? ico('arrow-down', 'ic-sm') + '<span class="sr-only"> (lowest)</span>' : '';
-        return '<div class="cmp-c-row"><span class="k">' + esc(labelOf(m.k)) + '</span>' +
-          '<span class="v' + cls + '">' + (v === null ? 'No data' : fmtVal(v, m.k)) + mark + '</span></div>';
+        return '<div class="cmp-c-row"><span class="k">' + esc(cmpLabel(m.k)) + '</span>' +
+          '<span class="v' + cls + '">' + cmpFmt(v, m.k) + mark + '</span></div>';
       }).join('');
       return '<div class="cmp-card">' +
         '<div class="cmp-c-hdr"><span class="cmp-swatch" style="background:' + pinColour(i) + '"></span>' +
@@ -19991,6 +20022,9 @@ var PH_SHOW = {
     cmpLegendEl.innerHTML = mets.length
       ? '<span class="cmp-key">' + ico('arrow-up', 'ic-sm') + ' highest ' + ico('arrow-down', 'ic-sm') + ' lowest</span>' +
         ((cmpLevel === 'ward' || cmpLevel === 'lsoa') ? ''
+          : cmpLevel === 'borough'
+          ? 'These are the LA figures the map shows: the LA’s own published figure where the data has one, ' +
+            'and otherwise a figure calculated from its wards, with counts summed and everything else weighted by population. '
           : 'These figures are calculated from the wards in each ' + esc(lvl.one) +
             ', with counts summed and everything else weighted by population. They are not published ' +
             esc(lvl.one) + ' statistics. ') +
@@ -20017,13 +20051,13 @@ var PH_SHOW = {
           esc(cmpAreaLabel(n)) + '<span class="cmp-t-sub">' + esc(cmpSubOf(n)) + '</span></th>';
       }).join('') + '</tr>';
     var rows = mets.map(function (m) {
-      return '<tr><th scope="row">' + esc(labelOf(m.k)) + '</th>' + pinned.map(function (n) {
+      return '<tr><th scope="row">' + esc(cmpLabel(m.k)) + '</th>' + pinned.map(function (n) {
         var v = num(cmpIndsOf(n)[m.k]);
-        if (v === null) return '<td class="none">No data</td>';
+        if (v === null) return '<td class="none">No figure</td>';
         var mark = '';
         if (ext[m.k] && v === ext[m.k].hi) mark = ico('arrow-up', 'ic-sm') + '<span class="sr-only"> (highest)</span>';
         else if (ext[m.k] && v === ext[m.k].lo) mark = ico('arrow-down', 'ic-sm') + '<span class="sr-only"> (lowest)</span>';
-        return '<td>' + fmtVal(v, m.k) + mark + '</td>';
+        return '<td>' + cmpFmt(v, m.k) + mark + '</td>';
       }).join('') + '</tr>';
     }).join('');
     wrap.innerHTML = '<table class="cmp-table"><thead>' + head + '</thead><tbody>' + rows + '</tbody></table>' +
@@ -20214,7 +20248,7 @@ var PH_SHOW = {
     // other way of recording.
     if (added) head.push('Wards counted', 'Method');
     // The display label and its unit, as the "Add an indicator" menu shows them.
-    head = head.concat(mets.map(function (m) { return headerOf(m.k); }));
+    head = head.concat(mets.map(function (m) { return cmpLsoaDecile(m.k) ? cmpLabel(m.k) : headerOf(m.k); }));
     var lines = [head.map(csvCell).join(',')];
     pinned.forEach(function (n) {
       var row = [cmpCode(n), cmpAreaLabel(n)];
@@ -20224,11 +20258,14 @@ var PH_SHOW = {
       } else if (cmpLevel === 'ward') {
         row.push((wardRec(n) || {}).lad || '');
       } else {
-        row.push(cmpWardsOf(n).length, 'summed for counts, population-weighted otherwise');
+        row.push(cmpWardsOf(n).length, cmpLevel === 'borough'
+          ? 'the LA file’s own figure where it has one, otherwise from wards: summed for counts, population-weighted otherwise'
+          : 'summed for counts, population-weighted otherwise');
       }
       var inds = cmpIndsOf(n);
       mets.forEach(function (m) {
-        row.push(indCsvValue(num(inds[m.k]), m.k));
+        var cv = num(inds[m.k]);
+        row.push(cmpLsoaDecile(m.k) ? (cv === null ? '' : String(Math.round(cv))) : indCsvValue(cv, m.k));
       });
       lines.push(row.map(csvCell).join(','));
     });
@@ -21467,8 +21504,9 @@ var PH_SHOW = {
 
   // Summed, not averaged. Everything absent from here is a rate, a score or a
   // percentage and gets weighted by population.
-  var RB_ADDITIVE = { census_population: 1, claimant_count: 1, gb_total_uprn: 1 };
-  function rbIsAdditive(k) { return RB_ADDITIVE[k] === 1 || /_count$/.test(k); }
+  // The map's own rule (laSums), so a custom area adds up crimes and
+  // claimants exactly as an LA does.
+  function rbIsAdditive(k) { return laSums(k); }
 
   // imd_rank is a national rank, not a quantity: the mean of two ranks is not
   // the rank of anything, so it is left out rather than averaged into a number
