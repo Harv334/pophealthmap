@@ -32,7 +32,7 @@ What is edited
                             and the tour chapter about the panel
 
 What is NOT edited, and is left for whoever takes it on
-    index.html still carries a canonical link, an og:url and a JSON-LD block
+    index.html still carries a canonical link and a JSON-LD block
     naming pophealth.uk. Those are correct while this is a copy of that site
     and wrong the moment it becomes its own thing, so they are a decision for
     its owner rather than a rewrite done on their behalf. They are listed in

@@ -147,11 +147,14 @@
 <meta name="theme-color" content="#005EB8">
 
 <!-- Link previews. These decide what appears when the map is shared into
-     Teams, Slack or LinkedIn, which is where most of its traffic starts. -->
+     Teams, Slack or LinkedIn, which is where most of its traffic starts.
+     There is no og:url: it named the home page for every state of the map,
+     and Facebook and LinkedIn treat it as the address of what was shared, so
+     a ward link could land on the home page without its ward. Without it
+     each platform uses the address actually shared. -->
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="PopHealth Map">
 <meta property="og:locale" content="en_GB">
-<meta property="og:url" content="https://pophealth.uk/">
 <meta property="og:title" content="PopHealth Map - population health across England by ward and neighbourhood">
 <meta property="og:description" content="Explore health, deprivation and local services across every neighbourhood in England, free and with no sign-in. Life expectancy, hospital admissions, crime, air quality, transport and more, from open NHS and government data.">
 <meta property="og:image" content="https://pophealth.uk/og.png">
@@ -907,6 +910,25 @@
   .cat-cap { margin: 4px 0 6px; font-size: var(--t-xs); line-height: 1.45; color: var(--ink-2); }
   /* Long sections show their first eight rows until "Show all" is chosen. */
   .cat-body.clipped .sr-x { display: none; }
+  /* Ctrl+P with the Area profile open prints the profile, full width and with
+     every section open, rather than the header, the tabs and the map controls
+     on one page with none of the figures. The class is set on beforeprint
+     (see _wirePrintProfile), only while a profile is showing. */
+  @media print {
+    html.print-profile, html.print-profile body { height: auto !important; overflow: visible !important; background: #fff !important; }
+    html.print-profile body > :not(.app), html.print-profile .app > :not(.main),
+    html.print-profile .main > :not(#sidebar), html.print-profile #sidebar > :not(#tab-ward) { display: none !important; }
+    html.print-profile .app, html.print-profile .main { display: block !important; height: auto !important;
+      max-height: none !important; overflow: visible !important; }
+    html.print-profile #sidebar { display: block !important; position: static !important; width: auto !important;
+      height: auto !important; overflow: visible !important; border: 0 !important; transform: none !important; box-shadow: none !important; }
+    html.print-profile #tab-ward { display: block !important; }
+    html.print-profile #wpanel { height: auto !important; overflow: visible !important; padding: 0 !important; }
+    html.print-profile #wpanel .cat-body { display: block !important; }
+    html.print-profile #wpanel .cat-block { break-inside: avoid-page; }
+    html.print-profile #wpanel .deselect-btn, html.print-profile #wpanel .sr-all,
+    html.print-profile #wpanel .cat-arrow { display: none !important; }
+  }
   .sr-all { display: inline-block; margin: 7px 0 3px; padding: 2px 0; border: 0; background: none; cursor: pointer;
             font: inherit; font-size: var(--t-xs); font-weight: 600; color: var(--nhs-blue);
             text-decoration: underline; text-underline-offset: 2px; }
@@ -1089,6 +1111,7 @@
      tooltip and the hint say why. */
   .dl-seg button[aria-disabled="true"]:not(.active) { color: var(--ink-3); opacity: .5; cursor: not-allowed; }
   .dl-seg button[aria-disabled="true"]:not(.active):hover { color: var(--ink-3); background: transparent; }
+  .dl-seg button.biv-lacks:not(.active) { color: var(--ink-3); opacity: .6; }
   .dl-hint { position: absolute; top: 100%; right: 0; margin-top: 4px; background: var(--invert-bg); color: var(--invert-ink); font-size: var(--t-xs); line-height: 1.4; padding: 6px 9px; border-radius: var(--r-sm); width: max-content; max-width: min(320px, calc(100vw - 24px)); opacity: 0; pointer-events: none; transition: opacity .2s; box-shadow: var(--shadow); }
   .dl-hint.show { opacity: 1; }
 
@@ -3860,7 +3883,8 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
         </div>
         <div class="rb-acts">
           <button type="button" class="ws-btn primary" id="rb-report" disabled>Open printable report</button>
-          <button type="button" class="ws-btn" id="rb-csv" disabled>Download CSV</button>
+          <button type="button" class="ws-btn" id="rb-csv" disabled
+                  title="A ZIP with the area's figures and its LSOAs as two CSV files, and the notes">Download ZIP</button>
           <button type="button" class="ws-btn" id="rb-notes" disabled
                   title="Notes on each figure, its source and the licence lines to keep with it">Download notes</button>
           <!-- An area is built by hand, so it is the one thing here somebody
@@ -4021,6 +4045,9 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
                     style="width:100%;justify-content:center;margin-top:11px">Open full comparison<svg class="ic" aria-hidden="true"><use href="#i-arrow-right"/></svg></button>
             <button type="button" class="ws-btn" id="cmp-csv" aria-describedby="cmp-quick"
                     style="width:100%;justify-content:center;margin-top:6px">Download CSV</button>
+            <button type="button" class="ws-btn" id="cmp-notes" aria-describedby="cmp-quick"
+                    title="Notes on each figure, its source and the licence lines to keep with it"
+                    style="width:100%;justify-content:center;margin-top:6px">Download notes</button>
           </div>
         </div>
       </div>
@@ -4077,6 +4104,8 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
             <button type="button" class="ws-btn primary" id="q-run">Run query</button>
             <button type="button" class="ws-btn" id="q-clear">Clear</button>
             <button type="button" class="ws-btn" id="q-csv" disabled aria-describedby="q-csv-why">Download CSV</button>
+            <button type="button" class="ws-btn" id="q-notes" disabled aria-describedby="q-csv-why"
+                    title="Notes on the query, each figure, its source and the licence lines to keep with it">Download notes</button>
           </div>
           <div class="q-sortrow">
             <span>Sort by</span>
@@ -8402,6 +8431,18 @@ function _touchIcon(html, size) {
 function mkGpIcon() {
   return _touchIcon(`<div class="mk mk-ring" style="--mk:${GP_RING};width:11px;height:11px"></div>`, 11);
 }
+/* The charities layer adds its markers in chunks, on timers. Switched off
+   before the last chunk (Reset does this), markercluster still finishes by
+   drawing the clusters onto a map it is no longer on, and throws "Cannot read
+   properties of null (reading 'getMinZoom')". Nothing needs drawing then:
+   adding the layer back to the map draws its clusters afresh. */
+if (L.MarkerCluster && L.MarkerCluster.prototype._recursivelyAddChildrenToMap) {
+  const _phAddChildren = L.MarkerCluster.prototype._recursivelyAddChildrenToMap;
+  L.MarkerCluster.prototype._recursivelyAddChildrenToMap = function () {
+    if (!this._group || !this._group._map) return;
+    return _phAddChildren.apply(this, arguments);
+  };
+}
 const gpL = L.markerClusterGroup({
   maxClusterRadius: 40,
   showCoverageOnHover: false,
@@ -8596,6 +8637,13 @@ function greenspacesIn(geom, gj) {
     else byName[key] = { name, kind, ha, n: 1, unnamed: !name };
   });
   return Object.values(byName).sort((a, b) => (a.unnamed - b.unnamed) || (b.ha - a.ha));
+}
+// The count beside a report's parks heading. It counts sites, and a line of
+// the list can hold several (the unnamed ones are grouped), so it says
+// "38 sites" when that differs from the lines listed under it.
+function greenspaceCount(list) {
+  const n = list.reduce((a, g) => a + g.n, 0);
+  return n === list.length ? String(n) : n.toLocaleString('en-GB') + ' sites';
 }
 // One line of a report's parks list.
 function greenspaceItemHtml(g) {
@@ -10517,6 +10565,24 @@ function showWard(wn) {
     </div>`;
 }
 
+/* Printing the Area profile: see the print rules beside .cat-body. Sections
+   cut short to "Show all" are opened for the printout and put back after. */
+(function _wirePrintProfile() {
+  let clipped = [];
+  window.addEventListener('beforeprint', () => {
+    const tab = document.getElementById('tab-ward');
+    const wp = document.getElementById('wpanel');
+    if (!tab || !wp || !tab.classList.contains('active') || wp.querySelector(':scope > .ph')) return;
+    document.documentElement.classList.add('print-profile');
+    clipped = Array.from(wp.querySelectorAll('.cat-body.clipped'));
+    clipped.forEach(b => b.classList.remove('clipped'));
+  });
+  window.addEventListener('afterprint', () => {
+    document.documentElement.classList.remove('print-profile');
+    clipped.forEach(b => b.classList.add('clipped'));
+    clipped = [];
+  });
+})();
 /* Open or close a profile section. The heading is a button inside an h3, so
    the body is found from the block rather than as the next element, and
    aria-expanded follows it. */
@@ -10866,18 +10932,125 @@ function _reportChartDownloads() {
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
-  const standalone = svg => {
+  /* A chart pasted into a slide has to explain itself, so the file is the
+     chart with a title line naming the area above it, the panel's key below
+     it as text and swatches, and a source line at the foot. */
+  const NS = 'http://www.w3.org/2000/svg';
+  const xmlEsc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const standalone = (svg, panel) => {
     const clone = svg.cloneNode(true);
     const vb = svg.viewBox && svg.viewBox.baseVal;
     const box = svg.getBoundingClientRect();
-    const w = (vb && vb.width) || box.width, h = (vb && vb.height) || box.height;
-    clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-    clone.setAttribute('width', w);
-    clone.setAttribute('height', h);
-    const st = document.createElementNS('http://www.w3.org/2000/svg', 'style');
-    st.textContent = 'text{font-family:Inter,Arial,sans-serif}';
-    clone.insertBefore(st, clone.firstChild);
-    return { xml: '<?xml version="1.0" standalone="no"?>\n' + new XMLSerializer().serializeToString(clone), w: w, h: h };
+    const cw = (vb && vb.width) || box.width, ch = (vb && vb.height) || box.height;
+    const pad = 16, W = Math.max(cw + pad * 2, 360), inner = W - pad * 2;
+    const h3 = panel && panel.querySelector('h3');
+    const h3t = h3 ? h3.textContent.trim() : '';
+    const when = (panel && panel.getAttribute('data-when')) || '';
+    const title = baseTitle + (h3t ? ': ' + h3t.charAt(0).toLowerCase() + h3t.slice(1) : '') +
+      (when && h3t.indexOf(when) === -1 ? ', ' + when : '');
+    const leg = panel && panel.querySelector('.legend');
+    // The key as runs of text and marks, laid out in lines that fit.
+    const items = [];
+    let srcInKey = '';
+    if (leg) {
+      leg.childNodes.forEach(n => {
+        if (n.nodeType === 3) { items.push({ t: n.textContent }); return; }
+        if (n.nodeType !== 1) return;
+        if (n.classList.contains('legend-tick')) { items.push({ tick: 1 }); return; }
+        const bg = n.style && n.style.background;
+        if (bg && !n.textContent.trim()) { items.push({ sw: bg }); return; }
+        items.push({ t: n.textContent });
+      });
+      const m = leg.textContent.match(/Source:\s*([^]*?)\.?\s*$/);
+      if (m) srcInKey = m[1];
+    }
+    const fsT = 13, fsK = 10, fsF = 9.5;
+    // Widths measured in the type face the file names, so the key's runs of
+    // text and its marks sit where they will be drawn.
+    const mctx = document.createElement('canvas').getContext('2d');
+    const tw = (t, fs, b) => { mctx.font = (b ? '700 ' : '400 ') + fs + 'px Inter, Arial, sans-serif'; return mctx.measureText(t).width; };
+    const cwK = tw(' ', fsK);
+    let out = '', x = 0, line = 0;
+    const keyLines = [];
+    const room = inner;
+    items.forEach((it, ii) => {
+      if (it.tick || it.sw) {
+        // A mark stays on the line of the word it explains.
+        const nx = items[ii + 1] && items[ii + 1].t ? String(items[ii + 1].t).trim().split(/\s+/)[0] || '' : '';
+        if (x > 0 && x + 14 + tw(nx, fsK) > room) { line++; x = 0; }
+        (keyLines[line] = keyLines[line] || []).push({ x: x, it: it });
+        x += it.tick ? 6 : 14;
+        return;
+      }
+      String(it.t).replace(/\s+/g, ' ').split(/(\s)/).forEach(word => {
+        if (!word) return;
+        const wlen = tw(word, fsK);
+        if (word === ' ') { if (x > 0) x += cwK; return; }
+        if (x + wlen > room && x > 0) { line++; x = 0; }
+        (keyLines[line] = keyLines[line] || []).push({ x: x, t: word });
+        x += wlen;
+      });
+    });
+    const wrapText = (text, fs, bold) => {
+      const lines = [];
+      let cur = '';
+      String(text).split(' ').forEach(wd => {
+        if (cur && tw(cur + ' ' + wd, fs, bold) > inner) { lines.push(cur); cur = wd; }
+        else cur = cur ? cur + ' ' + wd : wd;
+      });
+      if (cur) lines.push(cur);
+      return lines;
+    };
+    const titleLines = wrapText(title, fsT, 1);
+    let y = pad + fsT;
+    titleLines.forEach((t, i) => {
+      out += '<text x="' + pad + '" y="' + (y + i * (fsT + 4)) + '" font-size="' + fsT + '" font-weight="700" fill="#0F172A">' + xmlEsc(t) + '</text>';
+    });
+    y += (titleLines.length - 1) * (fsT + 4) + 10;
+    clone.setAttribute('x', pad);
+    clone.setAttribute('y', y);
+    clone.setAttribute('width', cw);
+    clone.setAttribute('height', ch);
+    y += ch + 8;
+    keyLines.forEach(row => {
+      y += fsK + 4;
+      let words = [];
+      const flush = () => {
+        if (!words.length) return;
+        out += '<text x="' + (pad + words[0].x) + '" y="' + y + '" font-size="' + fsK + '" fill="#5B6B7F">' +
+          xmlEsc(words.map(w => w.t).join(' ')) + '</text>';
+        words = [];
+      };
+      row.forEach(c => {
+        if (c.it) {
+          flush();
+          if (c.it.tick) out += '<rect x="' + (pad + c.x) + '" y="' + (y - fsK + 1) + '" width="1.5" height="' + fsK + '" fill="#0F172A"/>';
+          else out += '<circle cx="' + (pad + c.x + 7) + '" cy="' + (y - fsK / 2 + 1) + '" r="4" fill="' + xmlEsc(c.it.sw) + '"/>';
+        } else {
+          // Words carry on one text element while they follow each other.
+          if (words.length && Math.abs(words[words.length - 1].end - c.x) > cwK * 1.5) flush();
+          words.push({ x: c.x, t: c.t, end: c.x + tw(c.t, fsK) + cwK });
+        }
+      });
+      flush();
+    });
+    const src = (panel && panel.getAttribute('data-src')) || srcInKey;
+    y += 6;
+    wrapText((src ? 'Source: ' + src.replace(/\.$/, '') + '. ' : '') + 'PopHealth Map, pophealth.uk', fsF).forEach(t => {
+      y += fsF + 4;
+      out += '<text x="' + pad + '" y="' + y + '" font-size="' + fsF + '" fill="#5B6B7F">' + xmlEsc(t) + '</text>';
+    });
+    const H = Math.ceil(y + pad - 4);
+    const wrap = document.createElementNS(NS, 'svg');
+    wrap.setAttribute('xmlns', NS);
+    wrap.setAttribute('width', W);
+    wrap.setAttribute('height', H);
+    wrap.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    const xml = '<?xml version="1.0" standalone="no"?>\n' +
+      new XMLSerializer().serializeToString(wrap).replace(/<\/svg>$|\/>$/, '>') +
+      '<style>text{font-family:Inter,Arial,sans-serif}</style><rect width="100%" height="100%" fill="#fff"/>' +
+      out + new XMLSerializer().serializeToString(clone) + '</svg>';
+    return { xml: xml, w: W, h: H };
   };
   document.querySelectorAll('.panel').forEach(panel => {
     const svg = panel.querySelector('svg');
@@ -10901,10 +11074,10 @@ function _reportChartDownloads() {
       wrap.appendChild(b);
     };
     add('SVG', 'Download this chart as SVG', () => {
-      save(new Blob([standalone(svg).xml], { type: 'image/svg+xml;charset=utf-8' }), name + '.svg');
+      save(new Blob([standalone(svg, panel).xml], { type: 'image/svg+xml;charset=utf-8' }), name + '.svg');
     });
     add('PNG', 'Download this chart as PNG', () => {
-      const sv = standalone(svg), scale = 3;
+      const sv = standalone(svg, panel), scale = 3;
       const img = new Image();
       img.onload = () => {
         const c = document.createElement('canvas');
@@ -11021,7 +11194,8 @@ const REPORT_CSS = `
   .locblock li .meta { color: var(--ink-3); font-size: 9.5px; }
   .locblock .empty { font-size: 10px; color: #A9B4C2; }
 
-  .footer { padding: 18px 40px 26px; border-top: 3px solid var(--ink); font-size: 9.5px; line-height: 1.55; color: var(--ink-3); }
+  .footer { padding: 18px 40px 26px; border-top: 3px solid var(--ink); font-size: 9.5px; line-height: 1.55; color: var(--ink-3);
+            break-inside: avoid; page-break-inside: avoid; }
   .footer strong { color: var(--ink); }
   .footer .indep { margin-bottom: 8px; font-size: 10.5px; font-weight: 600; color: var(--ink); }
   .footer a { color: var(--ink); }
@@ -11821,7 +11995,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
     ${_kpi('Deprivation score', imdW != null ? imdW.toFixed(indDecimals('imd_score_ward')) : null, 'IMD 2025, higher is more deprived', _ctxBar(imdPct, 'lower-better'))}
     ${_kpi(indLabel('census_good_health_pct'), goodHlt != null ? goodHlt.toFixed(indDecimals('census_good_health_pct')) + '%' : null, 'of residents', _ctxBar(goodHpct, 'higher-better'))}
     ${_kpi(indLabel('census_bad_health_pct'), badHlt  != null ? badHlt.toFixed(indDecimals('census_bad_health_pct')) + '%' : null, 'of residents', _ctxBar(badHpct, 'lower-better'))}
-    ${_kpi('Disabled residents', disAny != null ? disAny.toFixed(indDecimals('census_disability_any_pct')) + '%' : null, 'of residents', _ctxBar(disAnyPct, 'lower-better'))}
+    ${_kpi(indLabel('census_disability_any_pct'), disAny != null ? disAny.toFixed(indDecimals('census_disability_any_pct')) + '%' : null, 'of residents', _ctxBar(disAnyPct, 'lower-better'))}
     ${_kpi(indLabel('core20_lsoa_count'), (c20L != null && totL != null) ? c20L.toFixed(0) + ' of ' + totL.toFixed(0) : null, core20TileSub(c20Pop))}
   </div>
 
@@ -11831,7 +12005,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
       ${_noCensus ? `<div class="panel"><p class="no-census">There are no Census figures for ${_esc(wdata ? wdata.name : wn)}, because its output areas are counted in neighbouring wards.</p></div>` : `
       <div class="panel"><h3>Ethnicity (Census 2021)</h3>${ethStack}</div>
       <div class="panel"><h3>Age (Census 2021)</h3>${ageStack}</div>
-      <div class="panel">
+      <div class="panel" data-src="ONS Census 2021" data-when="Census 2021">
         <h3>Compared with the ${PH_AREA} ward median</h3>
         ${compareCensus}
         <div class="legend"><span class="legend-tick"></span> ${PH_AREA} ward median,${_reportSwatch(REPORT_CMP.better)}better than the median,${_reportSwatch(REPORT_CMP.worse)}worse,${_reportSwatch(REPORT_CMP.neutral)}neither better nor worse</div>
@@ -11839,12 +12013,14 @@ function _generateWardReport(_reportWindow, wn, opts) {
     </div>
     <div class="col">
       <div class="section-h">Health and deprivation</div>
-      ${domainSVG ? `<div class="panel">
+      ${domainSVG ? `<div class="panel" data-src="MHCLG, English Indices of Deprivation 2025">
         <h3>Deprivation by domain, IMD 2025</h3>
         ${domainSVG}
-        <div class="legend">Each dot places the average of the ward\u2019s ${_wardLSOACodes.length} LSOA${_wardLSOACodes.length === 1 ? '' : 's'} among all the LSOAs in ${phWhere()}, so 90% means more deprived than 90% of them. The dashed line is the ${PH_AREA} median.</div>
+        <div class="legend">${_wardLSOACodes.length === 1
+          ? `Each dot places the ward\u2019s only LSOA among all the LSOAs in ${phWhere()}`
+          : `Each dot places the average of the ward\u2019s ${_wardLSOACodes.length} LSOAs among all the LSOAs in ${phWhere()}`}, so 90% means more deprived than 90% of them. The dashed line is the ${PH_AREA} median.</div>
       </div>` : ''}
-      <div class="panel">
+      <div class="panel" data-src="ONS Census 2021, DESNZ fuel poverty statistics and DWP claimant count">
         <h3>Health and economic indicators</h3>
         ${healthBars}
         <div class="legend"><span class="legend-tick"></span> ${PH_AREA} ward median,${_reportSwatch(REPORT_CMP.better)}better than the median,${_reportSwatch(REPORT_CMP.worse)}worse</div>
@@ -11878,13 +12054,14 @@ function _generateWardReport(_reportWindow, wn, opts) {
       ${_locBlock('Dental practices',     _dental,  d => `<strong>${_esc(d.name||'')}</strong> <span class="meta">${d.postcode?_esc(d.postcode):''}</span>`)}
       ${_locBlock('Hospitals', _hosp,   h => `<strong>${_esc(phTitle(h.n||''))}</strong> <span class="meta">${_esc([h.t, hospAeText(h)].filter(Boolean).join(' · '))}</span>`)}
       ${_locBlock('Charities',            _vcse,    v => `<strong>${_esc(v.name||'')}</strong>`)}
-      ${_green ? _locBlock('Parks and green spaces', _green, greenspaceItemHtml, '', _green.reduce((a, g) => a + g.n, 0)) : '' /* no green space data: left out, not "none" */}
+      ${_green ? _locBlock('Parks and green spaces', _green, greenspaceItemHtml, '', greenspaceCount(_green)) : '' /* no green space data: left out, not "none" */}
     </div>
   </div>
 
   <div class="footer">
     <div class="indep">PopHealth Map is an independent open-data project, not affiliated with the NHS. Figures are published statistics for planning and discussion; check the source before relying on one.</div>
     <strong>Sources:</strong> ${reportCredits(['census', 'imd', crimeRows.length ? 'crime' : '', 'fuel_poverty', 'claimant', 'health', 'gp', 'pharmacy', 'dental', 'hospitals', 'vcse', _green ? 'greenspace' : '']).map(_esc).join(' · ')}. Each median and comparison is taken across the ${PH_AREA} wards with a figure for that measure.
+    <div style="margin-top:6px">LSOAs are the small areas, of about 1,500 residents each, that official statistics are published for. Core20 means the most deprived fifth of areas in England, which the NHS gives priority to.</div>
     ${reportProvenanceHtml((wdata ? wdata.name : wn) + ' ward')}
   </div>
 </div>
@@ -11923,6 +12100,9 @@ function buildWardLayer() {
         // They stay drawn for context, but selecting one would put a ward in
         // the panel that the filter above it says is out of scope.
         if (typeof wardInFocus === 'function' && !wardInFocus(wn)) return;
+        // Compare at its cap of four refuses the click, and says so in its
+        // pane, so the outline stays on the ward it was on.
+        if (window.PH_COMPARE && PH_COMPARE.refuses && PH_COMPARE.refuses(wn)) return;
         // Update selection BEFORE the reset so the previously-selected ward
         // actually loses its 'selected' style (gs() reads selW).
         selW = wn;
@@ -13956,11 +14136,41 @@ window.PH_OA = (function () {
     }
   }
 
+  // A second indicator set aside by a level change: { k, first, lv }, the
+  // second, the first it was paired with, and the level it was shown at. It
+  // comes back when the reader returns to a level it has figures for.
+  let parked2 = null, lastFirst = null, lastLv = null;
   function sync() {
     const has = !!(curOv && curOv !== 'none');
     box.hidden = !has;
+    const lv = level();
+    // A different first indicator is a new comparison, so nothing comes back.
+    if (parked2 && parked2.first !== curOv) parked2 = null;
     // A second indicator that cannot be drawn with the new first one goes.
-    if (curOv2 !== 'none' && (!has || curOv2 === curOv || !ovHasLevel(curOv2, level()))) curOv2 = 'none';
+    if (curOv2 !== 'none' && (!has || curOv2 === curOv || !ovHasLevel(curOv2, lv))) {
+      // Only the level moved, with the same first indicator: say why the key
+      // went, and keep the pair to put back on the way back.
+      if (has && curOv2 !== curOv && curOv === lastFirst && lastLv && lastLv !== lv) {
+        parked2 = { k: curOv2, first: curOv, lv: lastLv };
+        if (typeof _dlHint === 'function') {
+          _dlHint(indLabel(curOv2) + ' has no ' + (_LVL_BUTTON[lv] || lv) + ' figures, so the map is showing ' +
+            indLabel(curOv) + ' on its own, and the comparison will come back when you choose ' +
+            (_LVL_BUTTON[lastLv] || lastLv) + ' again.', 7000);
+        }
+        curOv2 = 'none';
+        if (typeof _restyleAll === 'function') _restyleAll();
+      }
+      curOv2 = 'none';
+    } else if (curOv2 === 'none' && parked2 && has && ovHasLevel(parked2.k, lv) &&
+               sel.querySelector('option[value="' + parked2.k + '"]')) {
+      curOv2 = parked2.k;
+      parked2 = null;
+      _bivBreakCache = {};
+      if (typeof _restyleAll === 'function') _restyleAll();
+    }
+    lastFirst = has ? curOv : null;
+    lastLv = lv;
+    try { if (typeof _markLevelButtons === 'function') _markLevelButtons(); } catch (e) { /* not ready on first load */ }
     const b = bivOn();
     add.hidden = b || !pick.hidden;
     on.hidden = !b;
@@ -13979,6 +14189,7 @@ window.PH_OA = (function () {
   }
 
   window._bivSet = function (k) {
+    parked2 = null;
     curOv2 = (k && k !== curOv && sel.querySelector('option[value="' + k + '"]')) ? k : 'none';
     pick.hidden = true;
     apply();
@@ -14980,7 +15191,7 @@ function _buildLSOAReportHtml(code) {
     ${_kpi('Deprivation decile', decile != null ? decile + ' of 10' : null, 'where 1 is the most deprived tenth')}
     ${_kpi(indLabel('census_good_health_pct'), goodH != null ? goodH.toFixed(indDecimals('census_good_health_pct')) + '%' : null, 'of residents', _ctxBar(goodHpct, 'higher-better'))}
     ${_kpi(indLabel('census_bad_health_pct'), badH  != null ? badH.toFixed(indDecimals('census_bad_health_pct')) + '%' : null, 'of residents', _ctxBar(badHpct, 'lower-better'))}
-    ${_kpi('Disabled residents', disAny != null ? disAny.toFixed(indDecimals('census_disability_any_pct')) + '%' : null, 'of residents', _ctxBar(disAnyPct, 'lower-better'))}
+    ${_kpi(indLabel('census_disability_any_pct'), disAny != null ? disAny.toFixed(indDecimals('census_disability_any_pct')) + '%' : null, 'of residents', _ctxBar(disAnyPct, 'lower-better'))}
   </div>
 
   ${keyPoints}
@@ -14993,7 +15204,7 @@ function _buildLSOAReportHtml(code) {
       <div class="panel"><h3>Age (Census 2021)</h3>${ageStack}${inds.census_over85_pct != null ? `<div class="legend">Aged 85 and over: ${parseFloat(inds.census_over85_pct).toFixed(1)}% of residents</div>` : ''}</div>
     </div>
     <div class="row">
-      <div class="panel" style="flex:1">
+      <div class="panel" style="flex:1" data-src="ONS Census 2021" data-when="Census 2021">
         <h3>Compared with the ${PH_AREA} LSOA median</h3>
         ${compareCensus}
         <div class="legend"><span class="legend-tick"></span> ${PH_AREA} LSOA median,${_reportSwatch(REPORT_CMP.better)}better than the median,${_reportSwatch(REPORT_CMP.worse)}worse,${_reportSwatch(REPORT_CMP.neutral)}describes who lives here, so neither better nor worse</div>
@@ -15002,12 +15213,12 @@ function _buildLSOAReportHtml(code) {
 
     <div class="section-h">Health and deprivation</div>
     <div class="row">
-      <div class="panel" style="flex:0 0 340px">
+      <div class="panel" style="flex:0 0 340px" data-src="MHCLG, English Indices of Deprivation 2025">
         <h3>Deprivation by domain, IMD 2025</h3>
         ${domainSVG}
         <div class="legend">Each dot places this LSOA among all the LSOAs in ${phWhere()} on that domain, so 90% means more deprived than 90% of them. The dashed line is the ${PH_AREA} median.</div>
       </div>
-      <div class="panel" style="flex:1">
+      <div class="panel" style="flex:1" data-src="ONS Census 2021, DESNZ fuel poverty statistics and DWP claimant count">
         <h3>Health and economic indicators</h3>
         ${healthBars}
         <div class="legend"><span class="legend-tick"></span> ${PH_AREA} LSOA median,${_reportSwatch(REPORT_CMP.better)}better than the median,${_reportSwatch(REPORT_CMP.worse)}worse</div>
@@ -15041,7 +15252,7 @@ function _buildLSOAReportHtml(code) {
       ${_locBlock('Dental practices',     _dental,  d => `<strong>${_esc(d.name||'')}</strong> <span class="meta">${d.postcode?_esc(d.postcode):''}</span>`)}
       ${_locBlock('Hospitals', _hosp,    h => `<strong>${_esc(phTitle(h.n||''))}</strong> <span class="meta">${_esc([h.a, h.t, hospAeText(h)].filter(Boolean).join(' · '))}</span>`, 'span-2')}
       ${_locBlock('Charities',            _vcse,    v => `<strong>${_esc(v.name||'')}</strong> <span class="meta">${_esc(v.addr||'')}</span>`, 'span-2')}
-      ${_green ? _locBlock('Parks and green spaces', _green, greenspaceItemHtml, '', _green.reduce((a, g) => a + g.n, 0)) : '' /* no green space data: left out, not "none" */}
+      ${_green ? _locBlock('Parks and green spaces', _green, greenspaceItemHtml, '', greenspaceCount(_green)) : '' /* no green space data: left out, not "none" */}
     </div>
   </div>
 
@@ -15049,6 +15260,7 @@ function _buildLSOAReportHtml(code) {
     <div class="indep">PopHealth Map is an independent open-data project, not affiliated with the NHS. Figures are published statistics for planning and discussion; check the source before relying on one.</div>
     <strong>Data sources:</strong> ${reportCredits(['imd', 'census', crimeRows.length ? 'crime' : '', 'fuel_poverty', 'claimant', 'health', 'greenblue', 'gp', 'pharmacy', 'dental', 'hospitals', 'vcse', _green ? 'greenspace' : '']).map(_esc).join(' · ')}.
     <div style="margin-top:6px">Services and green spaces are listed when they sit inside this LSOA\u2019s boundary, and each median and comparison is taken across the ${PH_AREA} LSOAs with a figure for that measure.</div>
+    <div style="margin-top:6px">LSOAs are the small areas, of about 1,500 residents each, that official statistics are published for. Core20 means the most deprived fifth of areas in England, which the NHS gives priority to.</div>
     ${reportProvenanceHtml((props.name ? props.name + ', ' : '') + 'LSOA ' + code)}
   </div>
 </div>
@@ -16339,8 +16551,16 @@ function _markLevelButtons() {
     const lacks = on && typeof ovHasLevel === 'function' && !ovHasLevel(ov, b.dataset.dl);
     b.classList.toggle('native', isNat);
     if (lacks) b.setAttribute('aria-disabled', 'true'); else b.removeAttribute('aria-disabled');
+    // With two indicators on, a level the second one lacks is greyed too.
+    // It can still be chosen, which shows the first on its own (the hint
+    // says so), so it is a class rather than aria-disabled.
+    const ov2 = (typeof curOv2 !== 'undefined' && curOv2 && curOv2 !== 'none' && on) ? curOv2 : '';
+    const lacks2 = !lacks && !!ov2 && typeof ovHasLevel === 'function' && !ovHasLevel(ov2, b.dataset.dl);
+    b.classList.toggle('biv-lacks', lacks2);
     if (b.dataset.baseTitle === undefined) b.dataset.baseTitle = b.title || '';
     b.title = lacks ? _levelLackText(ov, b.dataset.dl)
+      : lacks2 ? indLabel(ov2) + ' has no ' + (_LVL_BUTTON[b.dataset.dl] || b.dataset.dl) +
+        ' figures, so choosing this shows ' + indLabel(ov) + ' on its own.'
       : b.dataset.baseTitle + (isNat ? ' The box around this button shows that the indicator is published at this level.' : '');
   });
 }
@@ -17029,6 +17249,11 @@ function _refreshUI() {
 // Reset everything → default view.
 function _resetAll() {
   try {
+    // Stop any zoom or pan still running first. Removing the cluster layers
+    // (GP practices, pharmacies, charities) mid-animation left markercluster
+    // finishing a step on a layer with no map, which threw "Cannot read
+    // properties of null (reading 'getMinZoom')".
+    if (typeof map !== 'undefined' && map && map.stop) map.stop();
     // The search pin, which marks a place the user asked about. Reset means
     // "put the map back to how it started", and a pin left behind outlives the
     // search that explained it.
@@ -17096,7 +17321,7 @@ function _resetAll() {
     if (typeof applyBoroughLock === 'function') applyBoroughLock();
     if (typeof BOROUGH_GJ !== 'undefined' && BOROUGH_GJ.features && typeof boroughL !== 'undefined' && boroughL) {
       if (typeof _markHomeView === 'function') _markHomeView();
-      map.fitBounds(boroughL.getBounds(), { padding: [20, 20] });
+      map.fitBounds(boroughL.getBounds(), { padding: [20, 20], animate: false });
     }
   } finally {
     _refreshUI();
@@ -17356,9 +17581,32 @@ function _writeUrlState() {
     }
     const qs = p.toString();
     const url = location.pathname + (qs ? '?' + qs : '');
-    history.replaceState(null, '', url);
+    /* A new step in the browser's history when the reader opens another tool
+       or selects another area, so Back closes the tool or returns to the last
+       area rather than leaving the site. Map moves, and anything a link or
+       the tour does on its own, still replace the current entry. */
+    const step = tool + '|' + (p.get('w') || '') + '|' + (p.get('ls') || '');
+    let push = false;
+    try {
+      push = _urlLastStep !== null && step !== _urlLastStep && _urlLanded && !_urlApplying &&
+        performance.now() - _readerInputAt < 1500 &&
+        !(window.PH_TOUR && PH_TOUR.running()) &&
+        url !== location.pathname + location.search;
+    } catch (e) { push = false; }
+    _urlLastStep = step;
+    if (push) history.pushState(null, '', url);
+    else history.replaceState(null, '', url);
+    _urlLastSearch = location.search;
   } catch (e) { /* ignore */ }
 }
+let _urlLastStep = null, _urlLastSearch = (typeof location !== 'undefined') ? location.search : '';
+/* Back and Forward between those steps. The page is built to open from a
+   link, so the surest way to put a step back exactly as it was is to open
+   its address again, which runs _readUrlState on it. A change of #fragment
+   alone (the skip link) leaves the query string as it was and is ignored. */
+window.addEventListener('popstate', () => {
+  if (location.search !== _urlLastSearch) location.reload();
+});
 let _urlWriteTimer = null;
 function _scheduleUrlWrite() {
   clearTimeout(_urlWriteTimer);
@@ -20624,7 +20872,9 @@ var PH_SHOW = {
       // without the user having to find a borough's outline to click.
       var rec0 = wardRec(wn);
       var target = cmpLevel === 'ward' ? wn : cmpAreaOfLad((rec0 && rec0.lad) || '');
-      if (target && pinned.indexOf(target) === -1 && pinned.length < PIN_MAX) pinned.push(target);
+      if (target && pinned.indexOf(target) === -1) {
+        if (pinned.length < PIN_MAX) pinned.push(target); else cmpCapNote();
+      }
       refreshPins();
       if (pinned.length >= 2) openCompareBar(true);
       return;
@@ -20908,7 +21158,10 @@ var PH_SHOW = {
     e.stopPropagation();
     if (!currentWard) return;
     if (typeof generateWardReport === 'function') generateWardReport(currentWard, {
-      autoPrint: true, anchor: pdfBtn, noteAfter: headEl,
+      // No autoPrint: the button says it opens the report, as the LSOA and
+      // Custom area buttons of the same name do, and the report's own Print
+      // or save as PDF button does the printing.
+      anchor: pdfBtn, noteAfter: headEl,
       // The note sits under the header, so the sheet opens far enough to show it.
       onBlocked: function () { if (sheetState !== 0) { sheetState = 0; applyState(); } },
     });
@@ -20989,7 +21242,9 @@ var PH_SHOW = {
     // so two downloads either side of a monthly refresh neither overwrite each
     // other nor pass for the same figures.
     if (DATA_DATE) filename = filename.replace(/(\.[A-Za-z0-9]+)?$/, '-' + DATA_DATE + '$1');
-    if (/^text\/csv/.test(mime || '')) text = withSourceCol(text, keys);
+    // A CSV starts with a byte order mark, so Excel on Windows opens it as
+    // UTF-8: without one, NO\u2082 and \u00b5g/m\u00b3 in the headings came out garbled.
+    if (/^text\/csv/.test(mime || '')) text = '\uFEFF' + withSourceCol(text, keys);
     saveBlob(filename, new Blob([text], { type: mime || 'text/plain;charset=utf-8' }));
   }
   function saveBlob(filename, blob) {
@@ -21271,6 +21526,7 @@ var PH_SHOW = {
   var _cmpTickedLsoa = false;
   function setCmpLevel(lvl) {
     if (cmpLevel === lvl) return;
+    var hadPins = pinned.length, hadLvl = cmpLvl();
     cmpLevel = lvl;
     pinned = [];
     _cmpAgg = {};
@@ -21316,6 +21572,12 @@ var PH_SHOW = {
     drawPins();
     syncPinBtn();
     closeCompareBar();
+    // Say where the pins went, rather than leaving "Nothing is pinned yet".
+    if (hadPins && cmpPinsEl && !(typeof _urlBusy === 'function' && _urlBusy())) {
+      var nWord = { 2: 'two', 3: 'three', 4: 'four' }[hadPins] || String(hadPins);
+      phNote(cmpPinsEl, (hadPins === 1 ? 'Your ' + hadLvl.one + ' was' : 'Your ' + nWord + ' ' + hadLvl.many + ' were') +
+        ' cleared, because Compare works on one size of area at a time.', { ms: 8000 });
+    }
     if (window.PH_URL) window.PH_URL.write();
   }
 
@@ -21403,6 +21665,7 @@ var PH_SHOW = {
     var openBtn = $('cmp-open'), csvBtn = $('cmp-csv');
     if (openBtn) openBtn.disabled = pinned.length < 2;
     if (csvBtn) csvBtn.disabled = !pinned.length;
+    if ($('cmp-notes')) $('cmp-notes').disabled = !pinned.length;
   }
 
   /**
@@ -21794,6 +22057,7 @@ var PH_SHOW = {
       renderCompareBar(); openCompareBar();
     });
     $('cmp-csv').addEventListener('click', cmpCsv);
+    $('cmp-notes').addEventListener('click', cmpNotes);
     $('cmp-bar-csv').addEventListener('click', cmpCsv);
     $('cmp-bar-close').addEventListener('click', closeCompareBar);
     $('cmp-bar-see').addEventListener('click', function () { openCompareBar(false); });
@@ -21863,15 +22127,38 @@ var PH_SHOW = {
     else if (cmpLevel === 'ward') target = props.ward || '';
     else target = cmpAreaOfLad(props.borough || '');
     if (!target) return false;
-    if (pinned.indexOf(target) === -1 && pinned.length < PIN_MAX) pinned.push(target);
+    if (pinned.indexOf(target) === -1) {
+      if (pinned.length < PIN_MAX) pinned.push(target); else { cmpCapNote(); return true; }
+    }
     refreshPins();
     if (pinned.length >= 2) openCompareBar(true);
+    return true;
+  }
+
+  /* A map click at the cap is refused, and says so in the pane in the words
+     the sheet's Pin button uses, rather than outlining an area that is not
+     in the comparison. */
+  function cmpCapNote() {
+    if (!cmpPinsEl) return;
+    phNote(cmpPinsEl, 'You have pinned four ' + cmpLvl().many + ', which is as many as fit side by side.',
+      { ms: 8000 });
+  }
+  // For the ward layer's click: true when this click would be refused, so the
+  // map leaves its outline where it was.
+  function cmpRefuses(wn) {
+    if (!inCompareMode() || pinned.length < PIN_MAX) return false;
+    var rec0 = wardRec(wn);
+    var target = cmpLevel === 'ward' ? wn
+      : cmpLevel === 'lsoa' ? '' : cmpAreaOfLad((rec0 && rec0.lad) || '');
+    if (!target || pinned.indexOf(target) !== -1) return false;
+    cmpCapNote();
     return true;
   }
 
   window.PH_COMPARE = {
     active: inCompareMode,
     pinFromLsoa: pinFromLsoa,
+    refuses: cmpRefuses,
     pinned: function () { return pinned.slice(); },
     clear: function () { if (!pinned.length) return; pinned = []; refreshPins(); },
     // Read-only, for the same reason PH_DIR and PH_REPORT expose theirs: the
@@ -21963,8 +22250,10 @@ var PH_SHOW = {
     // wards and by what rule, which a spreadsheet away from this page has no
     // other way of recording.
     if (added) head.push('Wards counted', 'Method');
-    // The display label and its unit, as the "Add an indicator" menu shows them.
-    head = head.concat(mets.map(function (m) { return cmpLsoaDecile(m.k) ? cmpLabel(m.k) : headerOf(m.k); }));
+    // Headed as the Data export heads its columns: label, unit and period.
+    head = head.concat(mets.map(function (m) {
+      return cmpLsoaDecile(m.k) ? cmpLabel(m.k) : cbWith(cmpCbLevel(), function () { return cbHeader(m.k); });
+    }));
     var lines = [head.map(csvCell).join(',')];
     pinned.forEach(function (n) {
       var row = [cmpCode(n), cmpAreaLabel(n)];
@@ -21987,6 +22276,26 @@ var PH_SHOW = {
     });
     download('pophealth-' + lvl.one + '-comparison.csv', lines.join('\n'), 'text/csv;charset=utf-8',
              mets.map(function (m) { return m.k; }));
+  }
+  // The Data export's level for Compare's: ICBs are made from LAs.
+  function cmpCbLevel() { return cmpLevel === 'icb' ? 'borough' : cmpLevel; }
+  function cmpNotes() {
+    if (!pinned.length) return;
+    var lvl = cmpLvl();
+    var keys = cmpActive().map(function (m) { return m.k; }).filter(function (k) { return !cmpLsoaDecile(k); });
+    var added = (cmpLevel === 'borough' || cmpLevel === 'icb');
+    var names = pinned.map(cmpAreaLabel);
+    download('pophealth-' + lvl.one + '-comparison-notes.txt', toolNotes({
+      title: 'your comparison',
+      lead: 'A comparison of ' + (names.length === 1 ? names[0] : names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1]) +
+        ', ' + ({ 1: 'one', 2: 'two', 3: 'three', 4: 'four' }[names.length] || names.length) + ' ' +
+        (names.length === 1 ? lvl.one : lvl.many) + ' side by side.',
+      csvName: 'pophealth-' + lvl.one + '-comparison' + (DATA_DATE ? '-' + DATA_DATE : '') + '.csv',
+      what: 'The file has a row for each ' + lvl.one + ' and a column for each indicator chosen.' +
+        (added ? ' No one publishes most of these figures for a whole ' + lvl.one + ', so each is calculated from ' +
+          'its wards, summed for counts and weighted by population otherwise, and the file says from how many wards.' : ''),
+      keys: keys, level: cmpCbLevel(),
+    }), 'text/plain;charset=utf-8');
   }
 
   /* ─────────────────────────────────────────────────────────────────────────
@@ -22459,7 +22768,31 @@ var PH_SHOW = {
             if (msg) msg.textContent = 'We could not find the postcode ' + pc + ', so please check it.';
             return;
           }
-          dirOpenNear({ label: res.postcode || pc, lat: res.latitude, lng: res.longitude, from: 'postcode' });
+          // The same region check as the header search: a postcode on another
+          // map has nothing near it here, and listing places 240 km away as
+          // its nearest looks broken.
+          var label = res.postcode || pc;
+          if (!(window.PH_REGION && PH_REGION.id === 'england')) {
+            var other = _regionOfPostcode(res);
+            var inArea = other ? other.id === PH_REGION.id : (res.region === PH_AREA);
+            if (!inArea) {
+              if (msg) {
+                if (other && other.live) {
+                  msg.innerHTML = esc(label) + ' is in ' + esc(phRegionPhrase(other.name)) +
+                    ', which this map does not cover, so <a href="' + esc(regionHref(other.id)) +
+                    '">open the ' + esc(other.name) + ' map</a> to see the places near it.';
+                } else if (other) {
+                  msg.textContent = label + ' is in ' + phRegionPhrase(other.name) +
+                    ', which this map does not cover, and the ' + other.name + ' map is not available yet.';
+                } else {
+                  msg.textContent = label + ' is outside ' + phWhere() +
+                    ', which is all this map covers, so there are no places near it to list.';
+                }
+              }
+              return;
+            }
+          }
+          dirOpenNear({ label: label, lat: res.latitude, lng: res.longitude, from: 'postcode' });
         }, function () {
           if (msg) msg.textContent = 'The postcode lookup could not be reached, so please check your connection and try again.';
         });
@@ -22476,10 +22809,14 @@ var PH_SHOW = {
         phNote($('dir-csv'), 'Nothing matches your search, so there is nothing to download yet.', { ms: 6000 });
         return;
       }
+      // Sorted nearest first when listing near a place, so the distance goes
+      // in as a column too.
+      var nearCsv = !!dirState.near;
       var lines = [['name', 'type', 'address', 'postcode', 'LA', 'lat', 'lng']
-        .map(csvCell).join(',')];
+        .concat(nearCsv ? ['Distance (m)'] : []).map(csvCell).join(',')];
       dirFiltered.forEach(function (r) {
-        lines.push([r.n, r.label, r.a, r.pc, r.lad, r.lat, r.lng].map(csvCell).join(','));
+        lines.push([r.n, r.label, r.a, r.pc, r.lad, r.lat, r.lng]
+          .concat(nearCsv ? [Number.isFinite(r._d) ? Math.round(r._d) : ''] : []).map(csvCell).join(','));
       });
       download('pophealth-directory.csv', lines.join('\n'), 'text/csv;charset=utf-8');
     });
@@ -23598,6 +23935,7 @@ var PH_SHOW = {
     active: function () { return currentMode === 'report'; },
     toggle: rbToggle,
     selected: function () { return rbSelected.slice(); },
+    files: function () { return rbSelected.length ? rbCsvFiles() : []; },
     aggregate: rbAggregate,
     /* For the shared link. An area is the only thing on this page a user
        builds by hand rather than chooses, so it was also the only thing they
@@ -23653,40 +23991,55 @@ var PH_SHOW = {
     $('rb-report').addEventListener('click', rbReport);
     $('rb-notes').addEventListener('click', function () {
       if (!rbSelected.length) return;
-      download((rbAreaName().replace(/[^A-Za-z0-9 _-]+/g, '') || 'area') + '-notes.txt',
-               rbNotes(), 'text/plain;charset=utf-8');
+      download(rbFileBase() + '-notes.txt', rbNotes(), 'text/plain;charset=utf-8');
     });
   }
 
-  function rbCsv() {
-    // Disabled until an LSOA is added (see renderReportPane).
-    if (!rbSelected.length) return;
+  // The area's name as a file name: "Poplar & Bow" is "Poplar and Bow", with
+  // anything a file system might refuse taken out and no doubled spaces.
+  function rbFileBase() {
+    return rbAreaName().replace(/&/g, ' and ').replace(/[^A-Za-z0-9 _-]+/g, '')
+      .replace(/\s+/g, ' ').trim() || 'area';
+  }
+  // The indicators in the order the picker's themes give them, then by name.
+  function rbKeysInOrder(keys) {
+    return [].concat.apply([], cbGroups(keys).map(function (g) { return g.keys; }));
+  }
+  /* The Custom area download: a ZIP, as Data export makes, holding one table
+     of the area's figures (an indicator to a row, with its unit, period,
+     method and publisher), the LSOAs it is made of as a second table, and the
+     notes, which name the area and say how many LSOAs it has. One table to a
+     file, so Excel, Power BI and pandas each read it as it is. */
+  function rbCsvFiles() {
     var agg = rbAggregate();
-    var keys = Object.keys(agg.indicators).sort();
-    var lines = [];
-    lines.push(['Area', rbAreaName()].map(csvCell).join(','));
-    lines.push(['LSOAs', agg.lsoas].map(csvCell).join(','));
-    lines.push([]);
-    lines.push(['Indicator', 'Value', 'How it was combined'].map(csvCell).join(','));
+    var keys = rbKeysInOrder(Object.keys(agg.indicators));
+    var base = rbFileBase() + (DATA_DATE ? '-' + DATA_DATE : '');
+    var lines = [['Indicator', 'Value', 'Unit', 'Period', 'How it was combined', 'Source (publisher)']
+      .map(csvCell).join(',')];
     keys.forEach(function (k) {
-      lines.push([k === 'imd_decile_mean' ? rbLabel(k) : headerOf(k), indCsvValue(agg.indicators[k], k),
-                  RB_METHOD_WORDS[agg.method[k]] || '']
-                 .map(csvCell).join(','));
+      cbWith('lsoa', function () {
+        lines.push([k === 'imd_decile_mean' ? rbLabel(k) : labelOf(k), indCsvValue(agg.indicators[k], k),
+                    cbUnit(k), cbPeriod(k), RB_METHOD_WORDS[agg.method[k]] || '', cbSourceText(k)]
+                   .map(csvCell).join(','));
+      });
     });
-    if (keys.some(function (k) { return RB_DOMAINS.indexOf(k) !== -1; })) {
-      lines.push([]);
-      lines.push([RB_DOMAIN_NOTE].map(csvCell).join(','));
-    }
-    lines.push([]);
-    lines.push(['LSOA code', 'LSOA name', 'Ward', 'LA', 'Population'].map(csvCell).join(','));
+    var ls = [['LSOA code', 'LSOA name', 'Ward', 'LA', 'Population'].map(csvCell).join(',')];
     rbSelected.forEach(function (code) {
       var pr = rbProps(code);
       var i = rbRecord(code) || {};
-      lines.push([code, pr.name || '', pr.ward || '', pr.borough || '',
-                  num_(i.census_population) || ''].map(csvCell).join(','));
+      ls.push([code, pr.name || '', pr.ward || '', pr.borough || '',
+               num_(i.census_population) || ''].map(csvCell).join(','));
     });
-    download((rbAreaName().replace(/[^A-Za-z0-9 _-]+/g, '') || 'area') + '.csv',
-             lines.join('\n'), 'text/csv;charset=utf-8', keys);
+    return [
+      { name: base + '.csv', text: lines.join('\n') + '\n' },
+      { name: base + '-lsoas.csv', text: withSourceCol(ls.join('\n'), []) },
+      { name: base + '-notes.txt', text: rbNotes() },
+    ];
+  }
+  function rbCsv() {
+    // Disabled until an LSOA is added (see renderReportPane).
+    if (!rbSelected.length) return;
+    saveBlob(rbFileBase() + (DATA_DATE ? '-' + DATA_DATE : '') + '.zip', cbZip(rbCsvFiles()));
   }
 
   /* The Sources line for a custom area, from the keys it holds: the
@@ -23708,23 +24061,53 @@ var PH_SHOW = {
     });
     return reportCredits(cats).concat(extra);
   }
+  /* Notes for the CSV a tool writes (Compare, Query): what it holds, each
+     figure as the Data export notes describe it, and the licence lines.
+     o: { title, lead, csvName, what, keys, level }. */
+  function toolNotes(o) {
+    var L = [];
+    var para = function (t) { L.push(t, ''); };
+    var dataDate = DATA_DATE ? cbDate(DATA_DATE) : '';
+    L.push('PopHealth Map: notes for ' + o.title, '');
+    if (o.lead) para(o.lead);
+    para('These notes go with ' + o.csvName + ', made from PopHealth Map (https://pophealth.uk) on ' +
+      cbDate(new Date()) + (dataDate ? ' from the figures updated on ' + dataDate : '') + '.');
+    if (o.what) para(o.what + ' A blank cell means there is no figure, so please do not read it as zero.');
+    L.push('The figures');
+    o.keys.forEach(function (k, n) {
+      cbWith(o.level, function () {
+        L.push((n + 1) + '. ' + cbHeader(k));
+        L.push.apply(L, cbIndicatorLines(k));
+      });
+      L.push('');
+    });
+    L.push('Licences');
+    para(phCreditText(o.keys));
+    para('If something in the figures looks wrong, please tell us at contact@pophealth.uk.');
+    return L.join('\n');
+  }
   // Notes to go with the Custom area CSV: what the area is, how it was
   // combined, each figure as the Data export notes describe it, and the
   // licence lines the figures need.
   function rbNotes() {
     var agg = rbAggregate();
-    var keys = Object.keys(agg.indicators).sort();
+    var keys = rbKeysInOrder(Object.keys(agg.indicators));
     var L = [];
     var para = function (t) { L.push(t, ''); };
     var dataDate = DATA_DATE ? cbDate(DATA_DATE) : '';
+    var base = rbFileBase() + (DATA_DATE ? '-' + DATA_DATE : '');
     L.push('PopHealth Map: notes for your custom area', '');
-    para('These notes go with the CSV for ' + rbAreaName() + ', a custom area made from PopHealth Map ' +
-      '(https://pophealth.uk) on ' + cbDate(new Date()) + (dataDate ? ' from the figures updated on ' + dataDate : '') + '.');
+    para('Area: ' + rbAreaName() + '. LSOAs: ' + agg.lsoas + '.');
+    para('These notes go with ' + base + '.csv, which holds the figures for ' + rbAreaName() + ', one indicator ' +
+      'to a row, and ' + base + '-lsoas.csv, which lists the LSOAs the area is made of. It is a custom area made ' +
+      'from PopHealth Map (https://pophealth.uk) on ' + cbDate(new Date()) +
+      (dataDate ? ' from the figures updated on ' + dataDate : '') + '.');
     para('The area is made of ' + agg.lsoas + ' LSOA' + (agg.lsoas === 1 ? '' : 's') + ' chosen by hand. It is not an ' +
       'official geography and no one else publishes figures for it. ' + rbMethodSentence(agg));
+    if (keys.some(function (k) { return RB_DOMAINS.indexOf(k) !== -1; })) para(RB_DOMAIN_NOTE);
     L.push('The figures');
     keys.forEach(function (k, n) {
-      L.push((n + 1) + '. ' + headerOf(k));
+      L.push((n + 1) + '. ' + (k === 'imd_decile_mean' ? rbLabel(k) : headerOf(k)));
       L.push.apply(L, cbWith('lsoa', function () { return cbIndicatorLines(k); }));
       L.push('');
     });
@@ -23794,9 +24177,9 @@ var PH_SHOW = {
       ]) +
       '<div class="content">' +
       '<div class="section-h">Figures for this area</div>' +
-      '<table class="tbl"><tr><th>Indicator</th><th class="n">Value</th><th>How it was combined</th></tr>' + rows + '</table>' + domainNote +
+      '<table class="tbl"><thead><tr><th>Indicator</th><th class="n">Value</th><th>How it was combined</th></tr></thead><tbody>' + rows + '</tbody></table>' + domainNote +
       '<div class="section-h">LSOAs included</div>' +
-      '<table class="tbl"><tr><th>LSOA</th><th>Name</th><th>Ward</th><th>LA</th><th class="n">Population</th></tr>' + list + '</table>' +
+      '<table class="tbl"><thead><tr><th>LSOA</th><th>Name</th><th>Ward</th><th>LA</th><th class="n">Population</th></tr></thead><tbody>' + list + '</tbody></table>' +
       '</div>' +
       '<div class="footer"><div class="indep">PopHealth Map is an independent open-data project, not affiliated with the NHS. ' +
       'Figures are published statistics for planning and discussion; check the source before relying on one.</div>' +
@@ -23805,6 +24188,7 @@ var PH_SHOW = {
       'Figures are the same ones the map draws; see the <a href="' +
       esc(new URL('methodology.html', location.href).href) + '" target="_blank" rel="noopener">' +
       'methodology page</a> for where each comes from and what it cannot tell you.' +
+      '<div style="margin-top:6px">LSOAs are the small areas, of about 1,500 residents each, that official statistics are published for. Core20 means the most deprived fifth of areas in England, which the NHS gives priority to.</div>' +
       '<div style="margin-top:6px"><strong>Sources:</strong> ' +
       rbSources(Object.keys(agg.indicators)).map(esc).join(' &middot; ') + '.</div>' +
       reportProvenanceHtml(rbAreaName(), Object.keys(agg.indicators)) + '</div>' +
@@ -24128,26 +24512,29 @@ var PH_SHOW = {
       availBy[l].forEach(function (k) { if (avail.indexOf(k) === -1) avail.push(k); });
     });
     avail.sort();
-    // Drop any column none of the chosen sizes has, so the count cannot
-    // promise a column no file will contain, and say which ones went. Not
-    // while a size is still loading: its list is not known yet.
+    // A chosen indicator none of the chosen sizes has stays chosen, so one
+    // exploratory click on LA does not undo the reader's selection. It is
+    // marked in the list and left out of these files only, and the count
+    // below does not promise a column no file will contain. Not while a size
+    // is still loading: its list is not known yet.
     var dropped = [];
     if (!pendingLv.length) {
       Object.keys(cbCols).forEach(function (k) {
-        if (avail.indexOf(k) === -1) { dropped.push(k); delete cbCols[k]; }
+        if (avail.indexOf(k) === -1) dropped.push(k);
       });
     }
 
-    var chosen = Object.keys(cbCols).length;
-    $('cb-picked').firstElementChild.innerHTML = chosen
-      ? '<strong>' + chosen + '</strong> indicator' + (chosen === 1 ? '' : 's') + ' chosen'
+    var picked = Object.keys(cbCols).length;
+    var chosen = picked - dropped.length;
+    $('cb-picked').firstElementChild.innerHTML = picked
+      ? '<strong>' + picked + '</strong> indicator' + (picked === 1 ? '' : 's') + ' chosen'
       : 'No indicators chosen yet';
-    $('cb-clear').hidden = !chosen;
+    $('cb-clear').hidden = !picked;
 
     // The list, narrowed by the search.
     var q = cbFind.trim().toLowerCase();
     var terms = q ? ((typeof window.PH_SEARCH_TERMS === 'function') ? window.PH_SEARCH_TERMS(q) : [q]) : [];
-    var groups = cbGroups(avail).map(function (g) {
+    var groups = cbGroups(avail.concat(dropped)).map(function (g) {
       return { label: g.label, keys: g.keys.filter(function (k) { return cbMatches(k, g.label, terms); }) };
     }).filter(function (g) { return g.keys.length; });
     cbShown = {};
@@ -24162,7 +24549,9 @@ var PH_SHOW = {
         : act.getAttribute('data-grpall') ? ['data-grpall', act.getAttribute('data-grpall')]
         : act.getAttribute('data-grp') ? ['data-grp', act.getAttribute('data-grp')] : null;
     }
+    var lvPlural = cbList(lvs.map(function (l) { return CB_LEVELS[l].plural; }));
     var missingFor = function (k) {
+      if (dropped.indexOf(k) !== -1) return 'Not published for ' + lvPlural;
       if (!multi || pendingLv.length) return '';
       var miss = lvs.filter(function (l) { return availBy[l].indexOf(k) === -1; });
       return miss.length ? 'Not published for ' + cbList(miss.map(function (l) { return CB_LEVELS[l].plural; })) : '';
@@ -24213,10 +24602,13 @@ var PH_SHOW = {
     $('cb-note').innerHTML =
       (dropped.length
         ? '<span class="cb-dropped" id="cb-dropped">' +
-          esc(dropped.map(labelOf).join(', ')) +
-          (dropped.length > 1 ? ' are' : ' is') + ' not published for ' +
-          esc(cbList(lvs.map(function (l) { return CB_LEVELS[l].plural; }))) +
-          ', so ' + (dropped.length > 1 ? 'they have' : 'it has') + ' been removed.</span>'
+          (dropped.length === 1 ? 'One of your indicators is'
+            : esc(cbCap(cbNum(dropped.length))) + ' of your indicators are') +
+          ' not published for ' + esc(lvPlural) + ', so the ' +
+          esc(cbList(lvs.map(function (l) { return CB_LEVELS[l].label; }))) +
+          (multi ? ' files leave ' : ' file leaves ') + (dropped.length === 1 ? 'it' : 'them') +
+          ' out, and ' + (dropped.length === 1 ? 'it' : 'they') +
+          ' will be back in the file when you choose another size of area.</span> '
         : '') +
       'Each figure is the one the map shows for that area, and the files never add areas ' +
       'together, which is what Custom area is for. Each column heading says what the figure ' +
@@ -24569,8 +24961,6 @@ var PH_SHOW = {
       (out.cols === 1 ? 'one column for the indicator you chose' : 'a column for each of the ' + cbNum(out.cols) + ' indicators you chose') +
       '. Each figure is the one the map ' +
       'shows for that area, and the file never adds areas together, which is what Custom area is for. ' +
-      'A blank cell means there is no figure for that area, because the publisher withheld it to ' +
-      'protect privacy or did not publish one for that area, so please do not read it as zero.' +
       'A blank cell means there is no figure for that area. Most are withheld by the publisher to protect ' +
       'privacy, and the notes for each column say where a blank has another cause, so please do not read ' +
       'a blank as zero.' +
@@ -24710,7 +25100,10 @@ var PH_SHOW = {
     var time = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1);
     var date = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
     files.forEach(function (f) {
-      var name = enc.encode(f.name), data = enc.encode(f.text), crc = cbCrc32(data);
+      // Each CSV in the ZIP starts with a byte order mark, as a CSV on its
+      // own does (see download), so Excel reads it as UTF-8.
+      var name = enc.encode(f.name), data = enc.encode((/\.csv$/i.test(f.name) ? '\uFEFF' : '') + f.text),
+          crc = cbCrc32(data);
       var h = new DataView(new ArrayBuffer(30));
       h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(6, 0x0800, true);
       h.setUint16(8, 0, true); h.setUint16(10, time, true); h.setUint16(12, date, true);
@@ -25000,30 +25393,21 @@ var PH_SHOW = {
   var qLyr = null;
 
   var OPS = [
-    { v: 'lte', l: '≤ at most' },
-    { v: 'gte', l: '≥ at least' },
-    { v: 'eq',  l: '= equals' },
+    { v: 'lte', l: 'at most' },
+    { v: 'gte', l: 'at least' },
+    { v: 'eq',  l: 'equals' },
   ];
 
   // _rows is the last result set, kept so re-entering Query puts its highlight
   // back on the map rather than making you run the query again.
   var q = { services: [], scope: '', conds: [], sort: 'imd_score', dir: 'desc', _rows: null };
 
-  // The indicator menu. Grouped so 99 keys are navigable, and the
-  // borough-level Fingertips series is last and labelled, because filtering
-  // wards on it selects every ward in a borough at once.
-  var GROUP_ORDER = [
-    'Deprivation (IMD 2025)', 'Census 2021', 'Local Health (ward)', 'Crime',
-    'Other', 'Fingertips (LA level)',
-  ];
-  function groupOf(k) {
-    if (/^imd_/.test(k) || (/_score$/.test(k) && !/^crime_/.test(k))) return 'Deprivation (IMD 2025)';
-    if (/^census_/.test(k)) return 'Census 2021';
-    if (/^ft_\d+$/.test(k)) return 'Local Health (ward)';
-    if (/^ft_/.test(k)) return 'Fingertips (LA level)';
-    if (/^crime_/.test(k) || /^claimant_/.test(k)) return 'Crime';
-    return 'Other';
-  }
+  // The indicator menu, shared by Query and Compare. Grouped by the same
+  // themes as the indicator picker and Data export (cbGroups), so the
+  // claimant rate is under Work, money and education and PTAL under
+  // Transport in every tool, and the figures OHID publishes only for each LA
+  // have their own group, because filtering wards on one selects every ward
+  // in an LA at once.
   var _indKeys = null;
   function indicatorKeys() {
     if (_indKeys) return _indKeys;
@@ -25037,23 +25421,17 @@ var PH_SHOW = {
     return _indKeys;
   }
   function indicatorOptions(selected) {
-    var byGroup = {};
     var keys = indicatorKeys();
-    keys.forEach(function (k) {
+    var offered = keys.filter(function (k) {
       // The same measure published twice (an LA series beside the ward one,
       // or an older copy) is offered once, as the one IND_SAME_AS points to.
       var twin = (typeof indSameAs === 'function') ? indSameAs(k) : '';
-      if (twin && keys.indexOf(twin) !== -1 && k !== selected) return;
-      var g = groupOf(k);
-      (byGroup[g] = byGroup[g] || []).push(k);
+      return !(twin && keys.indexOf(twin) !== -1 && k !== selected);
     });
     var html = '';
-    GROUP_ORDER.forEach(function (g) {
-      var keys = byGroup[g];
-      if (!keys || !keys.length) return;
-      keys.sort(function (a, b) { return labelOf(a).localeCompare(labelOf(b)); });
-      html += '<optgroup label="' + esc(g) + '">';
-      keys.forEach(function (k) {
+    cbGroups(offered).forEach(function (grp) {
+      html += '<optgroup label="' + esc(grp.label) + '">';
+      grp.keys.forEach(function (k) {
         html += '<option value="' + esc(k) + '"' + (k === selected ? ' selected' : '') + '>' +
           esc(headerOf(k)) + '</option>';
       });
@@ -25159,6 +25537,9 @@ var PH_SHOW = {
 
     el.innerHTML = '<span class="q-rb-lbl">This query asks for</span>' +
       parts.join(' ') + (where ? ', ' + where : '') + '.' + tail;
+    // The same sentence as plain text, for the notes that go with the CSV.
+    q._readText = (parts.join(' ') + (where ? ', ' + where : ''))
+      .replace(/<[^>]+>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&amp;/g, '&');
   }
 
   function renderBuilder() {
@@ -25238,10 +25619,17 @@ var PH_SHOW = {
   qSortEl.addEventListener('change', function () { q.sort = qSortEl.value; });
   qSortDirEl.addEventListener('change', function () { q.dir = qSortDirEl.value; });
 
-  function passes(v, op, target) {
+  // Equals compares at the precision the map shows the figure, so typing
+  // 5.9 finds the ward shown as 5.9% although its stored figure is 5.92.
+  function passes(v, op, target, k) {
     if (v == null || target == null) return false;
     if (op === 'lte') return v <= target;
     if (op === 'gte') return v >= target;
+    var dp = (typeof indDecimals === 'function' && k) ? indDecimals(k) : null;
+    if (dp != null) {
+      var f = Math.pow(10, dp);
+      return Math.round(v * f) === Math.round(target * f);
+    }
     return Math.abs(v - target) < 1e-9;
   }
 
@@ -25266,7 +25654,7 @@ var PH_SHOW = {
         for (var c = 0; c < live.length; c++) {
           var v = num(w.inds[live[c].key]);
           if (v == null) { skipped++; return; }
-          if (!passes(v, live[c].op, live[c].value)) return;
+          if (!passes(v, live[c].op, live[c].value, live[c].key)) return;
         }
 
         q.services.forEach(function (id, si) { svcTotals[id] += (maps[si][w.name] || 0); });
@@ -25306,6 +25694,7 @@ var PH_SHOW = {
       : '<span class="q-empty" id="q-csv-why">No ward meets every condition, so try loosening one of them.</span>';
     var csvBtn = $('q-csv');
     if (csvBtn) csvBtn.disabled = !rows.length;
+    if ($('q-notes')) $('q-notes').disabled = !rows.length;
 
     var sortLbl = headerOf(q.sort);
     var html = rows.slice(0, 200).map(function (r, i) {
@@ -25343,6 +25732,7 @@ var PH_SHOW = {
     qResEl.innerHTML = html;
     drawMatches(rows);
     q._rows = rows;
+    q._ranText = q._readText || '';
   }
 
   function drawMatches(rows) {
@@ -25419,6 +25809,7 @@ var PH_SHOW = {
     qBarEl.innerHTML = '<span class="q-empty" id="q-csv-why">Run the query to see the wards that match.</span>';
     qResEl.innerHTML = '';
     $('q-csv').disabled = true;
+    $('q-notes').disabled = true;
     drawMatches([]);
   });
   $('q-csv').addEventListener('click', function () {
@@ -25429,10 +25820,12 @@ var PH_SHOW = {
                           .map(function (c) { return c.key; });
     // The E05 code first: ward names repeat across boroughs, so the code is
     // the only column another dataset can be joined on.
+    // Headed as the Data export heads its columns: label, unit and period.
+    var hdr = function (k) { return cbWith('ward', function () { return cbHeader(k); }); };
     var header = ['Ward code', 'Ward name', 'LA']
       .concat(q.services.map(function (id) { return serviceById(id).label; }))
-      .concat([headerOf(q.sort)])
-      .concat(condKeys.map(headerOf));
+      .concat([hdr(q.sort)])
+      .concat(condKeys.map(hdr));
     var lines = [header.map(csvCell).join(',')];
     rows.forEach(function (r) {
       var inds = indsOf(r.name);
@@ -25442,6 +25835,24 @@ var PH_SHOW = {
         .map(csvCell).join(','));
     });
     download('pophealth-query.csv', lines.join('\n'), 'text/csv;charset=utf-8', [q.sort].concat(condKeys));
+  });
+  // The notes for the query's CSV, which start with the query itself, so the
+  // file can be cited and run again.
+  $('q-notes').addEventListener('click', function () {
+    var rows = q._rows;
+    if (!rows || !rows.length) return;
+    var keys = [q.sort].concat(q.conds.filter(function (c) { return c.key && c.value != null; })
+      .map(function (c) { return c.key; })).filter(function (k, i, a) { return k && a.indexOf(k) === i; });
+    var dataDate = DATA_DATE ? cbDate(DATA_DATE) : '';
+    download('pophealth-query-notes.txt', toolNotes({
+      title: 'your query',
+      lead: (q._ranText || 'Wards') + (dataDate ? ', using figures updated on ' + dataDate : '') + '.',
+      csvName: 'pophealth-query' + (DATA_DATE ? '-' + DATA_DATE : '') + '.csv',
+      what: 'The file has a row for each of the ' + rows.length + ' ward' + (rows.length === 1 ? '' : 's') +
+        ' that ' + (rows.length === 1 ? 'meets' : 'meet') + ' every condition, sorted as the list on the map was, ' +
+        'and a column for the sort indicator and each condition.',
+      keys: keys, level: 'ward',
+    }), 'text/plain;charset=utf-8');
   });
 
   // The example from the brief: services plus a borough plus two indicator

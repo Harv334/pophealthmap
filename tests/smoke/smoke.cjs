@@ -3738,6 +3738,222 @@ const smallText = page => page.evaluate(() => {
     await meth.page.close();
   }
 
+  // Review round 2, polish (P35 to P50): tools, sharing, reports and downloads.
+  {
+    const fsx = require('fs');
+    const { isMobile, hasTouch, ...viewport } = DESK;
+    const page = await browser.newPage({ viewport });
+    const errors = [];
+    page.on('pageerror', e => errors.push(e.message));
+    await page.route('https://api.postcodes.io/**', r => r.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({ status: 200, result: { postcode: 'M1 1AE', latitude: 53.4774, longitude: -2.2309,
+        region: 'North West', admin_ward: 'Piccadilly', admin_district: 'Manchester', codes: {} } }) }));
+    await page.goto(BASE + '/index.html?t=1');
+    await page.waitForTimeout(SETTLE);
+    ok(await page.evaluate(() => !document.querySelector('meta[property="og:url"]') && !!document.querySelector('link[rel="canonical"]')),
+      'sharing: no og:url, so a shared link previews and opens as the address shared (P42)');
+
+    // P36: a postcode on another region's map.
+    await page.click('.mode-btn[data-mode="directory"]');
+    await page.waitForFunction(() => document.querySelectorAll('#dir-types [data-dtype]').length > 3, null, { timeout: 30000 }).catch(() => {});
+    await page.fill('#dir-q', 'M1 1AE');
+    await page.waitForTimeout(700);
+    await page.click('#dir-near-go');
+    await page.waitForTimeout(800);
+    const dn = await page.evaluate(() => ({ msg: (document.getElementById('dir-offer-msg') || {}).textContent,
+      link: (document.querySelector('#dir-offer-msg a') || {}).href || '', near: !!PH_DIR.near() }));
+    ok(dn.msg === 'M1 1AE is in the North West, which this map does not cover, so open the North West map to see the places near it.' &&
+       /r=north-west/.test(dn.link) && !dn.near, 'directory: a postcode on another map links there rather than listing places 240 km away (P36)', JSON.stringify(dn));
+
+    // P37: choosing LAs keeps the indicators already chosen.
+    await page.click('.mode-btn[data-mode="csv"]');
+    await page.waitForTimeout(800);
+    const ex = await page.evaluate(async () => {
+      PH_CSV.setLevel('ward');
+      ['census_bad_health_pct', 'crime_rate_per_1000', 'imd_score_ward', 'census_over65_pct', 'claimant_rate_pct', 'ft_93283', 'ft_smoking_prevalence_adults']
+        .forEach(k => PH_CSV.pick(k));
+      const before = PH_CSV.columns().length;
+      PH_CSV.setLevel('borough');
+      for (let i = 0; i < 40 && /Loading/i.test(document.getElementById('cb-count').textContent); i++) await new Promise(r => setTimeout(r, 250));
+      const at = { n: PH_CSV.columns().length, note: (document.getElementById('cb-dropped') || {}).textContent || '',
+        marks: document.querySelectorAll('#cb-cols .cb-only').length, cols: PH_CSV.build().header.length };
+      PH_CSV.setLevel('ward');
+      return { before, at, after: PH_CSV.columns().length };
+    });
+    ok(ex.before === 7 && ex.at.n === 7 && ex.after === 7 && ex.at.marks > 0 &&
+       /^\w+ of your indicators are not published for LAs, so the LA file leaves them out, and they will be back in the file when you choose another size of area\.$/.test(ex.at.note),
+      'export: choosing LAs marks the indicators it lacks and keeps them chosen for the other sizes (P37)', JSON.stringify(ex));
+
+    // P39, P41: Query's groups, its operators, and equals at the shown precision.
+    await page.click('.mode-btn[data-mode="query"]');
+    await page.waitForTimeout(600);
+    await page.click('#q-add-cond');
+    await page.waitForTimeout(300);
+    const qg = await page.evaluate(() => {
+      const s = document.querySelector('.q-f-ind'), g = {};
+      s.querySelectorAll('optgroup').forEach(o => { g[o.label] = [...o.querySelectorAll('option')].map(x => x.value); });
+      const where = k => Object.keys(g).find(l => g[l].includes(k)) || '';
+      return { groups: Object.keys(g), claimant: where('claimant_rate_pct'), ptal: where('ptal_score'),
+        ops: [...document.querySelector('.q-f[data-op]').options].map(o => o.textContent).join('|') };
+    });
+    ok(qg.claimant === 'Work, money and education' && qg.ptal === 'Transport' && qg.groups.indexOf('Health figures for each LA') !== -1 &&
+       !qg.groups.some(g => /^(Crime|Local Health \(ward\)|Other)$/.test(g)) && qg.ops === 'at most|at least|equals',
+      'query: indicators grouped by the picker\'s themes, with plain operator names (P39, P41)', JSON.stringify(qg));
+    const shown = await page.evaluate(() => {
+      const w = Object.values(WARD_DATA).find(w => w.name === 'Stonebridge');
+      const v = Math.round(w.indicators.census_bad_health_pct * 10) / 10;
+      PH_QUERY.apply({ services: [], scope: '', conds: [['census_bad_health_pct', 'eq', String(v)]] });
+      return v;
+    });
+    await page.click('#q-run');
+    await page.waitForTimeout(1500);
+    const qr = await page.evaluate(() => [...document.querySelectorAll('.q-row')].map(b => b.getAttribute('data-ward')));
+    ok(qr.includes('Stonebridge'), 'query: "equals ' + shown + '" finds Stonebridge, shown as ' + shown + '% (P41)', qr.slice(0, 8).join(', '));
+    // P45: a byte order mark, headings with their period, and notes that start with the query.
+    const [qd] = await Promise.all([page.waitForEvent('download', { timeout: 8000 }).catch(() => null), page.click('#q-csv')]);
+    const qb = qd ? fsx.readFileSync(await qd.path()) : Buffer.from('');
+    const [qn] = await Promise.all([page.waitForEvent('download', { timeout: 8000 }).catch(() => null), page.click('#q-notes')]);
+    const qt = qn ? fsx.readFileSync(await qn.path(), 'utf8') : '';
+    ok(qb[0] === 0xEF && qb[1] === 0xBB && qb[2] === 0xBF && /"Bad or very bad health \(%, 2021\)"/.test(qb.toString('utf8').split('\n')[0]) &&
+       /^PopHealth Map: notes for your query\n\nWards anywhere in London, where bad or very bad health is exactly [\d.]+%, using figures updated on /.test(qt),
+      'query: the CSV starts with a byte order mark, heads its columns with their period, and its notes start with the query (P45)',
+      qb.toString('utf8').split('\n')[0] + ' / ' + qt.slice(0, 160));
+
+    // P40: Compare at its cap, and a level change that clears the pins.
+    await page.click('.mode-btn[data-mode="compare"]');
+    await page.waitForTimeout(800);
+    await page.evaluate(() => ['Lansbury', 'Stonebridge', 'Holloway', 'Bishopsgate']
+      .forEach(n => wLyr.getLayers().find(l => l.feature.properties.WD24NM === n).fire('click')));
+    await page.waitForTimeout(500);
+    const selBefore = await page.evaluate(() => selW);
+    await page.evaluate(() => wLyr.getLayers().find(l => l.feature.properties.WD24NM === 'Barnes').fire('click'));
+    await page.waitForTimeout(400);
+    const cap = await page.evaluate(() => ({ pins: PH_COMPARE.pinned(), sel: selW,
+      note: (document.querySelector('#tab-compare .ph-note') || {}).textContent || '' }));
+    ok(cap.pins.length === 4 && cap.pins.indexOf('Barnes') === -1 && cap.sel === selBefore &&
+       /You have pinned four wards, which is as many as fit side by side\./.test(cap.note),
+      'compare: a fifth ward is refused with the reason, and the outline stays where it was (P40)', JSON.stringify(cap));
+    const [cc] = await Promise.all([page.waitForEvent('download', { timeout: 8000 }).catch(() => null), page.click('#cmp-csv')]);
+    const ch = cc ? fsx.readFileSync(await cc.path(), 'utf8') : '';
+    ok(ch.charCodeAt(0) === 0xFEFF && /\(%, 2021\)/.test(ch.split('\n')[0]), 'compare: the CSV has a byte order mark and periods in its headings (P45)', ch.split('\n')[0]);
+    await page.evaluate(() => document.querySelector('#cmp-levels [data-cmplvl="borough"]').click());
+    await page.waitForTimeout(500);
+    const cl = await page.evaluate(() => ({ pins: PH_COMPARE.pinned().length,
+      note: [...document.querySelectorAll('#tab-compare .ph-note')].map(n => n.textContent).join(' / ') }));
+    ok(cl.pins === 0 && /Your four wards were cleared, because Compare works on one size of area at a time\./.test(cl.note),
+      'compare: switching size says where the pins went (P40)', JSON.stringify(cl));
+
+    // P45: the Custom area download is a ZIP of one-table files.
+    await page.click('.mode-btn[data-mode="report"]');
+    await page.waitForTimeout(1200);
+    const rf = await page.evaluate(async () => {
+      await ensureLsoaData();
+      const codes = LSOA_IMD.features.filter(f => f.properties.ward === 'Lansbury').map(f => f.properties.code);
+      PH_REPORT.apply({ name: 'Poplar & Bow  test', codes });
+      await new Promise(r => setTimeout(r, 1500));
+      return PH_REPORT.files().map(x => ({ name: x.name, head: x.text.split('\n')[0] }));
+    });
+    const [zd] = await Promise.all([page.waitForEvent('download', { timeout: 8000 }).catch(() => null), page.click('#rb-csv')]);
+    ok(rf.length === 3 && rf[0].head === 'Indicator,Value,Unit,Period,How it was combined,Source (publisher)' &&
+       /-lsoas\.csv$/.test(rf[1].name) && /-notes\.txt$/.test(rf[2].name) && !!zd && /^Poplar and Bow test-[\d-]+\.zip$/.test(zd.suggestedFilename()),
+      'custom area: a ZIP of the figures, the LSOAs and the notes, named without the ampersand (P45)', JSON.stringify(rf) + ' ' + (zd && zd.suggestedFilename()));
+
+    // P38: the two-indicator map across a level change.
+    await page.click('.mode-btn[data-mode="explore"]');
+    await page.waitForTimeout(400);
+    await page.evaluate(() => { const o = document.getElementById('ov'); o.value = 'census_bad_health_pct'; o.dispatchEvent(new Event('change')); });
+    await page.waitForTimeout(1200);
+    await page.click('#dl-seg button[data-dl="ward"]');
+    await page.waitForTimeout(1200);
+    await page.evaluate(() => window._bivSet('crime_rate_per_1000'));
+    await page.waitForTimeout(500);
+    const b1 = await page.evaluate(() => document.querySelector('#dl-seg button[data-dl="lsoa"]').classList.contains('biv-lacks'));
+    await page.click('#dl-seg button[data-dl="lsoa"]');
+    await page.waitForTimeout(1500);
+    const b2 = await page.evaluate(() => ({ ov2: curOv2, hint: (document.getElementById('dl-hint') || {}).textContent || '' }));
+    await page.click('#dl-seg button[data-dl="ward"]');
+    await page.waitForTimeout(1500);
+    const b3 = await page.evaluate(() => curOv2);
+    ok(b1 && b2.ov2 === 'none' && b3 === 'crime_rate_per_1000' &&
+       b2.hint === 'Crime rate per 1,000 residents has no LSOA figures, so the map is showing Bad or very bad health on its own, and the comparison will come back when you choose Ward again.',
+      'two indicators: a level the second lacks is greyed, leaving it says why, and coming back restores it (P38)', JSON.stringify([b1, b2, b3]));
+
+    // P43: opening a tool is a step Back can undo.
+    const h0 = await page.evaluate(() => history.length);
+    await page.click('.mode-btn[data-mode="compare"]');
+    await page.waitForTimeout(800);
+    const h1 = await page.evaluate(() => ({ n: history.length, s: location.search }));
+    await page.goBack();
+    await page.waitForTimeout(SETTLE);
+    const hb = await page.evaluate(() => ({ s: location.search, tool: document.querySelector('.mode-rail .mode-btn[aria-selected="true"]').dataset.mode }));
+    ok(h1.n === h0 + 1 && /mode=compare/.test(h1.s) && hb.tool === 'explore' && !/mode=compare/.test(hb.s),
+      'history: Back after opening Compare returns to the map, not the page before the site (P43)', JSON.stringify([h0, h1, hb]));
+
+    // P48: Ctrl+P with the Area profile open prints the profile.
+    await page.evaluate(() => { const l = wLyr.getLayers().find(l => l.feature.properties.WD24NM === 'Lansbury'); l.fire('click'); });
+    await page.waitForTimeout(800);
+    await page.click('#ws-profile');
+    await page.waitForTimeout(600);
+    await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
+    await page.emulateMedia({ media: 'print' });
+    const pr = await page.evaluate(() => ({ map: getComputedStyle(document.getElementById('map-wrap')).display,
+      hdr: getComputedStyle(document.querySelector('.hdr')).display, w: Math.round(document.getElementById('wpanel').getBoundingClientRect().width),
+      open: [...document.querySelectorAll('#wpanel .cat-body')].every(b => getComputedStyle(b).display === 'block') }));
+    const ppdf = await page.pdf({ format: 'A4' });
+    const ppages = (ppdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) || []).length;
+    await page.emulateMedia({ media: 'screen' });
+    await page.evaluate(() => window.dispatchEvent(new Event('afterprint')));
+    ok(pr.map === 'none' && pr.hdr === 'none' && pr.w > 600 && pr.open && ppages >= 2,
+      'print: the Area profile prints full width with every section open (P48)', JSON.stringify(pr) + ', ' + ppages + ' pages');
+
+    // P47: the sheet's Open printable report opens it without printing.
+    const [rep] = await Promise.all([page.waitForEvent('popup', { timeout: 20000 }).catch(() => null), page.click('#ws-pdf')]);
+    if (rep) {
+      await rep.evaluate(() => { window.print = () => { window.__printed = (window.__printed || 0) + 1; }; }).catch(() => {});
+      await rep.waitForTimeout(2500);
+      ok((await rep.evaluate(() => window.__printed || 0)) === 0, 'report: the ward sheet\'s Open printable report does not print by itself (P47)');
+      await rep.close();
+    } else ok(false, 'report: the ward sheet\'s Open printable report opens (P47)');
+
+    // P46, P49, P50: the reports' wording, and charts that explain themselves.
+    const R = await page.evaluate(async () => {
+      await Promise.all([ensureAllLayerData(), ensureLsoaImd(), ensureLsoaData(), ensureWardDetail(), ensureGreenspaceData()]);
+      const ward = wn => { let h = ''; _generateWardReport({ sink: x => { h = x; } }, wn); return h; };
+      return { Lansbury: ward('Lansbury'), lsoa: _buildLSOAReportHtml('E01004243') };
+    });
+    ok(/LSOAs are the small areas, of about 1,500 residents each, that official statistics are published for\. Core20 means the most deprived fifth of areas in England, which the NHS gives priority to\./.test(R.Lansbury) &&
+       /LSOAs are the small areas/.test(R.lsoa) && /kpi-lbl">Disabled residents \(all\)</.test(R.Lansbury) &&
+       /Parks and green spaces <span class="count">(\d+|[\d,]+ sites)</.test(R.Lansbury),
+      'report: the footer explains LSOA and Core20, the tile matches the chart, and the parks count says what it counts (P49, P50)');
+    const rp = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+    await rp.goto(BASE + '/robots.txt');
+    await rp.setContent(R.Lansbury);
+    await rp.waitForTimeout(800);
+    const [sd] = await Promise.all([rp.waitForEvent('download', { timeout: 8000 }).catch(() => null),
+      rp.evaluate(() => [...document.querySelectorAll('.panel')].find(x => /Compared with/.test(x.textContent)).querySelector('.chart-dl').click())]);
+    const sv = sd ? fsx.readFileSync(await sd.path(), 'utf8') : '';
+    ok(/>Lansbury: compared with the London ward median,/.test(sv) && />Census 2021</.test(sv) && /better than the median,/.test(sv) &&
+       /Source: ONS Census 2021\. PopHealth Map, pophealth\.uk/.test(sv),
+      'report: a downloaded chart carries its title, area, key and source (P46)', sv.slice(0, 200));
+    await rp.close();
+
+    // P35: Reset after layers, a focus, a network and a selection.
+    await page.click('.mode-btn[data-mode="explore"]').catch(() => {});
+    await page.evaluate(() => { const b = document.getElementById('borough-focus'); b.value = 'Hackney'; b.dispatchEvent(new Event('change')); });
+    await page.waitForTimeout(800);
+    await page.evaluate(() => ['tg', 'tph', 'vcse-tab-toggle'].forEach(id => { const e = document.getElementById(id);
+      if (e && !e.checked) { e.checked = true; e.dispatchEvent(new Event('change')); } }));
+    await page.waitForTimeout(1500);
+    await page.evaluate(() => { const s = document.getElementById('pcn-focus'); if (s && s.options.length > 1) { s.value = s.options[1].value; s.dispatchEvent(new Event('change')); } });
+    await page.waitForTimeout(500);
+    await page.evaluate(() => { const l = wLyr.getLayers().find(l => l.feature.properties.WD24NM === 'Dalston'); if (l) l.fire('click'); });
+    await page.waitForTimeout(150);
+    await page.click('#tb-reset');
+    await page.waitForTimeout(2500);
+    ok(!errors.length, 'no page errors (review round 2 polish checks, including Reset after layers, a focus and a selection, P35)', errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
   console.log(failed ? '\n' + failed + ' check(s) failed' : '\nAll checks passed');
   process.exit(failed ? 1 : 0);
