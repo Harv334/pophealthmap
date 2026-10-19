@@ -91,12 +91,13 @@ region.</p>
   health or circumstances.</p>
 </div>
 
-<p>The <strong>Ask about this data</strong> panel answers questions about the figures
-on the map. When you send a question:</p>
+<p>The <strong>Ask about this data</strong> panel, which is available on the London
+map for now, answers questions about the figures on the map. When you send a
+question:</p>
 
 <ul>
-  <li>Your question passes through a small server that this site runs on Cloudflare
-    to <strong>Anthropic</strong>, and Anthropic's Claude model writes the reply.</li>
+  <li>Your question goes to a small server that this site runs on Cloudflare, which
+    passes it to <strong>Anthropic</strong>, whose Claude model writes the reply.</li>
   <li>To write it, the model asks your browser for the figures it needs. Your browser
     looks them up in the map's own data, which it has already downloaded from this
     site, and the figures it finds pass back the same way, through this site's server
@@ -105,12 +106,18 @@ on the map. When you send a question:</p>
     that the model can follow the conversation, and closing or reloading the page
     clears it.</li>
   <li>You can ask 10 questions a day, and replying when the model asks you to narrow
-    a question down does not use one up. To keep to that limit, the server on
-    Cloudflare records your IP address with a count of the questions and requests
-    sent from it today, and it deletes that record automatically after 48 hours.</li>
+    a question down does not use one up. A work network shared by many people also
+    has a daily ceiling of its own, so it may run out sooner. To keep to these
+    limits, the panel stores a random number in your browser that identifies
+    nothing else and sends it with each question, and the server on Cloudflare
+    records it and your IP address with a count of the questions and requests sent
+    today. It deletes those records automatically after 48 hours.</li>
   <li>If you never send a question, nothing is sent to that server or to Anthropic,
     and opening the panel on its own sends nothing.</li>
 </ul>
+
+<p>The Ask panel is on the London map for now. On other regions and the England
+map it is not shown, and nothing is sent.</p>
 
 <p>You can read more in
 <a href="https://www.anthropic.com/legal/privacy">Anthropic's privacy policy</a> and
@@ -205,8 +212,9 @@ hospitals come from published NHS registers. The
 <h2 id="rights">Your personal data and your rights</h2>
 
 <p>Harvey Seville is responsible for the personal data this site handles. The only
-personal data the site keeps itself is your IP address with a count of the Ask
-questions sent from it, which is deleted after 48 hours. We keep it because we have
+personal data the site keeps itself is your IP address and the Ask panel's random
+browser number, with a count of the Ask questions sent from them, which is
+deleted after 48 hours. We keep it because we have
 a legitimate interest in sharing the Ask panel fairly and keeping its cost within
 what the project can carry.</p>
 
@@ -219,6 +227,18 @@ keeps them only for a limited time, mainly to check for misuse.</p>
 <p>You can ask for a copy of any personal data we hold about you, ask us to correct
 or delete it, or object to how we use it, by emailing
 <a href="mailto:contact@pophealth.uk">contact@pophealth.uk</a>.</p>
+
+<h2 id="terms">Using this site</h2>
+
+<p>PopHealth Map is provided free and as it is. The figures are published
+statistics about areas, brought together for planning, research and discussion.
+They are not medical advice and say nothing about any individual. We take care to
+reproduce each source faithfully, but we cannot promise that every figure is
+complete or current, and we are not responsible for decisions made using them.
+You may reuse the figures under the licences and with the credits listed on the
+<a href="methodology.html#licences">methodology page</a>, and the code under the
+MIT licence. Please use the Ask panel only for questions about the data, and do
+not try to get around its daily limit.</p>
 
 <h2>Questions and requests</h2>
 
@@ -238,7 +258,8 @@ with assistive technology.</p>
     <p>PopHealth Map lets you explore health, deprivation and local services across
     every neighbourhood in England, free and with no sign-in. You can get in touch at
     <a href="mailto:contact@pophealth.uk">contact@pophealth.uk</a>.</p>
-    <p>An independent project, not affiliated with the NHS.</p>
+    <p>An independent project, not affiliated with the NHS.
+    <a href="#terms">Terms of use</a>.</p>
   </div>
 </footer>
 

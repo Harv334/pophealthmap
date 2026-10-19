@@ -139,7 +139,8 @@ browser runs them against the JSON already loaded on the page, so every figure i
 an answer is the same number the map is drawing. What does leave the browser is
 the question, the earlier turns of that conversation and the figures the tools
 return: they go to the Worker and on to Anthropic. The Worker also keeps a count
-of questions per IP address for the daily limit, deleted after 48 hours. The
+of questions per IP address and per browser id for the daily limits, deleted
+after 48 hours. The
 details users see are in `privacy.html`.
 
 It is on for pophealth.uk: `data/map/assistant.js` sets `ASSISTANT_ENDPOINT` to the

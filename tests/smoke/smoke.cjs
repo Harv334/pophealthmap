@@ -3738,6 +3738,128 @@ const smallText = page => page.evaluate(() => {
     await meth.page.close();
   }
 
+  // Polish round (P62 to P76): search, speed, safety, licences, Ask, regions.
+  {
+    // P68: names from the data are escaped in the LSOA card, its tooltip and
+    // the ward report; a CSV cell cannot open with a formula; an= is capped.
+    const { page, errors } = await open(browser, 'index.html?t=1', DESK);
+    const sec = await page.evaluate(async () => {
+      await ensureLsoaImd();
+      const f = LSOA_IMD.features.find(x => x.properties.ward === 'Lansbury') || LSOA_IMD.features[0];
+      const saved = { name: f.properties.name, ward: f.properties.ward };
+      f.properties.name = 'LSOA <b>bold</b>'; f.properties.ward = 'Ward <b>bold</b>';
+      showLSOA(f);
+      await new Promise(r => setTimeout(r, 500));
+      const panel = document.querySelectorAll('#lsoa-panel b, .lsoa-panel b').length;
+      const panelHtml = document.body.innerHTML.indexOf('<b>bold</b>') !== -1;
+      Object.assign(f.properties, saved);
+      const w = Object.values(WARD_DATA).find(x => x.name === 'Lansbury');
+      const wSaved = w.name; let html = '';
+      w.name = 'Lansbury<b>bold</b>';
+      try { _generateWardReport({ sink: h => { html = h; } }, 'Lansbury', {}); } catch (e) { html = 'error ' + e.message; }
+      w.name = wSaved;
+      const d = new DOMParser().parseFromString(html, 'text/html');
+      const repBold = [...d.querySelectorAll('.minimap-cap b, b')].some(b => b.textContent === 'bold');
+      return { panel, panelHtml, repBold, safe: [_safeAreaName('=HYPERLINK("x")'), _safeAreaName('x'.repeat(200)).length, _safeAreaName('-1.5 area')] };
+    });
+    ok(!sec.panelHtml && !sec.repBold && sec.safe[0] === 'HYPERLINK("x")' && sec.safe[1] === 80 && sec.safe[2] === '1.5 area',
+      'polish: a name with markup stays text in the LSOA card and the ward report, and an= is capped and loses a leading =', JSON.stringify(sec));
+    // P62: London keeps its own address; P64: one font file per family and subset.
+    const head = await page.evaluate(() => ({ canon: document.querySelector('link[rel="canonical"]').href, title: document.title }));
+    ok(head.canon === 'https://pophealth.uk/' && /^PopHealth Map - /.test(head.title), 'polish: London keeps its canonical and title', JSON.stringify(head));
+    const fontsCss = fs.readFileSync(path.join(ROOT, 'vendor/fonts.css'), 'utf8');
+    ok((fontsCss.match(/@font-face/g) || []).length === 6 && /font-weight: 400 700;/.test(fontsCss) &&
+       fs.readdirSync(path.join(ROOT, 'vendor/fonts')).length === 6,
+      'polish: one font file per family and subset, each face a weight range');
+    // P72: each figure Ask's tools return carries its label, unit and period.
+    const tool = await page.evaluate(() => {
+      const ga = PH_ASSISTANT.runTool('get_area', { name: 'Lansbury', level: 'ward', indicators: ['census_population', 'ft_obesity_adults'] });
+      const all = PH_ASSISTANT.runTool('get_area', { name: 'Notting Dale', level: 'ward' });
+      const rk = PH_ASSISTANT.runTool('rank_areas', { indicator: 'census_over65_pct', direction: 'highest', n: 3, level: 'ward' });
+      return { keys: Object.keys(ga.indicators || {}), pop: ga.indicators && ga.indicators.census_population,
+        size: JSON.stringify(all).length, period: rk.period };
+    });
+    ok(tool.keys.join() === 'census_population,ft_obesity_adults' && tool.pop && typeof tool.pop.v === 'number' &&
+       tool.pop.label && tool.pop.unit === 'people' && tool.pop.period === '2021' && tool.size < 15000 && tool.period === '2021',
+      'polish: Ask figures carry a label, unit and period, limited to the indicators asked for', JSON.stringify(tool));
+    // P73: no example asks for something the tools cannot count.
+    await page.click('#ai-toggle').catch(() => {});
+    await page.waitForTimeout(500);
+    const chips = await page.evaluate(() => [...document.querySelectorAll('.ai-examples button, .ai-examples .ai-ex')].map(b => b.textContent.trim()));
+    ok(!chips.some(c => /GP practices/.test(c)) && chips.some(c => /lowest life expectancy for men/.test(c)),
+      'polish: the Ask examples are all answerable', chips.join(' | '));
+    // P76: ONS's back to front LA names are shown the everyday way.
+    const la = await page.evaluate(() => [phLaName('Kingston upon Hull, City of'), phLaName('Bristol, City of'),
+      phLaName('Herefordshire, County of'), phLaName('City of London'), ladPhrase(phLaName('Bristol, City of'))]);
+    ok(la.join('|') === 'Hull|Bristol|Herefordshire|City of London|Bristol', 'polish: Hull, Bristol and Herefordshire by their everyday names', la.join('|'));
+    ok(!errors.length, 'no page errors (polish round)', errors.join(' | '));
+    await page.close();
+
+    // P66: on a phone the output area level loads only the LAs in view.
+    if (HAS_OA) {
+      const { page: ph, errors: phErr } = await open(browser, 'index.html?t=1', PHONE);
+      const k = await ph.evaluate(() => OA_INDEX && OA_INDEX.keys.find(k => document.querySelector('#ov option[value="' + k + '"]')));
+      if (k) {
+        await setOv(ph, k);
+        await ph.evaluate(() => map.setView([51.494, -0.094], 14));
+        await ph.waitForTimeout(800);
+        await ph.evaluate(() => _setDataLevel('oa'));
+        await ph.waitForTimeout(4000);
+        const oa = await ph.evaluate(() => ({ loaded: PH_OA.loadedCount(), all: Object.keys(OA_INDEX.lads).length, level: _activeLevel() }));
+        ok(oa.level === 'oa' && oa.loaded > 0 && oa.loaded < oa.all, 'polish: on a phone the output area level loads only the LAs in view', JSON.stringify(oa));
+      }
+      ok(!phErr.length, 'no page errors (phone output areas)', phErr.join(' | '));
+      await ph.close();
+    }
+
+    // P70 and P71: the terms, and Ask named as London only.
+    const pv = await open(browser, 'privacy.html', DESK);
+    const pt = await pv.page.evaluate(() => document.body.innerText);
+    ok(/not medical advice/.test(pt) && /provided free and as it is/.test(pt) && /available on the London\s+map for now/.test(pt) &&
+       /On other regions and the England\s+map it is not shown, and nothing is sent\./.test(pt) &&
+       /which\s+passes it to Anthropic/.test(pt) && /10 questions a day/.test(pt) && /narrow\s+a question down does not use one up/.test(pt),
+      'polish: the privacy page has the terms and says Ask is on the London map for now');
+    await pv.page.close();
+    const ac = await open(browser, 'accessibility.html', DESK);
+    ok(/on the London map for now/.test(await ac.page.evaluate(() => document.body.innerText)), 'polish: the accessibility statement says Ask is London only');
+    await ac.page.close();
+
+    // P62 and P75: a region page names its own address, and asks for no file
+    // its manifest does not list.
+    if (HAS_NE) {
+      const packDir = path.join(ROOT, 'data/regions/north-east');
+      const list = [];
+      (function walk(d, rel) {
+        for (const n of fs.readdirSync(d)) {
+          const f = path.join(d, n), r = rel ? rel + '/' + n : n;
+          if (fs.statSync(f).isDirectory()) walk(f, r); else list.push(r);
+        }
+      })(packDir, '');
+      const { isMobile, hasTouch, ...viewport } = DESK;
+      const p = await browser.newPage({ viewport });
+      const missing = [], perr = [];
+      p.on('pageerror', e => perr.push(e.message));
+      p.on('response', r => { if (r.status() === 404 && /data\/regions\//.test(r.url())) missing.push(r.url().replace(BASE, '')); });
+      await p.route(/data\/regions\/north-east\/meta\/manifest\.json/, async r => {
+        const res = await r.fetch();
+        const m = await res.json();
+        m.files = list;
+        await r.fulfill({ response: res, json: m });
+      });
+      await p.goto(BASE + '/index.html?r=north-east&t=1');
+      await p.waitForTimeout(SETTLE);
+      const ne = await p.evaluate(() => ({ canon: document.querySelector('link[rel="canonical"]').href,
+        og: document.querySelector('meta[property="og:url"]').content, title: document.title,
+        wards: Object.keys(WARD_DATA).length }));
+      ok(ne.canon === 'https://pophealth.uk/?r=north-east' && ne.og === ne.canon &&
+         /^PopHealth Map: health and deprivation by ward in the North East/.test(ne.title) && ne.wards > 300,
+        'polish: a region page has its own canonical, og:url and title', JSON.stringify(ne));
+      ok(!missing.length, 'polish: a region page asks for no file its manifest does not list', missing.join(' | '));
+      ok(!perr.length, 'no page errors (region with a file list)', perr.join(' | '));
+      await p.close();
+    }
+  }
+
   await browser.close();
   console.log(failed ? '\n' + failed + ' check(s) failed' : '\nAll checks passed');
   process.exit(failed ? 1 : 0);

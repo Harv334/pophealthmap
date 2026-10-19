@@ -162,13 +162,19 @@ bill outright.
 or one IPv6 /64, using Cloudflare's Workers Rate Limiting (`ASK_BURST`), which
 costs no storage writes. It stops a script firing requests in parallel.
 
-**2. The daily cap per address.** `DAILY_CAP` in `src/index.js`, **10**
-questions per UTC day, and the panel promises that number in its opening
-message, so the two have to move together. A second counter bounds round trips
-(60 a day), so a forged continuation cannot slip past it. Counted in a Durable
-Object (`ASK_COUNTER`) **before** the model is called, so parallel requests
-cannot all pass on one count, and handed back if the call fails. Being per
-address, everyone behind one NAT (an NHS trust, a school) shares one allowance.
+**2. The daily cap per browser, and a ceiling per network.** `DAILY_CAP` in
+`src/index.js`, **10** questions per UTC day per browser, and the panel promises
+that number in its opening message, so the two have to move together. The
+browser is a random id the panel keeps in localStorage and sends as `client`;
+a request without one (a page cached from before) shares one allowance of ten
+per address. `NETWORK_CAP`, **100** questions a day, is the ceiling for one
+address or IPv6 /64 however many ids it uses, so everyone behind one NAT (an
+NHS trust, a council) is no longer limited to ten between them, and a caller
+inventing ids gets no more than 100. Second counters bound round trips (60 per
+browser, 600 per network), so a forged continuation cannot slip past them.
+Counted in a Durable Object (`ASK_COUNTER`) **before** the model is called, so
+parallel requests cannot all pass on one count, and handed back if the call
+fails.
 
 **3. A daily ceiling for the whole site.** `SITE_DAILY_QUESTIONS` (500) and
 `SITE_DAILY_REQUESTS` (2,000) in `wrangler.toml`. When either is reached, Ask

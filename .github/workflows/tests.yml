@@ -39,6 +39,10 @@ jobs:
       # What stops a region pack being published (scripts/check_region_pack.py).
       - name: Check the region pack checks
         run: python3 tests/pipeline/test_region_pack.py
+      # The deploy's own steps: the sitemap and dateModified, a pack's file
+      # list, the LSOA and MSOA figures in columns, and the font faces.
+      - name: Check the site build steps
+        run: python3 tests/pipeline/test_site_build.py
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
