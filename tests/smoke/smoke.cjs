@@ -827,7 +827,7 @@ const smallText = page => page.evaluate(() => {
       ok(r2.lang === 'en-GB' && r2.pcodes.length === 0 && r2.counts.length === 1 && r2.dashes === 0,
         'the report declares en-GB, has no "P95", gives one ward count and no dashes', JSON.stringify(r2));
       ok(r2.png, 'every report chart offers SVG and PNG');
-      ok(r2.careFill.toUpperCase() === '#9AA6B2', 'the report draws unpaid care as descriptive, in the neutral colour', r2.careFill);
+      ok(r2.careFill.toUpperCase() === '#7A8794', 'the report draws unpaid care as descriptive, in the neutral colour', r2.careFill);
       ok(/^mailto:contact@pophealth\.uk\?subject=Problem with a figure in the report for Lansbury ward&body=/.test(r2.mail) &&
          /Link to the map view: http/.test(r2.mail) && /please describe it here/.test(r2.mail) && / \| contact@pophealth\.uk$/.test(r2.mail),
         'the report footer says how to report a problem with a figure, by a pre-filled email', r2.mail);
@@ -3655,7 +3655,10 @@ const smallText = page => page.evaluate(() => {
     ok(/last reviewed on 19 October 2026/.test(a) && !/Every control can be reached/.test(a) && !/the toolbar/i.test(a) &&
        /the pages around it: the Methodology page, the About and privacy page and this statement/.test(a),
       'accessibility: no false keyboard claims, and the review date is current');
-    ok(['2.1.1', '2.4.7', '4.1.2', '4.1.3'].every(c => a.includes(c)), 'accessibility: the remaining known failures are listed');
+    // P31 to P34 fixed the focus ring, the on and off states, the status
+    // messages and the report's contrast, so only the rest are listed.
+    ok(['2.1.1', '1.3.1'].every(c => a.includes(c)) && !['2.4.7', '4.1.2', '4.1.3', '1.4.3', '1.4.11'].some(c => a.includes(c)),
+      'accessibility: the remaining known failures are listed, and the fixed ones are not');
     ok(/Your personal data and your rights/.test(pr) && /Harvey Seville is responsible/.test(pr) && /legitimate interest/.test(pr) &&
        /United States/.test(pr) && /background map does this whenever the map is open/.test(pr) && !/optional parts/.test(pr) &&
        /ph-ldr-swept/.test(pr) && !/devBannerDismissed/.test(pr) && /last updated on 19 October 2026/.test(pr),
@@ -4107,6 +4110,233 @@ const smallText = page => page.evaluate(() => {
     await page.waitForTimeout(2500);
     ok(!errors.length, 'no page errors (review round 2 polish checks, including Reset after layers, a focus and a selection, P35)', errors.join(' | '));
     await page.close();
+  }
+
+  // Review round 2, polish (P14 to P34): first visit, phones and accessibility.
+  {
+    const page = await browser.newPage({ viewport: DESK });
+    const errors = [];
+    page.on('pageerror', e => errors.push(e.message));
+    // postcodes.io is answered locally, with the LSOA the postcode is in
+    // taken from the boundaries once they have loaded (see below).
+    const PCL = { code: '', name: '' };
+    await page.route('https://api.postcodes.io/**', r => r.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({ status: 200, result: { postcode: 'E1 6AN', latitude: 51.520014, longitude: -0.072097,
+        admin_ward: 'Spitalfields & Banglatown', admin_district: 'Tower Hamlets', region: 'London', lsoa: PCL.name,
+        codes: { admin_ward: 'E05009333', lsoa: PCL.code } } }) }));
+    await page.goto(BASE + '/index.html?t=1');
+    await page.waitForTimeout(SETTLE);
+    // P14: the key indicators lead with a health figure anyone can read.
+    const keys = await page.evaluate(() => [...document.querySelectorAll('#ov-chips [data-ov]')].map(b => b.getAttribute('data-ov')));
+    ok(keys.join() === 'imd_decile,census_bad_health_pct,fuel_poverty_pct,no2_ugm3',
+      'polish: the key indicators are the decile, bad health, fuel poverty and NO2, not a negative score', keys.join());
+    // P34: the indicator card follows its button.
+    ok(await page.evaluate(() => document.getElementById('ov-cur-btns').nextElementSibling.id === 'ov-info-panel'),
+      'polish: the indicator card sits straight after About this indicator in the page order');
+    // P18: the level hint goes when the next indicator is chosen.
+    await setOv(page, 'no2_ugm3');
+    await page.waitForFunction(() => document.getElementById('dl-hint').classList.contains('show') && /Nitrogen/.test(document.getElementById('dl-hint').textContent), null, { timeout: 30000 }).catch(() => {});
+    await setOv(page, 'pm25_ugm3');
+    await page.waitForTimeout(1500);
+    const hint = await page.evaluate(() => { const h = document.getElementById('dl-hint'); return h.classList.contains('show') ? h.textContent : ''; });
+    ok(!/Nitrogen/.test(hint), 'polish: the Area level hint never names the indicator before', hint);
+    // P32: the level on show is pressed.
+    const pr = await page.evaluate(() => ({ g: document.getElementById('dl-seg').getAttribute('role'),
+      p: [...document.querySelectorAll('#dl-seg button')].map(b => (b.classList.contains('active') ? 'on' : 'off') + ':' + b.getAttribute('aria-pressed')) }));
+    ok(pr.g === 'group' && pr.p.every(x => x === 'on:true' || x === 'off:false') && pr.p.filter(x => x === 'on:true').length === 1,
+      'polish: the level buttons say which is pressed', JSON.stringify(pr));
+    // P15 and P31: a postcode search names the reader's own LSOA and is announced.
+    await setOv(page, 'imd_decile');
+    await page.waitForFunction(() => lsoaLyr && map.hasLayer(lsoaLyr) && Object.keys(LSOA_DATA).length > 1000, null, { timeout: 40000 }).catch(() => {});
+    const lsoa = await page.evaluate(() => {
+      const f = LSOA_IMD.features.find(f => f.properties.ward === 'Spitalfields & Banglatown' && LSOA_DATA[f.properties.code] && lsoaOvValue(f.properties.code, 'imd_decile') != null);
+      return f ? { code: f.properties.code, name: f.properties.name || f.properties.code, dec: String(lsoaOvValue(f.properties.code, 'imd_decile')) } : null;
+    });
+    if (lsoa) { PCL.code = lsoa.code; PCL.name = lsoa.name; }
+    await page.fill('#hdr-search-input', 'E1 6AN');
+    await page.waitForTimeout(1200);
+    const said = await page.evaluate(() => document.getElementById('hdr-search-status').textContent);
+    ok(said === 'Postcode E1 6AN, Spitalfields & Banglatown, Tower Hamlets. Press Enter to go there.', 'polish: the postcode found is announced', said);
+    await page.click('#sr-pc-row');
+    await page.waitForTimeout(1500);
+    const fig = await page.evaluate(() => document.getElementById('ws-fig').innerText);
+    ok(!!lsoa && fig === 'Your neighbourhood, ' + lsoa.name + ', is in decile ' + lsoa.dec + ' for Deprivation decile (IMD 2025).',
+      'polish: after a postcode search the ward sheet gives the figure for the reader\'s own LSOA', fig + ' ' + JSON.stringify(lsoa));
+    await page.evaluate(() => showWard('Lansbury'));
+    await page.waitForTimeout(600);
+    const fig2 = await page.evaluate(() => document.getElementById('ws-fig').innerText);
+    ok(fig2 === 'Deprivation decile (IMD 2025) is published for LSOAs, so hover over the map to see each one.',
+      'polish: without a postcode the ward sheet points to the map rather than saying "No figure"', fig2);
+    // P16: the full profile is a wide reading view, and the button closes it.
+    await page.click('#ws-profile');
+    // The panel widens over a short transition; read it once it has settled.
+    await page.waitForFunction(() => document.getElementById('sidebar').getBoundingClientRect().width >= 600, null, { timeout: 5000 }).catch(() => {});
+    await page.waitForTimeout(1000);
+    const wide = await page.evaluate(() => ({ w: document.getElementById('sidebar').getBoundingClientRect().width, b: document.getElementById('ws-profile').textContent,
+      fs: getComputedStyle(document.querySelector('#wpanel .sr')).fontSize }));
+    // The whole region framed first: an area cut off at the map's bottom
+    // edge keeps its whole box, which axe counts as a neighbour of the footer
+    // links below, and that depends on where the map is panned rather than
+    // on the profile.
+    await page.evaluate(() => map.fitBounds(wLyr.getBounds(), { padding: [40, 40], animate: false }));
+    await page.waitForTimeout(800);
+    await checkAxe(page, 'the full profile, wide');
+    await page.click('#ws-profile');
+    await page.waitForTimeout(800);
+    const back = await page.evaluate(() => ({ w: document.getElementById('sidebar').getBoundingClientRect().width, b: document.getElementById('ws-profile').textContent,
+      tab: document.querySelector('.sb-tab.active').dataset.tab }));
+    ok(wide.w >= 600 && wide.b === 'Close full profile' && wide.fs === '13px' && back.w < 400 && back.b === 'Open full profile' && back.tab !== 'ward',
+      'polish: the full profile opens wide in 13px text and its button closes it again', JSON.stringify([wide, back]));
+    // P17: the Area level help is a card under its button, not a bar.
+    await page.click('.dl-help');
+    await page.waitForTimeout(300);
+    const pop = await page.evaluate(() => { const p = document.querySelector('.help-pop'), b = document.querySelector('.dl-help').getBoundingClientRect();
+      if (!p) return null; const r = p.getBoundingClientRect(); return { w: Math.round(r.width), right: Math.round(r.right), btn: Math.round(b.right), top: r.top >= b.bottom, fs: getComputedStyle(p).fontSize }; });
+    ok(!!pop && pop.w <= 360 && Math.abs(pop.right - pop.btn) <= 2 && pop.top && pop.fs === '13px',
+      'polish: the Area level help opens under its button at a readable width', JSON.stringify(pop));
+    await page.keyboard.press('Escape');
+    // P29: group headings in sentence case, no repeated tag on each row.
+    await page.fill('#hdr-search-input', 'Brent');
+    await page.waitForTimeout(800);
+    const sr = await page.evaluate(() => ({ g: [...document.querySelectorAll('#hdr-search-results .sr-grp')].map(e => e.textContent),
+      tags: [...document.querySelectorAll('#hdr-search-results .sr-row .sr-type')].filter(e => e.getBoundingClientRect().width > 2).length }));
+    ok(sr.g.some(t => /^Wards \(\d+\)$/.test(t)) && sr.g.every(t => /^[A-Z][a-z]/.test(t) || /^(LAs|LSOAs|ICBs|GP practices) \(/.test(t)) && sr.tags === 0,
+      'polish: search groups are headed in sentence case and the rows do not repeat the tag', JSON.stringify(sr));
+    await page.fill('#hdr-search-input', '');
+    await page.keyboard.press('Escape');
+    // P34: the search box gets the 2px ring.
+    await page.focus('#hdr-search-input');
+    const ring = await page.evaluate(() => { const c = getComputedStyle(document.getElementById('hdr-search-input')); return c.outlineStyle + ' ' + c.outlineWidth; });
+    ok(/^solid 2px$/.test(ring), 'polish: the header search box shows the same focus ring as other controls', ring);
+    // P31: the indicator search says how many match.
+    await page.click('#sbtab-overlay');
+    await page.fill('#ov-search', 'health');
+    await page.waitForTimeout(500);
+    const ovs = await page.evaluate(() => { const e = document.getElementById('ov-results-status'); return { role: e.getAttribute('role'), t: e.textContent }; });
+    ok(ovs.role === 'status' && /^\d+( or more)? indicators? match(es)?$/.test(ovs.t), 'polish: the indicator search announces its count', JSON.stringify(ovs));
+    await page.fill('#ov-search', '');
+    ok(await page.evaluate(() => document.getElementById('q-resultbar').getAttribute('role') === 'status' && document.getElementById('dir-count').getAttribute('role') === 'status'),
+      'polish: the Query and Directory counts are status messages');
+    // P34: the Layers headings take focus and say whether they are open.
+    await page.click('#sbtab-layers');
+    await page.waitForTimeout(300);
+    const lh = await page.evaluate(() => [...document.querySelectorAll('#tab-layers .sb-lbl[role="button"]')].map(l => l.textContent.trim() + ':' + l.tabIndex + ':' + l.getAttribute('aria-expanded')));
+    await page.focus('#tab-layers .sb-lbl[role="button"]');
+    await page.keyboard.press('Enter');
+    const lh2 = await page.evaluate(() => { const l = document.querySelector('#tab-layers .sb-lbl[role="button"]'); return l.getAttribute('aria-expanded') + ':' + l.parentElement.classList.contains('collapsed'); });
+    await page.keyboard.press('Enter');
+    ok(lh.includes('Places and services:0:true') && lh.includes('Boundaries:0:true') && lh2 === 'false:true',
+      'polish: the Layers headings open and close from the keyboard and say which they are', JSON.stringify([lh, lh2]));
+    await checkAxe(page, 'Layers headings as buttons');
+    // P31: a second indicator is announced.
+    await page.evaluate(() => window._bivSet('census_bad_health_pct'));
+    await page.waitForTimeout(400);
+    const live = await page.evaluate(() => document.getElementById('sr-live').textContent);
+    ok(/compared with Bad or very bad health\.$/.test(live), 'polish: adding a second indicator is announced', live);
+    await page.evaluate(() => window._bivSet('none'));
+    // P32: the Compare and Query chips say whether they are on.
+    await page.click('.mode-btn[data-mode="compare"]');
+    await page.waitForTimeout(800);
+    const cmpP = await page.evaluate(() => [...document.querySelectorAll('#cmp-metrics [data-metric]')].every(c => c.getAttribute('aria-pressed') === String(c.classList.contains('on'))));
+    await page.click('.mode-btn[data-mode="query"]');
+    await page.waitForTimeout(800);
+    const svcP = await page.evaluate(() => [...document.querySelectorAll('#q-services [data-svc]')].length > 0 &&
+      [...document.querySelectorAll('#q-services [data-svc]')].every(c => c.getAttribute('aria-pressed') === String(c.classList.contains('on'))));
+    ok(cmpP && svcP, 'polish: the Compare indicator chips and the Query service chips carry aria-pressed', JSON.stringify([cmpP, svcP]));
+    await page.click('.mode-btn[data-mode="explore"]');
+    await page.waitForTimeout(500);
+    // P33: the ward report is a landmark, its charts have text, and better
+    // and worse differ in lightness.
+    const [rep] = await Promise.all([page.waitForEvent('popup', { timeout: 20000 }).catch(() => null),
+      page.evaluate(() => { showWard('Lansbury'); setTimeout(() => document.getElementById('ws-pdf').click(), 600); })]);
+    if (rep) {
+      await rep.waitForFunction(() => !!document.querySelector('.report'), null, { timeout: 30000 }).catch(() => {});
+      await rep.waitForTimeout(800);
+      const r = await rep.evaluate(() => ({ main: !!document.querySelector('main.report'),
+        bare: [...document.querySelectorAll('svg.ch-stack, svg.ch-compare, svg.ch-hbar')].filter(s => !s.getAttribute('aria-label')).length,
+        n: document.querySelectorAll('svg.ch-stack, svg.ch-compare').length }));
+      ok(r.main && r.n >= 3 && r.bare === 0, 'polish: the ward report has a main landmark and its charts have text alternatives', JSON.stringify(r));
+      await checkAxe(rep, 'the ward report');
+      await rep.close();
+    } else ok(false, 'polish: the ward report opens');
+    const luma = await page.evaluate(() => [REPORT_CMP.better, REPORT_CMP.worse, REPORT_CMP.neutral].map(h => {
+      const n = parseInt(h.slice(1), 16); return Math.round(0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)); }));
+    ok(Math.abs(luma[0] - luma[1]) >= 80 && Math.abs(luma[2] - luma[0]) >= 40 && Math.abs(luma[2] - luma[1]) >= 40,
+      'polish: the report\'s better, worse and neutral colours part in greyscale', luma.join(','));
+    ok(!errors.length, 'no page errors (polish, desktop)', errors.join(' | '));
+    await page.close();
+  }
+  {
+    // Phones: the tour, the Viewing strip, Custom area and the tap targets.
+    const { page, errors } = await open(browser, 'index.html?tour=1', PHONE);
+    const tour = await page.evaluate(async () => {
+      const o = [];
+      for (let i = 0; i < PH_TOUR.length; i++) {
+        await new Promise(r => setTimeout(r, 450));
+        const n = document.getElementById('tour-narr'), b = document.querySelector('.basemap-ctl');
+        o.push({ fs: getComputedStyle(n).fontSize, fits: n.scrollHeight <= n.clientHeight + 2,
+          h: document.getElementById('tour-strip').getBoundingClientRect().height / innerHeight, sat: !!(b && b.offsetParent) });
+        if (i < PH_TOUR.length - 1) document.getElementById('tour-next').click();
+      }
+      PH_TOUR.end();
+      return o;
+    });
+    ok(tour.every(c => c.fs === '15px' && c.fits && c.h <= 0.61 && !c.sat),
+      'polish: on a phone the tour reads at 15px, every chapter fits without scrolling, and the Satellite button waits', JSON.stringify(tour));
+    const attrs = await page.evaluate(() => { const i = document.getElementById('hdr-search-input');
+      return ['enterkeyhint', 'autocorrect', 'autocapitalize', 'spellcheck'].map(a => i.getAttribute(a)).join(); });
+    ok(attrs === 'search,off,off,false', 'polish: the search box asks for a Search key and no autocorrect', attrs);
+    await setOv(page, 'imd_decile');
+    await page.waitForTimeout(2500);
+    const vs = await page.evaluate(() => { const v = document.getElementById('viewing-strip'), x = document.getElementById('vs-ov-x');
+      const chip = v.querySelector('.chip.overlay');
+      return { h: Math.round(v.getBoundingClientRect().height), t: document.getElementById('vs-digest').textContent,
+        x: !x.hidden && x.getBoundingClientRect().width > 0 && x.getAttribute('aria-label'), chip: !!(chip && chip.getClientRects().length) }; });
+    ok(vs.h <= 40 && vs.t === 'All of London, coloured by Deprivation decile (IMD 2025)' && vs.x === 'Remove this indicator' && !vs.chip,
+      'polish: on a phone the Viewing strip is one line with its own remove button, and the amber chip goes', JSON.stringify(vs));
+    await page.tap('#vs-ov-x');
+    await page.waitForTimeout(800);
+    ok(await page.evaluate(() => curOv === 'none'), 'polish: the strip\'s remove button clears the indicator');
+    const hits = await hitSizes(page, '.mode-btn');
+    ok(hits.length >= 5 && hits.every(h => h.h >= 44), 'polish: the tool tabs are 44px tall on a phone', JSON.stringify(hits));
+    // P27: Custom area keeps count on the map.
+    await page.evaluate(() => PH_MODES.activate('report'));
+    await page.waitForTimeout(1500);
+    await page.evaluate(async () => {
+      for (let i = 0; i < 60 && !(typeof LSOA_IMD !== 'undefined' && LSOA_IMD && LSOA_IMD.features); i++) await new Promise(r => setTimeout(r, 250));
+      const codes = LSOA_IMD.features.filter(f => f.properties.ward === 'Lansbury').map(f => f.properties.code).slice(0, 2);
+      if (window.PH_DRAWER && PH_DRAWER.isOpen()) PH_DRAWER.close();
+      codes.forEach(c => PH_REPORT.toggle(c));
+    });
+    await page.waitForTimeout(600);
+    const rb = await page.evaluate(() => { const p = document.getElementById('rb-peek');
+      return { on: !!p && !p.hidden && p.getBoundingClientRect().height > 0, t: p ? p.innerText.replace(/\s+/g, ' ').trim() : '', vs: document.getElementById('vs-digest').textContent }; });
+    ok(rb.on && /^Your area has 2 LSOAs so far\. Open it to see the combined figures\. Open your area$/.test(rb.t) && rb.vs === 'Custom area: 2 LSOAs',
+      'polish: on a phone Custom area counts its LSOAs on the map, with a button back to the figures', JSON.stringify(rb));
+    await checkAxe(page, 'phone Custom area with its count');
+    await page.tap('#rb-peek .rb-peek-open');
+    await page.waitForTimeout(600);
+    ok(await page.evaluate(() => PH_DRAWER.isOpen()), 'polish: Open your area opens the drawer');
+    ok(!errors.length, 'no page errors (polish, phone)', errors.join(' | '));
+    await page.close();
+  }
+  {
+    // P19: the England screen and the 404 page offer a choice of region.
+    const { page } = await open(browser, 'index.html?r=england', PHONE);
+    const eng = await page.evaluate(() => ({ t: document.title, body: document.body.innerText,
+      links: [...document.querySelectorAll('a')].map(a => a.textContent + '=' + a.getAttribute('href')) }));
+    ok(eng.t === 'PopHealth Map: England' && /^PopHealth Map/.test(eng.body.trim()) && /Or open one region/.test(eng.body) &&
+       /no charity listings or Ask panel/.test(eng.body) && eng.links.some(l => /^North East=.*\?r=north-east$/.test(l)) && eng.links.length >= 9,
+      'polish: the England screen names the site and links to every region', JSON.stringify(eng).slice(0, 400));
+    await page.close();
+    const p4 = await browser.newPage({ viewport: DESK });
+    await routeSite(p4);
+    await p4.goto(BASE + '/404.html');
+    await p4.waitForTimeout(800);
+    const nf = await p4.evaluate(() => ({ btn: document.querySelector('main a.btn').textContent,
+      regs: [...document.querySelectorAll('main a')].map(a => a.getAttribute('href')).filter(h => /\?r=/.test(h)).length }));
+    ok(nf.btn === 'Open the map' && nf.regs === 9, 'polish: the 404 page opens the map or any region', JSON.stringify(nf));
+    await p4.close();
   }
 
   await browser.close();
