@@ -3817,7 +3817,7 @@ const smallText = page => page.evaluate(() => {
     const pt = await pv.page.evaluate(() => document.body.innerText);
     ok(/not medical advice/.test(pt) && /provided free and as it is/.test(pt) && /available on the London\s+map for now/.test(pt) &&
        /On other regions and the England\s+map it is not shown, and nothing is sent\./.test(pt) &&
-       /which\s+passes it to Anthropic/.test(pt) && /10 questions a day/.test(pt) && /narrow\s+a question down does not use one up/.test(pt),
+       /server passes it to Anthropic's Claude model/.test(pt.replace(/\s+/g, ' ')) && /10 questions a day/.test(pt) && /narrow\s+a question down does not use one up/.test(pt),
       'polish: the privacy page has the terms and says Ask is on the London map for now');
     await pv.page.close();
     const ac = await open(browser, 'accessibility.html', DESK);
