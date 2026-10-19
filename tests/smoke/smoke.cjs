@@ -1510,7 +1510,94 @@ const smallText = page => page.evaluate(() => {
       'the two-indicator key is named for both indicators and not described by the hidden scale', JSON.stringify(bivName));
     await page.click('#sbtab-overlay');
     await checkAxe(page, 'two indicators');
+    // The key in words (review P1): corners from each indicator's own words,
+    // low, middle and high on each axis, a swatch for a missing figure, the
+    // caution about cause, and thirds that never split or push up a tie.
+    const bk = await page.evaluate(() => {
+      const leg = document.getElementById('biv-legend');
+      const gw = leg.querySelector('.biv-gw');
+      const vals = [5, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 6].sort((a, b) => a - b);
+      const t = bivThirds(vals);
+      const cls = v => v < t[0] ? 0 : v < t[1] ? 1 : 2;
+      const allTied = bivThirds([1, 1, 1, 1, 1, 1, 2, 3, 4]);
+      const code = Object.keys(LSOA_DATA).find(c => bivFill('lsoa', c) !== BIV_MISSING);
+      return {
+        corners: [...leg.querySelectorAll('.biv-c')].map(e => e.textContent),
+        axes: [...leg.querySelectorAll('.biv-yl span, .biv-xl span')].map(e => e.textContent),
+        img: gw && gw.getAttribute('role') === 'img' && /nine colours/.test(gw.getAttribute('aria-label')),
+        miss: !!leg.querySelector('.biv-miss-sw') && /Missing one of the two figures/.test(leg.textContent),
+        note: /not proof that one causes the other/.test(leg.textContent),
+        zeros: vals.filter(v => v === 0).map(cls), ok: t.ok, tied: allTied.ok,
+        hover: code ? bivThirdsLine('lsoa', code) : '',
+        missEdge: bivEdge({ fillColor: BIV_MISSING, fillOpacity: 0.9, weight: 0.5 }).dashArray,
+      };
+    });
+    ok(bk.corners.indexOf('More deprived, dirtier air') !== -1 && bk.corners.indexOf('Less deprived, cleaner air') !== -1,
+      'two-indicator corners are named from each indicator\'s own words', bk.corners.join(' | '));
+    ok(bk.axes.join(' ') === 'High Middle Low Low Middle High' && bk.img && bk.miss && bk.note,
+      'two-indicator key marks low, middle and high, is one described image, has a missing swatch and the caution', JSON.stringify(bk));
+    ok(new Set(bk.zeros).size === 1 && bk.ok && bk.tied === false && bk.missEdge === '3 3',
+      'thirds keep tied figures together, an unsplittable indicator is flagged, missing figures are dashed', JSON.stringify(bk));
+    ok(/third/.test(bk.hover) && /deprived third/.test(bk.hover), 'two-indicator hover names the thirds', bk.hover);
     ok(errors.length === 0, 'no page errors (two indicators)', errors.join(' | '));
+    await page.close();
+  }
+
+  // Data and methodology polish (review P2 to P11).
+  {
+    const { page, errors } = await open(browser, 'index.html?t=1', DESK);
+    const dm = await page.evaluate(async () => {
+      await Promise.all([ensureLsoaData(), ensureMsoaData(), ensureLsoaImd(), ensureWardDetail()]);
+      const st = Object.values(WARD_DATA_BY_CODE).find(w => w.name === 'Stonebridge');
+      const asbIn = Object.values(WARD_DATA_BY_CODE).filter(w => w.crime_by_category).every(w =>
+        w.indicators.crime_total === Object.entries(w.crime_by_category).filter(([c]) => c !== 'anti-social-behaviour').reduce((a, [, v]) => a + v, 0));
+      const card = k => indicatorCardHTML(k).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+      const fit = Object.values(WARD_DATA_BY_CODE).find(w => w.name === 'Farringdon Without');
+      return {
+        covid: /COVID-19 raised deaths/.test(card('ft_93250')) && /COVID-19 raised deaths/.test(card('ft_93283')) &&
+          /2020\/21, was the first year of the pandemic/.test(card('ft_93227')) && !/COVID/.test(card('census_bad_health_pct')),
+        crime: asbIn && /not counting anti-social behaviour/.test(card('crime_total')),
+        jsa: indLabel('ft_93098') === 'Long-term Jobseeker’s Allowance claimants' && /Universal Credit/.test(card('ft_93098')) &&
+          !Object.values(MSOA_DATA).some(r => r.ft_93098 === 0 && !r.ft_93098_vs) && OV_CFG.ft_93098.min >= 0,
+        fit: wardFitNote(fit), fitNone: wardFitNote(st),
+        names: [indLabel('imd_score_ward'), indLabel('imd_score'), indSameAs('ft_93097')],
+        inc: [st.indicators.income_score, fmtOv(st.indicators.income_score, 'income_score'), OV_CFG.income_score.lo, OV_CFG.health_score.hi,
+          ovContext('ward', 'income_score', st.indicators.income_score, st)],
+        ratio: fmtOvTip(126, 'ft_93250'), vs: VS_ENGLAND_TEXT.S,
+        plain: Object.values(OV_PLAIN).filter(t => /where 100 is average/.test(t)).length,
+        oa: /about 125 households/.test(card('census_no_car_pct')),
+        est: EST_HTML.indexOf('>Estimated from 2011 areas<') !== -1,
+      };
+    });
+    ok(dm.covid, 'death, life expectancy and admissions cards say their periods take in the pandemic');
+    ok(dm.crime, 'the crime total leaves out anti-social behaviour, and its card says so');
+    ok(dm.jsa, 'long-term claimants are named for Jobseeker\'s Allowance, with no bare zeros');
+    ok(/slightly different area|noticeably different area/.test(dm.fit) && dm.fitNone === '', 'a ward whose LSOAs hold a different population is marked', dm.fit);
+    ok(dm.names[0] !== dm.names[1] && dm.names[2] === 'claimant_rate_pct', 'the two deprivation scores are named apart and the claimant rates are paired', dm.names.join(' | '));
+    ok(dm.inc[0] > 1 && /%$/.test(dm.inc[1]) && dm.inc[2] === 'Less deprived' && dm.inc[3] === 'More deprived' && /more deprived than/.test(dm.inc[4]),
+      'income deprivation reads as a percentage, and deprivation keys and hovers say less or more deprived', dm.inc.join(' | '));
+    ok(dm.ratio === '126.0 (England is 100)' && dm.vs === 'Not clearly different from England' && dm.plain === 0,
+      'hover ratios say England is 100, and similar reads not clearly different', dm.ratio + ' / ' + dm.vs);
+    ok(dm.oa && dm.est, 'Census cards carry the output area caution, and the 2011 label has one name');
+    // Ward rankings of a Local Health figure say there is no interval (P3), and
+    // the ward report places the ward among wards (P11) and marks a poor fit (P6).
+    await setOv(page, 'ft_93250');
+    await page.waitForTimeout(1500);
+    await page.evaluate(() => _setDataLevel('ward'));
+    await page.waitForTimeout(1500);
+    const rk = await page.evaluate(() => {
+      renderTopBottom();
+      let html = '';
+      _generateWardReport({ sink: h => { html = h; } }, 'Farringdon Without', {});
+      const d = new DOMParser().parseFromString(html, 'text/html');
+      return { notes: document.getElementById('rank-notes').textContent,
+        dots: [...d.querySelectorAll('.legend')].map(e => e.textContent).find(t => /Each dot places/.test(t)) || '',
+        fit: (d.querySelector('.fit-note') || {}).textContent || '' };
+    });
+    ok(/no interval is available/.test(rk.notes), 'ward rankings of a Local Health figure say no interval is available', rk.notes);
+    ok((!rk.dots || /places the ward among the [\d,]+ London wards/.test(rk.dots)) && /different area/.test(rk.fit),
+      'the ward report places the ward among wards and marks a poor LSOA fit', JSON.stringify(rk));
+    ok(errors.length === 0, 'no page errors (data and methodology polish)', errors.join(' | '));
     await page.close();
   }
 
