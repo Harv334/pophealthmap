@@ -38,7 +38,22 @@ const MODEL = "claude-sonnet-5";
  * the cap is doubled. The panel still says so when an answer is cut short.
  */
 const MAX_TOKENS = 2048;
-const DAILY_CAP = 10; // questions per IP, per UTC day
+const DAILY_CAP = 10; // questions per browser, per UTC day
+
+/**
+ * Questions per network (IP address, or IPv6 /64) per UTC day.
+ *
+ * The ten used to be counted per address, and large NHS trusts and councils
+ * send their staff out through a few shared addresses, so the first ten
+ * people in an organisation used up Ask for everyone else there. The ten are
+ * now counted per browser, by a random id the panel keeps in localStorage and
+ * sends with each request, and the address only has this higher ceiling. A
+ * caller who invents a new id each time gets no more than this from one
+ * network, which the site-wide ceiling bounds in turn. A request with no id
+ * (a page cached from before) shares one allowance of ten per address, as
+ * before.
+ */
+const NETWORK_CAP = 100;
 
 /**
  * Billed calls per IP per day, counting every round trip.
@@ -57,6 +72,7 @@ const DAILY_CAP = 10; // questions per IP, per UTC day
  * whatever the API will sell them.
  */
 const REQUEST_CAP = DAILY_CAP * 6;
+const NETWORK_REQUEST_CAP = NETWORK_CAP * 6;
 
 /**
  * A ceiling for the whole site, per UTC day.
@@ -150,6 +166,10 @@ Rules that matter:
   unless the value is 1. Getting this wrong overstates deprivation, which is
   the worst direction to be wrong in for this data.
 - Rates and percentages are not counts. Do not add percentages together.
+- Each figure in a tool result comes as v (the value) with its label, unit and
+  period. Use the label for what the figure is, not a guess from the key.
+  Give the period each figure covers, as the tool states it, the first time
+  you use it, for example "84.3 years (2019 to 2023)".
 - The map calls the local authority level "LA" (London's 32 boroughs and the
   City of London are its 33 LAs). Use "LA" in answers, introducing it once as
   "local authority (LA)", rather than "borough" or "council area".
@@ -170,13 +190,19 @@ const TOOLS = [
   {
     name: "get_area",
     description:
-      "Look up every indicator held for one ward or local authority (LA) by name. Use for " +
-      "'tell me about X' or any question about a single place.",
+      "Look up the indicators held for one ward or local authority (LA) by name. Use for " +
+      "'tell me about X' or any question about a single place. Name the indicators you " +
+      "need when the question is about particular ones; leave them out for a full profile.",
     input_schema: {
       type: "object",
       properties: {
         name: { type: "string", description: "Ward or LA name, e.g. 'Brent' or 'Church End'" },
         level: { type: "string", enum: ["ward", "la"], description: "Which geography to search: a ward, or an LA (local authority)" },
+        indicators: {
+          type: "array",
+          items: { type: "string" },
+          description: "Optional indicator keys to return, e.g. ft_life_expectancy_female; all of them if left out",
+        },
       },
       required: ["name", "level"],
     },
@@ -502,6 +528,15 @@ function clientKey(ip) {
   return s;
 }
 
+/**
+ * The browser's id from the request body, or "-" for none. Only a plain run
+ * of 16 to 64 letters, digits, - or _ is taken, so it cannot be used to
+ * smuggle anything into the counter's keys.
+ */
+function browserKey(id) {
+  return typeof id === "string" && /^[A-Za-z0-9_-]{16,64}$/.test(id) ? id : "-";
+}
+
 function utcDay(now) {
   return new Date(now === undefined ? Date.now() : now).toISOString().slice(0, 10);
 }
@@ -549,38 +584,46 @@ export class AskCounter {
   }
 
   async fetch(request) {
-    const { op, key, question, caps } = await request.json();
+    const { op, key, browser, question, caps } = await request.json();
     const day = utcDay();
     await this.rollover(day);
+    // Three counts: this browser on this network (the ten), the network as a
+    // whole (its ceiling) and the site. The browser's is keyed under its
+    // network, so an id carried to another network starts afresh there and
+    // an id cannot be used to spend another network's allowance.
     const ipKey = "ip:" + key;
-    const mine = (await this.storage.get(ipKey)) || { q: 0, r: 0 };
+    const brKey = "b:" + key + "|" + browserKey(browser);
+    const net = (await this.storage.get(ipKey)) || { q: 0, r: 0 };
+    const mine = (await this.storage.get(brKey)) || { q: 0, r: 0 };
     const site = (await this.storage.get("site")) || { q: 0, r: 0 };
     const q = question ? 1 : 0;
+    const left = () => Math.max(0, Math.min(caps.questions - mine.q, caps.networkQuestions - net.q));
 
     if (op === "refund") {
-      mine.q = Math.max(0, mine.q - q);
-      mine.r = Math.max(0, mine.r - 1);
-      site.q = Math.max(0, site.q - q);
-      site.r = Math.max(0, site.r - 1);
-      await this.storage.put({ [ipKey]: mine, site });
+      for (const c of [mine, net, site]) {
+        c.q = Math.max(0, c.q - q);
+        c.r = Math.max(0, c.r - 1);
+      }
+      await this.storage.put({ [ipKey]: net, [brKey]: mine, site });
       return Response.json({ ok: true });
     }
 
     // A question is refused once today's questions are used up. Round trips
-    // within a question already asked are bounded by the request count, so
+    // within a question already asked are bounded by the request counts, so
     // the last question of the day can still be finished.
     let refused = null;
     if (question && mine.q >= caps.questions) refused = "questions";
-    else if (mine.r >= caps.requests) refused = "requests";
+    else if (question && net.q >= caps.networkQuestions) refused = "network";
+    else if (mine.r >= caps.requests || net.r >= caps.networkRequests) refused = "requests";
     else if ((question && site.q >= caps.siteQuestions) || site.r >= caps.siteRequests) refused = "site";
-    if (refused) return Response.json({ allowed: false, refused, remaining: Math.max(0, caps.questions - mine.q) });
+    if (refused) return Response.json({ allowed: false, refused, remaining: left() });
 
-    mine.q += q;
-    mine.r += 1;
-    site.q += q;
-    site.r += 1;
-    await this.storage.put({ [ipKey]: mine, site });
-    return Response.json({ allowed: true, remaining: Math.max(0, caps.questions - mine.q) });
+    for (const c of [mine, net, site]) {
+      c.q += q;
+      c.r += 1;
+    }
+    await this.storage.put({ [ipKey]: net, [brKey]: mine, site });
+    return Response.json({ allowed: true, remaining: left() });
   }
 }
 
@@ -592,27 +635,30 @@ function capsFor(env) {
   return {
     questions: DAILY_CAP,
     requests: REQUEST_CAP,
+    networkQuestions: NETWORK_CAP,
+    networkRequests: NETWORK_REQUEST_CAP,
     siteQuestions: n(env.SITE_DAILY_QUESTIONS, SITE_QUESTION_CAP),
     siteRequests: n(env.SITE_DAILY_REQUESTS, SITE_REQUEST_CAP),
   };
 }
 
-async function counter(env, op, key, question) {
+async function counter(env, op, key, browser, question) {
   // One object for the whole site: the counts are small, and one object is
   // what makes the site-wide ceiling exact.
   const stub = env.ASK_COUNTER.get(env.ASK_COUNTER.idFromName("daily"));
   const res = await stub.fetch("https://ask-counter/", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ op, key, question, caps: capsFor(env) }),
+    body: JSON.stringify({ op, key, browser: browserKey(browser), question, caps: capsFor(env) }),
   });
   if (!res.ok) throw new Error(`counter answered ${res.status}`);
   return res.json();
 }
 
 const REFUSALS = {
-  questions: `Daily limit of ${DAILY_CAP} questions reached. Try again tomorrow.`,
-  requests: "Daily limit reached. Try again tomorrow.",
+  questions: `You have used today's ${DAILY_CAP} questions. They reset at midnight UTC, and everything else on the map still works.`,
+  network: "Today's questions from this network have been used. They reset at midnight UTC, and everything else on the map still works.",
+  requests: "Today's questions have been used. They reset at midnight UTC, and everything else on the map still works.",
   site: "Ask has answered as many questions as it can for today. Please try again tomorrow. The rest of the map still works.",
   burst: "That was a lot of questions in a short time. Please wait a minute and try again.",
 };
@@ -646,6 +692,7 @@ export default {
     const messages = checked.messages;
 
     const key = clientKey(request.headers.get("CF-Connecting-IP"));
+    const browser = body && body.client;
     const isQuestion = isNewQuestion(messages);
 
     // A burst limit first: it costs no storage, and it stops one address
@@ -662,7 +709,7 @@ export default {
     // pass on the same count. Handed back below if the call fails.
     let held;
     try {
-      held = await counter(env, "take", key, isQuestion);
+      held = await counter(env, "take", key, browser, isQuestion);
     } catch (e) {
       console.log(`counter failed, refusing: ${e && e.message}`);
       return json({ error: UNAVAILABLE }, 503, cors);
@@ -672,7 +719,7 @@ export default {
     }
     const giveBack = async () => {
       try {
-        await counter(env, "refund", key, isQuestion);
+        await counter(env, "refund", key, browser, isQuestion);
       } catch (e) {
         console.log(`refund failed: ${e && e.message}`);
       }

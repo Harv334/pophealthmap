@@ -20,9 +20,14 @@ BEGIN = "/* LA_REGIONS:BEGIN (scripts/build_la_regions.py writes this line) */"
 END = "/* LA_REGIONS:END */"
 
 
+# The everyday names the page shows (LA_DISPLAY in index.html's head).
+DISPLAY = {"Kingston upon Hull, City of": "Hull"}
+
+
 def display_name(name: str) -> str:
-    """ONS's "Bristol, City of" as people type it: "Bristol"."""
-    return re.sub(r",\s*(City|County) of$", "", str(name).strip())
+    """ONS's "Bristol, City of" as people type it: "Bristol", and Hull."""
+    name = str(name).strip()
+    return DISPLAY.get(name) or re.sub(r",\s*(City|County) of$", "", name)
 
 
 def build_index(repo: Path = REPO) -> dict:

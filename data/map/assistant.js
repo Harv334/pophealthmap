@@ -394,6 +394,30 @@ var MODEL_LABEL = "Claude Sonnet 5";
     return d.length > 90 ? d.slice(0, 87) + "..." : d;
   }
 
+  /**
+   * One figure as the tools return it: the value with what it is, its unit
+   * and the period it covers, so the model neither guesses an indicator's
+   * meaning from its key (ft_obesity_adults is overweight including
+   * obesity, not obesity) nor calls list_indicators to find out, and can
+   * tell the reader which year to look for. Fields the metadata does not
+   * have are left out rather than guessed.
+   */
+  function figure(key, v) {
+    var m = metaFor(key);
+    var f = { v: v, label: shortLabel(key) };
+    if (m && m.u) f.unit = m.u;
+    if (m && m.yr) f.period = String(m.yr);
+    return f;
+  }
+
+  function figures(ind, keys) {
+    var out = {};
+    keys.forEach(function (k) {
+      if (ind[k] !== undefined && ind[k] !== null && !isWithheld(k)) out[k] = figure(k, ind[k]);
+    });
+    return out;
+  }
+
   var TOOLS = {
     /* The key list, kept short. It used to send every indicator's full
        description, source, year and aggregation rule, 41 KB that was then
@@ -429,6 +453,9 @@ var MODEL_LABEL = "Claude Sonnet 5";
       if (!hit) return { error: "No " + levelWord(input.level) + " found matching '" + input.name + "'." };
       if (hit.ambiguous) return { error: "Several areas match; be more specific.", candidates: hit.ambiguous };
       var shownInd = shownOnly(hit.area.indicators);
+      // The indicators asked for, or every one the area has.
+      var asked = (input.indicators && input.indicators.length) ? input.indicators : Object.keys(shownInd);
+      shownInd = figures(shownInd, asked);
       var boroughLevel = Object.keys(shownInd).filter(isBoroughLevel);
       return {
         name: hit.area.name, level: levelWord(input.level), la: hit.area.lad || undefined,
@@ -456,7 +483,7 @@ var MODEL_LABEL = "Claude Sonnet 5";
           ? input.indicators
           : ["imd_score", "imd_decile_mean", "census_population", "census_over65_pct",
              "census_non_white_pct", "census_no_car_pct"];
-        wanted.forEach(function (k) { if (ind[k] !== undefined && !isWithheld(k)) keep[k] = ind[k]; });
+        keep = figures(ind, wanted);
         rows.push({ name: hit.area.name, indicators: keep });
       });
       if (!rows.length) return { error: "None of those areas were found.", not_found: missing };
@@ -504,6 +531,7 @@ var MODEL_LABEL = "Claude Sonnet 5";
         higher_means: hm,
         results_are: hm ? "the " + input.direction + " values; higher = " + hm : undefined,
         unit: meta && meta.u ? meta.u : undefined,
+        period: meta && meta.yr ? String(meta.yr) : undefined,
         source: meta && meta.src ? meta.src : undefined,
         level: levelWord(input.level), of_total: rows.length, results: rows.slice(0, n),
         // A ward ranking on a borough-level indicator is really a borough
@@ -619,6 +647,25 @@ var MODEL_LABEL = "Claude Sonnet 5";
     } catch (e) { /* private mode: the count is per-session then */ }
   }
 
+  /* This browser's random id, kept in localStorage and sent with each
+     request, so the Worker counts the ten questions per browser rather than
+     per network address (a whole NHS trust can share one). It names nothing
+     and is not linked to anything else; with storage blocked a new one is
+     made for the page, and the Worker counts that per address as before. */
+  var _clientId = null;
+  function clientId() {
+    if (_clientId) return _clientId;
+    try { _clientId = localStorage.getItem("ph-ask-client"); } catch (e) { /* blocked */ }
+    if (!_clientId || !/^[A-Za-z0-9_-]{16,64}$/.test(_clientId)) {
+      var b = new Uint8Array(16);
+      if (window.crypto && crypto.getRandomValues) crypto.getRandomValues(b);
+      else for (var i = 0; i < 16; i++) b[i] = Math.floor(Math.random() * 256);
+      _clientId = Array.prototype.map.call(b, function (x) { return ("0" + x.toString(16)).slice(-2); }).join("");
+      try { localStorage.setItem("ph-ask-client", _clientId); } catch (e) { /* blocked */ }
+    }
+    return _clientId;
+  }
+
   function capNow() { return (lastLimit && lastLimit.cap) || DAILY_CAP; }
 
   /* ── Is the message about to be sent free? ───────────────────────────────
@@ -671,9 +718,9 @@ var MODEL_LABEL = "Claude Sonnet 5";
     limitEl.title = (left === 0
       ? "You have used today's questions. The map, Query, Compare and Directory have no limit. "
       : "")
-      + "You can ask " + cap + " questions a day, and the count starts again at midnight. "
-      + "If other people share your internet connection, their questions may count "
-      + "towards the same limit.";
+      + "You can ask " + cap + " questions a day, and the count starts again at midnight UTC. "
+      + "A work network shared by many people has a daily ceiling of its own, "
+      + "so it may run out sooner.";
   }
 
   /**
@@ -701,7 +748,10 @@ var MODEL_LABEL = "Claude Sonnet 5";
      are replaced by a short stub (the answers that quoted them stay), then
      whole old exchanges are dropped. Nothing is changed while the history is
      small, so the conversation the Worker caches is not rewritten. */
-  var HISTORY_BYTES = 36000;
+  // 30 KB: each figure now carries its label, unit and period, so a full
+  // profile is about 13 KB, and two of them for the question being asked
+  // still fit under the Worker's 64 KB.
+  var HISTORY_BYTES = 30000;
   var STUB = "[figures shown earlier]";
   // One tool result may be at most 16 KB at the Worker; a bigger one is
   // replaced by a note asking the model to narrow its request.
@@ -829,7 +879,7 @@ var MODEL_LABEL = "Claude Sonnet 5";
         res = await fetch(ASSISTANT_ENDPOINT, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ messages: history }),
+          body: JSON.stringify({ messages: history, client: clientId() }),
           signal: ctl ? ctl.signal : undefined,
         });
       } catch (e) {
@@ -1014,14 +1064,16 @@ var MODEL_LABEL = "Claude Sonnet 5";
   var IS_LONDON = !window.PH_REGION || window.PH_REGION.isLondon;
   var EXAMPLES = IS_LONDON ? [
     "Compare deprivation in Brent and Bromley",
-    "Which 5 wards have the highest over-65 population?",
+    "Which 5 wards have the largest share of people aged 65 and over?",
     "Tell me about Notting Dale",
-    "Which LA has the most GP practices?",
+    // Not "the most GP practices": no tool can count them, so that chip was
+    // sure to come back as not available and cost the reader a question.
+    "Which LA has the lowest life expectancy for men?",
     "How deprived is Hackney?",
   ] : [
     "Which 5 wards are the most deprived?",
-    "Which 5 wards have the highest over-65 population?",
-    "Which LA has the most GP practices?",
+    "Which 5 wards have the largest share of people aged 65 and over?",
+    "Which LA has the lowest life expectancy for men?",
     "Which ward has the highest crime rate?",
   ];
 
@@ -1058,9 +1110,10 @@ var MODEL_LABEL = "Claude Sonnet 5";
         "relying on what it remembers, but it can still make mistakes. Your question and the figures looked up to answer it pass " +
         "through this site's server to Anthropic's Claude model, which writes " +
         "the reply, so please leave out anything personal.",
-      "You can ask " + DAILY_CAP + " questions a day, because each answer costs " +
-        "money to produce, and replying when it asks you to narrow a question " +
-        "down does not use one up. Everything else on the map has no limit.",
+      "You can ask " + DAILY_CAP + " questions a day, though a shared work network " +
+        "may run out sooner, because each answer costs money to produce. Replying " +
+        "when it asks you to narrow a question down does not use one up, and " +
+        "everything else on the map has no limit.",
     ].forEach(function (t) {
       var para = document.createElement("p");
       para.textContent = t;

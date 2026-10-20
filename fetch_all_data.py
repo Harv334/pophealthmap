@@ -3898,6 +3898,20 @@ def FT_MALE_ID(ind_id: int) -> int:
     return ind_id * 10 + 1
 
 
+def ft_msoa_drop_bare_zeros(ftm: pd.DataFrame) -> pd.DataFrame:
+    """Local Health MSOA rows less any 0 that OHID gives no England
+    comparison. Long-term unemployment (93098) counts Jobseeker's Allowance
+    claims only, and 309 of London's MSOAs read exactly 0 with no comparison:
+    too few claimants to test rather than none, so they are stored as no
+    figure. Every other zero in the release carries a comparison."""
+    if ftm is None or ftm.empty or "value" not in ftm.columns:
+        return ftm
+    vs = (ftm["vs_england"].fillna("").astype(str).str.strip()
+          if "vs_england" in ftm.columns else pd.Series("", index=ftm.index))
+    bare = (pd.to_numeric(ftm["value"], errors="coerce") == 0) & (vs == "")
+    return ftm[~bare]
+
+
 def _ft_msoa_variant(ind_id, df, name, want_msoa, rows, missing_codes) -> int:
     """Latest period per MSOA, 2011 codes bridged, rows appended. Returns the
     number of figures bridged from 2011 codes."""
@@ -5751,6 +5765,63 @@ def record_cover(wards: dict, cover: dict, key: str, vals: dict) -> int:
     return n
 
 
+# A ward whose LSOAs hold under 80% or over 125% of its Census residents is
+# marked: its deprivation and health figures cover a noticeably different
+# patch from the ward.
+WARD_FIT_LOW, WARD_FIT_HIGH = 0.8, 1.25
+
+
+def ward_lsoa_fit(wards: dict, lsoa_to_ward: dict, pop_by_lsoa: dict) -> dict:
+    """{ward: residents of the LSOAs the lookup gives it / its own Census
+    residents}, to two places, for wards with a Census population. The
+    ward's own count comes from output areas, which follow its boundary much
+    more closely than LSOAs do."""
+    lsoa_pop: dict = {}
+    for lc, wd in lsoa_to_ward.items():
+        if wd:
+            lsoa_pop[wd] = lsoa_pop.get(wd, 0.0) + float(pop_by_lsoa.get(lc, 0) or 0)
+    out = {}
+    for wd, w in wards.items():
+        cen = (w.get("indicators") or {}).get("census_population")
+        if not cen or cen <= 0:
+            continue
+        out[wd] = round(lsoa_pop.get(wd, 0.0) / float(cen), 2)
+    return out
+
+
+def ward_fit_is_off(ratio) -> bool:
+    """Outside the band. A ward with no LSOA at all (0, several of the City's)
+    has no LSOA-built figures to mark."""
+    return bool(ratio) and (ratio < WARD_FIT_LOW or ratio > WARD_FIT_HIGH)
+
+
+def record_lsoa_fit(wards: dict, fit: dict) -> int:
+    """ward["lsoa_fit"] for each ward outside the band, removed elsewhere.
+    Returns how many are marked."""
+    n = 0
+    for wd, w in wards.items():
+        r = fit.get(wd)
+        if ward_fit_is_off(r):
+            w["lsoa_fit"] = r
+            n += 1
+        else:
+            w.pop("lsoa_fit", None)
+    return n
+
+
+# police.uk categories left out of the crime total (see build_ward_data).
+CRIME_TOTAL_EXCLUDES = ("anti-social-behaviour",)
+
+
+def crime_total_by_ward(crime):
+    """Crimes per ward, not counting anti-social behaviour. A ward with only
+    anti-social behaviour on record has 0 crimes rather than no figure."""
+    wards = crime["WD25CD"].dropna().unique()
+    if "category" in crime.columns:
+        crime = crime[~crime["category"].astype(str).isin(CRIME_TOTAL_EXCLUDES)]
+    return crime.groupby("WD25CD").size().reindex(wards, fill_value=0)
+
+
 def build_ward_data() -> dict:
     """Wrapped shape expected by index.html loadData():
          {wards: {WD25CD: {name, lad, indicators:{...}}}, metadata: {...}}
@@ -5833,7 +5904,11 @@ def build_ward_data() -> dict:
 
     crime = _read_parquet_opt(DATA_DIR / "crime" / "police_uk_crime.parquet")
     if crime is not None and "WD25CD" in crime.columns:
-        for wd, n in crime.groupby("WD25CD").size().items():
+        # Anti-social behaviour is not a crime, forces record it differently
+        # (a fifth of Met records, almost none of the City of London Police's)
+        # and it has its own indicator, so the total, and the rate the page
+        # works out from it, leave it out.
+        for wd, n in crime_total_by_ward(crime).items():
             if wd:
                 _get(wd)["indicators"]["crime_total"] = int(n)
         # Per-category crime breakdown (violence, theft, drugs, etc.)
@@ -5886,7 +5961,7 @@ def build_ward_data() -> dict:
     # rests on its other LSOAs only, so the share of residents covered is
     # recorded, and a ward under WARD_MIN_COVER gets no figure (see
     # bridge_to_wards).
-    ftm = _read_parquet_opt(DATA_DIR / "outcomes" / "fingertips_msoa.parquet")
+    ftm = ft_msoa_drop_bare_zeros(_read_parquet_opt(DATA_DIR / "outcomes" / "fingertips_msoa.parquet"))
     if ftm is not None and not ftm.empty:
         sources["health_msoa"] = "OHID Fingertips (Local Health, MSOA)"
         lsoa_to_ward = get_lsoa_to_ward()
@@ -5953,7 +6028,7 @@ def build_ward_data() -> dict:
     if "pop_by_lsoa" not in locals():
         pop_by_lsoa = {}
 
-    def _agg_to_wards(df, value_col, ward_key, min_cover=None):
+    def _agg_to_wards(df, value_col, ward_key, min_cover=None, ndigits=2):
         if df is None or df.empty or value_col not in df.columns:
             return
         if min_cover is not None:
@@ -5981,7 +6056,7 @@ def build_ward_data() -> dict:
             den[wd] = den.get(wd, 0.0) + weight
         for wd, w in wards.items():
             if den.get(wd, 0) > 0:
-                w["indicators"][ward_key] = round(num[wd] / den[wd], 2)
+                w["indicators"][ward_key] = round(num[wd] / den[wd], ndigits)
 
     fp = _read_parquet_opt(DATA_DIR / "demographics" / "fuel_poverty.parquet")
     # --- IMD: LSOA scores rolled up to wards, population weighted ------------
@@ -5998,11 +6073,23 @@ def build_ward_data() -> dict:
                     "education_score", "health_score", "crime_score",
                     "barriers_score", "environment_score"):
             if col in imd_ward.columns:
-                _agg_to_wards(imd_ward, col, col)
+                # Income and employment are shares from 0 to 1, which the page
+                # shows as percentages: two places would leave 27 distinct
+                # employment figures across 684 wards, so they keep three, as
+                # MHCLG publishes them.
+                _agg_to_wards(imd_ward, col, col,
+                              ndigits=3 if col in ("income_score", "employment_score") else 2)
         # An average of deciles is not itself a decile, so it is named for what
         # it is. The per-ward Core20 counts below remain the categorical view.
         if "imd_decile" in imd_ward.columns:
             _agg_to_wards(imd_ward, "imd_decile", "imd_decile_mean")
+
+    # Wards whose LSOAs hold noticeably more or fewer people than the ward
+    # (Farringdon Without's hold 3.45 times its residents), so the map can say
+    # that their LSOA-built figures describe a different patch.
+    if pop_by_lsoa:
+        n_fit = record_lsoa_fit(wards, ward_lsoa_fit(wards, lsoa_to_ward, pop_by_lsoa))
+        info(f"ward LSOA fit: {n_fit} wards outside {WARD_FIT_LOW:.0%} to {WARD_FIT_HIGH:.0%} of their residents")
 
     _agg_to_wards(fp, "fuel_poverty_pct", "fuel_poverty_pct")
     if fp is not None:
@@ -6301,7 +6388,7 @@ def build_msoa_data() -> dict:
                 v = row[col]
                 if pd.notna(v):
                     rec[col] = int(v) if col == "census_population" else round(float(v), 4)
-    ftm = _read_parquet_opt(DATA_DIR / "outcomes" / "fingertips_msoa.parquet")
+    ftm = ft_msoa_drop_bare_zeros(_read_parquet_opt(DATA_DIR / "outcomes" / "fingertips_msoa.parquet"))
     if ftm is None or ftm.empty:
         warn("msoa_data: no fingertips_msoa parquet")
         ftm = pd.DataFrame(columns=["MSOA21CD", "indicator_id", "value"])
@@ -6509,10 +6596,17 @@ def build_vcse_json():
     #                       property, or a GP record
     # Together they were 37.9% of a 9.7 MB payload that every visitor downloads.
     # Adding a field back means adding it here and reading it in index.html.
+    #
+    # The *_desc labels went too: they repeated in English, on every record,
+    # what the *_tags codes already say, and the page holds the code to label
+    # table once (VCSE_TAG_LABELS). And a region-wide charity's covers list
+    # (every LA code in the scope, for about 5,800 records) is left out, as
+    # its scope says the same; the page counts the LAs on its map instead.
+    # Together that took the London file from 13.6 MB to about 7 MB.
     keep = ["num","name","addr","lat","lng","LAD25CD",
             "hq_in_nwl","covers","scope",
             "income","income_band","website",
-            "what_tags","what_desc","how_tags","how_desc","who_tags","who_desc"]
+            "what_tags","how_tags","who_tags"]
     cols = [c for c in keep if c in df.columns]
     out = df[cols].rename(columns={
         "name": "n", "addr": "a",
@@ -6530,6 +6624,8 @@ def build_vcse_json():
     ends = df["acc_end"].tolist() if "acc_end" in df.columns else [None] * len(records)
     n = 0
     for rec, pc, st, end in zip(records, pcs, sts, ends):
+        if rec.get("sc") == "london_wide":
+            rec.pop("cv", None)
         apply_charity_flags(rec, st, end)
         n += _generalise_small_charity(rec, pc)
     info(f"vcse: {n:,} of {len(records):,} charities shown by area only "

@@ -264,7 +264,19 @@ const smallText = page => page.evaluate(() => {
     ok(!!tip && tip.n === 1 && tip.name && tip.bg === 'rgb(255, 255, 255)' && tip.radius === '10px',
       'the LSOA hover card is the one card style and gives the decile once', JSON.stringify(tip));
     await page.click('#ov-about');
-    ok(await page.evaluate(() => /Published at/.test(document.getElementById('ov-info-panel').innerText)), 'indicator card opens');
+    ok(await page.evaluate(() => /How to read it/.test(document.getElementById('ov-info-panel').innerText)), 'indicator card opens');
+    // The card leads with what a general reader needs (P55): the period, how
+    // to read it and the source, with the analyst's rows in a closed
+    // Technical details.
+    const icLay = await page.evaluate(() => {
+      const p = document.getElementById('ov-info-panel'), d = p.querySelector('details.ic-tech');
+      const top = [...p.querySelectorAll(':scope > dl.ic dt')].map(e => e.textContent);
+      return { top, closed: !!d && !d.open, sum: d ? d.querySelector('summary').textContent : '',
+        tech: d ? [...d.querySelectorAll('dt')].map(e => e.textContent) : [], seen: /Published at|Method/.test(p.innerText) };
+    });
+    ok(icLay.closed && icLay.sum === 'Technical details' && icLay.top.indexOf('Period') === 0 && icLay.top.indexOf('How to read it') !== -1 &&
+       icLay.top.indexOf('Source') !== -1 && icLay.tech.indexOf('Method') !== -1 && icLay.tech.indexOf('Published at') !== -1 && !icLay.seen,
+      'the indicator card shows the period, how to read it and the source, with the rest in a closed Technical details', JSON.stringify(icLay));
     await checkAxe(page, 'indicator and card');
     // Indicator descriptions and cards (workplan 2.3): one control opens the
     // card and a button at its top closes it; no card or description carries
@@ -445,7 +457,7 @@ const smallText = page => page.evaluate(() => {
       return {
         bad, heads,
         old: (words.match(/Soc rent|Borough\/council|\bBoards?\b|\b[Mm]etrics?\b|VCSE|Point layers|Top & bottom/g) || []),
-        card: /^Deaths from all causes\s*Official title: Mortality from all causes/.test(card),
+        card: /^Deaths from all causes/.test(card) && /Technical details\s*Official title: Mortality from all causes/.test(card),
         controls: [document.getElementById('ws-profile').textContent, document.getElementById('ws-pdf').textContent,
           document.getElementById('sbtab-vcse').textContent, document.querySelector('.mode-btn[data-mode="report"] .ml-short').textContent,
           document.querySelector('#icb-row .lname').firstChild.textContent.trim()].join(' | '),
@@ -454,7 +466,7 @@ const smallText = page => page.evaluate(() => {
     ok(names.bad.length === 0, 'every indicator is named from the one label table', names.bad.slice(0, 5).join(', '));
     ok(names.old.length === 0, 'no old names (Soc rent, Boards, metric, VCSE, Borough/council)', names.old.join(', '));
     ok(names.heads.length === 0, 'no heading outside the Area profile uses "&"', names.heads.slice(0, 3).join(' / '));
-    ok(names.card, 'indicator card leads with the display label, then the official title');
+    ok(names.card, 'indicator card leads with the display label, with the official title under Technical details');
     ok(names.controls === 'Open full profile | Open printable report | Charities | Custom | Integrated care boards (ICBs)',
       'profile, report, Charities, Custom and ICB names', names.controls);
     await page.click('.mode-btn[data-mode="compare"]');
@@ -667,13 +679,27 @@ const smallText = page => page.evaluate(() => {
         };
       }
       const tiles = [...document.querySelectorAll('#ws-body .ws-kpi .ws-k-lbl')].map(e => e.textContent);
-      return { out, tiles, cols: getComputedStyle(document.querySelector('#ws-body .ws-strip')).gridTemplateColumns.split(' ').length };
+      showWard('Stonebridge');
+      await new Promise(r => setTimeout(r, 400));
+      const lead = document.querySelector('#ws-body .ws-kpi .ws-k-lbl').textContent,
+        leadNum = document.querySelector('#ws-body .ws-kpi .ws-k-num').textContent,
+        meta = document.getElementById('ws-meta').textContent;
+      return { out, tiles, lead, leadNum, meta, cols: getComputedStyle(document.querySelector('#ws-body .ws-strip')).gridTemplateColumns.split(' ').length };
     });
     const P = plain.out;
     ok(Object.values(P).every(x => x.sheetFirst && x.profFirst && x.sheet === x.prof),
       '"Summary" comes first in the ward sheet and the profile, and they match', JSON.stringify(P).slice(0, 300));
-    ok(/^Stonebridge is more deprived than 99% of the wards in London, and \d+ of its \d+ LSOAs are among the most deprived fifth of England\./.test(P.Stonebridge.sheet),
+    ok(/^Stonebridge is more deprived than 99% of the wards in London, and \d+ of its \d+ neighbourhoods \(LSOAs\) are among the most deprived fifth of England\./.test(P.Stonebridge.sheet),
       'Stonebridge leads with its ranking and its Core20 count', P.Stonebridge.sheet);
+    // P56: no "median" in the summary, a typical ward explained once, and
+    // the sheet leads with the ranking rather than the average decile.
+    ok(!/median/.test(P.Stonebridge.sheet) && /than in a typical London ward \(\d+\.\d%\)/.test(P.Stonebridge.sheet) &&
+       /can expect to live about [\d.]+ years, [\d.]+ years (less|more) than in a typical London ward/.test(P.Stonebridge.sheet) &&
+       /A typical ward is the middle one when all of them are put in order\.$/.test(P.Stonebridge.sheet),
+      'the summary compares with a typical ward and says what one is', P.Stonebridge.sheet);
+    ok(plain.lead === 'More deprived than' && plain.leadNum === '99%' && /more deprived than 99% of the wards in London/.test(plain.meta) &&
+       !/decile/.test(plain.meta),
+      'the ward sheet leads with its ranking, not the average decile', JSON.stringify([plain.lead, plain.leadNum, plain.meta]));
     ok(/^Holloway is (more|less) deprived than \d+% of the wards in London\./.test(P.Holloway.sheet) && !/deprived fifth/.test(P.Holloway.sheet),
       'Holloway, with no Core20 LSOAs, has no Core20 clause', P.Holloway.sheet);
     ok(/^Barnes is less deprived than \d+% of the wards in London/.test(P.Barnes.sheet), 'a Richmond ward says "less deprived than"', P.Barnes.sheet);
@@ -696,7 +722,7 @@ const smallText = page => page.evaluate(() => {
         return { h: s ? s.querySelector('h2').textContent : '', beforeKpis: !!s && s.nextElementSibling === document.querySelector('.report .kpis'),
           text: s ? s.querySelector('p').textContent : '' };
       });
-      ok(r.h === 'Summary' && r.beforeKpis && r.text === P.Bishopsgate.sheet,
+      ok(r.h === 'Summary' && r.beforeKpis && r.text === P.Stonebridge.sheet,
         'the printable report opens with the same "Summary" summary', JSON.stringify(r).slice(0, 300));
       await rep.close();
     } else ok(false, 'the printable report opens');
@@ -738,6 +764,8 @@ const smallText = page => page.evaluate(() => {
           return a === b ? '' : k + ' ' + a + ' vs ' + b;
         }).filter(Boolean),
         keyLbls: [...p.querySelectorAll('.keystat-lbl')].map(e => e.textContent),
+        workCap: (document.querySelector('#pc-economy .cat-cap') || {}).textContent || '',
+        ratio: ([...p.querySelectorAll('.sr[data-k]')].find(r => ovIsStdRatio(r.dataset.k)) || { textContent: '' }).textContent,
         popRows: p.querySelectorAll('.sr[data-k="census_population"]').length,
       };
     });
@@ -748,12 +776,17 @@ const smallText = page => page.evaluate(() => {
     ok(['Health and care', 'People and communities', 'Work, money and education', 'Housing and transport',
         'Environment and access', 'Crime and safety'].every(h => prof.heads.indexOf(h) !== -1) && !prof.heads.some(h => /&/.test(h)),
       'profile section headings say "and"', prof.heads.join(' | '));
-    ok(prof.oldPills.length === 0 && ['estimated from MSOAs', 'estimated from LSOAs', 'whole-LA figure'].every(t => prof.pills.indexOf(t) !== -1),
-      'profile marks estimates with worded pills, not level codes', prof.pills.join(', ') + ' / ' + prof.oldPills.join(', '));
+    ok(prof.oldPills.length === 0 && ['estimated from LSOAs', 'added up from LSOAs', 'whole-LA figure'].every(t => prof.pills.indexOf(t) !== -1) &&
+       prof.pills.indexOf('estimated from MSOAs') === -1,
+      'profile marks estimates with worded pills, not level codes, and no MSOA pill under the OHID estimates heading', prof.pills.join(', ') + ' / ' + prof.oldPills.join(', '));
+    ok(/average of the smaller LSOAs in the ward/.test(prof.key) && !/larger areas and weighted/.test(prof.key) &&
+       /claimant rate from the Office for National Statistics/.test(prof.key) && /Office for Health Improvement and Disparities \(OHID\)/.test(prof.key) &&
+       !/Department for Work and Pensions/.test(prof.key) && !/Department for Work and Pensions/.test(prof.workCap) && /\(England is 100\)/.test(prof.ratio),
+      'the profile key calls LSOAs smaller, names one claimant source and spells out OHID, and a ratio carries its anchor', prof.key.slice(0, 200) + ' / ' + prof.ratio);
     ok(prof.captions >= 6 && /output areas/.test(prof.key) && !/~/.test(prof.name), 'each section has a caption, the key covers output areas, no "~"', prof.name);
     ok(prof.shownBefore === 8 && prof.shownAfter === prof.total && prof.total > 10, 'a long section shows eight rows and then all of them',
       prof.shownBefore + ' then ' + prof.shownAfter + ' of ' + prof.total);
-    ok(prof.imd.indexOf('Deprivation score (IMD 2025)') !== -1 && prof.work.indexOf('Claimant rate, working age') !== -1 &&
+    ok(prof.imd.indexOf('Deprivation score by ward (IMD 2025)') !== -1 && prof.work.indexOf('Claimant rate, working age') !== -1 &&
        prof.work.indexOf('Out-of-work benefit claimants') !== -1 && prof.work.indexOf('Unemployment (Census 2021)') !== -1,
       'profile shows the IMD score, and the claimant rate and unemployment measures under Work', prof.imd.join(', ') + ' / ' + prof.work.join(', '));
     ok(prof.cols === 2 && !prof.dashes, 'profile key figures two by two, and no dashes in the profile');
@@ -794,7 +827,7 @@ const smallText = page => page.evaluate(() => {
       ok(r2.lang === 'en-GB' && r2.pcodes.length === 0 && r2.counts.length === 1 && r2.dashes === 0,
         'the report declares en-GB, has no "P95", gives one ward count and no dashes', JSON.stringify(r2));
       ok(r2.png, 'every report chart offers SVG and PNG');
-      ok(r2.careFill.toUpperCase() === '#9AA6B2', 'the report draws unpaid care as descriptive, in the neutral colour', r2.careFill);
+      ok(r2.careFill.toUpperCase() === '#7A8794', 'the report draws unpaid care as descriptive, in the neutral colour', r2.careFill);
       ok(/^mailto:contact@pophealth\.uk\?subject=Problem with a figure in the report for Lansbury ward&body=/.test(r2.mail) &&
          /Link to the map view: http/.test(r2.mail) && /please describe it here/.test(r2.mail) && / \| contact@pophealth\.uk$/.test(r2.mail),
         'the report footer says how to report a problem with a figure, by a pre-filled email', r2.mail);
@@ -809,6 +842,16 @@ const smallText = page => page.evaluate(() => {
         pills: document.querySelectorAll('#wpanel .sr .gpill').length, amp: /&/.test([...document.querySelectorAll('#wpanel h3')].map(h => h.textContent).join(' ')) };
     });
     ok(!lp.assess && lp.band && lp.pills === 0 && !lp.amp, 'LSOA profile gives the decile band, no level pills and no "&"', JSON.stringify(lp));
+    // P60: counts on the LSOA card are whole numbers, PTAL has one decimal,
+    // and small labels are in sentence case rather than capitals.
+    const typo = await page.evaluate(() => {
+      const rows = [...document.querySelectorAll('#wpanel .sr')].map(r => r.textContent);
+      const tt = sel => { const e = document.querySelector(sel); return e ? getComputedStyle(e).textTransform : 'none'; };
+      return { rows: rows.filter(t => /^(Stations within 1 km|Bus stops within 800 m)/.test(t)), ptal: indDecimals('ptal_score'),
+        wardStations: indDecimalsAt('rail_stations_1km', 'ward'), tt: [tt('.keystat-lbl'), tt('.rb-group h3')] };
+    });
+    ok(typo.rows.every(t => !/\d\.\d+$/.test(t.trim())) && typo.ptal === 1 && typo.wardStations === 1 && typo.tt.every(t => t === 'none'),
+      'LSOA counts are whole numbers, PTAL has one decimal and the small labels are not in capitals', JSON.stringify(typo));
     // The figures an analyst challenges first (workplan 1.11).
     const fig = await page.evaluate(() => {
       const vals = _bivIds('ward').map(id => _bivValue('ward', id, 'census_bad_health_pct')).filter(x => x != null);
@@ -821,7 +864,7 @@ const smallText = page => page.evaluate(() => {
     ok(fig.fmt.join('|') === '7.3 per 100,000|12.3%|101.3|2.3|85.3',
       'figures carry their own unit: "%" only on percentages, a rate per 100,000 says so, a ratio has none, and a mean decile has one place', fig.fmt.join(' | '));
     ok(!fig.desc.length, 'fertility, car to work, walk or cycle to work and unpaid care are descriptive', fig.desc.join(', '));
-    ok(/^Higher than 99% of /.test(fig.ctx[0]) && /^Lower than 99% of /.test(fig.ctx[1]) && !/100%/.test(fig.ctx.join(' ')),
+    ok(/^Within London: higher than 99% of wards$/.test(fig.ctx[0]) && /^Within London: lower than 99% of wards$/.test(fig.ctx[1]) && !/100%/.test(fig.ctx.join(' ')),
       'hover context stops at 99%, never 100%', fig.ctx.join(' | '));
     await setOv(page, 'ft_93089');
     await page.waitForTimeout(1500);
@@ -1036,7 +1079,7 @@ const smallText = page => page.evaluate(() => {
       ind[q] = await page.evaluate(() => document.getElementById('ov-results').innerText.replace(/\s+/g, ' ').trim());
     }
     await page.fill('#ov-search', '');
-    ok(!/No indicator matches/.test(ind.suicide) && /Suicide rate is only published for whole LAs/.test(ind.suicide) && /full profile/.test(ind.suicide),
+    ok(!/No indicator matches/.test(ind.suicide) && /Suicide rate is only published for whole LAs/.test(ind.suicide) && /full profile/.test(ind.suicide) && /plan to add it to the LA map/.test(ind.suicide),
       'a council-only indicator says where its figures are', ind.suicide);
     ok(/Nitrogen dioxide/.test(ind.pollution), 'indicator search knows everyday words', ind.pollution.slice(0, 120));
     ok(/^1 match\b/.test(ind.arson), 'one result reads "1 match"', ind.arson.slice(0, 60));
@@ -1403,6 +1446,12 @@ const smallText = page => page.evaluate(() => {
     // charities are the ones on the map plus the London-wide ones.
     await page.click('.mode-btn[data-mode="explore"]');
     await page.click('#sbtab-vcse');
+    // P59: with the layer off, the tab does not say the charities are on the map.
+    await page.uncheck('#vcse-tab-toggle');
+    await page.waitForTimeout(300);
+    const vOff = await page.evaluate(() => ({ about: document.getElementById('vcse-about').textContent, count: document.getElementById('vcse-count').textContent }));
+    ok(!/^Showing/.test(vOff.about.trim()) && /Tick Show charities to put them on the map\./.test(vOff.about) && !/on the map/.test(vOff.count),
+      'with Show charities unticked, the Charities tab does not say they are on the map', JSON.stringify(vOff));
     await page.check('#vcse-tab-toggle');
     await page.waitForFunction(() => document.querySelectorAll('.vcse-ring').length > 3, null, { timeout: 30000 }).catch(() => {});
     const ch = await page.evaluate(() => {
@@ -1510,7 +1559,94 @@ const smallText = page => page.evaluate(() => {
       'the two-indicator key is named for both indicators and not described by the hidden scale', JSON.stringify(bivName));
     await page.click('#sbtab-overlay');
     await checkAxe(page, 'two indicators');
+    // The key in words (review P1): corners from each indicator's own words,
+    // low, middle and high on each axis, a swatch for a missing figure, the
+    // caution about cause, and thirds that never split or push up a tie.
+    const bk = await page.evaluate(() => {
+      const leg = document.getElementById('biv-legend');
+      const gw = leg.querySelector('.biv-gw');
+      const vals = [5, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 6].sort((a, b) => a - b);
+      const t = bivThirds(vals);
+      const cls = v => v < t[0] ? 0 : v < t[1] ? 1 : 2;
+      const allTied = bivThirds([1, 1, 1, 1, 1, 1, 2, 3, 4]);
+      const code = Object.keys(LSOA_DATA).find(c => bivFill('lsoa', c) !== BIV_MISSING);
+      return {
+        corners: [...leg.querySelectorAll('.biv-c')].map(e => e.textContent),
+        axes: [...leg.querySelectorAll('.biv-yl span, .biv-xl span')].map(e => e.textContent),
+        img: gw && gw.getAttribute('role') === 'img' && /nine colours/.test(gw.getAttribute('aria-label')),
+        miss: !!leg.querySelector('.biv-miss-sw') && /Missing one of the two figures/.test(leg.textContent),
+        note: /not proof that one causes the other/.test(leg.textContent),
+        zeros: vals.filter(v => v === 0).map(cls), ok: t.ok, tied: allTied.ok,
+        hover: code ? bivThirdsLine('lsoa', code) : '',
+        missEdge: bivEdge({ fillColor: BIV_MISSING, fillOpacity: 0.9, weight: 0.5 }).dashArray,
+      };
+    });
+    ok(bk.corners.indexOf('More deprived, dirtier air') !== -1 && bk.corners.indexOf('Less deprived, cleaner air') !== -1,
+      'two-indicator corners are named from each indicator\'s own words', bk.corners.join(' | '));
+    ok(bk.axes.join(' ') === 'High Middle Low Low Middle High' && bk.img && bk.miss && bk.note,
+      'two-indicator key marks low, middle and high, is one described image, has a missing swatch and the caution', JSON.stringify(bk));
+    ok(new Set(bk.zeros).size === 1 && bk.ok && bk.tied === false && bk.missEdge === '3 3',
+      'thirds keep tied figures together, an unsplittable indicator is flagged, missing figures are dashed', JSON.stringify(bk));
+    ok(/third/.test(bk.hover) && /deprived third/.test(bk.hover), 'two-indicator hover names the thirds', bk.hover);
     ok(errors.length === 0, 'no page errors (two indicators)', errors.join(' | '));
+    await page.close();
+  }
+
+  // Data and methodology polish (review P2 to P11).
+  {
+    const { page, errors } = await open(browser, 'index.html?t=1', DESK);
+    const dm = await page.evaluate(async () => {
+      await Promise.all([ensureLsoaData(), ensureMsoaData(), ensureLsoaImd(), ensureWardDetail()]);
+      const st = Object.values(WARD_DATA_BY_CODE).find(w => w.name === 'Stonebridge');
+      const asbIn = Object.values(WARD_DATA_BY_CODE).filter(w => w.crime_by_category).every(w =>
+        w.indicators.crime_total === Object.entries(w.crime_by_category).filter(([c]) => c !== 'anti-social-behaviour').reduce((a, [, v]) => a + v, 0));
+      const card = k => indicatorCardHTML(k).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+      const fit = Object.values(WARD_DATA_BY_CODE).find(w => w.name === 'Farringdon Without');
+      return {
+        covid: /COVID-19 raised deaths/.test(card('ft_93250')) && /COVID-19 raised deaths/.test(card('ft_93283')) &&
+          /2020\/21, was the first year of the pandemic/.test(card('ft_93227')) && !/COVID/.test(card('census_bad_health_pct')),
+        crime: asbIn && /not counting anti-social behaviour/.test(card('crime_total')),
+        jsa: indLabel('ft_93098') === 'Long-term Jobseeker’s Allowance claimants' && /Universal Credit/.test(card('ft_93098')) &&
+          !Object.values(MSOA_DATA).some(r => r.ft_93098 === 0 && !r.ft_93098_vs) && OV_CFG.ft_93098.min >= 0,
+        fit: wardFitNote(fit), fitNone: wardFitNote(st),
+        names: [indLabel('imd_score_ward'), indLabel('imd_score'), indSameAs('ft_93097')],
+        inc: [st.indicators.income_score, fmtOv(st.indicators.income_score, 'income_score'), OV_CFG.income_score.lo, OV_CFG.health_score.hi,
+          ovContext('ward', 'income_score', st.indicators.income_score, st)],
+        ratio: fmtOvTip(126, 'ft_93250'), vs: VS_ENGLAND_TEXT.S,
+        plain: Object.values(OV_PLAIN).filter(t => /where 100 is average/.test(t)).length,
+        oa: /about 125 households/.test(card('census_no_car_pct')),
+        est: EST_HTML.indexOf('>Estimated from 2011 areas<') !== -1,
+      };
+    });
+    ok(dm.covid, 'death, life expectancy and admissions cards say their periods take in the pandemic');
+    ok(dm.crime, 'the crime total leaves out anti-social behaviour, and its card says so');
+    ok(dm.jsa, 'long-term claimants are named for Jobseeker\'s Allowance, with no bare zeros');
+    ok(/slightly different area|noticeably different area/.test(dm.fit) && dm.fitNone === '', 'a ward whose LSOAs hold a different population is marked', dm.fit);
+    ok(dm.names[0] !== dm.names[1] && dm.names[2] === 'claimant_rate_pct', 'the two deprivation scores are named apart and the claimant rates are paired', dm.names.join(' | '));
+    ok(dm.inc[0] > 1 && /%$/.test(dm.inc[1]) && dm.inc[2] === 'Less deprived' && dm.inc[3] === 'More deprived' && /more deprived than/.test(dm.inc[4]),
+      'income deprivation reads as a percentage, and deprivation keys and hovers say less or more deprived', dm.inc.join(' | '));
+    ok(dm.ratio === '126.0 (England is 100)' && dm.vs === 'Not clearly different from England' && dm.plain === 0,
+      'hover ratios say England is 100, and similar reads not clearly different', dm.ratio + ' / ' + dm.vs);
+    ok(dm.oa && dm.est, 'Census cards carry the output area caution, and the 2011 label has one name');
+    // Ward rankings of a Local Health figure say there is no interval (P3), and
+    // the ward report places the ward among wards (P11) and marks a poor fit (P6).
+    await setOv(page, 'ft_93250');
+    await page.waitForTimeout(1500);
+    await page.evaluate(() => _setDataLevel('ward'));
+    await page.waitForTimeout(1500);
+    const rk = await page.evaluate(() => {
+      renderTopBottom();
+      let html = '';
+      _generateWardReport({ sink: h => { html = h; } }, 'Farringdon Without', {});
+      const d = new DOMParser().parseFromString(html, 'text/html');
+      return { notes: document.getElementById('rank-notes').textContent,
+        dots: [...d.querySelectorAll('.legend')].map(e => e.textContent).find(t => /Each dot places/.test(t)) || '',
+        fit: (d.querySelector('.fit-note') || {}).textContent || '' };
+    });
+    ok(/no interval is available/.test(rk.notes), 'ward rankings of a Local Health figure say no interval is available', rk.notes);
+    ok((!rk.dots || /places the ward among the [\d,]+ London wards/.test(rk.dots)) && /different area/.test(rk.fit),
+      'the ward report places the ward among wards and marks a poor LSOA fit', JSON.stringify(rk));
+    ok(errors.length === 0, 'no page errors (data and methodology polish)', errors.join(' | '));
     await page.close();
   }
 
@@ -2290,6 +2426,24 @@ const smallText = page => page.evaluate(() => {
       'each tool is named once at the top of the panel', JSON.stringify(names));
     ok(await page.evaluate(() => !/sign-in/.test(document.querySelector('#ldr .ldr-line').textContent)),
       'the loading screen line has no sign-in phrase');
+    // P77: a visible Feedback link in the footer, a pre-filled email.
+    {
+      const fb = await page.evaluate(() => { const a = document.getElementById('sbar-feedback');
+        return a ? { t: a.textContent, href: decodeURIComponent(a.getAttribute('href')) } : null; });
+      ok(!!fb && fb.t === 'Feedback' && /^mailto:contact@pophealth\.uk\?subject=Feedback on PopHealth Map&body=1\. What is your role/.test(fb.href) &&
+         /\n3\. What would make it more useful to you\?/.test(fb.href),
+        'the footer has a Feedback link, an email with three questions', JSON.stringify(fb));
+    }
+    // P61: the footer's version is the first released one in CHANGELOG.md,
+    // and the data date is written in full.
+    {
+      const rel = (fs.readFileSync(path.join(ROOT, 'CHANGELOG.md'), 'utf8').match(/^## (\d+\.\d+\.\d+)\b/m) || [])[1];
+      const ft = await page.evaluate(() => ({ ver: document.getElementById('site-ver').textContent.trim(),
+        date: document.getElementById('data-date').textContent.trim() }));
+      ok(!!rel && ft.ver === 'Version ' + rel, 'the footer version matches the latest release in CHANGELOG.md', ft.ver + ' / ' + rel);
+      ok(!ft.date || /^Data updated \d{1,2} (January|February|March|April|May|June|July|August|September|October|November|December) \d{4}$/.test(ft.date),
+        'the footer writes the data date in full', ft.date);
+    }
     ok(errors.length === 0, 'no page errors (Compare and the map)', errors.join(' | '));
     await page.close();
   }
@@ -3088,8 +3242,9 @@ const smallText = page => page.evaluate(() => {
     const hasAdd = await page.evaluate(() => {
       const s = document.getElementById('cmp-add-metric');
       if (!s) return false;
-      const on = [...document.querySelectorAll('#cmp-metrics [data-metric].on')].map(c => c.textContent.trim());
-      const t = [...s.options].findIndex((o, i) => i > 0 && on.indexOf(o.textContent.trim()) === -1);
+      // By key: an option's name carries its unit, a chip's does not.
+      const on = PH_COMPARE.state().metrics;
+      const t = [...s.options].findIndex((o, i) => i > 0 && on.indexOf(o.value) === -1);
       if (t < 1) return false;
       s.selectedIndex = t - 1;
       s.focus();
@@ -3500,7 +3655,10 @@ const smallText = page => page.evaluate(() => {
     ok(/last reviewed on 19 October 2026/.test(a) && !/Every control can be reached/.test(a) && !/the toolbar/i.test(a) &&
        /the pages around it: the Methodology page, the About and privacy page and this statement/.test(a),
       'accessibility: no false keyboard claims, and the review date is current');
-    ok(['2.1.1', '2.4.7', '4.1.2', '4.1.3'].every(c => a.includes(c)), 'accessibility: the remaining known failures are listed');
+    // P31 to P34 fixed the focus ring, the on and off states, the status
+    // messages and the report's contrast, so only the rest are listed.
+    ok(['2.1.1', '1.3.1'].every(c => a.includes(c)) && !['2.4.7', '4.1.2', '4.1.3', '1.4.3', '1.4.11'].some(c => a.includes(c)),
+      'accessibility: the remaining known failures are listed, and the fixed ones are not');
     ok(/Your personal data and your rights/.test(pr) && /Harvey Seville is responsible/.test(pr) && /legitimate interest/.test(pr) &&
        /United States/.test(pr) && /background map does this whenever the map is open/.test(pr) && !/optional parts/.test(pr) &&
        /ph-ldr-swept/.test(pr) && !/devBannerDismissed/.test(pr) && /last updated on 19 October 2026/.test(pr),
@@ -3668,7 +3826,7 @@ const smallText = page => page.evaluate(() => {
       'the profile marks Hackney\'s combined and provisional LA figures', r.hk.join(', '));
     ok(r.part.some(t => /based on \d\d% of residents/.test(t)) && /rests on that part of the ward only/.test(r.partNote),
       'a ward health figure on part of the ward says what share of residents it rests on', r.part.join(', ') + ' / ' + r.partNote.slice(-120));
-    ok(/Provisional: OHID based this on provisional death and population figures, for \d+ of the \d+ LAs\./.test(r.card),
+    ok(/Provisional: (the Office for Health Improvement and Disparities \(OHID\)|OHID) based this on provisional death and population figures, for \d+ of the \d+ LAs\./.test(r.card),
       'the life expectancy card\'s Caution row gives OHID\'s note', r.card.replace(/<[^>]+>/g, ' ').slice(0, 400));
     ok(/LSOAs of 2011/.test(r.ptal) && /fewer than four in five of its residents is left blank/.test(r.ptal),
       'the PTAL card explains the 2011 LSOAs and the ward rule', r.ptal.replace(/<[^>]+>/g, ' ').slice(0, 500));
@@ -3736,6 +3894,571 @@ const smallText = page => page.evaluate(() => {
        /Census day, 21 March 2021/.test(mt) && !/mid-2022/.test(mt) && /measures of households|summed counts\s+behind it, as a ward's is/.test(mt),
       'the methodology describes the ward coverage rule, the Census population and Custom area\'s arithmetic', '');
     await meth.page.close();
+  }
+
+  // Review round 2, polish (P35 to P50): tools, sharing, reports and downloads.
+  {
+    const fsx = require('fs');
+    const { isMobile, hasTouch, ...viewport } = DESK;
+    const page = await browser.newPage({ viewport });
+    const errors = [];
+    page.on('pageerror', e => errors.push(e.message));
+    await page.route('https://api.postcodes.io/**', r => r.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({ status: 200, result: { postcode: 'M1 1AE', latitude: 53.4774, longitude: -2.2309,
+        region: 'North West', admin_ward: 'Piccadilly', admin_district: 'Manchester', codes: {} } }) }));
+    await page.goto(BASE + '/index.html?t=1');
+    await page.waitForTimeout(SETTLE);
+    ok(await page.evaluate(() => !document.querySelector('meta[property="og:url"]') && !!document.querySelector('link[rel="canonical"]')),
+      'sharing: no og:url, so a shared link previews and opens as the address shared (P42)');
+
+    // P36: a postcode on another region's map.
+    await page.click('.mode-btn[data-mode="directory"]');
+    await page.waitForFunction(() => document.querySelectorAll('#dir-types [data-dtype]').length > 3, null, { timeout: 30000 }).catch(() => {});
+    await page.fill('#dir-q', 'M1 1AE');
+    await page.waitForTimeout(700);
+    await page.click('#dir-near-go');
+    await page.waitForTimeout(800);
+    const dn = await page.evaluate(() => ({ msg: (document.getElementById('dir-offer-msg') || {}).textContent,
+      link: (document.querySelector('#dir-offer-msg a') || {}).href || '', near: !!PH_DIR.near() }));
+    ok(dn.msg === 'M1 1AE is in the North West, which this map does not cover, so open the North West map to see the places near it.' &&
+       /r=north-west/.test(dn.link) && !dn.near, 'directory: a postcode on another map links there rather than listing places 240 km away (P36)', JSON.stringify(dn));
+
+    // P37: choosing LAs keeps the indicators already chosen.
+    await page.click('.mode-btn[data-mode="csv"]');
+    await page.waitForTimeout(800);
+    const ex = await page.evaluate(async () => {
+      PH_CSV.setLevel('ward');
+      ['census_bad_health_pct', 'crime_rate_per_1000', 'imd_score_ward', 'census_over65_pct', 'claimant_rate_pct', 'ft_93283', 'ft_smoking_prevalence_adults']
+        .forEach(k => PH_CSV.pick(k));
+      const before = PH_CSV.columns().length;
+      PH_CSV.setLevel('borough');
+      for (let i = 0; i < 40 && /Loading/i.test(document.getElementById('cb-count').textContent); i++) await new Promise(r => setTimeout(r, 250));
+      const at = { n: PH_CSV.columns().length, note: (document.getElementById('cb-dropped') || {}).textContent || '',
+        marks: document.querySelectorAll('#cb-cols .cb-only').length, cols: PH_CSV.build().header.length };
+      PH_CSV.setLevel('ward');
+      return { before, at, after: PH_CSV.columns().length };
+    });
+    ok(ex.before === 7 && ex.at.n === 7 && ex.after === 7 && ex.at.marks > 0 &&
+       /^\w+ of your indicators are not published for LAs, so the LA file leaves them out, and they will be back in the file when you choose another size of area\.$/.test(ex.at.note),
+      'export: choosing LAs marks the indicators it lacks and keeps them chosen for the other sizes (P37)', JSON.stringify(ex));
+
+    // P39, P41: Query's groups, its operators, and equals at the shown precision.
+    await page.click('.mode-btn[data-mode="query"]');
+    await page.waitForTimeout(600);
+    await page.click('#q-add-cond');
+    await page.waitForTimeout(300);
+    const qg = await page.evaluate(() => {
+      const s = document.querySelector('.q-f-ind'), g = {};
+      s.querySelectorAll('optgroup').forEach(o => { g[o.label] = [...o.querySelectorAll('option')].map(x => x.value); });
+      const where = k => Object.keys(g).find(l => g[l].includes(k)) || '';
+      return { groups: Object.keys(g), claimant: where('claimant_rate_pct'), ptal: where('ptal_score'),
+        ops: [...document.querySelector('.q-f[data-op]').options].map(o => o.textContent).join('|') };
+    });
+    ok(qg.claimant === 'Work, money and education' && qg.ptal === 'Transport' && qg.groups.indexOf('Health figures for each LA') !== -1 &&
+       !qg.groups.some(g => /^(Crime|Local Health \(ward\)|Other)$/.test(g)) && qg.ops === 'at most|at least|equals',
+      'query: indicators grouped by the picker\'s themes, with plain operator names (P39, P41)', JSON.stringify(qg));
+    const shown = await page.evaluate(() => {
+      const w = Object.values(WARD_DATA).find(w => w.name === 'Stonebridge');
+      const v = Math.round(w.indicators.census_bad_health_pct * 10) / 10;
+      PH_QUERY.apply({ services: [], scope: '', conds: [['census_bad_health_pct', 'eq', String(v)]] });
+      return v;
+    });
+    await page.click('#q-run');
+    await page.waitForTimeout(1500);
+    const qr = await page.evaluate(() => [...document.querySelectorAll('.q-row')].map(b => b.getAttribute('data-ward')));
+    ok(qr.includes('Stonebridge'), 'query: "equals ' + shown + '" finds Stonebridge, shown as ' + shown + '% (P41)', qr.slice(0, 8).join(', '));
+    // P45: a byte order mark, headings with their period, and notes that start with the query.
+    const [qd] = await Promise.all([page.waitForEvent('download', { timeout: 8000 }).catch(() => null), page.click('#q-csv')]);
+    const qb = qd ? fsx.readFileSync(await qd.path()) : Buffer.from('');
+    const [qn] = await Promise.all([page.waitForEvent('download', { timeout: 8000 }).catch(() => null), page.click('#q-notes')]);
+    const qt = qn ? fsx.readFileSync(await qn.path(), 'utf8') : '';
+    ok(qb[0] === 0xEF && qb[1] === 0xBB && qb[2] === 0xBF && /"Bad or very bad health \(%, 2021\)"/.test(qb.toString('utf8').split('\n')[0]) &&
+       /^PopHealth Map: notes for your query\n\nWards anywhere in London, where bad or very bad health is exactly [\d.]+%, using figures updated on /.test(qt),
+      'query: the CSV starts with a byte order mark, heads its columns with their period, and its notes start with the query (P45)',
+      qb.toString('utf8').split('\n')[0] + ' / ' + qt.slice(0, 160));
+
+    // P40: Compare at its cap, and a level change that clears the pins.
+    await page.click('.mode-btn[data-mode="compare"]');
+    await page.waitForTimeout(800);
+    await page.evaluate(() => ['Lansbury', 'Stonebridge', 'Holloway', 'Bishopsgate']
+      .forEach(n => wLyr.getLayers().find(l => l.feature.properties.WD24NM === n).fire('click')));
+    await page.waitForTimeout(500);
+    const selBefore = await page.evaluate(() => selW);
+    await page.evaluate(() => wLyr.getLayers().find(l => l.feature.properties.WD24NM === 'Barnes').fire('click'));
+    await page.waitForTimeout(400);
+    const cap = await page.evaluate(() => ({ pins: PH_COMPARE.pinned(), sel: selW,
+      note: (document.querySelector('#tab-compare .ph-note') || {}).textContent || '' }));
+    ok(cap.pins.length === 4 && cap.pins.indexOf('Barnes') === -1 && cap.sel === selBefore &&
+       /You have pinned four wards, which is as many as fit side by side\./.test(cap.note),
+      'compare: a fifth ward is refused with the reason, and the outline stays where it was (P40)', JSON.stringify(cap));
+    const [cc] = await Promise.all([page.waitForEvent('download', { timeout: 8000 }).catch(() => null), page.click('#cmp-csv')]);
+    const ch = cc ? fsx.readFileSync(await cc.path(), 'utf8') : '';
+    ok(ch.charCodeAt(0) === 0xFEFF && /\(%, 2021\)/.test(ch.split('\n')[0]), 'compare: the CSV has a byte order mark and periods in its headings (P45)', ch.split('\n')[0]);
+    await page.evaluate(() => document.querySelector('#cmp-levels [data-cmplvl="borough"]').click());
+    await page.waitForTimeout(500);
+    const cl = await page.evaluate(() => ({ pins: PH_COMPARE.pinned().length,
+      note: [...document.querySelectorAll('#tab-compare .ph-note')].map(n => n.textContent).join(' / ') }));
+    ok(cl.pins === 0 && /Your four wards were cleared, because Compare works on one size of area at a time\./.test(cl.note),
+      'compare: switching size says where the pins went (P40)', JSON.stringify(cl));
+
+    // P45: the Custom area download is a ZIP of one-table files.
+    await page.click('.mode-btn[data-mode="report"]');
+    await page.waitForTimeout(1200);
+    const rf = await page.evaluate(async () => {
+      await ensureLsoaData();
+      const codes = LSOA_IMD.features.filter(f => f.properties.ward === 'Lansbury').map(f => f.properties.code);
+      PH_REPORT.apply({ name: 'Poplar & Bow  test', codes });
+      await new Promise(r => setTimeout(r, 1500));
+      return PH_REPORT.files().map(x => ({ name: x.name, head: x.text.split('\n')[0] }));
+    });
+    const [zd] = await Promise.all([page.waitForEvent('download', { timeout: 8000 }).catch(() => null), page.click('#rb-csv')]);
+    ok(rf.length === 3 && rf[0].head === 'Indicator,Value,Unit,Period,How it was combined,Source (publisher)' &&
+       /-lsoas\.csv$/.test(rf[1].name) && /-notes\.txt$/.test(rf[2].name) && !!zd && /^Poplar and Bow test-[\d-]+\.zip$/.test(zd.suggestedFilename()),
+      'custom area: a ZIP of the figures, the LSOAs and the notes, named without the ampersand (P45)', JSON.stringify(rf) + ' ' + (zd && zd.suggestedFilename()));
+
+    // P38: the two-indicator map across a level change.
+    await page.click('.mode-btn[data-mode="explore"]');
+    await page.waitForTimeout(400);
+    await page.evaluate(() => { const o = document.getElementById('ov'); o.value = 'census_bad_health_pct'; o.dispatchEvent(new Event('change')); });
+    await page.waitForTimeout(1200);
+    await page.click('#dl-seg button[data-dl="ward"]');
+    await page.waitForTimeout(1200);
+    await page.evaluate(() => window._bivSet('crime_rate_per_1000'));
+    await page.waitForTimeout(500);
+    const b1 = await page.evaluate(() => document.querySelector('#dl-seg button[data-dl="lsoa"]').classList.contains('biv-lacks'));
+    await page.click('#dl-seg button[data-dl="lsoa"]');
+    await page.waitForTimeout(1500);
+    const b2 = await page.evaluate(() => ({ ov2: curOv2, hint: (document.getElementById('dl-hint') || {}).textContent || '' }));
+    await page.click('#dl-seg button[data-dl="ward"]');
+    await page.waitForTimeout(1500);
+    const b3 = await page.evaluate(() => curOv2);
+    ok(b1 && b2.ov2 === 'none' && b3 === 'crime_rate_per_1000' &&
+       b2.hint === 'Crime rate per 1,000 residents has no LSOA figures, so the map is showing Bad or very bad health on its own, and the comparison will come back when you choose Ward again.',
+      'two indicators: a level the second lacks is greyed, leaving it says why, and coming back restores it (P38)', JSON.stringify([b1, b2, b3]));
+
+    // P43: opening a tool is a step Back can undo.
+    const h0 = await page.evaluate(() => history.length);
+    await page.click('.mode-btn[data-mode="compare"]');
+    await page.waitForTimeout(800);
+    const h1 = await page.evaluate(() => ({ n: history.length, s: location.search }));
+    await page.goBack();
+    await page.waitForTimeout(SETTLE);
+    const hb = await page.evaluate(() => ({ s: location.search, tool: document.querySelector('.mode-rail .mode-btn[aria-selected="true"]').dataset.mode }));
+    ok(h1.n === h0 + 1 && /mode=compare/.test(h1.s) && hb.tool === 'explore' && !/mode=compare/.test(hb.s),
+      'history: Back after opening Compare returns to the map, not the page before the site (P43)', JSON.stringify([h0, h1, hb]));
+
+    // P48: Ctrl+P with the Area profile open prints the profile.
+    await page.evaluate(() => { const l = wLyr.getLayers().find(l => l.feature.properties.WD24NM === 'Lansbury'); l.fire('click'); });
+    await page.waitForTimeout(800);
+    await page.click('#ws-profile');
+    await page.waitForTimeout(600);
+    await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
+    await page.emulateMedia({ media: 'print' });
+    const pr = await page.evaluate(() => ({ map: getComputedStyle(document.getElementById('map-wrap')).display,
+      hdr: getComputedStyle(document.querySelector('.hdr')).display, w: Math.round(document.getElementById('wpanel').getBoundingClientRect().width),
+      open: [...document.querySelectorAll('#wpanel .cat-body')].every(b => getComputedStyle(b).display === 'block') }));
+    const ppdf = await page.pdf({ format: 'A4' });
+    const ppages = (ppdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) || []).length;
+    await page.emulateMedia({ media: 'screen' });
+    await page.evaluate(() => window.dispatchEvent(new Event('afterprint')));
+    ok(pr.map === 'none' && pr.hdr === 'none' && pr.w > 600 && pr.open && ppages >= 2,
+      'print: the Area profile prints full width with every section open (P48)', JSON.stringify(pr) + ', ' + ppages + ' pages');
+
+    // P47: the sheet's Open printable report opens it without printing.
+    const [rep] = await Promise.all([page.waitForEvent('popup', { timeout: 20000 }).catch(() => null), page.click('#ws-pdf')]);
+    if (rep) {
+      await rep.evaluate(() => { window.print = () => { window.__printed = (window.__printed || 0) + 1; }; }).catch(() => {});
+      await rep.waitForTimeout(2500);
+      ok((await rep.evaluate(() => window.__printed || 0)) === 0, 'report: the ward sheet\'s Open printable report does not print by itself (P47)');
+      await rep.close();
+    } else ok(false, 'report: the ward sheet\'s Open printable report opens (P47)');
+
+    // P46, P49, P50: the reports' wording, and charts that explain themselves.
+    const R = await page.evaluate(async () => {
+      await Promise.all([ensureAllLayerData(), ensureLsoaImd(), ensureLsoaData(), ensureWardDetail(), ensureGreenspaceData()]);
+      const ward = wn => { let h = ''; _generateWardReport({ sink: x => { h = x; } }, wn); return h; };
+      return { Lansbury: ward('Lansbury'), lsoa: _buildLSOAReportHtml('E01004243') };
+    });
+    ok(/LSOAs are the small areas, of about 1,500 residents each, that official statistics are published for\. Core20 means the most deprived fifth of areas in England, which the NHS gives priority to\./.test(R.Lansbury) &&
+       /LSOAs are the small areas/.test(R.lsoa) && /kpi-lbl">Disabled residents \(all\)</.test(R.Lansbury) &&
+       /Parks and green spaces <span class="count">(\d+|[\d,]+ sites)</.test(R.Lansbury),
+      'report: the footer explains LSOA and Core20, the tile matches the chart, and the parks count says what it counts (P49, P50)');
+    const rp = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+    await rp.goto(BASE + '/robots.txt');
+    await rp.setContent(R.Lansbury);
+    await rp.waitForTimeout(800);
+    const [sd] = await Promise.all([rp.waitForEvent('download', { timeout: 8000 }).catch(() => null),
+      rp.evaluate(() => [...document.querySelectorAll('.panel')].find(x => /Compared with/.test(x.textContent)).querySelector('.chart-dl').click())]);
+    const sv = sd ? fsx.readFileSync(await sd.path(), 'utf8') : '';
+    ok(/>Lansbury: compared with the London ward median,/.test(sv) && />Census 2021</.test(sv) && /better than the median,/.test(sv) &&
+       /Source: ONS Census 2021\. PopHealth Map, pophealth\.uk/.test(sv),
+      'report: a downloaded chart carries its title, area, key and source (P46)', sv.slice(0, 200));
+    await rp.close();
+
+    // P35: Reset after layers, a focus, a network and a selection.
+    await page.click('.mode-btn[data-mode="explore"]').catch(() => {});
+    await page.evaluate(() => { const b = document.getElementById('borough-focus'); b.value = 'Hackney'; b.dispatchEvent(new Event('change')); });
+    await page.waitForTimeout(800);
+    await page.evaluate(() => ['tg', 'tph', 'vcse-tab-toggle'].forEach(id => { const e = document.getElementById(id);
+      if (e && !e.checked) { e.checked = true; e.dispatchEvent(new Event('change')); } }));
+    await page.waitForTimeout(1500);
+    await page.evaluate(() => { const s = document.getElementById('pcn-focus'); if (s && s.options.length > 1) { s.value = s.options[1].value; s.dispatchEvent(new Event('change')); } });
+    await page.waitForTimeout(500);
+    await page.evaluate(() => { const l = wLyr.getLayers().find(l => l.feature.properties.WD24NM === 'Dalston'); if (l) l.fire('click'); });
+    await page.waitForTimeout(150);
+    await page.click('#tb-reset');
+    await page.waitForTimeout(2500);
+    ok(!errors.length, 'no page errors (review round 2 polish checks, including Reset after layers, a focus and a selection, P35)', errors.join(' | '));
+    await page.close();
+  }
+
+  // Review round 2, polish (P14 to P34): first visit, phones and accessibility.
+  {
+    const page = await browser.newPage({ viewport: DESK });
+    const errors = [];
+    page.on('pageerror', e => errors.push(e.message));
+    // postcodes.io is answered locally, with the LSOA the postcode is in
+    // taken from the boundaries once they have loaded (see below).
+    const PCL = { code: '', name: '' };
+    await page.route('https://api.postcodes.io/**', r => r.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({ status: 200, result: { postcode: 'E1 6AN', latitude: 51.520014, longitude: -0.072097,
+        admin_ward: 'Spitalfields & Banglatown', admin_district: 'Tower Hamlets', region: 'London', lsoa: PCL.name,
+        codes: { admin_ward: 'E05009333', lsoa: PCL.code } } }) }));
+    await page.goto(BASE + '/index.html?t=1');
+    await page.waitForTimeout(SETTLE);
+    // P14: the key indicators lead with a health figure anyone can read.
+    const keys = await page.evaluate(() => [...document.querySelectorAll('#ov-chips [data-ov]')].map(b => b.getAttribute('data-ov')));
+    ok(keys.join() === 'imd_decile,census_bad_health_pct,fuel_poverty_pct,no2_ugm3',
+      'polish: the key indicators are the decile, bad health, fuel poverty and NO2, not a negative score', keys.join());
+    // P34: the indicator card follows its button.
+    ok(await page.evaluate(() => document.getElementById('ov-cur-btns').nextElementSibling.id === 'ov-info-panel'),
+      'polish: the indicator card sits straight after About this indicator in the page order');
+    // P18: the level hint goes when the next indicator is chosen.
+    await setOv(page, 'no2_ugm3');
+    await page.waitForFunction(() => document.getElementById('dl-hint').classList.contains('show') && /Nitrogen/.test(document.getElementById('dl-hint').textContent), null, { timeout: 30000 }).catch(() => {});
+    await setOv(page, 'pm25_ugm3');
+    await page.waitForTimeout(1500);
+    const hint = await page.evaluate(() => { const h = document.getElementById('dl-hint'); return h.classList.contains('show') ? h.textContent : ''; });
+    ok(!/Nitrogen/.test(hint), 'polish: the Area level hint never names the indicator before', hint);
+    // P32: the level on show is pressed.
+    const pr = await page.evaluate(() => ({ g: document.getElementById('dl-seg').getAttribute('role'),
+      p: [...document.querySelectorAll('#dl-seg button')].map(b => (b.classList.contains('active') ? 'on' : 'off') + ':' + b.getAttribute('aria-pressed')) }));
+    ok(pr.g === 'group' && pr.p.every(x => x === 'on:true' || x === 'off:false') && pr.p.filter(x => x === 'on:true').length === 1,
+      'polish: the level buttons say which is pressed', JSON.stringify(pr));
+    // P15 and P31: a postcode search names the reader's own LSOA and is announced.
+    await setOv(page, 'imd_decile');
+    await page.waitForFunction(() => lsoaLyr && map.hasLayer(lsoaLyr) && Object.keys(LSOA_DATA).length > 1000, null, { timeout: 40000 }).catch(() => {});
+    const lsoa = await page.evaluate(() => {
+      const f = LSOA_IMD.features.find(f => f.properties.ward === 'Spitalfields & Banglatown' && LSOA_DATA[f.properties.code] && lsoaOvValue(f.properties.code, 'imd_decile') != null);
+      return f ? { code: f.properties.code, name: f.properties.name || f.properties.code, dec: String(lsoaOvValue(f.properties.code, 'imd_decile')) } : null;
+    });
+    if (lsoa) { PCL.code = lsoa.code; PCL.name = lsoa.name; }
+    await page.fill('#hdr-search-input', 'E1 6AN');
+    await page.waitForTimeout(1200);
+    const said = await page.evaluate(() => document.getElementById('hdr-search-status').textContent);
+    ok(said === 'Postcode E1 6AN, Spitalfields & Banglatown, Tower Hamlets. Press Enter to go there.', 'polish: the postcode found is announced', said);
+    await page.click('#sr-pc-row');
+    await page.waitForTimeout(1500);
+    const fig = await page.evaluate(() => document.getElementById('ws-fig').innerText);
+    ok(!!lsoa && fig === 'Your neighbourhood, ' + lsoa.name + ', is in decile ' + lsoa.dec + ' for Deprivation decile (IMD 2025).',
+      'polish: after a postcode search the ward sheet gives the figure for the reader\'s own LSOA', fig + ' ' + JSON.stringify(lsoa));
+    await page.evaluate(() => showWard('Lansbury'));
+    await page.waitForTimeout(600);
+    const fig2 = await page.evaluate(() => document.getElementById('ws-fig').innerText);
+    ok(fig2 === 'Deprivation decile (IMD 2025) is published for LSOAs, so hover over the map to see each one.',
+      'polish: without a postcode the ward sheet points to the map rather than saying "No figure"', fig2);
+    // P16: the full profile is a wide reading view, and the button closes it.
+    await page.click('#ws-profile');
+    // The panel widens over a short transition; read it once it has settled.
+    await page.waitForFunction(() => document.getElementById('sidebar').getBoundingClientRect().width >= 600, null, { timeout: 5000 }).catch(() => {});
+    await page.waitForTimeout(1000);
+    const wide = await page.evaluate(() => ({ w: document.getElementById('sidebar').getBoundingClientRect().width, b: document.getElementById('ws-profile').textContent,
+      fs: getComputedStyle(document.querySelector('#wpanel .sr')).fontSize }));
+    // The whole region framed first: an area cut off at the map's bottom
+    // edge keeps its whole box, which axe counts as a neighbour of the footer
+    // links below, and that depends on where the map is panned rather than
+    // on the profile.
+    await page.evaluate(() => map.fitBounds(wLyr.getBounds(), { padding: [40, 40], animate: false }));
+    await page.waitForTimeout(800);
+    await checkAxe(page, 'the full profile, wide');
+    await page.click('#ws-profile');
+    await page.waitForTimeout(800);
+    const back = await page.evaluate(() => ({ w: document.getElementById('sidebar').getBoundingClientRect().width, b: document.getElementById('ws-profile').textContent,
+      tab: document.querySelector('.sb-tab.active').dataset.tab }));
+    ok(wide.w >= 600 && wide.b === 'Close full profile' && wide.fs === '13px' && back.w < 400 && back.b === 'Open full profile' && back.tab !== 'ward',
+      'polish: the full profile opens wide in 13px text and its button closes it again', JSON.stringify([wide, back]));
+    // P17: the Area level help is a card under its button, not a bar.
+    await page.click('.dl-help');
+    await page.waitForTimeout(300);
+    const pop = await page.evaluate(() => { const p = document.querySelector('.help-pop'), b = document.querySelector('.dl-help').getBoundingClientRect();
+      if (!p) return null; const r = p.getBoundingClientRect(); return { w: Math.round(r.width), right: Math.round(r.right), btn: Math.round(b.right), top: r.top >= b.bottom, fs: getComputedStyle(p).fontSize }; });
+    ok(!!pop && pop.w <= 360 && Math.abs(pop.right - pop.btn) <= 2 && pop.top && pop.fs === '13px',
+      'polish: the Area level help opens under its button at a readable width', JSON.stringify(pop));
+    await page.keyboard.press('Escape');
+    // P29: group headings in sentence case, no repeated tag on each row.
+    await page.fill('#hdr-search-input', 'Brent');
+    await page.waitForTimeout(800);
+    const sr = await page.evaluate(() => ({ g: [...document.querySelectorAll('#hdr-search-results .sr-grp')].map(e => e.textContent),
+      tags: [...document.querySelectorAll('#hdr-search-results .sr-row .sr-type')].filter(e => e.getBoundingClientRect().width > 2).length }));
+    ok(sr.g.some(t => /^Wards \(\d+\)$/.test(t)) && sr.g.every(t => /^[A-Z][a-z]/.test(t) || /^(LAs|LSOAs|ICBs|GP practices) \(/.test(t)) && sr.tags === 0,
+      'polish: search groups are headed in sentence case and the rows do not repeat the tag', JSON.stringify(sr));
+    await page.fill('#hdr-search-input', '');
+    await page.keyboard.press('Escape');
+    // P34: the search box gets the 2px ring.
+    await page.focus('#hdr-search-input');
+    const ring = await page.evaluate(() => { const c = getComputedStyle(document.getElementById('hdr-search-input')); return c.outlineStyle + ' ' + c.outlineWidth; });
+    ok(/^solid 2px$/.test(ring), 'polish: the header search box shows the same focus ring as other controls', ring);
+    // P31: the indicator search says how many match.
+    await page.click('#sbtab-overlay');
+    await page.fill('#ov-search', 'health');
+    await page.waitForTimeout(500);
+    const ovs = await page.evaluate(() => { const e = document.getElementById('ov-results-status'); return { role: e.getAttribute('role'), t: e.textContent }; });
+    ok(ovs.role === 'status' && /^\d+( or more)? indicators? match(es)?$/.test(ovs.t), 'polish: the indicator search announces its count', JSON.stringify(ovs));
+    await page.fill('#ov-search', '');
+    ok(await page.evaluate(() => document.getElementById('q-resultbar').getAttribute('role') === 'status' && document.getElementById('dir-count').getAttribute('role') === 'status'),
+      'polish: the Query and Directory counts are status messages');
+    // P34: the Layers headings take focus and say whether they are open.
+    await page.click('#sbtab-layers');
+    await page.waitForTimeout(300);
+    const lh = await page.evaluate(() => [...document.querySelectorAll('#tab-layers .sb-lbl[role="button"]')].map(l => l.textContent.trim() + ':' + l.tabIndex + ':' + l.getAttribute('aria-expanded')));
+    await page.focus('#tab-layers .sb-lbl[role="button"]');
+    await page.keyboard.press('Enter');
+    const lh2 = await page.evaluate(() => { const l = document.querySelector('#tab-layers .sb-lbl[role="button"]'); return l.getAttribute('aria-expanded') + ':' + l.parentElement.classList.contains('collapsed'); });
+    await page.keyboard.press('Enter');
+    ok(lh.includes('Places and services:0:true') && lh.includes('Boundaries:0:true') && lh2 === 'false:true',
+      'polish: the Layers headings open and close from the keyboard and say which they are', JSON.stringify([lh, lh2]));
+    await checkAxe(page, 'Layers headings as buttons');
+    // P31: a second indicator is announced.
+    await page.evaluate(() => window._bivSet('census_bad_health_pct'));
+    await page.waitForTimeout(400);
+    const live = await page.evaluate(() => document.getElementById('sr-live').textContent);
+    ok(/compared with Bad or very bad health\.$/.test(live), 'polish: adding a second indicator is announced', live);
+    await page.evaluate(() => window._bivSet('none'));
+    // P32: the Compare and Query chips say whether they are on.
+    await page.click('.mode-btn[data-mode="compare"]');
+    await page.waitForTimeout(800);
+    const cmpP = await page.evaluate(() => [...document.querySelectorAll('#cmp-metrics [data-metric]')].every(c => c.getAttribute('aria-pressed') === String(c.classList.contains('on'))));
+    await page.click('.mode-btn[data-mode="query"]');
+    await page.waitForTimeout(800);
+    const svcP = await page.evaluate(() => [...document.querySelectorAll('#q-services [data-svc]')].length > 0 &&
+      [...document.querySelectorAll('#q-services [data-svc]')].every(c => c.getAttribute('aria-pressed') === String(c.classList.contains('on'))));
+    ok(cmpP && svcP, 'polish: the Compare indicator chips and the Query service chips carry aria-pressed', JSON.stringify([cmpP, svcP]));
+    await page.click('.mode-btn[data-mode="explore"]');
+    await page.waitForTimeout(500);
+    // P33: the ward report is a landmark, its charts have text, and better
+    // and worse differ in lightness.
+    const [rep] = await Promise.all([page.waitForEvent('popup', { timeout: 20000 }).catch(() => null),
+      page.evaluate(() => { showWard('Lansbury'); setTimeout(() => document.getElementById('ws-pdf').click(), 600); })]);
+    if (rep) {
+      await rep.waitForFunction(() => !!document.querySelector('.report'), null, { timeout: 30000 }).catch(() => {});
+      await rep.waitForTimeout(800);
+      const r = await rep.evaluate(() => ({ main: !!document.querySelector('main.report'),
+        bare: [...document.querySelectorAll('svg.ch-stack, svg.ch-compare, svg.ch-hbar')].filter(s => !s.getAttribute('aria-label')).length,
+        n: document.querySelectorAll('svg.ch-stack, svg.ch-compare').length }));
+      ok(r.main && r.n >= 3 && r.bare === 0, 'polish: the ward report has a main landmark and its charts have text alternatives', JSON.stringify(r));
+      await checkAxe(rep, 'the ward report');
+      await rep.close();
+    } else ok(false, 'polish: the ward report opens');
+    const luma = await page.evaluate(() => [REPORT_CMP.better, REPORT_CMP.worse, REPORT_CMP.neutral].map(h => {
+      const n = parseInt(h.slice(1), 16); return Math.round(0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)); }));
+    ok(Math.abs(luma[0] - luma[1]) >= 80 && Math.abs(luma[2] - luma[0]) >= 40 && Math.abs(luma[2] - luma[1]) >= 40,
+      'polish: the report\'s better, worse and neutral colours part in greyscale', luma.join(','));
+    ok(!errors.length, 'no page errors (polish, desktop)', errors.join(' | '));
+    await page.close();
+  }
+  {
+    // Phones: the tour, the Viewing strip, Custom area and the tap targets.
+    const { page, errors } = await open(browser, 'index.html?tour=1', PHONE);
+    const tour = await page.evaluate(async () => {
+      const o = [];
+      for (let i = 0; i < PH_TOUR.length; i++) {
+        await new Promise(r => setTimeout(r, 450));
+        const n = document.getElementById('tour-narr'), b = document.querySelector('.basemap-ctl');
+        o.push({ fs: getComputedStyle(n).fontSize, fits: n.scrollHeight <= n.clientHeight + 2,
+          h: document.getElementById('tour-strip').getBoundingClientRect().height / innerHeight, sat: !!(b && b.offsetParent) });
+        if (i < PH_TOUR.length - 1) document.getElementById('tour-next').click();
+      }
+      PH_TOUR.end();
+      return o;
+    });
+    ok(tour.every(c => c.fs === '15px' && c.fits && c.h <= 0.61 && !c.sat),
+      'polish: on a phone the tour reads at 15px, every chapter fits without scrolling, and the Satellite button waits', JSON.stringify(tour));
+    const attrs = await page.evaluate(() => { const i = document.getElementById('hdr-search-input');
+      return ['enterkeyhint', 'autocorrect', 'autocapitalize', 'spellcheck'].map(a => i.getAttribute(a)).join(); });
+    ok(attrs === 'search,off,off,false', 'polish: the search box asks for a Search key and no autocorrect', attrs);
+    await setOv(page, 'imd_decile');
+    await page.waitForTimeout(2500);
+    const vs = await page.evaluate(() => { const v = document.getElementById('viewing-strip'), x = document.getElementById('vs-ov-x');
+      const chip = v.querySelector('.chip.overlay');
+      return { h: Math.round(v.getBoundingClientRect().height), t: document.getElementById('vs-digest').textContent,
+        x: !x.hidden && x.getBoundingClientRect().width > 0 && x.getAttribute('aria-label'), chip: !!(chip && chip.getClientRects().length) }; });
+    ok(vs.h <= 40 && vs.t === 'All of London, coloured by Deprivation decile (IMD 2025)' && vs.x === 'Remove this indicator' && !vs.chip,
+      'polish: on a phone the Viewing strip is one line with its own remove button, and the amber chip goes', JSON.stringify(vs));
+    await page.tap('#vs-ov-x');
+    await page.waitForTimeout(800);
+    ok(await page.evaluate(() => curOv === 'none'), 'polish: the strip\'s remove button clears the indicator');
+    const hits = await hitSizes(page, '.mode-btn');
+    ok(hits.length >= 5 && hits.every(h => h.h >= 44), 'polish: the tool tabs are 44px tall on a phone', JSON.stringify(hits));
+    // P27: Custom area keeps count on the map.
+    await page.evaluate(() => PH_MODES.activate('report'));
+    await page.waitForTimeout(1500);
+    await page.evaluate(async () => {
+      for (let i = 0; i < 60 && !(typeof LSOA_IMD !== 'undefined' && LSOA_IMD && LSOA_IMD.features); i++) await new Promise(r => setTimeout(r, 250));
+      const codes = LSOA_IMD.features.filter(f => f.properties.ward === 'Lansbury').map(f => f.properties.code).slice(0, 2);
+      if (window.PH_DRAWER && PH_DRAWER.isOpen()) PH_DRAWER.close();
+      codes.forEach(c => PH_REPORT.toggle(c));
+    });
+    await page.waitForTimeout(600);
+    const rb = await page.evaluate(() => { const p = document.getElementById('rb-peek');
+      return { on: !!p && !p.hidden && p.getBoundingClientRect().height > 0, t: p ? p.innerText.replace(/\s+/g, ' ').trim() : '', vs: document.getElementById('vs-digest').textContent }; });
+    ok(rb.on && /^Your area has 2 LSOAs so far\. Open it to see the combined figures\. Open your area$/.test(rb.t) && rb.vs === 'Custom area: 2 LSOAs',
+      'polish: on a phone Custom area counts its LSOAs on the map, with a button back to the figures', JSON.stringify(rb));
+    await checkAxe(page, 'phone Custom area with its count');
+    await page.tap('#rb-peek .rb-peek-open');
+    await page.waitForTimeout(600);
+    ok(await page.evaluate(() => PH_DRAWER.isOpen()), 'polish: Open your area opens the drawer');
+    ok(!errors.length, 'no page errors (polish, phone)', errors.join(' | '));
+    await page.close();
+  }
+  {
+    // P19: the England screen and the 404 page offer a choice of region.
+    const { page } = await open(browser, 'index.html?r=england', PHONE);
+    const eng = await page.evaluate(() => ({ t: document.title, body: document.body.innerText,
+      links: [...document.querySelectorAll('a')].map(a => a.textContent + '=' + a.getAttribute('href')) }));
+    ok(eng.t === 'PopHealth Map: England' && /^PopHealth Map/.test(eng.body.trim()) && /Or open one region/.test(eng.body) &&
+       /no charity listings or Ask panel/.test(eng.body) && eng.links.some(l => /^North East=.*\?r=north-east$/.test(l)) && eng.links.length >= 9,
+      'polish: the England screen names the site and links to every region', JSON.stringify(eng).slice(0, 400));
+    await page.close();
+    const p4 = await browser.newPage({ viewport: DESK });
+    await routeSite(p4);
+    await p4.goto(BASE + '/404.html');
+    await p4.waitForTimeout(800);
+    const nf = await p4.evaluate(() => ({ btn: document.querySelector('main a.btn').textContent,
+      regs: [...document.querySelectorAll('main a')].map(a => a.getAttribute('href')).filter(h => /\?r=/.test(h)).length }));
+    ok(nf.btn === 'Open the map' && nf.regs === 9, 'polish: the 404 page opens the map or any region', JSON.stringify(nf));
+    await p4.close();
+  }
+
+  // Polish round (P62 to P76): search, speed, safety, licences, Ask, regions.
+  {
+    // P68: names from the data are escaped in the LSOA card, its tooltip and
+    // the ward report; a CSV cell cannot open with a formula; an= is capped.
+    const { page, errors } = await open(browser, 'index.html?t=1', DESK);
+    const sec = await page.evaluate(async () => {
+      await ensureLsoaImd();
+      const f = LSOA_IMD.features.find(x => x.properties.ward === 'Lansbury') || LSOA_IMD.features[0];
+      const saved = { name: f.properties.name, ward: f.properties.ward };
+      f.properties.name = 'LSOA <b>bold</b>'; f.properties.ward = 'Ward <b>bold</b>';
+      showLSOA(f);
+      await new Promise(r => setTimeout(r, 500));
+      const panel = document.querySelectorAll('#lsoa-panel b, .lsoa-panel b').length;
+      const panelHtml = document.body.innerHTML.indexOf('<b>bold</b>') !== -1;
+      Object.assign(f.properties, saved);
+      const w = Object.values(WARD_DATA).find(x => x.name === 'Lansbury');
+      const wSaved = w.name; let html = '';
+      w.name = 'Lansbury<b>bold</b>';
+      try { _generateWardReport({ sink: h => { html = h; } }, 'Lansbury', {}); } catch (e) { html = 'error ' + e.message; }
+      w.name = wSaved;
+      const d = new DOMParser().parseFromString(html, 'text/html');
+      const repBold = [...d.querySelectorAll('.minimap-cap b, b')].some(b => b.textContent === 'bold');
+      return { panel, panelHtml, repBold, safe: [_safeAreaName('=HYPERLINK("x")'), _safeAreaName('x'.repeat(200)).length, _safeAreaName('-1.5 area')] };
+    });
+    ok(!sec.panelHtml && !sec.repBold && sec.safe[0] === 'HYPERLINK("x")' && sec.safe[1] === 80 && sec.safe[2] === '1.5 area',
+      'polish: a name with markup stays text in the LSOA card and the ward report, and an= is capped and loses a leading =', JSON.stringify(sec));
+    // P62: London keeps its own address; P64: one font file per family and subset.
+    const head = await page.evaluate(() => ({ canon: document.querySelector('link[rel="canonical"]').href, title: document.title }));
+    ok(head.canon === 'https://pophealth.uk/' && /^PopHealth Map: health and deprivation by ward in England/.test(head.title), 'polish: London keeps its canonical and title', JSON.stringify(head));
+    const fontsCss = fs.readFileSync(path.join(ROOT, 'vendor/fonts.css'), 'utf8');
+    ok((fontsCss.match(/@font-face/g) || []).length === 6 && /font-weight: 400 700;/.test(fontsCss) &&
+       fs.readdirSync(path.join(ROOT, 'vendor/fonts')).length === 6,
+      'polish: one font file per family and subset, each face a weight range');
+    // P72: each figure Ask's tools return carries its label, unit and period.
+    const tool = await page.evaluate(() => {
+      const ga = PH_ASSISTANT.runTool('get_area', { name: 'Lansbury', level: 'ward', indicators: ['census_population', 'ft_obesity_adults'] });
+      const all = PH_ASSISTANT.runTool('get_area', { name: 'Notting Dale', level: 'ward' });
+      const rk = PH_ASSISTANT.runTool('rank_areas', { indicator: 'census_over65_pct', direction: 'highest', n: 3, level: 'ward' });
+      return { keys: Object.keys(ga.indicators || {}), pop: ga.indicators && ga.indicators.census_population,
+        size: JSON.stringify(all).length, period: rk.period };
+    });
+    ok(tool.keys.join() === 'census_population,ft_obesity_adults' && tool.pop && typeof tool.pop.v === 'number' &&
+       tool.pop.label && tool.pop.unit === 'people' && tool.pop.period === '2021' && tool.size < 15000 && tool.period === '2021',
+      'polish: Ask figures carry a label, unit and period, limited to the indicators asked for', JSON.stringify(tool));
+    // P73: no example asks for something the tools cannot count.
+    await page.click('#ai-toggle').catch(() => {});
+    await page.waitForTimeout(500);
+    const chips = await page.evaluate(() => [...document.querySelectorAll('.ai-examples button, .ai-examples .ai-ex')].map(b => b.textContent.trim()));
+    ok(!chips.some(c => /GP practices/.test(c)) && chips.some(c => /lowest life expectancy for men/.test(c)),
+      'polish: the Ask examples are all answerable', chips.join(' | '));
+    // P76: ONS's back to front LA names are shown the everyday way.
+    const la = await page.evaluate(() => [phLaName('Kingston upon Hull, City of'), phLaName('Bristol, City of'),
+      phLaName('Herefordshire, County of'), phLaName('City of London'), ladPhrase(phLaName('Bristol, City of'))]);
+    ok(la.join('|') === 'Hull|Bristol|Herefordshire|City of London|Bristol', 'polish: Hull, Bristol and Herefordshire by their everyday names', la.join('|'));
+    ok(!errors.length, 'no page errors (polish round)', errors.join(' | '));
+    await page.close();
+
+    // P66: on a phone the output area level loads only the LAs in view.
+    if (HAS_OA) {
+      const { page: ph, errors: phErr } = await open(browser, 'index.html?t=1', PHONE);
+      const k = await ph.evaluate(() => OA_INDEX && OA_INDEX.keys.find(k => document.querySelector('#ov option[value="' + k + '"]')));
+      if (k) {
+        await setOv(ph, k);
+        await ph.evaluate(() => map.setView([51.494, -0.094], 14));
+        await ph.waitForTimeout(800);
+        await ph.evaluate(() => _setDataLevel('oa'));
+        await ph.waitForTimeout(4000);
+        const oa = await ph.evaluate(() => ({ loaded: PH_OA.loadedCount(), all: Object.keys(OA_INDEX.lads).length, level: _activeLevel() }));
+        ok(oa.level === 'oa' && oa.loaded > 0 && oa.loaded < oa.all, 'polish: on a phone the output area level loads only the LAs in view', JSON.stringify(oa));
+      }
+      ok(!phErr.length, 'no page errors (phone output areas)', phErr.join(' | '));
+      await ph.close();
+    }
+
+    // P70 and P71: the terms, and Ask named as London only.
+    const pv = await open(browser, 'privacy.html', DESK);
+    const pt = await pv.page.evaluate(() => document.body.innerText);
+    ok(/not medical advice/.test(pt) && /provided free and as it is/.test(pt) && /available on the London\s+map for now/.test(pt) &&
+       /On other regions and the England\s+map it is not shown, and nothing is sent\./.test(pt) &&
+       /server passes it to Anthropic's Claude model/.test(pt.replace(/\s+/g, ' ')) && /10 questions a day/.test(pt) && /narrow\s+a question down does not use one up/.test(pt),
+      'polish: the privacy page has the terms and says Ask is on the London map for now');
+    await pv.page.close();
+    const ac = await open(browser, 'accessibility.html', DESK);
+    ok(/on the London map for now/.test(await ac.page.evaluate(() => document.body.innerText)), 'polish: the accessibility statement says Ask is London only');
+    await ac.page.close();
+
+    // P62 and P75: a region page names its own address, and asks for no file
+    // its manifest does not list.
+    if (HAS_NE) {
+      const packDir = path.join(ROOT, 'data/regions/north-east');
+      const list = [];
+      (function walk(d, rel) {
+        for (const n of fs.readdirSync(d)) {
+          const f = path.join(d, n), r = rel ? rel + '/' + n : n;
+          if (fs.statSync(f).isDirectory()) walk(f, r); else list.push(r);
+        }
+      })(packDir, '');
+      const { isMobile, hasTouch, ...viewport } = DESK;
+      const p = await browser.newPage({ viewport });
+      const missing = [], perr = [];
+      p.on('pageerror', e => perr.push(e.message));
+      p.on('response', r => { if (r.status() === 404 && /data\/regions\//.test(r.url())) missing.push(r.url().replace(BASE, '')); });
+      await p.route(/data\/regions\/north-east\/meta\/manifest\.json/, async r => {
+        const res = await r.fetch();
+        const m = await res.json();
+        m.files = list;
+        await r.fulfill({ response: res, json: m });
+      });
+      await p.goto(BASE + '/index.html?r=north-east&t=1');
+      await p.waitForTimeout(SETTLE);
+      const ne = await p.evaluate(() => ({ canon: document.querySelector('link[rel="canonical"]').href,
+        og: (document.querySelector('meta[property="og:url"]') || {}).content || '', title: document.title,
+        wards: Object.keys(WARD_DATA).length }));
+      ok(ne.canon === 'https://pophealth.uk/?r=north-east' && !ne.og &&
+         /^PopHealth Map: health and deprivation by ward in the North East/.test(ne.title) && ne.wards > 300,
+        'polish: a region page has its own canonical, og:url and title', JSON.stringify(ne));
+      ok(!missing.length, 'polish: a region page asks for no file its manifest does not list', missing.join(' | '));
+      ok(!perr.length, 'no page errors (region with a file list)', perr.join(' | '));
+      await p.close();
+    }
   }
 
   await browser.close();

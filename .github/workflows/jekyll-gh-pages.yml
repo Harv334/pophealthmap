@@ -70,6 +70,20 @@ jobs:
             echo "No region-data release yet; deploying London only."
           fi
           rm -rf regions-dl
+      # A pack published before build-region.yml split the ward figures,
+      # counted the layers and listed its files gets them here, so every
+      # region page reads ward_core.json, shows its layer counts and asks
+      # for nothing its pack lacks, without waiting for a rebuild.
+      - name: Complete older region packs
+        run: |
+          for d in data/regions/*/; do
+            scope="$(basename "$d")"
+            [ "$scope" = england ] && continue
+            [ -f "$d/ward_data.json" ] || continue
+            [ -f "$d/ward_core.json" ] || python3 scripts/split_ward_data.py --region "$scope"
+            [ -f "$d/meta/layer_counts.json" ] || python3 scripts/build_layer_counts.py --region "$scope"
+            python3 scripts/write_pack_files.py "$d"
+          done
       # England (?r=england): London and every region pack just unpacked,
       # merged into one map at every level. Shapely re-joins the ICBs a region
       # boundary split and simplifies the geometry.
@@ -112,8 +126,12 @@ jobs:
       # worker/, archive/ and the parquet files among them. The script fails
       # if index.html or the key data files are missing, or if an internal
       # file got in.
+      # typescript strips the comments from the published index.html
+      # (scripts/strip_comments.cjs), the same version tests.yml checks.
       - name: Assemble the site
-        run: bash scripts/build_site.sh _site
+        run: |
+          npm install --no-save --no-package-lock typescript@5.6.3
+          bash scripts/build_site.sh _site
       - name: Check what is published
         run: |
           for f in HANDOVER HANDOVER.md README.md DOMAIN.md; do
