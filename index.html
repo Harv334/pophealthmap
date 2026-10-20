@@ -266,9 +266,6 @@
   set('meta[name="description"]', 'content', desc);
   set('meta[property="og:description"]', 'content', desc);
   set('meta[name="twitter:description"]', 'content', desc);
-  var alt = 'The PopHealth Map logo and the words A printable report for every ward';
-  set('meta[property="og:image:alt"]', 'content', alt);
-  set('meta[name="twitter:image:alt"]', 'content', alt);
 })();
 </script>
 
@@ -1876,7 +1873,9 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
      only stops a reader copying it. #src-lbl sits alongside, empty unless a
      failed data load has something to report. */
   .sbar-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
-  .sbar-link { color: var(--nhs-blue); text-decoration: none; }
+  /* At least 24px tall wherever the bar sits, so each link is a full touch
+     target (WCAG 2.5.8) even when the wide profile squeezes the bar. */
+  .sbar-link { color: var(--nhs-blue); text-decoration: none; display: inline-flex; align-items: center; min-height: 24px; }
   .sbar-link:hover { color: var(--nhs-dark); text-decoration: underline; }
   .sbar-credits { display: none; }
   .sidebar .sbar .sbar-credits { display: inline-flex; }
