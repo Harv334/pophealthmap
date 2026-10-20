@@ -39,6 +39,10 @@ jobs:
       # What stops a region pack being published (scripts/check_region_pack.py).
       - name: Check the region pack checks
         run: python3 tests/pipeline/test_region_pack.py
+      # The deploy's own steps: the sitemap and dateModified, a pack's file
+      # list, the LSOA and MSOA figures in columns, and the font faces.
+      - name: Check the site build steps
+        run: python3 tests/pipeline/test_site_build.py
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -51,7 +55,7 @@ jobs:
           python3 tests/pipeline/test_worker_guard.py
       - name: Install Playwright and axe-core
         run: |
-          npm install --no-save --no-package-lock playwright@1.56.1 axe-core@4.10.3
+          npm install --no-save --no-package-lock playwright@1.56.1 axe-core@4.10.3 typescript@5.6.3
           npx playwright install --with-deps chromium
       # One region pack, so the regional code path is tested too.
       - name: Add the North East pack

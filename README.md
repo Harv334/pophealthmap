@@ -1,7 +1,8 @@
 # PopHealth Map
 
-An interactive map of population health across all 33 London boroughs, at ward
-and LSOA level, and a single Python script that rebuilds it from public data.
+PopHealth Map is a free, open map of health, deprivation and local services for
+every ward and neighbourhood in England, built region by region. This repository
+holds the site and the Python pipeline that rebuilds it from public data.
 
 Live map: https://pophealth.uk
 
@@ -30,7 +31,7 @@ shows a figure that was not published for that exact area:
 | `fetch_all_data.py` | One script. Downloads everything, builds the JSON the map reads, writes `data/map/`. |
 | `ward_data.json`    | Ward-level indicators (704 wards) - consumed by the map at load |
 | `lsoa_data.json`    | LSOA-level IMD and census columns (4,994 London LSOAs) |
-| `pharmacies.json`   | Pharmacy point data (1,737 rows) |
+| `pharmacies.json`   | Pharmacy point data (London) |
 | `data/`             | Intermediate Parquet files, one per source. Committed so you can open them in Power BI or pandas without rerunning fetches. |
 | `data/boundaries/`  | LSOA, ward and borough GeoJSONs |
 | `data/meta/manifest.json` | Per-source status and timestamps from the last run. The map's freshness label reads this. |
@@ -38,8 +39,12 @@ shows a figure that was not published for that exact area:
 
 ## Coverage
 
-All 33 London boroughs plus the City of London: 704 wards, 4,994 LSOAs, 1,146
-GP practices, 1,737 pharmacies and 1,663 NHS dental practices.
+Every ward, MSOA and LSOA in each published region, together with the GP
+practices, pharmacies, dental practices and hospitals in each. London, the
+pilot region whose files sit at the repository root, has 33 LAs (the 32
+boroughs and the City of London), 704 wards and 4,994 LSOAs; the service
+counts move with each refresh, and `data/meta/layer_counts.json` holds the
+current ones.
 
 Deprivation covers 684 of the 704 wards. The 20 without a score are all City of
 London wards, which are tiny and share very few LSOAs between them, so there is
@@ -134,7 +139,8 @@ browser runs them against the JSON already loaded on the page, so every figure i
 an answer is the same number the map is drawing. What does leave the browser is
 the question, the earlier turns of that conversation and the figures the tools
 return: they go to the Worker and on to Anthropic. The Worker also keeps a count
-of questions per IP address for the daily limit, deleted after 48 hours. The
+of questions per IP address and per browser id for the daily limits, deleted
+after 48 hours. The
 details users see are in `privacy.html`.
 
 It is on for pophealth.uk: `data/map/assistant.js` sets `ASSISTANT_ENDPOINT` to the

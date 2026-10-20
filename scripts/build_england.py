@@ -381,6 +381,25 @@ def main() -> int:
                            "wards": len(wards), "councils": len(councils)}
     (OUT / "meta/manifest.json").write_text(json.dumps(manifest, indent=1), encoding="utf-8")
 
+    # The Layers panel's counts, from the merged files where England has them
+    # and summed over the regions for the LSOAs, which England keeps one file
+    # per LA. The charities are not merged (see above), so they have none.
+    from build_layer_counts import count_layers, write_counts  # noqa: E402
+    counts = {k: v for k, v in count_layers(OUT, region=True).items() if not k.startswith("vcse")}
+    for key in ("lsoa", "core20"):
+        tot = 0
+        for slug, src in srcs:
+            lc = read_json(path_in(slug, src, "meta/layer_counts.json"), {}) or {}
+            tot += int((lc.get("counts") or {}).get(key) or 0)
+        if tot:
+            counts[key] = tot
+    write_counts(counts, OUT / "meta/layer_counts.json")
+
+    # Last, once every file is written: the list the page checks before it
+    # asks for a file, so England spends no request on one it does not have.
+    from write_pack_files import write_files  # noqa: E402
+    write_files(OUT)
+
     for p in sorted(OUT.rglob("*")):
         if p.is_file():
             print(f"    {p.relative_to(OUT)}  {p.stat().st_size / 1e6:6.1f} MB")

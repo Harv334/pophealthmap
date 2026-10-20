@@ -130,6 +130,39 @@
     return p;
   };
 
+  /* LA names as people say them. ONS writes three LAs back to front
+     ("Bristol, City of", "Kingston upon Hull, City of", "Herefordshire,
+     County of"), and the region packs carry those names into the ward sheet,
+     the Summary and search. Each is shown as its everyday name; the codes are
+     unchanged, and PH_LA_ONS keeps the ONS form so search finds either.
+     London has none of these, so nothing London reads is touched. */
+  var LA_DISPLAY = {
+    'Bristol, City of': 'Bristol',
+    'Kingston upon Hull, City of': 'Hull',
+    'Herefordshire, County of': 'Herefordshire'
+  };
+  window.PH_LA_ONS = {};
+  window.phLaName = function (s) {
+    if (typeof s !== 'string' || s.indexOf(' of') === -1) return s;
+    var d = LA_DISPLAY[s];
+    if (!d) {
+      var m = /^(.+), (?:City|County) of$/.exec(s);
+      if (!m) return s;
+      d = m[1];
+    }
+    window.PH_LA_ONS[d] = s;
+    return d;
+  };
+  // The same, over the text of a JSON file before it is parsed, so every name
+  // in it (values and keys alike) changes together and lookups between files
+  // still meet. Regions only.
+  window.phLaText = function (t) {
+    if (isLondon || typeof t !== 'string' || t.indexOf(' of"') === -1) return t;
+    return t.replace(/"([^"\\]{1,80}), (City|County) of"/g, function (all, a, b) {
+      return '"' + window.phLaName(a + ', ' + b + ' of') + '"';
+    });
+  };
+
   /* The classic data scripts the app needs before its main block runs. They
      are written by the loader at the end of the body; preloading them here
      keeps them downloading in parallel with everything above, as the static
@@ -140,6 +173,33 @@
   for (var k = 0; k < window.PH_HEAD_DATA.length; k++) {
     document.write('<link rel="preload" as="script" href="' +
       window.regionPath(window.PH_HEAD_DATA[k]) + '">');
+  }
+
+  /* The manifest, and the ward figures chained from it, started here rather
+     than from loadData, which cannot run until the data scripts above and
+     the main block have been read. loadManifest and _fetchWardFigures take
+     these promises over. Each settles rather than rejects, so nothing is
+     reported as unhandled if the page stops before it reads them. A region
+     manifest that lists its files (meta/manifest.json "files") and leaves
+     out ward_core.json skips the request that would only 404. */
+  if (window.fetch && window.Promise) {
+    var early = window.PH_EARLY = {};
+    early.manifest = fetch(window.regionPath('data/meta/manifest.json'), { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .catch(function () { return null; });
+    early.wardCore = early.manifest.then(function (m) {
+      if (m && m.files && m.files.indexOf('ward_core.json') === -1) {
+        var e = new Error('not in the manifest'); e.status = 404;
+        return { err: e };
+      }
+      var u = window.regionPath('data/ward_core.json') +
+        (m && m.last_run ? '?v=' + encodeURIComponent(m.last_run) : '');
+      return fetch(u).then(function (r) {
+        if (!r.ok) { var e = new Error('HTTP ' + r.status); e.status = r.status; throw e; }
+        return r.text();
+      }).then(function (t) { return { json: JSON.parse(window.phLaText(t)) }; },
+        function (err) { return { err: err }; });
+    });
   }
 
   /* A region's own loading map (REGION_LOADER_MAP, made by
@@ -181,6 +241,36 @@
 <meta name="twitter:description" content="A free map of health, deprivation and local services for every ward and neighbourhood in England, with a printable report for each ward.">
 <meta name="twitter:image" content="https://pophealth.uk/og.png">
 <meta name="twitter:image:alt" content="A map of London wards shaded by deprivation score, beside the name PopHealth Map and the words A printable report for every ward">
+<!-- A region's own address, title and description. Without this every
+     ?r= page declared https://pophealth.uk/ as its canonical, so search
+     engines folded each region into the London page and a shared North East
+     link previewed as London. London (no ?r=) keeps the tags above. -->
+<script>
+(function () {
+  var R = window.PH_REGION;
+  if (!R || R.isLondon) return;
+  var place = (R.isEngland || /^Yorkshire/.test(R.name) ? '' : 'the ') + R.name;
+  var url = 'https://pophealth.uk/?r=' + R.id;
+  var title = 'PopHealth Map: health and deprivation by ward in ' + place;
+  var desc = 'A free map of health, deprivation and local services for every ward and ' +
+    'neighbourhood in ' + place + ', from open NHS and government data.';
+  var set = function (sel, attr, v) {
+    var el = document.querySelector(sel);
+    if (el) el.setAttribute(attr, v);
+  };
+  document.title = title;
+  set('link[rel="canonical"]', 'href', url);
+  set('meta[property="og:url"]', 'content', url);
+  set('meta[property="og:title"]', 'content', title);
+  set('meta[name="twitter:title"]', 'content', title);
+  set('meta[name="description"]', 'content', desc);
+  set('meta[property="og:description"]', 'content', desc);
+  set('meta[name="twitter:description"]', 'content', desc);
+  var alt = 'The PopHealth Map logo and the words A printable report for every ward';
+  set('meta[property="og:image:alt"]', 'content', alt);
+  set('meta[name="twitter:image:alt"]', 'content', alt);
+})();
+</script>
 
 <!-- Inline so it costs no request and cannot 404. The site mark, the same
      four blues as the header. The PNG icons and og.png are drawn from it by
@@ -204,6 +294,9 @@
      Regenerate the fonts with scripts/build_fonts.py. The libraries are
      pinned by directory name and updated by hand. -->
 <link rel="stylesheet" href="vendor/fonts.css">
+<!-- The body text's file, asked for now rather than once the stylesheet is
+     read. One file covers every weight (it is a variable font). -->
+<link rel="preload" href="vendor/fonts/Inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="vendor/leaflet-1.9.4/leaflet.css">
 <link rel="stylesheet" href="vendor/leaflet.markercluster-1.5.3/MarkerCluster.css">
 <link rel="stylesheet" href="vendor/leaflet.markercluster-1.5.3/MarkerCluster.Default.css">
@@ -1644,7 +1737,7 @@
 .ai-chip{color:var(--nhs-dark)}
 /* Panel header: the title, then the remaining questions beside it. */
 .ai-head-l{display:flex;align-items:baseline;gap:8px;min-width:0}
-.ai-limit{font-family:'JetBrains Mono',ui-monospace,monospace;font-size: var(--t-xs);font-weight:500;
+.ai-limit{font-family:inherit;font-size: var(--t-xs);font-weight:500;
   color:var(--ink-2);background: var(--paper);border:1px solid var(--line);border-radius:var(--r-sm);padding:1px 6px;
   white-space:nowrap;font-variant-numeric:tabular-nums;cursor:default}
 .ai-limit.spent{color:#A81A10;border-color:var(--tint-red-line);background:var(--tint-red)}
@@ -3169,9 +3262,11 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
      The Dataset entry is the one that earns its keep: it makes the map
      eligible for Google Dataset Search, a far less crowded index than
      general web search and the one an analyst looking for London ward
-     health data is most likely to be using. `dateModified` below is a
-     starting value and is refreshed from the pipeline manifest at runtime,
-     so it cannot drift out of step with the data. -->
+     health data is most likely to be using. `dateModified` below is
+     stamped from the manifest's last_run when the deploy assembles _site
+     (scripts/stamp_site.py), and the London page refreshes it from the
+     manifest at runtime too. Region pages leave it alone, because the
+     dataset it describes is the site's, not one region's. -->
 <script type="application/ld+json" id="ld-dataset">
 {
   "@context": "https://schema.org",
@@ -3196,7 +3291,7 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
       "@type": "Dataset",
       "@id": "https://pophealth.uk/#dataset",
       "name": "Population health in England by local authority, ward and LSOA",
-      "description": "Population health, deprivation and service access indicators for every region of England, at local authority (LA), ward, MSOA and LSOA level. In London, it covers 704 wards, 4,994 LSOAs, 1,146 GP practices, 1,737 pharmacies and 1,877 dental practices. Sources include OHID Fingertips, ONS Census 2021, IMD 2025, NHS ODS registers, QOF prevalence, police.uk recorded crime, DWP claimant count, fuel poverty, Charity Commission registers, Defra UK-AIR modelled background air quality and the Transport for London stop and station register. Every figure comes from a published source, named in the methodology. The air quality layers are Defra model output rather than measurements, and are labelled as such.",
+      "description": "Population health, deprivation and service access indicators for every region of England, at local authority (LA), ward, MSOA and LSOA level. It covers every ward, MSOA and LSOA in each published region, together with the GP practices, pharmacies, dental practices and hospitals in each. Sources include OHID Fingertips, ONS Census 2021, IMD 2025, NHS ODS registers, QOF prevalence, police.uk recorded crime, DWP claimant count, fuel poverty, Charity Commission registers, Defra UK-AIR modelled background air quality and the Transport for London stop and station register. Every figure comes from a published source, named in the methodology. The air quality layers are Defra model output rather than measurements, and are labelled as such.",
       "url": "https://pophealth.uk/",
       "sameAs": "https://github.com/Harv334/pophealthmap",
       "isAccessibleForFree": true,
@@ -4889,13 +4984,32 @@ let DATA_VERSION = '';
 // and have to say which data they hold: export filenames and report footers.
 let DATA_DATE = '';
 let _manifestPromise = null;
+/* The files a region manifest says its pack holds (its "files" list, written
+   by build-region.yml), or null when it gives none, as London's does. Paths
+   are relative to the region's folder: "ward_core.json", "map/pcn.json". */
+let _manifestFiles = null;
+
+/* Whether a data path is worth requesting: false only when the manifest lists
+   its files and this one is not among them, which spares a region the 404s
+   for London-only files (greenspaces, PCNs, output areas, the split ward
+   file, layer counts). Takes the path as written for London. */
+function dataListed(path) {
+  if (!_manifestFiles || PH_IS_LONDON) return true;
+  const full = regionPath(String(path).split('?')[0]);
+  const base = window.PH_REGION.base;
+  if (full.indexOf(base) !== 0) return true;
+  return _manifestFiles.has(full.slice(base.length));
+}
 
 function loadManifest() {
   if (_manifestPromise) return _manifestPromise;
-  _manifestPromise = fetch(regionPath('data/meta/manifest.json'), { cache: 'no-store' })
+  // Started in the head (PH_EARLY) where the browser allowed it.
+  const early = window.PH_EARLY && window.PH_EARLY.manifest;
+  _manifestPromise = (early || fetch(regionPath('data/meta/manifest.json'), { cache: 'no-store' })
     .then(r => (r.ok ? r.json() : null))
-    .catch(() => null)
+    .catch(() => null))
     .then(m => {
+      _manifestFiles = (m && Array.isArray(m.files)) ? new Set(m.files) : null;
       if (m && m.last_run) {
         DATA_VERSION = encodeURIComponent(m.last_run);
         DATA_DATE = String(m.last_run).slice(0, 10);
@@ -4918,9 +5032,18 @@ function dataUrl(path) {
 /* A file's JSON, or a rejection that says why not. err.status carries the
    HTTP status when there was an answer, and is 0 when there was none. */
 function _getJson(url) {
+  // A region waits for its manifest, which is already on its way (PH_EARLY),
+  // so a file its list leaves out is never asked for even from parse time.
+  return PH_IS_LONDON ? _getJsonListed(url) : loadManifest().then(() => _getJsonListed(url));
+}
+function _getJsonListed(url) {
+  if (!dataListed(url)) {
+    const e = new Error('not in the manifest'); e.status = 404;
+    return Promise.reject(e);
+  }
   return fetch(url).then(r => {
     if (!r.ok) { const e = new Error('HTTP ' + r.status); e.status = r.status; throw e; }
-    return r.json();
+    return _jsonLa(r);
   });
 }
 
@@ -5046,6 +5169,31 @@ const PH_LOAD = (function () {
 // about London (PTAL, TfL, the London ICBs) keep their own wording and are
 // hidden outside London instead.
 const PH_IS_LONDON = !window.PH_REGION || window.PH_REGION.isLondon;
+
+/* A response's JSON with the LA names put the way people say them
+   (phLaText, in the head). London's files are parsed as they are. */
+function _jsonLa(r) {
+  return PH_IS_LONDON ? r.json() : r.text().then(t => JSON.parse(phLaText(t)));
+}
+/* The same for the data scripts already parsed: the ward and LA outlines,
+   GP practices and hospitals. Every string field that holds an ONS back to
+   front LA name is replaced. */
+function _laNamesIn(list) {
+  if (PH_IS_LONDON || !Array.isArray(list)) return;
+  for (const it of list) {
+    const o = it && (it.properties || it);
+    if (!o || typeof o !== 'object') continue;
+    for (const k in o) if (typeof o[k] === 'string' && / of$/.test(o[k])) o[k] = phLaName(o[k]);
+  }
+}
+if (!PH_IS_LONDON) {
+  try {
+    if (typeof GJ !== 'undefined' && GJ) _laNamesIn(GJ.features);
+    if (typeof BOROUGH_GJ !== 'undefined' && BOROUGH_GJ) _laNamesIn(BOROUGH_GJ.features);
+    if (typeof GPS !== 'undefined') _laNamesIn(GPS);
+    if (typeof HOSP !== 'undefined') _laNamesIn(HOSP);
+  } catch (e) { /* names stay as published */ }
+}
 const PH_AREA = (window.PH_REGION && window.PH_REGION.name) || 'London';
 // The level's name wherever a sentence counts them. "LA" in every region,
 // London included: one name for the level everywhere, introduced as "local
@@ -5207,8 +5355,9 @@ const PH_WHERE_ARIA = PH_IS_LONDON
 
   // Green space is a London build so far. Asked once, cheaply, so the layer
   // is only offered where its file exists.
-  fetch(regionPath('greenspaces.geojson'), { method: 'HEAD' })
-    .then(r => r.ok)
+  loadManifest()
+    .then(() => dataListed('greenspaces.geojson')
+      ? fetch(regionPath('greenspaces.geojson'), { method: 'HEAD' }).then(r => r.ok) : false)
     .catch(() => false)
     .then(ok => {
       if (ok) return;
@@ -8253,13 +8402,18 @@ function vcseTagText(d) {
 function vcsePopupHtml(r) {
   const bucket = vcseCauseBucket(r);
   const color  = VCSE_BUCKET_COLORS[bucket];
-  const tags = (r.wd || r.wt || []).slice(0, 4).map(vcseTagText).join(', ') || '-';
-  const who  = (r.od || r.ot || []).slice(0, 3).map(vcseTagText).join(', ');
+  const lab = (fam, c) => (VCSE_TAG_LABELS[fam] && VCSE_TAG_LABELS[fam][c]) || c;
+  const tags = (r.wd || (r.wt || []).map(c => lab('wt', c))).slice(0, 4).map(vcseTagText).join(', ') || '-';
+  const who  = (r.od || (r.ot || []).map(c => lab('ot', c))).slice(0, 3).map(vcseTagText).join(', ');
   const href = _safeWebUrl(r.w);
   const web  = !r.w ? ''
     : href ? `<div class="pop-row"><div class="pop-key">Web</div><a href="${_esc(href)}" target="_blank" rel="noopener" style="color:#185FA5;text-decoration:none;word-break:break-all">${_esc(r.w)}</a></div>`
     : `<div class="pop-row"><div class="pop-key">Web</div><span style="word-break:break-all">${_esc(r.w)}</span></div>`;
-  const cov  = (r.cv || []).length ? `<div class="pop-row"><div class="pop-key">Covers</div>${r.cv.length} ${ladNoun(r.cv.length)}</div>` : '';
+  // A region-wide charity covers every LA on the map, so its file no longer
+  // lists all of their codes (cv); the count comes from the map instead.
+  const nCov = (r.cv || []).length || (r.sc === 'london_wide' && typeof BOROUGH_GJ !== 'undefined' && BOROUGH_GJ.features
+    ? BOROUGH_GJ.features.length : 0);
+  const cov  = nCov ? `<div class="pop-row"><div class="pop-key">Covers</div>${nCov} ${ladNoun(nCov)}</div>` : '';
   const area = vcseArea(r);
   const where = area
     ? `<div class="pop-addr">${_esc(area)}</div><div class="pop-row" style="color:var(--ink-3)">Area only. Small charities are often run from a trustee's home, so the street address is not shown.</div>`
@@ -8368,6 +8522,23 @@ function _ensureEnglandLsoas() {
       .catch(() => { delete _englandLsoaGot[code]; return false; })))).then(have);
 }
 
+/* The LSOA and MSOA figures as the page reads them, one record per area.
+   The published files are written in column form by scripts/compact_tables.py
+   (one list of codes and one list of values per indicator, a fifth of the
+   size); the repository's own copies, and older deployments, keep the
+   records, which pass through unchanged. A null is a figure the area does
+   not have, and is left out of its record as it was in the original. */
+function _expandColumns(d) {
+  if (!d || d.format !== 'columns' || !Array.isArray(d.codes) || !d.cols) return d;
+  const out = {}, keys = Object.keys(d.cols), cols = keys.map(k => d.cols[k]);
+  for (let i = 0; i < d.codes.length; i++) {
+    const r = {};
+    for (let j = 0; j < keys.length; j++) { const v = cols[j][i]; if (v !== null && v !== undefined) r[keys[j]] = v; }
+    out[d.codes[i]] = r;
+  }
+  return out;
+}
+
 function ensureLsoaData() {
   if (_englandLsoaLads()) return _ensureEnglandLsoas().then(() => LSOA_DATA);
   if (typeof LSOA_DATA === 'object' && LSOA_DATA && Object.keys(LSOA_DATA).length) {
@@ -8377,6 +8548,7 @@ function ensureLsoaData() {
   _lsoaDataLoading = loadJson(dataUrl('lsoa_data.json'), 'the LSOA figures', ensureLsoaData)
     .then(ld => {
       if (!ld) { _lsoaDataLoading = null; return null; }
+      ld = _expandColumns(ld);
       scaleShareDomainsIn(ld);
       LSOA_DATA = ld;
       // Any range cached while the figures were missing was computed over
@@ -8413,6 +8585,7 @@ function ensureLsoaImd() {
           resolve(null);
           return;
         }
+        _laNamesIn(LSOA_IMD.features);
         // The ward to LSOA index this file used to build at parse time.
         WARD_LSOA_IMD = {};
         LSOA_IMD.features.forEach(f => {
@@ -8581,7 +8754,7 @@ function esriBasemap() {
     maxZoom: 19,
     maxNativeZoom: 16,
     crossOrigin: 'anonymous',
-    attribution: 'Tiles \u00a9 <a href="https://www.esri.com">Esri</a>, HERE, Garmin \u00b7 \u00a9 <a href="https://openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    attribution: 'Tiles \u00a9 Esri, HERE, Garmin, <a href="https://openstreetmap.org/copyright">OpenStreetMap</a> \u00b7 Powered by <a href="https://www.esri.com">Esri</a>',
   });
 }
 // The street basemap in use: CARTO, or Esri's canvas if CARTO fails. The
@@ -8626,7 +8799,7 @@ function setBasemap(kind) {
       maxZoom: 19,
       maxNativeZoom: 18,
       crossOrigin: 'anonymous',
-      attribution: 'Imagery \u00a9 <a href="https://www.esri.com">Esri</a>, Maxar, Earthstar Geographics and the GIS User Community',
+      attribution: 'Powered by <a href="https://www.esri.com">Esri</a> \u00b7 Imagery \u00a9 Esri, Maxar, Earthstar Geographics and the GIS User Community',
     });
     if (!map.getPane('satLabels')) {
       const pane = map.createPane('satLabels');
@@ -8638,6 +8811,9 @@ function setBasemap(kind) {
       maxNativeZoom: 18,
       pane: 'satLabels',
       crossOrigin: 'anonymous',
+      // The place names and boundaries carry third-party map data, credited
+      // as the service's own copyrightText gives it.
+      attribution: 'Labels \u00a9 Esri, HERE, Garmin, \u00a9 <a href="https://openstreetmap.org/copyright">OpenStreetMap</a> contributors, and the GIS user community',
     });
   }
   if (sat) {
@@ -8866,8 +9042,8 @@ function ensureGreenspaceData() {
   if (_gsData) return Promise.resolve(_gsData);
   if (_gsDataLoading) return _gsDataLoading;
   _gsDataLoading = loadManifest()
-    .then(() => fetch(dataUrl('greenspaces.geojson')))
-    .then(r => r.ok ? r.json() : null)
+    .then(() => dataListed('greenspaces.geojson') ? fetch(dataUrl('greenspaces.geojson')) : null)
+    .then(r => r && r.ok ? r.json() : null)
     .then(gj => {
       if (gj && Array.isArray(gj.features)) _gsData = gj; else _gsDataLoading = null;
       return _gsData;
@@ -9060,7 +9236,7 @@ function _updateLayerCounts() {
    The point layers, VCSE and the LSOA boundaries are fetched on demand,
    which left their counts blank until the reader ticked the box. Blank was at
    least honest, but it withheld the one number that helps somebody decide
-   whether to switch a layer on at all: "1,737" next to Pharmacies is wanted
+   whether to switch a layer on at all: the count next to Pharmacies is wanted
    before the click, not after it.
 
    So the counts are measured from the payloads at build time by
@@ -9080,8 +9256,8 @@ function applyPrefetchedCounts() {
   // a refreshed dataset would be reported with counts out of the browser cache,
   // which is the one way this file could tell a lie.
   return loadManifest()
-    .then(() => fetch(dataUrl('data/meta/layer_counts.json')))
-    .then(r => (r.ok ? r.json() : null))
+    .then(() => dataListed('data/meta/layer_counts.json') ? fetch(dataUrl('data/meta/layer_counts.json')) : null)
+    .then(r => (r && r.ok ? r.json() : null))
     .catch(() => null)
     .then(payload => {
       const c = payload && payload.counts;
@@ -9742,7 +9918,7 @@ function wireVCSE(records) {
    Every single one of their toggles is off by default.
 
    A cold load pulled about 14 MB of JSON to put nothing on the screen:
-   11,134 VCSE organisations, 1,737 pharmacies and 1,663 dental practices,
+   about 11,000 VCSE organisations, 1,700 pharmacies and 1,700 dental practices,
    none of them drawn.
 
    They are fetched when something actually needs them now, following
@@ -9930,6 +10106,14 @@ function loadPharmacyLayer(practices) {
 // Fetched by ensureLayerData('pharmacy') when the toggle asks for it.
 
 
+/* A custom area's name as read from a shared link (an=): at most 80
+   characters, and never opening with =, +, - or @, so a crafted link cannot
+   put a spreadsheet formula into the reader's CSV or any length of wording
+   into the headline of a report branded PopHealth Map. */
+function _safeAreaName(s) {
+  return String(s == null ? '' : s).replace(/^[\s=+\-@]+/, '').slice(0, 80).trim();
+}
+
 function _esc(s) {
   if (s == null) return '';
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -9957,9 +10141,16 @@ let currentVCSEAreaFilter = 'all';
 // families. Empty set = no constraint from that family.
 const currentVCSETags = { wt: new Set(), ht: new Set(), ot: new Set() };
 
-// Human-readable labels for each family — populated from VCSE_ALL descriptors
-// (wd/hd/od) after data loads, so we don't hard-code the mapping here.
-const VCSE_TAG_LABELS = { wt: {}, ht: {}, ot: {} };
+// Human-readable labels for each family, the Charity Commission's own
+// wording for each code. vcse_data.json used to repeat them on every record
+// (wd/hd/od), megabytes of labels the codes already held, so they are kept
+// here once. A file that still carries them fills in any code this list
+// lacks (buildVCSETagFilters).
+const VCSE_TAG_LABELS = {
+  wt: {"education": "Education/training", "arts_culture": "Arts/culture/heritage/science", "health": "The Advancement Of Health Or Saving Of Lives", "poverty": "The Prevention Or Relief Of Poverty", "housing": "Accommodation/housing", "environment": "Environment/conservation/heritage", "general_purposes": "General Charitable Purposes", "disability": "Disability", "amateur_sport": "Amateur Sport", "community_economic": "Economic/community Development/employment", "human_rights": "Human Rights/religious Or Racial Harmony/equality Or Diversity", "recreation": "Recreation", "overseas_aid": "Overseas Aid/famine Relief", "other_charitable": "Other Charitable Purposes", "religion": "Religious Activities", "animals": "Animals", "armed_forces": "Armed Forces/emergency Service Efficiency"},
+  ht: {"services": "Provides Services", "grants_organisations": "Makes Grants To Organisations", "grants_individuals": "Makes Grants To Individuals", "buildings_facilities": "Provides Buildings/facilities/open Space", "advocacy_info": "Provides Advocacy/advice/information", "research": "Sponsors Or Undertakes Research", "other_activities": "Other Charitable Activities", "other_finance": "Provides Other Finance", "human_resources": "Provides Human Resources", "umbrella_body": "Acts As An Umbrella Or Resource Body"},
+  ot: {"general_public": "The General Public/mankind", "other_defined_groups": "Other Defined Groups", "children_youth": "Children/young People", "older_people": "Elderly/old People", "disability": "People With Disabilities", "ethnic_racial_origin": "People Of A Particular Ethnic Or Racial Origin", "other_charities": "Other Charities Or Voluntary Bodies"},
+};
 // Labels shown as the group title (must match the 3 <summary> texts in index).
 const VCSE_FAM_LABELS = {
   wt: 'Cause area',
@@ -12267,13 +12458,13 @@ function _generateWardReport(_reportWindow, wn, opts) {
             }).join('');
           }
         } catch(e) { /* silent */ }
-        miniMapSVG = `<svg class="minimap" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Location of ${wdata.name} within ${wardLad}">
+        miniMapSVG = `<svg class="minimap" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Location of ${_esc(wdata.name)} within ${_esc(wardLad)}">
           <rect width="${W}" height="${H}" fill="#F1F5F9"/>
           ${contextPaths}
           ${wardPath}
           ${pharmDots}
         </svg>
-        <div class="minimap-cap">${wdata.name} within ${wardLad}${pharmCount ? ` · <span class="mm-dot" aria-hidden="true"></span> ${pharmCount} pharmac${pharmCount === 1 ? 'y' : 'ies'}` : ''}</div>`;
+        <div class="minimap-cap">${_esc(wdata.name)} within ${_esc(wardLad)}${pharmCount ? ` · <span class="mm-dot" aria-hidden="true"></span> ${pharmCount} pharmac${pharmCount === 1 ? 'y' : 'ies'}` : ''}</div>`;
       }
     }
   } catch(e) { /* minimap is decorative — fail silent */ }
@@ -12800,7 +12991,7 @@ function _fitFocus(bounds) {
   const unit = n => (n === 1 ? 'LA' : 'LAs');
 
   fetch(dataUrl('data/map/icb_lookup.json'))
-    .then(r => (r.ok ? r.json() : null))
+    .then(r => (r.ok ? _jsonLa(r) : null))
     .catch(() => null)
     .then(d => {
       if (!d || !d.lad_to_icb) return;
@@ -14302,9 +14493,13 @@ const PH_PEEK = (function () {
 
    The smallest census geography, about 130 households, for census indicators
    only. data/map/oa/<council>.json holds one council's output areas; each
-   area's figures are an array in the order of index.json's "keys". Every
-   council loads at once, so the whole map is there to pan around: London is
-   about 26,000 shapes and 5 MB over the wire. They are drawn on a canvas,
+   area's figures are an array in the order of index.json's "keys". On a
+   desktop every council loads at once, so the whole map is there to pan
+   around: London is about 26,000 shapes and 5 MB over the wire. On a phone
+   (a narrow screen or a coarse pointer) that took the tab past 200 MB, which
+   is enough for iOS or a small Android phone to reload it, so a phone loads
+   only the LAs in view, more as the map moves, and lets go of those that
+   have left it. They are drawn on a canvas,
    which keeps that many shapes quick to pan and zoom, and their borders fade
    out as you zoom out so the colours stay readable.
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -14393,16 +14588,62 @@ window.PH_OA = (function () {
       },
     });
   }
+  // A phone, by screen or by pointer: the in-view mode above.
+  const PHONE = window.matchMedia ? window.matchMedia('(max-width: 900px), (pointer: coarse)') : { matches: false };
+  // Each LA's bounds for the in-view test: the bbox index.json gives, or
+  // failing that the LA's outline.
+  let laBounds = null;
+  function boundsOf(c) {
+    const bb = OA_INDEX.lads[c] && OA_INDEX.lads[c].bbox;
+    if (Array.isArray(bb) && bb.length === 4) return L.latLngBounds([bb[1], bb[0]], [bb[3], bb[2]]);
+    if (!laBounds) {
+      laBounds = {};
+      try {
+        (typeof BOROUGH_GJ !== 'undefined' && BOROUGH_GJ.features || []).forEach(f => {
+          const cd = f.properties && (f.properties.LAD25CD || f.properties.LAD24CD || f.properties.code);
+          if (cd) laBounds[cd] = L.geoJSON(f).getBounds();
+        });
+      } catch (e) { /* every LA counts as in view */ }
+    }
+    return laBounds[c] || null;
+  }
+  // The LAs a refresh should draw: all of them on a desktop, those in view
+  // (with a margin) on a phone.
+  function wanted() {
+    const all = Object.keys(OA_INDEX.lads);
+    if (!PHONE.matches || typeof map === 'undefined' || !map) return all;
+    const view = map.getBounds().pad(0.2);
+    return all.filter(c => { const b = boundsOf(c); return !b || b.intersects(view); });
+  }
+  // The hint stays up while files are loading, and says how far it has got.
+  function progress(want) {
+    const h = document.getElementById('dl-hint');
+    const left = want.filter(c => !loaded[c]).length;
+    if (!left) {
+      if (h && /^(Drawing all|Loaded \d)/.test(h.textContent)) h.classList.remove('show');
+      return;
+    }
+    if (typeof _dlHint === 'function' && (announced || (h && /^Loaded \d/.test(h.textContent)))) {
+      _dlHint('Loaded ' + (want.length - left) + ' of ' + want.length + (want.length === 1 ? ' LA' : ' LAs') + '\u2026', 60000);
+    }
+  }
   function refresh() {
     if (!on || !OA_INDEX) return;
     if (!group) group = L.layerGroup().addTo(map);
-    const all = Object.keys(OA_INDEX.lads);
+    const all = wanted();
     const pending = all.filter(c => !loaded[c]);
     if (pending.length && !announced && typeof _dlHint === 'function') {
       const n = all.reduce((a, c) => a + (OA_INDEX.lads[c].count || 0), 0);
-      _dlHint('Drawing all ' + n.toLocaleString('en-GB') + ' output areas, which can take a few seconds…', 4000);
+      _dlHint((PHONE.matches ? 'Drawing the ' + n.toLocaleString('en-GB') + ' output areas in view'
+        : 'Drawing all ' + n.toLocaleString('en-GB') + ' output areas') + ', which can take a few seconds\u2026', 60000);
     }
     announced = true;
+    // On a phone, the LAs that have left the view are let go.
+    if (PHONE.matches) {
+      Object.keys(loaded).forEach(c => {
+        if (all.indexOf(c) === -1) { if (group.hasLayer(loaded[c])) group.removeLayer(loaded[c]); delete loaded[c]; }
+      });
+    }
     all.forEach(c => {
       if (loaded[c]) { if (!group.hasLayer(loaded[c])) group.addLayer(loaded[c]); return; }
       if (loading[c]) return;
@@ -14411,14 +14652,13 @@ window.PH_OA = (function () {
       loading[c] = loadJson(dataUrl('data/map/oa/' + c + '.json'), 'the output areas', refresh).then(gj => {
         delete loading[c];
         if (!gj) return;
+        if (PHONE.matches && on && wanted().indexOf(c) === -1) { progress(wanted()); return; }
         loaded[c] = build(gj);
         if (on) group.addLayer(loaded[c]);
-        if (!Object.keys(loading).length) {
-          const h = document.getElementById('dl-hint');
-          if (h && /^Drawing all/.test(h.textContent)) h.classList.remove('show');
-        }
+        progress(wanted());
       }).catch(() => { delete loading[c]; });
     });
+    if (!pending.length) progress(all);
     restyle();
   }
   function restyle() { Object.keys(loaded).forEach(c => loaded[c].setStyle(style)); }
@@ -14427,6 +14667,8 @@ window.PH_OA = (function () {
     const e = JSON.stringify(edge());
     if (on && e !== lastEdge) { lastEdge = e; restyle(); }
   });
+  // A phone loads the LAs that come into view as the map moves.
+  if (typeof map !== 'undefined' && map) map.on('moveend', () => { if (on && PHONE.matches) refresh(); });
   const ovSel = document.getElementById('ov');
   if (ovSel) ovSel.addEventListener('change', () => setTimeout(restyle, 0));
   return {
@@ -14961,7 +15203,7 @@ function ensureMsoaData() {
     .then(md => {
       _msoaDataLoading = null;
       if (!md) return MSOA_DATA;
-      MSOA_DATA = md;
+      MSOA_DATA = _expandColumns(md);
       for (const k in _msoaRange) delete _msoaRange[k];
       if (typeof msoaLyr !== 'undefined' && msoaLyr) restyleMsoa();
       if (typeof _updateLayerCounts === 'function') _updateLayerCounts();
@@ -15137,7 +15379,7 @@ function showLSOA(feat) {
     <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:6px">
       <div>
         <span class="gpill" style="background:#fdebd0;color:#9A4A00;border:1px solid #e67e22">LSOA</span>
-        <span style="font-size:var(--t-xs);color:var(--ink-2);margin-left:4px">in ${props.ward}</span>
+        <span style="font-size:var(--t-xs);color:var(--ink-2);margin-left:4px">in ${_esc(props.ward)}</span>
       </div>
       <button class="deselect-btn" onclick="deselectLSOA()" title="Deselect this LSOA">Deselect${ico('x')}</button>
     </div>
@@ -15733,7 +15975,7 @@ function buildEmbeddedLSOALayer() {
         const decStr = (p.imd_decile && !decShown)
           ? `<span class="tip-row"><b>${_esc(indLabel('imd_decile'))}:</b> ${p.imd_decile} of 10, where 1 is the most deprived</span>` : '';
         const ovRows = ovTooltipRows(k => lsoaOvValue(p.code, k), null, 'lsoa', p.code);
-        lyr.bindTooltip(`<b class="tip-nm">${p.name}</b><span class="tip-meta">${p.ward ? 'LSOA in ' + p.ward + ' ward' : 'LSOA'}</span>${decStr}${ovRows}`, {sticky:true, opacity:.94}).openTooltip(e.latlng);
+        lyr.bindTooltip(`<b class="tip-nm">${_esc(p.name)}</b><span class="tip-meta">${p.ward ? 'LSOA in ' + _esc(p.ward) + ' ward' : 'LSOA'}</span>${decStr}${ovRows}`, {sticky:true, opacity:.94}).openTooltip(e.latlng);
       });
       lyr.on('mouseout', () => {
         // No restyling on mouseout — nothing changed on mouseover.
@@ -16072,7 +16314,7 @@ function loadIcbRegions() {
   if (icbLyr) return Promise.resolve(icbLyr);
   if (_icbLoading) return _icbLoading;
   _icbLoading = fetch(dataUrl('data/map/icbs.json'))
-    .then(r => (r.ok ? r.json() : null))
+    .then(r => (r.ok ? _jsonLa(r) : null))
     .then(gj => {
       if (!gj || !gj.features) { _icbLoading = null; return null; }
       icbLyr = L.geoJSON(gj, {
@@ -18360,7 +18602,7 @@ function _applyUrlLate(p) {
   if (!_urlDone.a && p.get('a')) {
     const codes = p.get('a').split('.').filter(Boolean).map(n => 'E01' + n);
     if (window.PH_REPORT && window.PH_REPORT.apply &&
-        window.PH_REPORT.apply({ name: p.get('an') || '', codes })) _urlDone.a = true;
+        window.PH_REPORT.apply({ name: _safeAreaName(p.get('an')), codes })) _urlDone.a = true;
     else waiting = true;
   }
   const settled = _urlLanded && _urlTimedPasses >= 2;
@@ -18498,7 +18740,9 @@ function _buildSearchIndex() {
         const icb = (typeof ICB_OF_LAD !== 'undefined' && ICB_OF_LAD)
           ? (ICB_OF_LAD[o.value] || ICB_OF_LAD[o.value === 'City of Westminster' ? 'Westminster' : o.value]) : '';
         const icbName = icb ? ((typeof ICB_LABEL !== 'undefined' && ICB_LABEL[icb]) || ('NHS ' + icb + ' ICB')) : '';
-        idx.push({ type:'LA', label:o.value, sub:icbName, _lc:(o.value + ' ' + (o.value === 'City of Westminster' ? 'westminster' : '')).toLowerCase(), _key:o.value });
+        // The ONS form too ("Kingston upon Hull, City of" for Hull), so either finds it.
+        const ons = (window.PH_LA_ONS && PH_LA_ONS[o.value]) || '';
+        idx.push({ type:'LA', label:o.value, sub:icbName, _lc:(o.value + ' ' + (o.value === 'City of Westminster' ? 'westminster' : '') + ' ' + ons).toLowerCase(), _key:o.value });
       });
     }
     const isel = document.getElementById('icb-focus');
@@ -18519,7 +18763,8 @@ function _buildSearchIndex() {
         const lad = w.lad || w.LAD || '';
         // The GSS code too: analysts often hold an E05 code rather than a name.
         const gss = w.code || '';
-        idx.push({ type:'ward', label:name, sub:lad, _lc:(name+' '+lad+' '+gss).toLowerCase(), _key:name });
+        const ons = (window.PH_LA_ONS && PH_LA_ONS[lad]) || '';
+        idx.push({ type:'ward', label:name, sub:lad, _lc:(name+' '+lad+' '+gss+' '+ons).toLowerCase(), _key:name });
       }
     }
     // LSOAs
@@ -18926,7 +19171,7 @@ function _renderPostcodeRow(results, pq, q) {
    Region slug to LA names joined by "|", written from scopes/ by
    scripts/build_la_regions.py. */
 /* LA_REGIONS:BEGIN (scripts/build_la_regions.py writes this line) */
-const PH_LA_REGIONS = {"east-midlands":"Amber Valley|Ashfield|Bassetlaw|Blaby|Bolsover|Boston|Broxtowe|Charnwood|Chesterfield|Derby|Derbyshire Dales|East Lindsey|Erewash|Gedling|Harborough|High Peak|Hinckley and Bosworth|Leicester|Lincoln|Mansfield|Melton|Newark and Sherwood|North East Derbyshire|North Kesteven|North Northamptonshire|North West Leicestershire|Nottingham|Oadby and Wigston|Rushcliffe|Rutland|South Derbyshire|South Holland|South Kesteven|West Lindsey|West Northamptonshire","east-of-england":"Babergh|Basildon|Bedford|Braintree|Breckland|Brentwood|Broadland|Broxbourne|Cambridge|Castle Point|Central Bedfordshire|Chelmsford|Colchester|Dacorum|East Cambridgeshire|East Hertfordshire|East Suffolk|Epping Forest|Fenland|Great Yarmouth|Harlow|Hertsmere|Huntingdonshire|Ipswich|King's Lynn and West Norfolk|Luton|Maldon|Mid Suffolk|North Hertfordshire|North Norfolk|Norwich|Peterborough|Rochford|South Cambridgeshire|South Norfolk|Southend-on-Sea|St Albans|Stevenage|Tendring|Three Rivers|Thurrock|Uttlesford|Watford|Welwyn Hatfield|West Suffolk","london":"Barking and Dagenham|Barnet|Bexley|Brent|Bromley|Camden|City of London|Croydon|Ealing|Enfield|Greenwich|Hackney|Hammersmith and Fulham|Haringey|Harrow|Havering|Hillingdon|Hounslow|Islington|Kensington and Chelsea|Kingston upon Thames|Lambeth|Lewisham|Merton|Newham|Redbridge|Richmond upon Thames|Southwark|Sutton|Tower Hamlets|Waltham Forest|Wandsworth|Westminster","north-east":"County Durham|Darlington|Gateshead|Hartlepool|Middlesbrough|Newcastle upon Tyne|North Tyneside|Northumberland|Redcar and Cleveland|South Tyneside|Stockton-on-Tees|Sunderland","north-west":"Blackburn with Darwen|Blackpool|Bolton|Burnley|Bury|Cheshire East|Cheshire West and Chester|Chorley|Cumberland|Fylde|Halton|Hyndburn|Knowsley|Lancaster|Liverpool|Manchester|Oldham|Pendle|Preston|Ribble Valley|Rochdale|Rossendale|Salford|Sefton|South Ribble|St. Helens|Stockport|Tameside|Trafford|Warrington|West Lancashire|Westmorland and Furness|Wigan|Wirral|Wyre","south-east":"Adur|Arun|Ashford|Basingstoke and Deane|Bracknell Forest|Brighton and Hove|Buckinghamshire|Canterbury|Cherwell|Chichester|Crawley|Dartford|Dover|East Hampshire|Eastbourne|Eastleigh|Elmbridge|Epsom and Ewell|Fareham|Folkestone and Hythe|Gosport|Gravesham|Guildford|Hart|Hastings|Havant|Horsham|Isle of Wight|Lewes|Maidstone|Medway|Mid Sussex|Milton Keynes|Mole Valley|New Forest|Oxford|Portsmouth|Reading|Reigate and Banstead|Rother|Runnymede|Rushmoor|Sevenoaks|Slough|South Oxfordshire|Southampton|Spelthorne|Surrey Heath|Swale|Tandridge|Test Valley|Thanet|Tonbridge and Malling|Tunbridge Wells|Vale of White Horse|Waverley|Wealden|West Berkshire|West Oxfordshire|Winchester|Windsor and Maidenhead|Woking|Wokingham|Worthing","south-west":"Bath and North East Somerset|Bournemouth, Christchurch and Poole|Bristol|Cheltenham|Cornwall|Cotswold|Dorset|East Devon|Exeter|Forest of Dean|Gloucester|Isles of Scilly|Mid Devon|North Devon|North Somerset|Plymouth|Somerset|South Gloucestershire|South Hams|Stroud|Swindon|Teignbridge|Tewkesbury|Torbay|Torridge|West Devon|Wiltshire","west-midlands":"Birmingham|Bromsgrove|Cannock Chase|Coventry|Dudley|East Staffordshire|Herefordshire|Lichfield|Malvern Hills|Newcastle-under-Lyme|North Warwickshire|Nuneaton and Bedworth|Redditch|Rugby|Sandwell|Shropshire|Solihull|South Staffordshire|Stafford|Staffordshire Moorlands|Stoke-on-Trent|Stratford-on-Avon|Tamworth|Telford and Wrekin|Walsall|Warwick|Wolverhampton|Worcester|Wychavon|Wyre Forest","yorkshire-and-the-humber":"Barnsley|Bradford|Calderdale|Doncaster|East Riding of Yorkshire|Kingston upon Hull|Kirklees|Leeds|North East Lincolnshire|North Lincolnshire|North Yorkshire|Rotherham|Sheffield|Wakefield|York"};
+const PH_LA_REGIONS = {"east-midlands":"Amber Valley|Ashfield|Bassetlaw|Blaby|Bolsover|Boston|Broxtowe|Charnwood|Chesterfield|Derby|Derbyshire Dales|East Lindsey|Erewash|Gedling|Harborough|High Peak|Hinckley and Bosworth|Leicester|Lincoln|Mansfield|Melton|Newark and Sherwood|North East Derbyshire|North Kesteven|North Northamptonshire|North West Leicestershire|Nottingham|Oadby and Wigston|Rushcliffe|Rutland|South Derbyshire|South Holland|South Kesteven|West Lindsey|West Northamptonshire","east-of-england":"Babergh|Basildon|Bedford|Braintree|Breckland|Brentwood|Broadland|Broxbourne|Cambridge|Castle Point|Central Bedfordshire|Chelmsford|Colchester|Dacorum|East Cambridgeshire|East Hertfordshire|East Suffolk|Epping Forest|Fenland|Great Yarmouth|Harlow|Hertsmere|Huntingdonshire|Ipswich|King's Lynn and West Norfolk|Luton|Maldon|Mid Suffolk|North Hertfordshire|North Norfolk|Norwich|Peterborough|Rochford|South Cambridgeshire|South Norfolk|Southend-on-Sea|St Albans|Stevenage|Tendring|Three Rivers|Thurrock|Uttlesford|Watford|Welwyn Hatfield|West Suffolk","london":"Barking and Dagenham|Barnet|Bexley|Brent|Bromley|Camden|City of London|Croydon|Ealing|Enfield|Greenwich|Hackney|Hammersmith and Fulham|Haringey|Harrow|Havering|Hillingdon|Hounslow|Islington|Kensington and Chelsea|Kingston upon Thames|Lambeth|Lewisham|Merton|Newham|Redbridge|Richmond upon Thames|Southwark|Sutton|Tower Hamlets|Waltham Forest|Wandsworth|Westminster","north-east":"County Durham|Darlington|Gateshead|Hartlepool|Middlesbrough|Newcastle upon Tyne|North Tyneside|Northumberland|Redcar and Cleveland|South Tyneside|Stockton-on-Tees|Sunderland","north-west":"Blackburn with Darwen|Blackpool|Bolton|Burnley|Bury|Cheshire East|Cheshire West and Chester|Chorley|Cumberland|Fylde|Halton|Hyndburn|Knowsley|Lancaster|Liverpool|Manchester|Oldham|Pendle|Preston|Ribble Valley|Rochdale|Rossendale|Salford|Sefton|South Ribble|St. Helens|Stockport|Tameside|Trafford|Warrington|West Lancashire|Westmorland and Furness|Wigan|Wirral|Wyre","south-east":"Adur|Arun|Ashford|Basingstoke and Deane|Bracknell Forest|Brighton and Hove|Buckinghamshire|Canterbury|Cherwell|Chichester|Crawley|Dartford|Dover|East Hampshire|Eastbourne|Eastleigh|Elmbridge|Epsom and Ewell|Fareham|Folkestone and Hythe|Gosport|Gravesham|Guildford|Hart|Hastings|Havant|Horsham|Isle of Wight|Lewes|Maidstone|Medway|Mid Sussex|Milton Keynes|Mole Valley|New Forest|Oxford|Portsmouth|Reading|Reigate and Banstead|Rother|Runnymede|Rushmoor|Sevenoaks|Slough|South Oxfordshire|Southampton|Spelthorne|Surrey Heath|Swale|Tandridge|Test Valley|Thanet|Tonbridge and Malling|Tunbridge Wells|Vale of White Horse|Waverley|Wealden|West Berkshire|West Oxfordshire|Winchester|Windsor and Maidenhead|Woking|Wokingham|Worthing","south-west":"Bath and North East Somerset|Bournemouth, Christchurch and Poole|Bristol|Cheltenham|Cornwall|Cotswold|Dorset|East Devon|Exeter|Forest of Dean|Gloucester|Isles of Scilly|Mid Devon|North Devon|North Somerset|Plymouth|Somerset|South Gloucestershire|South Hams|Stroud|Swindon|Teignbridge|Tewkesbury|Torbay|Torridge|West Devon|Wiltshire","west-midlands":"Birmingham|Bromsgrove|Cannock Chase|Coventry|Dudley|East Staffordshire|Herefordshire|Lichfield|Malvern Hills|Newcastle-under-Lyme|North Warwickshire|Nuneaton and Bedworth|Redditch|Rugby|Sandwell|Shropshire|Solihull|South Staffordshire|Stafford|Staffordshire Moorlands|Stoke-on-Trent|Stratford-on-Avon|Tamworth|Telford and Wrekin|Walsall|Warwick|Wolverhampton|Worcester|Wychavon|Wyre Forest","yorkshire-and-the-humber":"Barnsley|Bradford|Calderdale|Doncaster|East Riding of Yorkshire|Hull|Kirklees|Leeds|North East Lincolnshire|North Lincolnshire|North Yorkshire|Rotherham|Sheffield|Wakefield|York"};
 /* LA_REGIONS:END */
 let _laRegionList = null;
 /* LAs on other regions' maps whose name starts with what was typed, or has a
@@ -19776,7 +20021,16 @@ function _restyleAll() {
    generated (a 404), a server error, no answer at all, or a file cut off half
    way. Resolves { json, whole }, or rejects when neither file can be read. */
 function _fetchWardFigures() {
-  return _getJson(dataUrl('data/ward_core.json'))
+  // The first call takes over the request the head started (PH_EARLY); a
+  // retry from the loading screen fetches afresh.
+  const early = window.PH_EARLY && window.PH_EARLY.wardCore;
+  if (early) window.PH_EARLY.wardCore = null;
+  const core = early
+    ? early.then(r => { if (r.err) throw r.err; return r.json; })
+    : (dataListed('data/ward_core.json')
+        ? _getJson(dataUrl('data/ward_core.json'))
+        : Promise.reject(Object.assign(new Error('not in the manifest'), { status: 404 })));
+  return core
     .then(json => ({ json, whole: false }))
     .catch(err => {
       console.info('data/ward_core.json not loaded (' + err.message + '), so reading ward_data.json');
@@ -19884,7 +20138,7 @@ async function loadData() {
 
     // Keep the Dataset structured data in step with the data itself, so the
     // dateModified a crawler reads is never the one hardcoded in the head.
-    if (manifest && manifest.last_run) {
+    if (manifest && manifest.last_run && PH_IS_LONDON) {
       try {
         const ldEl = document.getElementById('ld-dataset');
         const ld = JSON.parse(ldEl.textContent);
@@ -19932,7 +20186,7 @@ async function loadData() {
 
     // Borough indicators, published per local authority. The borough layer is
     // always built, so unlike the MSOA one there is nothing to guard against.
-    fetch(dataUrl('borough_data.json')).then(r => r.ok ? r.json() : null).catch(() => null)
+    fetch(dataUrl('borough_data.json')).then(r => r.ok ? _jsonLa(r) : null).catch(() => null)
       .then(bd => {
         if (!bd) return;
         BOROUGH_DATA = bd;
@@ -21872,6 +22126,12 @@ var PH_SHOW = {
 
   function csvCell(v) {
     var s = v == null ? '' : String(v);
+    // A cell that opens with =, +, -, @, a tab or a carriage return is read
+    // as a formula by Excel and Sheets, so a name carried in from a shared
+    // link (an=) could become a live HYPERLINK in the reader's own file. An
+    // apostrophe keeps it as text. Plain numbers, negative domain scores such
+    // as -1.771 among them, are left alone.
+    if (/^[=+\-@\t\r]/.test(s) && !/^[-+]?\d+(\.\d+)?$/.test(s)) s = "'" + s;
     return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
   }
   // keys: the indicator keys the file holds, so its Source column carries

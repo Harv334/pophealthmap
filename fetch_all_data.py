@@ -6596,10 +6596,17 @@ def build_vcse_json():
     #                       property, or a GP record
     # Together they were 37.9% of a 9.7 MB payload that every visitor downloads.
     # Adding a field back means adding it here and reading it in index.html.
+    #
+    # The *_desc labels went too: they repeated in English, on every record,
+    # what the *_tags codes already say, and the page holds the code to label
+    # table once (VCSE_TAG_LABELS). And a region-wide charity's covers list
+    # (every LA code in the scope, for about 5,800 records) is left out, as
+    # its scope says the same; the page counts the LAs on its map instead.
+    # Together that took the London file from 13.6 MB to about 7 MB.
     keep = ["num","name","addr","lat","lng","LAD25CD",
             "hq_in_nwl","covers","scope",
             "income","income_band","website",
-            "what_tags","what_desc","how_tags","how_desc","who_tags","who_desc"]
+            "what_tags","how_tags","who_tags"]
     cols = [c for c in keep if c in df.columns]
     out = df[cols].rename(columns={
         "name": "n", "addr": "a",
@@ -6617,6 +6624,8 @@ def build_vcse_json():
     ends = df["acc_end"].tolist() if "acc_end" in df.columns else [None] * len(records)
     n = 0
     for rec, pc, st, end in zip(records, pcs, sts, ends):
+        if rec.get("sc") == "london_wide":
+            rec.pop("cv", None)
         apply_charity_flags(rec, st, end)
         n += _generalise_small_charity(rec, pc)
     info(f"vcse: {n:,} of {len(records):,} charities shown by area only "

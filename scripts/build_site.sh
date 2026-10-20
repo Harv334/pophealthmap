@@ -54,10 +54,30 @@ cp -p data/ward_core.json data/ward_rest.json "$OUT/data/"
 # them (scripts/build_england.py writes data/regions/england/). Absent on a
 # plain checkout, where only London is served.
 if [ -d data/regions ]; then
-  cp -rp data/regions "$OUT/data/regions"
+  # -L: a symlinked pack (a local test setup) is copied, not linked, so the
+  # steps below that rewrite files in _site never reach the original.
+  cp -rpL data/regions "$OUT/data/regions"
 fi
 
 : > "$OUT/.nojekyll"
+
+# The developer comments out of the published page (about a third of
+# index.html); the repository keeps them. Needs node and the typescript
+# package, which the workflows install pinned; without them the page is
+# published as it is.
+if command -v node >/dev/null 2>&1; then
+  node "$ROOT/scripts/strip_comments.cjs" "$OUT/index.html"
+else
+  echo "build_site: node not found, so index.html keeps its comments" >&2
+fi
+
+# The LSOA and MSOA figures in column form, a fifth of the size; the page
+# turns them back into records (scripts/compact_tables.py).
+python3 "$ROOT/scripts/compact_tables.py" "$OUT"
+
+# The sitemap (one entry per published region) and the Dataset dateModified,
+# dated from the manifests rather than typed by hand.
+python3 "$ROOT/scripts/stamp_site.py" "$OUT"
 
 # What must be there, and what must not.
 fail=0

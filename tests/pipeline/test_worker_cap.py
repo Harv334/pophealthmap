@@ -84,6 +84,29 @@ store.clear();
 store.set("day", "2000-01-01"); store.set("ip:1.2.3.4", { q: 10, r: 60 });
 out.nextDay = (await send(QUESTION)).status;
 out.dayNow = store.get("day");
+
+// Per browser: two browsers on one network each get their ten, and the
+// network as a whole stops at its ceiling of 100, saying so.
+store.clear();
+const asBrowser = (id, ip) => ({ ip: ip || "9.9.9.9", body: JSON.stringify({ messages: QUESTION, client: id }) });
+const idA = "a".repeat(32), idB = "b".repeat(32);
+out.browserA = await hammer(QUESTION, 12, asBrowser(idA));
+out.browserB = await hammer(QUESTION, 12, asBrowser(idB));
+let netAllowed = 0, netMsg = "";
+for (let i = 0; i < 15; i++) {
+  const id = ("c" + i).padEnd(20, "x");
+  for (let j = 0; j < 10; j++) {
+    const res = await send(QUESTION, asBrowser(id, "8.8.8.8"));
+    if (res.status === 200) netAllowed++; else netMsg = res.body.error + "|" + res.body.scope;
+  }
+}
+out.netAllowed = netAllowed; out.netMsg = netMsg;
+out.netCounter = store.get("ip:8.8.8.8");
+// An id that is not a plain token is ignored, and the request shares the
+// address's one allowance of ten with every other request without an id.
+store.clear();
+out.junk = await hammer(QUESTION, 12, asBrowser("<b>" + "z".repeat(20)));
+out.junkKeys = [...store.keys()].filter((k) => k.startsWith("b:"));
 return out;
 """)
 
@@ -91,7 +114,7 @@ check = Checks()
 h = r["honest"]
 check("an honest caller gets exactly 10 questions", h["allowed"] == 10 and h["billed"] == 10, json.dumps(h))
 check("the 11th question is refused with the daily message",
-      h["blocked"] == 5 and "Daily limit of 10" in (h["lastError"] or ""), json.dumps(h))
+      h["blocked"] == 5 and "today's 10 questions" in (h["lastError"] or ""), json.dumps(h))
 check("the counter holds questions and round trips", r["counter"] == {"q": 10, "r": 10}, json.dumps(r["counter"]))
 f = r["forger"]
 check("forged continuations are bounded by the round-trip cap (60)", f["allowed"] == 60 and f["billed"] == 60, json.dumps(f))
@@ -105,5 +128,12 @@ check("an IPv6 /64 shares one allowance", r["v6"] == 10 and r["v6keys"] == ["ip:
 b = r["burst"]
 check("more than 12 requests a minute from one address are refused", b["allowed"] == 12 and b["blocked"] == 2
       and "wait a minute" in (b["lastError"] or ""), json.dumps(b))
+check("each browser on one network gets its own 10 questions",
+      r["browserA"]["allowed"] == 10 and r["browserB"]["allowed"] == 10, json.dumps([r["browserA"], r["browserB"]]))
+check("a network stops at its ceiling of 100 and says it is the network's",
+      r["netAllowed"] == 100 and r["netMsg"].endswith("|network") and "this network" in r["netMsg"]
+      and r["netCounter"]["q"] == 100, f"{r['netAllowed']} {r['netMsg']} {r['netCounter']}")
+check("a malformed browser id is ignored and shares the address's ten",
+      r["junk"]["allowed"] == 10 and r["junkKeys"] == ["b:9.9.9.9|-"], json.dumps([r["junk"], r["junkKeys"]]))
 check("a new UTC day starts the counts again", r["nextDay"] == 200 and r["dayNow"] != "2000-01-01", json.dumps([r["nextDay"], r["dayNow"]]))
 check.done()

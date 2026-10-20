@@ -23,7 +23,10 @@ every other consumer reads, and having the split derive from it rather than
 replace it means a refresh cannot leave the two halves describing different
 weeks.
 
-Run after any refresh, before deploying. The workflow does this.
+Run after any refresh, before deploying. The workflow does this. For a
+region pack, --region <id> reads data/regions/<id>/ward_data.json and writes
+ward_core.json and ward_rest.json beside it, where the page's regionPath looks
+for them (build-region.yml runs it).
 """
 
 import gzip
@@ -67,7 +70,16 @@ def gz_kb(obj):
     return len(gzip.compress(json.dumps(obj, separators=(",", ":")).encode())) / 1024
 
 
-def main():
+def main(argv=None):
+    global SRC, OUT_DIR, CORE, REST
+    import argparse
+    ap = argparse.ArgumentParser(description="Split ward_data.json for the first paint.")
+    ap.add_argument("--region", help="a region id under data/regions/ (default: London at the root)")
+    args = ap.parse_args(argv)
+    if args.region:
+        base = ROOT / "data" / "regions" / args.region
+        SRC, OUT_DIR = base / "ward_data.json", base
+        CORE, REST = base / "ward_core.json", base / "ward_rest.json"
     if not SRC.exists():
         sys.exit(f"missing {SRC}. Run the pipeline first.")
 
