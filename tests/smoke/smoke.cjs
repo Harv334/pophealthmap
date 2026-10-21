@@ -3519,7 +3519,9 @@ const smallText = page => page.evaluate(() => {
         rows: document.querySelectorAll('#src-rows tr[id^="src-"]').length,
         dwp: /DWP benefits/.test(document.getElementById('src-table').innerText),
         status: (document.querySelector('#src-census td:last-child') || {}).textContent || '',
-        laIntro: /local authority \(LA\)/.test((document.querySelector('[aria-label="Words for areas"]') || {}).textContent || ''),
+        // "local authority (LA)" once, before the page first says LA alone.
+        laIntro: (() => { const t = main.innerText, i = t.indexOf('local authority (LA)'), j = t.search(/\bLAs?\b/);
+          return i >= 0 && t.split('local authority (LA)').length === 2 && j > i; })(),
         skip: (document.querySelector('a.skip') || {}).getAttribute && document.querySelector('a.skip').getAttribute('href'),
       };
     });
@@ -3533,7 +3535,7 @@ const smallText = page => page.evaluate(() => {
     ok(m.lastCol === 'Last updated here' && m.rows > 15 && !m.dwp, 'methodology: live source table, DWP row dropped',
       m.lastCol + ' / ' + m.rows);
     ok(/^(Updated|Not updated|Partly updated)/.test(m.status), 'methodology: short status per source', m.status);
-    ok(m.laIntro, 'methodology: glossary introduces "local authority (LA)"');
+    ok(m.laIntro, 'methodology: introduces "local authority (LA)" once, at its first use');
     ok(m.skip === '#main', 'methodology: skip link');
     await page.close();
 
