@@ -56,6 +56,17 @@ check(vals["E09000025"]["ft_932831"] == 80.1 if F.FT_MALE_ID(93283) == 932831 el
 check(vals["E09000030"]["ft_93227"] == 104.2, "ft_93227 for Tower Hamlets")
 check("ft_932831" not in vals.get("E09000001", {}), "the City's incalculable figure is not written")
 
+print("\n=== Barnsley and Sheffield found under their old codes ===")
+old = frame([
+    ["E08000016", "Barnsley", "Districts & UAs", "Persons", "2016/17 - 20/21", "20160000", "110.5", "108", "113"],
+    ["E08000019", "Sheffield", "Districts & UAs", "Persons", "2016/17 - 20/21", "20160000", "98.1", "96", "100"],
+    ["E08000039", "Sheffield", "Districts & UAs", "Persons", "2016/17 - 20/21", "20160000", "97.0", "95", "99"],
+])
+moved = F.ft_codes_to_current(old)
+codes = list(moved["Area Code"])
+check("E08000038" in codes and "E08000016" not in codes, "Barnsley's old code is filed under its new one")
+check(codes.count("E08000039") == 1 and "E08000019" in codes, "Sheffield's own new-code row is kept and the old one left alone")
+
 print("\n=== it is a source the pipeline runs ===")
 check(F.SOURCES.get("fingertips_msoa_la") is F.run_fingertips_msoa_la, "SOURCES has fingertips_msoa_la")
 

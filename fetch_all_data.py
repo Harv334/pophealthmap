@@ -3146,6 +3146,23 @@ CODE_PREDECESSORS = {
     "E08000039": "E08000019",   # Sheffield
 }
 
+
+def ft_codes_to_current(df: "pd.DataFrame") -> "pd.DataFrame":
+    """A Fingertips frame with each predecessor code's rows filed under the
+    council's current code, where the current code has no rows of its own.
+    The Local Health LA series (area type 501) still uses the old Barnsley and
+    Sheffield codes, so without this their LA figures were dropped."""
+    if df is None or df.empty or "Area Code" not in df.columns:
+        return df
+    have = set(df["Area Code"].astype(str))
+    swap = {old: new for new, old in CODE_PREDECESSORS.items()
+            if new not in have and old in have}
+    if not swap:
+        return df
+    df = df.copy()
+    df["Area Code"] = df["Area Code"].astype(str).replace(swap)
+    return df
+
 @lru_cache(maxsize=1)
 def _ft_district_parents() -> dict:
     """District code -> upper-tier (county) code, for districts in scope."""
@@ -4129,6 +4146,7 @@ def run_fingertips_msoa_la() -> pd.DataFrame:
             continue
         if df.empty or "Area Code" not in df.columns:
             continue
+        df = ft_codes_to_current(df)
         df = df[df["Area Code"].isin(SCOPE_LADS)]
         rows.extend(_ft_la_latest(df, ind_id))
     out = pd.DataFrame(rows, columns=["LAD25CD", "indicator_id", "value", "period"])
