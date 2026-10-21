@@ -96,7 +96,9 @@ let netAllowed = 0, netMsg = "";
 for (let i = 0; i < 15; i++) {
   const id = ("c" + i).padEnd(20, "x");
   for (let j = 0; j < 10; j++) {
-    const res = await send(QUESTION, asBrowser(id, "8.8.8.8"));
+    // The site ceiling (50) sits below the network's, so it is raised here.
+    const res = await send(QUESTION, { ...asBrowser(id, "8.8.8.8"),
+      env: { ...env, SITE_DAILY_QUESTIONS: "1000", SITE_DAILY_REQUESTS: "5000" } });
     if (res.status === 200) netAllowed++; else netMsg = res.body.error + "|" + res.body.scope;
   }
 }

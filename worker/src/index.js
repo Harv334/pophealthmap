@@ -82,8 +82,8 @@ const NETWORK_REQUEST_CAP = NETWORK_CAP * 6;
  * reached Ask stops for everyone until midnight UTC rather than spending on.
  * SITE_DAILY_QUESTIONS and SITE_DAILY_REQUESTS in wrangler.toml override them.
  */
-const SITE_QUESTION_CAP = 500;
-const SITE_REQUEST_CAP = 2000;
+const SITE_QUESTION_CAP = 50;
+const SITE_REQUEST_CAP = 200;
 
 /**
  * What a conversation may contain. The browser's history fits well inside

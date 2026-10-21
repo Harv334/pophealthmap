@@ -176,13 +176,15 @@ Counted in a Durable Object (`ASK_COUNTER`) **before** the model is called, so
 parallel requests cannot all pass on one count, and handed back if the call
 fails.
 
-**3. A daily ceiling for the whole site.** `SITE_DAILY_QUESTIONS` (500) and
-`SITE_DAILY_REQUESTS` (2,000) in `wrangler.toml`. When either is reached, Ask
+**3. A daily ceiling for the whole site.** `SITE_DAILY_QUESTIONS` (50) and
+`SITE_DAILY_REQUESTS` (200) in `wrangler.toml`. When either is reached, Ask
 stops for everyone until midnight UTC and says so; the rest of the map is
 unaffected. Set it from your budget: at the typical $0.01 to $0.03 a question,
-500 questions is $5 to $15 a day, and at the worst case it could be $75. For a
-$20 a month spend limit, a ceiling of about 30 questions a day (and 120
-requests) keeps a busy day from spending the month.
+50 questions is $0.50 to $1.50 a day, and at the worst case it could be about
+$7.50. That is up to about $45 a month if every day reaches the ceiling, so set
+the Anthropic spend limit to match. For a $20 a month spend limit, a ceiling of
+about 30 questions a day (and 120 requests) keeps a busy day from spending the
+month.
 
 All three **fail closed**. The KV counter they replace failed open: if KV
 errored, or ran out of its 1,000 free writes a day (a few hundred questions),
