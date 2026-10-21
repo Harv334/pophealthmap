@@ -1653,8 +1653,8 @@ const smallText = page => page.evaluate(() => {
   // The tour, the Indicators name and the Ask panel (workplan 1.4 to 1.6).
   // Six chapters in plain words; the last completes when the reader chooses
   // any indicator, on a desktop from the tab and on a phone through the menu;
-  // and the tour, the Ask panel and the privacy page describe the same route
-  // for a question: through this site's server to Anthropic's Claude model,
+  // and the tour and the privacy page describe the same route for a
+  // question: through this site's server to Anthropic's Claude model,
   // 10 a day, with a reply to a clarifying question free.
   const ASK_SAME = [/this site's server/, /Anthropic's Claude model/, /10 questions a day/,
     /narrow a question down does not use one up/];
@@ -1748,9 +1748,10 @@ const smallText = page => page.evaluate(() => {
       return { text: m ? m.innerText : '', paras: m ? m.querySelectorAll('p').length : 0,
         caution: (document.getElementById('ai-caution') || {}).innerText || '' };
     });
-    ok(intro.paras === 2 && ASK_SAME.every(re => re.test(intro.text)) && /personal/.test(intro.text) && /local authority \(LA\)/.test(intro.text) &&
+    ok(intro.paras === 1 && /compare areas/.test(intro.text) && /highest or lowest/.test(intro.text) && /personal information/.test(intro.caution) &&
+       intro.text.length < 200 &&
        !/[–—]/.test(intro.text + intro.caution) && /check any figure/.test(intro.caution),
-      vpName + ': the Ask panel opens with two paragraphs that describe the same route as the tour', intro.text);
+      vpName + ': the Ask panel opens with a short message saying what it can do', intro.text);
     ok(errors.length === 0, 'no page errors (tour, ' + vpName + ')', errors.join(' | '));
     await page.close();
   }
@@ -3607,7 +3608,7 @@ const smallText = page => page.evaluate(() => {
         intro: ((document.querySelector('.ai-intro') || {}).textContent || '') }), 600));
     });
     ok(!/every figure in them comes from this map|built from the figures on this map/.test(ask.caution + ask.intro) &&
-       /can still get things wrong/.test(ask.caution) && /can still make mistakes/.test(ask.intro),
+       /can still get things wrong/.test(ask.caution),
       'Ask: the panel does not promise that every figure comes from the map', ask.caution);
     await page.keyboard.press('Escape');
     await setOv(page, 'imd_score_ward');

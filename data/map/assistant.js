@@ -1097,23 +1097,14 @@ var MODEL_LABEL = "Claude Sonnet 5";
     log.setAttribute("aria-live", "polite");
     log.setAttribute("aria-label", "Conversation");
 
-    // One opening message, not three stacked notices. It says where a
-    // question goes, in the same words as the tour and the privacy page,
-    // because "read from your browser" on its own invites the belief that
-    // nothing leaves it. It carries the reason for the cap as well, so the
-    // count in the header can be just a count.
+    // One short opening message: what Ask can do. The header counts the
+    // questions left, the note under the box asks for nothing personal, and
+    // where a question goes is told in full by the tour and the privacy page.
     var intro = document.createElement("div");
     intro.className = "ai-msg ai-bot ai-intro";
     [
-      "Ask about any ward or local authority (LA) in your own words. The " +
-        "assistant looks up the figures on this map to answer, rather than " +
-        "relying on what it remembers, but it can still make mistakes. Your question and the figures looked up to answer it pass " +
-        "through this site's server to Anthropic's Claude model, which writes " +
-        "the reply, so please leave out anything personal.",
-      "You can ask " + DAILY_CAP + " questions a day, though a shared work network " +
-        "may run out sooner, because each answer costs money to produce. Replying " +
-        "when it asks you to narrow a question down does not use one up, and " +
-        "everything else on the map has no limit.",
+      "Ask questions about the data on this map. You can compare areas, or " +
+        "find the places with the highest or lowest figures.",
     ].forEach(function (t) {
       var para = document.createElement("p");
       para.textContent = t;
