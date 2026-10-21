@@ -2581,13 +2581,13 @@ const smallText = page => page.evaluate(() => {
       rl: (HOSP.find(d => d.n === 'Royal London Hospital') || {}).ae,
       guys: (HOSP.find(d => d.n === "Guy's Hospital") || {}).ae,
       qm: HOSP.filter(d => /^Queen Mary's Hospital, (Roehampton|Sidcup)$/.test(d.n)).length,
-      note: (document.getElementById('hosp-ae-note') || {}).textContent || '',
+      note: (document.getElementById('hosp-ae-note') || {}).title || '',
     }));
     ok(data.reg === 0 && data.gone.length === 0 && data.western && data.qm === 2,
       'hospitals: typed from the checked list, closed sites and services left out, names told apart', JSON.stringify(data));
     ok(data.ae >= 20 && data.rl === true && data.guys === false, 'hospitals: the major hospitals with a 24-hour A&E are flagged', JSON.stringify(data));
-    ok(/^Not every hospital has an A&E\. In an emergency call 999, and for urgent help that is not an emergency use NHS 111 online or call 111\.$/.test(data.note.trim()),
-      'hospitals: the Layers row says not every hospital has an A&E', data.note);
+    ok(/^Not every hospital has an A&E\. In an emergency call 999, and for urgent help that is not an emergency use NHS 111 online at 111\.nhs\.uk or call 111\.$/.test(data.note.trim()),
+      'hospitals: the Layers row\'s help button says not every hospital has an A&E', data.note);
     const pop = await page.evaluate(() => {
       let m = null;
       hL.eachLayer(l => { if (/Royal London Hospital</.test(l.getPopup().getContent())) m = l; });
@@ -2624,12 +2624,12 @@ const smallText = page => page.evaluate(() => {
       homeless: (GPS.find(d => d.code === 'E87772') || {}).kind || '',
       phBad: pharmData.filter(d => /fittleworth|online|chemist 2 home/i.test(d.name)).map(d => d.name),
       prison: dentalData.filter(d => /\bHMP\b/i.test(d.name)).map(d => d.name),
-      note: (document.getElementById('dental-note') || {}).textContent || '',
+      note: (document.getElementById('dental-note') || {}).title || '',
     }));
     ok(!s.gpBad.length && s.homeless === 'Practice for people who are homeless',
       'GP practices: no schemes, hubs or offices, and the practices for people who are homeless are labelled', JSON.stringify(s));
     ok(!s.phBad.length && !s.prison.length, 'pharmacies and dentists: no appliance or online-only suppliers, and no prisons', JSON.stringify(s));
-    ok(/A contract does not mean a practice is taking new NHS patients/.test(s.note), 'dental: the Layers row says what an NHS contract means', s.note);
+    ok(/A contract does not mean a practice is taking new NHS patients/.test(s.note), 'dental: the Layers row\'s help button says what an NHS contract means', s.note);
     ok(errors.length === 0, 'no page errors (service layers)', errors.join(' | '));
     await page.close();
   }
@@ -3279,8 +3279,8 @@ const smallText = page => page.evaluate(() => {
       await page.keyboard.press('ArrowDown');
       await page.waitForTimeout(1200);
       const v1 = await page.evaluate(() => document.getElementById('region-picker').value);
-      ok(page.url() === url0 && v1 !== v0 && await page.evaluate(() => !!document.getElementById('region-go')),
-        'region select: an arrow key chooses without leaving the page, and Open this region goes', JSON.stringify([url0, page.url(), v0, v1]));
+      ok(page.url() === url0 && v1 !== v0 && await page.evaluate(() => !document.getElementById('region-go')),
+        'region select: an arrow key chooses without leaving the page, and there is no separate Open button', JSON.stringify([url0, page.url(), v0, v1]));
       await page.evaluate(v => { document.getElementById('region-picker').value = v; }, v0);
     } else console.log('SKIP region select (one region published)');
 
@@ -3519,7 +3519,9 @@ const smallText = page => page.evaluate(() => {
         rows: document.querySelectorAll('#src-rows tr[id^="src-"]').length,
         dwp: /DWP benefits/.test(document.getElementById('src-table').innerText),
         status: (document.querySelector('#src-census td:last-child') || {}).textContent || '',
-        laIntro: /local authority \(LA\)/.test((document.querySelector('[aria-label="Words for areas"]') || {}).textContent || ''),
+        // "local authority (LA)" once, before the page first says LA alone.
+        laIntro: (() => { const t = main.innerText, i = t.indexOf('local authority (LA)'), j = t.search(/\bLAs?\b/);
+          return i >= 0 && t.split('local authority (LA)').length === 2 && j > i; })(),
         skip: (document.querySelector('a.skip') || {}).getAttribute && document.querySelector('a.skip').getAttribute('href'),
       };
     });
@@ -3533,7 +3535,7 @@ const smallText = page => page.evaluate(() => {
     ok(m.lastCol === 'Last updated here' && m.rows > 15 && !m.dwp, 'methodology: live source table, DWP row dropped',
       m.lastCol + ' / ' + m.rows);
     ok(/^(Updated|Not updated|Partly updated)/.test(m.status), 'methodology: short status per source', m.status);
-    ok(m.laIntro, 'methodology: glossary introduces "local authority (LA)"');
+    ok(m.laIntro, 'methodology: introduces "local authority (LA)" once, at its first use');
     ok(m.skip === '#main', 'methodology: skip link');
     await page.close();
 
