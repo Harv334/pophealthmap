@@ -3262,10 +3262,14 @@ FT_HEADLINE_AGE = {
     93930: "0-4 yrs", 30311: "5 yrs", 30314: "65+ yrs", 93560: "25-49 yrs",
 }
 # Survey prevalences, whose LA intervals say whether the right breakdown came
-# through: the 18 and over smoking figure has a median half-width of about 3
-# points, physical activity 3.6, the 18 to 64 breakdown 9.4.
+# through: across London's boroughs the 18 and over smoking figure has a
+# median half-width of about 3 points, physical activity 3.6, the 18 to 64
+# breakdown 9.4. Shire districts have smaller samples, so their headline
+# figures run wider: adult obesity and smoking came in at 5.0 to 5.1 in the
+# October 2026 rebuild of the East and West Midlands, East of England and
+# South East. The limit sits between those and the breakdown.
 FT_PREVALENCE_IDS = {92443, 93088, 93014}
-FT_CI_HALF_WIDTH_MAX = 5.0
+FT_CI_HALF_WIDTH_MAX = 7.0
 # A value whose note says this is a placeholder, not a figure.
 FT_WITHHELD_NOTES = ("not published", "cannot be calculated")
 

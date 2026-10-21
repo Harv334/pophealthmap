@@ -96,6 +96,8 @@ rows = [{"indicator_short": "s", "age": "18+ yrs", "value": 12.0, "lower_ci": 2.
 check(F.ft_sanity(rows, 92443, "s") is not None, "a median half-width of 10 points fails")
 rows = [{"indicator_short": "s", "age": "18+ yrs", "value": 12.0, "lower_ci": 9.0, "upper_ci": 15.0}] * 3
 check(F.ft_sanity(rows, 92443, "s") is None, "18+ with 3 point half-widths passes")
+rows = [{"indicator_short": "s", "age": "18+ yrs", "value": 25.0, "lower_ci": 19.9, "upper_ci": 30.1}] * 3
+check(F.ft_sanity(rows, 92443, "s") is None, "a shire district's 5.1 point half-width passes")
 
 print("Census: single years of age, checked against ONS")
 cols = {"geography code": ["E01000001", "E01000002", "W01000001"], "Age: Total": [1000, 1000, 1000],
