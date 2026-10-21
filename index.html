@@ -3630,16 +3630,12 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
              published; see PH_REGIONS_LIVE in the head and initRegionUi. -->
         <div class="sb-sec" id="region-picker-wrap" hidden>
           <label class="sb-lbl" for="region-picker">Region</label>
-          <div style="display:flex;gap:6px;align-items:center">
-            <select id="region-picker" aria-label="Region: which part of England the map shows" style="flex:1;min-width:0"></select>
-            <button type="button" id="region-go" class="btn">Open this region</button>
-          </div>
+          <select id="region-picker" aria-label="Region: which part of England the map shows" style="width:100%"></select>
         </div>
         <div class="sb-sec" id="pointlayers-sec">
           <div class="sb-lbl">Places and services</div>
-          <label class="lrow"><div class="sw sw-ring" style="--sw:#2F3B45"></div><span class="lname">GP practices <span class="lcount" id="gp-count">0</span></span><input type="checkbox" id="tg"></label>
-          <label class="lrow"><div class="sw sw-dot" style="--sw:#A32D2D"></div><span class="lname">Hospitals <span class="lcount" id="hosp-count">0</span></span><input type="checkbox" id="th"></label>
-          <p class="lsub hosp-ae-note" id="hosp-ae-note">Not every hospital has an A&amp;E. In an emergency call 999, and for urgent help that is not an emergency use <a href="https://111.nhs.uk/" target="_blank" rel="noopener">NHS 111 online</a> or call 111.</p>
+          <label class="lrow"><div class="sw sw-dot" style="--sw:#005EB8"></div><span class="lname">GP practices <span class="lcount" id="gp-count">0</span></span><input type="checkbox" id="tg"></label>
+          <div class="lrow lrow-split"><label for="th"><div class="sw sw-dot" style="--sw:#A32D2D"></div><span class="lname">Hospitals <span class="lcount" id="hosp-count">0</span></span></label><button type="button" class="lhelp" id="hosp-ae-note" aria-label="About hospitals" aria-expanded="false" title="Not every hospital has an A&amp;E. In an emergency call 999, and for urgent help that is not an emergency use NHS 111 online at 111.nhs.uk or call 111.">?</button><input type="checkbox" id="th"></div>
           <label class="lrow" id="greenspace-row"><div class="sw sw-dot" style="--sw:#2E7D32"></div><span class="lname">Parks and green spaces <span class="lcount" id="greenspace-count"></span></span><input type="checkbox" id="tgr"></label>
           <div id="greenspace-legend" class="lsub lkey" style="display:none">
             <div class="lsub-lbl">OS Open Greenspace categories</div>
@@ -3656,8 +3652,7 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
           </div>
           <!-- VCSE toggle lives in the VCSE tab; that is the only place to enable it. -->
 
-          <label class="lrow"><div class="sw sw-dot" style="--sw:#7B2D8E"></div><span class="lname">Dental practices <span class="lcount" id="dental-count"></span></span><input type="checkbox" id="td"></label>
-          <p class="lsub hosp-ae-note" id="dental-note">Practices that hold an NHS dental contract, from the NHS register. A contract does not mean a practice is taking new NHS patients, and practices that see only private patients are not shown. To find one taking NHS patients, use the <a href="https://www.nhs.uk/service-search/find-a-dentist" target="_blank" rel="noopener">dentist search on nhs.uk</a> or call NHS 111.</p>
+          <div class="lrow lrow-split"><label for="td"><div class="sw sw-dot" style="--sw:#7B2D8E"></div><span class="lname">Dental practices <span class="lcount" id="dental-count"></span></span></label><button type="button" class="lhelp" id="dental-note" aria-label="About dental practices" aria-expanded="false" title="Practices that hold an NHS dental contract, from the NHS register. A contract does not mean a practice is taking new NHS patients, and practices that see only private patients are not shown. To find one taking NHS patients, use the dentist search on nhs.uk or call NHS 111.">?</button><input type="checkbox" id="td"></div>
           <label class="lrow"><div class="sw sw-dot" style="--sw:#E89B1B"></div><span class="lname">Pharmacies <span class="lcount" id="pharm-count"></span></span><input type="checkbox" id="tph"></label>
         </div>
         <div class="sb-sec">
@@ -5228,7 +5223,7 @@ const PH_WHERE_ARIA = PH_IS_LONDON
        arrow key in a closed select, so navigating on change took a keyboard
        user to another region with one key press. A choice from the open
        list (mouse, or Enter in it) still goes straight there; an arrow key
-       only chooses, and Enter or Open this region goes. */
+       only chooses, and Enter goes. */
     const go = () => { if (pick.value !== R.id) location.href = regionHref(pick.value); };
     let arrowed = false;
     pick.addEventListener('keydown', e => {
@@ -5238,8 +5233,6 @@ const PH_WHERE_ARIA = PH_IS_LONDON
     });
     pick.addEventListener('change', () => { if (arrowed) { arrowed = false; return; } go(); });
     pick.addEventListener('mousedown', () => { arrowed = false; });
-    const goBtn = $('region-go');
-    if (goBtn) goBtn.addEventListener('click', go);
   }
   // One choice is not a choice: hidden until a second region is published.
   if (wrap) wrap.hidden = opts.length < 2;
@@ -8896,13 +8889,12 @@ document.addEventListener('click', e => {
 });
 
 // Static layers
-// GP layer: small white dots with a dark slate ring, clustered when zoomed out
-// the same way as the pharmacy and dental layers. The big blue lettered pins
-// that were here covered the shading underneath and their blue sat inside the
-// choropleth ramps, so a practice could read as a shaded area. White and slate
-// are outside every ramp. These stay L.marker (not circleMarker) so each dot is
-// still a focusable element that keyboard users can tab to.
-const GP_RING = '#2F3B45';
+// GP layer: small solid NHS blue dots with a white rim, clustered when zoomed
+// out the same way as the pharmacy and dental layers. The white rim keeps each
+// dot apart from the shading underneath. These stay L.marker (not
+// circleMarker) so each dot is still a focusable element that keyboard users
+// can tab to.
+const GP_RING = '#005EB8';
 /* A point marker's icon. On a touch screen the dot is drawn in the middle
    of an invisible 44px box, which is what the finger has to hit, so a tap
    that lands near a practice still opens it; with a mouse the marker stays
@@ -8914,7 +8906,7 @@ function _touchIcon(html, size) {
     : L.divIcon({ html: html, iconSize:[size,size], iconAnchor:[size/2,size/2], className:'' });
 }
 function mkGpIcon() {
-  return _touchIcon(`<div class="mk mk-ring" style="--mk:${GP_RING};width:11px;height:11px"></div>`, 11);
+  return _touchIcon(`<div class="mk" style="--mk:${GP_RING};width:11px;height:11px"></div>`, 11);
 }
 /* The charities layer adds its markers in chunks, on timers. Switched off
    before the last chunk (Reset does this), markercluster still finishes by
@@ -8935,7 +8927,7 @@ const gpL = L.markerClusterGroup({
   iconCreateFunction: cluster => {
     const c = cluster.getChildCount();
     const sz = c > 50 ? 36 : c > 20 ? 30 : 26;
-    return L.divIcon({ html:`<div class="mk mk-ring mk-lbl" style="--mk:${GP_RING};width:${sz}px;height:${sz}px">${c}</div>`, iconSize:[sz,sz], iconAnchor:[sz/2,sz/2], className:'' });
+    return L.divIcon({ html:`<div class="mk mk-lbl" style="--mk:${GP_RING};width:${sz}px;height:${sz}px">${c}</div>`, iconSize:[sz,sz], iconAnchor:[sz/2,sz/2], className:'' });
   }
 });
 gpL.addLayers(GPS.map(d => {
