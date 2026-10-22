@@ -3077,8 +3077,8 @@ const smallText = page => page.evaluate(() => {
     ok(await page.evaluate(() => { const h = document.getElementById('dl-help').title;
       return (h.match(/local authority \(LA\)/g) || []).length === 1 && /(four|five) sizes of area/.test(h) && !/\bBorough\b/.test(h); }),
       'region Area level help introduces local authority (LA) once');
-    // Ask is written for London's wards and LAs, so a region has no Ask
-    // button, no panel and no "Ask about this ward" (workplan 1.6).
+    // Ask is on each region map as well as London: the button, the panel and
+    // "Ask about this ward" are all there.
     const askNE = await page.evaluate(async () => {
       const w = Object.keys(WARD_DATA)[0];
       if (w) showWard(w);
@@ -3087,7 +3087,7 @@ const smallText = page => page.evaluate(() => {
       return { toggle: !!document.getElementById('ai-toggle'), panel: !!document.getElementById('ai-panel'),
         sheetAsk: !!b && !b.hidden && b.getBoundingClientRect().width > 0, available: !!(window.PH_ASSISTANT && PH_ASSISTANT.available) };
     });
-    ok(!askNE.toggle && !askNE.panel && !askNE.sheetAsk && !askNE.available, 'region: no Ask button or panel outside London', JSON.stringify(askNE));
+    ok(askNE.toggle && askNE.panel && askNE.sheetAsk && askNE.available, 'region: the North East map has the Ask button, its panel and Ask about this ward', JSON.stringify(askNE));
     // B6: the most deprived ten LSOAs are the ten with the lowest national
     // rank, not the first ten in the file (which were all in Gateshead).
     await setOv(page, 'imd_decile');
@@ -3129,8 +3129,8 @@ const smallText = page => page.evaluate(() => {
       return { o, link: getComputedStyle(document.getElementById('sbar-tour')).display };
     });
     ok(neTour.o.length === 6 && /how the North East changes from one neighbourhood to the next\. You can look at its 12 local authorities \(LAs\)/.test(neTour.o[0]) &&
-       !/London/.test(neTour.o.join(' ')) && !/Ask about this data/.test(neTour.o[3]) && neTour.link !== 'none',
-      'region: the tour runs on the region\'s own counts, with Take a tour, and leaves out Ask where there is none', JSON.stringify(neTour).slice(0, 600));
+       !/London/.test(neTour.o.join(' ')) && /Ask about this data/.test(neTour.o[3]) && neTour.link !== 'none',
+      'region: the tour runs on the region\'s own counts, with Take a tour, and tells of Ask', JSON.stringify(neTour).slice(0, 600));
     ok(errors.length === 0, 'no page errors (North East)', errors.join(' | '));
     await page.close();
     // A first visit to a region gets the tour too, since ?r= alone is not a shared view.
@@ -4458,16 +4458,19 @@ const smallText = page => page.evaluate(() => {
       await ph.close();
     }
 
-    // P70 and P71: the terms, and Ask named as London only.
+    // P70 and P71: the terms, and where Ask is: London and each region, not England.
     const pv = await open(browser, 'privacy.html', DESK);
     const pt = await pv.page.evaluate(() => document.body.innerText);
-    ok(/not medical advice/.test(pt) && /provided free and as it is/.test(pt) && /available on the London\s+map for now/.test(pt) &&
-       /On other regions and the England\s+map it is not shown, and nothing is sent\./.test(pt) &&
+    ok(/not medical advice/.test(pt) && /provided free and as it is/.test(pt) && /available on the London\s+map and on each region's map/.test(pt) &&
+       /On the England\s+map, which shows every region at once, it is not shown, and nothing is sent\./.test(pt.replace(/\s+/g, ' ')) &&
+       !/for now/.test(pt) &&
        /server passes it to Anthropic's Claude model/.test(pt.replace(/\s+/g, ' ')) && /10 questions a day/.test(pt) && /narrow\s+a question down does not use one up/.test(pt),
-      'polish: the privacy page has the terms and says Ask is on the London map for now');
+      'polish: the privacy page has the terms and says Ask is on London and each region map, not England');
     await pv.page.close();
     const ac = await open(browser, 'accessibility.html', DESK);
-    ok(/on the London map for now/.test(await ac.page.evaluate(() => document.body.innerText)), 'polish: the accessibility statement says Ask is London only');
+    const at = (await ac.page.evaluate(() => document.body.innerText)).replace(/\s+/g, ' ');
+    ok(/on the London map and each region's map, answers your questions/.test(at) && /On the England map, which shows every region at once, it is not shown/.test(at) &&
+       !/London map for now/.test(at), 'polish: the accessibility statement says Ask is on London and each region map, not England');
     await ac.page.close();
 
     // P62 and P75: a region page names its own address, and asks for no file
@@ -4518,7 +4521,14 @@ const smallText = page => page.evaluate(() => {
       const R = (n, i) => Promise.resolve(PH_ASSISTANT.runTool(n, i));
       const out = {};
       out.wardSync = typeof (PH_ASSISTANT.runTool('get_area', { name: 'Lansbury', level: 'ward' }) || {}).then === 'undefined';
+      {
+        const li0 = PH_ASSISTANT.runTool('list_indicators', {});
+        const no = PH_ASSISTANT.runTool('get_area', { name: 'Nowhere at all', level: 'ward' });
+        out.region = { li: li0.region, las: li0.la_count, wards: li0.ward_count, first: Object.keys(li0)[0], err: no.region,
+          rank: PH_ASSISTANT.runTool('rank_areas', { indicator: 'imd_score', direction: 'highest', n: 3, level: 'la' }).region };
+      }
       const ms = await R('get_area', { name: 'Brent 012', level: 'msoa', indicators: ['census_population', 'ft_93283'] });
+      out.region.msoa = ms.region;
       out.msoa = ms.name === 'Brent 012' && ms.code === 'E02000104' && ms.la === 'Brent' && ms.level === 'MSOA' &&
         ms.indicators.census_population.v === msoaOvValue('E02000104', 'census_population') &&
         ms.indicators.ft_93283.v === msoaOvValue('E02000104', 'ft_93283') && /8,000 people/.test(ms.caveat || '');
@@ -4555,6 +4565,9 @@ const smallText = page => page.evaluate(() => {
       return out;
     }, HAS_OA);
     ok(A.wardSync, 'Ask levels: ward lookups still answer at once, not with a promise');
+    ok(A.region.li === 'London' && A.region.first === 'region' && A.region.las === 33 && A.region.wards > 600 &&
+       A.region.err === 'London' && A.region.rank === 'London' && A.region.msoa === 'London',
+      'Ask levels: every London result names its region, and list_indicators counts the LAs and wards', JSON.stringify(A.region));
     ok(A.msoa, 'Ask levels: an MSOA by name, with its LA and the figures the map holds');
     ok(A.lsoa && A.lsoaOas, 'Ask levels: an LSOA by name and by code, with its ward, LA and output areas', JSON.stringify(A));
     ok(/is an LSOA code, so ask again with level lsoa/.test(A.wrongLevel), 'Ask levels: a code for another level says which level to use', A.wrongLevel);
@@ -4570,6 +4583,81 @@ const smallText = page => page.evaluate(() => {
       'Ask levels: list_indicators says where each indicator is, and stays under 16 KB', JSON.stringify(A.list));
     ok(!errors.length, 'no page errors (Ask levels)', errors.join(' | '));
     await page.close();
+  }
+
+  // Ask on a region map: the same tools, reading the region's own files, with
+  // every result naming the region and no London place in any of them.
+  if (HAS_NE) {
+    const { page, errors } = await open(browser, 'index.html?r=north-east&t=1', DESK);
+    const N = await page.evaluate(async () => {
+      const R = (n, i) => Promise.resolve(PH_ASSISTANT.runTool(n, i));
+      const ward = Object.keys(WARD_DATA).map(k => WARD_DATA[k]).find(w => w.lad && w.indicators && w.indicators.imd_score != null);
+      const la = ward.lad, out = { la, ward: ward.name };
+      const res = {};
+      res.li = await R('list_indicators', {});
+      res.ward = await R('get_area', { name: ward.name, level: 'ward', within_la: la, indicators: ['census_population', 'imd_score'] });
+      res.la = await R('get_area', { name: la, level: 'la', indicators: ['census_population', 'imd_score'] });
+      res.rankWard = await R('rank_areas', { indicator: 'imd_score', direction: 'highest', n: 5, level: 'ward' });
+      res.rankLsoa = await R('rank_areas', { indicator: 'imd_score', direction: 'highest', n: 5, level: 'lsoa', within_la: la });
+      res.rankOa = await R('rank_areas', { indicator: 'census_over65_pct', direction: 'highest', n: 5, level: 'oa', within_la: la });
+      res.london = await R('get_area', { name: 'Hackney', level: 'la' });
+      const las = new Set(Object.keys(WARD_DATA).map(k => WARD_DATA[k].lad));
+      out.regions = Object.keys(res).map(k => k + '=' + res[k].region);
+      out.li = { las: res.li.la_count, wards: res.li.ward_count, real: las.size, n: Object.keys(WARD_DATA).length };
+      out.wardOk = res.ward.name === ward.name && res.ward.la === la && res.ward.indicators.imd_score.v === ward.indicators.imd_score;
+      out.laOk = res.la.name === la && res.la.level === 'LA' && res.la.indicators.census_population.v > 0;
+      const wv = (res.rankWard.results || []).map(r => r.value);
+      out.rankWard = wv.length === 5 && wv.every((v, i) => !i || wv[i - 1] >= v) && res.rankWard.of_total === Object.keys(WARD_DATA).length &&
+        res.rankWard.results.every(r => las.has(r.la));
+      const lv = (res.rankLsoa.results || []).map(r => r.value);
+      out.rankLsoa = res.rankLsoa.level === 'LSOA' && res.rankLsoa.within === la && lv.length === 5 && lv.every((v, i) => !i || lv[i - 1] >= v) &&
+        res.rankLsoa.results.every(r => r.la === la && /^E01/.test(r.code) && r.ward && r.value === lsoaOvValue(r.code, 'imd_score'));
+      // The region packs have no output areas yet, so the tool says so and
+      // points to LSOAs; with them, the ranking is within the LA.
+      out.rankOa = res.rankOa.error ? /not available on the North East map/.test(res.rankOa.error) && /LSOA/.test(res.rankOa.error)
+        : res.rankOa.level === 'output area' && res.rankOa.results.every(r => r.la === la);
+      out.oaText = res.rankOa.error || '';
+      out.london = /No LA found matching 'Hackney'/.test(res.london.error || '');
+      // No London LA named anywhere in what the tools said, the list included.
+      const txt = JSON.stringify([res.li, res.ward, res.la, res.rankWard, res.rankLsoa, res.rankOa]);
+      out.londonNames = (txt.match(/\b(London|Brent|Camden|Hackney|Barnet|Westminster|Lambeth|Tower Hamlets|Newham)\b/g) || []);
+      return out;
+    });
+    ok(N.regions.every(r => /=North East$/.test(r)), 'region Ask: every tool result names the North East as its region', N.regions.join(' '));
+    ok(N.li.las === N.li.real && N.li.las === 12 && N.li.wards === N.li.n, 'region Ask: list_indicators counts the North East\'s 12 LAs and its wards', JSON.stringify(N.li));
+    ok(N.wardOk && N.laOk, 'region Ask: get_area finds a North East ward and its LA, with the map\'s figures', JSON.stringify(N));
+    ok(N.rankWard, 'region Ask: rank_areas at ward ranks the North East\'s own wards');
+    ok(N.rankLsoa, 'region Ask: rank_areas at LSOA within ' + N.la + ' ranks its LSOAs from the region\'s files');
+    ok(N.rankOa, 'region Ask: rank_areas at output area within an LA answers for this map', N.oaText);
+    ok(N.london, 'region Ask: a London LA is not found on the North East map');
+    ok(!N.londonNames.length, 'region Ask: no London place in the North East results', N.londonNames.join(', '));
+    ok(!errors.length, 'no page errors (region Ask)', errors.join(' | '));
+    await page.close();
+  }
+
+  // The England view has no Ask, even with its data there. The North East
+  // pack stands in for the England build so the page loads in full.
+  if (HAS_NE) {
+    const { isMobile, hasTouch, ...viewport } = DESK;
+    const p = await browser.newPage({ viewport });
+    const perr = [];
+    p.on('pageerror', e => perr.push(e.message));
+    if (!HAS_ENG) {
+      await p.route(/data\/regions\/england\//, r => {
+        const u = new URL(r.request().url());
+        const f = path.join(ROOT, decodeURIComponent(u.pathname).replace('/data/regions/england/', 'data/regions/north-east/'));
+        return fs.existsSync(f) ? r.fulfill({ path: f }) : r.fulfill({ status: 404, body: '' });
+      });
+    }
+    await p.goto(BASE + '/index.html?r=england&go=1&t=1');
+    await p.waitForFunction(() => typeof WARD_DATA !== 'undefined' && Object.keys(WARD_DATA).length > 0, null, { timeout: 120000 }).catch(() => {});
+    await p.waitForTimeout(3000);
+    const eng = await p.evaluate(() => ({ england: PH_REGION.isEngland, missing: PH_REGION.missing, wards: Object.keys(WARD_DATA).length,
+      toggle: !!document.getElementById('ai-toggle'), panel: !!document.getElementById('ai-panel'),
+      available: !!(window.PH_ASSISTANT && PH_ASSISTANT.available) }));
+    ok(eng.england && !eng.missing && eng.wards > 0 && !eng.toggle && !eng.panel && !eng.available,
+      'England: the England view has no Ask button or panel', JSON.stringify(eng));
+    await p.close();
   }
 
   await browser.close();

@@ -6,6 +6,8 @@ These changes are written and tested, and reach the site with the next data refr
 
 Census percentages for wards and LAs are calculated from the summed counts of their output areas: the households with no car or van in a ward's output areas, for example, divided by all their households. A measure of households is therefore a share of households rather than an average weighted by residents. Each indicator card, the Area profile, the Data export notes and the methodology page describe whichever method built the figures on screen, so they change with the data.
 
+Ask is now on each region's map as well as London's. It is told which region's map is open, so it ranks and compares that region's own areas, and its example questions there name no places. The England map still has no Ask panel, because it holds too many areas to look up at once.
+
 ## 1.0.0, 16 October 2026
 
 This is the first full release of PopHealth Map, a free map of population health with no sign-in. It puts small-area health, deprivation and Census figures on the same map as the GP practices, pharmacies and charities that serve those places, explains any area in plain English, and lets you build, compare and download your own areas. The site keeps its Beta badge, because the figures are still provisional while the site is being checked.
