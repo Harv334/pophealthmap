@@ -2,9 +2,10 @@
  * PopHealth Map assistant.
  *
  * The model is never sent the whole dataset. It receives tool definitions, and
- * the four functions below run against the JSON this page has already loaded,
- * so only the figures a question looks up are sent with it, and they are the
- * same numbers the map is drawing. The model is told to use only those, but
+ * the four functions below run against the JSON this page has loaded (for
+ * MSOAs, LSOAs and output areas, loading it first through the map's own
+ * loaders), so only the figures a question looks up are sent with it, and they
+ * are the same numbers the map is drawing. The model is told to use only those, but
  * nothing enforces it, so an answer can still carry a derived or mistaken
  * number, and the panel says so.
  *
@@ -173,21 +174,68 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
     var l = String(level || "").toLowerCase();
     return l === "la" || l === "borough" || l === "local authority";
   }
-  function levelWord(level) { return isLaLevel(level) ? "LA" : "ward"; }
 
-  function areasFor(level) {
+  /**
+   * The five levels Ask can read, largest first: the LA, the ward, then the
+   * three Census building blocks, MSOA (about 8,000 people), LSOA (about
+   * 1,500) and output area (about 300 people, or 125 households). Ward and
+   * LA figures are in memory from the first paint, so those tools answer at
+   * once; the three small levels load their files on first use, so their
+   * tools answer with a promise.
+   *
+   * A level the tools do not know is an error rather than quietly a ward:
+   * answering about wards when asked about something else is the mistake
+   * this panel most wants to avoid. Only a missing level means ward, as it
+   * always has.
+   */
+  function levelOf(level) {
+    if (level === undefined || level === null || level === "") return "ward";
+    var l = String(level).trim().toLowerCase().replace(/[\s_-]+/g, " ");
+    if (isLaLevel(l)) return "la";
+    if (l === "ward" || l === "msoa" || l === "lsoa") return l;
+    if (l === "oa" || l === "output area" || l === "output areas") return "oa";
+    return null;
+  }
+  var LEVEL_WORD = { ward: "ward", la: "LA", msoa: "MSOA", lsoa: "LSOA", oa: "output area" };
+  function levelWord(level) { return LEVEL_WORD[levelOf(level)] || "ward"; }
+  function isSmall(lv) { return lv === "msoa" || lv === "lsoa" || lv === "oa"; }
+  function badLevel(level) {
+    return { error: "Unknown level '" + level + "'. Use ward, la, msoa, lsoa or oa." };
+  }
+
+  // The level an ONS code belongs to, from its prefix: E00 output areas,
+  // E01 LSOAs, E02 MSOAs, E05 wards, E06 to E09 LAs.
+  function codeLevel(s) {
+    var m = /^E(\d\d)\d{6}$/i.exec(String(s || "").trim());
+    if (!m) return null;
+    return { "00": "oa", "01": "lsoa", "02": "msoa", "05": "ward", "06": "la", "07": "la", "08": "la", "09": "la" }[m[1]] || null;
+  }
+
+  function areasFor(level, laName) {
     if (isLaLevel(level)) return boroughRollup();
     var w = wards(), out = {};
     Object.keys(w).forEach(function (k) {
-      out[k] = { name: w[k].name || k, lad: w[k].lad || "", indicators: w[k].indicators || {} };
+      if (laName && w[k].lad !== laName) return;
+      // The page keys its wards by name and keeps the ONS code on each.
+      out[k] = { name: w[k].name || k, code: w[k].code || k, lad: w[k].lad || "", lad_code: w[k].lad_code || "",
+        indicators: w[k].indicators || {} };
     });
     return out;
   }
 
-  function findArea(name, level) {
-    var areas = areasFor(level);
+  /* One match over any set of areas: by code first, then the name exactly,
+     then a part of the name that only one area has. More than one partial
+     match is reported as ambiguous with the candidates, never resolved by
+     picking the first. */
+  function matchIn(areas, name) {
     var want = String(name || "").trim().toLowerCase();
+    if (!want) return null;
     var keys = Object.keys(areas);
+    var byCode = keys.filter(function (k) {
+      var a = areas[k];
+      return String(a.code || a.lad_code || "").toLowerCase() === want;
+    });
+    if (byCode.length) return { key: byCode[0], area: areas[byCode[0]] };
     var exact = keys.filter(function (k) { return (areas[k].name || "").toLowerCase() === want; });
     if (exact.length) return { key: exact[0], area: areas[exact[0]] };
     var partial = keys.filter(function (k) {
@@ -198,6 +246,51 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
       return { ambiguous: partial.slice(0, 8).map(function (k) { return areas[k].name; }) };
     }
     return null;
+  }
+
+  function findArea(name, level, laName) {
+    return matchIn(areasFor(level, laName), name);
+  }
+
+  // The LAs by name with their codes, without the work of the full rollup.
+  function laIndex() {
+    var w = wards(), out = {};
+    Object.keys(w).forEach(function (k) {
+      var x = w[k];
+      if (x.lad && !out[x.lad]) out[x.lad] = { name: x.lad, lad_code: x.lad_code || "" };
+    });
+    return out;
+  }
+
+  /* within_la and within_ward, resolved to one LA and one ward the same way
+     a place name is, so "Church End" narrows to Finchley Church End and a
+     name that matches nothing says so rather than ranking nothing. A ward
+     brings its LA with it. */
+  function resolveWithin(input) {
+    var out = {};
+    var la = input.within_la || input.within_borough;
+    if (la) {
+      var l = matchIn(laIndex(), la);
+      if (!l) return { error: "No LA found matching '" + la + "'." };
+      if (l.ambiguous) return { error: "Several LAs match '" + la + "'; be more specific.", candidates: l.ambiguous };
+      out.la = { name: l.area.name, code: l.area.lad_code };
+    }
+    if (input.within_ward) {
+      var w = findArea(input.within_ward, "ward", out.la && out.la.name);
+      if (!w) {
+        return { error: "No ward found matching '" + input.within_ward + "'" + (out.la ? " in " + out.la.name : "") + "." };
+      }
+      if (w.ambiguous) {
+        return { error: "Several wards match '" + input.within_ward + "'; be more specific, or give within_la.", candidates: w.ambiguous };
+      }
+      out.ward = { name: w.area.name, code: w.area.code, la: w.area.lad };
+      if (!out.la) out.la = { name: w.area.lad, code: w.area.lad_code };
+    }
+    return out;
+  }
+  function withinWords(within) {
+    if (within.ward) return within.ward.name + " ward, " + within.ward.la;
+    return within.la ? within.la.name : "";
   }
 
   /**
@@ -319,6 +412,7 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
     imd_decile_mean: "Mean IMD decile of the LSOAs in this area, population weighted. " + DECILE_SCALE,
     imd_best_decile: "The least deprived IMD decile present in this area. Deciles run 1 (the most deprived tenth nationally) to 10 (the least).",
     imd_worst_decile: "The most deprived IMD decile present in this area. Deciles run 1 (the most deprived tenth nationally) to 10 (the least).",
+    imd_rank: "The LSOA's rank among England's 33,755 LSOAs by IMD 2025, where 1 is the most deprived.",
   };
 
   var DIRECTION = {
@@ -333,6 +427,8 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
     imd_decile_mean: "less deprived",
     imd_best_decile: "less deprived",
     imd_worst_decile: "less deprived",
+    imd_decile: "less deprived",
+    imd_rank: "less deprived",
   };
 
   function metaFor(key) {
@@ -341,7 +437,7 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
     var ft = FT_META[key];
     if (ft) return { desc: ft[0], u: ft[1] || undefined, src: "OHID Fingertips", g: "LA" };
     var imd = IMD_META[key];
-    return imd ? { desc: imd, u: "decile", src: "MHCLG IMD 2025" } : null;
+    return imd ? { desc: imd, u: key === "imd_rank" ? "rank" : "decile", src: "MHCLG IMD 2025", yr: "2025" } : null;
   }
 
   function labelFor(key) {
@@ -418,127 +514,518 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
     return out;
   }
 
+  // ---- the small areas: MSOA, LSOA and output area ------------------------
+  /* Read from the files the map itself loads for these levels, through its
+     own loaders, so Ask quotes the figures the map draws and a second copy of
+     nothing is fetched. Each loader resolves null (or an empty table) when
+     its file could not be had, and the tools turn that into an error the
+     model can report, never an empty answer that looks like a finding.
+
+     Output areas are the exception to "the files the map loads". The map
+     holds them as drawn shapes, one file per LA, and London's are 14 MB in
+     all, so Ask loads only the one LA a question names and keeps just each
+     area's code, its LSOA and its figures. */
+  var small = { msoa: null, places: null, lsoa: null, oaIx: null, oa: {}, oaDone: {} };
+
+  function call(fnName) {
+    var fn = window[fnName];
+    if (typeof fn !== "function") return Promise.resolve(null);
+    try { return Promise.resolve(fn()).catch(function () { return null; }); } catch (e) { return Promise.resolve(null); }
+  }
+  function recOf(r) { return (r && r.indicators) || r || {}; }
+  // An MSOA's LA is its ONS name less the number, "Brent 012" is in Brent.
+  function laOfName(name) { return String(name || "").replace(/\s+\d+[A-Za-z]?$/, ""); }
+  // And an LSOA's MSOA is its name less the letter: "Brent 012A" is in Brent 012.
+  function msoaOfLsoa(name) { var m = /^(.*\d)[A-Z]$/.exec(String(name || "")); return m ? m[1] : undefined; }
+
+  function msoaAreas() {
+    return Promise.all([call("ensureMsoaData"), call("loadMsoaBoundaries")]).then(function () {
+      var data = (typeof MSOA_DATA === "object" && MSOA_DATA) ? MSOA_DATA : {};
+      var lyr = (typeof msoaLyr !== "undefined" && msoaLyr) ? msoaLyr : null;
+      if (!Object.keys(data).length || !lyr) return null;
+      if (small.msoa && small.msoa.src === data && small.msoa.lyr === lyr) return small.msoa.areas;
+      var areas = {};
+      lyr.eachLayer(function (l) {
+        var p = (l.feature && l.feature.properties) || {};
+        if (!p.code) return;
+        areas[p.code] = { code: p.code, name: p.name || p.code, la: laOfName(p.name) || undefined, indicators: recOf(data[p.code]) };
+      });
+      small.msoa = { src: data, lyr: lyr, areas: areas };
+      return areas;
+    });
+  }
+
+  // Each LSOA's name, ward and LA, from the LSOA boundaries (LSOA_IMD).
+  function lsoaPlaces() {
+    return call("ensureLsoaImd").then(function () {
+      var gj = (typeof LSOA_IMD !== "undefined" && LSOA_IMD && LSOA_IMD.features) ? LSOA_IMD : null;
+      if (!gj || !gj.features.length) return null;
+      if (small.places && small.places.src === gj && small.places.n === gj.features.length) return small.places.areas;
+      var w = wards(), byCode = {}, areas = {};
+      Object.keys(w).forEach(function (k) { byCode[w[k].code || k] = w[k]; });
+      gj.features.forEach(function (f) {
+        var p = f.properties || {};
+        if (!p.code) return;
+        var ward = byCode[p.ward_code] || null;
+        areas[p.code] = { code: p.code, name: p.name || p.code, msoa: msoaOfLsoa(p.name),
+          ward: (ward && ward.name) || p.ward || undefined, ward_code: p.ward_code || undefined,
+          la: p.borough || (ward && ward.lad) || undefined, la_code: (ward && ward.lad_code) || undefined,
+          imd_decile: p.imd_decile, imd_rank: p.imd_rank };
+      });
+      small.places = { src: gj, n: gj.features.length, areas: areas };
+      return areas;
+    });
+  }
+
+  function lsoaAreas() {
+    return Promise.all([lsoaPlaces(), call("ensureLsoaData")]).then(function (got) {
+      var places = got[0];
+      var data = (typeof LSOA_DATA === "object" && LSOA_DATA) ? LSOA_DATA : {};
+      if (!places || !Object.keys(data).length) return null;
+      if (small.lsoa && small.lsoa.src === data && small.lsoa.places === places) return small.lsoa.areas;
+      var areas = {};
+      Object.keys(places).forEach(function (c) {
+        var p = places[c], ind = {}, rec = recOf(data[c]);
+        Object.keys(rec).forEach(function (k) { ind[k] = rec[k]; });
+        if (ind.imd_decile == null && p.imd_decile != null) ind.imd_decile = p.imd_decile;
+        if (ind.imd_rank == null && p.imd_rank != null) ind.imd_rank = p.imd_rank;
+        areas[c] = { code: c, name: p.name, msoa: p.msoa, ward: p.ward, ward_code: p.ward_code,
+          la: p.la, la_code: p.la_code, indicators: ind };
+      });
+      small.lsoa = { src: data, places: places, areas: areas };
+      return areas;
+    });
+  }
+
+  // The output area index: which census keys, in what order, for which LAs.
+  function oaIndex() {
+    if (typeof OA_INDEX !== "undefined" && OA_INDEX && OA_INDEX.lads) return Promise.resolve(OA_INDEX);
+    if (small.oaIx) return small.oaIx;
+    if (typeof loadJson !== "function" || typeof dataUrl !== "function") return Promise.resolve(null);
+    small.oaIx = loadJson(dataUrl("data/map/oa/index.json"), "the output areas", function () {})
+      .then(function (ix) { if (!ix || !ix.lads) { small.oaIx = null; return null; } return ix; },
+        function () { small.oaIx = null; return null; });
+    return small.oaIx;
+  }
+
+  // One LA's output areas: code, LSOA and figures, the shapes let go.
+  function oaFor(lad, keys) {
+    if (small.oa[lad]) return small.oa[lad];
+    if (typeof loadJson !== "function" || typeof dataUrl !== "function") return Promise.resolve(null);
+    var forget = function () { delete small.oa[lad]; return null; };
+    small.oa[lad] = loadJson(dataUrl("data/map/oa/" + lad + ".json"), "the output areas", forget).then(function (gj) {
+      if (!gj || !gj.features) return forget();
+      var recs = gj.features.map(function (f) {
+        var q = f.properties || {}, ind = {};
+        if (Array.isArray(q.v)) keys.forEach(function (k, i) { if (q.v[i] != null) ind[k] = q.v[i]; });
+        else Object.keys(q.v || {}).forEach(function (k) { if (q.v[k] != null) ind[k] = q.v[k]; });
+        return { code: q.c, lsoa: q.l, indicators: ind };
+      }).filter(function (r) { return r.code; });
+      small.oaDone[lad] = recs;
+      return recs;
+    }, forget);
+    return small.oa[lad];
+  }
+
+  var OA_NEEDS_PLACE = "Output areas can only be ranked or looked up within one LA or ward, " +
+    "because there are about 26,000 of them. Call again with within_la or within_ward.";
+  var MSOA_NO_WARD = "MSOAs do not fit inside wards, so within_ward cannot narrow them. " +
+    "Use within_la, or level lsoa or oa for the areas inside a ward.";
+
+  function loadFailed(lv) {
+    return { error: "The " + LEVEL_WORD[lv] + " figures could not be loaded just now, so there is " +
+      "nothing to report at that level. Say so, and offer the ward or LA figures instead." };
+  }
+
+  /* The areas at one small level, narrowed to the LA or ward given. An
+     output area takes its ward from its LSOA, which is the ward that LSOA
+     best fits (the ONS lookup the map uses). */
+  async function areasAt(lv, within) {
+    var all, out = {};
+    if (lv === "msoa") {
+      if (within.ward) return { error: MSOA_NO_WARD };
+      all = await msoaAreas();
+      if (!all) return loadFailed(lv);
+    } else if (lv === "lsoa") {
+      all = await lsoaAreas();
+      if (!all) return loadFailed(lv);
+    } else {
+      if (!within.la) return { error: OA_NEEDS_PLACE };
+      var ix = await oaIndex();
+      if (!ix) return { error: "Output area figures are not available on this map." };
+      if (!ix.lads[within.la.code]) return { error: "There are no output area figures for " + within.la.name + "." };
+      var got = await Promise.all([oaFor(within.la.code, ix.keys || []), lsoaPlaces()]);
+      if (!got[0]) return loadFailed(lv);
+      var places = got[1];
+      if (!places && within.ward) return loadFailed("lsoa");
+      all = {};
+      got[0].forEach(function (r) {
+        var l = (places && places[r.lsoa]) || {};
+        all[r.code] = { code: r.code, name: r.code, lsoa: r.lsoa, lsoa_name: l.name, ward: l.ward,
+          ward_code: l.ward_code, la: within.la.name, indicators: r.indicators };
+      });
+    }
+    Object.keys(all).forEach(function (c) {
+      var a = all[c];
+      if (within.la && a.la !== within.la.name) return;
+      if (within.ward && a.ward_code !== within.ward.code) return;
+      out[c] = a;
+    });
+    return { areas: out };
+  }
+
+  // Where a small area sits: the parents an answer needs to place it.
+  function placeOf(lv, a) {
+    if (lv === "msoa") return { name: a.name, code: a.code, la: a.la };
+    if (lv === "lsoa") return { name: a.name, code: a.code, msoa: a.msoa, ward: a.ward, la: a.la };
+    return { code: a.code, lsoa: a.lsoa, lsoa_name: a.lsoa_name, ward: a.ward, la: a.la };
+  }
+
+  var A_LEVEL = { ward: "a ward", la: "an LA", msoa: "an MSOA", lsoa: "an LSOA", oa: "an output area" };
+  function notFound(lv, name, within) {
+    var cl = codeLevel(name);
+    if (cl && cl !== lv) {
+      return { error: "'" + name + "' is " + A_LEVEL[cl] + " code, so ask again with level " + cl + "." };
+    }
+    if (lv === "oa" && !cl) {
+      return { error: "Output areas have no names, only codes such as E00012345. For the output areas in a place, " +
+        "use rank_areas at level oa with within_la or within_ward, or get_area on an LSOA, which lists its output areas." };
+    }
+    var where = withinWords(within);
+    return { error: "No " + LEVEL_WORD[lv] + " found matching '" + name + "'" + (where ? " in " + where : "") + "." };
+  }
+
+  // Figures only: the MSOA file keeps a significance flag beside each
+  // Local Health figure (ft_93283_vs), which is not a figure itself.
+  function figuresOnly(ind) {
+    var out = {};
+    Object.keys(ind || {}).forEach(function (k) {
+      var v = ind[k];
+      if (/_vs$/.test(k) || v === null || v === "" || isNaN(parseFloat(v))) return;
+      out[k] = v;
+    });
+    return out;
+  }
+
+  /* The levels an indicator is available at, as the tools name them. The
+     map's own list (ovLevels, where "borough" is the LA) for the small
+     levels, and ward and LA for anything the ward file holds, since those
+     two tools have always served every ward indicator. */
+  var LEVEL_ORDER = ["la", "ward", "msoa", "lsoa", "oa"];
+  var SMALL_ONLY = { imd_rank: ["lsoa"] };
+  function levelsOf(key, inWards) {
+    var have = {};
+    if (inWards) { have.la = 1; have.ward = 1; }
+    var lv = [];
+    if (typeof ovLevels === "function") { try { lv = ovLevels(key) || []; } catch (e) { lv = []; } }
+    lv.concat(SMALL_ONLY[key] || []).forEach(function (l) { if (isSmall(l)) have[l] = 1; });
+    return LEVEL_ORDER.filter(function (l) { return have[l]; });
+  }
+  function wardKeys() {
+    var seen = {}, w = wards();
+    Object.keys(w).forEach(function (k) {
+      Object.keys(w[k].indicators || {}).forEach(function (i) { seen[i] = true; });
+    });
+    return seen;
+  }
+  function noValues(key, lv) {
+    var at = levelsOf(key, !!wardKeys()[key]);
+    return { error: "No " + LEVEL_WORD[lv] + " figures for '" + key + "'." +
+      (at.length ? " It is available at: " + at.join(", ") + "." : " Call list_indicators for valid keys.") };
+  }
+
+  /* The cautions a result carries, by level. Kept short: they reach the
+     model with every lookup and are there to be passed on, not quoted. */
+  var IMD_NOTE = "The IMD is published for LSOAs, so ward and LA deprivation figures summarise " +
+    "the LSOAs in them. Use level lsoa for the published figures.";
+  var SMALL_NOTE = {
+    msoa: "Each MSOA holds about 8,000 people, so a few people can move its figures; treat small differences between neighbouring MSOAs with care.",
+    lsoa: "Each LSOA holds about 1,500 people, so a few people can move its figures a lot; treat small differences between neighbouring LSOAs with care.",
+  };
+  var OA_NOTE = "Output areas have Census 2021 figures only, and each is placed in the ward its LSOA best fits.";
+  var BEST_FIT = "LSOAs are placed in the ward they best fit, so a few may lie partly outside it.";
+  function oaCaveat() {
+    return (typeof OA_CAVEAT === "string" ? OA_CAVEAT
+      : "Each output area holds about 125 households, so a few households can change these figures a lot.") + " " + OA_NOTE;
+  }
+  function isImdKey(k) { return /^imd_/.test(k) || DIRECTION[k] === "more deprived"; }
+  function caveatFor(lv, keys, within) {
+    var c = [];
+    if (lv === "ward" && keys.some(isBoroughLevel)) c.push(BOROUGH_CAVEAT);
+    if ((lv === "ward" || lv === "la") && keys.some(isImdKey)) c.push(IMD_NOTE);
+    if (SMALL_NOTE[lv]) c.push(SMALL_NOTE[lv]);
+    if (lv === "lsoa" && within && within.ward) c.push(BEST_FIT);
+    if (lv === "oa") c.push(oaCaveat());
+    return c.length ? c.join(" ") : undefined;
+  }
+
+  var COMPARE_DEFAULT = ["imd_score", "imd_decile_mean", "imd_decile", "census_population", "census_over65_pct",
+    "census_non_white_pct", "census_no_car_pct"];
+
+  function wantedKeys(input, ind) {
+    return (Array.isArray(input.indicators) && input.indicators.length) ? input.indicators : Object.keys(ind);
+  }
+
+  /* An output area found by its code alone: only among the LAs Ask has
+     already loaded, since the code does not say which LA it is in. */
+  function oaLaFromCache(code) {
+    var want = String(code || "").trim().toUpperCase();
+    var lads = Object.keys(small.oaDone);
+    for (var i = 0; i < lads.length; i++) {
+      if (small.oaDone[lads[i]].some(function (r) { return r.code === want; })) {
+        var la = null, idx = laIndex();
+        Object.keys(idx).forEach(function (n) { if (idx[n].lad_code === lads[i]) la = { name: n, code: lads[i] }; });
+        if (la) return la;
+      }
+    }
+    return null;
+  }
+
+  async function smallGetArea(input, lv) {
+    var within = resolveWithin(input);
+    if (within.error) return within;
+    if (lv === "oa" && !within.la) {
+      within.la = oaLaFromCache(input.name);
+      if (!within.la) {
+        return { error: codeLevel(input.name) === "oa"
+          ? "An output area is found by its code within one LA or ward, because the code does not say where it is. " +
+            "Call get_area again with within_la or within_ward."
+          : notFound(lv, input.name, {}).error };
+      }
+    }
+    var got = await areasAt(lv, within);
+    if (got.error) return got;
+    var hit = matchIn(got.areas, input.name);
+    if (!hit) return notFound(lv, input.name, within);
+    if (hit.ambiguous) {
+      return { error: "Several " + LEVEL_WORD[lv] + "s match; give the full name or the code.", candidates: hit.ambiguous };
+    }
+    var a = hit.area, shown = shownOnly(figuresOnly(a.indicators));
+    var want = wantedKeys(input, shown);
+    var out = placeOf(lv, a);
+    out.level = LEVEL_WORD[lv];
+    out.indicators = figures(shown, want);
+    var missing = want.filter(function (k) { return !(k in out.indicators); });
+    if (missing.length && Array.isArray(input.indicators) && input.indicators.length) out.not_at_this_level = missing;
+    // An LSOA's output areas, so a question can go one level further down.
+    if (lv === "lsoa" && a.la_code) {
+      var ix = await oaIndex();
+      var recs = ix && ix.lads[a.la_code] ? await oaFor(a.la_code, ix.keys || []) : null;
+      if (recs) {
+        out.output_areas = recs.filter(function (r) { return r.lsoa === a.code; }).map(function (r) { return r.code; });
+      }
+    }
+    out.caveat = caveatFor(lv, Object.keys(out.indicators), within);
+    return out;
+  }
+
+  async function smallCompare(input, lv) {
+    var within = resolveWithin(input);
+    if (within.error) return within;
+    var names = (Array.isArray(input.names) ? input.names : []).slice(0, 6);
+    if (lv === "oa" && !within.la && names.length) within.la = oaLaFromCache(names[0]);
+    if (lv === "oa" && !within.la) return { error: OA_NEEDS_PLACE };
+    var got = await areasAt(lv, within);
+    if (got.error) return got;
+    var wanted = (Array.isArray(input.indicators) && input.indicators.length) ? input.indicators : COMPARE_DEFAULT;
+    var rows = [], missing = [], shown = {};
+    names.forEach(function (n) {
+      var hit = matchIn(got.areas, n);
+      if (!hit || hit.ambiguous) { missing.push(n); return; }
+      var row = placeOf(lv, hit.area);
+      row.indicators = figures(shownOnly(figuresOnly(hit.area.indicators)), wanted);
+      Object.keys(row.indicators).forEach(function (k) { shown[k] = 1; });
+      rows.push(row);
+    });
+    if (!rows.length) return { error: "None of those areas were found.", not_found: missing };
+    return { level: LEVEL_WORD[lv], areas: rows, not_found: missing.length ? missing : undefined,
+      caveat: caveatFor(lv, Object.keys(shown), within) };
+  }
+
+  function rankResult(input, lv, rows, within) {
+    var key = input.indicator;
+    var n = Math.max(1, Math.min(parseInt(input.n, 10) || 5, 20));
+    rows.sort(function (x, y) { return input.direction === "lowest" ? x.value - y.value : y.value - x.value; });
+    var meta = metaFor(key);
+    var hm = higherMeans(key);
+    var where = withinWords(within);
+    return {
+      indicator: key, label: labelFor(key), direction: input.direction,
+      // Spelled out so the answer cannot invert the scale: this says what a
+      // high value means, and what the rows you are looking at therefore are.
+      higher_means: hm,
+      results_are: hm ? "the " + input.direction + " values; higher = " + hm : undefined,
+      unit: meta && meta.u ? meta.u : undefined,
+      period: meta && meta.yr ? String(meta.yr) : undefined,
+      source: meta && meta.src ? meta.src : undefined,
+      level: LEVEL_WORD[lv], within: where || undefined, of_total: rows.length, results: rows.slice(0, n),
+      // A ward ranking on a borough-level indicator is really a borough
+      // ranking with the wards of each borough tied. Say so here rather
+      // than let the ordering imply a distinction that is not in the data.
+      caveat: caveatFor(lv, [key], within),
+    };
+  }
+
+  function withheldError(key) {
+    return { error: "'" + key + "' is left out of this version of the map until the data " +
+      "is refreshed, because the published figure is not the headline one. Call " +
+      "list_indicators for valid keys." };
+  }
+
+  async function smallRank(input, lv) {
+    var key = input.indicator;
+    if (isWithheld(key)) return withheldError(key);
+    if (/_vs$/.test(String(key))) return noValues(key, lv);
+    var within = resolveWithin(input);
+    if (within.error) return within;
+    var got = await areasAt(lv, within);
+    if (got.error) return got;
+    var rows = [];
+    Object.keys(got.areas).forEach(function (c) {
+      var a = got.areas[c];
+      var v = parseFloat((a.indicators || {})[key]);
+      if (isNaN(v)) return;
+      var row = placeOf(lv, a);
+      row.value = v;
+      rows.push(row);
+    });
+    if (!rows.length) {
+      if (!Object.keys(got.areas).length) return { error: "No " + LEVEL_WORD[lv] + "s found in " + withinWords(within) + "." };
+      return noValues(key, lv);
+    }
+    return rankResult(input, lv, rows, within);
+  }
+
   var TOOLS = {
     /* The key list, kept short. It used to send every indicator's full
        description, source, year and aggregation rule, 41 KB that was then
        resent with every later round trip and question; the model needs only
        enough to pick a key, and get_area and rank_areas carry the detail for
-       the keys it picks. */
+       the keys it picks.
+
+       Grouped by the levels each indicator is available at, so the levels
+       are said once per group rather than once per key, which keeps the list
+       inside one tool result. */
     list_indicators: function () {
-      var seen = {}, w = wards();
-      Object.keys(w).forEach(function (k) {
-        Object.keys(w[k].indicators || {}).forEach(function (i) { seen[i] = true; });
+      var inWards = wardKeys(), keys = {};
+      Object.keys(inWards).forEach(function (k) { keys[k] = 1; });
+      if (typeof CATS !== "undefined" && Array.isArray(CATS)) {
+        CATS.forEach(function (c) {
+          ((c && c.fields) || []).forEach(function (f) { if (f && f.k) keys[f.k] = 1; });
+        });
+      }
+      Object.keys(SMALL_ONLY).forEach(function (k) { keys[k] = 1; });
+      var groups = {};
+      Object.keys(keys).filter(function (k) { return !isWithheld(k); }).sort().forEach(function (k) {
+        var at = levelsOf(k, !!inWards[k]);
+        if (!at.length) return;
+        var m = metaFor(k);
+        var row = { key: k, label: shortLabel(k) };
+        if (m && m.u) row.unit = m.u;
+        if (m && m.yr) row.period = m.yr;
+        if (isBoroughLevel(k)) row.la_only = true;
+        var hm = higherMeans(k);
+        if (hm) row.higher_means = hm;
+        var g = at.join(",");
+        (groups[g] = groups[g] || { levels: at, indicators: [] }).indicators.push(row);
       });
       return {
-        indicators: Object.keys(seen).filter(function (k) { return !isWithheld(k); }).sort().map(function (k) {
-          var m = metaFor(k);
-          var row = { key: k, label: shortLabel(k) };
-          if (m && m.u) row.unit = m.u;
-          if (m && m.yr) row.period = m.yr;
-          if (isBoroughLevel(k)) row.la_only = true;
-          var hm = higherMeans(k);
-          if (hm) row.higher_means = hm;
-          return row;
-        }),
-        note: "Deprivation deciles run 1 (most deprived) to 10 (least deprived). " +
+        groups: Object.keys(groups).map(function (g) { return groups[g]; })
+          .sort(function (a, b) { return b.levels.length - a.levels.length; }),
+        note: "Each group lists the levels its indicators are available at: la (local authority, LA), " +
+          "ward, msoa, lsoa and oa (output area). Deprivation deciles run 1 (most deprived) to 10 (least deprived). " +
           "Indicators marked la_only are published for the whole " +
-          "local authority (LA), so they are the same value for every ward in " +
+          "LA, so they are the same value for every ward in " +
           "it; do not rank wards by them. Call the local authority level 'LA' " +
           "in answers, not 'borough'.",
       };
     },
 
     get_area: function (input) {
-      var hit = findArea(input.name, input.level);
-      if (!hit) return { error: "No " + levelWord(input.level) + " found matching '" + input.name + "'." };
+      var lv = levelOf(input.level);
+      if (!lv) return badLevel(input.level);
+      if (isSmall(lv)) return smallGetArea(input, lv);
+      var within = resolveWithin(input);
+      if (within.error) return within;
+      if (within.ward) return { error: "within_ward narrows LSOAs and output areas; for a ward or LA, use within_la." };
+      var hit = findArea(input.name, lv, lv === "ward" && within.la ? within.la.name : null);
+      if (!hit) {
+        var cl = codeLevel(input.name);
+        if (cl && cl !== lv) return notFound(lv, input.name, within);
+        return { error: "No " + levelWord(lv) + " found matching '" + input.name + "'." };
+      }
       if (hit.ambiguous) return { error: "Several areas match; be more specific.", candidates: hit.ambiguous };
       var shownInd = shownOnly(hit.area.indicators);
       // The indicators asked for, or every one the area has.
-      var asked = (input.indicators && input.indicators.length) ? input.indicators : Object.keys(shownInd);
-      shownInd = figures(shownInd, asked);
+      shownInd = figures(shownInd, wantedKeys(input, shownInd));
       var boroughLevel = Object.keys(shownInd).filter(isBoroughLevel);
       return {
-        name: hit.area.name, level: levelWord(input.level), la: hit.area.lad || undefined,
+        name: hit.area.name, level: levelWord(lv), la: hit.area.lad || undefined,
         indicators: shownInd,
         // A ward profile mixes ward figures with borough ones. Name which are
         // which, so a borough figure is not reported as being about the ward.
-        la_level_indicators: (input.level === "ward" && boroughLevel.length)
+        la_level_indicators: (lv === "ward" && boroughLevel.length)
           ? boroughLevel : undefined,
-        caveat: (input.level === "ward" && boroughLevel.length) ? BOROUGH_CAVEAT : undefined,
+        caveat: caveatFor(lv, Object.keys(shownInd)),
       };
     },
 
     compare_areas: function (input) {
-      var names = input.names || [], rows = [], missing = [];
+      var lv = levelOf(input.level);
+      if (!lv) return badLevel(input.level);
+      if (isSmall(lv)) return smallCompare(input, lv);
+      var within = resolveWithin(input);
+      if (within.error) return within;
+      var laName = lv === "ward" && within.la ? within.la.name : null;
+      var names = Array.isArray(input.names) ? input.names : [], rows = [], missing = [];
       names.slice(0, 6).forEach(function (n) {
-        var hit = findArea(n, input.level);
+        var hit = findArea(n, lv, laName);
         if (!hit || hit.ambiguous) { missing.push(n); return; }
-        var ind = hit.area.indicators, keep = {};
         // imd_decile_mean, not imd_decile. The ward figure is a population
         // weighted mean of LSOA deciles, so it is not itself a decile and is
         // not published under that name. The old key matched nothing and was
         // dropped in silence, so the default comparison came back without any
-        // deprivation figure at all.
-        var wanted = (input.indicators && input.indicators.length)
-          ? input.indicators
-          : ["imd_score", "imd_decile_mean", "census_population", "census_over65_pct",
-             "census_non_white_pct", "census_no_car_pct"];
-        keep = figures(ind, wanted);
-        rows.push({ name: hit.area.name, indicators: keep });
+        // deprivation figure at all. (imd_decile is in the default list for
+        // LSOAs, which do have one; a ward or LA simply has no such key.)
+        var wanted = (Array.isArray(input.indicators) && input.indicators.length) ? input.indicators : COMPARE_DEFAULT;
+        rows.push({ name: hit.area.name, la: lv === "ward" ? (hit.area.lad || undefined) : undefined,
+          indicators: figures(hit.area.indicators, wanted) });
       });
       if (!rows.length) return { error: "None of those areas were found.", not_found: missing };
       var shown = {};
       rows.forEach(function (r) { Object.keys(r.indicators).forEach(function (k) { shown[k] = 1; }); });
       var boroughLevel = Object.keys(shown).filter(isBoroughLevel);
       return {
-        level: levelWord(input.level), areas: rows, not_found: missing.length ? missing : undefined,
+        level: levelWord(lv), areas: rows, not_found: missing.length ? missing : undefined,
         // Comparing two wards in the same borough on a borough-level indicator
         // will show them as identical, which is an artefact of the geography
         // rather than a finding about the wards.
-        la_level_indicators: (input.level === "ward" && boroughLevel.length)
+        la_level_indicators: (lv === "ward" && boroughLevel.length)
           ? boroughLevel : undefined,
-        caveat: (input.level === "ward" && boroughLevel.length) ? BOROUGH_CAVEAT : undefined,
+        caveat: caveatFor(lv, Object.keys(shown)),
       };
     },
 
     rank_areas: function (input) {
-      var areas = areasFor(input.level), key = input.indicator;
-      if (isWithheld(key)) {
-        return { error: "'" + key + "' is left out of this version of the map until the data " +
-          "is refreshed, because the published figure is not the headline one. Call " +
-          "list_indicators for valid keys." };
-      }
-      var n = Math.max(1, Math.min(parseInt(input.n, 10) || 5, 20));
-      var rows = [];
+      var lv = levelOf(input.level);
+      if (!lv) return badLevel(input.level);
+      if (isSmall(lv)) return smallRank(input, lv);
+      var key = input.indicator;
+      if (isWithheld(key)) return withheldError(key);
+      var within = resolveWithin(input);
+      if (within.error) return within;
+      if (within.ward) return { error: "within_ward narrows LSOAs and output areas; to rank wards, use within_la." };
+      var areas = areasFor(lv), rows = [];
       Object.keys(areas).forEach(function (k) {
         var a = areas[k];
-        var within = input.within_la || input.within_borough;
-        if (within &&
-            (a.lad || "").toLowerCase().indexOf(String(within).toLowerCase()) === -1) return;
+        if (within.la && (a.lad || a.name) !== within.la.name) return;
         var v = parseFloat((a.indicators || {})[key]);
-        if (!isNaN(v)) rows.push({ name: a.name, la: a.lad || undefined, value: v });
+        if (!isNaN(v)) rows.push({ name: a.name, la: lv === "ward" ? (a.lad || undefined) : undefined, value: v });
       });
       if (!rows.length) {
         return { error: "No values for indicator '" + key + "'. Call list_indicators for valid keys." };
       }
-      rows.sort(function (x, y) { return input.direction === "lowest" ? x.value - y.value : y.value - x.value; });
-      var meta = metaFor(key);
-      var hm = higherMeans(key);
-      return {
-        indicator: key, label: labelFor(key), direction: input.direction,
-        // Spelled out so the answer cannot invert the scale: this says what a
-        // high value means, and what the rows you are looking at therefore are.
-        higher_means: hm,
-        results_are: hm ? "the " + input.direction + " values; higher = " + hm : undefined,
-        unit: meta && meta.u ? meta.u : undefined,
-        period: meta && meta.yr ? String(meta.yr) : undefined,
-        source: meta && meta.src ? meta.src : undefined,
-        level: levelWord(input.level), of_total: rows.length, results: rows.slice(0, n),
-        // A ward ranking on a borough-level indicator is really a borough
-        // ranking with the wards of each borough tied. Say so here rather
-        // than let the ordering imply a distinction that is not in the data.
-        caveat: (input.level === "ward" && isBoroughLevel(key)) ? BOROUGH_CAVEAT : undefined,
-      };
+      return rankResult(input, lv, rows, within);
     },
   };
 
@@ -548,7 +1035,9 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
    * These four functions are what actually produce every figure the assistant
    * states, so they are the part worth testing, and they can be tested without
    * an API key or a deployed Worker: they are pure functions over the JSON the
-   * page has already loaded. Nothing here mutates map state.
+   * page has loaded, and for the MSOA, LSOA and output area levels they load
+   * it first through the map's own loaders (so runTool returns a promise
+   * there). Nothing here changes what the map shows.
    */
   // Set by initFloating once the panel exists; null where there is no panel.
   var openWith = null;
@@ -578,12 +1067,19 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
     get configured() { return !!ASSISTANT_ENDPOINT; },
   };
 
+  /* Ward and LA lookups answer at once, as they always have. MSOA, LSOA and
+     output area ones load their files first and answer with a promise, which
+     resolves to the same kind of result, an error included: a promise from
+     here never rejects. */
+  function toolFailed(e) { return { error: "Tool failed: " + (e && e.message ? e.message : String(e)) }; }
   function runTool(name, input) {
     try {
       if (!TOOLS[name]) return { error: "Unknown tool: " + name };
-      return TOOLS[name](input || {});
+      var out = TOOLS[name](input || {});
+      if (out && typeof out.then === "function") return out.then(null, toolFailed);
+      return out;
     } catch (e) {
-      return { error: "Tool failed: " + (e && e.message ? e.message : String(e)) };
+      return toolFailed(e);
     }
   }
 
@@ -965,16 +1461,18 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
       var turn = keepBlocks(data.content, true);
       history.push({ role: "assistant", content: turn });
       // Every tool_use block must get exactly one tool_result, in one message.
-      var results = turn
-        .filter(function (b) { return b.type === "tool_use"; })
-        .map(function (b) {
-          var out = JSON.stringify(runTool(b.name, b.input));
-          if (out.length > RESULT_BYTES) {
-            out = JSON.stringify({ error: "That result is too large to send. Ask for fewer " +
-              "indicators or fewer areas at once, for example with compare_areas and a short indicators list." });
-          }
-          return { type: "tool_result", tool_use_id: b.id, content: out };
-        });
+      // A small-area tool answers with a promise once its files are in, so
+      // all of this turn's calls are awaited together.
+      var uses = turn.filter(function (b) { return b.type === "tool_use"; });
+      var outs = await Promise.all(uses.map(function (b) { return runTool(b.name, b.input); }));
+      var results = uses.map(function (b, i) {
+        var out = JSON.stringify(outs[i]);
+        if (out.length > RESULT_BYTES) {
+          out = JSON.stringify({ error: "That result is too large to send. Ask for fewer " +
+            "indicators or fewer areas at once, for example with compare_areas and a short indicators list." });
+        }
+        return { type: "tool_result", tool_use_id: b.id, content: out };
+      });
       history.push({ role: "user", content: results });
     }
     // Out of rounds with tool results last. A short reply closes the turn, so
