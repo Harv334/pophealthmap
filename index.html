@@ -4473,7 +4473,7 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
           <div class="ws-acts">
             <button type="button" class="ws-btn" id="ws-pin"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg>Pin to compare</button>
             <button type="button" class="ws-btn" id="ws-pdf" title="Open the printable ward report, which you can save as a PDF">Open printable report</button>
-            <!-- Shown only where the Ask panel is on the page (London). -->
+            <!-- Shown only where the Ask panel is on the page (not the England view). -->
             <button type="button" class="ws-btn" id="ws-ask" hidden>Ask about this ward</button>
             <button type="button" class="ws-btn primary" id="ws-profile">Open full profile</button>
             <button type="button" class="ws-close" id="ws-size" aria-expanded="true"
@@ -21763,7 +21763,7 @@ var PH_SHOW = {
     renderFig();
 
     syncPinBtn();
-    // The Ask panel is built after this script, and only in London.
+    // The Ask panel is built after this script, and not on the England view.
     if (askBtn) askBtn.hidden = !(window.PH_ASSISTANT && PH_ASSISTANT.available);
     renderBody(w);
     var wasOpen = sheet.classList.contains('open');

@@ -262,6 +262,19 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
     return out;
   }
 
+  /* Which map this page is, for the tool results. The Worker's instructions
+     are the same for every map, so the region reaches the model here: every
+     result names it, and list_indicators also counts its LAs and wards, so an
+     answer can say "of the 12 LAs in the North East" without guessing. */
+  function regionName() {
+    var R = window.PH_REGION;
+    return (R && R.name) || "London";
+  }
+  function regionCounts() {
+    return { region: regionName(), la_count: Object.keys(laIndex()).length,
+      ward_count: Object.keys(wards()).length };
+  }
+
   /* within_la and within_ward, resolved to one LA and one ward the same way
      a place name is, so "Church End" narrows to Finchley Church End and a
      name that matches nothing says so rather than ranking nothing. A ward
@@ -522,9 +535,11 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
      model can report, never an empty answer that looks like a finding.
 
      Output areas are the exception to "the files the map loads". The map
-     holds them as drawn shapes, one file per LA, and London's are 14 MB in
-     all, so Ask loads only the one LA a question names and keeps just each
-     area's code, its LSOA and its figures. */
+     holds them as drawn shapes, one file per LA, and a whole map's run to
+     well over 10 MB, so Ask loads only the one LA a question names and keeps
+     just each area's code, its LSOA and its figures. A map built without
+     output areas (the region packs, for now) has no index.json, and the
+     tools say the level is not available there. */
   var small = { msoa: null, places: null, lsoa: null, oaIx: null, oa: {}, oaDone: {} };
 
   function call(fnName) {
@@ -628,7 +643,7 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
   }
 
   var OA_NEEDS_PLACE = "Output areas can only be ranked or looked up within one LA or ward, " +
-    "because there are about 26,000 of them. Call again with within_la or within_ward.";
+    "because a map holds thousands of them. Call again with within_la or within_ward.";
   var MSOA_NO_WARD = "MSOAs do not fit inside wards, so within_ward cannot narrow them. " +
     "Use within_la, or level lsoa or oa for the areas inside a ward.";
 
@@ -652,7 +667,10 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
     } else {
       if (!within.la) return { error: OA_NEEDS_PLACE };
       var ix = await oaIndex();
-      if (!ix) return { error: "Output area figures are not available on this map." };
+      if (!ix) {
+        return { error: "Output area figures are not available on the " + regionName() + " map. " +
+          "Say so, and offer the LSOA figures instead, which are the next level up." };
+      }
       if (!ix.lads[within.la.code]) return { error: "There are no output area figures for " + within.la.name + "." };
       var got = await Promise.all([oaFor(within.la.code, ix.keys || []), lsoaPlaces()]);
       if (!got[0]) return loadFailed(lv);
@@ -929,7 +947,9 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
         var g = at.join(",");
         (groups[g] = groups[g] || { levels: at, indicators: [] }).indicators.push(row);
       });
+      var map = regionCounts();
       return {
+        region: map.region, la_count: map.la_count, ward_count: map.ward_count,
         groups: Object.keys(groups).map(function (g) { return groups[g]; })
           .sort(function (a, b) { return b.levels.length - a.levels.length; }),
         note: "Each group lists the levels its indicators are available at: la (local authority, LA), " +
@@ -937,7 +957,8 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
           "Indicators marked la_only are published for the whole " +
           "LA, so they are the same value for every ward in " +
           "it; do not rank wards by them. Call the local authority level 'LA' " +
-          "in answers, not 'borough'.",
+          "in answers, not 'borough'. The region field names the map these figures are from, and " +
+          "la_count and ward_count say how many LAs and wards it holds; rankings and comparisons are within it.",
       };
     },
 
@@ -1044,7 +1065,7 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
 
   window.PH_ASSISTANT = {
     runTool: function (n, i) { return runTool(n, i); },
-    // Whether the Ask panel is on this page (configured, and in London).
+    // Whether the Ask panel is on this page (configured, and not the England view).
     get available() { return !!openWith; },
     // Opens the panel with a question about the named place in the box.
     askAbout: function (name) {
@@ -1072,14 +1093,21 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
      resolves to the same kind of result, an error included: a promise from
      here never rejects. */
   function toolFailed(e) { return { error: "Tool failed: " + (e && e.message ? e.message : String(e)) }; }
+  // Every result, an error included, starts by naming the map's region.
+  function withRegion(out) {
+    if (!out || typeof out !== "object" || Array.isArray(out)) return out;
+    var tagged = { region: regionName() };
+    Object.keys(out).forEach(function (k) { if (k !== "region") tagged[k] = out[k]; });
+    return tagged;
+  }
   function runTool(name, input) {
     try {
-      if (!TOOLS[name]) return { error: "Unknown tool: " + name };
+      if (!TOOLS[name]) return withRegion({ error: "Unknown tool: " + name });
       var out = TOOLS[name](input || {});
-      if (out && typeof out.then === "function") return out.then(null, toolFailed);
-      return out;
+      if (out && typeof out.then === "function") return out.then(withRegion, function (e) { return withRegion(toolFailed(e)); });
+      return withRegion(out);
     } catch (e) {
-      return toolFailed(e);
+      return withRegion(toolFailed(e));
     }
   }
 
@@ -1558,8 +1586,11 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
   window.PH_ASSISTANT.render = render;
 
   // The named places are London's. Elsewhere the examples name none, so a
-  // region's Ask panel never suggests a question about places it does not hold.
+  // region's Ask panel never suggests a question about places it does not hold,
+  // and each one can be answered with ward and LA figures, which every region
+  // map has.
   var IS_LONDON = !window.PH_REGION || window.PH_REGION.isLondon;
+  var IS_ENGLAND = !!(window.PH_REGION && window.PH_REGION.isEngland);
   var EXAMPLES = IS_LONDON ? [
     "Compare deprivation in Brent and Bromley",
     "Which 5 wards have the largest share of people aged 65 and over?",
@@ -1745,11 +1776,14 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
    */
   function initFloating() {
     if (!ASSISTANT_ENDPOINT) return; // not configured: no panel, map unaffected
-    // The examples, the tool layer's wording and the answering service's own
-    // instructions are written for London's wards and LAs, so outside London
-    // (the England view included) there is no button and no panel, rather
-    // than one that promises answers about places it cannot describe.
-    if (!IS_LONDON) return;
+    // London and each region map have the panel. The England view does not:
+    // it holds every ward in the country, and its LSOAs load one LA at a
+    // time, so the tools would be ranking a map that is only partly there.
+    // The tool results name the region (withRegion), so the answering
+    // service's instructions, which are the same for every map, know which
+    // map a question is about.
+    // A region whose data is not published has nothing to answer from.
+    if (IS_ENGLAND || (window.PH_REGION && window.PH_REGION.missing)) return;
     var host = document.querySelector(".map-wrap");
     if (!host || document.getElementById("ai-panel")) return;
 

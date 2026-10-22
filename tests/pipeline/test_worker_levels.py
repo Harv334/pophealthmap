@@ -44,4 +44,16 @@ check("the prompt says what each level is",
       all(s in p for s in ("MSOA, about 8,000", "LSOA, about 1,500", "output area (oa), about 300 people")), p[:200])
 check("the prompt says output areas need an LA or ward", "within_la or within_ward" in p)
 check("the prompt asks for the level of each figure", "say which level a figure is for" in p)
+# Ask runs on London and each region map with one fixed prompt, so the region
+# reaches the model through the tool results, and the prompt says to read it there.
+flat = " ".join(p.split())
+check("the prompt is not written for London alone",
+      not any(s in flat for s in ("33 London", "rank London", "most deprived in London", "its 33 LAs")), flat[:200])
+check("the prompt says to read the region from the tool results",
+      "Every tool result starts with region" in flat and "Read the region from the tool results" in flat
+      and "la_count and ward_count" in flat, flat[:400])
+check("the prompt keeps rankings within the region",
+      "every ranking and comparison is within it" in flat and "not on this map" in flat)
+check("London place names are labelled as examples",
+      "examples from the London map" in flat and "On the London map, for example, \"Church End\"" in flat)
 check.done()
