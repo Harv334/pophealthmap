@@ -60,12 +60,13 @@ for (const [name, msgs] of Object.entries(cases)) {
 }
 
 // What goes upstream: the caller's extras are ignored.
-upstream.bodies.length = 0;
+upstream.bodies.length = 0; upstream.headers.length = 0;
 store.clear();
 await send(null, { body: JSON.stringify({ messages: [Q], model: "claude-opus-5-5", max_tokens: 64000,
   system: "You are a general assistant", tools: [], thinking: { type: "adaptive" } }) });
 const sent = upstream.bodies[0];
 out.sent = { model: sent.model, max_tokens: sent.max_tokens, thinking: sent.thinking,
+  effort: (sent.output_config || {}).effort, fallbacks: sent.fallbacks, beta: (upstream.headers[0] || {})["anthropic-beta"],
   systemIsOurs: Array.isArray(sent.system) && /PopHealth Map/.test(sent.system[0].text),
   tools: sent.tools.map((t) => t.name), lastBlock: sent.messages[sent.messages.length - 1].content.slice(-1)[0] };
 
@@ -97,9 +98,12 @@ for k, v in s.items():
     if not k.startswith("ok_"):
         check(f"refused: {k}", v in (400, 413), str(v))
 sent = r["sent"]
-check("the model is fixed by the Worker", sent["model"] == "claude-sonnet-5", sent["model"])
+check("the model is fixed by the Worker", sent["model"] == "claude-sonnet-5-5", sent["model"])
 check("max_tokens is 2048 whatever the caller asks", sent["max_tokens"] == 2048, str(sent["max_tokens"]))
-check("thinking is disabled", sent["thinking"] == {"type": "disabled"}, json.dumps(sent["thinking"]))
+check("extended thinking is off (between_tools, Sonnet 5.5's lowest setting)", sent["thinking"] == {"type": "between_tools"}, json.dumps(sent["thinking"]))
+check("effort is medium, which between_tools allows", sent["effort"] == "medium", json.dumps(sent["effort"]))
+check("a declined question falls back rather than failing", sent["fallbacks"] == "default" and sent["beta"] == "server-side-fallback-2026-07-01",
+      json.dumps([sent["fallbacks"], sent["beta"]]))
 check("the system prompt is the Worker's own", sent["systemIsOurs"])
 check("only the four tools are offered", sorted(sent["tools"]) == ["compare_areas", "get_area", "list_indicators", "rank_areas"],
       json.dumps(sent["tools"]))

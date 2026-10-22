@@ -46,7 +46,15 @@ wrangler secret put ANTHROPIC_API_KEY
 #    [[migrations]] entry) and the burst limit ([[ratelimits]]); there is
 #    nothing to create by hand.
 wrangler deploy
+
+# 3. Check it. Open the map, ask two or three questions, and watch the calls
+#    (model, stop reason and token use) in a second terminal.
+wrangler tail
 ```
+
+Every change to `src/index.js` or `wrangler.toml` (the model, the caps, the
+tools) reaches the live site only after `wrangler deploy`; merging to main
+does not deploy the Worker.
 
 The counter used to be a KV namespace (`RATE_LIMIT`). It is no longer used,
 and once this version is live it can be deleted under Storage & Databases → KV.
@@ -110,9 +118,18 @@ fake bindings and a stubbed API, so they cost nothing:
 
 ## What it costs, and how to cap it
 
-`claude-sonnet-5` at $2 per million input tokens and $10 per million output.
-Cached input costs $2.50 per million to write and $0.20 per million to read.
-Answers are capped at 2,048 output tokens with thinking switched off.
+`claude-sonnet-5-5` at $2 per million input tokens and $10 per million output,
+the same prices as Sonnet 5. Cached input costs $2.50 per million to write and
+$0.20 per million to read. Answers are capped at 2,048 output tokens with
+extended thinking off: Sonnet 5.5 refuses `thinking: {type: "disabled"}`, so the
+Worker sends `{type: "between_tools"}`, its lowest setting, at effort `medium`.
+Any short progress notes the model writes between tool calls come back as
+thinking blocks; the panel neither shows them nor sends them back.
+
+If a safety classifier declines a question, `fallbacks: "default"` (beta header
+`server-side-fallback-2026-07-01`) lets the API retry it on a model that can
+answer. That should be rare for questions about area statistics; the model
+that actually answered is in each `wrangler tail` line.
 
 **The old figure here was wrong.** It said a call sent about 1,500 input tokens
 and a question cost half a penny. Measured requests were about 45,000
@@ -153,7 +170,7 @@ and once corrected described a mean decile of 3 as the most deprived tenth.
 Both are the kind of error that reads as authoritative and gets quoted. If cost
 ever matters more than that, the model is one line in `src/index.js`, but test
 the deprivation questions before trusting it, and check the caching minimum for
-the new model (1,024 tokens on Sonnet 5; the fixed part here is about 2,100).
+the new model (512 tokens on Sonnet 5.5; the fixed part here is about 2,100).
 
 Four limits sit in front of that. The last is the only one that bounds the
 bill outright.

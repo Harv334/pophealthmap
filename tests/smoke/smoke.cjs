@@ -2782,13 +2782,17 @@ const smallText = page => page.evaluate(() => {
     globalThis.fetch = async (url, init) => {
       const body = JSON.parse(init.body), msgs = body.messages, last = msgs[msgs.length - 1];
       const said = last.content.map(b => b.text || '').join(' ');
-      const reply = (stop, content) => new Response(JSON.stringify({ model: 'claude-sonnet-5', stop_reason: stop, content,
+      const reply = (stop, content) => new Response(JSON.stringify({ model: 'claude-sonnet-5-5', stop_reason: stop, content,
         usage: { input_tokens: 1, output_tokens: 1 } }), { status: 200, headers: { 'content-type': 'application/json' } });
       if (last.content[0].type === 'tool_result') return reply('end_turn', [{ type: 'text', text: 'Done with the figures.' }]);
       if (/COMPARE/.test(said)) return reply('end_turn', [{ type: 'text', text: 'Here they are.\n\n| Ward | IMD score |\n|---|---|\n| Notting Dale | 41.2 |\n| **Stonebridge** | 38.5 |\n\n- Higher means more deprived.' }]);
       if (/CUTTOOL/.test(said)) return reply('max_tokens', [{ type: 'text', text: 'Let me compare those.' }, { type: 'tool_use', id: 'cut' + (++ids), name: 'compare_areas', input: {} }]);
       if (/CUTTEXT/.test(said)) return reply('max_tokens', [{ type: 'text', text: 'Brent: IMD score 30.3\nBromley: IMD' }]);
       if (/REFUSE/.test(said)) return reply('refusal', []);
+      // Sonnet 5.5 with thinking "between_tools" returns a progress note as a
+      // thinking block before its tool call.
+      if (/NOTE/.test(said)) return reply('tool_use', [{ type: 'thinking', thinking: 'Looking up Lansbury first.', signature: 'sig' },
+        { type: 'tool_use', id: 'n' + (++ids), name: 'get_area', input: { name: 'Lansbury', level: 'ward' } }]);
       if (/PROFILE/.test(said)) return reply('tool_use', [{ type: 'tool_use', id: 'p' + (++ids), name: 'get_area', input: { name: 'Lansbury', level: 'ward' } },
         { type: 'tool_use', id: 'p' + (++ids), name: 'get_area', input: { name: 'Stonebridge', level: 'ward' } }]);
       return reply('end_turn', [{ type: 'text', text: 'Fine.' }]);
@@ -2841,6 +2845,10 @@ const smallText = page => page.evaluate(() => {
     const rf = await ask('REFUSE this');
     const rf2 = await ask('and now?');
     ok(rf.text === 'I cannot answer that one. Please ask about the figures on the map.' && rf2.text === 'Fine.', 'Ask: a refusal gets a plain reply and the next question works', JSON.stringify([rf.text, rf2.text]));
+    const nb = seen.length;
+    const note = await ask('NOTE tell me about Lansbury');
+    ok(note.text === 'Done with the figures.' && !/Looking up/.test(note.text) && seen.slice(nb).every(x => x.status === 200),
+      'Ask: a progress note between tool calls is not shown or sent back, and the answer completes', JSON.stringify({ note: note.text, seen: seen.slice(nb) }));
     const profiles = [];
     for (let i = 0; i < 8; i++) profiles.push(await ask('PROFILE ' + i + ' Lansbury and Stonebridge'));
     const maxSize = Math.max(...seen.map(s => s.size)), bad = seen.filter(s => s.status !== 200);

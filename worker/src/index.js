@@ -26,18 +26,30 @@
  * token caching minimum, where Haiku's 2,048 left it just short, so the cached
  * reads claw some of that back.
  */
-const MODEL = "claude-sonnet-5";
+const MODEL = "claude-sonnet-5-5";
 
 /**
- * Room for the longest answers, with thinking switched off.
+ * Room for the longest answers, with extended thinking switched off.
  *
- * Sonnet 5 thinks adaptively unless told not to, and its thinking shares
- * max_tokens with the answer. At 1,024 that left comparisons, the longest
- * answers, cut off mid-figure. Thinking is disabled in the request below,
- * which suits a model whose job is to look figures up and report them, and
- * the cap is doubled. The panel still says so when an answer is cut short.
+ * Thinking shares max_tokens with the answer. At 1,024 that left comparisons,
+ * the longest answers, cut off mid-figure, so thinking is off in the request
+ * below, which suits a model whose job is to look figures up and report them,
+ * and the cap is doubled. The panel still says so when an answer is cut short.
+ *
+ * Sonnet 5.5 refuses thinking {type: "disabled"}; its lowest setting is
+ * "between_tools", which does no extended thinking and returns any short
+ * progress notes it writes between tool calls as thinking blocks. The panel
+ * shows only text and keeps only text and tool calls in the history it sends
+ * back (keepBlocks in assistant.js), and this Worker refuses anything else,
+ * so those notes are never replayed. That also keeps the panel's history
+ * trimming (stubbed tool results, dropped questions) clear of the API's check
+ * that earlier turns are unchanged, which applies to replayed thinking blocks.
+ * between_tools needs effort "high" or below; "medium" is the suggested start
+ * for multistep tool use.
  */
 const MAX_TOKENS = 2048;
+const THINKING = { type: "between_tools" };
+const EFFORT = "medium";
 const DAILY_CAP = 10; // questions per browser, per UTC day
 
 /**
@@ -733,13 +745,18 @@ export default {
           "content-type": "application/json",
           "x-api-key": env.ANTHROPIC_API_KEY,
           "anthropic-version": "2023-06-01",
+          // If a safety classifier declines, the API retries on a model that
+          // can answer (fallbacks below) instead of failing the question.
+          "anthropic-beta": "server-side-fallback-2026-07-01",
         },
         body: JSON.stringify({
           // Fixed here, never taken from the request: the model, the output
           // cap, the instructions and the tools are the Worker's alone.
           model: MODEL,
           max_tokens: MAX_TOKENS,
-          thinking: { type: "disabled" },
+          thinking: THINKING,
+          output_config: { effort: EFFORT },
+          fallbacks: "default",
           system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
           tools: TOOLS,
           messages: withCacheBreakpoint(messages),
@@ -764,7 +781,7 @@ export default {
     // What each call cost, for `wrangler tail`: worker/README.md prices a
     // question from these.
     if (data && data.usage) {
-      console.log(JSON.stringify({ q: isQuestion, stop: data.stop_reason, usage: data.usage }));
+      console.log(JSON.stringify({ q: isQuestion, model: data.model, stop: data.stop_reason, usage: data.usage }));
     }
     // Under an underscore so it cannot collide with a field the API adds later.
     data._limit = { cap: DAILY_CAP, remaining: held.remaining, enforced: true };

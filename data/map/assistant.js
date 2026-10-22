@@ -26,7 +26,7 @@ var ASSISTANT_ENDPOINT = "https://pophealthmapai.sevilleharvey.workers.dev";
  * the reply itself, so a drift here is corrected by the first question anyone
  * asks; it is only the opening state that depends on this line.
  */
-var MODEL_LABEL = "Claude Sonnet 5";
+var MODEL_LABEL = "Claude Sonnet 5.5";
 
 (function () {
   "use strict";

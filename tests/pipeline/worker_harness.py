@@ -65,10 +65,11 @@ const env = {
     },
   },
 };
-const upstream = { calls: 0, bodies: [], reply: { stop_reason: "end_turn", content: [{ type: "text", text: "ok" }] }, status: 200 };
+const upstream = { calls: 0, bodies: [], headers: [], reply: { stop_reason: "end_turn", content: [{ type: "text", text: "ok" }] }, status: 200 };
 globalThis.fetch = async (url, init) => {
   upstream.calls++;
   upstream.bodies.push(JSON.parse(init.body));
+  upstream.headers.push(init.headers || {});
   const status = upstream.status;
   return new Response(JSON.stringify(upstream.reply), { status, headers: { "content-type": "application/json" } });
 };
