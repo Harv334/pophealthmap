@@ -7236,8 +7236,11 @@ function msoaRedrawn2021(code) {
   return /^E02\d{6}$/.test(code || '') && code > MSOA_LAST_2011;
 }
 /* Why an indicator's MSOAs are blank, read from the data: 'redrawn' when
-   every blank MSOA is one redrawn in 2021, 'none' when none is blank,
-   'withheld' otherwise, and '' while the MSOA figures have not loaded. */
+   every blank MSOA is one redrawn in 2021, 'withheld' when none of them is,
+   'mixed' when there are both, 'few' and 'few-mixed' for the same on the
+   long-term claimants series, 'none' when none is blank, and '' while the
+   MSOA figures have not loaded. Most older Local Health series are mixed:
+   published for the 2011 MSOAs and with small counts withheld as well. */
 const _blankCause = {};
 function ftBlankCause(k) {
   if (_blankCause[k]) return _blankCause[k];
@@ -7251,8 +7254,9 @@ function ftBlankCause(k) {
   // Long-term claimants: OHID's 0s with no England comparison are stored as
   // no figure (ft_msoa_drop_bare_zeros in the pipeline), so most blanks are
   // too few claimants to measure rather than withheld.
+  const redrawn = blank.some(msoaRedrawn2021);
   const cause = !blank.length ? 'none' : blank.every(msoaRedrawn2021) ? 'redrawn'
-    : FT_BARE_ZERO_BLANK[k] ? 'few' : 'withheld';
+    : FT_BARE_ZERO_BLANK[k] ? (redrawn ? 'few-mixed' : 'few') : redrawn ? 'mixed' : 'withheld';
   _blankCause[k] = cause;
   return cause;
 }
@@ -7260,8 +7264,9 @@ function ftBlankCause(k) {
 function msoaNoFigure(code, k) {
   if (typeof k === 'string' && k.startsWith('ft_')) {
     if (msoaRedrawn2021(code)) return 'No figure: this MSOA was redrawn in 2021 and OHID’s figures leave it out';
-    if (ftBlankCause(k) === 'few') return 'No figure: too few long-term claimants to measure';
-    if (ftBlankCause(k) === 'withheld') return 'No figure (withheld to protect privacy)';
+    const why = ftBlankCause(k);
+    if (why === 'few' || why === 'few-mixed') return 'No figure: too few long-term claimants to measure';
+    if (why === 'withheld' || why === 'mixed') return 'No figure (withheld to protect privacy)';
   }
   return 'No figure';
 }
@@ -7269,6 +7274,8 @@ const FT_BARE_ZERO_BLANK = { ft_93098: 1 };
 const BLANK_NOTE_FEW = 'Areas left blank have no figure. Where there are too few long-term claimants to measure, OHID gives 0, which we show as no figure.';
 const BLANK_NOTE_REDRAWN ='Areas left blank have no figure. OHID’s figures leave out the MSOAs that were redrawn in 2021, so blank is a gap, not zero.';
 const BLANK_NOTE_WITHHELD = 'Areas left blank have no figure. OHID withholds figures where so few people are counted that someone could be identified, so blank does not mean zero.';
+const BLANK_NOTE_MIXED = 'Areas left blank have no figure. OHID withholds figures where so few people are counted that someone could be identified, and leaves out the MSOAs redrawn in 2021, so blank does not mean zero.';
+const BLANK_NOTE_FEW_MIXED = 'Areas left blank have no figure. OHID gives 0 where there are too few long-term claimants to measure, which we show as no figure, and leaves out the MSOAs redrawn in 2021.';
 /* Figures carried from 2011 MSOA codes to a 2021 MSOA by the ONS lookup are
    estimates for the 2021 area; the pipeline marks them ft_<id>_est. */
 function ovIsEstimated(level, id, k) {
@@ -17801,8 +17808,10 @@ document.addEventListener('change', e => {
     if (ftActive && !cause && ovHasLevel(curOv, 'msoa') && typeof ensureMsoaData === 'function') {
       ensureMsoaData().then(() => { if (ftBlankCause(curOv)) update(); });
     }
-    const show = ftActive && (cause === 'redrawn' || cause === 'withheld' || cause === 'few' || (!cause && !ovHasLevel(curOv, 'msoa')));
-    const want = !show ? '' : cause === 'redrawn' ? BLANK_NOTE_REDRAWN : cause === 'few' ? BLANK_NOTE_FEW : BLANK_NOTE_WITHHELD;
+    const NOTES = { redrawn: BLANK_NOTE_REDRAWN, withheld: BLANK_NOTE_WITHHELD, mixed: BLANK_NOTE_MIXED,
+      few: BLANK_NOTE_FEW, 'few-mixed': BLANK_NOTE_FEW_MIXED };
+    const show = ftActive && (!!NOTES[cause] || (!cause && !ovHasLevel(curOv, 'msoa')));
+    const want = !show ? '' : (NOTES[cause] || BLANK_NOTE_WITHHELD);
     if (note.textContent !== want) note.textContent = want;
     note.hidden = !show;
     if (show) note.title = want; else note.removeAttribute('title');
