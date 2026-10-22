@@ -1554,7 +1554,7 @@ const smallText = page => page.evaluate(() => {
     const cols = await page.evaluate(() => { const c = new Set(); lsoaLyr && lsoaLyr.eachLayer(l => c.add(l.options.fillColor)); return c.size; });
     ok(await page.evaluate(() => bivOn()), 'two-indicator map restores from link');
     ok(cols >= 8, 'two-indicator map uses the nine colours', cols + ' colours');
-    const bivName = await page.evaluate(() => { const m = document.getElementById('map-legend-strip'); return { l: m.getAttribute('aria-label'), d: m.getAttribute('aria-describedby') || '' }; });
+    const bivName = await page.evaluate(() => { const m = document.getElementById('mls-open'); return { l: m.getAttribute('aria-label'), d: m.getAttribute('aria-describedby') || '' }; });
     ok(/Average deprivation decile|Deprivation decile/i.test(bivName.l) && /compared with .*nitrogen dioxide/i.test(bivName.l) && !/mls-min/.test(bivName.d),
       'the two-indicator key is named for both indicators and not described by the hidden scale', JSON.stringify(bivName));
     await page.click('#sbtab-overlay');
@@ -1926,7 +1926,7 @@ const smallText = page => page.evaluate(() => {
       await page.evaluate(() => PH_DRAWER.close());
       await page.waitForTimeout(400);
       const lg = await rectOf(page, '#map-legend-strip');
-      const lgName = await page.evaluate(() => [document.getElementById('map-legend-strip').getAttribute('aria-label'),
+      const lgName = await page.evaluate(() => [document.getElementById('mls-open').getAttribute('aria-label'),
         document.getElementById('mls-label').firstChild.textContent.trim()]);
       ok(lgName[0] === 'About this indicator: ' + lgName[1], 'phone: the key is a button named after its indicator', lgName.join(' / '));
       await page.touchscreen.tap(lg.l + 30, lg.t + lg.h / 2);
@@ -2715,13 +2715,34 @@ const smallText = page => page.evaluate(() => {
       redrawn: Object.keys(MSOA_DATA).filter(msoaRedrawn2021).length,
       card: msoaNoFigure(Object.keys(MSOA_DATA).filter(msoaRedrawn2021)[0], 'ft_93227'),
       other: msoaNoFigure('E02000001', 'census_bad_health_pct') }));
-    ok(/^Areas left blank have no figure\. OHID’s figures for these areas leave out the MSOAs that were redrawn in 2021/.test(b7.text) && b7.redrawn === 39,
+    ok(/^Areas left blank have no figure\. OHID’s figures leave out the MSOAs that were redrawn in 2021/.test(b7.text) && b7.redrawn === 39,
       'the blank-area notice names the 39 MSOAs redrawn in 2021 for the hospital admissions series', JSON.stringify(b7));
     ok(/^No figure: this MSOA was redrawn in 2021/.test(b7.card) && b7.other === 'No figure', 'a blank MSOA\'s card says why, or "No figure"', JSON.stringify(b7));
     await setOv(page, 'ft_93105');
     await page.waitForTimeout(1500);
-    ok(/^Areas left without colour have no figure\. OHID, the Office for Health Improvement and Disparities, withholds/.test(
+    ok(/^Areas left blank have no figure\. OHID withholds figures/.test(
       await page.evaluate(() => document.getElementById('mls-note').textContent)), 'other blanks are described as withheld');
+    // The note wraps under the scale inside the key rather than being cut off.
+    const nf = await page.evaluate(() => { const n = document.getElementById('mls-note'), k = document.getElementById('map-legend-strip');
+      const a = n.getBoundingClientRect(), b = k.getBoundingClientRect();
+      return { fits: n.scrollWidth <= n.clientWidth + 1 && a.left >= b.left - 1 && a.right <= b.right + 1 && a.bottom <= b.bottom + 1 && a.top >= b.top - 1,
+        lines: Math.round(a.height / parseFloat(getComputedStyle(n).lineHeight)), keyW: Math.round(b.width) }; });
+    ok(nf.fits && nf.lines <= 3 && nf.keyW < 700, 'the missing-figure note is shown in full inside the key, in three lines or fewer', JSON.stringify(nf));
+    // The reverse button turns the colours round on the map and in both keys, and back.
+    const flip = await page.evaluate(async () => {
+      const first = id => (document.getElementById(id).style.background.match(/rgb\([^)]*\)|#[0-9a-f]{6}/i) || [''])[0];
+      const fill = () => { let c = null; wLyr.eachLayer(l => { if (!c && l.options.fillColor && l.options.fillColor !== '#ccc') c = l.options.fillColor; }); return c; };
+      const b = document.getElementById('mls-flip');
+      const before = { s: first('sc-grad'), m: first('mls-grad'), f: fill(), p: b.getAttribute('aria-pressed') };
+      b.click(); await new Promise(r => setTimeout(r, 300));
+      const after = { s: first('sc-grad'), m: first('mls-grad'), f: fill(), p: b.getAttribute('aria-pressed') };
+      b.click(); await new Promise(r => setTimeout(r, 300));
+      const back = { s: first('sc-grad'), f: fill(), p: b.getAttribute('aria-pressed') };
+      return { before, after, back, card: !document.getElementById('ov-info-panel') || document.getElementById('ov-info-panel').hidden };
+    });
+    ok(flip.before.p === 'false' && flip.after.p === 'true' && flip.back.p === 'false' && flip.after.s !== flip.before.s &&
+       flip.after.m === flip.after.s && flip.back.s === flip.before.s && flip.back.f === flip.before.f,
+      'the reverse button turns the colour scale round in both keys and on the map, and back again', JSON.stringify(flip));
     // H1: an LA map of a Local Health indicator says it is our estimate, and
     // its LA list leaves out the City.
     await setOv(page, 'ft_932831');

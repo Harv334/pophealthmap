@@ -694,9 +694,21 @@
   .map-legend-strip { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); background: color-mix(in srgb, var(--paper) 94%, transparent); border: 1px solid var(--line); border-radius: var(--r-md); padding: 6px var(--s-3); box-shadow: var(--shadow); font-size: var(--t-xs); color: var(--ink-2); display: flex; align-items: center; gap: 10px; z-index: 540; pointer-events: none; max-width: 90%; }
   .map-legend-strip .mls-label { font-weight: 600; color: var(--ink); max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* The key opens the indicator's card, so it takes the pointer. */
-  .map-legend-strip[role="button"] { pointer-events: auto; cursor: pointer; }
-  .map-legend-strip[role="button"]:hover { border-color: var(--nhs-blue); }
-  .map-legend-strip:focus-visible { outline: 2px solid var(--nhs-blue); outline-offset: 2px; }
+  /* The key's contents let a press through to .mls-open beneath them, which
+     covers the whole key; only the two buttons take a press. */
+  .map-legend-strip .mls-open { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0;
+    border: 0; border-radius: inherit; background: none; cursor: pointer; pointer-events: auto; font: inherit; }
+  .map-legend-strip:has(.mls-open:hover) { border-color: var(--nhs-blue); }
+  .map-legend-strip .mls-open:focus-visible { outline: 2px solid var(--nhs-blue); outline-offset: 2px; }
+  .map-legend-strip .mls-flip { position: relative; z-index: 1; pointer-events: auto; flex: none;
+    display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; margin: -4px -4px -4px 0;
+    padding: 0; border: 1px solid var(--line); border-radius: 50%; background: var(--paper); color: var(--ink-2); cursor: pointer; }
+  .map-legend-strip .mls-flip .ic { width: 14px; height: 14px; vertical-align: 0; }
+  .map-legend-strip .mls-flip:hover { border-color: var(--nhs-blue); color: var(--nhs-blue); }
+  .map-legend-strip .mls-flip[aria-pressed="true"] { background: var(--nhs-blue); border-color: var(--nhs-blue); color: var(--on-accent); }
+  .map-legend-strip .mls-flip:focus-visible { outline: 2px solid var(--nhs-blue); outline-offset: 2px; }
+  /* The decile key is the LSOA layer's own palette, which this does not turn. */
+  .map-legend-strip.is-decile .mls-flip { display: none; }
   /* "Indicators", the floating chip, phones only (see the narrow-screen rules). */
   .map-chip { display: none; position: absolute; left: 8px; bottom: 72px; z-index: 2600;
     align-items: center; gap: 7px; padding: 8px var(--s-3); min-height: 36px; margin: 0;
@@ -709,9 +721,11 @@
   /* The missing-figure note: one line under the scale, as wide as the key
      and no wider (it hangs in the padding the key makes for it), with the
      whole of it in the title and read out with the key. */
-  .map-legend-strip.has-note:not(.is-biv) { padding-bottom: calc(6px + 1.5em); }
-  .map-legend-strip .mls-note { position: absolute; left: var(--s-3); right: var(--s-3); bottom: 5px;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.5;
+  /* The note is a row of its own under the scale, wrapping to the key's
+     width rather than widening it (contain: inline-size keeps its length out
+     of the key's width), so the whole of it can be read. */
+  .map-legend-strip.has-note:not(.is-biv) { flex-wrap: wrap; row-gap: 4px; }
+  .map-legend-strip .mls-note { flex: 1 0 100%; contain: inline-size; white-space: normal; line-height: 1.4;
     color: var(--tint-amber-ink); font-weight: 600; }
   .map-legend-strip .mls-note[hidden] { display: none; }
   .map-legend-strip .mls-unit { display: block; font-weight: 400; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; }
@@ -2356,7 +2370,7 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
   .biv-grid span { display: block; }
   .biv-note { grid-column: 1 / -1; color: var(--ink-3); line-height: 1.4; margin-top: 2px; }
   .map-legend-strip .mls-biv { display: none; }
-  .map-legend-strip.is-biv > :not(.mls-biv) { display: none; }
+  .map-legend-strip.is-biv > :not(.mls-biv):not(.mls-open) { display: none; }
   .map-legend-strip.is-biv .mls-biv { display: flex; align-items: center; gap: 8px; }
   .mls-biv .biv-grid { grid-template-columns: repeat(3, 11px); grid-template-rows: repeat(3, 11px); }
   .ov-search { width: 100%; box-sizing: border-box; min-height: 40px; padding: 0 var(--s-3); font: inherit;
@@ -2972,12 +2986,12 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
     .map-legend-strip { left: 8px; right: 8px; transform: none; max-width: none;
       font-size: var(--t-xs); padding: 5px 9px; }
     .map-legend-strip .mls-label { max-width: 45%; }
-    .map-legend-strip .mls-note { left: 9px; right: 9px; bottom: 4px; }
-    .map-legend-strip.has-note:not(.is-biv) { padding-bottom: calc(5px + 1.5em); }
-    /* The key with its missing-figure line is a line taller, so the Ask
-       button and the chip above it go up by a line too. */
-    .map-wrap.has-note #ai-toggle, .map-wrap.has-note .map-chip { bottom: 90px; }
-    .map-wrap.has-note.has-sheet #ai-toggle, .map-wrap.has-note.has-sheet .map-chip { bottom: calc(var(--sheet-lift) + 90px); }
+
+    /* The key with its missing-figure note is two or three lines taller, so
+       the Ask button and the chip above it go up by however tall the key is
+       (--mls-h, measured in _wireBlankNote), clearing it by 8px. */
+    .map-wrap.has-note #ai-toggle, .map-wrap.has-note .map-chip { bottom: calc(var(--mls-h, 58px) + 32px); }
+    .map-wrap.has-note.has-sheet #ai-toggle, .map-wrap.has-note.has-sheet .map-chip { bottom: calc(var(--sheet-lift) + var(--mls-h, 58px) + 32px); }
     /* A fully open ward sheet leaves a strip of map for seeing where the
        ward is. The key and the basemap switch wait until it drops back
        (the credits stay, one line on the sheet's edge, as the licences
@@ -3364,6 +3378,7 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
      The shapes follow the Lucide set (ISC licence). -->
 <svg class="ic-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
   <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+  <symbol id="i-reverse" viewBox="0 0 24 24"><path d="M4 10a8 8 0 0 1 14.5-4.5"/><path d="M19 2v4h-4"/><path d="M20 14a8 8 0 0 1-14.5 4.5"/><path d="M5 22v-4h4"/></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
   <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
@@ -4357,13 +4372,18 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
            at the bottom of the map. Hidden when no overlay is active. Mirrors the sidebar
            scale-bar via the same data, so users can read the choropleth without scrolling. -->
       <!-- A tap or click on it opens the indicator's card (workplan 2.10). -->
-      <div id="map-legend-strip" class="map-legend-strip" style="display:none" role="button" tabindex="0"
-           aria-label="About this indicator" aria-describedby="mls-min mls-max mls-note"
-           title="Select to read about this indicator">
+      <!-- Two buttons side by side, not one inside the other: .mls-open covers
+           the whole key and opens the indicator card, and .mls-flip at its
+           right end reverses the colours. -->
+      <div id="map-legend-strip" class="map-legend-strip" style="display:none">
+        <button type="button" class="mls-open" id="mls-open" aria-label="About this indicator"
+                aria-describedby="mls-min mls-max mls-note" title="Select to read about this indicator"></button>
         <span class="mls-label" id="mls-label"></span>
         <span class="mls-min" id="mls-min"></span>
         <span class="mls-grad" id="mls-grad"></span>
         <span class="mls-max" id="mls-max"></span>
+        <button type="button" class="mls-flip" id="mls-flip" aria-pressed="false"
+                aria-label="Reverse the colours" title="Reverse the colours, so the lowest figures are darkest"><svg class="ic" aria-hidden="true"><use href="#i-reverse"/></svg></button>
         <span class="mls-biv" id="mls-biv"></span>
         <span class="mls-note" id="mls-note" hidden></span>
       </div>
@@ -7169,9 +7189,15 @@ function _textOn(bg) {
   const L = 0.2126 * lum[0] + 0.7152 * lum[1] + 0.0722 * lum[2];
   return (1.05 / (L + 0.05)) >= 4.5 ? '#fff' : '#111';
 }
+/* The reader's own choice, from the reverse button at the end of the key:
+   true paints the scale the other way round, on every layer and both keys,
+   for whichever indicator is shown, until it is pressed again or the map is
+   reset. */
+let rampFlip = false;
 function ovRamp(k, t) {
   const cfg = (typeof OV_CFG !== 'undefined') ? OV_CFG[k] : null;
-  return ramp(cfg && cfg.rev ? 1 - t : t);
+  const rev = !!(cfg && cfg.rev) !== rampFlip;
+  return ramp(rev ? 1 - t : t);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -7240,9 +7266,9 @@ function msoaNoFigure(code, k) {
   return 'No figure';
 }
 const FT_BARE_ZERO_BLANK = { ft_93098: 1 };
-const BLANK_NOTE_FEW = 'Areas left blank have no figure. Where there are too few long-term claimants to measure, OHID gives 0 with no comparison with England, and we show that as no figure rather than as none.';
-const BLANK_NOTE_REDRAWN ='Areas left blank have no figure. OHID’s figures for these areas leave out the MSOAs that were redrawn in 2021, so a blank is a gap in what was published rather than a zero.';
-const BLANK_NOTE_WITHHELD = 'Areas left without colour have no figure. OHID, the Office for Health Improvement and Disparities, withholds figures where so few people are counted that someone could be identified, so a blank area does not mean zero.';
+const BLANK_NOTE_FEW = 'Areas left blank have no figure. Where there are too few long-term claimants to measure, OHID gives 0, which we show as no figure.';
+const BLANK_NOTE_REDRAWN ='Areas left blank have no figure. OHID’s figures leave out the MSOAs that were redrawn in 2021, so blank is a gap, not zero.';
+const BLANK_NOTE_WITHHELD = 'Areas left blank have no figure. OHID withholds figures where so few people are counted that someone could be identified, so blank does not mean zero.';
 /* Figures carried from 2011 MSOA codes to a 2021 MSOA by the ONS lookup are
    estimates for the 2021 area; the pipeline marks them ft_<id>_est. */
 function ovIsEstimated(level, id, k) {
@@ -13365,15 +13391,11 @@ function _fitFocus(bounds) {
     }, 260);
   }
   const strip = document.getElementById('map-legend-strip');
+  const opener = document.getElementById('mls-open');
   const lbl = document.getElementById('mls-label');
-  if (strip) {
+  if (strip && opener) {
     const act = () => (strip.classList.contains('is-biv') ? openBivKey() : openIndicators(true));
-    strip.addEventListener('click', act);
-    strip.addEventListener('keydown', e => {
-      if (e.key !== 'Enter' && e.key !== ' ') return;
-      e.preventDefault();
-      act();
-    });
+    opener.addEventListener('click', act);
     // The button's name follows the indicator it is the key to.
     // The label holds the unit on a line of its own (.mls-unit), which is
     // left out of the name.
@@ -13384,12 +13406,12 @@ function _fitFocus(bounds) {
     const name = () => {
       const pair = strip.classList.contains('is-biv') && biv ? [...biv.querySelectorAll('b')].map(b => b.textContent.trim()) : [];
       if (pair.length === 2) {
-        strip.setAttribute('aria-label', 'Show the key for ' + pair[0] + ', compared with ' + pair[1]);
-        strip.removeAttribute('aria-describedby');
+        opener.setAttribute('aria-label', 'Show the key for ' + pair[0] + ', compared with ' + pair[1]);
+        opener.removeAttribute('aria-describedby');
         return;
       }
-      strip.setAttribute('aria-describedby', 'mls-min mls-max mls-note');
-      strip.setAttribute('aria-label', 'About this indicator: ' + (lbl ? [...lbl.childNodes]
+      opener.setAttribute('aria-describedby', 'mls-min mls-max mls-note');
+      opener.setAttribute('aria-label', 'About this indicator: ' + (lbl ? [...lbl.childNodes]
         .filter(n => !(n.classList && n.classList.contains('mls-unit'))).map(n => n.textContent).join('').trim() : ''));
     };
     if (lbl) new MutationObserver(name).observe(lbl, { childList: true, characterData: true, subtree: true });
@@ -17788,6 +17810,13 @@ document.addEventListener('change', e => {
     const wrap = strip.closest('.map-wrap');
     if (wrap) wrap.classList.toggle('has-note', show);
   };
+  // The key's height, for the phone layout to lift the buttons above it.
+  if (typeof ResizeObserver === 'function') {
+    const wrap = strip.closest('.map-wrap');
+    if (wrap) new ResizeObserver(() => {
+      if (strip.offsetHeight) wrap.style.setProperty('--mls-h', strip.offsetHeight + 'px');
+    }).observe(strip);
+  }
   const ovEl = document.getElementById('ov');
   // Deferred a tick so curOv has been updated by the existing handler first.
   if (ovEl) ovEl.addEventListener('change', () => setTimeout(update, 0));
@@ -17987,6 +18016,7 @@ function _refreshUI() {
 // Reset everything → default view.
 function _resetAll() {
   try {
+    if (rampFlip && typeof setRampFlip === 'function') setRampFlip(false);
     // Stop any zoom or pan still running first. Removing the cluster layers
     // (GP practices, pharmacies, charities) mid-animation left markercluster
     // finishing a step on a layer with no map, which threw "Cannot read
@@ -18119,6 +18149,24 @@ function _applyColourPalette() {
 // the two legend gradients start in the colours the map is actually using
 // rather than in whatever was written into the markup.
 _applyColourPalette();
+
+// The reverse button at the end of the key (rampFlip, read by ovRamp).
+function setRampFlip(on) {
+  rampFlip = !!on;
+  const b = document.getElementById('mls-flip');
+  if (b) {
+    b.setAttribute('aria-pressed', String(rampFlip));
+    b.title = rampFlip ? 'Put the colours back, so the highest figures are darkest'
+      : 'Reverse the colours, so the lowest figures are darkest';
+  }
+  _applyColourPalette();
+  if (window.PH_OA && typeof PH_OA.restyle === 'function') { try { PH_OA.restyle(); } catch (e) {} }
+  if (typeof renderTopBottom === 'function') { try { renderTopBottom(); } catch (e) {} }
+}
+(function _wireRampFlip() {
+  const b = document.getElementById('mls-flip');
+  if (b) b.addEventListener('click', e => { e.stopPropagation(); setRampFlip(!rampFlip); });
+})();
 
 /* More, in the header: Presentation view and the colour-blind palette. It
    opens below its button, closes on Esc (back to the button), on a press
