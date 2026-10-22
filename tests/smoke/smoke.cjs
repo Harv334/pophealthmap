@@ -2720,8 +2720,8 @@ const smallText = page => page.evaluate(() => {
     ok(/^No figure: this MSOA was redrawn in 2021/.test(b7.card) && b7.other === 'No figure', 'a blank MSOA\'s card says why, or "No figure"', JSON.stringify(b7));
     await setOv(page, 'ft_93105');
     await page.waitForTimeout(1500);
-    ok(/^Areas left blank have no figure\. OHID withholds figures/.test(
-      await page.evaluate(() => document.getElementById('mls-note').textContent)), 'other blanks are described as withheld');
+    ok(/^Areas left blank have no figure\. OHID withholds figures where so few people are counted that someone could be identified, and leaves out the MSOAs redrawn in 2021/.test(
+      await page.evaluate(() => document.getElementById('mls-note').textContent)), 'a series with both kinds of blank (withheld and redrawn in 2021) names both');
     // The note wraps under the scale inside the key rather than being cut off.
     const nf = await page.evaluate(() => { const n = document.getElementById('mls-note'), k = document.getElementById('map-legend-strip');
       const a = n.getBoundingClientRect(), b = k.getBoundingClientRect();
