@@ -1554,7 +1554,7 @@ const smallText = page => page.evaluate(() => {
     const cols = await page.evaluate(() => { const c = new Set(); lsoaLyr && lsoaLyr.eachLayer(l => c.add(l.options.fillColor)); return c.size; });
     ok(await page.evaluate(() => bivOn()), 'two-indicator map restores from link');
     ok(cols >= 8, 'two-indicator map uses the nine colours', cols + ' colours');
-    const bivName = await page.evaluate(() => { const m = document.getElementById('map-legend-strip'); return { l: m.getAttribute('aria-label'), d: m.getAttribute('aria-describedby') || '' }; });
+    const bivName = await page.evaluate(() => { const m = document.getElementById('mls-open'); return { l: m.getAttribute('aria-label'), d: m.getAttribute('aria-describedby') || '' }; });
     ok(/Average deprivation decile|Deprivation decile/i.test(bivName.l) && /compared with .*nitrogen dioxide/i.test(bivName.l) && !/mls-min/.test(bivName.d),
       'the two-indicator key is named for both indicators and not described by the hidden scale', JSON.stringify(bivName));
     await page.click('#sbtab-overlay');
@@ -1926,7 +1926,7 @@ const smallText = page => page.evaluate(() => {
       await page.evaluate(() => PH_DRAWER.close());
       await page.waitForTimeout(400);
       const lg = await rectOf(page, '#map-legend-strip');
-      const lgName = await page.evaluate(() => [document.getElementById('map-legend-strip').getAttribute('aria-label'),
+      const lgName = await page.evaluate(() => [document.getElementById('mls-open').getAttribute('aria-label'),
         document.getElementById('mls-label').firstChild.textContent.trim()]);
       ok(lgName[0] === 'About this indicator: ' + lgName[1], 'phone: the key is a button named after its indicator', lgName.join(' / '));
       await page.touchscreen.tap(lg.l + 30, lg.t + lg.h / 2);
@@ -2715,13 +2715,34 @@ const smallText = page => page.evaluate(() => {
       redrawn: Object.keys(MSOA_DATA).filter(msoaRedrawn2021).length,
       card: msoaNoFigure(Object.keys(MSOA_DATA).filter(msoaRedrawn2021)[0], 'ft_93227'),
       other: msoaNoFigure('E02000001', 'census_bad_health_pct') }));
-    ok(/^Areas left blank have no figure\. OHID’s figures for these areas leave out the MSOAs that were redrawn in 2021/.test(b7.text) && b7.redrawn === 39,
+    ok(/^Areas left blank have no figure\. OHID’s figures leave out the MSOAs that were redrawn in 2021/.test(b7.text) && b7.redrawn === 39,
       'the blank-area notice names the 39 MSOAs redrawn in 2021 for the hospital admissions series', JSON.stringify(b7));
     ok(/^No figure: this MSOA was redrawn in 2021/.test(b7.card) && b7.other === 'No figure', 'a blank MSOA\'s card says why, or "No figure"', JSON.stringify(b7));
     await setOv(page, 'ft_93105');
     await page.waitForTimeout(1500);
-    ok(/^Areas left without colour have no figure\. OHID, the Office for Health Improvement and Disparities, withholds/.test(
+    ok(/^Areas left blank have no figure\. OHID withholds figures/.test(
       await page.evaluate(() => document.getElementById('mls-note').textContent)), 'other blanks are described as withheld');
+    // The note wraps under the scale inside the key rather than being cut off.
+    const nf = await page.evaluate(() => { const n = document.getElementById('mls-note'), k = document.getElementById('map-legend-strip');
+      const a = n.getBoundingClientRect(), b = k.getBoundingClientRect();
+      return { fits: n.scrollWidth <= n.clientWidth + 1 && a.left >= b.left - 1 && a.right <= b.right + 1 && a.bottom <= b.bottom + 1 && a.top >= b.top - 1,
+        lines: Math.round(a.height / parseFloat(getComputedStyle(n).lineHeight)), keyW: Math.round(b.width) }; });
+    ok(nf.fits && nf.lines <= 3 && nf.keyW < 700, 'the missing-figure note is shown in full inside the key, in three lines or fewer', JSON.stringify(nf));
+    // The reverse button turns the colours round on the map and in both keys, and back.
+    const flip = await page.evaluate(async () => {
+      const first = id => (document.getElementById(id).style.background.match(/rgb\([^)]*\)|#[0-9a-f]{6}/i) || [''])[0];
+      const fill = () => { let c = null; wLyr.eachLayer(l => { if (!c && l.options.fillColor && l.options.fillColor !== '#ccc') c = l.options.fillColor; }); return c; };
+      const b = document.getElementById('mls-flip');
+      const before = { s: first('sc-grad'), m: first('mls-grad'), f: fill(), p: b.getAttribute('aria-pressed') };
+      b.click(); await new Promise(r => setTimeout(r, 300));
+      const after = { s: first('sc-grad'), m: first('mls-grad'), f: fill(), p: b.getAttribute('aria-pressed') };
+      b.click(); await new Promise(r => setTimeout(r, 300));
+      const back = { s: first('sc-grad'), f: fill(), p: b.getAttribute('aria-pressed') };
+      return { before, after, back, card: !document.getElementById('ov-info-panel') || document.getElementById('ov-info-panel').hidden };
+    });
+    ok(flip.before.p === 'false' && flip.after.p === 'true' && flip.back.p === 'false' && flip.after.s !== flip.before.s &&
+       flip.after.m === flip.after.s && flip.back.s === flip.before.s && flip.back.f === flip.before.f,
+      'the reverse button turns the colour scale round in both keys and on the map, and back again', JSON.stringify(flip));
     // H1: an LA map of a Local Health indicator says it is our estimate, and
     // its LA list leaves out the City.
     await setOv(page, 'ft_932831');
@@ -2773,7 +2794,7 @@ const smallText = page => page.evaluate(() => {
     const env = { ANTHROPIC_API_KEY: 'sk-test', ALLOWED_ORIGINS: new URL(BASE).origin,
       ASK_COUNTER: { idFromName: n => n, get: () => ({ fetch: (u, i) => obj.fetch(new Request(u, i)) }) },
       ASK_BURST: { limit: async () => ({ success: true }) } };
-    let ids = 0, force413 = false;
+    let ids = 0, force413 = false, toolResults = null;
     const seen = [];
     const realFetch = globalThis.fetch, realLog = console.log;
     // The Worker logs each call's usage; not wanted in this output.
@@ -2782,13 +2803,22 @@ const smallText = page => page.evaluate(() => {
     globalThis.fetch = async (url, init) => {
       const body = JSON.parse(init.body), msgs = body.messages, last = msgs[msgs.length - 1];
       const said = last.content.map(b => b.text || '').join(' ');
-      const reply = (stop, content) => new Response(JSON.stringify({ model: 'claude-sonnet-5', stop_reason: stop, content,
+      const reply = (stop, content) => new Response(JSON.stringify({ model: 'claude-sonnet-5-5', stop_reason: stop, content,
         usage: { input_tokens: 1, output_tokens: 1 } }), { status: 200, headers: { 'content-type': 'application/json' } });
-      if (last.content[0].type === 'tool_result') return reply('end_turn', [{ type: 'text', text: 'Done with the figures.' }]);
+      if (last.content[0].type === 'tool_result') {
+        toolResults = last.content.map(b => b.content);
+        return reply('end_turn', [{ type: 'text', text: 'Done with the figures.' }]);
+      }
+      if (/SMALLAREA/.test(said)) return reply('tool_use', [{ type: 'tool_use', id: 's' + (++ids), name: 'rank_areas',
+        input: { indicator: 'imd_score', direction: 'highest', n: 3, level: 'lsoa', within_ward: 'Church End' } }]);
       if (/COMPARE/.test(said)) return reply('end_turn', [{ type: 'text', text: 'Here they are.\n\n| Ward | IMD score |\n|---|---|\n| Notting Dale | 41.2 |\n| **Stonebridge** | 38.5 |\n\n- Higher means more deprived.' }]);
       if (/CUTTOOL/.test(said)) return reply('max_tokens', [{ type: 'text', text: 'Let me compare those.' }, { type: 'tool_use', id: 'cut' + (++ids), name: 'compare_areas', input: {} }]);
       if (/CUTTEXT/.test(said)) return reply('max_tokens', [{ type: 'text', text: 'Brent: IMD score 30.3\nBromley: IMD' }]);
       if (/REFUSE/.test(said)) return reply('refusal', []);
+      // Sonnet 5.5 with thinking "between_tools" returns a progress note as a
+      // thinking block before its tool call.
+      if (/NOTE/.test(said)) return reply('tool_use', [{ type: 'thinking', thinking: 'Looking up Lansbury first.', signature: 'sig' },
+        { type: 'tool_use', id: 'n' + (++ids), name: 'get_area', input: { name: 'Lansbury', level: 'ward' } }]);
       if (/PROFILE/.test(said)) return reply('tool_use', [{ type: 'tool_use', id: 'p' + (++ids), name: 'get_area', input: { name: 'Lansbury', level: 'ward' } },
         { type: 'tool_use', id: 'p' + (++ids), name: 'get_area', input: { name: 'Stonebridge', level: 'ward' } }]);
       return reply('end_turn', [{ type: 'text', text: 'Fine.' }]);
@@ -2832,6 +2862,14 @@ const smallText = page => page.evaluate(() => {
     ok(axeAsk.length === 0, 'accessibility: the Ask panel with a table answer', axeAsk.join(', '));
     ok(await page.evaluate(() => PH_ASSISTANT.render('<img src=x onerror=alert(1)>\n| <b>a</b> | b |\n|---|---|\n| <i>c</i> | d |').indexOf('<img') === -1 &&
       PH_ASSISTANT.render('| <b>a</b> | b |\n|---|---|\n| c | d |').indexOf('&lt;b&gt;') !== -1), 'Ask: text in tables is escaped like the rest of the answer');
+    // A small-area tool answers with a promise; the loop waits for it and
+    // sends its result, not an empty object.
+    const sa = await ask('SMALLAREA which LSOAs in Church End ward are most deprived?');
+    let saRes = null;
+    try { saRes = JSON.parse((toolResults || [])[0]); } catch (e) { /* reported below */ }
+    ok(sa.text === 'Done with the figures.' && !sa.error && saRes && saRes.level === 'LSOA' &&
+       saRes.within === 'Finchley Church End ward, Barnet' && (saRes.results || []).length === 3,
+      'Ask: the answer loop waits for an LSOA ranking and sends its figures to the Worker', JSON.stringify({ sa, saRes }).slice(0, 400));
     const c1 = await ask('CUTTOOL compare everything');
     const c2 = await ask('and the next one?');
     ok(/Let me compare those\.\s+This answer was cut short, so please ask about fewer places at once\.$/.test(c1.text) && !c1.error &&
@@ -2841,6 +2879,10 @@ const smallText = page => page.evaluate(() => {
     const rf = await ask('REFUSE this');
     const rf2 = await ask('and now?');
     ok(rf.text === 'I cannot answer that one. Please ask about the figures on the map.' && rf2.text === 'Fine.', 'Ask: a refusal gets a plain reply and the next question works', JSON.stringify([rf.text, rf2.text]));
+    const nb = seen.length;
+    const note = await ask('NOTE tell me about Lansbury');
+    ok(note.text === 'Done with the figures.' && !/Looking up/.test(note.text) && seen.slice(nb).every(x => x.status === 200),
+      'Ask: a progress note between tool calls is not shown or sent back, and the answer completes', JSON.stringify({ note: note.text, seen: seen.slice(nb) }));
     const profiles = [];
     for (let i = 0; i < 8; i++) profiles.push(await ask('PROFILE ' + i + ' Lansbury and Stonebridge'));
     const maxSize = Math.max(...seen.map(s => s.size)), bad = seen.filter(s => s.status !== 200);
@@ -4462,6 +4504,72 @@ const smallText = page => page.evaluate(() => {
       ok(!perr.length, 'no page errors (region with a file list)', perr.join(' | '));
       await p.close();
     }
+  }
+
+  // Ask reads every level the map holds. Ward and LA tools answer at once, as
+  // the checks above rely on; MSOA, LSOA and output area ones load their
+  // files and answer with a promise. Each figure is checked against the
+  // map's own table, and each result names the area's parents.
+  {
+    const { page, errors } = await open(browser, 'index.html?t=1', DESK);
+    // One LA's output areas made to fail, to see the tool say so.
+    await page.route(/data\/map\/oa\/E09000002\.json/, r => r.abort());
+    const A = await page.evaluate(async hasOa => {
+      const R = (n, i) => Promise.resolve(PH_ASSISTANT.runTool(n, i));
+      const out = {};
+      out.wardSync = typeof (PH_ASSISTANT.runTool('get_area', { name: 'Lansbury', level: 'ward' }) || {}).then === 'undefined';
+      const ms = await R('get_area', { name: 'Brent 012', level: 'msoa', indicators: ['census_population', 'ft_93283'] });
+      out.msoa = ms.name === 'Brent 012' && ms.code === 'E02000104' && ms.la === 'Brent' && ms.level === 'MSOA' &&
+        ms.indicators.census_population.v === msoaOvValue('E02000104', 'census_population') &&
+        ms.indicators.ft_93283.v === msoaOvValue('E02000104', 'ft_93283') && /8,000 people/.test(ms.caveat || '');
+      const ln = await R('get_area', { name: 'Brent 012A', level: 'lsoa', indicators: ['imd_decile', 'imd_score'] });
+      const lc = await R('get_area', { name: 'e01000570', level: 'lsoa', indicators: ['imd_decile'] });
+      out.lsoa = ln.code === 'E01000570' && lc.name === 'Brent 012A' && ln.ward === 'Wembley Hill' && lc.ward === 'Wembley Hill' &&
+        ln.la === 'Brent' && ln.msoa === 'Brent 012' && ln.indicators.imd_score.v === lsoaOvValue('E01000570', 'imd_score') &&
+        lc.indicators.imd_decile.v === lsoaOvValue('E01000570', 'imd_decile') && /1,500 people/.test(ln.caveat || '');
+      out.lsoaOas = hasOa ? (Array.isArray(ln.output_areas) && ln.output_areas.length > 0 && ln.output_areas.every(c => /^E00\d{6}$/.test(c))) : true;
+      out.wrongLevel = (await R('get_area', { name: 'E01000570', level: 'msoa' })).error || '';
+      const rk = await R('rank_areas', { indicator: 'imd_score', direction: 'highest', n: 3, level: 'lsoa', within_ward: 'Church End' });
+      const rv = (rk.results || []).map(r => r.value);
+      out.lsoaRank = rk.within === 'Finchley Church End ward, Barnet' && rv.length === 3 && rv[0] >= rv[1] && rv[1] >= rv[2] &&
+        rk.results.every(r => r.ward === 'Finchley Church End' && r.la === 'Barnet' && r.value === lsoaOvValue(r.code, 'imd_score')) &&
+        rk.higher_means === 'more deprived' && /best fit/.test(rk.caveat || '');
+      if (hasOa) {
+        const oa = await R('rank_areas', { indicator: 'census_over65_pct', direction: 'highest', n: 5, level: 'oa', within_la: 'Hackney' });
+        const ov = (oa.results || []).map(r => r.value);
+        out.oaRank = oa.level === 'output area' && oa.of_total === OA_INDEX.lads.E09000012.count && ov.length === 5 &&
+          ov.every((v, i) => !i || ov[i - 1] >= v) && oa.results.every(r => r.la === 'Hackney' && /^E00/.test(r.code) && /^E01/.test(r.lsoa) && r.ward) &&
+          (oa.caveat || '').indexOf(OA_CAVEAT) === 0;
+        out.oaNone = (await R('rank_areas', { indicator: 'census_over65_pct', direction: 'highest', n: 5, level: 'oa' })).error || '';
+        const top = oa.results && oa.results[0];
+        const one = top ? await R('get_area', { name: top.code, level: 'oa', within_la: 'Hackney', indicators: ['census_over65_pct'] }) : {};
+        out.oaGet = !!top && one.code === top.code && one.lsoa === top.lsoa && one.ward === top.ward && one.la === 'Hackney' &&
+          one.indicators.census_over65_pct.v === top.value && (one.caveat || '').indexOf(OA_CAVEAT) === 0;
+        out.oaNoPlace = (await R('get_area', { name: 'E00000001', level: 'oa' })).error || '';
+        out.oaFailed = (await R('rank_areas', { indicator: 'census_population', direction: 'highest', n: 3, level: 'oa', within_la: 'Barking and Dagenham' })).error || '';
+      }
+      const li = PH_ASSISTANT.runTool('list_indicators', {});
+      const at = k => { const g = (li.groups || []).find(g => g.indicators.some(r => r.key === k)); return g ? g.levels.join(',') : ''; };
+      out.list = { size: JSON.stringify(li).length, over65: at('census_over65_pct'), decile: at('imd_decile'), mean: at('imd_decile_mean'),
+        laOnly: [...new Set((li.groups || []).filter(g => g.indicators.some(r => r.la_only)).map(g => g.levels.join(',')))].join('|'), withheld: JSON.stringify(li).indexOf('"' + (PH_ASSISTANT.isWithheld('ft_smoking_prevalence_adults') ? 'ft_smoking_prevalence_adults' : 'none') + '"') };
+      return out;
+    }, HAS_OA);
+    ok(A.wardSync, 'Ask levels: ward lookups still answer at once, not with a promise');
+    ok(A.msoa, 'Ask levels: an MSOA by name, with its LA and the figures the map holds');
+    ok(A.lsoa && A.lsoaOas, 'Ask levels: an LSOA by name and by code, with its ward, LA and output areas', JSON.stringify(A));
+    ok(/is an LSOA code, so ask again with level lsoa/.test(A.wrongLevel), 'Ask levels: a code for another level says which level to use', A.wrongLevel);
+    ok(A.lsoaRank, 'Ask levels: the most deprived LSOAs in Church End ward, ranked within Finchley Church End');
+    if (HAS_OA) {
+      ok(A.oaRank, 'Ask levels: output areas ranked within one LA, with their LSOA, ward and the output area caveat');
+      ok(/within_la or within_ward/.test(A.oaNone), 'Ask levels: an output area ranking with no LA or ward asks for one', A.oaNone);
+      ok(A.oaGet && /within_la or within_ward/.test(A.oaNoPlace), 'Ask levels: an output area by code within an LA, and a plain error without one', A.oaNoPlace);
+      ok(/could not be loaded/.test(A.oaFailed), 'Ask levels: a file that will not load is a clear tool error', A.oaFailed);
+    }
+    ok(A.list.size < 16 * 1024 && A.list.over65 === 'la,ward,msoa,lsoa' + (HAS_OA ? ',oa' : '') && A.list.decile === 'lsoa' &&
+       A.list.mean === 'la,ward' && A.list.laOnly === 'la,ward' && A.list.withheld === -1,
+      'Ask levels: list_indicators says where each indicator is, and stays under 16 KB', JSON.stringify(A.list));
+    ok(!errors.length, 'no page errors (Ask levels)', errors.join(' | '));
+    await page.close();
   }
 
   await browser.close();

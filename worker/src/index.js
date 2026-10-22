@@ -26,18 +26,30 @@
  * token caching minimum, where Haiku's 2,048 left it just short, so the cached
  * reads claw some of that back.
  */
-const MODEL = "claude-sonnet-5";
+const MODEL = "claude-sonnet-5-5";
 
 /**
- * Room for the longest answers, with thinking switched off.
+ * Room for the longest answers, with extended thinking switched off.
  *
- * Sonnet 5 thinks adaptively unless told not to, and its thinking shares
- * max_tokens with the answer. At 1,024 that left comparisons, the longest
- * answers, cut off mid-figure. Thinking is disabled in the request below,
- * which suits a model whose job is to look figures up and report them, and
- * the cap is doubled. The panel still says so when an answer is cut short.
+ * Thinking shares max_tokens with the answer. At 1,024 that left comparisons,
+ * the longest answers, cut off mid-figure, so thinking is off in the request
+ * below, which suits a model whose job is to look figures up and report them,
+ * and the cap is doubled. The panel still says so when an answer is cut short.
+ *
+ * Sonnet 5.5 refuses thinking {type: "disabled"}; its lowest setting is
+ * "between_tools", which does no extended thinking and returns any short
+ * progress notes it writes between tool calls as thinking blocks. The panel
+ * shows only text and keeps only text and tool calls in the history it sends
+ * back (keepBlocks in assistant.js), and this Worker refuses anything else,
+ * so those notes are never replayed. That also keeps the panel's history
+ * trimming (stubbed tool results, dropped questions) clear of the API's check
+ * that earlier turns are unchanged, which applies to replayed thinking blocks.
+ * between_tools needs effort "high" or below; "medium" is the suggested start
+ * for multistep tool use.
  */
 const MAX_TOKENS = 2048;
+const THINKING = { type: "between_tools" };
+const EFFORT = "medium";
 const DAILY_CAP = 10; // questions per browser, per UTC day
 
 /**
@@ -100,7 +112,8 @@ const LIMITS = {
 };
 
 const SYSTEM_PROMPT = `You are the assistant built into PopHealth Map, a public
-population health map of the 33 London local authorities at ward and LSOA level.
+population health map of the 33 London local authorities, from whole local
+authorities down to output areas.
 
 You answer questions about this data only. You have no data in your context;
 you get it by calling tools, and the page runs them against the exact figures
@@ -173,6 +186,19 @@ Rules that matter:
 - The map calls the local authority level "LA" (London's 32 boroughs and the
   City of London are its 33 LAs). Use "LA" in answers, introducing it once as
   "local authority (LA)", rather than "borough" or "council area".
+- The tools read five levels. From the largest: LA; ward; MSOA, about 8,000
+  people; LSOA, about 1,500 people; output area (oa), about 300 people or 125
+  households. Use ward or LA unless the question asks for smaller areas or for
+  detail inside a ward or LA, such as "which LSOAs in Church End ward are most
+  deprived" (rank_areas at level lsoa with within_ward). Deprivation (IMD) is
+  published by LSOA, and ward and LA figures summarise it. Output areas have
+  only Census 2021 figures and only codes, not names, and every output area
+  lookup or ranking needs within_la or within_ward. Not every indicator exists
+  at every level, and list_indicators says which.
+- Always say which level a figure is for, and place a small area by the parents
+  the tool gives, for example "LSOA Brent 012A, in Wembley Hill ward, Brent".
+  Pass on the caveat a small-area result carries: figures for so few people
+  move a lot.
 - Some indicators are published for the whole LA and repeated for every ward in
   it. Tool results mark these, with la_only, with la_level_indicators, or
   with a caveat. When one appears, say the figure is an LA figure. Never
@@ -186,18 +212,39 @@ Rules that matter:
 - UK English. Be concise: a couple of short paragraphs, or a small table when
   comparing. No preamble.`;
 
+/**
+ * The levels the tools can read, and the two narrowing fields, shared by all
+ * three area tools so they are described the same way everywhere.
+ */
+const LEVEL = {
+  type: "string",
+  enum: ["ward", "la", "msoa", "lsoa", "oa"],
+  description:
+    "ward; la for a local authority (LA); msoa (about 8,000 people); lsoa (about 1,500 people); " +
+    "oa for an output area (about 300 people, Census 2021 figures only)",
+};
+const WITHIN_LA = { type: "string", description: "Optional: restrict to one LA (local authority), by name or code" };
+const WITHIN_WARD = {
+  type: "string",
+  description: "Optional: restrict to one ward, for levels lsoa and oa. Output areas need this or within_la",
+};
+
 const TOOLS = [
   {
     name: "get_area",
     description:
-      "Look up the indicators held for one ward or local authority (LA) by name. Use for " +
-      "'tell me about X' or any question about a single place. Name the indicators you " +
-      "need when the question is about particular ones; leave them out for a full profile.",
+      "Look up the indicators held for one area by name or code: a ward, an LA, an MSOA, an LSOA " +
+      "or an output area. Use for 'tell me about X' or any question about a single place. Name the " +
+      "indicators you need when the question is about particular ones; leave them out for a full " +
+      "profile. An output area has a code but no name, and is found within an LA or ward. An LSOA's " +
+      "result lists its output area codes.",
     input_schema: {
       type: "object",
       properties: {
-        name: { type: "string", description: "Ward or LA name, e.g. 'Brent' or 'Church End'" },
-        level: { type: "string", enum: ["ward", "la"], description: "Which geography to search: a ward, or an LA (local authority)" },
+        name: { type: "string", description: "Area name or code, e.g. 'Brent', 'Church End', 'Brent 012A' or 'E01000570'" },
+        level: LEVEL,
+        within_la: WITHIN_LA,
+        within_ward: WITHIN_WARD,
         indicators: {
           type: "array",
           items: { type: "string" },
@@ -210,13 +257,15 @@ const TOOLS = [
   {
     name: "compare_areas",
     description:
-      "Compare two or more wards or LAs across the indicators given, or " +
+      "Compare two or more areas at one level across the indicators given, or " +
       "across headline indicators if none are named.",
     input_schema: {
       type: "object",
       properties: {
-        names: { type: "array", items: { type: "string" }, description: "2 to 6 area names" },
-        level: { type: "string", enum: ["ward", "la"], description: "ward, or la for local authorities (LAs)" },
+        names: { type: "array", items: { type: "string" }, description: "2 to 6 area names or codes" },
+        level: LEVEL,
+        within_la: WITHIN_LA,
+        within_ward: WITHIN_WARD,
         indicators: {
           type: "array",
           items: { type: "string" },
@@ -230,15 +279,17 @@ const TOOLS = [
     name: "rank_areas",
     description:
       "Rank areas by one indicator, highest or lowest first. Use for 'which " +
-      "ward has the most/least X' and for top-N questions.",
+      "ward has the most/least X', for top-N questions, and for the small areas " +
+      "inside an LA or ward, such as the most deprived LSOAs in a ward.",
     input_schema: {
       type: "object",
       properties: {
         indicator: { type: "string", description: "Indicator key to rank by" },
         direction: { type: "string", enum: ["highest", "lowest"] },
         n: { type: "integer", description: "How many to return, 1 to 20" },
-        level: { type: "string", enum: ["ward", "la"], description: "ward, or la for local authorities (LAs)" },
-        within_la: { type: "string", description: "Optional: restrict to one LA (local authority)" },
+        level: LEVEL,
+        within_la: WITHIN_LA,
+        within_ward: WITHIN_WARD,
       },
       required: ["indicator", "direction", "n", "level"],
     },
@@ -246,8 +297,9 @@ const TOOLS = [
   {
     name: "list_indicators",
     description:
-      "List the indicator keys available, with their human labels. Call this " +
-      "first if you are unsure what an indicator is called.",
+      "List the indicator keys available, with their human labels, grouped by the " +
+      "levels each is available at. Call this first if you are unsure what an " +
+      "indicator is called or whether it exists at a level.",
     input_schema: { type: "object", properties: {} },
   },
 ];
@@ -733,13 +785,18 @@ export default {
           "content-type": "application/json",
           "x-api-key": env.ANTHROPIC_API_KEY,
           "anthropic-version": "2023-06-01",
+          // If a safety classifier declines, the API retries on a model that
+          // can answer (fallbacks below) instead of failing the question.
+          "anthropic-beta": "server-side-fallback-2026-07-01",
         },
         body: JSON.stringify({
           // Fixed here, never taken from the request: the model, the output
           // cap, the instructions and the tools are the Worker's alone.
           model: MODEL,
           max_tokens: MAX_TOKENS,
-          thinking: { type: "disabled" },
+          thinking: THINKING,
+          output_config: { effort: EFFORT },
+          fallbacks: "default",
           system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
           tools: TOOLS,
           messages: withCacheBreakpoint(messages),
@@ -764,7 +821,7 @@ export default {
     // What each call cost, for `wrangler tail`: worker/README.md prices a
     // question from these.
     if (data && data.usage) {
-      console.log(JSON.stringify({ q: isQuestion, stop: data.stop_reason, usage: data.usage }));
+      console.log(JSON.stringify({ q: isQuestion, model: data.model, stop: data.stop_reason, usage: data.usage }));
     }
     // Under an underscore so it cannot collide with a field the API adds later.
     data._limit = { cap: DAILY_CAP, remaining: held.remaining, enforced: true };
