@@ -3924,12 +3924,25 @@ const smallText = page => page.evaluate(() => {
       for (let i = 0; i < 40 && PH_REPORT.aggregate().method.census_social_rented_pct !== 'counts'; i++) await new Promise(r => setTimeout(r, 250));
       const a = PH_REPORT.aggregate();
       const tiles = [...document.querySelectorAll('#rb-summary .rb-stat')].map(e => e.innerText.replace(/\s+/g, ' '));
-      return { keys: Object.keys(a.indicators), m: a.method, dec: a.indicators.imd_decile_mean, tiles };
+      // The ward the LSOAs make up, whose fuel poverty the pipeline weights
+      // by households in the same way, and the LA's own figure beside it.
+      const wcode = (LSOA_IMD.features.find(f => f.properties.ward === 'Lansbury') || {}).properties.ward_code;
+      const wrec = (WARD_DATA_BY_CODE[wcode] || {}).indicators || {};
+      const lad = (WARD_DATA_BY_CODE[wcode] || {}).lad_code;
+      for (let i = 0; i < 40 && !(BOROUGH_DATA[lad] || {}).fuel_poverty_pct; i++) await new Promise(r => setTimeout(r, 250));
+      const bd = (BOROUGH_DATA[lad] || {}).fuel_poverty_pct;
+      return { keys: Object.keys(a.indicators), m: a.method, dec: a.indicators.imd_decile_mean, tiles,
+               fp: a.indicators.fuel_poverty_pct, wardFp: wrec.fuel_poverty_pct, laFp: bd,
+               laShown: Number(boroughOvValue(lad, 'fuel_poverty_pct')) };
     });
     ok(rb.keys.indexOf('imd_decile') === -1 && rb.keys.indexOf('gb_total_uprn') === -1 && typeof rb.dec === 'number' &&
        rb.m.census_social_rented_pct === 'counts' && rb.m.census_population === 'summed' && rb.m.fuel_poverty_pct === 'households' &&
        rb.tiles.some(t => /^Average deprivation decile \(IMD 2025\) \d\.\d$/.test(t)),
       'Custom area gives an average decile to one place, sums the Census counts and weights fuel poverty by households', JSON.stringify(rb).slice(0, 400));
+    ok(typeof rb.fp === 'number' && typeof rb.wardFp === 'number' && Math.abs(rb.fp - rb.wardFp) < 0.02 &&
+       typeof rb.laFp === 'number' && rb.laShown === rb.laFp,
+      'fuel poverty: a Custom area of a ward\'s LSOAs matches the ward, and the LA shows its own household-weighted figure',
+      JSON.stringify({ fp: rb.fp, wardFp: rb.wardFp, laFp: rb.laFp, laShown: rb.laShown }));
     ok(!errors.length, 'no page errors (review round 2 checks)', errors.join(' | '));
     await page.close();
 
@@ -3938,6 +3951,27 @@ const smallText = page => page.evaluate(() => {
     ok(!/cover\s+every one/.test(mt) && /fewer than four in five of its residents, we show no figure for the ward/.test(mt) &&
        /Census day, 21 March 2021/.test(mt) && !/mid-2022/.test(mt) && /measures of households|summed counts\s+behind it, as a ward's is/.test(mt),
       'the methodology describes the ward coverage rule, the Census population and Custom area\'s arithmetic', '');
+    // How figures reach areas: lookups for most, location for points, and
+    // what is averaged rather than added.
+    const pl = await meth.page.evaluate(() => {
+      const t = document.body.innerText;
+      const lk = (document.querySelector('#lookups + .wrap') || {}).innerText || '';
+      return {
+        never: /We never split an LSOA/.test(t), points: /about 1 in 10/.test(t) && /ONS Postcode Directory gives/.test(t),
+        police: /boundary contains the map position police\.uk gives/.test(t),
+        avg: /stations within 1 km and bus stops within 800\s+metres are averaged/.test(t),
+        cover: /For Local Health figures and\s+PTAL, a ward has no figure/.test(t),
+        fuel: /Fuel poverty is a share of households/.test(t),
+        old: /Nothing is matched by name|never lay one boundary|same lookup is used for every indicator|Only plain totals/.test(t),
+        lsoa11: /LSOA11_LSOA21_LAD22_EW_LU/.test(lk), msoaRow: /Placing each LSOA in its MSOA/.test(lk),
+        equal: /parents\s+count equally/.test(lk), codes: /matched by hand to their old\s+codes/.test(lk),
+        ft501: /area type 501/.test(t),
+      };
+    });
+    ok(pl.never && pl.points && pl.police && pl.avg && pl.cover && pl.fuel && !pl.old &&
+       pl.lsoa11 && pl.msoaRow && pl.equal && pl.codes && pl.ft501,
+      'methodology: says how figures are placed (lookups, postcodes, police positions, averaged counts) and the appendix matches the code',
+      JSON.stringify(pl));
     await meth.page.close();
   }
 

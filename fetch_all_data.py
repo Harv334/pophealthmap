@@ -4444,9 +4444,12 @@ def run_fuel_poverty() -> pd.DataFrame | None:
         "fuel_poverty_pct": pd.to_numeric(df[pct_col], errors="coerce"),
         "period": period,
     }).dropna(subset=["LSOA21CD"])
-    # Many DESNZ releases use LSOA 2011 codes (E01xxxxxx) which still align
-    # with most 2021 boundaries — keep as-is; mismatches will just be skipped
-    # in build_lsoa_data.
+    # Recent releases are on the 2021 LSOAs, the same codes as everything else
+    # here: the 2024 figures cover all 33,755 of England's. An older release on
+    # the 2011 LSOAs would share most codes, and any LSOA it does not know is
+    # simply left blank. Rows that are not LSOA codes, such as the sheet's
+    # "Back to contents" link, are dropped.
+    out = out[out["LSOA21CD"].str.match(r"^[EW]01\d{6}$")]
     out_path = DATA_DIR / "demographics" / "fuel_poverty.parquet"
     out = write_parquet_guarded(out_path, out, source="fuel_poverty")
     ok(f"fuel_poverty: {len(out):,} LSOAs -> "
@@ -5769,6 +5772,112 @@ def bridge_to_wards(per_lsoa: dict, lsoa_to_ward: dict, pop_by_lsoa: dict, *,
     return vals, cover
 
 
+# Above this share of the LSOAs with a figure having no Census population (and
+# more than one of them), the population table and the lookup are out of step,
+# and the build stops.
+LSOA_NO_POP_MAX = 0.01
+
+
+def lsoa_means_to_areas(per_lsoa: dict, lsoa_to_area: dict, weight_by_lsoa: dict, *,
+                        what: str = "ward figures", weight: str = "residents") -> dict:
+    """{area: weighted mean} of LSOA values, each LSOA weighted by
+    weight_by_lsoa (Census 2021 residents, or households for a household
+    measure). lsoa_to_area is the LSOA -> ward (or LA) lookup.
+
+    There is no fallback to a weight of 1. With no weights at all the build
+    stops, because every figure would silently become a plain average of
+    LSOAs while the site says it follows where people live. An LSOA that has
+    a figure but no weight (zero, or missing from the weight table) gets no
+    say, as in bridge_to_wards: a weighted mean has nothing to weigh it by,
+    and every LSOA in England has residents, so a missing one means a code
+    the population table does not know. A ward whose only LSOAs with figures
+    are like that gets no figure. The build warns with how many there were,
+    and stops when they are more than LSOA_NO_POP_MAX of the LSOAs with
+    figures (a single one is always let through), because then the table
+    and the lookup do not match.
+    """
+    if not weight_by_lsoa or not any((w or 0) > 0 for w in weight_by_lsoa.values()):
+        raise RuntimeError(
+            f"{what}: no Census 2021 {weight} to weight the LSOAs by. "
+            "Run the census source first.")
+    num: dict = {}
+    den: dict = {}
+    n_used = 0
+    no_weight: list = []
+    for lc, v in per_lsoa.items():
+        area = lsoa_to_area.get(lc)
+        if not area or v is None or pd.isna(v):
+            continue
+        n_used += 1
+        w = float(weight_by_lsoa.get(lc, 0) or 0)
+        if w <= 0:
+            no_weight.append(lc)
+            continue
+        num[area] = num.get(area, 0.0) + float(v) * w
+        den[area] = den.get(area, 0.0) + w
+    if no_weight:
+        msg = (f"{what}: {len(no_weight):,} of {n_used:,} LSOAs with a figure have no "
+               f"Census {weight} (for example {', '.join(sorted(no_weight)[:3])}), so they "
+               "are left out of the weighted average")
+        if len(no_weight) > max(1, n_used * LSOA_NO_POP_MAX):
+            raise RuntimeError(msg + ". The Census figures and the lookup do not match.")
+        warn(msg)
+    return {a: num[a] / d for a, d in den.items() if d > 0}
+
+
+def lsoa_sums_to_areas(per_lsoa: dict, lsoa_to_area: dict) -> dict:
+    """{area: total} of LSOA counts. A count is added up, never averaged."""
+    out: dict = {}
+    for lc, v in per_lsoa.items():
+        area = lsoa_to_area.get(lc)
+        if not area or v is None or pd.isna(v):
+            continue
+        out[area] = out.get(area, 0.0) + float(v)
+    return out
+
+
+def custom_is_count(col: str) -> bool:
+    """A custom column that is a count, so it is added up into wards rather
+    than averaged (data/custom/README.md). The map's laSums uses the same
+    _count rule for LAs."""
+    return str(col).endswith("_count")
+
+
+def census_households_by_lsoa(cnt: "pd.DataFrame | None") -> dict:
+    """{LSOA21CD: households at the 2021 Census}, the base of the car or van
+    table, which counts every household. {} when the counts are missing.
+    Custom area in the browser weights by the same number
+    (lsoa_census_counts.json), so a ward and an area built from the same
+    LSOAs agree."""
+    col = "census_no_car_pct__den"
+    if cnt is None or cnt.empty or col not in cnt.columns or "LSOA21CD" not in cnt.columns:
+        return {}
+    hh = dict(zip(cnt["LSOA21CD"].astype(str),
+                  pd.to_numeric(cnt[col], errors="coerce").fillna(0)))
+    return hh if any(v > 0 for v in hh.values()) else {}
+
+
+def fuel_poverty_by_area(fp: "pd.DataFrame | None", lsoa_to_area: dict,
+                         households: dict, pop_by_lsoa: dict, *,
+                         what: str = "fuel poverty") -> dict:
+    """Fuel poverty for each ward or LA, {area: pct}. It is a share of
+    households, so each LSOA is weighted by its households at the 2021
+    Census. That is the area's fuel-poor households over its households, as
+    near as the published LSOA shares allow (DESNZ's own household counts
+    are not kept). Without the household counts it falls back to residents,
+    with a warning."""
+    if fp is None or fp.empty or "fuel_poverty_pct" not in fp.columns:
+        return {}
+    per_lsoa = {str(lc): float(v) for lc, v in zip(fp["LSOA21CD"], fp["fuel_poverty_pct"])
+                if pd.notna(v)}
+    if households:
+        return lsoa_means_to_areas(per_lsoa, lsoa_to_area, households,
+                                   what=what, weight="households")
+    warn(f"{what}: no Census household counts (census2021_counts.parquet), "
+         "so it is weighted by residents instead of households")
+    return lsoa_means_to_areas(per_lsoa, lsoa_to_area, pop_by_lsoa, what=what)
+
+
 def record_cover(wards: dict, cover: dict, key: str, vals: dict) -> int:
     """Write a ward's coverage for one indicator into ward["cover"][key], as a
     whole percentage, where it has a figure that rests on less than all of its
@@ -6035,23 +6144,25 @@ def build_ward_data() -> dict:
         census_method = "weighted" if cen_stale else "counts"
 
     # Everything below is LSOA, so the LSOA lookup and the LSOA populations.
+    # Without the populations pop_by_lsoa is empty, and the first weighted
+    # figure below stops the build (lsoa_means_to_areas) rather than
+    # averaging LSOAs as if each held the same number of people.
     cen = _read_parquet_opt(DATA_DIR / "demographics" / "census2021.parquet")
-    if cen_src is not None and not cen_src.empty:
-        lsoa_to_ward = get_lsoa_to_ward()
-        pop_by_lsoa = ({} if cen is None or cen.empty or "census_population" not in cen.columns
-                       else dict(zip(cen["LSOA21CD"].astype(str),
-                                     pd.to_numeric(cen["census_population"], errors="coerce").fillna(0))))
+    lsoa_to_ward = get_lsoa_to_ward()
+    pop_by_lsoa = ({} if cen is None or cen.empty or "census_population" not in cen.columns
+                   else dict(zip(cen["LSOA21CD"].astype(str),
+                                 pd.to_numeric(cen["census_population"], errors="coerce").fillna(0))))
 
-    # --- Fuel poverty + PTAL: per-LSOA -> per-ward (population weighted) ----
-    # Reuses lsoa_to_ward + pop_by_lsoa built in the census block above. If
-    # census was absent both dicts may be missing, so guard for that.
-    if "lsoa_to_ward" not in locals():
-        lsoa_to_ward = get_lsoa_to_ward()
-    if "pop_by_lsoa" not in locals():
-        pop_by_lsoa = {}
-
-    def _agg_to_wards(df, value_col, ward_key, min_cover=None, ndigits=2):
+    def _agg_to_wards(df, value_col, ward_key, min_cover=None, ndigits=2, total=False):
+        """Residents-weighted ward means of an LSOA column, or with
+        total=True its ward sums (counts)."""
         if df is None or df.empty or value_col not in df.columns:
+            return
+        if total:
+            per_lsoa = {str(lc): v for lc, v in zip(df["LSOA21CD"], df[value_col]) if pd.notna(v)}
+            for wd, v in lsoa_sums_to_areas(per_lsoa, lsoa_to_ward).items():
+                if wd in wards:
+                    wards[wd]["indicators"][ward_key] = round(v, ndigits)
             return
         if min_cover is not None:
             # A source that leaves LSOAs out (PTAL's 2011 codes did) would
@@ -6065,20 +6176,11 @@ def build_ward_data() -> dict:
                     wards[wd]["indicators"][ward_key] = round(v, 2)
             record_cover(wards, cover, ward_key, vals)
             return
-        num, den = {}, {}
-        for _, row in df.iterrows():
-            lc = str(row["LSOA21CD"])
-            wd = lsoa_to_ward.get(lc)
-            v = row.get(value_col)
-            if not wd or pd.isna(v):
-                continue
-            pop = pop_by_lsoa.get(lc, 0) or 0
-            weight = float(pop) if pop > 0 else 1.0
-            num[wd] = num.get(wd, 0.0) + float(v) * weight
-            den[wd] = den.get(wd, 0.0) + weight
-        for wd, w in wards.items():
-            if den.get(wd, 0) > 0:
-                w["indicators"][ward_key] = round(num[wd] / den[wd], ndigits)
+        per_lsoa = {str(lc): v for lc, v in zip(df["LSOA21CD"], df[value_col]) if pd.notna(v)}
+        for wd, v in lsoa_means_to_areas(per_lsoa, lsoa_to_ward, pop_by_lsoa,
+                                         what=f"ward {ward_key}").items():
+            if wd in wards:
+                wards[wd]["indicators"][ward_key] = round(v, ndigits)
 
     fp = _read_parquet_opt(DATA_DIR / "demographics" / "fuel_poverty.parquet")
     # --- IMD: LSOA scores rolled up to wards, population weighted ------------
@@ -6113,7 +6215,14 @@ def build_ward_data() -> dict:
         n_fit = record_lsoa_fit(wards, ward_lsoa_fit(wards, lsoa_to_ward, pop_by_lsoa))
         info(f"ward LSOA fit: {n_fit} wards outside {WARD_FIT_LOW:.0%} to {WARD_FIT_HIGH:.0%} of their residents")
 
-    _agg_to_wards(fp, "fuel_poverty_pct", "fuel_poverty_pct")
+    # Fuel poverty is a share of households, so it is weighted by households,
+    # as Custom area weights it (fuel_poverty_by_area).
+    for wd, v in fuel_poverty_by_area(
+            fp, lsoa_to_ward,
+            census_households_by_lsoa(_read_parquet_opt(DATA_DIR / "demographics" / "census2021_counts.parquet")),
+            pop_by_lsoa, what="ward fuel_poverty_pct").items():
+        if wd in wards:
+            wards[wd]["indicators"]["fuel_poverty_pct"] = round(v, 2)
     if fp is not None:
         sources["fuel_poverty"] = "DESNZ sub-regional fuel poverty (LILEE)"
         sources["_fuel_poverty_year"] = _fuel_poverty_period(fp)
@@ -6141,7 +6250,8 @@ def build_ward_data() -> dict:
     # Your own figures. LSOA rows roll up to wards on the same population
     # weighting as everything else; ward rows are already ward-level and are
     # written straight on. Columns ending _count are summed, because a count
-    # that gets averaged looks plausible and is wrong.
+    # that gets averaged looks plausible and is wrong. The map then adds the
+    # ward sums up for each LA (laSums), so an LA total is a total too.
     for level in ("lsoa", "ward"):
         cf = _read_parquet_opt(CUSTOM_DIR / f"custom_{level}.parquet")
         if cf is None or cf.empty:
@@ -6150,7 +6260,8 @@ def build_ward_data() -> dict:
         code_col = "LSOA21CD" if level == "lsoa" else "WD25CD"
         for col in [c for c in cf.columns if c != code_col]:
             if level == "lsoa":
-                _agg_to_wards(cf, col, col)
+                _agg_to_wards(cf, col, col, total=custom_is_count(col),
+                              ndigits=4 if custom_is_count(col) else 2)
             else:
                 for _, row in cf.iterrows():
                     wd = str(row[code_col])
@@ -6315,10 +6426,11 @@ def build_borough_data() -> dict:
     instead of apologising for them at ward level.
 
     The Fingertips values are the published figure for that local authority,
-    with nothing aggregated or split. The one derived set is the Census
+    with nothing aggregated or split. Two sets are derived: the Census
     percentages, each the summed counts of the LA's output areas (see
-    census_la_figures), which the map would otherwise have to average from
-    ward percentages.
+    census_la_figures), and fuel poverty, from the LA's LSOAs weighted by
+    households (fuel_poverty_by_area). The map would otherwise average both
+    from ward figures, weighted by residents.
 
     Flat records keyed by LAD25CD, matching msoa_data.json and lsoa_data.json.
     Names come from data/map/boroughs.js, which the browser already loads.
@@ -6373,6 +6485,21 @@ def build_borough_data() -> dict:
     for lad, vals in cen.items():
         out.setdefault(lad, {}).update(vals)
     n_cen = sum(len(v) for v in cen.values())
+    # Fuel poverty for each LA from all of its LSOAs, weighted by households
+    # as the wards are. The map would otherwise average the ward figures by
+    # residents.
+    fp = _read_parquet_opt(DATA_DIR / "demographics" / "fuel_poverty.parquet")
+    if fp is not None and not fp.empty:
+        demo = DATA_DIR / "demographics"
+        cen_l = _read_parquet_opt(demo / "census2021.parquet")
+        pops = ({} if cen_l is None or cen_l.empty or "census_population" not in cen_l.columns
+                else dict(zip(cen_l["LSOA21CD"].astype(str),
+                              pd.to_numeric(cen_l["census_population"], errors="coerce").fillna(0))))
+        to_la = {lc: lad for lc, (_wd, lad) in get_lsoa_ward_lookup().items() if lad}
+        for lad, v in fuel_poverty_by_area(
+                fp, to_la, census_households_by_lsoa(_read_parquet_opt(demo / "census2021_counts.parquet")),
+                pops, what=f"{LA_WORD} fuel_poverty_pct").items():
+            out.setdefault(lad, {})["fuel_poverty_pct"] = round(v, 2)
     info(f"borough_data: {len(out):,} {LA_WORD}s, {n_vals:,} published values, "
          f"{n_cen:,} Census figures from summed counts")
     return out

@@ -261,17 +261,23 @@ areas</a>. These are the parts of it that change what you see.</p>
 
 <p>LSOA boundaries come from the 2021 Census, and wards were redrawn in 2025.
 So the two really do cross, and about four in ten LSOAs cross a ward boundary.
-We give each LSOA to the one ward it fits best. This means a ward's figure
-counts each LSOA once, rather than splitting it by the land it shares. If you
+We never split an LSOA. ONS publishes a best-fit lookup that puts each whole
+LSOA in the ward where most of its residents live, and we use it as it is (it
+is named in the <a href="#lookups">technical appendix</a>). This means a ward's
+figure counts each LSOA once, rather than splitting it by the land it shares. If you
 zoom in and see LSOA and ward edges crossing, that is how the boundaries are
 really drawn. It is not a fault in the map.</p>
 
 <h4 id="adding-up">How figures are combined into wards and LAs</h4>
 
-<p>When we combine small areas into wards or LAs, rates, percentages and scores
-are weighted by population. This means each small area counts in proportion to
-how many people live there. Only plain totals, such as population, crimes and
-the number of services, are simply added together (summed). <span data-cen="ward-weighted">Census
+<p>When we combine small areas into wards or LAs, counts such as population,
+the claimant count and the number of services are added up. Rates, percentages
+and scores are weighted by population. This means each small area counts in
+proportion to the number of people living there at the 2021 Census. Fuel
+poverty is a share of households, so it is weighted by the number of
+households instead. Counts of stations within 1 km and bus stops within 800
+metres are averaged, not added, because one station is close to several LSOAs.
+So a ward's figure is what its average resident has nearby. <span data-cen="ward-weighted">Census
 percentages are combined from their output areas by weighting too, as explained
 under <a href="#census-levels">Census figures at every level</a>.</span><span data-cen="ward-counts" hidden>Census
 percentages are different, because ONS publishes the counts behind them. Each
@@ -283,8 +289,9 @@ proportion to where its people live.</p>
 
 <p>Where a figure is not published for LAs, we work out each LA's figure from
 its wards in the same way. This gives the rate for all of the LA's residents,
-rather than a simple average of wards of different sizes. It can differ
-slightly from a figure the council or a publisher gives, which may use a
+rather than a simple average of wards of different sizes. Fuel poverty is
+worked out from all of the LA's LSOAs, weighted by households. An LA figure
+worked out like this can differ slightly from a figure the council or a publisher gives, which may use a
 different population or year. For OHID's Local Health indicators the
 difference can be bigger. Life expectancy and ratios compared with England
 cannot be averaged exactly, and OHID's own LA figures can cover a different
@@ -305,7 +312,7 @@ labelled as the LA's figure.</p>
 <h4 id="services">Services are counted where they stand</h4>
 
 <p>GP practices, pharmacies, dentists and hospitals are counted in the ward
-they stand in. A practice that serves people in the next ward still counts only
+they stand in, which we find from their postcode. A practice that serves people in the next ward still counts only
 in its own ward. So these counts will not always match a count made another
 way.</p>
 
@@ -381,7 +388,7 @@ and say what each one means.</p>
             added together. Each Census percentage is worked out from the
             summed counts behind it, as a ward's is. Other figures are averages
             weighted by residents, except fuel poverty, which is weighted by
-            households. An average of deprivation deciles is not itself a
+            households, as a ward's is. An average of deprivation deciles is not itself a
             decile, so it is shown as the average deprivation decile.</td></tr>
   </tbody>
 </table>
@@ -592,29 +599,66 @@ warning.</p>
 
 <p>Figures come from many publishers, for different years and different kinds
 of area. Boundaries also change: wards are redrawn, councils merge, and the
-small Census areas were updated in 2021. So the map follows one rule. This
-means every figure is put on the map in the same way, and every step can be
-checked against a published ONS file.</p>
+small Census areas were updated in 2021. This section explains how each figure
+reaches a ward or an LA, so that every step can be checked. The exact files are
+listed in the <a href="#appendix">technical appendix</a>.</p>
 
-<h3 id="one-rule">One rule for every figure</h3>
+<h3 id="one-rule">Most figures are combined using ONS lookups</h3>
 
-<p>Every figure is first placed on the 2021 Census building blocks, which are
-output areas, LSOAs and MSOAs. It is then combined into wards and LAs using the
-official ONS lookup files, which are tables that say which small areas belong
-to which ward and LA. They are listed in the
-<a href="#appendix">technical appendix</a>. Counts are added
-together<span data-cen="ward-counts" hidden>, Census percentages are calculated from their summed counts,</span>
-and everything else is weighted by population. Nothing is matched by name, and
-we never lay one boundary over another to decide where a figure belongs.</p>
+<p>Most figures are published for small areas: output areas, LSOAs or MSOAs. We
+combine them into wards using lookup files published by ONS, which list the
+ward each small area belongs to. Every LSOA is placed in one ward using the ONS
+best-fit lookup for the wards in force from May 2025. We never split an LSOA.
+If it crosses a ward boundary, the whole LSOA goes to the ward where most of
+its residents live. Census figures use the ONS output area lookup instead,
+because output areas are smaller and follow ward boundaries more closely. If
+that lookup cannot be used, Census figures use the LSOA lookup too. MSOA
+figures reach wards through their LSOAs: each LSOA takes its MSOA's figure and
+is then placed in its ward in the usual way. Every LSOA and every ward sits
+wholly inside one LA.</p>
+
+<h3 id="by-location">Some things are placed by where they are</h3>
+
+<p>Services, crimes and a few other figures do not go through a lookup. GP
+practices, pharmacies, dentists, hospitals and charities are placed by postcode, in the
+ward and LSOA the ONS Postcode Directory gives that postcode. Crimes are placed
+in the ward and LSOA whose boundary contains the map position police.uk gives
+them. So a crime or a practice is counted in the ward it is really in, which is
+not always the ward its LSOA is given to. This is true of about 1 in 10 of
+them. Air pollution comes on a 1 km grid, and each LSOA takes the average of
+the grid squares it covers, by area. Distances to stations and bus stops are
+measured in a straight line from the middle of each LSOA. Charities are linked
+to the LAs they say they work in by matching the LA names in the Charity
+Commission register. PCN footprints come from where each network's registered
+patients live (see <a href="#pcns">Primary care networks are lists of patients,
+not areas</a>).</p>
+
+<h3 id="combining">Adding up and averaging</h3>
+
+<p>When LSOAs are combined into a ward, counts such as population and the
+claimant count are added up. Rates, percentages and scores are weighted by
+population, which means each LSOA counts in proportion to the number of people
+living there at the 2021 Census. Fuel poverty is a share of households, so it
+is weighted by the number of households instead.
+<span data-cen="ward-counts" hidden>Census percentages are worked out from the
+counts behind them.</span><span data-cen="ward-weighted">Census percentages are
+averaged from their output areas, weighted by residents.</span> Counts of
+stations within 1 km and bus stops within 800 metres are averaged, not added,
+because one station is close to several LSOAs. For Local Health figures and
+PTAL, a ward has no figure unless the LSOAs with figures hold at least four in
+five of its residents. Where no LA figure is published, we work out the LA's
+figure from its wards in the same way. Fuel poverty is worked out from all of
+the LA's LSOAs instead, and Census figures as explained under
+<a href="#census-levels">Census figures at every level</a>.</p>
 
 <h3 id="best-fit">Best fit, not exact fit</h3>
 
 <p>The ONS lookups give each LSOA to the one ward it mostly sits in, based on
 where people live. Many LSOAs cross a ward boundary (see
 <a href="#lsoas-and-wards">LSOAs do not sit inside wards</a>). So a ward figure
-built this way is a close estimate for the ward, not an exact count. But the
-same lookup is used for every indicator, so ward figures can still be fairly
-compared with each other. For a few wards, the LSOAs given to them hold a lot
+built this way is a close estimate for the ward, not an exact count. But every
+figure built from LSOAs uses the same lookup, so ward figures can still be
+fairly compared with each other. For a few wards, the LSOAs given to them hold a lot
 more or a lot fewer people than the ward itself. Where the LSOAs hold under 80%
 or over 125% of the ward's residents, the ward is marked in the Area profile
 and the ward report.</p>
@@ -752,34 +796,60 @@ above, for anyone who wants to check it or repeat it.</p>
   <tbody>
     <tr><td class="term">Small areas to wards and LAs</td>
         <td><code>LSOA21_WD25_LAD25_EW_LU_v2</code> (May 2025 boundaries)</td>
-        <td>Every ward and LA figure that is built up from LSOAs.</td></tr>
+        <td>Every ward and LA figure that is built up from LSOAs. Each whole
+            LSOA goes to the ward where most of its residents live, and is never
+            split.</td></tr>
     <tr><td class="term">Output areas to wards (Census only)</td>
-        <td><code>OA21_WD25_LAD25_EW_LU</code> (May 2025 boundaries)</td>
+        <td><code>OA21_WD25_LAD25_EW_LU</code> (May 2025 boundaries), in its
+            <code>_v2</code> edition where ONS offers it</td>
         <td>Census ward figures, built from output areas because they follow
             ward boundaries far more closely than LSOAs. If this lookup cannot
-            be reached during an update, the LSOA lookup above is used
-            instead.</td></tr>
-    <tr><td class="term">Output areas to small areas</td>
+            be reached during an update, or its wards do not match the wards of
+            the LSOA lookup above, the LSOA lookup is used instead.</td></tr>
+    <tr><td class="term">LSOAs to MSOAs</td>
         <td><code>OA21_LAD23_LSOA21_MSOA21_LEP23_EN_LU</code></td>
-        <td>Placing each Census 2021 output area in its LSOA and MSOA.</td></tr>
+        <td>Placing each LSOA in its MSOA, so that MSOA figures can reach wards
+            through their LSOAs. Each output area's LSOA comes from the output
+            area boundary file.</td></tr>
+    <tr><td class="term">2011 LSOAs to 2021 LSOAs</td>
+        <td><code>LSOA11_LSOA21_LAD22_EW_LU</code></td>
+        <td>PTAL, which the GLA publishes for the 2011 LSOAs. An LSOA that is
+            unchanged, or was split from a 2011 LSOA, takes that LSOA's figure.
+            One that was merged or redrawn takes the plain average of the 2011
+            LSOAs it came from, because the lookup has no weights.</td></tr>
     <tr><td class="term">2011 MSOAs to 2021 MSOAs</td>
         <td><code>MSOA11_MSOA21_LAD22_EW_LU_v2</code>, weighted by the 2011
             Census population of each area (Nomis <code>KS101EW</code>)</td>
         <td>Local Health figures still published for 2011 areas. A split area
-            takes its parent's figure. A merged one takes its parents' figures,
-            weighted by their 2011 populations.</td></tr>
+            takes its parent's figure. A merged or redrawn one takes its
+            parents' figures, each weighted by that parent's whole 2011
+            population. If the 2011 populations cannot be loaded, the parents
+            count equally.</td></tr>
     <tr><td class="term">Places with an address or a location</td>
         <td>ONS Postcode Directory, through postcodes.io, or the publisher's own
-            coordinates</td>
-        <td>GP practices, pharmacies, dentists, hospitals and charities are
-            placed using their postcodes. Crimes, stations and bus stops come
-            with their own map positions. Each one then falls into whichever
-            area it is in.</td></tr>
+            map position</td>
+        <td>GP practices, pharmacies, dentists, hospitals and charities take the
+            ward and LSOA that the ONS Postcode Directory gives their postcode.
+            A postcode no longer in use is placed by its last known position.
+            Crimes are placed in the ward and LSOA whose boundary contains the
+            map position police.uk gives them. About 1 in 10 crimes and
+            practices sit in a different ward from the one their LSOA is given
+            to, so these counts follow where things really are.</td></tr>
+    <tr><td class="term">Grids, stops and areas served</td>
+        <td>Defra's 1 km grid, the register of stops and stations, and the
+            Charity Commission register</td>
+        <td>Each LSOA takes the average of the air pollution grid squares it
+            covers, weighted by the area of each square inside it. Distances to
+            stations and bus stops are measured in a straight line from the
+            middle of each LSOA. Charities are linked to the LAs whose names
+            appear in the areas they say they work in.</td></tr>
     <tr><td class="term">LA codes</td>
         <td>Current ONS LA codes (May 2025), checked against the codes each
-            publisher uses, with any mismatch traced through the ONS Code
-            History Database</td>
-        <td>LA figures, such as those from OHID's main profiles.</td></tr>
+            publisher uses</td>
+        <td>LA figures, such as those from OHID's main profiles. Any LA that
+            does not match is flagged. Two councils whose codes changed in
+            2024, Barnsley and Sheffield, are matched by hand to their old
+            codes, which we looked up in the ONS Code History Database.</td></tr>
   </tbody>
 </table>
 </div>
@@ -820,7 +890,7 @@ thirds of a metre.</p>
     <tr><td class="term">Census 2021</td><td>Nomis bulk downloads of the Census 2021 topic summary tables (<code>TS001</code> and others), for output areas, LSOAs and MSOAs</td></tr>
     <tr><td class="term">Claimant count</td><td>Nomis <code>CLA01</code> (Universal Credit and Jobseeker's Allowance claimants)</td></tr>
     <tr><td class="term">Index of Multiple Deprivation</td><td>File 7 of the English Indices of Deprivation 2025 (scores, ranks, deciles and population denominators)</td></tr>
-    <tr><td class="term">OHID main profiles</td><td>Fingertips area type <code>502</code> (upper-tier LAs), with districts matched to their county through Fingertips' county to district lookup</td></tr>
+    <tr><td class="term">OHID main profiles</td><td>Fingertips area type <code>501</code> (districts and unitary authorities) first, then <code>502</code> (upper-tier LAs). Where neither has a figure under the LA's code, its old code is tried, and then its county's figure, labelled as the county's, through Fingertips' county to district lookup</td></tr>
     <tr><td class="term">GP practices</td><td>NHS Organisation Data Service <code>epraccur</code></td></tr>
     <tr><td class="term">Pharmacies</td><td>NHS Organisation Data Service <code>edispensary</code></td></tr>
     <tr><td class="term">Dental practices</td><td>NHS Organisation Data Service <code>egdpprac</code></td></tr>
@@ -1018,7 +1088,7 @@ var SOURCES = [
     pub: 'DESNZ',
     what: 'Households in fuel poverty, meaning on a low income in a home with low ' +
           'energy efficiency.',
-    geo: 'LSOA',
+    geo: 'LSOA, combined into wards and LAs weighted by households',
     period: '2022',
     ind: 'fuel_poverty_pct',
     cadence: 'Yearly.',

@@ -58,5 +58,7 @@ error, it looks like a finding, which is why nothing here guesses it.
 Nothing is smoothed or modelled. LSOA figures are rolled up to wards by
 population-weighted mean, the same rule every other source here follows.
 Counts are not summed unless you name the column so it ends in `_count`.
+A `_count` column is added up into wards, and the wards are added up into
+LAs.
 
 Areas you do not supply are left blank rather than filled in.

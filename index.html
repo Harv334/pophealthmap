@@ -7571,7 +7571,7 @@ function indicatorFacts(k) {
     f.num = 'Households in fuel poverty under the low income, low energy efficiency measure';
     f.den = 'All households';
     f.cadence = 'DESNZ publishes these estimates once a year, about two years after the year they describe.';
-    f.method = 'DESNZ models these from survey and administrative data, so the figures for small areas are estimates.';
+    f.method = 'DESNZ models these from survey and administrative data, so the figures for small areas are estimates. Ward and LA figures are averages of their LSOAs weighted by households at the 2021 Census, because this is a share of households.';
     return f;
   }
   if (/UK-AIR|PCM/.test(src)) {
@@ -24723,7 +24723,8 @@ var PH_SHOW = {
           }
         }
         // Fuel poverty is a share of households, so it is weighted by them
-        // when the counts are here. Everything else is weighted by residents.
+        // when the counts are here, as the pipeline weights a ward's and an
+        // LA's (fuel_poverty_by_area). Everything else is weighted by residents.
         // No weight means no say: falling back to 1 would let an empty LSOA
         // count as much as a full one.
         var byHH = k === 'fuel_poverty_pct' && allHH;
@@ -24754,7 +24755,7 @@ var PH_SHOW = {
     return 'Counts are added up' +
       (used.counts ? ', Census percentages are worked out from the summed counts as a ward\u2019s are' : '') +
       ', and other figures are averages weighted by residents' +
-      (used.households ? ', except fuel poverty, which is weighted by households' : '') + '.' +
+      (used.households ? ', except fuel poverty, which is weighted by households as a ward\u2019s is' : '') + '.' +
       (rbCounts ? '' : ' Census percentages are weighted by residents too, so measures of households can differ slightly from a ward\u2019s.');
   }
   function num_(v) {
@@ -25861,7 +25862,8 @@ var PH_SHOW = {
         : /IMD/.test(src) ? 'MHCLG publishes this for each LSOA'
         : 'This is published for each LSOA';
       return first + '.' + (L === 'ward'
-        ? ' Each ward figure ' + (cbSums(k) ? 'is the sum of' : 'is an average, weighted by population, of') +
+        ? ' Each ward figure ' + (cbSums(k) ? 'is the sum of'
+            : /DESNZ/.test(src) ? 'is an average, weighted by households, of' : 'is an average, weighted by population, of') +
           ' the LSOAs that best fit the ward under the ONS lookup.'
         : '');
     }
