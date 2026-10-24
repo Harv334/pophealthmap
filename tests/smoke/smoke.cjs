@@ -330,6 +330,8 @@ const smallText = page => page.evaluate(() => {
     await page.click('#sbtab-overlay');
     await page.click('#ov-chips button');
     await page.waitForTimeout(2500);
+    // The key fills in once the indicator is drawn, later on a busy machine.
+    await page.waitForFunction(() => /\d/.test(document.getElementById('sc-lo').textContent), null, { timeout: 10000 }).catch(() => {});
     ok(await page.evaluate(() => curOv && curOv !== 'none'), 'key indicator chip sets an indicator');
     ok(await page.evaluate(() => /\d/.test(document.getElementById('sc-lo').textContent)), 'legend shows numbers');
     // One hover card, and the LSOA's decile given once when the map is
@@ -902,6 +904,9 @@ const smallText = page => page.evaluate(() => {
     const [rep2] = await Promise.all([page.waitForEvent('popup', { timeout: 20000 }).catch(() => null), page.click('#ws-pdf')]);
     if (rep2) {
       await rep2.waitForFunction(() => !!document.querySelector('.report'), null, { timeout: 30000 }).catch(() => {});
+      // The charts' download buttons are added once each chart is drawn,
+      // which on a busy machine is after the report itself appears.
+      await rep2.waitForFunction(() => document.querySelectorAll('.chart-dl-wrap').length > 0, null, { timeout: 15000 }).catch(() => {});
       const r2 = await rep2.evaluate(() => {
         const t = document.body.innerText;
         const blk = [...document.querySelectorAll('.locblock')].find(b => /Parks and green spaces/i.test(b.querySelector('h4').textContent));
