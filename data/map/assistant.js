@@ -485,6 +485,16 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
     dfle_female: "more years free of limiting illness",
     dfle_male: "more years free of limiting illness",
   };
+  // The healthy places index (AHAH) and the mental health index (SAMHI):
+  // a higher score is worse, and their deciles and the food insecurity
+  // deciles (PPFI) count from the worst tenth, so a higher decile is better.
+  ["ahah_index", "ahah_health_services", "ahah_retail", "ahah_air_quality", "ahah_green_blue"]
+    .forEach(function (k) { DIRECTION[k] = "less healthy"; });
+  DIRECTION.ahah_decile = "healthier";
+  DIRECTION.samhi_index = "worse mental health";
+  DIRECTION.samhi_decile = "better mental health";
+  ["ppfi_decile", "ppfi_supermarket_proximity_decile", "ppfi_supermarket_access_decile", "ppfi_online_decile",
+   "ppfi_nonsupermarket_decile", "ppfi_family_decile"].forEach(function (k) { DIRECTION[k] = "lower risk"; });
 
   function metaFor(key) {
     var m = (typeof OV_META === "object" && OV_META && OV_META[key]) ? OV_META[key] : null;
@@ -969,7 +979,9 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
   }
 
   // The fields of each list_indicators row, in order (see list_indicators).
-  var LIST_COLUMNS = ["key", "label", "unit", "period", "higher_means", "la_only"];
+  // No unit or period: get_area, rank_areas and compare_areas give both with
+  // every figure, and with them the list no longer fitted in one tool result.
+  var LIST_COLUMNS = ["key", "label", "higher_means", "la_only"];
 
   var TOOLS = {
     /* The key list, kept short. It used to send every indicator's full
@@ -985,9 +997,11 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
        Each indicator is a row of values in the order `columns` names them,
        not an object repeating the same five field names: with 150 indicators
        those names alone were about 5 KB of a result that the answer loop
-       refuses past RESULT_BYTES. The period most of a group's indicators share is
-       said once, on the group, and a row gives its own only where it differs.
-       A field missing from the end of a row is empty. */
+       refuses past RESULT_BYTES. With some 230 indicators the units and
+       periods went too (14,455 characters with every indicator before the
+       last 43 were added): the tools that return figures give each one's
+       unit and period with it. A field missing from the end of a row is
+       empty. */
     list_indicators: function () {
       var inWards = wardKeys(), keys = {};
       Object.keys(inWards).forEach(function (k) { keys[k] = 1; });
@@ -1001,10 +1015,7 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
       Object.keys(keys).filter(function (k) { return !isWithheld(k); }).sort().forEach(function (k) {
         var at = levelsOf(k, !!inWards[k]);
         if (!at.length) return;
-        var m = metaFor(k);
         var row = { key: k, label: shortLabel(k) };
-        if (m && m.u) row.unit = m.u;
-        if (m && m.yr) row.period = String(m.yr);
         if (isBoroughLevel(k)) row.la_only = true;
         var hm = higherMeans(k);
         if (hm) row.higher_means = hm;
@@ -1015,26 +1026,21 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
       var out = Object.keys(groups).map(function (g) { return groups[g]; })
         .sort(function (a, b) { return b.levels.length - a.levels.length; })
         .map(function (g) {
-          var n = {}, top = null;
-          g.indicators.forEach(function (r) { if (r.period) n[r.period] = (n[r.period] || 0) + 1; });
-          Object.keys(n).forEach(function (p) { if (n[p] > 1 && (!top || n[p] > n[top])) top = p; });
           var rows = g.indicators.map(function (r) {
-            var a = LIST_COLUMNS.map(function (c) {
-              var v = r[c];
-              return (c === "period" && v === top) || v == null ? "" : v;
-            });
+            var a = LIST_COLUMNS.map(function (c) { return r[c] == null ? "" : r[c]; });
             while (a.length > 2 && a[a.length - 1] === "") a.pop();
             return a;
           });
-          return top ? { levels: g.levels, period: top, rows: rows } : { levels: g.levels, rows: rows };
+          return { levels: g.levels, rows: rows };
         });
       return {
         region: map.region, la_count: map.la_count, ward_count: map.ward_count,
         columns: LIST_COLUMNS,
         groups: out,
         note: "Each group lists the levels its indicators are available at: la (local authority, LA), " +
-          "ward, msoa, lsoa and oa (output area), and the period its indicators cover unless a row gives its own. " +
+          "ward, msoa, lsoa and oa (output area). " +
           "Each row is one indicator, its values in the order of columns; a value missing from the end of a row is empty. " +
+          "get_area, rank_areas and compare_areas give each figure's unit and period. " +
           "Deprivation deciles run 1 (most deprived) to 10 (least deprived). " +
           "Indicators marked la_only are published for the whole " +
           "LA, so they are the same value for every ward in " +

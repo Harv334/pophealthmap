@@ -503,6 +503,25 @@ and say what each one means.</p>
             condition, from the Quality and Outcomes Framework (QOF). It counts
             only diagnosed cases. So it can be lower than the true level where a
             condition often goes undiagnosed.</td></tr>
+    <tr><td class="term">Healthy places index</td><td>Access to Healthy Assets and Hazards (AHAH)</td>
+        <td>GeoDS's measure of how healthy the places around an area are, from
+            access to health services, how near fast food outlets, pubs,
+            off-licences, gambling outlets and tobacconists are, air quality and
+            access to green and blue space. A higher score means a less healthy
+            place.</td></tr>
+    <tr><td class="term">Mental health index</td><td>Small Area Mental Health Index (SAMHI)</td>
+        <td>PLDR's single score for mental ill health in an area, from hospital,
+            GP, prescribing, survey and benefit records. A higher score means
+            worse mental health.</td></tr>
+    <tr><td class="term">Risk of food insecurity</td><td>Priority Places for Food Index (PPFI)</td>
+        <td>CDRC's measure of how likely people in an area are to struggle to
+            get food, from how near and how easy to reach supermarkets are,
+            online delivery, other food shops and the need for family food
+            support. Decile 1 is the highest risk.</td></tr>
+    <tr><td class="term">Food hygiene rating</td><td>Food Hygiene Rating Scheme rating</td>
+        <td>The rating from 0 to 5 a council gives a food business at
+            inspection. 5 is very good, and 0, 1 and 2 mean urgent, major or
+            some improvement is necessary.</td></tr>
     <tr><td class="term">Similar to England</td><td>Not significantly different from England</td>
         <td>OHID's test of whether an area's figure is different from England's
             by more than chance would explain. If the area's 95% confidence
@@ -582,6 +601,16 @@ and say what each one means.</p>
         <td>The register of care homes and their beds.</td></tr>
     <tr><td class="term">TfL</td><td>Transport for London</td>
         <td>The register of London's stations and bus stops, and PTAL.</td></tr>
+    <tr><td class="term">GeoDS</td><td>Geographic Data Service, University of Liverpool</td>
+        <td>The healthy places index (AHAH) and its drive times.</td></tr>
+    <tr><td class="term">PLDR</td><td>Place-based Longitudinal Data Resource, University of Liverpool</td>
+        <td>The mental health index (SAMHI).</td></tr>
+    <tr><td class="term">House of Commons Library</td><td>House of Commons Library</td>
+        <td>The estimates of illness recorded by GPs for MSOAs.</td></tr>
+    <tr><td class="term">CDRC</td><td>Consumer Data Research Centre</td>
+        <td>The risk of food insecurity (PPFI).</td></tr>
+    <tr><td class="term">FSA</td><td>Food Standards Agency</td>
+        <td>The register of food businesses and their hygiene ratings.</td></tr>
     <tr><td class="term">Charity Commission</td><td>Charity Commission for England and Wales</td>
         <td>The register of charities.</td></tr>
   </tbody>
@@ -711,7 +740,9 @@ nearest GP practice, pharmacy and NHS dentist are measured in a straight line
 from the point ONS places where most of each LSOA's people live (its
 population-weighted centre), to the nearest site anywhere in England. Care
 homes are placed by postcode, and road casualties in the LSOA the casualty
-lives in, as DfT records it. Charities are linked
+lives in, as DfT records it. Food businesses on the FSA register are placed in
+the LSOA whose boundary contains the map position FSA gives them, or by
+postcode where it gives none. Charities are linked
 to the LAs they say they work in by matching the LA names in the Charity
 Commission register. PCN footprints come from where each network's registered
 patients live (see <a href="#pcns">Primary care networks are lists of patients,
@@ -755,6 +786,18 @@ casualties or care homes for its own figure to mean much. The mid-year
 population estimates are added up into wards and LAs in the same way, and the
 distances to GP practices, pharmacies and dentists are averaged, weighted by
 population.</p>
+
+<p>The healthy places index (AHAH) and its drive times, and the mental health
+index (SAMHI), are averaged into wards and LAs weighted by population. Their
+deciles, and those of the risk of food insecurity (PPFI), stay with LSOAs,
+because an average of deciles is not a decile. For wards and LAs we show
+instead the share of residents who live in an LSOA in the fifth of England at
+highest risk of food insecurity. The takeaways, pubs and food hygiene ratings
+are counted for each LSOA and added up into wards and LAs before dividing,
+and a ward with fewer than 20 rated food businesses has no hygiene figure.
+The estimates of illness recorded by GPs are published for MSOAs, and reach
+wards and LAs through their LSOAs as the other MSOA figures do, weighted by
+residents.</p>
 
 <h3 id="best-fit">Best fit, not exact fit</h3>
 
@@ -1050,6 +1093,10 @@ Outside London, station and bus stop measures use the
 <a href="https://www.data.gov.uk/dataset/ff93ffc1-6656-47d8-9155-85ea0b8f2251/national-public-transport-access-nodes-naptan">National Public Transport Access Nodes (NaPTAN)</a>
 register from the Department for Transport, under the Open Government Licence v3.0.</p>
 
+<p>The risk of food insecurity (Priority Places for Food Index): data provided
+by the Consumer Data Research Centre (CDRC), an ESRC Data Investment, refs
+ES/L011840/1; ES/L011891/1.</p>
+
 <p>Our <a href="https://github.com/Harv334/pophealthmap/blob/main/DATA_LICENCES.md">data
 licences file</a> lists the licence for each source and the wording each
 publisher asks for.</p>
@@ -1306,6 +1353,86 @@ var SOURCES = [
     cadence: 'Monthly.',
     manifest: 'care_homes' },
 
+  { id: 'ahah',
+    name: 'Healthy places index and drive times to outlets',
+    pub: 'Geographic Data Service (GeoDS), University of Liverpool: Access to Healthy Assets and Hazards (AHAH)',
+    what: 'An index of how healthy the places around each LSOA are, and its four domains: access to ' +
+          'health services, how near fast food outlets, pubs, off-licences, gambling outlets and ' +
+          'tobacconists are, air quality, and access to green and blue space. A higher score means a ' +
+          'less healthy place. It compares places with each other rather than measuring anything ' +
+          'directly. Also the drive time in minutes by car to the nearest outlet of each of those five ' +
+          'kinds, which the map shows without calling nearer better or worse. We work out the deciles ' +
+          'across England, decile 1 the least healthy tenth. Versions are built differently, so they ' +
+          'should not be compared.',
+    geo: 'LSOA, averaged into wards and LAs weighted by population',
+    period: 'Version 5.1, May 2026, at the last check',
+    ind: 'ahah_index',
+    cadence: 'A new version from time to time.',
+    skipNote: 'Not on the map yet: the file could not be downloaded, so it has to be added by hand.',
+    manifest: 'ahah' },
+
+  { id: 'samhi',
+    name: 'Mental health index',
+    pub: 'Place-based Longitudinal Data Resource (PLDR), University of Liverpool: Small Area Mental Health Index (SAMHI)',
+    what: 'One score for mental ill health in each LSOA, combining mental health hospital attendances, ' +
+          'antidepressant prescribing, depression recorded by GPs, the GP Patient Survey and benefit claims ' +
+          'for mental illness. A higher score means worse mental health than in other places. We show its ' +
+          'latest year, and work out the deciles across England, decile 1 the worst tenth. Where PLDR ' +
+          'publishes it for the LSOAs of 2011, an LSOA drawn in 2021 takes the figure of the one it came from. ' +
+          'It overlaps the mood and anxiety measure in the deprivation indices.',
+    geo: 'LSOA, averaged into wards and LAs weighted by population',
+    period: 'The latest year in version 4.00',
+    ind: 'samhi_index',
+    cadence: 'A new version from time to time.',
+    skipNote: 'Not on the map yet: its licence has to be checked, or its file added by hand.',
+    manifest: 'samhi' },
+
+  { id: 'qof-msoa',
+    name: 'Illness recorded by GPs, estimated for small areas',
+    pub: 'House of Commons Library, from GP practice registers (QOF, NHS England) and NHS Digital\'s counts of where patients live',
+    what: 'The estimated share of patients on a GP register for each of 20 conditions, such as ' +
+          'diabetes, asthma and depression. The Library shares each practice\'s figure among the MSOAs ' +
+          'where its patients live. It counts illness GPs have recorded, not everyone who has it, and a ' +
+          'practice that records more carefully raises the figure for every area it serves.',
+    geo: 'MSOA, blended into wards and averaged into LAs weighted by population',
+    period: '2024/25 at the last check',
+    ind: 'qof_est_diabetes_pct',
+    cadence: 'Yearly, after each year of GP figures.',
+    skipNote: 'Not on the map yet: the file could not be found, so it has to be added by hand.',
+    manifest: 'qof_msoa' },
+
+  { id: 'ppfi',
+    name: 'Risk of food insecurity',
+    pub: 'Consumer Data Research Centre (CDRC), with Which?: Priority Places for Food Index (PPFI)',
+    what: 'Which tenth of England each LSOA falls in by its risk that people struggle to get food: ' +
+          'how near and how easy to reach supermarkets are, online delivery, other food shops and the ' +
+          'need for family food support, together and one by one. Decile 1 is the highest risk. For ' +
+          'wards and LAs, the share of residents living in the fifth of England at highest risk. It is a ' +
+          'risk index, not a count of people going without food. Its fuel poverty and socio-demographic ' +
+          'domains are left out, as the map has those figures already. Data provided by the Consumer Data ' +
+          'Research Centre (CDRC), an ESRC Data Investment, refs ES/L011840/1; ES/L011891/1.',
+    geo: 'LSOA; wards and LAs from the residents of their LSOAs',
+    period: 'Version 2.1, July 2024',
+    ind: 'ppfi_decile',
+    cadence: 'A new version from time to time.',
+    skipNote: 'Not on the map yet: CDRC\'s file needs a login, so it has to be added by hand.',
+    manifest: 'ppfi' },
+
+  { id: 'fhrs',
+    name: 'Takeaways, pubs and food hygiene ratings',
+    pub: 'Food Standards Agency (FSA), food hygiene rating scheme, with residents from the 2021 Census',
+    what: 'Takeaways and sandwich shops, and pubs, bars and nightclubs, per 1,000 residents, and the share ' +
+          'of rated food businesses with a hygiene rating of 0, 1 or 2. FSA\'s takeaway type mixes hot food ' +
+          'takeaways with sandwich shops and bakeries, and many chain fast food outlets are listed as ' +
+          'restaurants. Businesses are counted where they are, so town centres with few residents have high ' +
+          'rates. Shown for wards and LAs only.',
+    geo: 'Each business placed in its LSOA by where it is, added up into wards and LAs',
+    period: 'The register at the last update',
+    ind: 'fhrs_takeaways_per_1000',
+    cadence: 'Daily; read again here every month.',
+    skipNote: 'Not on the map yet: the register could not be read, so its files have to be added by hand.',
+    manifest: 'fhrs' },
+
   { id: 'fuel-poverty',
     name: 'Fuel poverty',
     pub: 'DESNZ',
@@ -1546,6 +1673,10 @@ Array.prototype.forEach.call(document.querySelectorAll('table.stack'), labelTabl
       return '<span class="status-bad">Not updated' + (when ? ' on ' + esc(when) : '') + '</span>' +
         '<br><span class="small">The map is showing the last figures that did update, ' +
         'which are older than the rest.</span>';
+    }
+    // A source that needs a file someone adds by hand, and has none yet.
+    if (s.status === 'skipped' && rec.skipNote) {
+      return '<span class="small">' + esc(rec.skipNote) + '</span>';
     }
     if (s.status === 'partial') {
       return '<span class="status-part">Partly updated' + (when ? ' on ' + esc(when) : '') + '</span>' +

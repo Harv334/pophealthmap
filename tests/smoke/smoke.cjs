@@ -5279,6 +5279,219 @@ const smallText = page => page.evaluate(() => {
     }
   }
 
+  // Healthy places (GeoDS AHAH), mental health (PLDR SAMHI), illness
+  // recorded by GPs by MSOA (House of Commons Library), risk of food
+  // insecurity (CDRC PPFI) and food outlets (FSA). Each arrives with a
+  // refresh (PPFI once its file is added by hand), so as shipped each is
+  // offered exactly when the build lists it; with figures (injected here as
+  // a refresh writes them) each sits in its theme at its levels, with its
+  // card, and Ask lists them within its 15,000 character cap.
+  {
+    const QOF = ['af', 'asthma', 'cancer', 'chd', 'ckd', 'copd', 'dementia', 'depression', 'diabetes', 'epilepsy', 'hf',
+      'hypertension', 'ld', 'smi', 'ndh', 'obesity', 'osteoporosis', 'pad', 'ra', 'stroke'].map(c => 'qof_est_' + c + '_pct');
+    const AHAH = ['ahah_index', 'ahah_health_services', 'ahah_retail', 'ahah_air_quality', 'ahah_green_blue',
+      'ahah_fast_food_min', 'ahah_pubs_min', 'ahah_off_licence_min', 'ahah_gambling_min', 'ahah_tobacco_min'];
+    const DECILES = ['ahah_decile', 'samhi_decile', 'ppfi_decile', 'ppfi_supermarket_proximity_decile',
+      'ppfi_supermarket_access_decile', 'ppfi_online_decile', 'ppfi_nonsupermarket_decile', 'ppfi_family_decile'];
+    const LSOA_TOO = AHAH.concat(['samhi_index']);
+    const WARD_LA = ['ppfi_priority_pct', 'fhrs_takeaways_per_1000', 'fhrs_pubs_per_1000', 'fhrs_low_hygiene_pct'];
+    const KEYS = LSOA_TOO.concat(DECILES, QOF, WARD_LA);
+    const fake = (k, i) => {
+      const x = (i * 37 % 100) / 100;
+      if (/_decile$/.test(k)) return 1 + (i % 10);
+      if (/_min$/.test(k)) return Math.round((0.5 + 10 * x) * 100) / 100;
+      if (k === 'samhi_index') return Math.round((-2 + 4 * x) * 1000) / 1000;
+      if (/^fhrs_.*_per_1000$/.test(k)) return Math.round((0.2 + 3 * x) * 100) / 100;
+      if (/^qof_est_/.test(k)) return Math.round((1 + 10 * x) * 100) / 100;
+      return Math.round((5 + 40 * x) * 10) / 10;
+    };
+    const readJson = f => JSON.parse(fs.readFileSync(path.join(ROOT, f), 'utf8'));
+    const inject = async (page, vintage) => {
+      await page.route('**/data/map/indicators.js*', r => {
+        const t = fs.readFileSync(path.join(ROOT, 'data/map/indicators.js'), 'utf8');
+        const at = t.indexOf('var PH_IND_STATS = ');
+        const doc = JSON.parse(t.slice(at + 19, t.lastIndexOf(';')));
+        KEYS.forEach(k => {
+          const st = { n: 600, d: 500, p5: fake(k, 3), p95: fake(k, 80) };
+          doc.stats[k] = { lv: DECILES.includes(k) ? { lsoa: st } : QOF.includes(k) ? { msoa: st, ward: st, borough: st }
+            : WARD_LA.includes(k) ? { ward: st, borough: st } : { lsoa: st, ward: st, borough: st } };
+        });
+        r.fulfill({ contentType: 'application/javascript', body: t.slice(0, at) + 'var PH_IND_STATS = ' + JSON.stringify(doc) + ';\n' });
+      });
+      for (const f of ['data/ward_core.json', 'ward_data.json']) {
+        await page.route('**/' + f + '*', r => {
+          const doc = readJson(f);
+          Object.keys(doc.wards || {}).forEach((wd, i) => {
+            const ind = doc.wards[wd].indicators = doc.wards[wd].indicators || {};
+            KEYS.filter(k => !DECILES.includes(k)).forEach(k => { ind[k] = fake(k, i); });
+          });
+          if (doc.metadata) doc.metadata.places = { ahah_version: '5.1', samhi_year: 2022, samhi_vintage: vintage,
+            samhi_licence: 'Open Government Licence', ppfi_basis: 'reranked', ppfi_version: '2.1',
+            fhrs_as_at: '2026-10-20', qof_msoa_period: '2024/25' };
+          r.fulfill({ contentType: 'application/json', body: JSON.stringify(doc) });
+        });
+      }
+      await page.route('**/lsoa_data.json*', r => {
+        const doc = readJson('lsoa_data.json');
+        Object.keys(doc).forEach((c, i) => { LSOA_TOO.concat(DECILES).forEach(k => { doc[c][k] = fake(k, i); }); });
+        r.fulfill({ contentType: 'application/json', body: JSON.stringify(doc) });
+      });
+      await page.route('**/msoa_data.json*', r => {
+        const doc = readJson('msoa_data.json');
+        Object.keys(doc).forEach((c, i) => { QOF.forEach(k => { doc[c][k] = fake(k, i); }); });
+        r.fulfill({ contentType: 'application/json', body: JSON.stringify(doc) });
+      });
+      await page.route('**/borough_data.json*', r => {
+        const doc = readJson('borough_data.json');
+        Object.keys(doc).forEach((c, i) => {
+          KEYS.filter(k => !DECILES.includes(k)).forEach(k => { (doc[c].indicators || doc[c])[k] = fake(k, i + 5); });
+        });
+        r.fulfill({ contentType: 'application/json', body: JSON.stringify(doc) });
+      });
+    };
+
+    // As shipped: each is offered, and listed by Ask, exactly when the build
+    // has figures for it, and each has its registry entries either way.
+    {
+      const { page, errors } = await open(browser, 'index.html?t=1', DESK);
+      const r = await page.evaluate(keys => {
+        const G = (PH_IND_STATS && PH_IND_STATS.stats) || {};
+        const opts = new Set([...document.querySelectorAll('#ov option')].map(o => o.value));
+        const cats = new Set(CATS.flatMap(c => c.fields.map(f => f.k)));
+        const asked = JSON.stringify(PH_ASSISTANT.runTool('list_indicators', {}));
+        return {
+          wrong: keys.filter(k => { const has = !!G[k]; return opts.has(k) !== has || cats.has(k) !== has ||
+            (asked.indexOf('"' + k + '"') !== -1) !== has || PH_EMPTY_IND.has(k) === has; }),
+          meta: keys.filter(k => !(OV_META[k] && OV_CFG[k] && IND_NAMES[k] && OV_PLAIN[k] && saInfo(k))),
+          listed: keys.filter(k => G[k]).length,
+        };
+      }, KEYS);
+      ok(!r.wrong.length, 'Healthy places and food: as shipped, each is offered and listed by Ask exactly when the build has its figures (' +
+        r.listed + ' of ' + KEYS.length + ' have)', r.wrong.join(', '));
+      ok(!r.meta.length, 'Healthy places and food: each has its label, colour direction, plain line and card', r.meta.join(', '));
+      ok(!errors.length, 'no page errors (healthy places and food, as shipped)', errors.join(' | '));
+      await page.close();
+    }
+
+    // With figures, as a refresh will write them.
+    for (const vintage of ['2011', '2021']) {
+      const page = await browser.newPage({ viewport: { width: DESK.width, height: DESK.height } });
+      const errors = [];
+      page.on('pageerror', e => errors.push(e.message));
+      await inject(page, vintage);
+      await page.goto(BASE + '/index.html?t=1');
+      await page.waitForTimeout(SETTLE);
+      const r = await page.evaluate(keys => {
+        const li = PH_ASSISTANT.runTool('list_indicators', {});
+        const ci = c => li.columns.indexOf(c);
+        const find = k => { for (const g of li.groups) for (const x of g.rows) if (x[ci('key')] === k) return { levels: g.levels.join(','), row: x }; return null; };
+        const theme = k => ((window.PH_THEMES || []).find(t => t.keys.includes(k)) || {}).label || '';
+        const dd = (k, name) => { const d = document.createElement('div'); d.innerHTML = indicatorCardHTML(k);
+          const dt = [...d.querySelectorAll('dt')].find(e => e.textContent === name); return dt ? dt.nextElementSibling.textContent : ''; };
+        const la = Object.keys(BOROUGH_DATA)[0];
+        return {
+          opts: [...document.querySelectorAll('#ov option')].map(o => o.value).filter(k => keys.indexOf(k) !== -1).length,
+          lv: ['ahah_index', 'ahah_decile', 'ahah_fast_food_min', 'samhi_index', 'samhi_decile', 'qof_est_diabetes_pct',
+               'ppfi_decile', 'ppfi_priority_pct', 'fhrs_takeaways_per_1000'].map(k => k + ' ' + ovLevels(k).join(',')),
+          themes: keys.map(theme),
+          ask: ['ahah_index', 'ahah_decile', 'samhi_index', 'qof_est_asthma_pct', 'ppfi_online_decile', 'fhrs_low_hygiene_pct'].map(find),
+          size: JSON.stringify(li).length, cols: li.columns.join(','),
+          ahahPub: dd('ahah_index', 'Published at'), ahahMethod: dd('ahah_index', 'Method'), timeUnit: dd('ahah_pubs_min', 'Unit'),
+          timeMethod: dd('ahah_pubs_min', 'Method'), decMethod: dd('ahah_decile', 'Method'),
+          samhiMethod: dd('samhi_index', 'Method'), samhiCadence: dd('samhi_index', 'Updates'),
+          qofPub: dd('qof_est_diabetes_pct', 'Published at'), qofCounted: dd('qof_est_diabetes_pct', 'Counted'),
+          ppfiMethod: dd('ppfi_decile', 'Method'), shareCounted: dd('ppfi_priority_pct', 'Counted'),
+          fhrsMethod: dd('fhrs_takeaways_per_1000', 'Method'), fhrsPub: dd('fhrs_low_hygiene_pct', 'Published at'),
+          anchors: ['ahah_index', 'ahah_tobacco_min', 'samhi_decile', 'qof_est_copd_pct', 'ppfi_priority_pct', 'fhrs_pubs_per_1000'].map(_methAnchor),
+          la: [boroughOvValue(la, 'fhrs_takeaways_per_1000'), (BOROUGH_DATA[la].indicators || BOROUGH_DATA[la]).fhrs_takeaways_per_1000],
+          dec: [indDecimals('ahah_decile'), indDecimals('ppfi_decile'), indDecimals('samhi_index'), indDecimals('fhrs_pubs_per_1000'),
+                indDecimals('qof_est_ckd_pct'), indDecimals('ahah_fast_food_min')],
+          dir: [!!OV_CFG.ahah_pubs_min.descriptive, !!OV_CFG.fhrs_takeaways_per_1000.descriptive, OV_CFG.ahah_index.wh,
+                OV_CFG.ahah_decile.wh, OV_CFG.fhrs_low_hygiene_pct.wh, OV_CFG.samhi_index.wh],
+          credits: [phLicenceExtras(['ppfi_family_decile']).join(' '), phLicenceExtras(['ahah_index', 'samhi_index', 'fhrs_pubs_per_1000']).join(' ')],
+          read: ['ahah_decile', 'samhi_decile', 'ppfi_online_decile', 'ppfi_priority_pct', 'imd_decile'].map(_cardHowToRead),
+        };
+      }, KEYS);
+      if (vintage === '2011') {
+        ok(r.opts === KEYS.length, 'Healthy places and food: with figures, all ' + KEYS.length + ' are offered', String(r.opts));
+        ok(r.lv.join(' | ') === 'ahah_index borough,ward,lsoa | ahah_decile lsoa | ahah_fast_food_min borough,ward,lsoa | ' +
+           'samhi_index borough,ward,lsoa | samhi_decile lsoa | qof_est_diabetes_pct borough,ward,msoa | ppfi_decile lsoa | ' +
+           'ppfi_priority_pct borough,ward | fhrs_takeaways_per_1000 borough,ward',
+          'Healthy places and food: scores and drive times for LSOAs, wards and LAs, deciles for LSOAs only, the QOF estimates from MSOAs, the food counts for wards and LAs', r.lv.join(' | '));
+        ok(KEYS.every((k, i) => r.themes[i] === (/^(samhi|qof_est)_/.test(k) ? 'Health' : 'Food and healthy places')),
+          'Healthy places and food: AHAH, PPFI and the FSA counts under Food and healthy places, SAMHI and the QOF estimates under Health',
+          KEYS.map((k, i) => k + ' ' + r.themes[i]).filter(x => !/(Health|Food and healthy places)$/.test(x)).join(', ') || r.themes.join(', '));
+        const lv = r.ask.map(a => a && a.levels);
+        ok(lv.join() === 'la,ward,lsoa,lsoa,la,ward,lsoa,la,ward,msoa,lsoa,la,ward' && r.size < 15000 && r.cols === 'key,label,higher_means,la_only',
+          'Healthy places and food: Ask lists them at their levels, within its 15,000 character cap', JSON.stringify({ lv, size: r.size, cols: r.cols }));
+        ok(r.ask[0].row.indexOf('less healthy') !== -1 && r.ask[1].row.indexOf('healthier') !== -1 &&
+           r.ask[2].row.indexOf('worse mental health') !== -1 && r.ask[4].row.indexOf('lower risk') !== -1,
+          'Healthy places and food: Ask says which way the scores and deciles run', JSON.stringify(r.ask.map(a => a && a.row)));
+        ok(/GeoDS, at the University of Liverpool, publishes this for LSOAs\./.test(r.ahahPub) &&
+           /figures are an average of all the LSOAs in each LA, weighted by population\./.test(r.ahahPub) &&
+           /less healthy place/.test(r.ahahMethod) && r.timeUnit === 'minutes by car' && /not a walking time/.test(r.timeMethod) &&
+           /least healthy tenth/.test(r.decMethod),
+          'Healthy places and food: the AHAH cards say who publishes it, how wards and LAs are made, which way it runs and the drive time unit',
+          JSON.stringify({ pub: r.ahahPub, unit: r.timeUnit }));
+        ok(/worse mental health/.test(r.samhiMethod) && /LSOAs of 2011/.test(r.samhiMethod) && /2022/.test(r.samhiCadence),
+          'Healthy places and food: the SAMHI card says a higher score is worse, its year, and that 2011 LSOAs were bridged', r.samhiMethod);
+        ok(/House of Commons Library estimates these for MSOAs\./.test(r.qofPub) && /in proportion to where its residents live/.test(r.qofPub) &&
+           /register for diabetes/.test(r.qofCounted),
+          'Healthy places and food: the QOF estimate card names the Library and how wards are made', r.qofPub);
+        ok(/Decile 1 is the tenth of England's LSOAs at highest risk/.test(r.ppfiMethod) && /put England's LSOAs in order again/.test(r.ppfiMethod) &&
+           /deciles 1 and 2/.test(r.shareCounted),
+          'Healthy places and food: the PPFI cards say decile 1 is the highest risk and how wards and LAs are made', r.ppfiMethod);
+        ok(/sandwich shops and bakeries/.test(r.fhrsMethod) && /wards and LAs only/.test(r.fhrsMethod) && /fewer than 20/.test(r.fhrsPub),
+          'Healthy places and food: the FSA cards say what the takeaway type mixes, and that LSOAs are not shown', r.fhrsMethod);
+        ok(r.anchors.join() === 'src-ahah,src-ahah,src-samhi,src-qof-msoa,src-ppfi,src-fhrs',
+          'Healthy places and food: cards link to their own source rows', r.anchors.join());
+        ok(r.la[0] === r.la[1] && r.la[0] != null, 'Healthy places and food: an LA shows the LA file\'s own figure', JSON.stringify(r.la));
+        ok(r.dec.join() === '0,0,2,2,1,1', 'Healthy places and food: whole deciles, two places for SAMHI and the FSA rates, one for the rest', r.dec.join());
+        ok(r.dir.join() === 'true,true,true,false,true,true',
+          'Healthy places and food: drive times and takeaway rates have no good end; a higher index, hygiene share or SAMHI is worse', r.dir.join());
+        ok(/least healthy/.test(r.read[0]) && /worst mental health/.test(r.read[1]) && /highest risk/.test(r.read[2]) &&
+           /higher figure is worse/.test(r.read[3]) && /most deprived/.test(r.read[4]) && !/deprived/.test(r.read.slice(0, 4).join(' ')),
+          'Healthy places and food: each decile card says what 1 means in its own words, not deprivation\'s', JSON.stringify(r.read));
+        ok(/Consumer Data Research Centre \(CDRC\)/.test(r.credits[0]) && /ES\/L011840\/1/.test(r.credits[0]) && !/CDRC/.test(r.credits[1]),
+          'Healthy places and food: files with a PPFI figure carry CDRC\'s attribution, and others do not', JSON.stringify(r.credits));
+        // Drawn at LSOA, with its decile in the LSOA profile, and the QOF
+        // estimates under the Library's own heading in the ward profile.
+        await setOv(page, 'ahah_index');
+        await page.waitForTimeout(1500);
+        const lp = await page.evaluate(async () => {
+          await ensureLsoaImd();
+          showLSOA(LSOA_IMD.features.find(f => f.properties.ward === 'Lansbury'));
+          const t = document.getElementById('wpanel').innerText;
+          return { block: /Healthy places, mental health and food/.test(t), dec: /Decile \d+ of 10, where 1 is the least healthy/.test(t) };
+        });
+        ok(lp.block && lp.dec, 'Healthy places and food: the LSOA profile shows the healthy places index with its decile', JSON.stringify(lp));
+        const ctx = await page.evaluate(() => [ovContext('lsoa', 'ahah_decile', 5), ovContext('lsoa', 'ppfi_decile', 5),
+          ovContext('lsoa', 'samhi_decile', 5)]);
+        ok(/(healthier|less healthy) than \d+% of LSOAs/.test(ctx[0]) && /at (lower|higher) risk than/.test(ctx[1]) &&
+           /(better|worse) than/.test(ctx[2]) && !/deprived/.test(ctx.join(' ')),
+          'Healthy places and food: an LSOA\'s place among the others is said in each decile\'s own words', JSON.stringify(ctx));
+        await page.evaluate(() => showWard('Lansbury'));
+        await page.waitForTimeout(1200);
+        const wp = await page.evaluate(() => {
+          const subs = [...document.querySelectorAll('#wpanel .sr-sub')].map(e => e.textContent);
+          const row = document.querySelector('#wpanel .sr[data-k="qof_est_diabetes_pct"]');
+          const lh = row && row.closest('.cat-body');
+          return { subs, row: !!row, ohid: !!(lh && [...lh.querySelectorAll('.sr-lh')].some(b => /OHID/.test(b.textContent) &&
+            b.contains(row))) };
+        });
+        ok(wp.subs.includes('House of Commons Library estimates for this ward') && wp.row && !wp.ohid,
+          'Healthy places and food: the ward profile shows the QOF estimates under the Library\'s heading, not OHID\'s', JSON.stringify(wp));
+        const meth = await (await fetch(BASE + '/methodology.html')).text();
+        const missing = ['ahah', 'samhi', 'qof-msoa', 'ppfi', 'fhrs'].filter(id => meth.indexOf("id: '" + id + "'") === -1);
+        ok(!missing.length, 'Healthy places and food: the methodology page has a source row for each', missing.join(', '));
+      } else {
+        ok(!/LSOAs of 2011/.test(r.samhiMethod), 'Healthy places and food: SAMHI on the 2021 LSOAs says nothing of a bridge', r.samhiMethod);
+      }
+      ok(!errors.length, 'no page errors (healthy places and food, with figures, ' + vintage + ')', errors.join(' | '));
+      await page.close();
+    }
+  }
+
   // Ask on a region map: the same tools, reading the region's own files, with
   // every result naming the region and no London place in any of them.
   if (HAS_NE) {
