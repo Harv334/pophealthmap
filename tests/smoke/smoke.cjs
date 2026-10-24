@@ -110,7 +110,9 @@ const emptyIndicatorAudit = page => page.evaluate(() => {
   const opts = [...document.querySelectorAll('#ov option')].map(o => o.value).filter(v => v !== 'none');
   const picker = [].concat(...(window.PH_THEMES || []).map(t => t.keys));
   const li = PH_ASSISTANT.runTool('list_indicators', {});
-  const ask = [].concat(...li.groups.map(g => g.indicators.map(r => r.key)));
+  // Each group's rows are values in the order li.columns names them.
+  const ki = (li.columns || []).indexOf('key');
+  const ask = [].concat(...li.groups.map(g => (g.rows || []).map(r => r[ki])));
   const offered = [...new Set(cats.concat(opts, picker, ask))];
   return {
     empty: [...PH_EMPTY_IND], offered, cats, opts, picker, ask,
@@ -4920,6 +4922,183 @@ const smallText = page => page.evaluate(() => {
       });
       ok(lp.idaci && lp.dec && /IDACI/.test(lp.legend), 'IoD 2025 extras: IDACI draws, and the LSOA profile gives it with its decile', JSON.stringify(lp));
       ok(!errors.length, 'no page errors (IoD 2025 extras, with figures)', errors.join(' | '));
+      await page.close();
+    }
+  }
+
+  // The small-area additions (fetch_all_data.py, SMALL-AREA ADDITIONS):
+  // distances to the nearest GP practice, pharmacy and NHS dentist, ONS's
+  // mid-year population estimates, the claimant rate aged 18 to 24, residents
+  // killed or seriously injured on the roads, care home beds, and the crime
+  // figures for LSOAs. Their figures arrive with a refresh, so the page is
+  // checked as shipped, where none is offered and crime stays ward-only, and
+  // with figures put into the files the way the pipeline writes them.
+  {
+    const LSOA_TOO = ['gp_dist_km', 'pharmacy_dist_km', 'dentist_dist_km', 'sape_population',
+      'sape_age0_15_pct', 'sape_age16_64_pct', 'sape_age65plus_pct', 'sape_age75plus_pct'];
+    const WARD_LA = ['claimant_18_24_pct', 'road_ksi_per_1000', 'care_home_beds_per_100_75plus'];
+    const KEYS = LSOA_TOO.concat(WARD_LA);
+    const CRIME = ['crime_total', 'crime_rate_per_1000', 'crime_violence_12mo', 'crime_burglary_12mo',
+      'crime_robbery_12mo', 'crime_theft_12mo', 'crime_asb_12mo'];
+    const fake = (k, i) => {
+      const x = (i * 37 % 100) / 100;
+      if (/_dist_km$/.test(k)) return Math.round((0.1 + 1.5 * x) * 1000) / 1000;
+      if (k === 'sape_population') return 1200 + (i * 53 % 900);
+      if (/^crime_/.test(k)) return k === 'crime_rate_per_1000' ? Math.round((20 + 200 * x) * 10) / 10 : (i * 7 % 60);
+      return Math.round((2 + 25 * x) * 10) / 10;
+    };
+    const readJson = f => JSON.parse(fs.readFileSync(path.join(ROOT, f), 'utf8'));
+    const inject = async (page, origin) => {
+      await page.route('**/data/map/indicators.js*', r => {
+        const t = fs.readFileSync(path.join(ROOT, 'data/map/indicators.js'), 'utf8');
+        const at = t.indexOf('var PH_IND_STATS = ');
+        const doc = JSON.parse(t.slice(at + 19, t.lastIndexOf(';')));
+        KEYS.forEach(k => {
+          const st = { n: 600, d: 500, p5: fake(k, 3), p95: fake(k, 80) };
+          doc.stats[k] = { lv: LSOA_TOO.indexOf(k) !== -1 ? { lsoa: st, ward: st, borough: st } : { ward: st, borough: st } };
+        });
+        CRIME.forEach(k => {
+          doc.stats[k] = doc.stats[k] || { lv: {} };
+          doc.stats[k].lv.lsoa = { n: 4900, d: 300, p5: fake(k, 3), p95: fake(k, 80) };
+        });
+        r.fulfill({ contentType: 'application/javascript', body: t.slice(0, at) + 'var PH_IND_STATS = ' + JSON.stringify(doc) + ';\n' });
+      });
+      for (const f of ['data/ward_core.json', 'ward_data.json']) {
+        await page.route('**/' + f + '*', r => {
+          const doc = readJson(f);
+          Object.keys(doc.wards || {}).forEach((wd, i) => {
+            const ind = doc.wards[wd].indicators = doc.wards[wd].indicators || {};
+            KEYS.forEach(k => { ind[k] = fake(k, i); });
+          });
+          if (doc.metadata) doc.metadata.small_area = { service_access_origin: origin, sape_year: 2024,
+            claimant_18_24_month: '2026-08', road_ksi_years: '2021 to 2025', care_homes_as_at: '2026-10-02' };
+          r.fulfill({ contentType: 'application/json', body: JSON.stringify(doc) });
+        });
+      }
+      await page.route('**/lsoa_data.json*', r => {
+        const doc = readJson('lsoa_data.json');
+        Object.keys(doc).forEach((c, i) => { LSOA_TOO.concat(CRIME).forEach(k => { doc[c][k] = fake(k, i); }); });
+        r.fulfill({ contentType: 'application/json', body: JSON.stringify(doc) });
+      });
+      await page.route('**/borough_data.json*', r => {
+        const doc = readJson('borough_data.json');
+        Object.keys(doc).forEach((c, i) => { KEYS.forEach(k => { (doc[c].indicators || doc[c])[k] = fake(k, i + 5); }); });
+        r.fulfill({ contentType: 'application/json', body: JSON.stringify(doc) });
+      });
+    };
+
+    // As shipped: no figures for them, so none is offered, and crime is
+    // drawn for wards only.
+    {
+      const { page, errors } = await open(browser, 'index.html?t=1', DESK);
+      const r = await page.evaluate(keys => ({
+        cats: CATS.flatMap(c => c.fields.map(f => f.k)).filter(k => keys.indexOf(k) !== -1),
+        opts: [...document.querySelectorAll('#ov option')].map(o => o.value).filter(k => keys.indexOf(k) !== -1),
+        themes: [].concat(...(window.PH_THEMES || []).map(t => t.keys)).filter(k => keys.indexOf(k) !== -1),
+        listed: keys.filter(k => JSON.stringify(PH_ASSISTANT.runTool('list_indicators', {})).indexOf('"' + k + '"') !== -1),
+        meta: keys.filter(k => !(OV_META[k] && OV_CFG[k] && IND_NAMES[k] && OV_PLAIN[k] && PH_EMPTY_FIELDS[k])),
+        crime: ovLevels('crime_rate_per_1000').join(','),
+      }), KEYS);
+      ok(!r.cats.length && !r.opts.length && !r.themes.length && !r.listed.length,
+        'Small-area additions: a build without their figures does not offer them, and Ask does not list them', JSON.stringify(r));
+      ok(!r.meta.length, 'Small-area additions: each has its label, colour direction, plain line and card', r.meta.join(', '));
+      ok(r.crime === 'borough,ward', 'Crime by LSOA: a build without LSOA crime figures draws crime for wards and LAs only', r.crime);
+      ok(!errors.length, 'no page errors (small-area additions, as shipped)', errors.join(' | '));
+      await page.close();
+    }
+
+    // With figures, as a refresh will write them.
+    for (const origin of ['pwc', 'centroid']) {
+      const page = await browser.newPage({ viewport: { width: DESK.width, height: DESK.height } });
+      const errors = [];
+      page.on('pageerror', e => errors.push(e.message));
+      await inject(page, origin);
+      await page.goto(BASE + '/index.html?t=1');
+      await page.waitForTimeout(SETTLE);
+      const r = await page.evaluate(({ keys, crime }) => {
+        const li = PH_ASSISTANT.runTool('list_indicators', {});
+        const ci = c => li.columns.indexOf(c);
+        const find = k => { for (const g of li.groups) for (const x of g.rows) if (x[ci('key')] === k) return g.levels.join(','); return null; };
+        const card = k => { const d = document.createElement('div'); d.innerHTML = indicatorCardHTML(k); return d.textContent; };
+        const dd = (k, name) => { const d = document.createElement('div'); d.innerHTML = indicatorCardHTML(k);
+          const dt = [...d.querySelectorAll('dt')].find(e => e.textContent === name); return dt ? dt.nextElementSibling.textContent : ''; };
+        const theme = k => ((window.PH_THEMES || []).find(t => t.keys.indexOf(k) !== -1) || {}).label || '';
+        return {
+          opts: [...document.querySelectorAll('#ov option')].map(o => o.value).filter(k => keys.indexOf(k) !== -1).length,
+          lv: { gp: ovLevels('gp_dist_km').join(','), sape: ovLevels('sape_age75plus_pct').join(','),
+                youth: ovLevels('claimant_18_24_pct').join(','), ksi: ovLevels('road_ksi_per_1000').join(','),
+                beds: ovLevels('care_home_beds_per_100_75plus').join(','),
+                crime: ovLevels('crime_rate_per_1000').join(','), vehicle: ovLevels('crime_vehicle_12mo').join(',') },
+          ask: { gp: find('gp_dist_km'), youth: find('claimant_18_24_pct'), crime: find('crime_rate_per_1000') },
+          size: JSON.stringify(li).length,
+          themes: { gp: theme('gp_dist_km'), sape: theme('sape_population'), youth: theme('claimant_18_24_pct'),
+                    ksi: theme('road_ksi_per_1000'), beds: theme('care_home_beds_per_100_75plus') },
+          gpPub: dd('gp_dist_km', 'Published at'), gpMethod: dd('gp_dist_km', 'Method'), gpUnit: dd('gp_dist_km', 'Unit'),
+          youthPub: dd('claimant_18_24_pct', 'Published at'), youthUnit: dd('claimant_18_24_pct', 'Unit'),
+          ksiCard: card('road_ksi_per_1000'), bedsCard: card('care_home_beds_per_100_75plus'),
+          sapePub: dd('sape_age65plus_pct', 'Published at'), crimePub: dd('crime_rate_per_1000', 'Published at'),
+          crimeMethod: dd('crime_rate_per_1000', 'Method'),
+          anchors: ['gp_dist_km', 'sape_population', 'claimant_18_24_pct', 'road_ksi_per_1000', 'care_home_beds_per_100_75plus'].map(_methAnchor),
+          la: [boroughOvValue('E09000001', 'claimant_18_24_pct'), (BOROUGH_DATA.E09000001.indicators || BOROUGH_DATA.E09000001).claimant_18_24_pct],
+          dec: [indDecimals('gp_dist_km'), indDecimals('sape_population'), indDecimals('claimant_18_24_pct')],
+          descriptive: [!!OV_CFG.care_home_beds_per_100_75plus.descriptive, !!OV_CFG.sape_age75plus_pct.descriptive, OV_CFG.gp_dist_km.wh],
+          credits: [phLicenceExtras(['care_home_beds_per_100_75plus']).join(' '), phLicenceExtras(['gp_dist_km']).join(' ')],
+        };
+      }, { keys: KEYS, crime: CRIME });
+      if (origin === 'pwc') {
+        ok(r.opts === 11, 'Small-area additions: with figures, all 11 are offered', String(r.opts));
+        ok(r.lv.gp === 'borough,ward,lsoa' && r.lv.sape === 'borough,ward,lsoa' && r.lv.youth === 'borough,ward' &&
+           r.lv.ksi === 'borough,ward' && r.lv.beds === 'borough,ward',
+          'Small-area additions: distances and estimates for LSOAs, wards and LAs; the three rates for wards and LAs only', JSON.stringify(r.lv));
+        ok(r.lv.crime === 'borough,ward,lsoa' && r.lv.vehicle === 'borough,ward',
+          'Crime by LSOA: with LSOA figures the crime rate is drawn for LSOAs too, and a type the LSOA file lacks is not', JSON.stringify(r.lv));
+        ok(r.ask.gp === 'la,ward,lsoa' && r.ask.youth === 'la,ward' && r.ask.crime === 'la,ward,lsoa' && r.size < 15000,
+          'Small-area additions: Ask lists them at the right levels, within its 15,000 character cap', JSON.stringify({ ask: r.ask, size: r.size }));
+        ok(r.themes.gp === 'Environment and access' && r.themes.sape === 'People and communities' &&
+           r.themes.youth === 'Work, money and education' && r.themes.ksi === 'Crime and safety' && r.themes.beds === 'Health',
+          'Small-area additions: each sits in its theme', JSON.stringify(r.themes));
+        ok(/We measure these for each LSOA from the NHS registers/.test(r.gpPub) &&
+           /Ward figures are an average of the LSOAs that best fit each ward, weighted by population\./.test(r.gpPub) &&
+           /figures are an average of all the LSOAs in each LA, weighted by population\./.test(r.gpPub) &&
+           /population-weighted centre of each LSOA/.test(r.gpMethod) && /not a walking route or a travel time/.test(r.gpMethod) && r.gpUnit === 'km',
+          'Small-area additions: the GP distance card says it is a straight line from the population-weighted centre, averaged into wards and LAs',
+          JSON.stringify([r.gpPub, r.gpMethod, r.gpUnit]));
+        ok(/add up the claimants and the people aged 18 to 24 of the LSOAs/.test(r.youthPub) && r.youthUnit === '% of residents aged 18 to 24',
+          'Small-area additions: the youth claimant card says ward and LA rates come from summed counts', JSON.stringify([r.youthPub, r.youthUnit]));
+        ok(/adjusted/.test(r.ksiCard) && /where they live|lives in/.test(r.ksiCard) && /capacity/.test(r.bedsCard) && /younger adults/.test(r.bedsCard),
+          'Small-area additions: the road casualty card says adjusted and by home, the care home card says capacity');
+        ok(/add up the people of each age in the LSOAs/.test(r.sapePub),
+          'Small-area additions: the population estimate shares are made from summed counts', r.sapePub);
+        ok(/LSOA figures are counted in the same way, from the crimes in each LSOA/.test(r.crimePub) && /each LSOA/.test(r.crimePub) &&
+           /An LSOA is small/.test(r.crimeMethod),
+          'Crime by LSOA: the card says LSOAs are counted from their own crimes, and that their counts are small', JSON.stringify([r.crimePub, r.crimeMethod]));
+        ok(r.anchors.join() === 'src-service-access,src-sape,src-claimant-youth,src-road-casualties,src-care-homes',
+          'Small-area additions: cards link to their own source rows', r.anchors.join());
+        ok(r.la[0] === r.la[1] && r.la[0] != null, 'Small-area additions: an LA shows the LA file\'s own figure, not an average of its wards', JSON.stringify(r.la));
+        ok(r.dec.join() === '2,0,1', 'Small-area additions: two decimals for kilometres, whole people, one for rates', r.dec.join());
+        ok(r.descriptive[0] && r.descriptive[1] && r.descriptive[2] === true,
+          'Small-area additions: care home beds and the estimates have no good end; further from a GP is worse', JSON.stringify(r.descriptive));
+        ok(/Care Quality Commission/.test(r.credits[0]) && /ONS Postcode Directory/.test(r.credits[1]) && /Royal Mail/.test(r.credits[1]),
+          'Small-area additions: files with care home beds credit CQC, and with distances the postcode directory', JSON.stringify(r.credits));
+        // Drawn at LSOA, and named in the LSOA profile with its unit.
+        await setOv(page, 'gp_dist_km');
+        await page.waitForTimeout(1500);
+        const lp = await page.evaluate(async () => {
+          await ensureLsoaImd();
+          showLSOA(LSOA_IMD.features.find(f => f.properties.ward === 'Lansbury'));
+          const t = document.getElementById('wpanel').innerText;
+          return { row: /Distance to nearest GP practice\s*[\d.]+\s*km/.test(t), legend: (document.getElementById('ov-cur-nm') || {}).textContent || '' };
+        });
+        ok(lp.row && /GP practice/.test(lp.legend), 'Small-area additions: the GP distance draws, and the LSOA profile gives it in km', JSON.stringify(lp));
+        const meth = await (await fetch(BASE + '/methodology.html')).text();
+        const missing = ['src-service-access', 'src-sape', 'src-claimant-youth', 'src-road-casualties', 'src-care-homes']
+          .filter(id => meth.indexOf("id: '" + id.slice(4) + "'") === -1);
+        ok(!missing.length, 'Small-area additions: the methodology page has a source row for each', missing.join(', '));
+      } else {
+        ok(/middle of each LSOA/.test(r.gpMethod) && !/population-weighted/.test(r.gpMethod),
+          'Small-area additions: when ONS gave no centroids, the GP distance card says it is measured from the middle of each LSOA', r.gpMethod);
+      }
+      ok(!errors.length, 'no page errors (small-area additions, with figures, ' + origin + ')', errors.join(' | '));
       await page.close();
     }
   }

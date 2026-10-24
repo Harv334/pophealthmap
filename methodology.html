@@ -489,6 +489,19 @@ and say what each one means.</p>
         <td>A figure published for a 2011 MSOA and carried over to a 2021 MSOA,
             as explained under <a href="#estimated">How figures are placed onto
             areas</a>.</td></tr>
+    <tr><td class="term">Mid-year estimate</td><td>Mid-year population estimate</td>
+        <td>ONS's estimate of how many people live in an area in the middle of
+            a year, made by rolling the last Census forward with births, deaths
+            and people moving. It is more recent than the Census, but less
+            certain for small areas.</td></tr>
+    <tr><td class="term">Killed or seriously injured</td><td>KSI casualties</td>
+        <td>People killed or seriously injured in a road collision reported to
+            the police. DfT adjusts the serious injuries so that forces which
+            record injuries in different ways can be compared.</td></tr>
+    <tr><td class="term">Population-weighted centre</td><td>Population-weighted centroid</td>
+        <td>The point ONS places in each LSOA where most of its people live,
+            used here to measure distances from, rather than the middle of its
+            shape.</td></tr>
     <tr><td class="term">PTAL</td><td>Public Transport Accessibility Level</td>
         <td>TfL's measure of how well connected a place is to public transport.
             It uses bands from 0 to 6b, shown here on a 0 to 8 scale where 8 is
@@ -509,8 +522,8 @@ and say what each one means.</p>
   </thead>
   <tbody>
     <tr><td class="term">ONS</td><td>Office for National Statistics</td>
-        <td>The Census, the area boundaries and the lookups between them, and
-            the claimant count with DWP.</td></tr>
+        <td>The Census, the mid-year population estimates, the area boundaries
+            and the lookups between them, and the claimant count with DWP.</td></tr>
     <tr><td class="term">Nomis</td><td>Nomis, run for ONS by Durham University</td>
         <td>The service we take the Census and claimant count figures
             from.</td></tr>
@@ -530,6 +543,11 @@ and say what each one means.</p>
     <tr><td class="term">Defra</td><td>Department for Environment, Food and Rural Affairs</td>
         <td>The modelled air quality figures and the green and blue space
             measures.</td></tr>
+    <tr><td class="term">DfT</td><td>Department for Transport</td>
+        <td>The road casualty figures (STATS19), and outside London the national
+            register of stops (NaPTAN).</td></tr>
+    <tr><td class="term">CQC</td><td>Care Quality Commission</td>
+        <td>The register of care homes and their beds.</td></tr>
     <tr><td class="term">TfL</td><td>Transport for London</td>
         <td>The register of London's stations and bus stops, and PTAL.</td></tr>
     <tr><td class="term">Charity Commission</td><td>Charity Commission for England and Wales</td>
@@ -656,7 +674,12 @@ them. So a crime or a practice is counted in the ward it is really in, which is
 not always the ward its LSOA is given to. This is true of about 1 in 10 of
 them. Air pollution comes on a 1 km grid, and each LSOA takes the average of
 the grid squares it covers, by area. Distances to stations and bus stops are
-measured in a straight line from the middle of each LSOA. Charities are linked
+measured in a straight line from the middle of each LSOA. Distances to the
+nearest GP practice, pharmacy and NHS dentist are measured in a straight line
+from the point ONS places where most of each LSOA's people live (its
+population-weighted centre), to the nearest site anywhere in England. Care
+homes are placed by postcode, and road casualties in the LSOA the casualty
+lives in, as DfT records it. Charities are linked
 to the LAs they say they work in by matching the LA names in the Charity
 Commission register. PCN footprints come from where each network's registered
 patients live (see <a href="#pcns">Primary care networks are lists of patients,
@@ -683,6 +706,17 @@ figure from its wards in the same way. Fuel poverty, and the deprivation
 measures beyond the IMD's seven domains, are worked out from all of the LA's
 LSOAs instead, and Census figures as explained under
 <a href="#census-levels">Census figures at every level</a>.</p>
+
+<p>A few figures are rates made from counts we add up ourselves. For the
+claimant rate aged 18 to 24, residents killed or seriously injured on the
+roads, and care home beds per 100 people aged 75 and over, we add up the counts
+of the LSOAs in each ward, and the people they are counted out of, before
+dividing. LA figures add up all the LSOAs in the LA in the same way. These are
+shown for wards and LAs only, because an LSOA has too few claimants,
+casualties or care homes for its own figure to mean much. The mid-year
+population estimates are added up into wards and LAs in the same way, and the
+distances to GP practices, pharmacies and dentists are averaged, weighted by
+population.</p>
 
 <h3 id="best-fit">Best fit, not exact fit</h3>
 
@@ -1129,7 +1163,7 @@ var SOURCES = [
           'The total and the crime rate leave out anti-social behaviour. It is not a crime, ' +
           'police forces record it in different ways, and it has its own indicator.',
     geo: 'Places moved by the publisher to nearby points on the map, so no one can be ' +
-         'identified, then counted here into wards',
+         'identified, then counted here into wards and, from the next data refresh, LSOAs',
     period: 'The 12 months to the latest release',
     cadence: 'Monthly, about two months behind.',
     manifest: 'crime' },
@@ -1143,6 +1177,58 @@ var SOURCES = [
     period: 'The latest month published',
     cadence: 'Monthly.',
     manifest: 'claimant' },
+
+  { id: 'claimant-youth',
+    name: 'Claimant count aged 18 to 24',
+    pub: 'DWP and ONS, through Nomis, with ONS mid-year population estimates',
+    what: 'People aged 18 to 24 claiming benefits because they are unemployed, as a rate of ' +
+          'everyone aged 18 to 24. ONS rounds each LSOA\'s count to the nearest 5, so it is ' +
+          'shown for wards and LAs only, adding up the LSOAs\' claimants and people of that age ' +
+          'before dividing.',
+    geo: 'LSOA counts, added up into wards and LAs',
+    period: 'The latest month published',
+    ind: 'claimant_18_24_pct',
+    cadence: 'Monthly.',
+    manifest: 'claimant_youth' },
+
+  { id: 'sape',
+    name: 'Mid-year population estimates',
+    pub: 'ONS',
+    what: 'How many people live in each LSOA, and the shares aged 0 to 15, 16 to 64, 65 and ' +
+          'over and 75 and over, estimated for the middle of a recent year by rolling the ' +
+          'Census forward with births, deaths and people moving. They are shown beside the ' +
+          'Census figures, not in place of them, and the claimant and crime rates still use ' +
+          'the Census.',
+    geo: 'LSOA, added up into wards and LAs',
+    period: 'The latest year published, mid-2024 at the last check',
+    ind: 'sape_population',
+    cadence: 'Yearly, more than a year after the date they describe.',
+    manifest: 'sape' },
+
+  { id: 'road-casualties',
+    name: 'Road casualties',
+    pub: 'Police forces, through DfT\'s road casualty statistics (STATS19)',
+    what: 'Residents killed or seriously injured in road collisions reported to the police over ' +
+          'five years, wherever in Great Britain the collision happened, per 1,000 residents at ' +
+          'the 2021 Census. Serious injuries use DfT\'s adjusted figures, because police forces ' +
+          'record injuries differently. Many slight injuries are never reported, so they are not counted.',
+    geo: 'Each casualty\'s home LSOA, added up into wards and LAs',
+    period: 'The latest five years published',
+    ind: 'road_ksi_per_1000',
+    cadence: 'Yearly, each September.',
+    manifest: 'road_casualties' },
+
+  { id: 'care-homes',
+    name: 'Care home beds',
+    pub: 'Care Quality Commission (CQC), with ONS mid-year population estimates',
+    what: 'Beds in care homes registered with CQC, with or without nursing, per 100 people ' +
+          'aged 75 and over. It measures care home capacity, not how many residents need care, ' +
+          'and it counts homes for younger adults too.',
+    geo: 'Each care home placed by postcode in its LSOA, added up into wards and LAs',
+    period: 'The directory at the last update',
+    ind: 'care_home_beds_per_100_75plus',
+    cadence: 'Monthly.',
+    manifest: 'care_homes' },
 
   { id: 'fuel-poverty',
     name: 'Fuel poverty',
@@ -1263,6 +1349,21 @@ var SOURCES = [
     period: 'As the register stood at the last update',
     cadence: 'Continuous, as stops open and close.',
     manifest: 'tfl' },
+
+  { id: 'service-access',
+    name: 'Distance to GP practices, pharmacies and dentists',
+    pub: 'Measured here from the NHS registers of GP practices, pharmacies and dental practices',
+    what: 'The straight-line distance in kilometres from each LSOA to the nearest GP practice, ' +
+          'community pharmacy and high street NHS dental practice, measured from the point ONS ' +
+          'places where most of the LSOA\'s people live (or the middle of the LSOA where ONS ' +
+          'gives no such point). It is not a travel time. Sites in other ' +
+          'LAs count, because for an LSOA near the edge the nearest one often is. Branch surgeries ' +
+          'are not on the GP register, and a dental contract does not mean a practice is taking ' +
+          'new NHS patients.',
+    geo: 'Measured for each LSOA, and averaged into wards and LAs weighted by population',
+    period: 'As the registers stood at the last update',
+    cadence: 'Monthly.',
+    manifest: 'service_access' },
 
   { id: 'ptal',
     name: 'Public transport accessibility (PTAL)',

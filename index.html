@@ -3885,6 +3885,7 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
               <option value="census_disability_lot_pct">Disability (limited a lot) % · Output area</option>
               <option value="census_provides_unpaid_care_pct">Provides unpaid care % · Output area</option>
               <option value="census_unpaid_care_50h_pct">Unpaid care, 50 or more hours a week % · Output area</option>
+              <option value="care_home_beds_per_100_75plus">Care home beds per 100 people aged 75 and over · Ward</option>
               <option value="ft_a_e_attendance_under_5">A&E attendances, ages 0 to 4 · LA</option>
               <option value="ft_cervical_screening_25_49">Cancer screening coverage: cervical (25 to 49) · LA</option>
               <option value="ft_child_poverty_low_income">Children in relative low income families (under 16) · LA</option>
@@ -3995,6 +3996,11 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
               <option value="census_working_age_pct">Aged 15 to 64 % · Output area</option>
               <option value="census_over65_pct">65+ % · Output area</option>
               <option value="census_over85_pct">85+ % · Output area</option>
+              <option value="sape_population">Population, mid-year estimate · LSOA</option>
+              <option value="sape_age0_15_pct">Aged 0 to 15 %, mid-year estimate · LSOA</option>
+              <option value="sape_age16_64_pct">Aged 16 to 64 %, mid-year estimate · LSOA</option>
+              <option value="sape_age65plus_pct">Aged 65 and over %, mid-year estimate · LSOA</option>
+              <option value="sape_age75plus_pct">Aged 75 and over %, mid-year estimate · LSOA</option>
               <option value="census_english_hh_all_pct">All adults in the household have English as a main language % · Output area</option>
               <option value="census_english_hh_none_pct">No one in the household has English as a main language % · Output area</option>
               <option value="census_poor_english_pct">Cannot speak English well or at all % · Output area</option>
@@ -4013,6 +4019,7 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
               <option value="census_hh_deprived_2plus_pct">Households deprived in two or more dimensions % · Output area</option>
               <option value="census_hh_deprived_any_pct">Households deprived in at least one dimension % · Output area</option>
               <option value="claimant_rate_pct">Claimant rate, working age (%) · LSOA</option>
+              <option value="claimant_18_24_pct">Claimant rate, aged 18 to 24 (%) · Ward</option>
             </optgroup>
             <optgroup label="Housing and transport">
               <option value="census_no_car_pct">No car/van % · Output area</option>
@@ -4035,6 +4042,9 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
               <option value="rail_stations_1km">Stations within 1 km (TfL) · LSOA</option>
               <option value="bus_stop_dist_m">Distance to nearest bus stop, straight line, m (TfL) · LSOA</option>
               <option value="bus_stops_800m">Bus stops within 800 m (TfL) · LSOA</option>
+              <option value="gp_dist_km">Distance to nearest GP practice, straight line, km · LSOA</option>
+              <option value="pharmacy_dist_km">Distance to nearest pharmacy, straight line, km · LSOA</option>
+              <option value="dentist_dist_km">Distance to nearest NHS dentist, straight line, km · LSOA</option>
               <option value="gb_commitment_pct">Green OR blue space within 15 min walk % (Defra) · LSOA</option>
               <option value="green_commitment_pct">Green space within 15 min walk % (Defra) · LSOA</option>
               <option value="green_doorstep_pct">Doorstep green space (&lt;200m, &ge;0.5 ha) % · LSOA</option>
@@ -4056,6 +4066,7 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
               <option value="crime_arson_12mo">Arson &amp; criminal damage · Ward</option>
               <option value="crime_weapons_12mo">Possession of weapons · Ward</option>
               <option value="crime_misc_society_12mo">Other crime · Ward</option>
+              <option value="road_ksi_per_1000">Residents killed or seriously injured on the roads, per 1,000 · Ward</option>
             </optgroup>
           </select>
 
@@ -5444,6 +5455,10 @@ const OV_CFG = {
   // and it is also more people looking after one another. Neither is "worse".
   census_provides_unpaid_care_pct: { lo:"Lower", hi:"Higher", wh:true,  min:2,    max:10,   descriptive:true },
   census_unpaid_care_50h_pct:      { lo:"Lower", hi:"Higher", wh:true,  min:0.5,  max:5,    descriptive:true },
+  // Care home beds (CQC) per 100 people aged 75 and over. Descriptive: more
+  // beds is capacity, not a better or worse place to live, and one large
+  // home decides a ward's figure. No range typed: it comes from indicators.js.
+  care_home_beds_per_100_75plus:   { lo:"Fewer", hi:"More",   wh:false, descriptive:true },
   // Crime (ward total, 12 months)
   crime_total:                     { lo:"Fewer", hi:"More",   wh:true,  min:200,  max:5000 },
   // Per 1,000 residents. Capped near the 95th percentile: a handful of
@@ -5460,6 +5475,9 @@ const OV_CFG = {
   crime_drug_offences_12mo:        { lo:"Fewer", hi:"More",   wh:true,  min:0,    max:250  },
   crime_misc_society_12mo:         { lo:"Fewer", hi:"More",   wh:true,  min:0,    max:60   },
   crime_weapons_12mo:              { lo:"Fewer", hi:"More",   wh:true,  min:0,    max:30   },
+  // Residents killed or seriously injured on the roads (DfT STATS19), per
+  // 1,000 over five years. More is worse. Range from indicators.js.
+  road_ksi_per_1000:               { lo:"Fewer", hi:"More",   wh:true },
   crime_public_order_12mo:         { lo:"Fewer", hi:"More",   wh:true,  min:0,    max:250  },
   crime_robbery_12mo:              { lo:"Fewer", hi:"More",   wh:true,  min:0,    max:150  },
   crime_theft_12mo:                { lo:"Fewer", hi:"More",   wh:true,  min:0,    max:1500 },
@@ -5549,6 +5567,13 @@ const OV_CFG = {
   census_working_age_pct:          { lo:"Lower", hi:"Higher", wh:false, min:55,   max:80,   descriptive:true },
   census_over65_pct:               { lo:"Lower", hi:"Higher", wh:false, min:5,    max:22,   descriptive:true },
   census_over85_pct:               { lo:"Lower", hi:"Higher", wh:false, min:0.5,  max:4,    descriptive:true },
+  // ONS mid-year population estimates. Descriptive, like the Census ages;
+  // ranges from indicators.js.
+  sape_population:                 { lo:"Fewer", hi:"More",   wh:false, descriptive:true },
+  sape_age0_15_pct:                { lo:"Lower", hi:"Higher", wh:false, descriptive:true },
+  sape_age16_64_pct:               { lo:"Lower", hi:"Higher", wh:false, descriptive:true },
+  sape_age65plus_pct:              { lo:"Lower", hi:"Higher", wh:false, descriptive:true },
+  sape_age75plus_pct:              { lo:"Lower", hi:"Higher", wh:false, descriptive:true },
   // Environment & access. Higher fuel poverty = worse (wh:true).
   fuel_poverty_pct:                { lo:"Lower", hi:"Higher", wh:true,  min:5,    max:25   },
   // PTAL: higher band = better transport access, so wh:false. The scale is the
@@ -5574,6 +5599,13 @@ const OV_CFG = {
   rail_stations_1km:               { lo:"Fewer",  hi:"More",    wh:false, min:0,   max:8    },
   bus_stop_dist_m:                 { lo:"Closer", hi:"Further", wh:true,  min:0,   max:600  },
   bus_stops_800m:                  { lo:"Fewer",  hi:"More",    wh:false, min:0,   max:75   },
+  // Distance to the nearest GP practice, pharmacy and NHS dentist, measured
+  // by the pipeline from the NHS registers (run_service_access). Further is
+  // worse. No range typed: under a kilometre for most of London, over ten in
+  // the most rural regions, so it comes from indicators.js.
+  gp_dist_km:                      { lo:"Closer", hi:"Further", wh:true },
+  pharmacy_dist_km:                { lo:"Closer", hi:"Further", wh:true },
+  dentist_dist_km:                 { lo:"Closer", hi:"Further", wh:true },
   // Defra 15-min green/blue space access (ODS, 2025). Higher % of UPRNs within
   // the relevant walking distance to qualifying space = BETTER access (wh:false).
   // Ranges chosen to span the observed London spread (LSOA-level).
@@ -5642,6 +5674,9 @@ const OV_CFG = {
   // Claimant count (NOMIS CLA01). Rate is claimants per working-age resident.
   claimant_rate_pct:               { lo:"Lower", hi:"Higher", wh:true,  min:1,    max:10   },
   claimant_count:                  { lo:"Fewer", hi:"More",   wh:true,  min:0,    max:300  },
+  // Claimants aged 18 to 24 over people aged 18 to 24 (ONS mid-year
+  // estimates), for wards and LAs from summed LSOA counts.
+  claimant_18_24_pct:              { lo:"Lower", hi:"Higher", wh:true },
   // Household language (Census 2021, TS025). "All adults English" is the
   // fully-English-speaking household share; "no people English" flags where
   // services may need interpreting, so wh:true on that one. Both are
@@ -5849,6 +5884,9 @@ const CATS = [
     { k: "census_disability_lot_pct",        l: "Disability, limited a lot (%)", g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_provides_unpaid_care_pct",  l: "Provides unpaid care (%)",      g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_unpaid_care_50h_pct",       l: "Unpaid care, 50 or more hours a week (%)", g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
+    // Counted for wards and LAs from the care homes in their LSOAs; one home
+    // decides an LSOA's figure, so LSOAs are not offered.
+    { k: "care_home_beds_per_100_75plus",    l: "Care home beds per 100 people aged 75 and over", g: "ward" },
     { k: "ft_93280", l: "Fuel poverty (low income, low energy efficiency methodology)", g: "msoa", lv: ["ward","msoa"] },
     { k: "ft_93097", l: "Unemployment: people claiming out of work benefit (aged 16 to 64)", g: "msoa", lv: ["ward","msoa"] },
     { k: "ft_93098", l: "Long-term unemployment: people claiming out of work benefit for over 12 months (aged 16 to 64)", g: "msoa", lv: ["ward","msoa"] },
@@ -5952,6 +5990,13 @@ const CATS = [
     { k: "census_working_age_pct",           l: "Aged 15 to 64 (%)",            g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_over65_pct",                l: "65 and over (%)",               g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_over85_pct",                l: "85 and over (%)",               g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
+    // ONS mid-year population estimates, published per LSOA; wards and LAs
+    // from summed counts (small_area_figures in the pipeline).
+    { k: "sape_population",                  l: "Population, mid-year estimate",  g: "lsoa", lv: ["ward","lsoa"] },
+    { k: "sape_age0_15_pct",                 l: "Aged 0 to 15, mid-year estimate (%)", g: "lsoa", lv: ["ward","lsoa"] },
+    { k: "sape_age16_64_pct",                l: "Aged 16 to 64, mid-year estimate (%)", g: "lsoa", lv: ["ward","lsoa"] },
+    { k: "sape_age65plus_pct",               l: "Aged 65 and over, mid-year estimate (%)", g: "lsoa", lv: ["ward","lsoa"] },
+    { k: "sape_age75plus_pct",               l: "Aged 75 and over, mid-year estimate (%)", g: "lsoa", lv: ["ward","lsoa"] },
     { k: "census_white_pct",                 l: "White (%)",                     g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_asian_pct",                 l: "Asian / Asian British (%)",     g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_black_pct",                 l: "Black / Black British (%)",     g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
@@ -5988,6 +6033,8 @@ const CATS = [
     { k: "census_no_qual_pct",               l: "No qualifications (%)",         g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "claimant_count",                   l: "Claimant count",                g: "lsoa" },
     { k: "claimant_rate_pct",                l: "Claimant rate, working-age (%)", g: "lsoa" },
+    // Summed from LSOA counts, which Nomis rounds to 5, so wards and LAs only.
+    { k: "claimant_18_24_pct",               l: "Claimant rate, aged 18 to 24 (%)", g: "ward" },
   ]},
   { key: "housing", label: "Housing and transport", ico: "home", fields: [
     { k: "census_owned_pct",                 l: "Owner occupied (%)",            g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
@@ -6011,6 +6058,10 @@ const CATS = [
     { k: "no2_ugm3",            l: "Nitrogen dioxide NO₂ (µg/m³)",     g: "lsoa", lv: ["ward","lsoa"] },
     { k: "pm25_ugm3",           l: "Fine particulates PM2.5 (µg/m³)",  g: "lsoa", lv: ["ward","lsoa"] },
     { k: "pm10_ugm3",           l: "Particulates PM10 (µg/m³)",        g: "lsoa", lv: ["ward","lsoa"] },
+    // Measured per LSOA by the pipeline; ward and LA figures weighted by residents.
+    { k: "gp_dist_km",          l: "Distance to nearest GP practice, straight line (km)", g: "lsoa", lv: ["ward","lsoa"] },
+    { k: "pharmacy_dist_km",    l: "Distance to nearest pharmacy, straight line (km)", g: "lsoa", lv: ["ward","lsoa"] },
+    { k: "dentist_dist_km",     l: "Distance to nearest NHS dentist, straight line (km)", g: "lsoa", lv: ["ward","lsoa"] },
     { k: "gb_commitment_pct",                l: "Green OR blue 15-min walk (%)", g: "lsoa" },
     { k: "green_commitment_pct",             l: "Green space 15-min walk (%)",   g: "lsoa" },
     { k: "green_doorstep_pct",               l: "Doorstep green (<200m, ≥0.5 ha) (%)",    g: "lsoa" },
@@ -6031,6 +6082,8 @@ const CATS = [
     { k: "crime_arson_12mo",                 l: "Arson & criminal damage",           g: "ward" },
     { k: "crime_weapons_12mo",               l: "Possession of weapons",             g: "ward" },
     { k: "crime_misc_society_12mo",          l: "Other crime",      g: "ward" },
+    // By where the casualty lives, for wards and LAs from summed LSOA counts.
+    { k: "road_ksi_per_1000",                l: "Residents killed or seriously injured on the roads", g: "ward" },
   ]}
 ];
 
@@ -6057,6 +6110,142 @@ function iodWeightWords(k) {
   const want = k === 'idaci_pct' ? 'children' : k === 'idaopi_pct' ? 'older' : 'residents';
   const got = w[k] || want;
   return IOD_WEIGHT_WORDS[got] || 'residents at the 2021 Census';
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE SMALL-AREA ADDITIONS
+
+   Distance to the nearest GP practice, pharmacy and NHS dentist (measured
+   here from the NHS registers), ONS's mid-year population estimates, the
+   claimant rate aged 18 to 24, residents killed or seriously injured on the
+   roads, and care home beds per 100 people aged 75 and over
+   (fetch_all_data.py, "SMALL-AREA ADDITIONS"). One entry each says who
+   publishes the figures, how the ward and LA figures are made and what the
+   card says, so the card, the Data export notes and the methodology link all
+   read from one place. Their figures arrive with a data refresh; until then
+   the empty-indicator rule (PH_EMPTY_IND) keeps them out of every list.
+   ═══════════════════════════════════════════════════════════════════════════ */
+// What the ward file says about them (build_ward_data, metadata.small_area):
+// where the distances are measured from, and the periods.
+function saNote(name) {
+  try { return ((typeof WARD_META === 'object' && WARD_META && WARD_META.small_area) || {})[name]; }
+  catch (e) { return undefined; }        // not loaded yet
+}
+function saOriginWords() {
+  const o = saNote('service_access_origin');
+  return o === 'centroid' ? 'the middle of each LSOA'
+    : o === 'mixed' ? 'the population-weighted centre of each LSOA where ONS publishes one, and otherwise its middle'
+    : 'the population-weighted centre of each LSOA, the point ONS places where most of its people live';
+}
+const SA_DIST_WHAT = {
+  gp_dist_km: ['GP practice', 'The register lists main surgeries but not branch surgeries, so in some places the nearest place to see a GP is closer than this, and a practice nearby may not be taking new patients.'],
+  pharmacy_dist_km: ['pharmacy', 'Online and distance-selling pharmacies and appliance suppliers are left out, because nobody can walk into them.'],
+  dentist_dist_km: ['high street NHS dental practice', 'Orthodontists and hospital and community dental services are left out, because they take referrals, and an NHS contract does not mean a practice is taking new NHS patients.'],
+};
+const SA_SAPE_AGE = { sape_age0_15_pct: '0 to 15', sape_age16_64_pct: '16 to 64', sape_age65plus_pct: '65 and over', sape_age75plus_pct: '75 and over' };
+const SA_SUMMED = ' before dividing, so each figure is for the area as a whole rather than an average of its LSOAs.';
+const SMALL_AREA = {};
+['gp_dist_km', 'pharmacy_dist_km', 'dentist_dist_km'].forEach(k => {
+  SMALL_AREA[k] = {
+    by: 'We measure these for each LSOA from the NHS registers of GP practices, pharmacies and dental practices.',
+    ward: 'Ward figures are an average of the LSOAs that best fit each ward, weighted by population.',
+    borough: 'LA figures are an average of all the LSOAs in each LA, weighted by population.',
+    card: 'NHS registers of GP practices, pharmacies and dentists, distances measured here',
+    full: 'NHS England Organisation Data Service (ODS) registers of GP practices (epraccur), pharmacies (edispensary) and dental practices (egdpprac), placed by postcode with the ONS Postcode Directory through postcodes.io, with distances measured here',
+    anchor: 'src-service-access',
+    facts: () => ({
+      cadence: 'We measure these again every month from the latest NHS registers.',
+      method: 'This is a straight-line distance from ' + saOriginWords() + ' to the nearest ' + SA_DIST_WHAT[k][0] +
+        ', not a walking route or a travel time, so it says least about rural areas, where roads wind and buses are few. ' +
+        SA_DIST_WHAT[k][1] + ' Sites over an LA boundary count, because for an LSOA near the edge the nearest one often is.',
+    }),
+  };
+});
+['sape_population', 'sape_age0_15_pct', 'sape_age16_64_pct', 'sape_age65plus_pct', 'sape_age75plus_pct'].forEach(k => {
+  SMALL_AREA[k] = {
+    by: 'ONS publishes these estimates for LSOAs.',
+    ward: k === 'sape_population' ? 'Ward figures add up the LSOAs that best fit each ward under the ONS lookup.'
+      : 'Ward figures add up the people of each age in the LSOAs that best fit each ward' + SA_SUMMED,
+    borough: k === 'sape_population' ? 'LA figures add up all the LSOAs in each LA.'
+      : 'LA figures add up all the LSOAs in each LA in the same way.',
+    card: 'ONS, mid-year population estimates for LSOAs',
+    full: 'Office for National Statistics (ONS), mid-year population estimates for Lower layer Super Output Areas, by single year of age',
+    anchor: 'src-sape',
+    facts: () => ({
+      num: SA_SAPE_AGE[k] ? 'People aged ' + SA_SAPE_AGE[k] : '',
+      den: SA_SAPE_AGE[k] ? 'Everyone living in the area, as ONS estimates it' : '',
+      cadence: 'ONS publishes these estimates once a year, more than a year after the date they describe.',
+      method: 'ONS rolls the 2021 Census count forward with births, deaths and people moving, so these are estimates, least certain where many students live or many people move in and out. ' +
+        'They are more recent than the Census figures on this map, which describe March 2021. The claimant and crime rates still use the Census counts, as they did before these estimates were added.',
+    }),
+  };
+});
+SMALL_AREA.claimant_18_24_pct = {
+  by: 'ONS publishes claimant counts by age for LSOAs, and we add them up for each ward and LA.',
+  ward: 'Ward figures add up the claimants and the people aged 18 to 24 of the LSOAs that best fit each ward' + SA_SUMMED,
+  borough: 'LA figures add them up in the same way for all the LSOAs in each LA.',
+  card: 'ONS, claimant count by age, from Nomis, with ONS mid-year population estimates',
+  full: 'Claimant count by age from the Office for National Statistics (ONS), published on Nomis (dataset NM_162_1), with ONS mid-year population estimates for LSOAs',
+  anchor: 'src-claimant-youth',
+  unit: '% of residents aged 18 to 24',
+  facts: () => ({
+    num: 'People aged 18 to 24 claiming Universal Credit or Jobseeker\'s Allowance mainly because they are out of work',
+    den: 'People aged 18 to 24 in ONS\'s mid-year population estimates',
+    cadence: 'ONS publishes the claimant count every month, and we refresh it here on the 15th of each month.',
+    method: 'ONS rounds each LSOA\'s count to the nearest 5, so this is shown for wards and LAs only, where the rounding of several LSOAs mostly evens out. ' +
+      'Students are counted where they live in term time, which lowers the rate in student areas, and some people on Universal Credit who are in low-paid work count too.',
+  }),
+};
+SMALL_AREA.road_ksi_per_1000 = {
+  by: 'DfT publishes each road casualty with the LSOA they live in, and we add them up for each ward and LA.',
+  ward: 'Ward figures add up the casualties and the residents of the LSOAs that best fit each ward' + SA_SUMMED,
+  borough: 'LA figures add them up in the same way for all the LSOAs in each LA.',
+  card: 'DfT, road casualty statistics (STATS19), with residents from the 2021 Census',
+  full: 'Department for Transport (DfT), reported road casualties Great Britain (STATS19), casualties for the last five years, with residents from the Office for National Statistics (ONS) Census 2021',
+  anchor: 'src-road-casualties',
+  unit: 'per 1,000 residents over five years',
+  facts: () => ({
+    num: 'Residents killed or seriously injured in road collisions reported to the police over five years, wherever in Great Britain they happened',
+    den: 'Usual residents at the 2021 Census, per 1,000',
+    cadence: 'DfT publishes the final figures for each year the following September, and we refresh them here every month.',
+    method: 'Serious injuries use DfT\'s adjusted figures. Police forces record injuries in different ways, so DfT gives each injured person the chance that their injury was serious, and these chances are added up. ' +
+      'Counting people where they live rather than where the collision happened means a busy road through a ward does not make it look dangerous to live in. ' +
+      'It is shown for wards and LAs only, because most LSOAs have none or one in five years, and many slight injuries are never reported to the police, so they are not counted.',
+  }),
+};
+SMALL_AREA.care_home_beds_per_100_75plus = {
+  by: 'CQC lists each care home with its beds, and we add them up for each ward and LA.',
+  ward: 'Ward figures add up the beds and the people aged 75 and over of the LSOAs that best fit each ward' + SA_SUMMED,
+  borough: 'LA figures add them up in the same way for all the LSOAs in each LA.',
+  card: 'CQC, care directory, with ONS mid-year population estimates',
+  full: 'Care Quality Commission (CQC), care directory with filters (care homes and their registered beds), with Office for National Statistics (ONS) mid-year population estimates',
+  anchor: 'src-care-homes',
+  unit: 'beds per 100 people aged 75 and over',
+  facts: () => ({
+    num: 'Beds in care homes registered with CQC, with or without nursing, placed by their postcode',
+    den: 'People aged 75 and over in ONS\'s mid-year population estimates, per 100',
+    cadence: 'CQC updates its care directory every month, and we refresh it here on the 15th of each month.',
+    method: 'Beds are registered places, not residents, and they include homes for younger adults with a disability or mental health needs. ' +
+      'So this says how much care home capacity an area has rather than how many of its own residents need care, and one large home lifts a ward\'s figure a long way. ' +
+      'It is shown for wards and LAs only, because most LSOAs have no care home at all.',
+  }),
+};
+function saInfo(k) { return Object.prototype.hasOwnProperty.call(SMALL_AREA, k) ? SMALL_AREA[k] : null; }
+
+/* Crime by LSOA. The pipeline counts police.uk's crimes in each LSOA as well
+   as each ward (crime_by_lsoa), under the ward keys, so one indicator is
+   drawn at both levels. A build from before that has them for wards only, so
+   the LSOA level is offered only where indicators.js says the LSOA file
+   holds them (see _crimeLsoaLevel, after OV_META). */
+const CRIME_LSOA_KEYS = ['crime_total', 'crime_rate_per_1000', 'crime_violence_12mo', 'crime_burglary_12mo',
+  'crime_robbery_12mo', 'crime_theft_12mo', 'crime_asb_12mo'];
+function crimeHasLsoa(k) {
+  // PH_IND_STATS directly, not indStats: this runs while the registry is
+  // being set up, before the key aliases indStats reads exist, and the
+  // crime keys have no alias.
+  const G = (typeof PH_IND_STATS === 'object' && PH_IND_STATS && PH_IND_STATS.stats) || {};
+  const st = G[k || 'crime_total'];
+  return !!(st && st.lv && st.lv.lsoa && st.lv.lsoa.n > 0);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -6130,6 +6319,7 @@ const IND_NAMES = {
   census_disability_lot_pct:       ['Disabled residents (limited a lot)', 'Disabled under the Equality Act: day-to-day activities limited a lot'],
   census_provides_unpaid_care_pct: ['Unpaid carers', 'Provision of unpaid care: provides any unpaid care'],
   census_unpaid_care_50h_pct:      ['Unpaid care, 50 or more hours a week', 'Provision of unpaid care: provides 50 or more hours unpaid care a week'],
+  care_home_beds_per_100_75plus:   ['Care home beds per 100 people aged 75 and over', 'Beds in CQC registered care homes per 100 residents aged 75 and over'],
   // Health, OHID Local Health (published for MSOAs)
   ft_93280:  ['Fuel poverty (OHID, 2023)', 'Fuel poverty (low income, low energy efficiency methodology)'],
   ft_93097:  ['Out-of-work benefit claimants', 'Unemployment: people claiming out of work benefit (aged 16 to 64)'],
@@ -6233,6 +6423,12 @@ const IND_NAMES = {
   census_working_age_pct:     [CENSUS_AGE_OK ? 'Working age (16 to 64)' : 'Aged 15 to 64', 'Age: ' + AGE_WORK],
   census_over65_pct:          ['Aged 65 and over', 'Age: 65 and over'],
   census_over85_pct:          ['Aged 85 and over', 'Age: 85 and over'],
+  // ONS mid-year population estimates
+  sape_population:            ['Population (mid-year estimate)', 'Mid-year population estimate: all ages'],
+  sape_age0_15_pct:           ['Aged 0 to 15 (mid-year estimate)', 'Mid-year population estimate: aged 0 to 15'],
+  sape_age16_64_pct:          ['Aged 16 to 64 (mid-year estimate)', 'Mid-year population estimate: aged 16 to 64'],
+  sape_age65plus_pct:         ['Aged 65 and over (mid-year estimate)', 'Mid-year population estimate: aged 65 and over'],
+  sape_age75plus_pct:         ['Aged 75 and over (mid-year estimate)', 'Mid-year population estimate: aged 75 and over'],
   census_white_pct:           ['White', 'Ethnic group: White'],
   census_asian_pct:           ['Asian or Asian British', 'Ethnic group: Asian, Asian British or Asian Welsh'],
   census_black_pct:           ['Black or Black British', 'Ethnic group: Black, Black British, Black Welsh, Caribbean or African'],
@@ -6262,6 +6458,7 @@ const IND_NAMES = {
   census_no_qual_pct:              ['No qualifications', 'Highest level of qualification: no qualifications'],
   claimant_count:                  ['Claimant count', 'Claimant count'],
   claimant_rate_pct:               ['Claimant rate, working age', 'Claimant count as a proportion of residents aged ' + AGE_WORK],
+  claimant_18_24_pct:              ['Claimant rate, aged 18 to 24', 'Claimant count aged 18 to 24 as a proportion of residents aged 18 to 24'],
   // Housing and transport
   census_owned_pct:            ['Home ownership', 'Tenure of household: owned'],
   census_social_rented_pct:    ['Social renting', 'Tenure of household: social rented'],
@@ -6279,6 +6476,9 @@ const IND_NAMES = {
   rail_stations_1km:           ['Stations within 1 km', ''],
   bus_stop_dist_m:             ['Distance to nearest bus stop', ''],
   bus_stops_800m:              ['Bus stops within 800 m', ''],
+  gp_dist_km:                  ['Distance to nearest GP practice', ''],
+  pharmacy_dist_km:            ['Distance to nearest pharmacy', ''],
+  dentist_dist_km:             ['Distance to nearest NHS dentist', ''],
   // Environment and access
   fuel_poverty_pct:        ['Fuel poverty', 'Households in fuel poverty (Low Income Low Energy Efficiency)'],
   no2_ugm3:                ['Nitrogen dioxide (NO₂)', 'Modelled annual mean background nitrogen dioxide'],
@@ -6303,6 +6503,7 @@ const IND_NAMES = {
   crime_arson_12mo:         ['Arson and criminal damage', ''],
   crime_weapons_12mo:       ['Possession of weapons', ''],
   crime_misc_society_12mo:  ['Other crime', ''],
+  road_ksi_per_1000:        ['Residents killed or seriously injured on the roads', 'Road casualties killed or seriously injured (adjusted), by home LSOA, per 1,000 residents over five years'],
 };
 
 /* The same measure published twice: an LA series beside the small-area one,
@@ -6370,14 +6571,16 @@ const IND_DECIMALS = {};
     'crime_drug_offences_12mo', 'crime_public_order_12mo', 'crime_arson_12mo', 'crime_weapons_12mo',
     'crime_misc_society_12mo', 'core20_lsoa_count', 'total_lsoa_count', 'claimant_count',
     'gb_total_uprn', 'imd_decile', 'imd_rank', 'rail_station_dist_m', 'bus_stop_dist_m',
-    'idaci_decile', 'idaci_rank', 'idaopi_decile', 'idaopi_rank'];
+    'idaci_decile', 'idaci_rank', 'idaopi_decile', 'idaopi_rank', 'sape_population'];
   // PTAL has one decimal: a second suggests a precision the measure lacks.
   // The sub-domain scores, the mood and anxiety score and the air quality
   // and road accident measures run over a few units, so they keep two.
   const two = ['education_score', 'health_score', 'crime_score',
     'barriers_score', 'environment_score', 'cyp_education_score', 'adult_skills_score',
     'geo_barriers_score', 'wider_barriers_score', 'indoors_score', 'outdoors_score',
-    'iod_mood_anxiety', 'iod_air_quality', 'iod_road_accidents'];
+    'iod_mood_anxiety', 'iod_air_quality', 'iod_road_accidents',
+    // Distances in kilometres: most of London is under one, so two places.
+    'gp_dist_km', 'pharmacy_dist_km', 'dentist_dist_km'];
   Object.keys(IND_NAMES).forEach(k => { IND_DECIMALS[k] = 1; });
   whole.forEach(k => { IND_DECIMALS[k] = 0; });
   two.forEach(k => { IND_DECIMALS[k] = 2; });
@@ -6410,7 +6613,7 @@ function indCsvValue(v, k) {
    counts, scores and deciles, whose label already says what they are. */
 function indValueUnit(k) {
   const u = indUnit(k);
-  return u === '%' ? '%' : (/^(µg\/m³|m)$/.test(u) ? ' ' + u : '');
+  return u === '%' ? '%' : (/^(µg\/m³|m|km)$/.test(u) ? ' ' + u : '');
 }
 
 /* Put the names where the older readers look for them, so nothing that reads
@@ -6679,6 +6882,7 @@ const OV_META = {
   census_disability_lot_pct:      { src: "Census 2021 (TS038)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of residents whose day-to-day activities are limited a lot by a long-term health problem or disability, the more severe of the two groups the Equality Act counts as disabled." },
   census_provides_unpaid_care_pct:{ src: "Census 2021 (TS039)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of residents aged 5 and over who give unpaid care to someone because of a long-term illness, a disability or old age." },
   census_unpaid_care_50h_pct:     { src: "Census 2021 (TS039)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of residents aged 5 and over who give 50 or more hours of unpaid care a week to someone because of a long-term illness, a disability or old age. These carers are part of the unpaid carers figure. The rate is not adjusted for age, so places with more older residents tend to have more." },
+  care_home_beds_per_100_75plus:  { src: "CQC care directory, with ONS mid-year population estimates", yr: "latest month", g: "Ward, from LSOA counts", u: "beds per 100", desc: "The number of beds in care homes registered with the Care Quality Commission, with or without nursing, for every 100 people aged 75 and over living in the area. It measures how much care home capacity an area has, not how many of its own residents need care, and one large home can lift a ward's figure a long way. Beds in homes for younger adults are counted too." },
   census_inactive_ltsick_pct:     { src: "Census 2021 (TS066)",  yr: "2021", g: "Output area", u: "%",       desc: "Residents aged 16 and over who were neither working nor looking for work because of long-term sickness or disability, as a share of all residents of that age. People over State Pension age who are ill mostly describe themselves as retired, so this is mainly about people of working age, but because the base is everyone aged 16 and over it reads lower than a working-age rate. It describes work, not health, so it differs from the disability figures." },
   census_never_worked_ltu_pct:    { src: "Census 2021 (TS062)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of residents aged 16 and over who have never had a paid job or have been out of work for a long time, one group of the socio-economic classification ONS publishes. People who have never worked include many who stayed at home to care for a family, so the figure is higher in some communities and among older women for reasons that have little to do with jobs. The base is everyone aged 16 and over, students included." },
   census_hh_deprived_2plus_pct:   { src: "Census 2021 (TS011)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of households deprived in two or more of the four dimensions ONS measures from Census answers. A household counts in education when no one has qualifications at level 2, such as five good GCSEs, and no one aged 16 to 18 is a full-time student; in employment when someone is unemployed or long-term sick; in health when someone is in bad health or disabled; and in housing when the home is overcrowded, shared or has no central heating. ONS calls these simple measures from the Census, not to be compared with the Index of Multiple Deprivation." },
@@ -6713,6 +6917,12 @@ const OV_META = {
   census_working_age_pct:         { src: CENSUS_AGE_OK ? "Census 2021 (TS007)" : "Census 2021 (TS007A)", yr: "2021", g: "Output area", u: "%",       desc: CENSUS_AGE_OK ? "The share of residents aged 16 to 64, the ages usually counted as working age." : "The share of residents aged 15 to 64. Working age is usually counted from 16, but the Census tables this version of the map uses group ages in fives, so this band starts at 15." },
   census_over65_pct:              { src: "Census 2021 (TS007A)", yr: "2021", g: "Output area", u: "%",       desc: "The share of residents aged 65 and over." },
   census_over85_pct:              { src: "Census 2021 (TS007A)", yr: "2021", g: "Output area", u: "%",       desc: "The share of residents aged 85 and over." },
+  // ONS mid-year population estimates for LSOAs (fetch_all_data.py, run_sape)
+  sape_population:                { src: "ONS mid-year population estimates", yr: "mid-2024", g: "LSOA", u: "people", desc: "The number of people ONS estimates were living in the area in the middle of the year, rolled forward from the 2021 Census with births, deaths and people moving. It is more recent than the Census count, but it is an estimate, least certain in areas with many students or where many people move in and out." },
+  sape_age0_15_pct:               { src: "ONS mid-year population estimates", yr: "mid-2024", g: "LSOA", u: "%", desc: "The share of the area's people aged 0 to 15 in ONS's mid-year population estimates. It is more recent than the Census figure for children, which covers ages 0 to 14 on this map." },
+  sape_age16_64_pct:              { src: "ONS mid-year population estimates", yr: "mid-2024", g: "LSOA", u: "%", desc: "The share of the area's people aged 16 to 64, often taken as working age, in ONS's mid-year population estimates." },
+  sape_age65plus_pct:             { src: "ONS mid-year population estimates", yr: "mid-2024", g: "LSOA", u: "%", desc: "The share of the area's people aged 65 and over in ONS's mid-year population estimates, more recent than the Census figure of the same name." },
+  sape_age75plus_pct:             { src: "ONS mid-year population estimates", yr: "mid-2024", g: "LSOA", u: "%", desc: "The share of the area's people aged 75 and over in ONS's mid-year population estimates. It is the base of the care home beds figure." },
   census_higher_managerial_pct:   { src: "Census 2021 (TS062)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of residents aged 16 and over in higher managerial, administrative and professional jobs, using the socio-economic classification ONS publishes." },
   census_routine_semi_routine_pct:{ src: "Census 2021 (TS062)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of residents aged 16 and over in semi-routine and routine jobs, such as care, retail, cleaning or driving, using the socio-economic classification ONS publishes. Intermediate jobs and small employers are not counted. The base is everyone aged 16 and over, including students and people who have never worked." },
   census_english_hh_all_pct:      { src: "Census 2021 (TS025)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of households where every adult has English as a main language. It records the language people name as their main one rather than how well they speak English, so a household fluent in English can still fall outside it." },
@@ -6729,6 +6939,7 @@ const OV_META = {
   crime_burglary_12mo:            { src: "data.police.uk street-level crime", yr: "Aug 2025 to Jul 2026", g: "Ward, counted from point data", u: "crimes", desc: "Burglaries of homes, businesses and community buildings recorded by the police in the last 12 months." },
   crime_drug_offences_12mo:       { src: "data.police.uk street-level crime", yr: "Aug 2025 to Jul 2026", g: "Ward, counted from point data", u: "crimes", desc: "Drug offences recorded by the police in the last 12 months, including possession, supply and production." },
   crime_misc_society_12mo:        { src: "data.police.uk street-level crime", yr: "Aug 2025 to Jul 2026", g: "Ward, counted from point data", u: "crimes", desc: "Other crimes recorded by the police in the last 12 months, such as handling stolen goods, forgery and perverting the course of justice." },
+  road_ksi_per_1000:              { src: "DfT road casualty statistics (STATS19)", yr: "last five years", g: "Ward, from LSOA counts", u: "per 1,000", desc: "People living in the area who were killed or seriously injured in a road collision reported to the police over the last five years, wherever in Great Britain it happened, for every 1,000 residents at the 2021 Census. Serious injuries use DfT's adjusted figures, because police forces record injuries differently. Many slight injuries are never reported to the police, so they are not counted." },
   crime_weapons_12mo:             { src: "data.police.uk street-level crime", yr: "Aug 2025 to Jul 2026", g: "Ward, counted from point data", u: "crimes", desc: "Offences of carrying or possessing a weapon, such as a firearm or a knife, recorded by the police in the last 12 months." },
   crime_public_order_12mo:        { src: "data.police.uk street-level crime", yr: "Aug 2025 to Jul 2026", g: "Ward, counted from point data", u: "crimes", desc: "Public order offences recorded in the last 12 months, such as causing fear, alarm or distress, racially or religiously aggravated offences and violent disorder." },
   crime_robbery_12mo:             { src: "data.police.uk street-level crime", yr: "Aug 2025 to Jul 2026", g: "Ward, counted from point data", u: "crimes", desc: "Robberies of people and of business property recorded by the police in the last 12 months, where force or the threat of it is used to steal." },
@@ -6756,6 +6967,7 @@ const OV_META = {
   ft_suicide_rate: { src: "OHID Fingertips", yr: "2022 - 24", g: "LA (upper tier)", u: "per 100,000", desc: "Deaths from suicide per 100,000 people, published only for the whole LA." },
   core20_lsoa_count:              { src: "NHSE Core20PLUS5",     yr: "2025", g: "Ward", u: "LSOAs",  desc: "The number of the ward's LSOAs that are among the most deprived 20% in England, meaning deprivation deciles 1 and 2, which NHS England calls Core20 in its Core20PLUS5 approach." },
   claimant_rate_pct:              { src: "NOMIS CLA01",          yr: "August 2026", g: "Ward/LSOA", u: "%", desc: "People aged 16 to 64 claiming Universal Credit or Jobseeker's Allowance mainly because they are out of work, as a share of residents aged " + AGE_WORK + " at the 2021 Census." },
+  claimant_18_24_pct:             { src: "ONS claimant count by age (Nomis NM_162_1), with ONS mid-year population estimates", yr: "latest month", g: "Ward, from LSOA counts", u: "%", desc: "People aged 18 to 24 claiming Universal Credit or Jobseeker's Allowance mainly because they are out of work, as a share of everyone aged 18 to 24 living in the area. Some people on Universal Credit who are in low-paid work count too, and students are counted where they live in term time, so areas with many students have lower rates." },
 
   // Environment + access
   fuel_poverty_pct:               { src: "DESNZ LILEE",          yr: "2022", g: "LSOA", u: "%",       desc: "The share of households in fuel poverty, which means they have a low income and live in a home that is costly to heat, with an energy efficiency rating of D or below." },
@@ -6781,6 +6993,11 @@ const OV_META = {
   rail_stations_1km:              { src: "TfL Unified API (London); DfT NaPTAN (elsewhere)",      yr: "as at Sep 2026", g: "LSOA", u: "stations", desc: "The number of railway, metro and tram stations within 1 kilometre of the middle of the LSOA." },
   bus_stop_dist_m:                { src: "TfL Unified API (London); DfT NaPTAN (elsewhere)",      yr: "as at Sep 2026", g: "LSOA", u: "m", desc: "The straight-line distance from the middle of the LSOA to the nearest bus stop, where the stops on each side of a road count separately, as the stop registers list them." },
   bus_stops_800m:                 { src: "TfL Unified API (London); DfT NaPTAN (elsewhere)",      yr: "as at Sep 2026", g: "LSOA", u: "stops", desc: "The number of bus stops within 800 metres of the middle of the LSOA, which is roughly a ten-minute walk." },
+  // Distance to the nearest GP practice, pharmacy and NHS dentist, measured
+  // here from the NHS registers (fetch_all_data.py, run_service_access).
+  gp_dist_km:                     { src: "NHS registers of GP practices, pharmacies and dentists, distances measured here", yr: "as at the latest refresh", g: "LSOA", u: "km", desc: "The straight-line distance, in kilometres, from the LSOA to the nearest GP practice on the NHS register. It is not a travel time, and a real journey is longer wherever a river, a railway or a main road is in the way. Practices over an LA boundary count, because for an LSOA near the edge the nearest one often is. The register lists main surgeries but not branch surgeries, so the nearest place to see a GP can be closer than this, and a practice nearby may not be taking new patients." },
+  pharmacy_dist_km:               { src: "NHS registers of GP practices, pharmacies and dentists, distances measured here", yr: "as at the latest refresh", g: "LSOA", u: "km", desc: "The straight-line distance, in kilometres, from the LSOA to the nearest community pharmacy on the NHS register, leaving out online and distance-selling pharmacies and appliance suppliers, which nobody can walk into. It is not a travel time, and pharmacies over an LA boundary count." },
+  dentist_dist_km:                { src: "NHS registers of GP practices, pharmacies and dentists, distances measured here", yr: "as at the latest refresh", g: "LSOA", u: "km", desc: "The straight-line distance, in kilometres, from the LSOA to the nearest high street dental practice with an NHS contract, leaving out orthodontists and hospital and community dental services, which take referrals. An NHS contract does not mean the practice is taking new NHS patients. It is not a travel time, and practices over an LA boundary count." },
 
   // IMD 2025
   imd_score:                      { src: "MHCLG IMD 2025",       yr: "2025", g: "LSOA", u: "score",  desc: "The overall Index of Multiple Deprivation 2025 score combines income, employment, education, health, crime, access to housing and services, and living environment, and a higher score means more deprivation." },
@@ -7132,6 +7349,13 @@ function phPruneEmptyIndicators() {
     });
   }
 })();
+(function _crimeLsoaLevel() {
+  CATS.forEach(c => (c.fields || []).forEach(f => {
+    if (!f || CRIME_LSOA_KEYS.indexOf(f.k) === -1 || !crimeHasLsoa(f.k)) return;
+    f.lv = ['ward', 'lsoa'];
+    if (OV_META[f.k]) OV_META[f.k].g = 'Ward and LSOA, counted from point data';
+  }));
+})();
 /* One plain-English line per indicator: what the number measures, for the
    indicator picker and library. The fuller technical note stays in OV_META.desc
    and the info panel. */
@@ -7142,6 +7366,7 @@ const OV_PLAIN = {
   census_disability_lot_pct: "People whose day-to-day activities are limited a lot by a health problem or disability.",
   census_provides_unpaid_care_pct: "People who look after a relative, friend or neighbour without being paid.",
   census_unpaid_care_50h_pct: "People who give 50 or more hours of unpaid care a week.",
+  care_home_beds_per_100_75plus: "Care home beds for every 100 people aged 75 and over.",
   ft_a_e_attendance_under_5: "How often children under 5 go to A&E, per 1,000 children.",
   ft_cervical_screening_25_49: "Women aged 25 to 49 who are up to date with cervical screening.",
   ft_child_poverty_low_income: "Children under 16 living in families on a low income.",
@@ -7248,6 +7473,11 @@ const OV_PLAIN = {
   census_working_age_pct: "Residents aged " + AGE_WORK + ".",
   census_over65_pct: "Residents aged 65 and over.",
   census_over85_pct: "Residents aged 85 and over.",
+  sape_population: "Number of people living in the area, as ONS estimates it for a recent year.",
+  sape_age0_15_pct: "People aged 0 to 15, from ONS's recent population estimates.",
+  sape_age16_64_pct: "People aged 16 to 64, from ONS's recent population estimates.",
+  sape_age65plus_pct: "People aged 65 and over, from ONS's recent population estimates.",
+  sape_age75plus_pct: "People aged 75 and over, from ONS's recent population estimates.",
   census_english_hh_all_pct: "Households where every adult has English as a main language.",
   census_english_hh_none_pct: "Households where no one has English as a main language. They may still speak English well.",
   census_poor_english_pct: "People who cannot speak English well or at all.",
@@ -7264,6 +7494,7 @@ const OV_PLAIN = {
   census_higher_managerial_pct: "People in senior managerial and professional jobs.",
   census_routine_semi_routine_pct: "People in routine and semi-routine jobs, such as care, retail or manual work.",
   claimant_rate_pct: "Working-age people claiming Universal Credit or Jobseeker's Allowance for being out of work.",
+  claimant_18_24_pct: "People aged 18 to 24 claiming Universal Credit or Jobseeker's Allowance for being out of work.",
   census_no_car_pct: "Households without a car or van.",
   census_social_rented_pct: "Households renting from the council or a housing association.",
   census_private_rented_pct: "Households renting from a private landlord.",
@@ -7282,6 +7513,9 @@ const OV_PLAIN = {
   rail_stations_1km: "Number of train, tube or tram stations within 1 km.",
   bus_stop_dist_m: "Straight-line distance to the nearest bus stop, in metres.",
   bus_stops_800m: "Number of bus stops within 800 m, about a ten-minute walk.",
+  gp_dist_km: "Straight-line distance to the nearest GP practice, in kilometres.",
+  pharmacy_dist_km: "Straight-line distance to the nearest pharmacy, in kilometres.",
+  dentist_dist_km: "Straight-line distance to the nearest NHS dental practice, in kilometres.",
   gb_commitment_pct: "Homes within a 15-minute walk of a park, green space or water.",
   green_commitment_pct: "Homes within a 15-minute walk of a park or green space.",
   green_doorstep_pct: "Homes within 200 m of a small green space.",
@@ -7301,6 +7535,7 @@ const OV_PLAIN = {
   crime_arson_12mo: "Recorded arson and criminal damage in the last 12 months.",
   crime_weapons_12mo: "Recorded offences for carrying weapons in the last 12 months.",
   crime_misc_society_12mo: "Other recorded crimes, such as handling stolen goods, in the last 12 months.",
+  road_ksi_per_1000: "Residents killed or seriously injured on the roads over five years, per 1,000 residents.",
 };
 function ovMeta(k) { return OV_META[k] || null; }
 
@@ -7980,6 +8215,7 @@ function indicatorFacts(k) {
   const m = (typeof OV_META === 'object' && OV_META[k]) || {};
   const src = String(m.src || '');
   const f = { num: '', den: '', cadence: '', method: '' };
+  if (saInfo(k)) return Object.assign(f, saInfo(k).facts());
   const ftId = (k.match(/^ft_(\d+)$/) || [])[1];
   if (ftId && FT_INFO[ftId]) {
     const [vt, unit, yt, up, ds] = FT_INFO[ftId];
@@ -8047,7 +8283,8 @@ function indicatorFacts(k) {
     f.den = k === 'crime_rate_per_1000' ? 'Usual residents at the 2021 Census, per 1,000' : '';
     f.cadence = 'The police publish new figures every month, about two months behind, and we refresh them here on the 15th of each month.';
     f.method = 'The police move each crime to an anonymous point nearby before publishing it, so a crime close to a boundary can fall in the next area.' +
-      (k === 'crime_rate_per_1000' ? ' Crimes are counted where they happen rather than where victims live, so rates run high where few people live but many visit, such as town centres, stations and nightlife.' : '');
+      (k === 'crime_rate_per_1000' ? ' Crimes are counted where they happen rather than where victims live, so rates run high where few people live but many visit, such as town centres, stations and nightlife.' : '') +
+      (crimeHasLsoa(k) ? ' An LSOA is small, so its counts are small too, and one busy street, shop or station can decide its figure.' : '');
     return f;
   }
   if (/NOMIS CLA01/.test(src)) {
@@ -8154,7 +8391,8 @@ function _publishedBy(k) {
     : 'ONS publishes these figures for output areas, LSOAs and MSOAs.';
   if (/^ft_\d+$/.test(k)) return 'OHID publishes these figures for MSOAs.';
   if (/^ft_/.test(k)) return 'OHID publishes these figures only for each LA as a whole.';
-  if (/police/i.test(src)) return 'We count the crimes in each ward from the locations the police publish.';
+  if (saInfo(k)) return saInfo(k).by;
+  if (/police/i.test(src)) return 'We count the crimes in each ward' + (crimeHasLsoa(k) ? ' and each LSOA' : '') + ' from the locations the police publish.';
   if (k === 'core20_lsoa_count') return 'We count these for each ward from the deprivation deciles MHCLG publishes for LSOAs.';
   if (k === 'imd_score_ward' || k === 'imd_decile_mean') return 'We calculate these for each ward from the figures MHCLG publishes for LSOAs.';
   if (/IMD/.test(src)) return 'MHCLG publishes these figures for LSOAs.';
@@ -8176,7 +8414,19 @@ function _publishedAt(k, nat, lv) {
   // Nearest the published level first, so each sentence builds on the one
   // before it: wards from MSOAs, then LAs from wards.
   lv.slice().sort((a, b) => LADDER.indexOf(b) - LADDER.indexOf(a)).forEach(l => {
+    // The small-area additions say how their ward and LA figures are made,
+    // the rates counted here for wards included (their nat is 'ward').
+    if (saInfo(k) && (l === 'ward' || l === 'borough')) {
+      out.push(saInfo(k)[l]);
+      return;
+    }
     if (l === nat) return;
+    // Crimes are counted for LSOAs from their own points, as for wards.
+    if (l === 'lsoa' && nat === 'ward' && /police/i.test(String(((typeof OV_META === 'object' && OV_META[k]) || {}).src || ''))) {
+      out.push('LSOA figures are counted in the same way, from the crimes in each LSOA' +
+        (k === 'crime_rate_per_1000' ? ', and divided by its residents at the 2021 Census.' : '.'));
+      return;
+    }
     // The IoD 2025 measures beyond the IMD are weighted up from their LSOAs
     // by the pipeline, an LA's from all of its LSOAs (iod_area_figures).
     if (isIodExtra(k) && (l === 'ward' || l === 'borough')) {
@@ -8229,6 +8479,7 @@ function _cardSource(k) {
   if (ts) return 'ONS, Census 2021 table ' + ts;
   if (/^ft_\d+$/.test(k)) return 'OHID, Local Health';
   if (/^ft_/.test(k)) return 'OHID, Fingertips';
+  if (saInfo(k)) return saInfo(k).card;
   if (k === 'crime_rate_per_1000') return 'data.police.uk, with residents from the 2021 Census';
   if (/police/i.test(src)) return 'data.police.uk';
   if (/underlying indicators/.test(src)) return 'MHCLG, English Indices of Deprivation 2025, underlying indicators';
@@ -8248,6 +8499,7 @@ function _cardSource(k) {
    prefixes: crime_score is an IMD domain, not police data. */
 function _methAnchor(k) {
   if (k === 'core20_lsoa_count') return 'src-core20';
+  if (saInfo(k)) return saInfo(k).anchor;
   const s = _cardSource(k) || '';
   if (/^ONS, Census/.test(s) || /Census 2021/.test(s) && !/police/.test(s)) return 'src-census';
   if (/underlying indicators/.test(s)) return 'src-iod-indicators';
@@ -8270,6 +8522,7 @@ function _cardUnit(k) {
   if (k === 'employment_score') return '% of working-age residents';
   if (k === 'idaci_pct') return '% of children aged 0 to 15';
   if (k === 'idaopi_pct') return '% of people aged 60 and over';
+  if (saInfo(k) && saInfo(k).unit) return saInfo(k).unit;
   return indUnit(k);
 }
 /* Each acronym is spelled out the first time a card uses it, and only then.
@@ -8285,6 +8538,7 @@ const CARD_ACRONYMS = [
   ['GLA', 'the Greater London Authority (GLA)'],
   ['TfL', 'Transport for London (TfL)'],
   ['DfT', 'the Department for Transport (DfT)'],
+  ['CQC', 'the Care Quality Commission (CQC)'],
 ];
 function _spellOnce() {
   const seen = {};
@@ -11800,6 +12054,15 @@ const PH_CREDIT_TFL = 'Station and bus stop measures: Powered by TfL Open Data. 
   'Licensed under version 2.0 of the Open Government Licence with amendments for Transport for London.';
 const PH_CREDIT_DEFRA = 'Air quality: © Crown copyright Defra via uk-air.defra.gov.uk, ' +
   'licenced under the Open Government Licence (OGL).';
+/* CQC asks to be named as the source of its care directory, and the
+   distances to GP practices, pharmacies and dentists place each site by
+   postcode with the ONS Postcode Directory, which carries the OS and Royal
+   Mail notices (DATA_LICENCES.md). */
+const PH_CQC_KEYS = ['care_home_beds_per_100_75plus'];
+const PH_POSTCODE_KEYS = ['gp_dist_km', 'pharmacy_dist_km', 'dentist_dist_km'];
+const PH_CREDIT_CQC = 'Care home beds: contains Care Quality Commission (CQC) data, used under the Open Government Licence v3.0.';
+const PH_CREDIT_ONSPD = 'Distances to GP practices, pharmacies and dentists: sites placed by postcode with the ONS Postcode Directory. ' +
+  'Contains OS data © Crown copyright and database right 2026. Contains Royal Mail data © Royal Mail copyright and database right 2026.';
 function phCreditBase() {
   return 'PopHealth Map (pophealth.uk), an independent project not affiliated with the NHS' +
     (DATA_DATE ? ', with figures updated on ' + fmtDate(DATA_DATE) : '') + '. ' +
@@ -11810,6 +12073,8 @@ function phLicenceExtras(keys) {
   const out = [];
   if (PH_IS_LONDON && PH_TFL_KEYS.some(has)) out.push(PH_CREDIT_TFL);
   if (PH_DEFRA_AIR_KEYS.some(has)) out.push(PH_CREDIT_DEFRA);
+  if (PH_CQC_KEYS.some(has)) out.push(PH_CREDIT_CQC);
+  if (PH_POSTCODE_KEYS.some(has)) out.push(PH_CREDIT_ONSPD);
   return out;
 }
 function phCreditText(keys) {
@@ -14309,6 +14574,8 @@ function _fitFocus(bounds) {
   // and police.uk. Police first, since its crime rate also names ONS.
   const SRC_TAGS = [
     [/police/i,             'police.uk'],
+    [/\bcqc\b/i,            'CQC'],
+    [/\bdft\b|stats19/i,     'DfT'],
     [/census/i,             'ONS'],
     [/fingertips|ohid/i,    'OHID'],
     [/mhclg|\bimd\b|core20/i, 'MHCLG'],
@@ -14674,14 +14941,14 @@ function _fitFocus(bounds) {
     pollution: ['nitrogen dioxide', 'particles'], air: ['nitrogen dioxide', 'particles'],
     unemployment: ['claimant', 'out-of-work'], unemployed: ['claimant', 'out-of-work', 'unemployment'],
     jobless: ['claimant', 'out-of-work', 'unemployment'], benefits: ['claimant', 'out-of-work'],
-    elderly: ['65 and over', '85 and over', 'older people'], older: ['65 and over', '85 and over', 'older people'],
+    elderly: ['65 and over', '85 and over', 'older people', '75 and over'], older: ['65 and over', '85 and over', 'older people', '75 and over'],
     pensioners: ['65 and over', 'older people'],
     gcse: ['key stage 4'], gcses: ['key stage 4'], sats: ['key stage 2'], exams: ['key stage'], attainment: ['key stage'],
     university: ['higher education'], college: ['higher education', 'staying on'],
     heating: ['central heating', 'fuel poverty'], damp: ['poor condition'], accidents: ['road traffic'],
-    road: ['road traffic'], anxiety: ['mood and anxiety'], idaci: ['affecting children'], idaopi: ['affecting older'],
+    road: ['road traffic', 'on the roads'], anxiety: ['mood and anxiety'], idaci: ['affecting children'], idaopi: ['affecting older'],
     children: ['under 16', 'under 15', 'under 5', 'reception', 'year 6', 'child'], kids: ['under 16', 'under 15', 'under 5', 'reception', 'year 6', 'child'],
-    babies: ['under 5', 'fertility'], births: ['fertility'], young: ['under 16', 'under 15', '15 to 24', '10 to 24'],
+    babies: ['under 5', 'fertility'], births: ['fertility'], young: ['under 16', 'under 15', '15 to 24', '10 to 24', '18 to 24'],
     obesity: ['obes', 'overweight'], overweight: ['obes', 'overweight'], weight: ['obes', 'overweight'],
     parks: ['green space'], park: ['green space'], rivers: ['blue space'], water: ['blue space'],
     trains: ['station'], train: ['station'], rail: ['station'], tube: ['station', 'public transport'],
@@ -14707,6 +14974,11 @@ function _fitFocus(bounds) {
     travellers: ['traveller'], gypsies: ['gypsy'], interpreting: ['speak english'], interpreters: ['speak english'],
     sick: ['long-term sick'], sickness: ['long-term sick'], 'out of work': ['long-term sick', 'out-of-work', 'claimant'],
     workless: ['never worked', 'long-term sick', 'claimant'],
+    doctor: ['gp practice'], doctors: ['gp practice'], gp: ['gp practice'], surgery: ['gp practice'],
+    chemist: ['pharmacy'], chemists: ['pharmacy'], pharmacies: ['pharmacy'], dentists: ['dentist'], dental: ['dentist'],
+    'care homes': ['care home'], 'nursing home': ['care home'], 'nursing homes': ['care home'],
+    crashes: ['on the roads'], collisions: ['on the roads'], casualties: ['on the roads'], ksi: ['killed or seriously injured'],
+    youth: ['18 to 24'], 'young people': ['18 to 24', '15 to 24'], population: ['population', 'mid-year estimate'],
   };
   // Shared with the Data export search, so the same everyday words work there.
   window.PH_SEARCH_TERMS = q => searchTerms(q);
@@ -15981,7 +16253,8 @@ function showLSOA(feat) {
 
     // Environment and access
     const envRows = ['fuel_poverty_pct', 'no2_ugm3', 'pm25_ugm3', 'pm10_ugm3', 'ptal_score',
-      'rail_station_dist_m', 'rail_stations_1km', 'bus_stop_dist_m', 'bus_stops_800m']
+      'rail_station_dist_m', 'rail_stations_1km', 'bus_stop_dist_m', 'bus_stops_800m',
+      'gp_dist_km', 'pharmacy_dist_km', 'dentist_dist_km']
       .map(row).filter(Boolean).join('');
     if (envRows) {
       envLsoaBlock = `<div class="cat-block">
@@ -21485,6 +21758,11 @@ var PH_SHOW = {
     // radius is the other way round.
     rail_station_dist_m: 'high-bad',        bus_stop_dist_m: 'high-bad',
     rail_stations_1km: 'high-good',         bus_stops_800m: 'high-good',
+    // The distance to the nearest GP practice, pharmacy and NHS dentist.
+    gp_dist_km: 'high-bad', pharmacy_dist_km: 'high-bad', dentist_dist_km: 'high-bad',
+    // Claimants aged 18 to 24, and residents killed or seriously injured on
+    // the roads. Care home beds and the population estimates are descriptive.
+    claimant_18_24_pct: 'high-bad',         road_ksi_per_1000: 'high-bad',
     // MUST be listed here. ptal_score ends in _score, and the fallback below
     // reads that shape as an IMD domain score and returns 'high-bad'. PTAL is
     // the opposite: 8 is the best-connected band. Without this entry Compare
@@ -25969,7 +26247,10 @@ var PH_SHOW = {
         : /admission|injur/.test(t) ? 'Hospital admissions' : 'Health';
     }
     if (/^(ptal_|rail_|bus_)|^census_(no_car|active_travel|public_transport|car_to_work)_/.test(k)) return 'Transport';
-    if (/^(fuel_|gb_|green_|blue_|no2_|pm25_|pm10_)/.test(k)) return 'Environment and access';
+    if (/^(fuel_|gb_|green_|blue_|no2_|pm25_|pm10_)|^(gp|pharmacy|dentist)_dist_km$/.test(k)) return 'Environment and access';
+    if (/^sape_/.test(k)) return 'People and communities';
+    if (/^road_ksi_/.test(k)) return 'Crime and safety';
+    if (/^care_home_/.test(k)) return 'Health';
     if (/^census_(owned|social_rented|private_rented|overcrowded|underoccupied)_/.test(k)) return 'Housing';
     if (/^(imd_|core20_|total_lsoa|census_hh_deprived_|idaci_|idaopi_|iod_)|_score$/.test(k)) return 'Deprivation';
     if (/^crime/.test(k)) return 'Crime and safety';
@@ -26410,6 +26691,7 @@ var PH_SHOW = {
       var fid = FT_LA_IDS[k.slice(3)];
       return 'Office for Health Improvement and Disparities (OHID), Fingertips' + (fid ? ' indicator ' + fid : '');
     }
+    if (saInfo(k)) return saInfo(k).full;
     if (k === 'crime_rate_per_1000') return 'Police recorded crime from data.police.uk, with residents from the Office for National Statistics (ONS) Census 2021';
     if (/police/i.test(src)) return 'Police recorded crime and anti-social behaviour from data.police.uk';
     if (k === 'core20_lsoa_count') return 'NHS England’s Core20PLUS5 definition, applied to the English Indices of Deprivation 2025 from the Ministry of Housing, Communities and Local Government (MHCLG)';
@@ -26437,6 +26719,8 @@ var PH_SHOW = {
     var L = cbLevel, one = CB_LEVELS[L].label;
     var src = String(cbMeta(k).src || '');
     var nat = cbMeta(k).nat || ((typeof ovNativeLevel === 'function') ? ovNativeLevel(k) : '');
+    var sa = saInfo(k);
+    if (sa) return sa.by + (L === 'ward' ? ' ' + sa.ward : L === 'borough' ? ' ' + sa.borough : '');
     if (isBoroughLevelKey(k)) {
       var gone = Object.keys(BOROUGH_DATA).filter(laMissingOhid);
       var goneText = gone.length
@@ -26493,8 +26777,9 @@ var PH_SHOW = {
     }
     if (nat === 'ward') {
       if (/police/i.test(src)) {
-        return 'Counted here for each ward from the street-level crime locations the police publish' +
-          (k === 'crime_rate_per_1000' ? ', then divided by the ward’s residents at the 2021 Census' : '') + '.';
+        var one_ = L === 'lsoa' ? 'LSOA' : 'ward';
+        return 'Counted here for each ' + one_ + ' from the street-level crime locations the police publish' +
+          (k === 'crime_rate_per_1000' ? ', then divided by the ' + one_ + '’s residents at the 2021 Census' : '') + '.';
       }
       if (k === 'imd_decile_mean') return 'Calculated here for each ward as the average of its LSOAs’ deprivation deciles, weighted by population.';
       return 'Counted here for each ward from the LSOAs that best fit it under the ONS lookup.';
