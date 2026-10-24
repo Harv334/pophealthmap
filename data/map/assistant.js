@@ -476,6 +476,14 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
     iod_no_central_heating: "more deprived",
     iod_air_quality: "more deprived",
     iod_road_accidents: "more deprived",
+    // ONS's MSOA releases.
+    saie_total_income: "more income",
+    saie_net_bhc: "more income",
+    saie_net_ahc: "more income",
+    hle_female: "more years in good health",
+    hle_male: "more years in good health",
+    dfle_female: "more years free of limiting illness",
+    dfle_male: "more years free of limiting illness",
   };
 
   function metaFor(key) {
@@ -748,15 +756,25 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
   }
 
   // Figures only: the MSOA file keeps a significance flag beside each
-  // Local Health figure (ft_93283_vs), which is not a figure itself.
+  // Local Health figure (ft_93283_vs), and ONS's 95% limits beside each of
+  // its modelled figures (saie_net_bhc_lci and _uci), which are not figures
+  // themselves. The limits reach the model on their figure, as range_95
+  // (withRanges).
   function figuresOnly(ind) {
     var out = {};
     Object.keys(ind || {}).forEach(function (k) {
       var v = ind[k];
-      if (/_vs$/.test(k) || v === null || v === "" || isNaN(parseFloat(v))) return;
+      if (/_(vs|lci|uci)$/.test(k) || v === null || v === "" || isNaN(parseFloat(v))) return;
       out[k] = v;
     });
     return out;
+  }
+  function withRanges(figs, ind) {
+    Object.keys(figs || {}).forEach(function (k) {
+      var lo = parseFloat((ind || {})[k + "_lci"]), hi = parseFloat((ind || {})[k + "_uci"]);
+      if (isFinite(lo) && isFinite(hi)) figs[k].range_95 = [lo, hi];
+    });
+    return figs;
   }
 
   /* The levels an indicator is available at, as the tools name them. The
@@ -858,7 +876,7 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
     var want = wantedKeys(input, shown);
     var out = placeOf(lv, a);
     out.level = LEVEL_WORD[lv];
-    out.indicators = figures(shown, want);
+    out.indicators = withRanges(figures(shown, want), a.indicators);
     var missing = want.filter(function (k) { return !(k in out.indicators); });
     if (missing.length && Array.isArray(input.indicators) && input.indicators.length) out.not_at_this_level = missing;
     // An LSOA's output areas, so a question can go one level further down.
@@ -929,7 +947,7 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
   async function smallRank(input, lv) {
     var key = input.indicator;
     if (isWithheld(key)) return withheldError(key);
-    if (/_vs$/.test(String(key))) return noValues(key, lv);
+    if (/_(vs|lci|uci)$/.test(String(key))) return noValues(key, lv);
     var within = resolveWithin(input);
     if (within.error) return within;
     var got = await areasAt(lv, within);

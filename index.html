@@ -3936,6 +3936,16 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
               <option value="ft_93224">Unintentional and deliberate injuries: hospital admissions in young people (aged 15 to 24) · MSOA</option>
               <option value="ft_93107">Year 6 prevalence of obesity (including severe obesity), 3 years data combined · MSOA</option>
               <option value="ft_93108">Year 6 prevalence of overweight (including obesity), 3 years data combined · MSOA</option>
+              <option value="ft_93092">Low birth weight of live babies · MSOA</option>
+              <option value="ft_93234">Cancer incidence: all cancers · MSOA</option>
+              <option value="ft_93235">Cancer incidence: breast cancer · MSOA</option>
+              <option value="ft_93236">Cancer incidence: colorectal cancer · MSOA</option>
+              <option value="ft_93237">Cancer incidence: lung cancer · MSOA</option>
+              <option value="ft_93238">Cancer incidence: prostate cancer · MSOA</option>
+              <option value="hle_female">Healthy life expectancy at birth, women · MSOA</option>
+              <option value="hle_male">Healthy life expectancy at birth, men · MSOA</option>
+              <option value="dfle_female">Disability-free life expectancy at birth, women · MSOA</option>
+              <option value="dfle_male">Disability-free life expectancy at birth, men · MSOA</option>
             </optgroup>
             <optgroup label="Deprivation">
               <option value="core20_lsoa_count">Core20 LSOAs in ward · Ward</option>
@@ -4013,6 +4023,9 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
               <option value="census_hh_deprived_2plus_pct">Households deprived in two or more dimensions % · Output area</option>
               <option value="census_hh_deprived_any_pct">Households deprived in at least one dimension % · Output area</option>
               <option value="claimant_rate_pct">Claimant rate, working age (%) · LSOA</option>
+              <option value="saie_total_income">Average household income before tax · MSOA</option>
+              <option value="saie_net_bhc">Average household income after tax, before housing costs · MSOA</option>
+              <option value="saie_net_ahc">Average household income after tax and housing costs · MSOA</option>
             </optgroup>
             <optgroup label="Housing and transport">
               <option value="census_no_car_pct">No car/van % · Output area</option>
@@ -5696,6 +5709,27 @@ const OV_CFG = {
   ft_93259                      : { lo:"Lower", hi:"Higher", wh:true, min:16.5071, max:221.8785 },
   ft_93260                      : { lo:"Lower", hi:"Higher", wh:true, min:32.9288, max:161.9386 },
   ft_93480                      : { lo:"Lower", hi:"Higher", wh:true, min:24.047, max:307.7992 },
+  // Local Health series added in October 2026 (fingertips_msoa_extra in the
+  // pipeline), shipped only where they pass its per-series checks. No
+  // ranges typed: they come from the measured percentiles in indicators.js.
+  // Breast and prostate cancer are descriptive: their incidence rises with
+  // screening and PSA testing, so a higher figure is not plainly worse.
+  ft_93092                      : { lo:"Lower", hi:"Higher", wh:true },
+  ft_93234                      : { lo:"Lower", hi:"Higher", wh:true },
+  ft_93235                      : { lo:"Lower", hi:"Higher", wh:true, descriptive:true },
+  ft_93236                      : { lo:"Lower", hi:"Higher", wh:true },
+  ft_93237                      : { lo:"Lower", hi:"Higher", wh:true },
+  ft_93238                      : { lo:"Lower", hi:"Higher", wh:true, descriptive:true },
+  // ONS healthy and disability-free life expectancy at birth, per MSOA. More
+  // years in good health is better.
+  hle_female                    : { lo:"Lower", hi:"Higher", wh:false },
+  hle_male                      : { lo:"Lower", hi:"Higher", wh:false },
+  dfle_female                   : { lo:"Lower", hi:"Higher", wh:false },
+  dfle_male                     : { lo:"Lower", hi:"Higher", wh:false },
+  // ONS small area income estimates, per MSOA: a higher income is better.
+  saie_total_income             : { lo:"Lower", hi:"Higher", wh:false },
+  saie_net_bhc                  : { lo:"Lower", hi:"Higher", wh:false },
+  saie_net_ahc                  : { lo:"Lower", hi:"Higher", wh:false },
 
 };
 
@@ -5882,6 +5916,20 @@ const CATS = [
     { k: "ft_93259", l: "Mortality from stroke", g: "msoa", lv: ["ward","msoa"] },
     { k: "ft_93260", l: "Mortality from respiratory diseases", g: "msoa", lv: ["ward","msoa"] },
     { k: "ft_93480", l: "Mortality from causes considered preventable (aged under 75)", g: "msoa", lv: ["ward","msoa"] },
+    // Local Health, October 2026 additions, and ONS's health state life
+    // expectancies, all published per MSOA and blended onto wards through
+    // their LSOAs. A build without their figures leaves them out
+    // (phPruneEmptyIndicators).
+    { k: "ft_93092", l: "Low birth weight of live babies", g: "msoa", lv: ["ward","msoa"] },
+    { k: "ft_93234", l: "Cancer incidence: all cancers", g: "msoa", lv: ["ward","msoa"] },
+    { k: "ft_93235", l: "Cancer incidence: breast cancer", g: "msoa", lv: ["ward","msoa"] },
+    { k: "ft_93236", l: "Cancer incidence: colorectal cancer", g: "msoa", lv: ["ward","msoa"] },
+    { k: "ft_93237", l: "Cancer incidence: lung cancer", g: "msoa", lv: ["ward","msoa"] },
+    { k: "ft_93238", l: "Cancer incidence: prostate cancer", g: "msoa", lv: ["ward","msoa"] },
+    { k: "hle_female", l: "Healthy life expectancy at birth, women", g: "msoa", lv: ["ward","msoa"] },
+    { k: "hle_male", l: "Healthy life expectancy at birth, men", g: "msoa", lv: ["ward","msoa"] },
+    { k: "dfle_female", l: "Disability-free life expectancy at birth, women", g: "msoa", lv: ["ward","msoa"] },
+    { k: "dfle_male", l: "Disability-free life expectancy at birth, men", g: "msoa", lv: ["ward","msoa"] },
     { k: "ft_a_e_attendance_under_5", l: "A&E attendances, ages 0 to 4", g: "borough", lv: ["borough","ward"] },
     { k: "ft_cervical_screening_25_49", l: "Cancer screening coverage: cervical (25 to 49)", g: "borough", lv: ["borough","ward"] },
     { k: "ft_child_poverty_low_income", l: "Children in relative low income families (under 16)", g: "borough", lv: ["borough","ward"] },
@@ -5988,6 +6036,11 @@ const CATS = [
     { k: "census_no_qual_pct",               l: "No qualifications (%)",         g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "claimant_count",                   l: "Claimant count",                g: "lsoa" },
     { k: "claimant_rate_pct",                l: "Claimant rate, working-age (%)", g: "lsoa" },
+    // ONS small area income estimates, published per MSOA with intervals,
+    // and weighted onto wards and LAs by households in the pipeline.
+    { k: "saie_total_income",                l: "Average household income before tax", g: "msoa", lv: ["ward","msoa"] },
+    { k: "saie_net_bhc",                     l: "Average household income after tax, before housing costs", g: "msoa", lv: ["ward","msoa"] },
+    { k: "saie_net_ahc",                     l: "Average household income after tax and housing costs", g: "msoa", lv: ["ward","msoa"] },
   ]},
   { key: "housing", label: "Housing and transport", ico: "home", fields: [
     { k: "census_owned_pct",                 l: "Owner occupied (%)",            g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
@@ -6057,6 +6110,22 @@ function iodWeightWords(k) {
   const want = k === 'idaci_pct' ? 'children' : k === 'idaopi_pct' ? 'older' : 'residents';
   const got = w[k] || want;
   return IOD_WEIGHT_WORDS[got] || 'residents at the 2021 Census';
+}
+/* The Local Health series added in October 2026 (fingertips_msoa_extra in
+   the pipeline, which ships each only if it passes its per-series checks),
+   and ONS's two MSOA releases: income (SAIE) and healthy and disability-free
+   life expectancy. ONS publishes a 95% interval for each MSOA figure, which
+   the pipeline keeps beside it as <key>_lci and <key>_uci (ovIntervalHTML). */
+const FT_EXTRA_IDS = ['93092', '93234', '93235', '93236', '93237', '93238'];
+const ONS_MSOA_KEYS = new Set(['saie_total_income', 'saie_net_bhc', 'saie_net_ahc',
+  'hle_female', 'hle_male', 'dfle_female', 'dfle_male']);
+function isOnsMsoa(k) { return ONS_MSOA_KEYS.has(k); }
+/* What the ward and LA income figures are weighted by: households, unless
+   the ward file says the pipeline had no household counts (saie_weight). */
+function saieWeightWords() {
+  let w = '';
+  try { w = (typeof WARD_META === 'object' && WARD_META && WARD_META.saie_weight) || ''; } catch (e) { /* not loaded yet */ }
+  return w === 'residents' ? 'residents' : 'households';
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -6164,6 +6233,18 @@ const IND_NAMES = {
   ft_93259:  ['Deaths from stroke', 'Mortality from stroke'],
   ft_93260:  ['Deaths from respiratory disease', 'Mortality from respiratory diseases'],
   ft_93480:  ['Preventable deaths under 75', 'Mortality from causes considered preventable (aged under 75)'],
+  // Local Health, October 2026 additions (titles as scripts/fingertips_metadata.json records them)
+  ft_93092:  ['Low birth weight', 'Low birth weight of live babies'],
+  ft_93234:  ['New cancer cases, all cancers', 'Cancer incidence: all cancers'],
+  ft_93235:  ['New breast cancer cases', 'Cancer incidence: breast cancer'],
+  ft_93236:  ['New bowel cancer cases', 'Cancer incidence: colorectal cancer'],
+  ft_93237:  ['New lung cancer cases', 'Cancer incidence: lung cancer'],
+  ft_93238:  ['New prostate cancer cases', 'Cancer incidence: prostate cancer'],
+  // ONS health state life expectancies for MSOAs, 2019 to 2023
+  hle_female:  ['Healthy life expectancy at birth, women', 'Healthy life expectancy (HLE) at birth, females, MSOA'],
+  hle_male:    ['Healthy life expectancy at birth, men', 'Healthy life expectancy (HLE) at birth, males, MSOA'],
+  dfle_female: ['Disability-free life expectancy at birth, women', 'Disability-free life expectancy (DFLE) at birth, females, MSOA'],
+  dfle_male:   ['Disability-free life expectancy at birth, men', 'Disability-free life expectancy (DFLE) at birth, males, MSOA'],
   // Health, OHID, published for each LA
   // (Titles as fetch_all_data.py's FINGERTIPS_INDICATORS records them.)
   ft_a_e_attendance_under_5:         ['A&E attendances, under 5s', 'A&E attendances (0 to 4 years)'],
@@ -6262,6 +6343,10 @@ const IND_NAMES = {
   census_no_qual_pct:              ['No qualifications', 'Highest level of qualification: no qualifications'],
   claimant_count:                  ['Claimant count', 'Claimant count'],
   claimant_rate_pct:               ['Claimant rate, working age', 'Claimant count as a proportion of residents aged ' + AGE_WORK],
+  // ONS small area income estimates, financial year ending 2023
+  saie_total_income:               ['Average household income before tax', 'Total annual household income (mean, modelled)'],
+  saie_net_bhc:                    ['Average household income after tax, before housing costs', 'Net annual household income before housing costs, equivalised (mean, modelled)'],
+  saie_net_ahc:                    ['Average household income after tax and housing costs', 'Net annual household income after housing costs, equivalised (mean, modelled)'],
   // Housing and transport
   census_owned_pct:            ['Home ownership', 'Tenure of household: owned'],
   census_social_rented_pct:    ['Social renting', 'Tenure of household: social rented'],
@@ -6370,7 +6455,9 @@ const IND_DECIMALS = {};
     'crime_drug_offences_12mo', 'crime_public_order_12mo', 'crime_arson_12mo', 'crime_weapons_12mo',
     'crime_misc_society_12mo', 'core20_lsoa_count', 'total_lsoa_count', 'claimant_count',
     'gb_total_uprn', 'imd_decile', 'imd_rank', 'rail_station_dist_m', 'bus_stop_dist_m',
-    'idaci_decile', 'idaci_rank', 'idaopi_decile', 'idaopi_rank'];
+    'idaci_decile', 'idaci_rank', 'idaopi_decile', 'idaopi_rank',
+    // Income in whole pounds: ONS's own intervals run to thousands.
+    'saie_total_income', 'saie_net_bhc', 'saie_net_ahc'];
   // PTAL has one decimal: a second suggests a precision the measure lacks.
   // The sub-domain scores, the mood and anxiety score and the air quality
   // and road accident measures run over a few units, so they keep two.
@@ -6408,6 +6495,11 @@ function indCsvValue(v, k) {
 /* The unit printed after a figure in a list of rows, now that labels do not
    carry it: "%" straight on, a measurement after a space, and nothing for
    counts, scores and deciles, whose label already says what they are. */
+/* A pound sign in front of a figure in money ("£ a year"), for the lists
+   that write the unit after the number (indValueUnit). */
+function indValuePrefix(k) {
+  return /^£/.test(indUnit(k)) ? '£' : '';
+}
 function indValueUnit(k) {
   const u = indUnit(k);
   return u === '%' ? '%' : (/^(µg\/m³|m)$/.test(u) ? ' ' + u : '');
@@ -6863,6 +6955,23 @@ const OV_META = {
   ft_93259                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2019 - 23", g: "MSOA", u: "ratio, where England is 100", desc: "Deaths from stroke, compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many deaths as expected, 120 means 20% more and 80 means 20% fewer, so a lower figure is better." },
   ft_93260                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2019 - 23", g: "MSOA", u: "ratio, where England is 100", desc: "Deaths from respiratory diseases, such as pneumonia and long-term lung disease, compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many deaths as expected, 120 means 20% more and 80 means 20% fewer, so a lower figure is better." },
   ft_93480                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2019 - 23", g: "MSOA", u: "ratio, where England is 100", desc: "Deaths under 75 from causes that good public health and timely care could largely prevent, compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many deaths as expected, 120 means 20% more and 80 means 20% fewer, so a lower figure is better." },
+  // Local Health, October 2026 additions. The cancer periods are not typed:
+  // they come from the data (indicators.js) when a build has them.
+  ft_93092                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2018 - 22", g: "MSOA", u: "%", desc: "The share of babies born alive who weighed under 2,500 grams, with five years combined so that the figures are steadier, so a lower figure is better. Smoking in pregnancy, deprivation and being born early all make low birth weight more likely." },
+  ft_93234                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "", g: "MSOA", u: "ratio, where England is 100", desc: "New cases of cancer of any kind diagnosed in residents, compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many new cases as expected, 120 means 20% more and 80 means 20% fewer, so a lower figure is better. Several years are combined because the areas are small." },
+  ft_93235                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "", g: "MSOA", u: "ratio, where England is 100", desc: "New cases of breast cancer diagnosed in residents, compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many new cases as expected, 120 means 20% more and 80 means 20% fewer. Screening finds cancers that would otherwise be found later, so a higher figure can mean more screening as well as more cancer, and neither a higher nor a lower figure is better in itself." },
+  ft_93236                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "", g: "MSOA", u: "ratio, where England is 100", desc: "New cases of bowel (colorectal) cancer diagnosed in residents, compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many new cases as expected, 120 means 20% more and 80 means 20% fewer, so a lower figure is better. Bowel screening finds some cancers early, so how many people take part also moves this figure." },
+  ft_93237                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "", g: "MSOA", u: "ratio, where England is 100", desc: "New cases of lung cancer diagnosed in residents, compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many new cases as expected, 120 means 20% more and 80 means 20% fewer, so a lower figure is better. Most lung cancer is caused by smoking, so it follows smoking rates from years before." },
+  ft_93238                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "", g: "MSOA", u: "ratio, where England is 100", desc: "New cases of prostate cancer diagnosed in residents, compared with what England's rates would predict for an area with the same mix of ages and sexes. A figure of 100 means as many new cases as expected, 120 means 20% more and 80 means 20% fewer. Blood (PSA) testing finds many prostate cancers, so a higher figure can mean more testing as well as more cancer, and neither a higher nor a lower figure is better in itself." },
+  // ONS health state life expectancies for MSOAs, 2019 to 2023.
+  hle_female                    : { src: "ONS health state life expectancy for MSOAs", yr: "2019 - 23", g: "MSOA", u: "years", desc: "The number of years a girl born in the area could expect to live in good or very good health, if death rates and health at each age stayed as they were, so a higher figure is better. ONS combines deaths over 2019 to 2023 with how people rated their own health at the 2021 Census." },
+  hle_male                      : { src: "ONS health state life expectancy for MSOAs", yr: "2019 - 23", g: "MSOA", u: "years", desc: "The number of years a boy born in the area could expect to live in good or very good health, if death rates and health at each age stayed as they were, so a higher figure is better. ONS combines deaths over 2019 to 2023 with how people rated their own health at the 2021 Census." },
+  dfle_female                   : { src: "ONS health state life expectancy for MSOAs", yr: "2019 - 23", g: "MSOA", u: "years", desc: "The number of years a girl born in the area could expect to live without an illness or disability that limits her day-to-day activities, if death rates and health at each age stayed as they were, so a higher figure is better. ONS combines deaths over 2019 to 2023 with what people said about their health at the 2021 Census." },
+  dfle_male                     : { src: "ONS health state life expectancy for MSOAs", yr: "2019 - 23", g: "MSOA", u: "years", desc: "The number of years a boy born in the area could expect to live without an illness or disability that limits his day-to-day activities, if death rates and health at each age stayed as they were, so a higher figure is better. ONS combines deaths over 2019 to 2023 with what people said about their health at the 2021 Census." },
+  // ONS small area income estimates, financial year ending 2023.
+  saie_total_income             : { src: "ONS small area income estimates", yr: "2022/23", g: "MSOA", u: "£ a year", desc: "The average (mean) yearly income of households in the area before tax, counting earnings, pensions, benefits and other income, so a higher figure is better. ONS models it from a national survey and from Census and benefit records, so it is an estimate, and a mean is pulled up by a few very high incomes." },
+  saie_net_bhc                  : { src: "ONS small area income estimates", yr: "2022/23", g: "MSOA", u: "£ a year", desc: "The average (mean) yearly income of households in the area after income tax and other deductions, before housing costs are paid, so a higher figure is better. ONS adjusts each household's income for its size and make-up, so that a couple and a family of five can be compared. It is modelled, so it is an estimate." },
+  saie_net_ahc                  : { src: "ONS small area income estimates", yr: "2022/23", g: "MSOA", u: "£ a year", desc: "The average (mean) yearly income of households in the area after income tax and after housing costs such as rent, mortgage interest and water rates, adjusted for the size of the household, so a higher figure is better. Households who own their home outright pay no rent or mortgage, so areas where many do look better off on this measure. It is modelled, so it is an estimate." },
 
 };
 
@@ -7181,6 +7290,16 @@ const OV_PLAIN = {
   ft_93255: "Deaths from heart and circulatory disease, compared with England, where 100 is England’s level for the same ages.",
   ft_93256: "Deaths under 75 from heart and circulatory disease, compared with England, where 100 is England’s level for the same ages.",
   ft_93480: "Deaths under 75 that public health action could have avoided, compared with England, where 100 is England’s level for the same ages.",
+  ft_93092: "Babies born alive weighing under 2.5 kg, as a share of all live births.",
+  ft_93234: "New cases of cancer of any kind, compared with England, where 100 is England’s level for the same ages.",
+  ft_93235: "New breast cancer cases, compared with England, where 100 is England’s level for the same ages. Screening finds many of them.",
+  ft_93236: "New bowel cancer cases, compared with England, where 100 is England’s level for the same ages.",
+  ft_93237: "New lung cancer cases, compared with England, where 100 is England’s level for the same ages.",
+  ft_93238: "New prostate cancer cases, compared with England, where 100 is England’s level for the same ages. Testing finds many of them.",
+  hle_female: "How many years a girl born now can expect to live in good health, for this small area.",
+  hle_male: "How many years a boy born now can expect to live in good health, for this small area.",
+  dfle_female: "How many years a girl born now can expect to live free of a limiting illness or disability.",
+  dfle_male: "How many years a boy born now can expect to live free of a limiting illness or disability.",
   ft_93257: "Deaths from coronary heart disease, compared with England, where 100 is England’s level for the same ages.",
   ft_93260: "Deaths from lung and breathing diseases, compared with England, where 100 is England’s level for the same ages.",
   ft_93259: "Deaths from stroke, compared with England, where 100 is England’s level for the same ages.",
@@ -7264,6 +7383,9 @@ const OV_PLAIN = {
   census_higher_managerial_pct: "People in senior managerial and professional jobs.",
   census_routine_semi_routine_pct: "People in routine and semi-routine jobs, such as care, retail or manual work.",
   claimant_rate_pct: "Working-age people claiming Universal Credit or Jobseeker's Allowance for being out of work.",
+  saie_total_income: "The average yearly income of households here before tax, as ONS estimates it.",
+  saie_net_bhc: "Average yearly household income after tax, before rent or mortgage, adjusted for household size.",
+  saie_net_ahc: "Average yearly household income after tax and housing costs, adjusted for household size.",
   census_no_car_pct: "Households without a car or van.",
   census_social_rented_pct: "Households renting from the council or a housing association.",
   census_private_rented_pct: "Households renting from a private landlord.",
@@ -7742,6 +7864,21 @@ function ovIsEstimated(level, id, k) {
   const d = MSOA_DATA[id];
   return !!(d && d[k + '_est']);
 }
+/* ONS's 95% confidence interval for an MSOA's modelled figure (income,
+   healthy and disability-free life expectancy), which the pipeline keeps
+   beside it as <key>_lci and <key>_uci. Shown where the figure is, at MSOA
+   only: a ward or LA figure is a blend of MSOAs and has none. '' when the
+   build has no interval for it. */
+function ovIntervalHTML(level, id, k) {
+  if (level !== 'msoa' || typeof MSOA_DATA === 'undefined' || !MSOA_DATA) return '';
+  const d = MSOA_DATA[id];
+  const r = d && (d.indicators || d);
+  const f = resolveOvField(k);
+  const lo = r ? parseFloat(r[f + '_lci']) : NaN, hi = r ? parseFloat(r[f + '_uci']) : NaN;
+  if (!isFinite(lo) || !isFinite(hi)) return '';
+  return '<span class="vs vs-s" title="ONS models this figure, so it is an estimate. ONS is 95% sure the true figure lies in this range.">' +
+    '95% range ' + fmtOv(lo, k) + ' to ' + fmtOv(hi, k) + '</span>';
+}
 const EST_HTML = '<span class="vs vs-s" title="OHID published this figure for the MSOA as it was drawn in 2011, and we have carried it onto the 2021 boundary using the ONS lookup, so it is an estimate.">Estimated from 2011 areas</span>';
 function ovVsHTML(code) {
   if (!code || !VS_ENGLAND_TEXT[code]) return '';
@@ -7891,7 +8028,15 @@ const FT_INFO = {
   "93283": ["Life expectancy", "Years", "Calendar", "2025-07-21"],
   "93465": ["Indirectly standardised ratio", "per 100", "Financial", "2022-07-05"],
   "93480": ["Indirectly standardised ratio", "per 100", "Calendar", "2025-07-03"],
-  "932831": ["Life expectancy", "Years", "Calendar", "2025-07-21"]
+  "932831": ["Life expectancy", "Years", "Calendar", "2025-07-21"],
+  // Added in October 2026 and not yet fetched, so OHID's last upload date is
+  // not known here; the card leaves it out until it is.
+  "93092": ["Proportion", "%", "Calendar", ""],
+  "93234": ["Indirectly standardised ratio", "per 100", "Calendar", ""],
+  "93235": ["Indirectly standardised ratio", "per 100", "Calendar", ""],
+  "93236": ["Indirectly standardised ratio", "per 100", "Calendar", ""],
+  "93237": ["Indirectly standardised ratio", "per 100", "Calendar", ""],
+  "93238": ["Indirectly standardised ratio", "per 100", "Calendar", ""]
 };
 const CENSUS_BASE = {
   TS001: ['Usual residents', ''],
@@ -7946,6 +8091,7 @@ const FT_COUNTED = {
   '93219': ['Hospital admissions of children under 15 for injuries', 'Children aged under 15'],
   '93224': ['Hospital admissions of young people aged 15 to 24 for injuries', 'Residents aged 15 to 24'],
   '93280': ['Households in fuel poverty', 'All households'],
+  '93092': ['Live babies born weighing under 2,500 grams', 'All live births with a recorded birth weight'],
 };
 // Where OHID took the counts from, as FT_INFO names it, in words.
 const FT_DATA_FROM = {
@@ -7984,11 +8130,14 @@ function indicatorFacts(k) {
   if (ftId && FT_INFO[ftId]) {
     const [vt, unit, yt, up, ds] = FT_INFO[ftId];
     const title = (typeof indTitle === 'function' && indTitle(k)) || '';
-    const what = /mortality|death/i.test(title + ' ' + (m.desc || '')) ? 'deaths'
+    const what = /incidence/i.test(title) ? 'new cases of cancer'
+      : /mortality|death/i.test(title + ' ' + (m.desc || '')) ? 'deaths'
       : /emergency/i.test(title) ? 'emergency admissions' : 'admissions';
     const word = FT_PERIOD_WORD[yt] || 'year';
-    const old = (Date.now() - Date.parse(up)) > 3 * 365.25 * 864e5;
-    f.cadence = old
+    const old = !!up && (Date.now() - Date.parse(up)) > 3 * 365.25 * 864e5;
+    f.cadence = !up
+      ? 'OHID updates these figures every one to three years, with each period running by ' + word + '.'
+      : old
       ? 'OHID last updated these figures on ' + fmtDate(up) + ', more than three years ago, and each period runs by ' + word + '.'
       : 'OHID updates these figures every one to three years and last did so on ' + fmtDate(up) + ', with each period running by ' + word + '.';
     if (/standardised ratio/i.test(vt)) {
@@ -8005,6 +8154,7 @@ function indicatorFacts(k) {
     } else if (/proportion/i.test(vt)) {
       [f.num, f.den] = FT_COUNTED[ftId] || ['', ''];
       if (ds && /Child Measurement/.test(ds)) f.method = 'Children are weighed and measured at school in Reception and Year 6, and three school years are pooled because the areas are small.';
+      if (ftId === '93092') f.method = 'Births are registered by where the mother lives, and five years are pooled because the areas are small. All live births are counted, including babies born early, which OHID\'s LA measure of low birth weight in babies born at term leaves out.';
     }
     if (ds) f.method = (f.method ? f.method + ' ' : '') + 'OHID builds these figures from ' + (FT_DATA_FROM[ds] || ds) + '.';
     const covid = ftCovidNote(k);
@@ -8038,6 +8188,30 @@ function indicatorFacts(k) {
             : ', and an LA figure is an average of its ward figures, weighted by population') +
         ', so the figures can differ a little from the tables ONS publishes for wards and LAs.' +
         (wc && lc ? '' : ' Because the average is weighted by residents, a measure of households is weighted by residents too.');
+    return f;
+  }
+  if (/^ONS small area income/.test(src)) {
+    f.num = 'The yearly income of the households in the area, in pounds, as a mean';
+    f.den = 'All households';
+    f.cadence = 'ONS publishes these estimates every few years, for one financial year at a time, and has not yet given a date for the next edition.';
+    f.method = 'ONS models these figures from the Family Resources Survey, using Census 2021 and benefit and tax records for each area, so each is an estimate with a 95% confidence interval. When the map shows MSOAs, each one\'s interval is shown beside its figure, and many neighbouring MSOAs are not clearly different. ' +
+      (k === 'saie_total_income' ? 'Total income is before tax and counts earnings, pensions, benefits and other income. '
+        : 'ONS adjusts each household\'s income for its size and make-up (equivalisation), so that households of different sizes can be compared. ') +
+      (k === 'saie_net_ahc' ? 'Housing costs are rent, mortgage interest, water rates and buildings insurance, so households who own outright, often older ones, look better off than on the measure before housing costs. ' : '') +
+      'The figures are in pounds of April 2022 to March 2023, when prices were rising fast, and should not be compared with ONS\'s earlier editions, which used the 2011 MSOAs and a different model. ' +
+      'Ward figures are averages of the MSOAs each ward overlaps and LA figures are averages of their MSOAs, both weighted by ' +
+      (saieWeightWords() === 'households' ? 'households at the 2021 Census, because these are means over households.'
+        : 'residents at the 2021 Census, because this build had no counts of households.');
+    return f;
+  }
+  if (/^ONS health state life expectancy/.test(src)) {
+    f.num = /^dfle_/.test(k) ? 'Years a newborn could expect to live without an illness or disability that limits day-to-day activities'
+      : 'Years a newborn could expect to live in good or very good health';
+    f.cadence = 'ONS makes these estimates after each census, so the next will follow the 2031 Census.';
+    f.method = 'ONS combines a life table built from deaths in 2019 to 2023 with the share of people at each age who said at the 2021 Census that their health was good or very good, or that no illness or disability limited their day-to-day activities. ' +
+      'The Census fell during the pandemic. ONS says these figures should not be compared with its survey-based figures for LAs, or with its earlier estimates for MSOAs, which used the 2011 Census. ' +
+      'Each MSOA figure has a 95% confidence interval, shown beside it when the map shows MSOAs, and the intervals are often several years wide. ' +
+      'Ward figures blend the MSOAs each ward overlaps, weighted by residents. Life expectancy cannot be averaged exactly, so ward figures, and LA figures where ONS gives none, are our estimates.';
     return f;
   }
   if (/police/i.test(src)) {
@@ -8154,6 +8328,7 @@ function _publishedBy(k) {
     : 'ONS publishes these figures for output areas, LSOAs and MSOAs.';
   if (/^ft_\d+$/.test(k)) return 'OHID publishes these figures for MSOAs.';
   if (/^ft_/.test(k)) return 'OHID publishes these figures only for each LA as a whole.';
+  if (/^ONS (small area income|health state)/.test(src)) return 'ONS publishes these estimates for MSOAs.';
   if (/police/i.test(src)) return 'We count the crimes in each ward from the locations the police publish.';
   if (k === 'core20_lsoa_count') return 'We count these for each ward from the deprivation deciles MHCLG publishes for LSOAs.';
   if (k === 'imd_score_ward' || k === 'imd_decile_mean') return 'We calculate these for each ward from the figures MHCLG publishes for LSOAs.';
@@ -8177,6 +8352,22 @@ function _publishedAt(k, nat, lv) {
   // before it: wards from MSOAs, then LAs from wards.
   lv.slice().sort((a, b) => LADDER.indexOf(b) - LADDER.indexOf(a)).forEach(l => {
     if (l === nat) return;
+    // ONS's MSOA income and health state life expectancy: wards from the
+    // MSOAs they overlap, through their LSOAs; income LAs from all of their
+    // MSOAs, by households (msoa_figures_to_areas in the pipeline).
+    if (isOnsMsoa(k) && (l === 'ward' || l === 'borough')) {
+      const hh = /^saie_/.test(k) && saieWeightWords() === 'households';
+      const by = hh ? 'households' : 'residents';
+      if (l === 'ward') {
+        out.push('Ward figures blend the MSOAs that each ward overlaps, in proportion to where its ' + by + ' are.');
+      } else if (/^saie_/.test(k)) {
+        out.push('LA figures are an average of all the MSOAs in each LA, weighted by ' + by + '.');
+      } else {
+        out.push(laIsWardEstimate(k) ? 'LA figures are an average of the ward figures, weighted by population, and are our estimates.'
+          : 'LA figures are ONS\'s own, from the same release.');
+      }
+      return;
+    }
     // The IoD 2025 measures beyond the IMD are weighted up from their LSOAs
     // by the pipeline, an LA's from all of its LSOAs (iod_area_figures).
     if (isIodExtra(k) && (l === 'ward' || l === 'borough')) {
@@ -8229,6 +8420,8 @@ function _cardSource(k) {
   if (ts) return 'ONS, Census 2021 table ' + ts;
   if (/^ft_\d+$/.test(k)) return 'OHID, Local Health';
   if (/^ft_/.test(k)) return 'OHID, Fingertips';
+  if (/^ONS small area income/.test(src)) return 'ONS, income estimates for small areas, financial year ending 2023';
+  if (/^ONS health state life expectancy/.test(src)) return 'ONS, health state life expectancies for MSOAs, 2019 to 2023';
   if (k === 'crime_rate_per_1000') return 'data.police.uk, with residents from the 2021 Census';
   if (/police/i.test(src)) return 'data.police.uk';
   if (/underlying indicators/.test(src)) return 'MHCLG, English Indices of Deprivation 2025, underlying indicators';
@@ -8253,7 +8446,9 @@ function _methAnchor(k) {
   if (/underlying indicators/.test(s)) return 'src-iod-indicators';
   if (/supplementary indices/.test(s)) return 'src-iod-extra';
   if (/^MHCLG/.test(s)) return 'src-imd';
-  if (/Local Health/.test(s)) return 'src-local-health';
+  if (/Local Health/.test(s)) return FT_EXTRA_IDS.indexOf(k.slice(3)) !== -1 ? 'src-local-health-extra' : 'src-local-health';
+  if (/income estimates for small areas/.test(s)) return 'src-saie';
+  if (/health state life expectancies/.test(s)) return 'src-hle-msoa';
   if (/^OHID, Fingertips/.test(s)) return 'src-fingertips';
   if (/police/.test(s)) return 'src-crime';
   if (/claimant/.test(s)) return 'src-claimant';
@@ -8655,6 +8850,8 @@ function fmtOv(v, k) {
   const m = (typeof OV_META === 'object' && OV_META) ? OV_META[key] : null;
   const u = m ? String(m.u || '').trim() : (/_pct$/.test(key) ? '%' : '');
   if (u === '%') return s + '%';
+  // Money ("£ a year") takes its pound sign: "£38,450".
+  if (/^£/.test(u)) return (s.charAt(0) === '-' ? '-£' + s.slice(1) : '£' + s);
   if (/^per /.test(u) && indLabel(key).toLowerCase().indexOf(u.toLowerCase()) === -1) return s + ' ' + u;
   return s;
 }
@@ -8686,7 +8883,7 @@ function ovTooltipRows(valueForKey, ward, level, id) {
     const ctx = (level && !bivOn()) ? ovContext(level, k, v, ward) : '';
     // A ward's Local Health figure is our blend of MSOA figures, so it has
     // no interval: said here, where a percentile could look precise.
-    const est = level === 'ward' && /^ft_\d+$/.test(k) && !bivOn()
+    const est = level === 'ward' && (/^ft_\d+$/.test(k) || isOnsMsoa(k)) && !bivOn()
       ? 'Ward figures are estimates from MSOA figures, so no interval is available.' : '';
     return `<span class="tip-row"><b>${ovLabel(k)}:</b> ${fmtOvTip(v, k)}</span>` +
       (ctx ? `<span class="ctx">${ctx}</span>` : '') + (est ? `<span class="ctx">${est}</span>` : '');
@@ -10005,7 +10202,9 @@ function boroughOvValue(code, k) {
    from OHID's LA series, so the key says so and the City of London, whose
    figure rests on very small numbers, is left out of their LA rankings. */
 function laIsWardEstimate(k) {
-  if (!/^ft_\d+$/.test(k || '')) return false;
+  // ONS's healthy and disability-free life expectancy too: an average of
+  // ward life expectancies is not exact either.
+  if (!/^ft_\d+$/.test(k || '') && !/^(hle|dfle)_/.test(k || '')) return false;
   const f = resolveOvField(k);
   for (const code in BOROUGH_DATA) {
     const d = BOROUGH_DATA[code];
@@ -11331,6 +11530,7 @@ function profileCaption(key, has, lad) {
     case 'health':
       return 'How residents described their health, disability and unpaid care at the 2021 Census' +
         (has.msoa ? ', then health outcomes estimated by the Office for Health Improvement and Disparities (OHID)' : '') +
+        (has.ons ? ', healthy and disability-free life expectancy as the Office for National Statistics (ONS) estimates it' : '') +
         (has.borough ? ', and figures ' + (has.msoa ? 'OHID' : 'the Office for Health Improvement and Disparities (OHID)') +
           ' publishes only for the whole of ' + (has.county || ladPhrase(la)) : '') + '.';
     case 'imd2025':
@@ -11342,7 +11542,8 @@ function profileCaption(key, has, lad) {
     case 'economy':
       return 'Work and qualifications at the 2021 Census' +
         (has.lsoa || has.msoa ? ', and the people claiming benefits because they are out of work, from the ' +
-          'claimant count published by the Office for National Statistics (ONS)' + (has.msoa ? ' and from OHID' : '') : '') + '.';
+          'claimant count published by the Office for National Statistics (ONS)' + (has.msoa ? ' and from OHID' : '') : '') +
+        (has.ons ? (has.lsoa || has.msoa ? ', and household income as ONS estimates it' : ', and household income as the Office for National Statistics (ONS) estimates it') : '') + '.';
     case 'housing':
       return 'Homes, cars and travel to work at the 2021 Census' +
         (has.lsoa ? ', and how near the nearest station and bus stop are, estimated from the LSOAs in this ward' : '') + '.';
@@ -11478,9 +11679,10 @@ function showWard(wn) {
     // The indicator's own decimal places, rounded the way the hover card,
     // the key figures and the downloads round them, so one figure never
     // shows two values on the same screen.
-    const display = isNum ? fmtNum(val, indDecimals(f.k)) : _esc(val);
+    const display = isNum ? indValuePrefix(f.k) + fmtNum(val, indDecimals(f.k)) : _esc(val);
     let unit = '';
-    if (f.k.startsWith('ft_')) {
+    // ONS's healthy life expectancy reads in years, as OHID's life expectancy does.
+    if (f.k.startsWith('ft_') || /^(hle|dfle)_/.test(f.k)) {
       const u = String((ovMeta(f.k) || {}).u || '').trim();
       // A ratio carries its anchor, so 204.1 reads as twice England's level.
       if (isNum && ovIsStdRatio(f.k)) unit = '<span class="sv-u">(England is 100)</span>';
@@ -11540,9 +11742,12 @@ function showWard(wn) {
     // The population is the first key figure above, so it is not repeated
     // as a row (the picker and other lists still have it).
     const ownF  = wardFields.filter(f => f.g !== 'msoa' && profRow(f) && !(f.k === 'census_population' && !isNaN(parseFloat(inds.census_population))));
-    const msoaF = wardFields.filter(f => f.g === 'msoa' && profRow(f)).sort((a, b) => leadRank(a) - leadRank(b));
+    const msoaF = wardFields.filter(f => f.g === 'msoa' && !isOnsMsoa(f.k) && profRow(f)).sort((a, b) => leadRank(a) - leadRank(b));
+    // ONS's MSOA estimates (income, healthy life expectancy) under their
+    // own heading, since they are not OHID's.
+    const onsF  = wardFields.filter(f => f.g === 'msoa' && isOnsMsoa(f.k) && profRow(f));
     const ctxF  = fields.filter(f => f.g === 'borough' && profRow(f));
-    const total = ownF.length + msoaF.length + ctxF.length;
+    const total = ownF.length + msoaF.length + onsF.length + ctxF.length;
     if (!total) return '';
     // Rows past the eighth are marked, and hidden until "Show all".
     const clip = total > PROFILE_MAX;
@@ -11554,6 +11759,7 @@ function showWard(wn) {
     }).join('');
     const own = rowsOf(ownF);
     const msoaStart = n, msoaRows = rowsOf(msoaF);
+    const onsStart = n, onsRows = rowsOf(onsF);
     const ctxStart = n, ctxRows = rowsOf(ctxF);
     const hideFrom = start => clip && start >= PROFILE_SHOW ? ' sr-x' : '';
     // Life expectancy is in two series: OHID's small-area estimate, which
@@ -11595,13 +11801,19 @@ function showWard(wn) {
             : ', and further down as the official figure for the whole of ' + _esc(ladPhrase(bor)) + '.') +
           ' The two cover different years, so the difference between them is not a change in this ward.' : ''}</div></div>
       ${msoaRows}` : '';
+    const onsIncome = onsF.some(f => /^saie_/.test(f.k));
+    const ons = onsRows ? `<div class="sr-lh${hideFrom(onsStart)}"><div class="sr-sub">ONS estimates for this ward</div>
+      <div class="sr-sub-note">ONS models these for MSOAs from surveys and records, so each MSOA figure is an estimate with a range. This ward’s figure is calculated from them, weighted by where its ${
+        onsIncome && saieWeightWords() === 'households' ? 'households are' : 'residents live'}, and has no range of its own.${
+        onsIncome ? ' Income is a yearly average (mean) per household, in pounds of April 2022 to March 2023.' : ''}</div></div>
+      ${onsRows}` : '';
     const ctx = ctxRows ? `<div class="sr-ctx${hideFrom(ctxStart)}">
       <div class="sr-sub">Figures for the whole of ${_esc(allCty ? ctyName : ladPhrase(bor))}</div>
       <div class="sr-sub-note">${allCty ? ctyNote
         : `OHID publishes these only for the LA, so every ward in ${_esc(ladPhrase(bor))} shows the same figure and they cannot tell this ward apart from its neighbours.${ctyNote ? ' ' + ctyNote : ''}`}</div>
       ${ctxRows}</div>` : '';
     const has = { lsoa: ownF.some(f => f.g === 'lsoa'), msoa: msoaF.length > 0, borough: ctxF.length > 0,
-                  county: allCty ? ctyName : '' };
+                  county: allCty ? ctyName : '', ons: onsF.length > 0 };
     const cap = profileCaption(cat.key, has, wdata.lad);
     const more = clip
       ? `<button type="button" class="sr-all" aria-expanded="false" data-n="${total}" onclick="toggleProfileAll(this)">Show all ${total} figures</button>`
@@ -11612,7 +11824,7 @@ function showWard(wn) {
         <span class="cat-hdr-l">${ico(cat.ico, 'cat-ico')}${_esc(cat.label)}</span>
         ${ico('chevron-right', 'cat-arrow' + (op ? ' open' : ''))}
       </button></h3>
-      <div class="cat-body${op ? ' open' : ''}${clip ? ' clipped' : ''}" id="pc-${cat.key}">${cap ? `<p class="cat-cap">${cap}</p>` : ''}${own}${msoa}${ctx}${missing}${more}</div>
+      <div class="cat-body${op ? ' open' : ''}${clip ? ' clipped' : ''}" id="pc-${cat.key}">${cap ? `<p class="cat-cap">${cap}</p>` : ''}${own}${msoa}${ons}${ctx}${missing}${more}</div>
     </div>`;
   }).join('');
 
@@ -14499,6 +14711,8 @@ function _fitFocus(bounds) {
     'Health': [
       ['Everyday health (Census 2021)', /^census_/],
       ['Children\'s weight', /reception|year 6/],
+      ['Birth weight', /birth weight/],
+      ['New cancer cases', /cancer incidence/],
     ],
     'Life expectancy and deaths': [
       ['Life expectancy', /life expectancy/],
@@ -14681,14 +14895,14 @@ function _fitFocus(bounds) {
     heating: ['central heating', 'fuel poverty'], damp: ['poor condition'], accidents: ['road traffic'],
     road: ['road traffic'], anxiety: ['mood and anxiety'], idaci: ['affecting children'], idaopi: ['affecting older'],
     children: ['under 16', 'under 15', 'under 5', 'reception', 'year 6', 'child'], kids: ['under 16', 'under 15', 'under 5', 'reception', 'year 6', 'child'],
-    babies: ['under 5', 'fertility'], births: ['fertility'], young: ['under 16', 'under 15', '15 to 24', '10 to 24'],
+    babies: ['under 5', 'fertility', 'birth weight'], births: ['fertility', 'birth weight'], young: ['under 16', 'under 15', '15 to 24', '10 to 24'],
     obesity: ['obes', 'overweight'], overweight: ['obes', 'overweight'], weight: ['obes', 'overweight'],
     parks: ['green space'], park: ['green space'], rivers: ['blue space'], water: ['blue space'],
     trains: ['station'], train: ['station'], rail: ['station'], tube: ['station', 'public transport'],
     buses: ['bus'], transport: ['public transport', 'station', 'bus'],
     cars: ['car or van'], car: ['car or van'], driving: ['car or van'], cycling: ['walk or cycle'], walking: ['walk or cycle'],
     race: ['ethnic'], ethnicity: ['ethnic'], migrants: ['born outside'], immigrants: ['born outside'], immigration: ['born outside'],
-    language: ['english'], housing: ['renting', 'ownership'], rent: ['renting'], renters: ['renting'],
+    language: ['english'], housing: ['renting', 'ownership'], rent: ['renting', 'housing costs'], renters: ['renting'],
     homeowners: ['ownership'], mortgage: ['ownership'],
     mortality: ['deaths'], death: ['deaths'], dying: ['deaths'], lifespan: ['life expectancy'],
     heart: ['cardiovascular', 'coronary', 'heart attack'], cardiac: ['cardiovascular', 'coronary', 'heart attack'],
@@ -14696,7 +14910,7 @@ function _fitFocus(bounds) {
     mental: ['self-harm', 'mental illness', 'depression', 'suicide', 'mood and anxiety'],
     depression: ['depression', 'self-harm', 'mood and anxiety'],
     drinking: ['alcohol'], drink: ['alcohol'], carers: ['unpaid care'], caring: ['unpaid care'],
-    disabled: ['disab'], disability: ['disab'], education: ['qualifications', 'key stage', 'higher education'],
+    disabled: ['disab'], disability: ['disab', 'disability-free'], education: ['qualifications', 'key stage', 'higher education'],
     school: ['qualifications', 'reception', 'year 6', 'key stage'],
     burglaries: ['burglary'], knife: ['weapons'], knives: ['weapons'], guns: ['weapons'], drugs: ['drug'],
     antisocial: ['anti-social'], asb: ['anti-social'], vaccination: ['vaccination', 'mmr'], vaccines: ['vaccination', 'mmr'], jabs: ['vaccination', 'mmr'],
@@ -14707,6 +14921,13 @@ function _fitFocus(bounds) {
     travellers: ['traveller'], gypsies: ['gypsy'], interpreting: ['speak english'], interpreters: ['speak english'],
     sick: ['long-term sick'], sickness: ['long-term sick'], 'out of work': ['long-term sick', 'out-of-work', 'claimant'],
     workless: ['never worked', 'long-term sick', 'claimant'],
+    income: ['household income'], incomes: ['household income'], earnings: ['household income'], wages: ['household income'],
+    salary: ['household income'], pay: ['household income'], wealth: ['household income'], rich: ['household income'],
+    'cost of living': ['household income', 'housing costs'],
+    cancer: ['cancer'], tumour: ['cancer'], breast: ['breast cancer'], bowel: ['bowel cancer'], lung: ['lung cancer'],
+    prostate: ['prostate cancer'], screening: ['screening', 'breast cancer'], birthweight: ['birth weight'],
+    newborn: ['birth weight'], pregnancy: ['birth weight', 'fertility'], healthy: ['healthy life expectancy'],
+    'good health': ['healthy life expectancy', 'good/very good health'],
   };
   // Shared with the Data export search, so the same everyday words work there.
   window.PH_SEARCH_TERMS = q => searchTerms(q);
@@ -15084,7 +15305,8 @@ const PH_PEEK = (function () {
       const v = val(k);
       const has = !(v == null || v === '' || isNaN(parseFloat(v)));
       const ctx = (!has || bivOn() || level === 'oa') ? '' : ovContext(level, k, v);
-      const vs = has ? ovVsHTML(ovVsEngland(level, code, k)) + (ovIsEstimated(level, code, k) ? EST_HTML : '') : '';
+      const vs = has ? ovVsHTML(ovVsEngland(level, code, k)) + (ovIsEstimated(level, code, k) ? EST_HTML : '') +
+        ovIntervalHTML(level, code, k) : '';
       return '<div class="ap-row"><span>' + esc(ovLabel(k)) +
         (ctx ? '<span class="ctx">' + esc(ctx) + '</span>' : '') + (vs ? '<span class="ctx">' + vs + '</span>' : '') + '</span><b>' +
         (has ? esc(fmtOvTip(v, k)) : esc(level === 'msoa' ? msoaNoFigure(code, k) : 'No figure')) + '</b></div>';
@@ -16870,7 +17092,8 @@ function loadMsoaBoundaries() {
                            && v != null && !isNaN(parseFloat(v)))
               ? `<span class="tip-row"><b>${_esc(_ovLabel(curOv))}:</b> ${fmtOvTip(parseFloat(v), curOv)}` +
                 ovVsHTML(ovVsEngland('msoa', p.code, curOv)) +
-                (ovIsEstimated('msoa', p.code, curOv) ? EST_HTML : '') + '</span>' +
+                (ovIsEstimated('msoa', p.code, curOv) ? EST_HTML : '') +
+                ovIntervalHTML('msoa', p.code, curOv) + '</span>' +
                 (bivOn() ? '' : `<span class="ctx">${ovContext('msoa', curOv, v)}</span>`)
               : (curOv && curOv !== 'none' && ovHasLevel(curOv, 'msoa'))
               ? `<span class="tip-row"><b>${_esc(_ovLabel(curOv))}:</b> <span class="tip-none">${_esc(msoaNoFigure(p.code, curOv))}</span></span>`
@@ -17399,7 +17622,7 @@ function renderTopBottom() {
   const worstHdr = document.getElementById('rank-worst-hdr');
   // The unit once, in each header, short enough to sit beside "Best 10".
   const u = indUnit(curOv);
-  const uShort = !u ? '' : u === '%' ? '%' : /^ratio/.test(u) ? 'ratio' : /^per /.test(u) ? 'rate ' + u : u;
+  const uShort = !u || /^£/.test(u) ? '' : u === '%' ? '%' : /^ratio/.test(u) ? 'ratio' : /^per /.test(u) ? 'rate ' + u : u;
   // "Best 20" in green over the wards with the most Black residents would read
   // as a verdict on who lives there, and "Best" crime counts mostly name the
   // emptiest wards. Neutral lists are named by the figure and set in ink.
@@ -17417,7 +17640,7 @@ function renderTopBottom() {
   // To the indicator's own decimal places, as on the hover card and in the
   // Data export, rather than by the size of the number.
   const rankDp = indDecimals(curOv);
-  const fmt = v => fmtNum(v, rankDp);
+  const fmt = v => indValuePrefix(curOv) + fmtNum(v, rankDp);
   const unitSfx = indValueUnit(curOv);
 
   // What the lists cannot show by themselves, said under them.
@@ -17706,11 +17929,13 @@ function _syncScaleNumbers() {
         (age ? ' <span class="ov-old">' + _e(age) + '.</span>' : '') +
         (caution ? '<span class="ov-caution">' + _e(caution) + '</span>' : '') +
         (drawnLvl === 'oa' ? '<span class="ctx" id="sc-oa-note">' + _e(OA_CAVEAT) + '</span>' : '') +
-        (nativeG === 'msoa' && drawnLvl === 'msoa' ? '<span class="ctx">Select an MSOA to see whether its figure differs from England\'s, by OHID\'s test.</span>' : '') +
+        (nativeG === 'msoa' && drawnLvl === 'msoa' && /^ft_/.test(curOv) ? '<span class="ctx">Select an MSOA to see whether its figure differs from England\'s, by OHID\'s test.</span>' : '') +
+        (isOnsMsoa(curOv) && drawnLvl === 'msoa' ? '<span class="ctx">These are modelled estimates. Select an MSOA to see the range ONS is 95% sure its figure lies in.</span>' : '') +
         (estLa
           ? '<span class="ctx" id="sc-la-est">' + _e('These LA figures are our estimates from ward figures' +
               (fmtPeriod(meta.yr) ? ' for ' + fmtPeriod(meta.yr) : '') +
-              ', and can differ from OHID’s own LA figures, which are shown on each Area profile.') + '</span>'
+              (/^ft_/.test(curOv) ? ', and can differ from OHID’s own LA figures, which are shown on each Area profile.'
+                : ', because ONS publishes these figures for MSOAs only.')) + '</span>'
           : '')
       : '';
   }
@@ -21491,6 +21716,9 @@ var PH_SHOW = {
     // mode paints the best-served wards red and calls them worse, which is the
     // exact inversion the rest of this map was corrected to stop making.
     ptal_score: 'high-good',
+    // ONS: more income, and more years in good health, are better.
+    saie_total_income: 'high-good', saie_net_bhc: 'high-good', saie_net_ahc: 'high-good',
+    hle_female: 'high-good', hle_male: 'high-good', dfle_female: 'high-good', dfle_male: 'high-good',
   };
   function polarityOf(k) {
     // Descriptive in OV_CFG (who lives here, how they travel, births, unpaid
@@ -25940,10 +26168,11 @@ var PH_SHOW = {
         if (typeof cbInds(src[c])[k] !== 'object') seen[k] = 1;
       });
     });
-    // OHID's England comparison (_vs) and the estimated-from-2011 flag (_est)
-    // are not indicators: they ride along beside the figure they describe.
+    // OHID's England comparison (_vs), the estimated-from-2011 flag (_est)
+    // and ONS's 95% limits (_lci, _uci) are not indicators: they ride along
+    // beside the figure they describe.
     return Object.keys(seen).filter(function (k) {
-      return k !== 'name' && k !== 'lad' && k !== 'code' && !/_(vs|est)$/.test(k) && !phWithheld(k);
+      return k !== 'name' && k !== 'lad' && k !== 'code' && !/_(vs|est|lci|uci)$/.test(k) && !phWithheld(k);
     }).sort();
   }
 
@@ -25968,6 +26197,8 @@ var PH_SHOW = {
         : /life expectancy|mortality/.test(t) ? 'Life expectancy and deaths'
         : /admission|injur/.test(t) ? 'Hospital admissions' : 'Health';
     }
+    if (/^saie_/.test(k)) return 'Work, money and education';
+    if (/^(hle|dfle)_/.test(k)) return 'Life expectancy and deaths';
     if (/^(ptal_|rail_|bus_)|^census_(no_car|active_travel|public_transport|car_to_work)_/.test(k)) return 'Transport';
     if (/^(fuel_|gb_|green_|blue_|no2_|pm25_|pm10_)/.test(k)) return 'Environment and access';
     if (/^census_(owned|social_rented|private_rented|overcrowded|underoccupied)_/.test(k)) return 'Housing';
@@ -26359,6 +26590,10 @@ var PH_SHOW = {
         columns.push({ kind: 'vs', key: k, header: labelOf(k) + ', compared with England' + (per ? ' (' + per + ')' : '') });
       }
       if (has('_est', k)) columns.push({ kind: 'est', key: k, header: labelOf(k) + ', estimated from 2011 areas' });
+      if (has('_lci', k) && has('_uci', k)) {
+        columns.push({ kind: 'lci', key: k, header: cbHeader(k) + ', lower 95% limit' });
+        columns.push({ kind: 'uci', key: k, header: cbHeader(k) + ', upper 95% limit' });
+      }
     });
     // Where a district's OHID figures are its county's, a column names the
     // area they describe, so the file cannot pass a county figure off as the
@@ -26372,6 +26607,7 @@ var PH_SHOW = {
         if (c.kind === 'id') return String(l[c.field] || '');
         if (c.kind === 'vs') return VS_ENGLAND_TEXT[i[c.key + '_vs']] || '';
         if (c.kind === 'est') return i[c.key + '_est'] ? 'Yes' : '';
+        if (c.kind === 'lci' || c.kind === 'uci') return cbCell(i[c.key + '_' + c.kind], c.key);
         if (c.kind === 'from') return cbFigArea(code, rec, l, laKeys);
         return cbCell(i[c.key], c.key);
       }));
@@ -26410,6 +26646,8 @@ var PH_SHOW = {
       var fid = FT_LA_IDS[k.slice(3)];
       return 'Office for Health Improvement and Disparities (OHID), Fingertips' + (fid ? ' indicator ' + fid : '');
     }
+    if (/^saie_/.test(k)) return 'Office for National Statistics (ONS), Income estimates for small areas, England and Wales: financial year ending 2023';
+    if (/^(hle|dfle)_/.test(k)) return 'Office for National Statistics (ONS), Health state life expectancy estimates for Middle layer Super Output Areas, England and Wales: 2019 to 2023';
     if (k === 'crime_rate_per_1000') return 'Police recorded crime from data.police.uk, with residents from the Office for National Statistics (ONS) Census 2021';
     if (/police/i.test(src)) return 'Police recorded crime and anti-social behaviour from data.police.uk';
     if (k === 'core20_lsoa_count') return 'NHS England’s Core20PLUS5 definition, applied to the English Indices of Deprivation 2025 from the Ministry of Housing, Communities and Local Government (MHCLG)';
@@ -26468,6 +26706,17 @@ var PH_SHOW = {
           (censusLaCounts() ? 'calculated from the counts of the output areas in its wards.'
             : 'an average of its ward figures, weighted by population.')
         : 'ONS publishes Census 2021 figures for output areas, LSOAs and MSOAs, so these are its own ' + one + ' figures.';
+    }
+    if (nat === 'msoa' && isOnsMsoa(k)) {
+      var income = /^saie_/.test(k), by = income && saieWeightWords() === 'households' ? 'households' : 'residents';
+      return L === 'msoa' ? 'ONS publishes this modelled estimate for each MSOA, with the lower and upper limits of its ' +
+          '95% confidence interval in the columns beside it.'
+        : L === 'borough'
+        ? (income ? 'ONS publishes this for each MSOA, and each LA figure is an average of all its MSOAs, weighted by ' + by + '.'
+            : laIsWardEstimate(k) ? 'ONS publishes this for each MSOA, and each LA figure is our estimate, an average of its ward figures weighted by population.'
+            : 'ONS publishes this for each MSOA and for each LA, and these are its own LA figures.')
+        : 'ONS publishes this for each MSOA, and each ward figure blends the MSOAs the ward overlaps, in proportion to where its ' +
+          by + (by === 'households' ? ' are.' : ' live.');
     }
     if (nat === 'msoa') {
       return L === 'msoa' ? 'OHID publishes this figure for each MSOA.'
