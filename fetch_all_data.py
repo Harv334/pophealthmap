@@ -13,13 +13,20 @@ Plus it writes the map data files under data/map/ that index.html loads.
 MANUAL DOWNLOADS  (none are required for a normal run)
 ------------------------------------------------------------------------------
 Everything is either fetched from an open API or committed to the repo. The
-only files you can drop in .cache/ are these, and both are optional:
+only files you can drop in .cache/ are these, and all are optional:
 
   .cache/imd2025/File_7_IoD2025_All_Ranks_...csv  [only to rebuild]
       Index of Multiple Deprivation 2025 - File 7 (all domains). IMD is static
       between releases, so data/demographics/imd2025.parquet is committed and
       used as-is. Drop the raw CSV here only when a new IoD is published and
       the parquet needs regenerating. See IMD_SOURCE_URL below.
+
+  .cache/iod2025/File_7_...csv, File_8_...xlsx  [only to rebuild]
+      The same release's File 7 again (IDACI, IDAOPI, sub-domains) and File 8
+      (underlying indicators). Both are downloaded from the release page by
+      themselves until data/demographics/iod2025_extra.parquet and
+      iod2025_indicators.parquet hold every column; a file dropped here is
+      read instead. See IOD_API_URL below.
 
 No cache needed - the script hits these APIs directly (cached between runs):
   - ODS 'ets' extract    (NHS trust sites, which hospitals are derived from)
@@ -1753,7 +1760,73 @@ IMD_LANDING_URL = (
 #             full-England and the scoping happens downstream)
 #   columns - 11 of File 7's ~60: LSOA21CD, the overall IMD score, decile and
 #             rank, and the seven domain scores. Population denominators and
-#             the per-domain ranks and deciles are dropped as unused.
+#             the per-domain ranks and deciles are dropped as unused here;
+#             IDACI, IDAOPI, the sub-domains and the denominators they need
+#             are kept by run_iod_extra in a parquet of their own.
+
+
+def iod_norm(s) -> str:
+    """A header as the IoD column matching reads it: lower case, with every
+    run of punctuation or spaces turned into one space, so "Sub-domain",
+    "Sub domain" and "sub-domain " all read "sub domain" and "aged 0-15"
+    reads "aged 0 15"."""
+    return " ".join(re.sub(r"[^0-9a-z]+", " ", str(s).lower()).split())
+
+
+def iod_find_cols(columns, *kws, exclude=()) -> list:
+    """Every column whose normalised header holds all of kws and none of
+    exclude, in the file's own order."""
+    want = [iod_norm(k) for k in kws]
+    bar = [iod_norm(e) for e in exclude]
+    out = []
+    for c in columns:
+        if not isinstance(c, str):
+            continue
+        n = iod_norm(c)
+        if all(k in n for k in want) and not any(b in n for b in bar):
+            out.append(c)
+    return out
+
+
+def iod_find_col(columns, *kws, exclude=()):
+    """The first column iod_find_cols finds, or None."""
+    hits = iod_find_cols(columns, *kws, exclude=exclude)
+    return hits[0] if hits else None
+
+
+def iod_lookup(columns, alternatives, exclude=()):
+    """The first column matching any of the keyword tuples in alternatives,
+    tried in order."""
+    for kws in alternatives:
+        c = iod_find_col(columns, *kws, exclude=exclude)
+        if c:
+            return c
+    return None
+
+
+# How the IMD and its seven domain scores are found in File 7. Each domain
+# lookup rules out the narrower measures that share its words, so the column
+# order of a release cannot hand a domain the wrong figure: "income" and
+# "score" are also in the IDACI and IDAOPI headers ("Income Deprivation
+# Affecting Children Index (IDACI) Score (rate)"), "barriers" in the two
+# barriers sub-domains, and so on. Ranks and deciles are never a score.
+IOD_DOMAIN_LOOKUPS = {
+    "imd_score":         ((("multiple deprivation", "score"), ("imd", "score")), ()),
+    "income_score":      ((("income", "score"),), ("affecting", "idaci", "idaopi")),
+    "employment_score":  ((("employment", "score"),), ()),
+    "education_score":   ((("education", "score"),), ("sub domain", "young people", "adult skills")),
+    "health_score":      ((("health", "score"),), ()),
+    "crime_score":       ((("crime", "score"),), ()),
+    "barriers_score":    ((("barriers", "score"),), ("sub domain", "geographical", "wider")),
+    "environment_score": ((("environment", "score"),), ("sub domain", "indoors", "outdoors")),
+}
+
+
+def iod_domain_cols(columns) -> dict:
+    """{imd_score / income_score / ...: the File 7 header, or None}."""
+    return {key: iod_lookup(columns, alts, exclude=tuple(ex) + ("rank", "decile"))
+            for key, (alts, ex) in IOD_DOMAIN_LOOKUPS.items()}
+
 
 def run_imd2025() -> pd.DataFrame:
     rule("IMD 2025 (MHCLG)")
@@ -1808,24 +1881,24 @@ def run_imd2025() -> pd.DataFrame:
 
     df = df.rename(columns={c: c.strip() for c in df.columns})
 
-    def find_col(*kws):
-        for c in df.columns:
-            lc = c.lower()
-            if all(k in lc for k in kws):
-                return c
-        return None
-
-    code_col   = find_col("lsoa", "code")
-    score_col  = find_col("multiple deprivation", "score")  or find_col("imd", "score")
-    decile_col = find_col("multiple deprivation", "decile") or find_col("imd", "decile")
-    rank_col   = find_col("multiple deprivation", "rank")   or find_col("imd", "rank")
-    income_col = find_col("income",    "score")
-    emp_col    = find_col("employment","score")
-    edu_col    = find_col("education", "score")
-    health_col = find_col("health",    "score")
-    crime_col  = find_col("crime",     "score")
-    barriers_col = find_col("barriers","score")
-    env_col    = find_col("environment","score")
+    # Matched on normalised headers, and each domain rules out the narrower
+    # measures that share its words (IOD_DOMAIN_LOOKUPS): "income" and
+    # "score" are in the IDACI header too, so a release that put IDACI first
+    # would otherwise hand the Income domain the children's figure.
+    code_col   = iod_find_col(df.columns, "lsoa", "code")
+    dom        = iod_domain_cols(df.columns)
+    score_col  = dom["imd_score"]
+    decile_col = (iod_find_col(df.columns, "multiple deprivation", "decile")
+                  or iod_find_col(df.columns, "imd", "decile"))
+    rank_col   = (iod_find_col(df.columns, "multiple deprivation", "rank", exclude=("decile",))
+                  or iod_find_col(df.columns, "imd", "rank", exclude=("decile",)))
+    income_col = dom["income_score"]
+    emp_col    = dom["employment_score"]
+    edu_col    = dom["education_score"]
+    health_col = dom["health_score"]
+    crime_col  = dom["crime_score"]
+    barriers_col = dom["barriers_score"]
+    env_col    = dom["environment_score"]
 
     if not code_col:
         raise RuntimeError(f"imd2025: no LSOA code column found in {src}")
@@ -1866,6 +1939,677 @@ def run_imd2025() -> pd.DataFrame:
     out = write_parquet_guarded(out_path, out, source="imd2025")
     ok(f"imd2025: {len(out):,} LSOAs -> {out_path.relative_to(REPO_ROOT)}")
     return out
+
+
+# ============================================================================
+# SOURCE 3a: IoD 2025 beyond the IMD  (MHCLG, LSOA-level)
+# ============================================================================
+# The IMD parquet keeps the overall index and its seven domains. Two more parts
+# of the same release are kept beside it, each in its own parquet and under its
+# own manifest key, so a problem with either never marks the IMD itself failed:
+#
+#   iod_extra       data/demographics/iod2025_extra.parquet, from File 7, the
+#                   file the IMD parquet is filtered from. It also carries the
+#                   two supplementary indices, IDACI (the share of children
+#                   aged 0 to 15 living in income-deprived families) and IDAOPI
+#                   (the share of people aged 60 and over who are income
+#                   deprived), each as a rate, a rank and a decile; the six
+#                   sub-domain scores (children and young people, and adult
+#                   skills, under education; geographical and wider barriers;
+#                   indoors and outdoors living environment); and the population
+#                   denominators, of which the children aged 0 to 15 and the
+#                   people aged 60 and over weight IDACI and IDAOPI into wards
+#                   and LAs, so those figures are the share of the area's
+#                   children (or older people), not of its residents.
+#   iod_indicators  data/demographics/iod2025_indicators.parquet, from File 8,
+#                   the underlying indicators the domains are built from: for
+#                   health, years of potential life lost, the comparative
+#                   illness and disability ratio, acute morbidity and mood and
+#                   anxiety disorders; for education, Key Stage 2 and Key Stage
+#                   4 attainment, staying on after 16, entry to higher
+#                   education, adults with no or low qualifications and English
+#                   language proficiency; for living environment, housing in
+#                   poor condition, houses without central heating, air quality
+#                   and road traffic accidents.
+#
+# Both are static between releases, like the IMD: once the committed parquet
+# holds every column it is used as it is, with no download. Until then, and
+# whenever a raw file is dropped in .cache/iod2025/, the file is read from the
+# release. Nothing is pinned by hand: the files are found on the release page
+# through the gov.uk content API by their "File 7" and "File 8" titles (File 7
+# falls back to IMD_SOURCE_URL), and every column by the words in its header.
+# Where a file or a column is missing, or a column fails a check, the source is
+# marked failed in the manifest saying what, the rest is still written, and the
+# map leaves out any indicator that has no figures.
+#
+# Headers. The IDACI header is "Income Deprivation Affecting Children Index
+# (IDACI) Score (rate)", as Leicester's IoD 2025 field glossary (built from the
+# MHCLG file) gives it in the fact-check notes; the others are matched by the
+# words of the 2019 File 7 layout ("... (IDAOPI) Rank (where 1 is most
+# deprived)", "Children and Young People Sub-domain Score", "Indoors Sub-domain
+# Score", "Dependent Children aged 0-15: mid 2015 (excluding prisoners)",
+# "Older population aged 60 and over: ..."), so a changed year or punctuation
+# does not matter. File 8 is a workbook with one sheet per domain, as in 2019.
+# Its 2025 headers were not seen when this was written (the proxy refused the
+# fact-check too), so each indicator is found by the words the technical report
+# uses for it and is checked against its own domain before it is kept: a
+# column that matches twice, reads on the wrong scale or runs the wrong way is
+# reported, never guessed at.
+IOD_API_URL = ("https://www.gov.uk/api/content/government/statistics/"
+               "english-indices-of-deprivation-2025")
+# A direct link, for when the release page moves.
+IOD_FILE7_URL_OVERRIDE = os.environ.get("IOD_FILE7_URL", "")
+IOD_FILE8_URL_OVERRIDE = os.environ.get("IOD_FILE8_URL", "")
+IOD_CACHE = CACHE_DIR / "iod2025"
+IOD_EXTRA_PARQUET = "iod2025_extra.parquet"
+IOD_INDICATORS_PARQUET = "iod2025_indicators.parquet"
+
+# File 7: (key, keyword tuples tried in order, words that rule a header out,
+# kind). The kind says how a figure is checked and stored. "rate" is MHCLG's 0
+# to 1 rate, stored as a percentage (idaci_pct), which is how the map shows it.
+# "rank" runs from 1, the most deprived LSOA in England. "decile" runs 1 to 10,
+# 1 the most deprived tenth. "score" is a sub-domain score as published, where a
+# higher score means more deprived.
+_IOD_NOT_SCORE = ("rank", "decile")
+IOD_FILE7_FIELDS = (
+    ("idaci_pct",     (("idaci", "score"), ("affecting children", "score")), _IOD_NOT_SCORE, "rate"),
+    ("idaci_rank",    (("idaci", "rank"), ("affecting children", "rank")), ("decile", "score"), "rank"),
+    ("idaci_decile",  (("idaci", "decile"), ("affecting children", "decile")), ("score",), "decile"),
+    ("idaopi_pct",    (("idaopi", "score"), ("affecting older", "score")), _IOD_NOT_SCORE, "rate"),
+    ("idaopi_rank",   (("idaopi", "rank"), ("affecting older", "rank")), ("decile", "score"), "rank"),
+    ("idaopi_decile", (("idaopi", "decile"), ("affecting older", "decile")), ("score",), "decile"),
+    ("cyp_education_score",  (("children and young people", "score"),), _IOD_NOT_SCORE, "score"),
+    ("adult_skills_score",   (("adult skills", "score"),), _IOD_NOT_SCORE, "score"),
+    ("geo_barriers_score",   (("geographical barriers", "score"),), _IOD_NOT_SCORE, "score"),
+    ("wider_barriers_score", (("wider barriers", "score"),), _IOD_NOT_SCORE, "score"),
+    ("indoors_score",        (("indoors", "score"),), _IOD_NOT_SCORE, "score"),
+    ("outdoors_score",       (("outdoors", "score"),), _IOD_NOT_SCORE, "score"),
+)
+# The denominators that weight IDACI and IDAOPI into wards and LAs.
+IOD_FILE7_DENOMINATORS = (
+    ("iod_pop_children", (("dependent children",), ("children", "aged 0 15")),
+     ("score", "rank", "decile")),
+    ("iod_pop_older", (("aged 60 and over",), ("older population",)),
+     ("score", "rank", "decile")),
+)
+# Each File 7 measure must rise with the domain it belongs to (a rank or decile
+# must fall as its own rate rises), which catches a header matched to the
+# wrong column before it reaches the map.
+IOD_FILE7_PARENT = {
+    "idaci_pct": "income_score", "idaopi_pct": "income_score",
+    "cyp_education_score": "education_score", "adult_skills_score": "education_score",
+    "geo_barriers_score": "barriers_score", "wider_barriers_score": "barriers_score",
+    "indoors_score": "environment_score", "outdoors_score": "environment_score",
+}
+
+# File 8: (key, the domain score it is checked against, direction, kind,
+# keyword tuples tried in order, words that rule a header out). Direction +1
+# means a higher figure is worse, so it must rise with its domain score; -1
+# means a higher figure is better (attainment), so it must fall as the domain
+# score rises. The map colours each one in its stated direction, so a column
+# that runs the other way is left out rather than painted backwards. Kind:
+# "share" is a proportion, stored as a percentage whether published from 0 to 1
+# or from 0 to 100; "ratio" is a standardised ratio, stored with England at 100
+# whether published with England at 1 or at 100; "value" is kept as published.
+# Absence (new in 2025) is not taken: it is several measures, primary,
+# secondary and persistent, and the brief keeps the set it names.
+IOD_FILE8_SPECS = (
+    ("iod_ypll",               "health_score",      +1, "value",
+     (("years of potential life lost",), ("ypll",)), ()),
+    ("iod_cidr",               "health_score",      +1, "ratio",
+     (("comparative illness",), ("cidr",)), ()),
+    ("iod_acute_morbidity",    "health_score",      +1, "ratio",
+     (("acute morbidity",),), ()),
+    ("iod_mood_anxiety",       "health_score",      +1, "value",
+     (("mood and anxiety",), ("mood", "anxiety"), ("mental health",)), ()),
+    ("iod_ks2",                "education_score",   -1, "value",
+     (("key stage 2",), ("ks2",)), ()),
+    ("iod_ks4",                "education_score",   -1, "value",
+     (("key stage 4",), ("ks4",)), ()),
+    ("iod_staying_on",         "education_score",   +1, "share",
+     (("staying on",),), ()),
+    ("iod_he_entry",           "education_score",   +1, "share",
+     (("higher education",),), ()),
+    ("iod_adult_quals",        "education_score",   +1, "share",
+     (("qualification",), ("adult skills",)), ("english",)),
+    ("iod_english",            "education_score",   +1, "share",
+     (("english language",), ("speak english",), ("english proficiency",)),
+     ("qualification", "adult skills")),
+    ("iod_housing_poor",       "environment_score", +1, "share",
+     (("poor condition",),), ()),
+    ("iod_no_central_heating", "environment_score", +1, "share",
+     (("central heating",),), ()),
+    ("iod_air_quality",        "environment_score", +1, "value",
+     (("air quality",),), ()),
+    ("iod_road_accidents",     "environment_score", +1, "value",
+     (("road traffic",),), ("noise",)),
+)
+# A rank, decile or sub-domain column must never be taken for an indicator,
+# and nor must a part of one: the 2019 workbook lists the four pollutants as
+# "Nitrogen dioxide (component of air quality indicator)" and so on, beside
+# "Air quality indicator" itself.
+IOD_FILE8_EXCLUDE = ("rank", "decile", "sub domain", "domain score", "component")
+# Below this many LSOAs with figures a direction check is not attempted.
+IOD_CHECK_MIN_N = 200
+# The weakest agreement with its domain an indicator may show and still be
+# taken to run the stated way (a rank correlation).
+IOD_MIN_AGREEMENT = 0.1
+
+
+def iod_rank_corr(a: "pd.Series", b: "pd.Series", *, min_n: int | None = None):
+    """The rank correlation of two LSOA-indexed series over the LSOAs both
+    have, or None when too few do. Pearson on ranks, so no scipy."""
+    j = pd.concat([a.rename("a"), b.rename("b")], axis=1, join="inner").dropna()
+    if len(j) < (IOD_CHECK_MIN_N if min_n is None else min_n):
+        return None
+    x, y = j["a"].rank(), j["b"].rank()
+    if x.std() == 0 or y.std() == 0:
+        return None
+    return float(x.corr(y))
+
+
+def iod_scale(s: "pd.Series", kind: str) -> tuple:
+    """(series as stored, problem or ""), for one IoD column of the given
+    kind (see IOD_FILE7_FIELDS and IOD_FILE8_SPECS)."""
+    v = s.dropna()
+    if v.empty:
+        return s, "has no figures"
+    lo, hi = float(v.min()), float(v.max())
+    if kind == "rate":
+        if lo < 0:
+            return s, f"has negative rates (from {lo:g})"
+        if hi <= 1.0:
+            return s * 100, ""
+        if hi <= 100.0:
+            return s, ""
+        return s, f"reads as a rate but runs to {hi:g}"
+    if kind == "share":
+        if hi <= 1.0:
+            return s * 100, ""
+        if hi <= 100.0:
+            return s, ""
+        return s, f"reads as a share but runs to {hi:g}"
+    if kind == "ratio":
+        med = float(v.median())
+        if 0.2 <= med <= 5:
+            return s * 100, ""
+        if 20 <= med <= 500:
+            return s, ""
+        return s, f"reads as a ratio to England but its median is {med:g}"
+    if kind == "rank":
+        if lo < 1 or (v.round() != v).any():
+            return s, "is not a rank from 1"
+        return s, ""
+    if kind == "decile":
+        if not v.isin(range(1, 11)).all():
+            return s, "is not a decile from 1 to 10"
+        return s, ""
+    return s, ""
+
+
+def _iod_lsoa_series(df: "pd.DataFrame", col: str, codes: "pd.Series") -> "pd.Series":
+    s = pd.Series(pd.to_numeric(df[col], errors="coerce").to_numpy(), index=codes.to_numpy())
+    return s[~s.index.duplicated()]
+
+
+def _iod_lsoa_rows(df: "pd.DataFrame") -> tuple:
+    """(rows, codes) of a release table: only the rows carrying an English
+    LSOA code, so a notes line or a total row is never read as an area."""
+    df = df.rename(columns={c: c.strip() for c in df.columns if isinstance(c, str)})
+    code_col = iod_find_col(df.columns, "lsoa", "code")
+    if not code_col:
+        return df, None, None
+    codes = df[code_col].astype(str).str.strip()
+    keep = codes.str.match(r"^E01\d{6}$").to_numpy()
+    return df[keep], codes[keep], code_col
+
+
+def iod_parse_file7(df: "pd.DataFrame") -> tuple:
+    """(frame, problems, matched) from a File 7 table.
+
+    The frame is LSOA21CD plus every IOD_FILE7_FIELDS and denominator column
+    found and checked; problems lists, in words, every one that was missing
+    or failed a check (empty when all were fine); matched is {key: header}.
+    Raises RuntimeError when there is no LSOA code column, since then nothing
+    can be read at all."""
+    df, codes, code_col = _iod_lsoa_rows(df)
+    if code_col is None:
+        raise RuntimeError("File 7 has no LSOA code column (headers seen: "
+                           + ", ".join(map(str, list(df.columns)[:8])) + ")")
+    if not len(codes):
+        raise RuntimeError("File 7 has no rows with an English LSOA code")
+    dom = iod_domain_cols(df.columns)
+    parent = {k: _iod_lsoa_series(df, c, codes) for k, c in dom.items() if c}
+    cols: dict = {}
+    problems: list = []
+    matched: dict = {}
+    n_all = codes.nunique()
+    for key, alts, exclude, kind in IOD_FILE7_FIELDS:
+        col = iod_lookup(df.columns, alts, exclude=exclude)
+        if not col:
+            problems.append(f"{key}: no File 7 column with " +
+                            " or ".join("'" + " ".join(a) + "'" for a in alts))
+            continue
+        s, why = iod_scale(_iod_lsoa_series(df, col, codes), kind)
+        if not why and kind in ("rank", "decile"):
+            own = cols.get(key.rsplit("_", 1)[0] + "_pct")
+            r = None if own is None else iod_rank_corr(s, own)
+            if r is not None and r > -0.5:
+                why = f"does not fall as its own rate rises (rank correlation {r:.2f})"
+        elif not why and IOD_FILE7_PARENT.get(key) in parent:
+            r = iod_rank_corr(s, parent[IOD_FILE7_PARENT[key]])
+            if r is not None and r < IOD_MIN_AGREEMENT:
+                why = (f"does not rise with {IOD_FILE7_PARENT[key]} "
+                       f"(rank correlation {r:.2f}), so it may be the wrong column")
+        if why:
+            problems.append(f"{key} ('{col}') {why}; not used")
+            continue
+        if s.notna().sum() < 0.9 * n_all:
+            problems.append(f"{key} ('{col}') has figures for only {int(s.notna().sum()):,} "
+                            f"of {n_all:,} LSOAs")
+        cols[key] = s
+        matched[key] = col
+    for key, alts, exclude in IOD_FILE7_DENOMINATORS:
+        col = iod_lookup(df.columns, alts, exclude=exclude)
+        if not col:
+            problems.append(f"{key}: no File 7 denominator column with " +
+                            " or ".join("'" + " ".join(a) + "'" for a in alts))
+            continue
+        s = _iod_lsoa_series(df, col, codes)
+        if s.dropna().empty or float(s.min()) < 0:
+            problems.append(f"{key} ('{col}') is not a population count; not used")
+            continue
+        cols[key] = s
+        matched[key] = col
+    out = pd.DataFrame(cols, index=pd.Index(sorted(set(codes)), name="LSOA21CD"))
+    return out.reset_index(), problems, matched
+
+
+def iod_parse_file8(sheets: dict, parent: "pd.DataFrame | None") -> tuple:
+    """(frame, problems, matched) from the sheets of a File 8 workbook.
+
+    Each IOD_FILE8_SPECS indicator is looked for across every sheet with an
+    LSOA code column. One that no column matches, or that two different
+    columns match, is reported and left out, never guessed at; so is one on
+    the wrong scale for its kind or running against its own domain score in
+    parent (imd2025.parquet). Raises RuntimeError when no sheet has an LSOA
+    code column."""
+    tables = []
+    for name, df in sheets.items():
+        rows, codes, code_col = _iod_lsoa_rows(df)
+        if code_col is not None and len(codes):
+            tables.append((name, rows, codes))
+    if not tables:
+        raise RuntimeError("no sheet of File 8 has LSOA codes (sheets: "
+                           + ", ".join(map(str, sheets)) + ")")
+    par: dict = {}
+    if parent is not None and not parent.empty and "LSOA21CD" in parent.columns:
+        pc = parent["LSOA21CD"].astype(str)
+        for c in ("health_score", "education_score", "environment_score"):
+            if c in parent.columns:
+                s = pd.Series(pd.to_numeric(parent[c], errors="coerce").to_numpy(), index=pc.to_numpy())
+                par[c] = s[~s.index.duplicated()]
+    n_all = len(set().union(*(set(t[2]) for t in tables)))
+    cols: dict = {}
+    problems: list = []
+    matched: dict = {}
+    for key, pkey, sign, kind, alts, exclude in IOD_FILE8_SPECS:
+        hits = []
+        for kws in alts:
+            for name, rows, codes in tables:
+                for c in iod_find_cols(rows.columns, *kws,
+                                       exclude=tuple(exclude) + IOD_FILE8_EXCLUDE):
+                    hits.append((name, c, rows, codes))
+            if hits:
+                break
+        heads = list(dict.fromkeys(iod_norm(h[1]) for h in hits))
+        if not hits:
+            problems.append(f"{key}: no File 8 column with " +
+                            " or ".join("'" + " ".join(a) + "'" for a in alts))
+            continue
+        if len(heads) > 1:
+            problems.append(f"{key}: {len(heads)} File 8 columns match ("
+                            + "; ".join(f"'{h[1]}'" for h in hits[:4]) + "), so none is used")
+            continue
+        name, col, rows, codes = hits[0]
+        s, why = iod_scale(_iod_lsoa_series(rows, col, codes), kind)
+        if not why and pkey in par:
+            r = iod_rank_corr(s, par[pkey])
+            if r is not None and r * sign < IOD_MIN_AGREEMENT:
+                why = (f"should {'rise' if sign > 0 else 'fall'} as {pkey} rises but its rank "
+                       f"correlation with it is {r:.2f}, so its direction is not the one the map states")
+        if why:
+            problems.append(f"{key} ('{name}': '{col}') {why}; not used")
+            continue
+        if s.notna().sum() < 0.9 * n_all:
+            problems.append(f"{key} ('{col}') has figures for only {int(s.notna().sum()):,} "
+                            f"of {n_all:,} LSOAs")
+        cols[key] = s
+        matched[key] = f"{name}: {col}"
+    codes_all = sorted(set().union(*(set(t[2]) for t in tables)))
+    out = pd.DataFrame(cols, index=pd.Index(codes_all, name="LSOA21CD"))
+    return out.reset_index(), problems, matched
+
+
+def iod_release_files() -> list:
+    """[{"title", "url"}] for every file on the IoD 2025 release page, from
+    the gov.uk content API, or from the page itself when that answers nothing."""
+    found: dict = {}
+
+    def add(title, url):
+        if not isinstance(url, str):
+            return
+        if url.startswith("/media/"):
+            url = "https://assets.publishing.service.gov.uk" + url
+        if "assets.publishing.service.gov.uk" not in url:
+            return
+        if url not in found or (title and not found[url]):
+            found[url] = str(title or "")
+
+    sess = browser_session(referer="https://www.gov.uk/")
+    try:
+        r = sess.get(IOD_API_URL, timeout=60)
+        r.raise_for_status()
+
+        def walk(o):
+            if isinstance(o, dict):
+                add(o.get("title") or o.get("filename") or "", o.get("url"))
+                for v in o.values():
+                    walk(v)
+            elif isinstance(o, list):
+                for v in o:
+                    walk(v)
+        try:
+            walk(r.json())
+        except ValueError:
+            pass
+        for u in re.findall(r'https://assets\.publishing\.service\.gov\.uk/[^"\s<>\\]+', r.text):
+            add("", u)
+    except Exception as e:
+        warn(f"iod: could not read the release through the gov.uk content API ({e})")
+    if not found:
+        try:
+            r = sess.get(IMD_LANDING_URL, timeout=60)
+            r.raise_for_status()
+            for m in re.finditer(r'<a[^>]+href="([^"]+)"[^>]*>(.*?)</a>', r.text, re.S):
+                add(re.sub(r"<[^>]+>", " ", m.group(2)).strip(), m.group(1))
+        except Exception as e:
+            warn(f"iod: could not read the release page {IMD_LANDING_URL} ({e})")
+    return [{"title": t, "url": u} for u, t in found.items()]
+
+
+def iod_pick_file(files: list, number: int, exts: tuple, words: tuple = ()):
+    """The URL of File <number> among the release's files, by its title or
+    its file name ("File 7: all ranks, ...", "File_7_IoD2025_...csv"), in the
+    first of exts that it is published in. words are keyword tuples that also
+    identify it, for a title that drops the number."""
+    pat = re.compile(rf"\bfile {number}\b")
+
+    def named(f):
+        t = iod_norm(f.get("title", ""))
+        n = iod_norm(str(f.get("url", "")).split("?")[0].rsplit("/", 1)[-1])
+        return bool(pat.search(t) or pat.search(n)) or any(
+            all(w in t + " " + n for w in ws) for ws in words)
+
+    cands = [f for f in files if named(f)]
+    for ext in exts:
+        for f in cands:
+            if str(f["url"]).lower().split("?")[0].endswith(ext):
+                return f["url"]
+    return None
+
+
+def _iod_raw_files(number: int) -> list:
+    """Raw copies of File <number> on disk, largest first: in .cache/iod2025/
+    by name, and for File 7 also any CSV in the IMD's drop folder."""
+    out = []
+    pat = re.compile(rf"\bfile {number}\b")
+    if IOD_CACHE.is_dir():
+        for p in IOD_CACHE.iterdir():
+            n = iod_norm(p.name)
+            if p.suffix.lower() in (".csv", ".xlsx", ".ods") and (
+                    pat.search(n) or (number == 8 and "underlying" in n)):
+                out.append(p)
+    imd_dir = CACHE_DIR / "imd2025"
+    if number == 7 and imd_dir.is_dir():
+        out += [p for p in imd_dir.iterdir()
+                if p.suffix.lower() == ".csv" or (p.suffix.lower() == ".xlsx" and pat.search(iod_norm(p.name)))]
+    return sorted(set(out), key=lambda p: p.stat().st_size, reverse=True)
+
+
+def _iod_download(number: int, exts: tuple, words: tuple = (), override: str = ""):
+    """Download File <number> into .cache/iod2025/, or None (with a warning)."""
+    url = override
+    if not url:
+        url = iod_pick_file(iod_release_files(), number, exts, words)
+        if not url and number == 7:
+            url = IMD_SOURCE_URL
+            info(f"iod: File 7 not found on the release page; trying {url}")
+    if not url:
+        warn(f"iod: File {number} is not listed on the release ({IOD_API_URL})")
+        return None
+    name = url.split("?")[0].rsplit("/", 1)[-1] or f"File_{number}"
+    if not re.search(rf"\bfile {number}\b", iod_norm(name)):
+        name = f"File_{number}_{name}"
+    dest = IOD_CACHE / name
+    try:
+        info(f"iod: downloading {url}")
+        r = browser_session(referer="https://www.gov.uk/").get(url, timeout=300)
+        r.raise_for_status()
+        head = r.content[:200].lstrip().lower()
+        if len(r.content) < 10_000 or head.startswith((b"<!doctype", b"<html")):
+            raise RuntimeError(f"got {len(r.content):,} bytes that are not the file")
+        write_bytes_atomic(dest, r.content)
+    except Exception as e:
+        warn(f"iod: File {number} download failed ({e})")
+        return None
+    return dest
+
+
+def _iod_sheets(src: Path) -> dict:
+    """Every table of a release file that has an LSOA code header, read with
+    that row as its header: one for a CSV, one per sheet for a workbook."""
+    if src.suffix.lower() == ".csv":
+        try:
+            return {src.stem: pd.read_csv(src, encoding="utf-8-sig", low_memory=False)}
+        except UnicodeDecodeError:
+            return {src.stem: pd.read_csv(src, encoding="latin-1", low_memory=False)}
+    xl = pd.ExcelFile(src)
+    out = {}
+    for name in xl.sheet_names:
+        try:
+            top = xl.parse(name, header=None, nrows=15)
+        except Exception:
+            continue
+        hdr = None
+        for i, row in enumerate(top.itertuples(index=False)):
+            if any(isinstance(v, str) and "lsoa" in iod_norm(v) and "code" in iod_norm(v)
+                   for v in row):
+                hdr = i
+                break
+        if hdr is not None:
+            out[name] = xl.parse(name, header=hdr)
+    return out
+
+
+def _iod_committed(name: str):
+    """The committed parquet for this scope, copied from the national one
+    when a region has none of its own yet; None when there is neither."""
+    out_path = DATA_DIR / "demographics" / name
+    national = NATIONAL_DATA_DIR / "demographics" / name
+    if not out_path.exists() and national.exists() and national != out_path:
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_bytes(national.read_bytes())
+    if not out_path.exists():
+        return None
+    try:
+        return pd.read_parquet(out_path)
+    except Exception as e:
+        warn(f"iod: {out_path.name} unreadable ({e})")
+        return None
+
+
+def _iod_fail(source: str, msg: str) -> None:
+    """Mark the source failed in the manifest with msg, keeping its output."""
+    warn(f"{source}: {msg}")
+    _SOURCE_ERROR[source] = msg if len(msg) <= 2000 else msg[:1997] + "..."
+
+
+def _iod_write(name: str, out: "pd.DataFrame", source: str) -> "pd.DataFrame":
+    """Write the parquet, unless it already holds exactly this (a rewrite of
+    unchanged data still shows as a modified binary in git)."""
+    out_path = DATA_DIR / "demographics" / name
+    if out_path.exists():
+        try:
+            previous = pd.read_parquet(out_path)
+        except Exception:
+            previous = None
+        if previous is not None and previous.equals(out):
+            ok(f"{source}: {len(out):,} LSOAs, unchanged from the committed parquet")
+            _record_write(out_path, len(out))
+            return out
+    out = write_parquet_guarded(out_path, out, source=source)
+    ok(f"{source}: {len(out):,} LSOAs -> {out_path.relative_to(REPO_ROOT)}")
+    return out
+
+
+def _iod_run(source: str, number: int, name: str, want: list, exts: tuple,
+             words: tuple, override: str, parse) -> "pd.DataFrame":
+    """The shared body of run_iod_extra and run_iod_indicators: the raw file
+    if one is on disk, else the committed parquet when it is complete, else a
+    download; then parse(sheets) -> (frame, problems, matched)."""
+    raw = _iod_raw_files(number)
+    prev = _iod_committed(name)
+    if not raw:
+        if prev is not None and len(prev) and all(k in prev.columns for k in want):
+            ok(f"{source}: {len(prev):,} LSOAs from the committed parquet "
+               "(static between releases; no download needed)")
+            return prev
+        got = _iod_download(number, exts, words, override)
+        if got is None:
+            msg = (f"File {number} of the English Indices of Deprivation 2025 could not be "
+                   f"found or downloaded ({IMD_LANDING_URL}), so "
+                   + ("the figures stay as last committed" if prev is not None and len(prev)
+                      else "there are no figures yet")
+                   + f". Download it from the release page into {IOD_CACHE} and rerun "
+                   f"`python fetch_all_data.py --only {source}`.")
+            if prev is not None and len(prev):
+                _iod_fail(source, msg)
+                return prev
+            raise RuntimeError(msg)
+        raw = [got]
+    src = raw[0]
+    info(f"{source}: reading {src.name}")
+    try:
+        sheets = _iod_sheets(src)
+    except Exception as e:
+        raise RuntimeError(f"File {number} ({src.name}) could not be read: {type(e).__name__}: {e}")
+    out, problems, matched = parse(sheets)
+    for k in want:
+        if k in matched:
+            info(f"{source}: {k} <- {matched[k]!r}")
+    found = [k for k in want if k in out.columns]
+    if not found:
+        msg = f"none of the expected columns was found in {src.name}: " + "; ".join(problems[:6])
+        if prev is not None and len(prev):
+            _iod_fail(source, msg)
+            return prev
+        raise RuntimeError(msg)
+    if problems:
+        _iod_fail(source, f"{len(want) - len(found)} of {len(want)} columns missing or "
+                          "not used: " + "; ".join(problems))
+    out = _iod_write(name, out, source)
+    info(f"{source}: {len(found)} of {len(want)} columns")
+    return out
+
+
+def run_iod_extra() -> pd.DataFrame:
+    rule("IoD 2025: IDACI, IDAOPI and sub-domains (MHCLG)")
+    want = [f[0] for f in IOD_FILE7_FIELDS] + [d[0] for d in IOD_FILE7_DENOMINATORS]
+
+    def parse(sheets):
+        if not sheets:
+            raise RuntimeError("File 7 has no table with an LSOA code column")
+        # A CSV is one table; in a workbook, the sheet that carries IDACI.
+        best = max(sheets.values(), key=lambda d: (
+            bool(iod_find_col(d.columns, "idaci")), len(d.columns)))
+        return iod_parse_file7(best)
+
+    return _iod_run("iod_extra", 7, IOD_EXTRA_PARQUET, want, (".csv", ".xlsx"), (),
+                    IOD_FILE7_URL_OVERRIDE, parse)
+
+
+def run_iod_indicators() -> pd.DataFrame:
+    rule("IoD 2025: underlying indicators (MHCLG)")
+    want = [s[0] for s in IOD_FILE8_SPECS]
+    imd = _read_parquet_opt(DATA_DIR / "demographics" / "imd2025.parquet")
+    if imd is None:
+        imd = _read_parquet_opt(NATIONAL_DATA_DIR / "demographics" / "imd2025.parquet")
+    if imd is None:
+        warn("iod_indicators: no imd2025.parquet, so the directions cannot be checked")
+
+    def parse(sheets):
+        return iod_parse_file8(sheets, imd)
+
+    return _iod_run("iod_indicators", 8, IOD_INDICATORS_PARQUET, want,
+                    (".xlsx", ".csv", ".ods"), (("underlying", "indicators"),),
+                    IOD_FILE8_URL_OVERRIDE, parse)
+
+
+# Weighted into wards and LAs by their own File 7 denominators, so a ward's
+# IDACI is the share of its children, not an average over its residents.
+IOD_WEIGHTS = {
+    "idaci_pct":  ("iod_pop_children", "children", "children aged 0 to 15"),
+    "idaopi_pct": ("iod_pop_older", "older", "people aged 60 and over"),
+}
+# Published per LSOA and never averaged: an average of ranks or deciles is not
+# the rank or decile of anything.
+IOD_LSOA_ONLY = ("idaci_rank", "idaci_decile", "idaopi_rank", "idaopi_decile")
+
+
+def iod_area_figures(frames, lsoa_to_area: dict, pop_by_lsoa: dict, *,
+                     what: str = "ward") -> tuple:
+    """({area: {key: value}}, {key: weight}) for the IoD 2025 extra and
+    underlying figures, from their LSOAs.
+
+    IDACI and IDAOPI are weighted by the File 7 children aged 0 to 15 and
+    people aged 60 and over, which are their own denominators, so an area's
+    figure is its income-deprived children over its children. Without those
+    columns they fall back to residents, with a warning, and the weight
+    returned says "residents" so the map can say so. Everything else is
+    weighted by Census 2021 residents, as the IMD domain scores are. Ranks,
+    deciles and the denominators themselves are not carried up."""
+    out: dict = {}
+    used: dict = {}
+    for df in frames:
+        if df is None or df.empty or "LSOA21CD" not in df.columns:
+            continue
+        codes = df["LSOA21CD"].astype(str)
+        for col in df.columns:
+            if col == "LSOA21CD" or col.startswith("iod_pop_") or col in IOD_LSOA_ONLY:
+                continue
+            vals = pd.to_numeric(df[col], errors="coerce")
+            per = {lc: float(v) for lc, v in zip(codes, vals) if pd.notna(v)}
+            if not per:
+                continue
+            wcol, short, words = IOD_WEIGHTS.get(col, (None, "residents", "residents"))
+            weights = {}
+            if wcol and wcol in df.columns:
+                weights = {lc: float(w) for lc, w in zip(codes, pd.to_numeric(df[wcol], errors="coerce"))
+                           if pd.notna(w) and w > 0}
+            if weights:
+                got = lsoa_means_to_areas(per, lsoa_to_area, weights, what=f"{what} {col}",
+                                          weight=words, source="File 7")
+                used[col] = short
+            else:
+                if wcol:
+                    warn(f"{what} {col}: File 7 gave no {words} for the LSOAs, so it is "
+                         "weighted by Census 2021 residents instead")
+                got = lsoa_means_to_areas(per, lsoa_to_area, pop_by_lsoa, what=f"{what} {col}")
+                used[col] = "residents"
+            for area, v in got.items():
+                out.setdefault(area, {})[col] = round(v, 2)
+    return out, used
 
 
 # ============================================================================
@@ -5779,10 +6523,12 @@ LSOA_NO_POP_MAX = 0.01
 
 
 def lsoa_means_to_areas(per_lsoa: dict, lsoa_to_area: dict, weight_by_lsoa: dict, *,
-                        what: str = "ward figures", weight: str = "residents") -> dict:
+                        what: str = "ward figures", weight: str = "residents",
+                        source: str = "Census 2021") -> dict:
     """{area: weighted mean} of LSOA values, each LSOA weighted by
     weight_by_lsoa (Census 2021 residents, or households for a household
-    measure). lsoa_to_area is the LSOA -> ward (or LA) lookup.
+    measure, or a publisher's own denominator, which source names for the
+    messages). lsoa_to_area is the LSOA -> ward (or LA) lookup.
 
     There is no fallback to a weight of 1. With no weights at all the build
     stops, because every figure would silently become a plain average of
@@ -5798,8 +6544,8 @@ def lsoa_means_to_areas(per_lsoa: dict, lsoa_to_area: dict, weight_by_lsoa: dict
     """
     if not weight_by_lsoa or not any((w or 0) > 0 for w in weight_by_lsoa.values()):
         raise RuntimeError(
-            f"{what}: no Census 2021 {weight} to weight the LSOAs by. "
-            "Run the census source first.")
+            f"{what}: no {source} {weight} to weight the LSOAs by. "
+            + ("Run the census source first." if source == "Census 2021" else ""))
     num: dict = {}
     den: dict = {}
     n_used = 0
@@ -5817,10 +6563,10 @@ def lsoa_means_to_areas(per_lsoa: dict, lsoa_to_area: dict, weight_by_lsoa: dict
         den[area] = den.get(area, 0.0) + w
     if no_weight:
         msg = (f"{what}: {len(no_weight):,} of {n_used:,} LSOAs with a figure have no "
-               f"Census {weight} (for example {', '.join(sorted(no_weight)[:3])}), so they "
+               f"{source} {weight} (for example {', '.join(sorted(no_weight)[:3])}), so they "
                "are left out of the weighted average")
         if len(no_weight) > max(1, n_used * LSOA_NO_POP_MAX):
-            raise RuntimeError(msg + ". The Census figures and the lookup do not match.")
+            raise RuntimeError(msg + f". The {source} figures and the lookup do not match.")
         warn(msg)
     return {a: num[a] / d for a, d in den.items() if d > 0}
 
@@ -6208,6 +6954,25 @@ def build_ward_data() -> dict:
         if "imd_decile" in imd_ward.columns:
             _agg_to_wards(imd_ward, "imd_decile", "imd_decile_mean")
 
+    # --- IoD 2025 beyond the IMD: IDACI, IDAOPI, sub-domains, indicators -----
+    # The same LSOA-to-ward rule as the IMD, except that IDACI and IDAOPI are
+    # weighted by their own File 7 denominators (children aged 0 to 15, people
+    # aged 60 and over), so a ward's figure is the share of its children or
+    # older people. iod_weights in the metadata records which weight was used,
+    # so the map's card describes the figures shipped. Ranks and deciles stay
+    # LSOA-only.
+    iod_frames = [_read_parquet_opt(DATA_DIR / "demographics" / n)
+                  for n in (IOD_EXTRA_PARQUET, IOD_INDICATORS_PARQUET)
+                  if (DATA_DIR / "demographics" / n).exists()]
+    iod_weights_used: dict = {}
+    if any(f is not None and not f.empty for f in iod_frames):
+        sources["iod"] = "MHCLG English Indices of Deprivation 2025 (Files 7 and 8)"
+        iod_vals, iod_weights_used = iod_area_figures(iod_frames, lsoa_to_ward, pop_by_lsoa,
+                                                      what="ward")
+        for wd, vals in iod_vals.items():
+            if wd in wards:
+                wards[wd]["indicators"].update(vals)
+
     # Wards whose LSOAs hold noticeably more or fewer people than the ward
     # (Farringdon Without's hold 3.45 times its residents), so the map can say
     # that their LSOA-built figures describe a different patch.
@@ -6370,6 +7135,11 @@ def build_ward_data() -> dict:
             "lsoa_to_ward_lookup_year": "2025",
             # How the Census ward percentages were made (see above).
             "census_method": census_method,
+            # What each IoD 2025 ward and LA figure is weighted by:
+            # "children" or "older" (File 7's own denominators) for IDACI
+            # and IDAOPI, "residents" (Census 2021) for the rest, or for
+            # those two when File 7 gave no denominators.
+            "iod_weights": iod_weights_used,
         },
     }
 
@@ -6500,6 +7270,23 @@ def build_borough_data() -> dict:
                 fp, to_la, census_households_by_lsoa(_read_parquet_opt(demo / "census2021_counts.parquet")),
                 pops, what=f"{LA_WORD} fuel_poverty_pct").items():
             out.setdefault(lad, {})["fuel_poverty_pct"] = round(v, 2)
+    # The IoD 2025 extra and underlying figures for each LA from all of its
+    # LSOAs, which nest exactly in LAs, weighted as the wards are
+    # (iod_area_figures): IDACI and IDAOPI by their own denominators, the rest
+    # by residents. The map would otherwise average the ward figures by
+    # residents, which is wrong for IDACI and IDAOPI.
+    demo = DATA_DIR / "demographics"
+    iod_frames = [_read_parquet_opt(demo / n) for n in (IOD_EXTRA_PARQUET, IOD_INDICATORS_PARQUET)
+                  if (demo / n).exists()]
+    if any(f is not None and not f.empty for f in iod_frames):
+        cen_l = _read_parquet_opt(demo / "census2021.parquet")
+        pops = ({} if cen_l is None or cen_l.empty or "census_population" not in cen_l.columns
+                else dict(zip(cen_l["LSOA21CD"].astype(str),
+                              pd.to_numeric(cen_l["census_population"], errors="coerce").fillna(0))))
+        to_la = {lc: lad for lc, (_wd, lad) in get_lsoa_ward_lookup().items() if lad}
+        iod_la, _ = iod_area_figures(iod_frames, to_la, pops, what=LA_WORD)
+        for lad, vals in iod_la.items():
+            out.setdefault(lad, {}).update(vals)
     info(f"borough_data: {len(out):,} {LA_WORD}s, {n_vals:,} published values, "
          f"{n_cen:,} Census figures from summed counts")
     return out
@@ -6608,6 +7395,27 @@ def build_lsoa_data() -> dict:
             v = row.get("fuel_poverty_pct")
             if code in out and pd.notna(v):
                 out[code]["fuel_poverty_pct"] = round(float(v), 2)
+
+    # IoD 2025 beyond the IMD: IDACI, IDAOPI and the sub-domains (File 7) and
+    # the underlying indicators (File 8), each LSOA's own published figure.
+    # The File 7 population denominators only weight the ward and LA figures,
+    # so they are not written here.
+    for iod_name in (IOD_EXTRA_PARQUET, IOD_INDICATORS_PARQUET):
+        iod_path = DATA_DIR / "demographics" / iod_name
+        idf = _read_parquet_opt(iod_path) if iod_path.exists() else None
+        if idf is None or idf.empty or "LSOA21CD" not in idf.columns:
+            continue
+        icols = [c for c in idf.columns if c != "LSOA21CD" and not c.startswith("iod_pop_")]
+        for rec in idf[["LSOA21CD"] + icols].to_dict("records"):
+            code = str(rec["LSOA21CD"])
+            if code not in out:
+                continue
+            for c in icols:
+                v = rec[c]
+                if v is None or pd.isna(v):
+                    continue
+                out[code][c] = (int(round(float(v))) if c.endswith(("_rank", "_decile"))
+                                else round(float(v), 3))
 
     # PTAL (GLA LSOA Atlas, average band score 0-8)
     pt = _read_parquet_opt(DATA_DIR / "demographics" / "ptal.parquet")
@@ -8718,6 +9526,10 @@ SOURCES = {
     "pcn":         run_pcn,
     "pharmacies":  run_pharmacies,
     "imd":         run_imd2025,
+    # After imd: run_iod_indicators checks each indicator against its
+    # domain score in imd2025.parquet.
+    "iod_extra":   run_iod_extra,
+    "iod_indicators": run_iod_indicators,
     "census":      run_census2021,
     "census_oa":   run_census_oa,
     "claimant":    run_claimant_count,

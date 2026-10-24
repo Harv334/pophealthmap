@@ -88,6 +88,24 @@ https://www.gov.uk/government/collections/fuel-poverty-sub-regional-statistics
 into `.cache/fuel_poverty/`, then run
 `python fetch_all_data.py --only fuel_poverty`.
 
+**IoD 2025 beyond the IMD** (`iod_extra`, `iod_indicators`). Fetched
+automatically until the two parquets in `data/demographics/` hold every
+column, then static like the IMD. The pipeline finds File 7 (IDACI, IDAOPI,
+sub-domains) and File 8 (underlying indicators) on the release page through
+the gov.uk content API and matches every column by the words in its header.
+A failure names what was missing: a file it could not download, or a column
+it could not find, found twice, or found running the wrong way for its
+domain. The run log lists each match as `<key> <- '<header>'`. For a missing
+file, download it from
+https://www.gov.uk/government/statistics/english-indices-of-deprivation-2025
+into `.cache/iod2025/` (or set `IOD_FILE7_URL` or `IOD_FILE8_URL`) and run
+`python fetch_all_data.py --only iod_extra iod_indicators`. For a column
+whose header changed, edit its keywords in `IOD_FILE7_FIELDS` or
+`IOD_FILE8_SPECS`. An indicator the 2025 release does not publish (staying on
+after 16 and homes without central heating may be gone) keeps failing until
+its spec and its registry entries in `index.html` are removed; until then the
+map leaves it out because it has no figures.
+
 **Air quality** (`air_quality`). Fetched automatically: the pipeline reads the
 UK-AIR index and takes the most recent year listed for each pollutant rather
 than a pinned filename, because the filenames carry a version suffix that
