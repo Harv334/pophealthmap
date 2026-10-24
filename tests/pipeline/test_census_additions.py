@@ -321,6 +321,20 @@ alt = p._census_frame("lsoa")
 check("TS003 without the hyphen and with a Total column gives the same three figures",
       all(abs(float(alt.set_index("LSOA21CD").loc[l, k]) - float(lsoa_figs.set_index("LSOA21CD").loc[l, k])) < 1e-9
           for l in LSOAS for k in ("census_pensioner_alone_pct", "census_lone_parent_dep_pct", "census_one_person_hh_pct")))
+# As the October 2026 refresh found it: the group as a parent above its
+# parts, and every column ending "; measures: Value". The parent must still
+# be counted once, not with its parts as well (that gave wards up to 125%).
+nomis = tables(LSOAS, LSOA_ROWS, "lsoa")
+nomis["TS003"] = nomis["TS003"].rename(columns=lambda c: c if c in ("date", "geography", "geography code")
+                                       else c.replace("One-person", "One person").replace(
+                                           "Total: All households", "Total") + "; measures: Value")
+STATE["lsoa"] = nomis
+alt = p._census_frame("lsoa")
+check("TS003 with '; measures: Value' on every column counts the one person group once",
+      all(abs(float(alt.set_index("LSOA21CD").loc[l, k]) - float(lsoa_figs.set_index("LSOA21CD").loc[l, k])) < 1e-9
+          for l in LSOAS for k in ("census_pensioner_alone_pct", "census_lone_parent_dep_pct", "census_one_person_hh_pct")),
+      str(alt.set_index("LSOA21CD")["census_one_person_hh_pct"].head(3).tolist()) + " vs " +
+      str(lsoa_figs.set_index("LSOA21CD")["census_one_person_hh_pct"].head(3).tolist()))
 STATE["lsoa"] = tables(LSOAS, LSOA_ROWS, "lsoa")
 
 print("=== wards and LAs, from the counts ===")

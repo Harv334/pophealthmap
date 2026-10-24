@@ -2847,13 +2847,18 @@ def _cen_findall(df: pd.DataFrame, *kws, exclude=()) -> list[str]:
     if len(raw) <= 1:
         return raw
     # Drop any column that is a strict descendant of another matched column.
+    # Compared without the "; measures: Value" ending some Nomis files add,
+    # which otherwise sits between a parent's name and its children's: the
+    # October 2026 refresh counted TS003's one person households three times
+    # over (the group and both of its parts), giving wards up to 125%.
     out = []
     for c in raw:
         is_descendant = False
+        cl = _cen_label(c)
         for other in raw:
             if other == c:
                 continue
-            if c.startswith(other + ": "):
+            if cl.startswith(_cen_label(other) + ": "):
                 is_descendant = True
                 break
         if not is_descendant:
