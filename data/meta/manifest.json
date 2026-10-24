@@ -1,10 +1,10 @@
 {
-  "last_run": "2026-10-24T20:24:07.055885+00:00",
+  "last_run": "2026-10-24T20:40:42.092034+00:00",
   "sources": {
     "air_quality": {
-      "duration_s": 9.7,
+      "duration_s": 9.6,
       "error": "",
-      "fetched_at": "2026-10-24T20:16:33.279056+00:00",
+      "fetched_at": "2026-10-24T20:32:35.547689+00:00",
       "notes": "source returned no frame",
       "output_path": "",
       "rows_written": 0,
@@ -12,9 +12,9 @@
       "status": "skipped"
     },
     "boundaries": {
-      "duration_s": 36.4,
+      "duration_s": 33.2,
       "error": "",
-      "fetched_at": "2026-10-24T20:15:48.596222+00:00",
+      "fetched_at": "2026-10-24T20:31:54.198776+00:00",
       "notes": "",
       "output_path": "",
       "rows_written": 4,
@@ -24,10 +24,32 @@
       },
       "status": "ok"
     },
-    "census": {
-      "duration_s": 2.4,
+    "care_homes": {
+      "duration_s": 71.8,
       "error": "",
-      "fetched_at": "2026-10-24T20:17:12.041963+00:00",
+      "fetched_at": "2026-10-24T20:39:12.712250+00:00",
+      "notes": "",
+      "output_path": "data/healthcare/care_homes.parquet",
+      "rows_written": 1266,
+      "schema": {
+        "LAD25CD": "str",
+        "LSOA21CD": "str",
+        "WD25CD": "str",
+        "as_at": "str",
+        "beds": "int64",
+        "lat": "float64",
+        "lng": "float64",
+        "location_id": "str",
+        "name": "str",
+        "nursing": "bool",
+        "postcode": "str"
+      },
+      "status": "ok"
+    },
+    "census": {
+      "duration_s": 2.2,
+      "error": "",
+      "fetched_at": "2026-10-24T20:33:14.057951+00:00",
       "notes": "also wrote data/demographics/census2021_counts.parquet, data/demographics/census2021_msoa.parquet",
       "output_path": "data/demographics/census2021.parquet",
       "rows_written": 35672,
@@ -86,9 +108,9 @@
       "status": "ok"
     },
     "census_oa": {
-      "duration_s": 18.6,
+      "duration_s": 18.1,
       "error": "",
-      "fetched_at": "2026-10-24T20:17:14.462122+00:00",
+      "fetched_at": "2026-10-24T20:33:16.214941+00:00",
       "notes": "also wrote data/demographics/census2021_oa_counts.parquet",
       "output_path": "data/demographics/census2021_oa.parquet",
       "rows_written": 26369,
@@ -101,7 +123,7 @@
     "charities": {
       "duration_s": 13.8,
       "error": "",
-      "fetched_at": "2026-10-24T20:23:49.163908+00:00",
+      "fetched_at": "2026-10-24T20:37:51.780740+00:00",
       "notes": "",
       "output_path": "data/vcse/charities.parquet",
       "rows_written": 18539,
@@ -141,7 +163,7 @@
     "claimant": {
       "duration_s": 0.3,
       "error": "",
-      "fetched_at": "2026-10-24T20:17:33.054907+00:00",
+      "fetched_at": "2026-10-24T20:33:34.344823+00:00",
       "notes": "",
       "output_path": "data/economy/claimant_count.parquet",
       "rows_written": 4994,
@@ -155,10 +177,24 @@
       },
       "status": "ok"
     },
-    "crime": {
-      "duration_s": 90.3,
+    "claimant_youth": {
+      "duration_s": 26.2,
       "error": "",
-      "fetched_at": "2026-10-24T20:22:14.990712+00:00",
+      "fetched_at": "2026-10-24T20:38:44.964726+00:00",
+      "notes": "",
+      "output_path": "data/economy/claimant_18_24.parquet",
+      "rows_written": 4994,
+      "schema": {
+        "LSOA21CD": "str",
+        "claimant_18_24_month": "str",
+        "claimant_count_18_24": "float64"
+      },
+      "status": "ok"
+    },
+    "crime": {
+      "duration_s": 88.4,
+      "error": "",
+      "fetched_at": "2026-10-24T20:36:19.498774+00:00",
       "notes": "",
       "output_path": "data/crime/police_uk_crime.parquet",
       "rows_written": 1126803,
@@ -178,7 +214,7 @@
     "custom": {
       "duration_s": 0.0,
       "error": "",
-      "fetched_at": "2026-10-24T20:15:48.595778+00:00",
+      "fetched_at": "2026-10-24T20:31:54.198421+00:00",
       "notes": "source returned no frame",
       "output_path": "",
       "rows_written": 0,
@@ -186,9 +222,9 @@
       "status": "skipped"
     },
     "dentists": {
-      "duration_s": 4.1,
+      "duration_s": 5.2,
       "error": "",
-      "fetched_at": "2026-10-24T20:24:02.967191+00:00",
+      "fetched_at": "2026-10-24T20:38:05.545724+00:00",
       "notes": "",
       "output_path": "data/healthcare/dental_practices.parquet",
       "rows_written": 1760,
@@ -210,9 +246,9 @@
       "status": "ok"
     },
     "fingertips": {
-      "duration_s": 8.8,
+      "duration_s": 8.1,
       "error": "",
-      "fetched_at": "2026-10-24T20:17:49.506908+00:00",
+      "fetched_at": "2026-10-24T20:33:50.396091+00:00",
       "notes": "",
       "output_path": "data/outcomes/fingertips.parquet",
       "rows_written": 594,
@@ -236,9 +272,9 @@
       "status": "ok"
     },
     "fingertips_msoa": {
-      "duration_s": 8.5,
+      "duration_s": 8.4,
       "error": "",
-      "fetched_at": "2026-10-24T20:17:58.263333+00:00",
+      "fetched_at": "2026-10-24T20:33:58.498019+00:00",
       "notes": "",
       "output_path": "data/outcomes/fingertips_msoa.parquet",
       "rows_written": 32559,
@@ -253,10 +289,31 @@
       },
       "status": "ok"
     },
+    "fingertips_msoa_extra": {
+      "duration_s": 8.0,
+      "error": "",
+      "fetched_at": "2026-10-24T20:35:43.994210+00:00",
+      "notes": "also wrote data/outcomes/fingertips_msoa_extra_la.parquet",
+      "output_path": "data/outcomes/fingertips_msoa_extra.parquet",
+      "rows_written": 1002,
+      "schema": {
+        "MSOA21CD": "str",
+        "estimated": "bool",
+        "indicator_id": "int64",
+        "indicator_name": "str",
+        "lower_ci": "float64",
+        "period": "str",
+        "upper_ci": "float64",
+        "value": "float64",
+        "value_note": "str",
+        "vs_england": "str"
+      },
+      "status": "ok"
+    },
     "fingertips_msoa_la": {
       "duration_s": 1.2,
       "error": "",
-      "fetched_at": "2026-10-24T20:18:06.726126+00:00",
+      "fetched_at": "2026-10-24T20:34:06.946141+00:00",
       "notes": "",
       "output_path": "data/outcomes/fingertips_msoa_la.parquet",
       "rows_written": 1056,
@@ -269,12 +326,12 @@
       "status": "ok"
     },
     "fingertips_profiles": {
-      "duration_s": 185.7,
+      "duration_s": 95.9,
       "error": "",
-      "fetched_at": "2026-10-24T20:18:07.916226+00:00",
+      "fetched_at": "2026-10-24T20:34:08.126227+00:00",
       "notes": "kept last run's figures for 5 indicator(s) that came back missing or incomplete: mh_91117, mort_91102, smok_92445, laprof_90851, laprof_92445",
       "output_path": "data/outcomes/fingertips_profiles.parquet",
-      "rows_written": 19240,
+      "rows_written": 18646,
       "schema": {
         "LAD25CD": "str",
         "age": "str",
@@ -293,9 +350,9 @@
       "status": "partial"
     },
     "fuel_poverty": {
-      "duration_s": 20.2,
+      "duration_s": 19.2,
       "error": "",
-      "fetched_at": "2026-10-24T20:21:13.591542+00:00",
+      "fetched_at": "2026-10-24T20:36:00.122550+00:00",
       "notes": "",
       "output_path": "data/demographics/fuel_poverty.parquet",
       "rows_written": 33755,
@@ -307,9 +364,9 @@
       "status": "ok"
     },
     "gp": {
-      "duration_s": 3.9,
+      "duration_s": 3.8,
       "error": "",
-      "fetched_at": "2026-10-24T20:16:47.011929+00:00",
+      "fetched_at": "2026-10-24T20:32:49.211767+00:00",
       "notes": "",
       "output_path": "data/healthcare/gp_practices.parquet",
       "rows_written": 1125,
@@ -330,9 +387,9 @@
       "status": "ok"
     },
     "greenblue": {
-      "duration_s": 8.3,
+      "duration_s": 8.2,
       "error": "",
-      "fetched_at": "2026-10-24T20:16:25.021513+00:00",
+      "fetched_at": "2026-10-24T20:32:27.394121+00:00",
       "notes": "",
       "output_path": "",
       "rows_written": 1,
@@ -342,10 +399,28 @@
       },
       "status": "ok"
     },
+    "hle_msoa": {
+      "duration_s": 4.6,
+      "error": "",
+      "fetched_at": "2026-10-24T20:35:55.572089+00:00",
+      "notes": "also wrote data/outcomes/hle_msoa_la.parquet",
+      "output_path": "data/outcomes/hle_msoa.parquet",
+      "rows_written": 6856,
+      "schema": {
+        "MSOA21CD": "str",
+        "dfle_female": "float64",
+        "dfle_male": "float64",
+        "edition": "str",
+        "hle_female": "float64",
+        "hle_male": "float64",
+        "period": "str"
+      },
+      "status": "ok"
+    },
     "hospitals": {
       "duration_s": 3.9,
       "error": "",
-      "fetched_at": "2026-10-24T20:23:45.309865+00:00",
+      "fetched_at": "2026-10-24T20:37:47.861960+00:00",
       "notes": "",
       "output_path": "data/healthcare/hospitals.parquet",
       "rows_written": 111,
@@ -366,7 +441,7 @@
     "imd": {
       "duration_s": 0.0,
       "error": "",
-      "fetched_at": "2026-10-24T20:16:57.910894+00:00",
+      "fetched_at": "2026-10-24T20:32:59.919051+00:00",
       "notes": "",
       "output_path": "",
       "rows_written": 33755,
@@ -386,9 +461,9 @@
       "status": "ok"
     },
     "iod_extra": {
-      "duration_s": 0.5,
+      "duration_s": 0.6,
       "error": "",
-      "fetched_at": "2026-10-24T20:16:57.917102+00:00",
+      "fetched_at": "2026-10-24T20:32:59.925311+00:00",
       "notes": "",
       "output_path": "data/demographics/iod2025_extra.parquet",
       "rows_written": 33755,
@@ -414,7 +489,7 @@
     "iod_indicators": {
       "duration_s": 13.6,
       "error": "",
-      "fetched_at": "2026-10-24T20:16:58.408482+00:00",
+      "fetched_at": "2026-10-24T20:33:00.497390+00:00",
       "notes": "6 of 14 columns missing or not used: iod_ks2: no File 8 column with 'key stage 2' or 'ks2'; iod_ks4: no File 8 column with 'key stage 4' or 'ks4'; iod_staying_on: no File 8 column with 'staying on'; iod_adult_quals: no File 8 column with 'qualification' or 'adult skills'; iod_english: no File 8 column with 'english language' or 'speak english' or 'english proficiency'; iod_no_central_heating: no File 8 column with 'central heating'",
       "output_path": "data/demographics/iod2025_indicators.parquet",
       "rows_written": 33755,
@@ -434,7 +509,7 @@
     "naptan": {
       "duration_s": 0.0,
       "error": "",
-      "fetched_at": "2026-10-24T20:16:47.011512+00:00",
+      "fetched_at": "2026-10-24T20:32:49.211323+00:00",
       "notes": "source returned no frame",
       "output_path": "",
       "rows_written": 0,
@@ -444,7 +519,7 @@
     "pcn": {
       "duration_s": 0.0,
       "error": "",
-      "fetched_at": "2026-10-24T20:16:50.870411+00:00",
+      "fetched_at": "2026-10-24T20:32:52.988529+00:00",
       "notes": "",
       "output_path": "",
       "rows_written": 202,
@@ -455,9 +530,9 @@
       "status": "ok"
     },
     "pharmacies": {
-      "duration_s": 7.0,
+      "duration_s": 6.9,
       "error": "",
-      "fetched_at": "2026-10-24T20:16:50.889238+00:00",
+      "fetched_at": "2026-10-24T20:32:53.005472+00:00",
       "notes": "",
       "output_path": "data/healthcare/pharmacies.parquet",
       "rows_written": 1713,
@@ -476,9 +551,9 @@
       "status": "ok"
     },
     "ptal": {
-      "duration_s": 41.2,
+      "duration_s": 0.2,
       "error": "",
-      "fetched_at": "2026-10-24T20:21:33.837323+00:00",
+      "fetched_at": "2026-10-24T20:36:19.277979+00:00",
       "notes": "",
       "output_path": "data/demographics/ptal.parquet",
       "rows_written": 4994,
@@ -489,9 +564,9 @@
       "status": "ok"
     },
     "qof": {
-      "duration_s": 16.1,
+      "duration_s": 15.8,
       "error": "",
-      "fetched_at": "2026-10-24T20:17:33.376269+00:00",
+      "fetched_at": "2026-10-24T20:33:34.625280+00:00",
       "notes": "",
       "output_path": "data/healthcare/qof_prevalence.parquet",
       "rows_written": 1115,
@@ -515,10 +590,71 @@
       },
       "status": "ok"
     },
-    "tfl": {
-      "duration_s": 4.0,
+    "road_casualties": {
+      "duration_s": 1.5,
+      "error": "RuntimeError: road_casualties: could not download https://data.dft.gov.uk/road-accident-safety-data/dft-road-casualty-statistics-casualty-last-5-years.csv (HTTPError: 404 Client Error: Not Found for url: https://data.dft.gov.uk/road-accident-safety-data/dft-road-casualty-statistics-casualty-last-5-years.csv)",
+      "fetched_at": "2026-10-24T20:39:11.170028+00:00",
+      "notes": "",
+      "output_path": "",
+      "rows_written": 0,
+      "schema": {},
+      "status": "failed"
+    },
+    "saie": {
+      "duration_s": 3.6,
+      "error": "2 of 3 measures missing or not used: after housing costs is below before housing costs for only 87% of MSOAs, so the two columns may be the wrong way round; neither is used",
+      "fetched_at": "2026-10-24T20:35:51.946922+00:00",
+      "notes": "",
+      "output_path": "data/demographics/saie_msoa.parquet",
+      "rows_written": 6856,
+      "schema": {
+        "MSOA21CD": "str",
+        "period": "str",
+        "saie_total_income": "int64",
+        "saie_total_income_lci": "int64",
+        "saie_total_income_uci": "int64"
+      },
+      "status": "failed"
+    },
+    "sape": {
+      "duration_s": 34.2,
       "error": "",
-      "fetched_at": "2026-10-24T20:16:42.966374+00:00",
+      "fetched_at": "2026-10-24T20:38:10.741185+00:00",
+      "notes": "",
+      "output_path": "data/demographics/sape_lsoa.parquet",
+      "rows_written": 4994,
+      "schema": {
+        "LSOA21CD": "str",
+        "sape_age0_15": "int64",
+        "sape_age16_64": "int64",
+        "sape_age18_24": "int64",
+        "sape_age65plus": "int64",
+        "sape_age75plus": "int64",
+        "sape_population": "int64",
+        "sape_year": "int64"
+      },
+      "status": "ok"
+    },
+    "service_access": {
+      "duration_s": 17.6,
+      "error": "",
+      "fetched_at": "2026-10-24T20:40:24.506912+00:00",
+      "notes": "",
+      "output_path": "data/environment/service_access_lsoa.parquet",
+      "rows_written": 4994,
+      "schema": {
+        "LSOA21CD": "str",
+        "dentist_dist_km": "float64",
+        "gp_dist_km": "float64",
+        "origin": "str",
+        "pharmacy_dist_km": "float64"
+      },
+      "status": "ok"
+    },
+    "tfl": {
+      "duration_s": 4.1,
+      "error": "",
+      "fetched_at": "2026-10-24T20:32:45.149706+00:00",
       "notes": "",
       "output_path": "data/environment/tfl_transport_lsoa.parquet",
       "rows_written": 4994,
