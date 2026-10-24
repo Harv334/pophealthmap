@@ -8756,6 +8756,29 @@ def build_ward_data() -> dict:
             for key, (kv, cover) in covers.items():
                 record_cover(wards, cover, key, kv)
 
+    # --- Healthy places (AHAH), mental health (SAMHI), food access (PPFI),
+    # food outlets (FSA) and the QOF estimates for MSOAs (places_figures):
+    # scores and drive times averaged over the LSOAs that best fit each
+    # ward, weighted by residents; counts added up before dividing; the QOF
+    # estimates from their MSOAs through the LSOAs, with no figure under
+    # WARD_MIN_COVER.
+    places_notes: dict = {}
+    if pop_by_lsoa:
+        pl_vals, places_notes, pl_covers = places_figures(lsoa_to_ward, pop_by_lsoa, what="ward")
+        for wd, vals in pl_vals.items():
+            if wd in wards:
+                wards[wd]["indicators"].update(vals)
+        for key, (kv, cover) in pl_covers.items():
+            record_cover(wards, cover, key, kv)
+        for note, name, label in (
+                ("ahah_version", "ahah", "GeoDS Access to Healthy Assets and Hazards (AHAH)"),
+                ("samhi_year", "samhi", "PLDR Small Area Mental Health Index (SAMHI)"),
+                ("ppfi_basis", "ppfi", "CDRC Priority Places for Food Index (PPFI)"),
+                ("fhrs_as_at", "fhrs", "FSA food hygiene rating scheme"),
+                ("qof_msoa_period", "qof_msoa", "House of Commons Library QOF estimates (MSOA)")):
+            if note in places_notes:
+                sources[name] = label
+
     pt = _read_parquet_opt(DATA_DIR / "demographics" / "ptal.parquet")
     # A ward with figures for under four in five of its residents is left
     # blank rather than given the figure of a corner of it.
@@ -8931,6 +8954,12 @@ def build_ward_data() -> dict:
             # and IDAOPI, "residents" (Census 2021) for the rest, or for
             # those two when File 7 gave no denominators.
             "iod_weights": iod_weights_used,
+            # For the healthy places, mental health, food and QOF figures
+            # (places_figures): the AHAH and PPFI versions, the SAMHI year,
+            # its LSOA vintage ("2011" when bridged) and the licence it was
+            # used under, how the PPFI deciles were made, the date of the FSA
+            # extract and the QOF year.
+            "places": places_notes,
             # For the small-area additions: where the distances are measured
             # from ("pwc", ONS's population-weighted centroids, "centroid",
             # the middle of each LSOA's shape, or "mixed"), the year of the
@@ -9115,6 +9144,14 @@ def build_borough_data() -> dict:
         vals, _ = msoa_figures_to_areas(saie, SAIE_KEYS, get_lsoa_to_msoa(), to_la, weights)
         for lad, rec in vals.items():
             out.setdefault(lad, {}).update({k: round(v) for k, v in rec.items()})
+    # The healthy places, mental health, food and QOF figures for each LA
+    # from all of its LSOAs (and the QOF estimates from its MSOAs, which nest
+    # in it), made as the ward figures are (places_figures).
+    if pops_sa:
+        pl_la, _notes, _covers = places_figures(to_la_sa, pops_sa, what=LA_WORD)
+        for lad, vals in pl_la.items():
+            if lad in SCOPE_LADS or lad in out:
+                out.setdefault(lad, {}).update(vals)
     # Healthy and disability-free life expectancy: ONS's own LA figures where
     # the MSOA release carries them, under the same keys. Without them the map
     # works an LA figure out from its wards and says it is an estimate, as for
@@ -9213,6 +9250,15 @@ def build_msoa_data() -> dict:
                     if v is not None and pd.notna(v):
                         out.setdefault(code, {})[c] = int(round(float(v))) if nd == 0 else round(float(v), nd)
 
+    # The House of Commons Library's estimates of GP-recorded illness, as
+    # published for each MSOA (places_msoa_values). The file is national.
+    if _read_static_opt("healthcare", QOF_MSOA_PARQUET) is not None:
+        try:
+            for code, vals in places_msoa_values(set(get_lsoa_to_msoa().values())).items():
+                out.setdefault(code, {}).update(vals)
+        except Exception as e:
+            warn(f"msoa_data: no LSOA to MSOA lookup ({e}); the QOF estimates left out")
+
     n_vals = sum(len(v) for v in out.values())
     info(f"msoa_data: {len(out):,} MSOAs, {n_vals:,} published values, none derived")
     return out
@@ -9285,6 +9331,12 @@ def build_lsoa_data() -> dict:
                     continue
                 out[code][c] = (int(round(float(v))) if c.endswith(("_rank", "_decile"))
                                 else round(float(v), 3))
+
+    # Healthy places (AHAH, with its decile), mental health (SAMHI) and food
+    # access (the PPFI deciles), each LSOA's own figure (places_lsoa_values).
+    for code, vals in places_lsoa_values().items():
+        if code in out:
+            out[code].update(vals)
 
     # PTAL (GLA LSOA Atlas, average band score 0-8)
     pt = _read_parquet_opt(DATA_DIR / "demographics" / "ptal.parquet")
@@ -9748,6 +9800,9 @@ def _indicator_periods() -> dict[str, str]:
         for k in keys:
             if k in f.columns:
                 out[k] = str(per.mode().iloc[0])
+    # AHAH and PPFI by their version, SAMHI and QOF by their year, the FSA
+    # counts by the date of the extract.
+    out.update(places_periods())
 
     try:
         sources = json.loads(MANIFEST_PATH.read_text(encoding="utf-8")).get("sources") or {}
@@ -14303,6 +14358,1620 @@ def dwp_periods() -> dict:
     return out
 
 
+# ============================================================================
+# HEALTHY PLACES, MENTAL HEALTH, RECORDED ILLNESS, FOOD ACCESS AND FOOD
+# OUTLETS
+# ============================================================================
+# Five sources, one per publisher, each with its own manifest entry, so one
+# that fails never hides or holds back another:
+#
+#   ahah      Access to Healthy Assets and Hazards (AHAH), GeoDS at the
+#             University of Liverpool: an index of how healthy the places
+#             around each LSOA are, its four domains, and the drive time to
+#             the nearest fast food outlet, pub, off-licence, gambling outlet
+#             and tobacconist. LSOA 2021.
+#   samhi     Small Area Mental Health Index (SAMHI), the Place-based
+#             Longitudinal Data Resource (PLDR) at the University of
+#             Liverpool. LSOA; 2011 codes are bridged to 2021.
+#   qof_msoa  The share of patients on GP registers for about 20 conditions,
+#             estimated for MSOAs by the House of Commons Library from QOF.
+#   ppfi      Priority Places for Food Index (PPFI), the Consumer Data
+#             Research Centre (CDRC). LSOA 2021.
+#   fhrs      Food Standards Agency (FSA) food hygiene ratings: takeaways,
+#             pubs and businesses rated 0 to 2, counted by LSOA.
+#
+# Any of them may sit behind a login, or on a host that refuses GitHub's
+# servers. So each reads a file from .cache/<source>/ first, and both refresh
+# workflows copy into that folder whatever is attached to a GitHub release
+# named <source>-source (with a hyphen: qof-msoa-source). With no file there,
+# and no way to fetch one, the source is "skipped" with a note saying what to
+# download from where and which release to attach it to, never "failed", so it
+# never holds back a region pack. A file that is there but reads wrong fails.
+# With no new file, figures written by an earlier run are kept.
+#
+# Ward and LA figures are made by places_figures: scores and drive times as
+# averages of the LSOAs weighted by Census 2021 residents, counts added up
+# before dividing, the PPFI share from the residents of the LSOAs in its
+# highest-priority fifth, and the QOF estimates from their MSOAs through the
+# LSOAs (msoa_figures_to_areas).
+PLACES_SOURCES = ("ahah", "samhi", "qof_msoa", "ppfi", "fhrs")
+# The last LSOA code of 2011. The LSOAs drawn at the 2021 Census have codes
+# above it (E01033769 on), so a file holding none of those is on the 2011
+# LSOAs.
+LSOA_LAST_2011 = "E01033768"
+# A national LSOA file with fewer English LSOAs than this is not the file.
+PLACES_MIN_LSOAS = 1000
+# Words that only say a column is a rank, a percentile or a decile.
+_PL_ROLE_WORDS = {
+    "rank": {"rnk", "rank", "rn", "rk", "ranks", "ranking"},
+    "pct": {"pct", "pctl", "percentile", "pc", "centile", "pcntl"},
+    "dec": {"dec", "decile", "dc", "dcl", "deciles", "decl"},
+}
+# Licences that allow the figures to be republished, as a page names them.
+_OPEN_LICENCES = (
+    ("Open Government Licence", r"open\s+government\s+licen[cs]e|\bogl\b"),
+    ("Open Parliament Licence", r"open\s+parliament\s+licen[cs]e"),
+    ("CC BY", r"creative\s+commons\s+attribution(?![\s-]*non)|\bcc[\s-]?by(?![\s-]*nc)\b"),
+    ("CC0", r"\bcc0\b|public\s+domain\s+dedication"),
+    ("ODC-BY", r"open\s+data\s+commons\s+attribution|\bodc[\s-]?by\b"),
+)
+
+
+def places_cache(source: str) -> Path:
+    return CACHE_DIR / source
+
+
+def places_release(source: str) -> str:
+    """The GitHub release the workflows copy into .cache/<source>/."""
+    return source.replace("_", "-") + "-source"
+
+
+def places_local_files(source: str, exts=(".csv", ".xlsx", ".zip", ".parquet")) -> list:
+    """Data files in .cache/<source>/, newest first, leaving out the notes
+    this pipeline writes beside a download."""
+    d = places_cache(source)
+    if not d.is_dir():
+        return []
+    files = [p for p in d.iterdir() if p.is_file() and p.suffix.lower() in exts
+             and not p.name.endswith(".release.json")]
+    return sorted(files, key=lambda p: p.stat().st_mtime, reverse=True)
+
+
+def places_skip(source: str, what: str, where: str, why: str = "") -> None:
+    """Mark the source "skipped", saying what to download from where and which
+    release to attach it to. Returns None, which main() reads as skipped."""
+    msg = ((why + ". ") if why else "No file was found for it, so there are no figures yet. ") + \
+        (f"To add them, download {what} from {where} and attach it to a GitHub release named "
+         f"{places_release(source)}; both refresh workflows copy it into .cache/{source}/ "
+         f"before the pipeline runs. Or put it in .cache/{source}/ and run "
+         f"`python fetch_all_data.py --only {source}`.")
+    _SOURCE_SKIPPED[source] = msg
+    warn(f"{source}: {msg}")
+    return None
+
+
+def places_keep(source: str, path: Path, why: str):
+    """Last run's figures, when there is no new file to read, or None."""
+    prev = _read_parquet_opt(path) if path.exists() else None
+    if prev is None or prev.empty:
+        return None
+    _SOURCE_NOTE[source] = f"{why}; the figures stay as last written"
+    info(f"{source}: {why}; keeping {len(prev):,} rows from {path.name}")
+    _record_write(path, len(prev))
+    return prev
+
+
+def places_licence(text: str) -> str:
+    """The open licence a page or record names, or ""."""
+    t = re.sub(r"<[^>]+>", " ", str(text or "")).lower()
+    for name, pat in _OPEN_LICENCES:
+        if re.search(pat, t):
+            return name
+    return ""
+
+
+def places_words(header) -> tuple:
+    """(role, base) for a column header. role is "rank", "pct", "dec" or ""
+    for a value; base is what is left once a release prefix (ah5, v5), the
+    role and words that only describe the value (minutes, mean, score) are
+    taken out, run together: "ah5ffood_rnk" is ("rank", "ffood") and
+    "Fast food (minutes by car)" is ("", "fastfood")."""
+    words = iod_norm(header).split()
+    if words:
+        m = re.fullmatch(r"(ah\d+)([a-z].*)", words[0])
+        if m:
+            words = [m.group(1), m.group(2)] + words[1:]
+    words = [w for w in words if not re.fullmatch(r"ah\d+|v\d+|\d{4}", w)]
+    role = ""
+    for r, ws in _PL_ROLE_WORDS.items():
+        if any(w in ws for w in words):
+            role = r
+            words = [w for w in words if w not in ws]
+            break
+    filler = {"min", "mins", "minutes", "minute", "time", "times", "dist", "distance", "km", "mean",
+              "avg", "average", "car", "drive", "driving", "travel", "value", "score", "exp", "val",
+              "to", "nearest", "the", "of", "by", "in", "access", "accessibility", "domain", "space",
+              "spaces", "and", "outlets", "outlet", "measure", "indicator", "shops", "shop"}
+    return role, "".join(w for w in words if w not in filler)
+
+
+def places_code_header(v) -> bool:
+    """Whether a header cell names an LSOA or MSOA code column."""
+    n = iod_norm(v).replace(" ", "")
+    return bool(re.fullmatch(r"(?:lsoa|msoa|geo|geography|area|lsoa11|lsoa21|msoa11|msoa21)"
+                             r"(?:20)?(?:11|21)?(?:cd|code|codes)?", n))
+
+
+def places_tables(src: Path) -> list:
+    """[(sheet, text above the header, frame)] for each table in a file with
+    an LSOA or MSOA code column: a CSV, each sheet of a workbook, a parquet,
+    or the data files inside a zip. Read as text from the header row."""
+    src = Path(src)
+    suf = src.suffix.lower()
+    if suf == ".zip":
+        out = []
+        with zipfile.ZipFile(src) as z:
+            for n in z.namelist():
+                if n.lower().endswith((".csv", ".xlsx", ".parquet")) and not n.startswith("__MACOSX"):
+                    tmp = src.with_name(src.stem + "__" + re.sub(r"[^A-Za-z0-9._-]", "_", Path(n).name))
+                    tmp.write_bytes(z.read(n))
+                    try:
+                        out += places_tables(tmp)
+                    finally:
+                        tmp.unlink(missing_ok=True)
+        return out
+    if suf == ".parquet":
+        df = pd.read_parquet(src)
+        return [(src.stem, "", df.astype(str).where(df.notna(), None))]
+    if suf == ".csv":
+        raw = None
+        for enc in ("utf-8-sig", "latin-1"):
+            try:
+                raw = pd.read_csv(src, header=None, dtype=str, encoding=enc, low_memory=False,
+                                  keep_default_na=False)
+                break
+            except UnicodeDecodeError:
+                continue
+        sheets = [(src.stem, raw)] if raw is not None else []
+    else:
+        xl = pd.ExcelFile(src)
+        sheets = [(str(n), xl.parse(n, header=None, dtype=str)) for n in xl.sheet_names]
+    out = []
+    for name, raw in sheets:
+        if raw is None or raw.empty:
+            continue
+        hdr = None
+        for i in range(min(30, len(raw))):
+            if any(isinstance(v, str) and places_code_header(v) for v in raw.iloc[i].tolist()):
+                hdr = i
+                break
+        if hdr is None:
+            continue
+        title = " ".join(str(v) for v in raw.iloc[:hdr].to_numpy().ravel()
+                         if isinstance(v, str) and v.strip())
+        cols, seen = [], {}
+        for j, c in enumerate(raw.iloc[hdr].tolist()):
+            c = str(c).strip() if c is not None and str(c).strip() not in ("", "nan") else f"column {j + 1}"
+            seen[c] = seen.get(c, 0) + 1
+            cols.append(c if seen[c] == 1 else f"{c} ({seen[c]})")
+        df = raw.iloc[hdr + 1:].reset_index(drop=True)
+        df.columns = cols
+        out.append((name, title, df))
+    return out
+
+
+def places_code_col(df: "pd.DataFrame", prefix: str):
+    """The column holding the most codes starting with prefix (E01 or E02),
+    among those whose header names a code, else among all columns."""
+    def n_codes(c):
+        return int(df[c].astype(str).str.strip().str.match(rf"^{prefix}\d{{6}}$").sum())
+    named = [c for c in df.columns if isinstance(c, str) and places_code_header(c)]
+    for cands in (named, list(df.columns)):
+        best = max(cands, key=n_codes, default=None)
+        if best is not None and n_codes(best) > 0:
+            return best
+    return None
+
+
+def places_num(s: "pd.Series") -> "pd.Series":
+    return pd.to_numeric(s.astype(str).str.replace(r"[,\s%]", "", regex=True)
+                         .replace({"": None, "nan": None, "None": None}), errors="coerce")
+
+
+def places_decile(s: "pd.Series", *, worst_high: bool) -> "pd.Series":
+    """England deciles of a score, 1 for the worst tenth: the highest scores
+    when worst_high, else the lowest. Ties keep the file's order."""
+    v = s.dropna()
+    if v.empty:
+        return pd.Series(dtype="Int64")
+    r = v.rank(method="first", ascending=not worst_high)
+    return (((r - 1) * 10 // len(v)) + 1).astype(int).reindex(s.index).astype("Int64")
+
+
+def places_scope_frame(national: "pd.DataFrame", scope: set, *, cols, source: str,
+                       vintage_ok: bool = True) -> tuple:
+    """(frame keyed by LSOA21CD for the scope, "2021" or "2011") from a
+    national frame keyed by LSOA code. A file on the 2011 LSOAs (none of its
+    codes above LSOA_LAST_2011, and the scope not all there) is bridged with
+    the ONS lookup: an unchanged or split LSOA takes its 2011 figure, a merged
+    or redrawn one the average of its parents (lsoa11_to_lsoa21_values)."""
+    have = set(national["LSOA_CODE"])
+    direct = len(have & scope) / max(1, len(scope))
+    is_2011 = not any(c > LSOA_LAST_2011 for c in have) and direct < 0.995
+    if not is_2011:
+        out = national[national["LSOA_CODE"].isin(scope)].rename(columns={"LSOA_CODE": "LSOA21CD"})
+        return out[["LSOA21CD"] + list(cols)].reset_index(drop=True), "2021"
+    if not vintage_ok:
+        raise RuntimeError(f"{source}: the file is on the 2011 LSOAs (no code above {LSOA_LAST_2011})")
+    rows = get_lsoa11_lsoa21_rows()
+    out = pd.DataFrame({"LSOA21CD": sorted({c21 for _p, c21, _ch in rows if c21 in scope})})
+    for c in cols:
+        vals = lsoa11_to_lsoa21_values(dict(zip(national["LSOA_CODE"], national[c])), rows)
+        out[c] = out["LSOA21CD"].map(vals)
+    info(f"{source}: the file is on the 2011 LSOAs, so it was bridged to {len(out):,} LSOAs of 2021")
+    return out, "2011"
+
+
+def places_corr(a: "pd.Series", b: "pd.Series") -> float:
+    """Rank correlation of two columns over the rows both have, or 0."""
+    both = a.notna() & b.notna()
+    if both.sum() < 10:
+        return 0.0
+    try:
+        return float(a[both].rank().corr(b[both].rank()))
+    except Exception:
+        return 0.0
+
+
+def places_download(url: str, dest: Path, source: str, *, min_bytes: int = 20_000,
+                    session=None, headers=None) -> "Path | None":
+    """Download url to dest, refusing an HTML page (a login form, say) or a
+    file too small to be the data. None, with a warning, when it fails."""
+    try:
+        sess = session or browser_session()
+        r = sess.get(url, timeout=600, headers=headers or {}, allow_redirects=True)
+        r.raise_for_status()
+        head = r.content[:300].lstrip().lower()
+        if head.startswith((b"<!doctype", b"<html")) or b"<html" in head[:120]:
+            raise RuntimeError("got a web page, not the file (a login may be needed)")
+        if len(r.content) < min_bytes:
+            raise RuntimeError(f"got only {len(r.content):,} bytes")
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        write_bytes_atomic(dest, r.content)
+        info(f"{source}: downloaded {url} ({len(r.content) / 1e6:.1f} MB)")
+        return dest
+    except Exception as e:
+        warn(f"{source}: could not download {url} ({type(e).__name__}: {e})")
+        return None
+
+
+# ---------------------------------------------------------------------------
+# Access to Healthy Assets and Hazards (AHAH), GeoDS
+# ---------------------------------------------------------------------------
+# Version 5.1 (20 May 2026) is on the 2021 LSOAs for England and Wales: an
+# overall index, four domains (health services, retail hazards, air quality,
+# green and blue space) and 15 input measures, each with values, ranks and
+# percentiles. Accessibility in 5.1 is the mean drive time in minutes by car
+# along the road network, not a distance, so the five retail measures are
+# minutes by car. A higher index or domain score means a less healthy place.
+# Licence: the Open Government Licence, as GeoDS lists it. Whether the
+# download needs a free GeoDS login was not confirmed, so the files are found
+# through the portal's own record (CKAN's package_show, then the dataset
+# page's links) and a login page is treated as no file.
+#
+# The column names of 5.1 were not seen (the fact-check did not reach the
+# variable dictionary), so they are matched by their words (places_words): an
+# "ah5" style prefix is set aside, then the base names of earlier releases
+# (ffood, gamb, pubs, off, tob, h, r, e, g, ahah) or spelled-out words. A
+# measure matched twice, or not at all, is reported and left out. Deciles are
+# worked out here from the index across England's LSOAs, 1 the least healthy
+# tenth, as the map's other deciles count from the worst.
+AHAH_PAGE = "https://data.geods.ac.uk/dataset/access-to-healthy-assets-hazards-ahah"
+AHAH_CKAN = "https://data.geods.ac.uk/api/3/action/package_show?id="
+AHAH_IDS = ("access-to-healthy-assets-hazards-ahah", "8fa47a8b-345c-438d-a8c3-0ac758ee12be")
+AHAH_PARQUET = "ahah_lsoa.parquet"
+# key: the base names (places_words) that mean it.
+AHAH_MEASURES = {
+    "ahah_index": {"ahah", "ahahindex", "index", "overall", "overallindex", "ahahoverall", "combined"},
+    "ahah_health_services": {"h", "health", "healthservices", "healthservice", "hs"},
+    "ahah_retail": {"r", "retail", "retailservices", "retailhazards", "retailenvironment"},
+    "ahah_air_quality": {"e", "air", "airquality", "airpollution", "environment", "env"},
+    "ahah_green_blue": {"g", "green", "greenblue", "bluegreen", "naturalenvironment", "natural"},
+    "ahah_fast_food_min": {"ffood", "fastfood", "ff"},
+    "ahah_pubs_min": {"pubs", "pub", "bars", "pubsbars", "pubsbarsnightclubs", "pubsbarsclubs", "pubbar"},
+    "ahah_off_licence_min": {"off", "offlic", "offlicence", "offlicences", "offlicense", "offlicenses", "offl"},
+    "ahah_gambling_min": {"gamb", "gambling", "gam", "betting", "bet"},
+    "ahah_tobacco_min": {"tob", "tobac", "tobacco", "tobacconist", "tobacconists", "tobvape",
+                         "vape", "tobaccovape", "vapes", "tobacconistsvape", "tobacconistvape"},
+}
+AHAH_SCORES = ("ahah_index", "ahah_health_services", "ahah_retail", "ahah_air_quality", "ahah_green_blue")
+AHAH_TIMES = ("ahah_fast_food_min", "ahah_pubs_min", "ahah_off_licence_min", "ahah_gambling_min",
+              "ahah_tobacco_min")
+AHAH_KEYS = AHAH_SCORES + AHAH_TIMES + ("ahah_decile",)
+
+
+def places_version(text: str) -> str:
+    """"5.1" from a file or resource name such as AHAH_V5_1.csv or
+    SAMHI_v4_00.csv ("4.00"), or "" when it names none."""
+    m = re.search(r"(?i)(?<![a-z])v(?:ersion)?[\s_.-]*(\d{1,2})(?:[._-](\d{1,2}))?(?!\d)", str(text or ""))
+    if not m:
+        return ""
+    return m.group(1) + (f".{m.group(2)}" if m.group(2) else "")
+
+
+def ahah_pick(resources: list) -> list:
+    """The LSOA data files among a dataset's resources ({"name", "url",
+    "format"}), one per name, CSV before Parquet, a zip or a workbook; never
+    the dictionary, the methodology or Scotland's data zones."""
+    def text(r):
+        return iod_norm(" ".join(str(r.get(k) or "") for k in ("name", "url", "format", "description")))
+    out: dict = {}
+    order = {"csv": 0, "parquet": 1, "zip": 2, "xlsx": 3}
+    for r in resources:
+        t = text(r)
+        url = str(r.get("url") or "")
+        ext = next((e for e in order if url.lower().split("?")[0].endswith("." + e)
+                    or iod_norm(r.get("format")) == e), None)
+        if not ext or not url:
+            continue
+        if any(w in t for w in ("dictionary", "methodology", "technical", "guide", "report", "readme",
+                                "metadata", "data zone", "datazone", "scotland", "previous")):
+            continue
+        stem = iod_norm(Path(url.split("?")[0]).stem)
+        if stem not in out or order[ext] < order[out[stem][0]]:
+            out[stem] = (ext, url)
+    lsoa_first = sorted(out.values(), key=lambda v: (0 if "lsoa" in iod_norm(v[1]) else 1, order[v[0]]))
+    return [u for _e, u in lsoa_first][:4]
+
+
+def ahah_find() -> tuple:
+    """([file urls], licence, version text) from GeoDS's record of the
+    dataset, else from the dataset page's links."""
+    sess = browser_session(referer="https://data.geods.ac.uk/")
+    for ident in AHAH_IDS:
+        try:
+            r = sess.get(AHAH_CKAN + ident, timeout=60)
+            j = r.json() if r.ok else {}
+        except Exception as e:
+            info(f"ahah: GeoDS record {ident} did not answer ({type(e).__name__}: {e})")
+            continue
+        res = (j.get("result") or {}) if j.get("success") else {}
+        if res.get("resources"):
+            urls = ahah_pick(res["resources"])
+            lic = places_licence(" ".join(str(res.get(k) or "") for k in ("license_title", "license_id")))
+            ver = res.get("version") or next((places_version(x.get("name")) for x in res["resources"]
+                                              if places_version(x.get("name"))), "")
+            info(f"ahah: GeoDS lists {len(res['resources'])} file(s); using {len(urls)}; licence "
+                 f"{res.get('license_title') or 'not stated'}")
+            return urls, lic, str(ver or "")
+    try:
+        r = sess.get(AHAH_PAGE, timeout=60)
+        r.raise_for_status()
+        links = [h if h.startswith("http") else "https://data.geods.ac.uk" + h
+                 for h in re.findall(r'href="([^"]+)"', r.text)]
+        res = [{"url": u, "name": urllib.parse.unquote(u.rsplit("/", 1)[-1])} for u in dict.fromkeys(links)
+               if re.search(r"\.(csv|zip|parquet|xlsx)(\?|$)", u, re.I)]
+        return ahah_pick(res), places_licence(r.text), ""
+    except Exception as e:
+        info(f"ahah: {AHAH_PAGE} did not answer ({type(e).__name__}: {e})")
+    return [], "", ""
+
+
+def ahah_parse(tables: list) -> tuple:
+    """(national frame with LSOA_CODE and the AHAH keys, problems, matched).
+
+    Reads every table with English LSOA codes and takes each measure from the
+    one column whose words name it (places_words), a value rather than a rank
+    or a percentile. Raises RuntimeError when no table has English LSOA codes
+    or when they are all 2011 codes."""
+    found: dict = {k: [] for k in AHAH_MEASURES}
+    all_codes: set = set()
+    frames = []
+    for name, _title, df in tables:
+        code_col = places_code_col(df, "E01")
+        if code_col is None:
+            continue
+        codes = df[code_col].astype(str).str.strip()
+        keep = codes.str.match(r"^E01\d{6}$")
+        if not keep.any():
+            continue
+        sub = df[keep.to_numpy()].copy()
+        sub.index = codes[keep].to_numpy()
+        sub = sub[~sub.index.duplicated()]
+        all_codes |= set(sub.index)
+        frames.append(sub)
+        for c in sub.columns:
+            if c == code_col or not isinstance(c, str):
+                continue
+            role, base = places_words(c)
+            if role:
+                continue
+            for key, bases in AHAH_MEASURES.items():
+                if base in bases:
+                    found[key].append((name, c, places_num(sub[c])))
+    if not all_codes:
+        raise RuntimeError("no table in the file has English LSOA codes (sheets: "
+                           + ", ".join(str(t[0]) for t in tables) + ")")
+    if not any(c > LSOA_LAST_2011 for c in all_codes):
+        raise RuntimeError(f"the file's LSOA codes are all {LSOA_LAST_2011} or below, so it is on the 2011 "
+                           "LSOAs (a release before version 4); it is not used")
+    idx = pd.Index(sorted(all_codes))
+    cols: dict = {}
+    problems: list = []
+    matched: dict = {}
+    for key in AHAH_MEASURES:
+        hits = found[key]
+        # The same column in two tables of one release (a zip with the index
+        # and the inputs, say) counts once.
+        uniq = {c: (s, c, v) for s, c, v in hits}
+        if len(uniq) > 1:
+            # A plain value beats an exponentially transformed one.
+            plain = [h for h in uniq.values() if "exp" not in iod_norm(h[1]).split()]
+            uniq = {h[1]: h for h in plain} if len(plain) == 1 else uniq
+        if not uniq:
+            problems.append(f"{key}: no column for it")
+            continue
+        if len(uniq) > 1:
+            problems.append(f"{key}: {len(uniq)} columns match ("
+                            + "; ".join(f"'{c}'" for c in list(uniq)[:4]) + "), so none is used")
+            continue
+        sheet, col, s = next(iter(uniq.values()))
+        s = s[~s.index.duplicated()].reindex(idx)
+        if s.notna().sum() < 0.9 * len(idx):
+            problems.append(f"{key} ('{col}') has figures for only {int(s.notna().sum()):,} of {len(idx):,} LSOAs")
+            continue
+        cols[key] = s
+        matched[key] = f"{sheet}: {col}"
+    for key in AHAH_TIMES:
+        if key in cols:
+            med = float(cols[key].median())
+            if not 0.2 <= med <= 90:
+                problems.append(f"{key} has a median of {med:,.2f}, which is not minutes by car; not used")
+                cols.pop(key)
+                matched.pop(key, None)
+    # A higher score means a less healthy place. The retail domain says how
+    # near the hazards are, so it should fall as the drive times to them
+    # rise; if it rises with them the scores run the other way, and none of
+    # them is used rather than painted the wrong way round.
+    times = [cols[k] for k in AHAH_TIMES if k in cols]
+    if "ahah_retail" in cols and times:
+        rho = places_corr(cols["ahah_retail"], pd.concat(times, axis=1).mean(axis=1))
+        if rho > 0.2:
+            problems.append(f"the retail domain rises with the drive times to outlets (rank correlation "
+                            f"{rho:.2f}), so the scores do not run the documented way (higher is less "
+                            "healthy); no score is used")
+            for k in AHAH_SCORES:
+                cols.pop(k, None)
+                matched.pop(k, None)
+    if "ahah_index" in cols:
+        for k in AHAH_SCORES[1:]:
+            if k in cols and places_corr(cols["ahah_index"], cols[k]) < -0.2:
+                problems.append(f"{k} falls as the index rises, so it does not run the index's way; not used")
+                cols.pop(k)
+                matched.pop(k, None)
+        cols["ahah_decile"] = places_decile(cols["ahah_index"], worst_high=True)
+    out = pd.DataFrame(cols, index=idx)
+    out.index.name = "LSOA_CODE"
+    return out.reset_index(), problems, matched
+
+
+def run_ahah() -> "pd.DataFrame | None":
+    rule("Access to Healthy Assets and Hazards (AHAH, GeoDS)")
+    source = "ahah"
+    cache = places_cache(source)
+    cache.mkdir(parents=True, exist_ok=True)
+    out_path = DATA_DIR / "environment" / AHAH_PARQUET
+    files = places_local_files(source)
+    # Only the newest set: the files of one download or one release, so an
+    # older version left in the cache is not read beside a newer one.
+    if files:
+        files = [f for f in files if f.stat().st_mtime >= files[0].stat().st_mtime - 3600][:4]
+    licence, version = "", ""
+    if files:
+        info(f"ahah: reading {', '.join(p.name for p in files)} from {cache}")
+    else:
+        urls, licence, version = ahah_find()
+        if urls and not licence:
+            return places_skip(source, "the AHAH LSOA file (version 5.1 or later, CSV)", AHAH_PAGE,
+                               why="GeoDS's record of AHAH names no open licence, so its figures are "
+                                   "not republished here. Check the licence on the dataset page first (the "
+                                   "fact-check found the Open Government Licence)")
+        for u in urls:
+            dest = cache / re.sub(r"[^A-Za-z0-9._-]", "_", urllib.parse.unquote(u.split("?")[0]).rsplit("/", 1)[-1])
+            got = places_download(u, dest, source, min_bytes=200_000)
+            if got:
+                files.append(got)
+    if not files:
+        kept = places_keep(source, out_path, "no AHAH file could be had this run")
+        if kept is not None:
+            return kept
+        return places_skip(source, "the AHAH LSOA file (version 5.1 or later, CSV)", AHAH_PAGE)
+    tables = []
+    for f in files[:4]:
+        try:
+            tables += places_tables(f)
+        except Exception as e:
+            raise RuntimeError(f"ahah: {f.name} could not be read ({type(e).__name__}: {e})")
+    version = version or next((places_version(f.name) for f in files if places_version(f.name)), "")
+    if version and version.split(".")[0].isdigit() and int(version.split(".")[0]) < 5:
+        raise RuntimeError(f"ahah: the file is version {version}, which measured distance rather than "
+                           "minutes by car; use version 5.1 or later")
+    national, problems, matched = ahah_parse(tables)
+    for k, v in matched.items():
+        info(f"ahah: {k} <- {v!r}")
+    got = [k for k in AHAH_KEYS if k in national.columns]
+    if not got:
+        raise RuntimeError("ahah: none of the AHAH measures was found: " + "; ".join(problems[:6])
+                           + ". Columns: " + ", ".join(str(c) for t in tables[:2] for c in list(t[2].columns)[:30]))
+    scope = set(get_lsoa_ward_lookup())
+    out, _v = places_scope_frame(national, scope, cols=got, source=source, vintage_ok=False)
+    if len(out) < 0.99 * len(scope):
+        _SOURCE_ERROR[source] = f"the file has figures for {len(out):,} of the {len(scope):,} LSOAs in scope"
+    out["ahah_version"] = version
+    if problems:
+        missing = [k for k in AHAH_KEYS if k not in got]
+        msg = f"{len(missing)} of {len(AHAH_KEYS)} measures missing or not used: " + "; ".join(problems)
+        if "ahah_index" not in got:
+            _SOURCE_ERROR[source] = msg
+        else:
+            _SOURCE_NOTE[source] = msg
+            warn(f"ahah: {msg}")
+    out = write_parquet_guarded(out_path, out, source=source)
+    ok(f"ahah: {len(out):,} LSOAs, {len(got)} measures, version {version or 'not stated'} "
+       f"-> {out_path.relative_to(REPO_ROOT)}")
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Small Area Mental Health Index (SAMHI), PLDR
+# ---------------------------------------------------------------------------
+# Version 4.00 is the latest on PLDR's page (a wide CSV of 6.14 MB and a long
+# one of 30.18 MB). It combines mental health hospital attendances, the GP
+# Patient Survey (question 34), antidepressant prescribing, QOF depression and
+# Incapacity Benefit and ESA claims for mental illness into one score for each
+# LSOA and year; a higher score means worse mental health. Its LSOA vintage
+# was not confirmed (earlier versions are on the 2011 LSOAs), so a file on the
+# 2011 codes is bridged to 2021 (places_scope_frame). Its licence was not
+# confirmed either, so the figures are used only when PLDR's page names an
+# open licence, or when someone has attached the file to the samhi-source
+# release, having checked it. The latest year in the file is kept. Deciles
+# are worked out here across England's LSOAs, 1 the worst tenth.
+#
+# The column names of 4.00 were not seen. Earlier releases have the LSOA code
+# (lsoa11), the year (long) or the year in the column name (wide), and the
+# score as "samhi_index"; both shapes are read.
+SAMHI_PAGE = "https://pldr.org/dataset/2noyv/small-area-mental-health-index-samhi"
+SAMHI_PARQUET = "samhi_lsoa.parquet"
+SAMHI_KEYS = ("samhi_index", "samhi_decile")
+
+
+def samhi_pick(links: list) -> list:
+    """The SAMHI CSVs among a page's links, the wide file first, newest
+    version first."""
+    def name(u):
+        return urllib.parse.unquote(u.split("?")[0]).rsplit("/", 1)[-1].lower()
+    cands = [u for u in dict.fromkeys(links) if name(u).endswith((".csv", ".zip")) and "/download/" in u.lower()
+             or name(u).endswith(".csv") and "samhi" in name(u)]
+    def rank(u):
+        v = re.findall(r"v(\d+)[._-]?(\d+)?", name(u))
+        ver = max(((int(a), int(b or 0)) for a, b in v), default=(0, 0))
+        return (0 if "long" in name(u) else 1, ver, name(u).endswith(".csv"))
+    return sorted(cands, key=rank, reverse=True)
+
+
+def samhi_parse(tables: list) -> tuple:
+    """(national frame LSOA_CODE, samhi_index, samhi_decile; the year; the
+    columns used). Long files (a year column) and wide ones (the year in the
+    column name) are both read; the latest year is kept."""
+    for name, _title, df in tables:
+        code_col = places_code_col(df, "E01")
+        if code_col is None:
+            continue
+        codes = df[code_col].astype(str).str.strip()
+        keep = codes.str.match(r"^E01\d{6}$").to_numpy()
+        if not keep.any():
+            continue
+        d = df[keep].copy()
+        d["_code"] = codes[keep].to_numpy()
+        heads = {c: iod_norm(c) for c in d.columns if isinstance(c, str) and c not in (code_col, "_code")}
+        year_col = next((c for c, h in heads.items() if h in ("year", "yr", "period", "time period")), None)
+
+        def is_index(h):
+            w = h.split()
+            return ("samhi" in h.replace(" ", "") and not any(x in w for x in ("dec", "decile", "rank", "rnk",
+                                                                               "z", "pct", "percentile"))
+                    and ("index" in w or h.replace(" ", "") in ("samhi", "samhiindex")
+                         or re.fullmatch(r"samhi(?:\s*index)?\s*(?:19|20)\d\d", h) is not None))
+        if year_col:
+            idx_cols = [c for c, h in heads.items() if is_index(h) and not re.search(r"(?:19|20)\d\d", h)]
+            if len(idx_cols) != 1:
+                continue
+            years = places_num(d[year_col])
+            latest = int(years.max())
+            sub = d[years == latest]
+            s = places_num(sub[idx_cols[0]])
+            out = pd.DataFrame({"LSOA_CODE": sub["_code"].to_numpy(), "samhi_index": s.to_numpy()})
+            used = f"{name}: {idx_cols[0]} ({year_col} {latest})"
+        else:
+            by_year = {}
+            for c, h in heads.items():
+                m = re.search(r"((?:19|20)\d\d)", h)
+                if m and is_index(h):
+                    by_year.setdefault(int(m.group(1)), []).append(c)
+            if not by_year:
+                continue
+            latest = max(by_year)
+            if len(by_year[latest]) != 1:
+                raise RuntimeError(f"samhi: {len(by_year[latest])} columns hold the {latest} index "
+                                   f"({', '.join(by_year[latest][:4])})")
+            col = by_year[latest][0]
+            out = pd.DataFrame({"LSOA_CODE": d["_code"].to_numpy(), "samhi_index": places_num(d[col]).to_numpy()})
+            used = f"{name}: {col}"
+        out = out.dropna(subset=["samhi_index"]).drop_duplicates("LSOA_CODE")
+        if len(out) < PLACES_MIN_LSOAS:
+            raise RuntimeError(f"samhi: only {len(out):,} LSOAs have an index for {latest}")
+        sd = float(out["samhi_index"].std())
+        if not 0.05 < sd < 20 or abs(float(out["samhi_index"].median())) > 10:
+            raise RuntimeError(f"samhi: the {latest} index has a median of {out['samhi_index'].median():.2f} and a "
+                               f"spread of {sd:.2f}, which is not a score built from z-scores; not used")
+        out["samhi_decile"] = places_decile(out["samhi_index"], worst_high=True)
+        return out.reset_index(drop=True), latest, used
+    raise RuntimeError("samhi: no table has an LSOA code column and a SAMHI index column (sheets: "
+                       + ", ".join(str(t[0]) for t in tables) + "; columns: "
+                       + ", ".join(str(c) for t in tables[:1] for c in list(t[2].columns)[:20]) + ")")
+
+
+def run_samhi() -> "pd.DataFrame | None":
+    rule("Small Area Mental Health Index (SAMHI, PLDR)")
+    source = "samhi"
+    cache = places_cache(source)
+    cache.mkdir(parents=True, exist_ok=True)
+    out_path = DATA_DIR / "outcomes" / SAMHI_PARQUET
+    files = places_local_files(source, exts=(".csv", ".zip"))
+    licence = "attached by hand to the samhi-source release" if files else ""
+    what = "the SAMHI CSV (version 4.00 or later, the wide file)"
+    if files:
+        info(f"samhi: reading {files[0].name} from {cache}")
+    else:
+        page = ""
+        try:
+            r = browser_session(referer="https://pldr.org/").get(SAMHI_PAGE, timeout=60)
+            r.raise_for_status()
+            page = r.text
+        except Exception as e:
+            info(f"samhi: {SAMHI_PAGE} did not answer ({type(e).__name__}: {e})")
+        if page:
+            licence = places_licence(page)
+            links = [h if h.startswith("http") else "https://pldr.org" + h
+                     for h in re.findall(r'href="([^"]+)"', page)]
+            urls = samhi_pick(links)
+            if urls and not licence:
+                kept = places_keep(source, out_path, "PLDR's page names no open licence for SAMHI")
+                return kept if kept is not None else places_skip(
+                    source, what, SAMHI_PAGE,
+                    why="PLDR's page for SAMHI names no open licence, so its figures are not republished "
+                        "here. Check the licence on that page first")
+            for u in urls[:2]:
+                dest = cache / re.sub(r"[^A-Za-z0-9._-]", "_", urllib.parse.unquote(u.split("?")[0]).rsplit("/", 1)[-1])
+                got = places_download(u, dest, source, min_bytes=500_000)
+                if got:
+                    files = [got]
+                    break
+    if not files:
+        kept = places_keep(source, out_path, "no SAMHI file could be had this run")
+        return kept if kept is not None else places_skip(source, what, SAMHI_PAGE)
+    src = files[0]
+    try:
+        tables = places_tables(src)
+    except Exception as e:
+        raise RuntimeError(f"samhi: {src.name} could not be read ({type(e).__name__}: {e})")
+    national, year, used = samhi_parse(tables)
+    info(f"samhi: samhi_index <- {used!r}; {len(national):,} LSOAs in England, {year}")
+    scope = set(get_lsoa_ward_lookup())
+    out, vintage = places_scope_frame(national, scope, cols=SAMHI_KEYS, source=source)
+    out["samhi_decile"] = out["samhi_decile"].map(lambda v: int(v + 0.5) if pd.notna(v) else pd.NA).astype("Int64")
+    out["samhi_year"] = int(year)
+    out["samhi_vintage"] = vintage
+    out["samhi_version"] = places_version(src.name)
+    out["samhi_licence"] = licence
+    if len(out) < 0.95 * len(scope):
+        _SOURCE_ERROR[source] = f"{src.name} has figures for {len(out):,} of the {len(scope):,} LSOAs in scope"
+    out = write_parquet_guarded(out_path, out, source=source)
+    ok(f"samhi: {len(out):,} LSOAs, {year}, on the {vintage} LSOAs, licence {licence or 'not stated'} "
+       f"-> {out_path.relative_to(REPO_ROOT)}")
+    return out
+
+
+# ---------------------------------------------------------------------------
+# GP-recorded prevalence estimates for MSOAs, House of Commons Library
+# ---------------------------------------------------------------------------
+# The Library's "Constituency data: health conditions" dashboard estimates,
+# for about 20 conditions, the share of patients on a GP register, from QOF
+# 2024/25 practice prevalence joined with NHS Digital's counts of where each
+# practice's patients live, for MSOAs, constituencies and regions in England.
+# Its method and R code are in the GitHub project local-health-data-from-QOF.
+# These are recorded prevalence, not true prevalence: a practice's coding
+# habits spread across every MSOA it serves. The licence of the Library's
+# outputs is presumed to be the Open Parliament Licence; it was not checked.
+#
+# The download is found on the Library's page, by name (a spreadsheet whose
+# name or link says MSOA, health or condition), and failing that through the
+# GitHub project the page links to; the file's layout was not seen, so long
+# tables (a condition column) and wide ones (a column per condition) are both
+# read, and a condition is known by its words (QOF_MSOA_CONDITIONS). A file on
+# the 2011 MSOAs is refused. The parquet is national (every English MSOA);
+# wards and LAs come from it through the LSOAs, weighted by residents.
+QOF_MSOA_PAGES = ("https://commonslibrary.parliament.uk/constituency-data-how-healthy-is-your-area/",)
+QOF_MSOA_PARQUET = "qof_msoa.parquet"
+# key: (phrases that name the condition, phrases that rule a header out)
+QOF_MSOA_CONDITIONS = {
+    "qof_est_af_pct":           (("atrial fibrillation",), ()),
+    "qof_est_asthma_pct":       (("asthma",), ()),
+    "qof_est_cancer_pct":       (("cancer",), ()),
+    "qof_est_chd_pct":          (("coronary heart disease", "chd"), ()),
+    "qof_est_ckd_pct":          (("chronic kidney disease", "ckd"), ()),
+    "qof_est_copd_pct":         (("copd", "chronic obstructive pulmonary"), ()),
+    "qof_est_dementia_pct":     (("dementia",), ()),
+    "qof_est_depression_pct":   (("depression",), ()),
+    "qof_est_diabetes_pct":     (("diabetes",), ("non diabetic", "nondiabetic", "hyperglycaemia")),
+    "qof_est_epilepsy_pct":     (("epilepsy",), ()),
+    "qof_est_hf_pct":           (("heart failure",), ()),
+    "qof_est_hypertension_pct": (("hypertension", "high blood pressure"), ()),
+    "qof_est_ld_pct":           (("learning disability", "learning disabilities"), ()),
+    "qof_est_smi_pct":          (("mental health", "serious mental illness", "smi"), ()),
+    "qof_est_ndh_pct":          (("non diabetic hyperglycaemia", "nondiabetic hyperglycaemia", "ndh"), ()),
+    "qof_est_obesity_pct":      (("obesity",), ()),
+    "qof_est_osteoporosis_pct": (("osteoporosis",), ()),
+    "qof_est_pad_pct":          (("peripheral arterial disease", "pad"), ()),
+    "qof_est_ra_pct":           (("rheumatoid arthritis",), ()),
+    "qof_est_stroke_pct":       (("stroke", "tia"), ()),
+}
+QOF_MSOA_KEYS = tuple(QOF_MSOA_CONDITIONS)
+# Headers that are about a figure rather than the figure.
+_QOF_NOT_VALUE = ("number", "count", "patients", "register size", "list size", "lower", "upper",
+                  "confidence", "rank", "decile", "name", "code", "region", "constituency", "population",
+                  "denominator", "numerator", "change", "difference")
+
+
+def qof_condition(text: str) -> "str | None":
+    """The key of the one condition a header or label names, or None."""
+    hits = [k for k, (phr, ex) in QOF_MSOA_CONDITIONS.items() if _ons_has(text, phr) and not _ons_has(text, ex)]
+    if "qof_est_ndh_pct" in hits:
+        hits = [k for k in hits if k != "qof_est_diabetes_pct"]
+    return hits[0] if len(hits) == 1 else None
+
+
+def qof_period(text: str) -> str:
+    """"2024/25" from text naming a QOF year (2024/25, 2024-25, 2024 to 2025)."""
+    m = re.search(r"(20\d\d)\s*(?:/|-|to)\s*(?:20)?(\d\d)\b", str(text or ""))
+    if m and (int(m.group(2)) - int(m.group(1)[2:])) % 100 == 1:
+        return f"{m.group(1)}/{m.group(2)}"
+    return ""
+
+
+def qof_msoa_parse(tables: list) -> tuple:
+    """(national frame MSOA21CD and qof_est_* percentages, problems, matched)."""
+    found: dict = {k: [] for k in QOF_MSOA_KEYS}
+    all_codes: set = set()
+    for name, title, df in tables:
+        code_col = places_code_col(df, "E02")
+        if code_col is None:
+            continue
+        codes = df[code_col].astype(str).str.strip()
+        keep = codes.str.match(r"^E02\d{6}$").to_numpy()
+        if not keep.any():
+            continue
+        d = df[keep]
+        all_codes |= set(codes[keep])
+        cols = [c for c in d.columns if c != code_col and isinstance(c, str)]
+        # Long: a column of condition names beside one of figures. A column
+        # of figures has thousands of distinct values and is not read word
+        # by word.
+        def cond_of(series):
+            u = series.astype(str).unique()
+            return None if len(u) > 200 else series.astype(str).map({v: qof_condition(v) for v in u})
+        conds = {c: cond_of(d[c]) for c in cols}
+        cond_col = next((c for c in cols if conds[c] is not None and conds[c].notna().mean() > 0.5), None)
+        if cond_col is not None:
+            vals = [c for c in cols if c != cond_col and not _ons_has(c, _QOF_NOT_VALUE)
+                    and places_num(d[c]).notna().mean() > 0.8]
+            pref = [c for c in vals if _ons_has(c, ("prevalence", "rate", "percentage", "per cent", "proportion",
+                                                    "estimate", "value"))]
+            crude = [c for c in pref if not _ons_has(c, ("standardised", "standardized", "age adjusted"))]
+            pick = crude or pref or vals
+            if len(pick) != 1:
+                continue
+            keys = conds[cond_col]
+            v = places_num(d[pick[0]])
+            for key in QOF_MSOA_KEYS:
+                m = (keys == key).to_numpy()
+                if m.any():
+                    s = pd.Series(v[m].to_numpy(), index=codes[keep][m].to_numpy())
+                    found[key].append((name, f"{cond_col} / {pick[0]}", s[~s.index.duplicated()]))
+            continue
+        for c in cols:
+            if _ons_has(c, _QOF_NOT_VALUE) or _ons_has(c, ("standardised", "standardized")):
+                continue
+            key = qof_condition(c)
+            if key:
+                s = pd.Series(places_num(d[c]).to_numpy(), index=codes[keep].to_numpy())
+                found[key].append((name, c, s[~s.index.duplicated()]))
+    if not all_codes:
+        raise RuntimeError("no table in the file has English MSOA codes (sheets: "
+                           + ", ".join(str(t[0]) for t in tables) + ")")
+    if not any(c > MSOA_LAST_2011 for c in all_codes):
+        raise RuntimeError(f"the file's MSOA codes are all {MSOA_LAST_2011} or below, so it is on the 2011 "
+                           "MSOAs; it is not used")
+    idx = pd.Index(sorted(all_codes), name="MSOA21CD")
+    cols: dict = {}
+    problems: list = []
+    matched: dict = {}
+    for key in QOF_MSOA_KEYS:
+        hits = found[key]
+        if not hits:
+            continue
+        if len({(s, c) for s, c, _v in hits}) > 1:
+            problems.append(f"{key}: {len(hits)} columns match (" + "; ".join(f"'{c}'" for _s, c, _v in hits[:3])
+                            + "), so none is used")
+            continue
+        sheet, col, s = hits[0]
+        cols[key] = s.reindex(idx)
+        matched[key] = f"{sheet}: {col}"
+    if cols:
+        top = max(float(s.max()) for s in cols.values() if s.notna().any())
+        if top <= 1.0:
+            cols = {k: s * 100 for k, s in cols.items()}       # proportions, not percentages
+    for key in list(cols):
+        med = float(cols[key].median()) if cols[key].notna().any() else float("nan")
+        if not 0.01 <= med <= 60:
+            problems.append(f"{key} ('{matched[key]}') has a median of {med:.2f}, which is not a percentage of "
+                            "patients; not used")
+            cols.pop(key)
+            matched.pop(key)
+    out = pd.DataFrame(cols, index=idx)
+    for k in out.columns:
+        out[k] = out[k].round(3)
+    return out.reset_index(), problems, matched
+
+
+def qof_msoa_find() -> list:
+    """Spreadsheet links on the Library's page that look like the MSOA
+    data, then any in the GitHub project the page links to."""
+    sess = browser_session(referer="https://commonslibrary.parliament.uk/")
+    found: list = []
+    repos: list = []
+    for page in QOF_MSOA_PAGES:
+        try:
+            r = sess.get(page, timeout=60)
+            r.raise_for_status()
+        except Exception as e:
+            info(f"qof_msoa: {page} did not answer ({type(e).__name__}: {e})")
+            continue
+        for href, text in re.findall(r'<a[^>]+href="([^"]+)"[^>]*>(.*?)</a>', r.text, re.S):
+            label = iod_norm(urllib.parse.unquote(href) + " " + re.sub(r"<[^>]+>", " ", text))
+            if re.search(r"\.(xlsx|csv|zip)(\?|$)", href, re.I) and any(
+                    w in label for w in ("msoa", "health", "condition", "prevalence", "qof")):
+                found.append(href if href.startswith("http") else urllib.parse.urljoin(page, href))
+            m = re.match(r"https?://github\.com/([^/]+)/(local-health-data-from-qof[^/#?]*)", href, re.I)
+            if m:
+                repos.append((m.group(1), m.group(2)))
+    for owner, repo in dict.fromkeys(repos):
+        try:
+            j = requests.get(f"https://api.github.com/repos/{owner}/{repo}/git/trees/HEAD?recursive=1",
+                             timeout=60).json()
+            for t in (j.get("tree") or []):
+                path = str(t.get("path") or "")
+                if re.search(r"\.(csv|xlsx)$", path, re.I) and "msoa" in path.lower():
+                    found.append(f"https://raw.githubusercontent.com/{owner}/{repo}/HEAD/{path}")
+        except Exception as e:
+            info(f"qof_msoa: the GitHub project {owner}/{repo} did not answer ({type(e).__name__}: {e})")
+    found = list(dict.fromkeys(found))
+    return sorted(found, key=lambda u: (0 if "msoa" in u.lower() else 1, u))
+
+
+def run_qof_msoa() -> "pd.DataFrame | None":
+    rule("GP-recorded prevalence estimates for MSOAs (House of Commons Library)")
+    source = "qof_msoa"
+    cache = places_cache(source)
+    cache.mkdir(parents=True, exist_ok=True)
+    out_path = DATA_DIR / "healthcare" / QOF_MSOA_PARQUET
+    what = "the MSOA data of the House of Commons Library's 'Constituency data: health conditions' dashboard"
+    files = places_local_files(source, exts=(".csv", ".xlsx", ".zip"))
+    if files:
+        info(f"qof_msoa: reading {files[0].name} from {cache}")
+    else:
+        for u in qof_msoa_find()[:3]:
+            dest = cache / re.sub(r"[^A-Za-z0-9._-]", "_", urllib.parse.unquote(u.split("?")[0]).rsplit("/", 1)[-1])
+            got = places_download(u, dest, source, min_bytes=5_000)
+            if got:
+                try:
+                    if qof_msoa_parse(places_tables(got))[0].shape[1] > 1:
+                        files = [got]
+                        break
+                except Exception as e:
+                    info(f"qof_msoa: {got.name} is not the MSOA file ({e})")
+                got.unlink(missing_ok=True)
+    if not files:
+        kept = places_keep(source, out_path, "no MSOA file could be had this run")
+        return kept if kept is not None else places_skip(source, what, QOF_MSOA_PAGES[0])
+    src = files[0]
+    try:
+        tables = places_tables(src)
+    except Exception as e:
+        raise RuntimeError(f"qof_msoa: {src.name} could not be read ({type(e).__name__}: {e})")
+    out, problems, matched = qof_msoa_parse(tables)
+    for k, v in matched.items():
+        info(f"qof_msoa: {k} <- {v!r}")
+    got = [k for k in QOF_MSOA_KEYS if k in out.columns]
+    if not got:
+        raise RuntimeError(f"qof_msoa: no condition was found in {src.name}: " + "; ".join(problems[:6])
+                           + ". Columns: " + ", ".join(str(c) for t in tables[:2] for c in list(t[2].columns)[:30]))
+    out["period"] = (qof_period(src.name) or qof_period(" ".join(f"{t[0]} {t[1]}" for t in tables))
+                     or qof_period(" ".join(str(c) for t in tables for c in t[2].columns)))
+    if problems:
+        _SOURCE_NOTE[source] = "; ".join(problems)
+        warn("qof_msoa: " + "; ".join(problems))
+    info(f"qof_msoa: {len(got)} conditions for {len(out):,} MSOAs, period {out['period'].iloc[0] or 'not stated'}"
+         + (f"; not in the file: {', '.join(k for k in QOF_MSOA_KEYS if k not in got)}" if len(got) < len(QOF_MSOA_KEYS) else ""))
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    return write_parquet_guarded(out_path, out, source=source)
+
+
+# ---------------------------------------------------------------------------
+# Priority Places for Food Index (PPFI), CDRC
+# ---------------------------------------------------------------------------
+# Version 2.1 (July 2024) ranks every LSOA of 2021 in England and Wales (data
+# zones in Scotland, super output areas in Northern Ireland) by its risk of
+# food insecurity, in a combined index and seven domains. The CSV (3.27 MB)
+# holds ranks and deciles, decile 1 the highest priority. It needs a free
+# CDRC login, so it is never fetched here: the file is read from .cache/ppfi/,
+# which the workflows fill from the ppfi-source release. Licence: CDRC Open
+# data (the exact licence was not confirmed), with CDRC's attribution.
+#
+# Kept: the combined index and five domains (supermarket proximity,
+# supermarket accessibility, online delivery, non-supermarket food and family
+# food support). The fuel poverty domain is left out, as the map has DESNZ's
+# own figure, and so is socio-demographic barriers, which repeats the IMD.
+# The column names were not seen, so domains are found by their words. The
+# ranks may be for the whole UK, so deciles are worked out again within
+# England from the ranks, their direction taken from the published deciles;
+# with only deciles, they are used as published if they split England's
+# LSOAs into tenths, and refused if not.
+PPFI_PAGE = "https://data.cdrc.ac.uk/node/2515"
+PPFI_PARQUET = "ppfi_lsoa.parquet"
+PPFI_DOMAINS = {
+    # key: (phrases, phrases that rule it out)
+    "ppfi_decile":                       (("combined", "ppfi", "overall", "priority places"), ("domain",)),
+    "ppfi_supermarket_proximity_decile": (("supermarket proximity", "proximity to supermarket",
+                                           "proximity supermarket"), ("non supermarket", "nonsupermarket")),
+    "ppfi_supermarket_access_decile":    (("supermarket accessibility", "accessibility to supermarket",
+                                           "supermarket access", "access to supermarket",
+                                           "accessibility supermarket"), ("non supermarket", "nonsupermarket")),
+    "ppfi_online_decile":                (("online", "e commerce", "ecommerce", "delivery", "internet"), ()),
+    "ppfi_nonsupermarket_decile":        (("non supermarket", "nonsupermarket"), ()),
+    "ppfi_family_decile":                (("family", "families", "food support"), ()),
+}
+PPFI_LSOA_KEYS = tuple(PPFI_DOMAINS)
+# Domains the file has that are not used, so their columns are not mistaken
+# for the combined index.
+_PPFI_OTHER = ("fuel", "socio", "demographic")
+
+
+def ppfi_parse(tables: list) -> tuple:
+    """(national frame LSOA_CODE and the PPFI England deciles, problems,
+    basis). basis says how the deciles were made: "reranked" (within England
+    from the file's ranks) or "published"."""
+    for name, _title, df in tables:
+        code_col = places_code_col(df, "E01")
+        if code_col is None:
+            continue
+        codes = df[code_col].astype(str).str.strip()
+        eng = codes.str.match(r"^E01\d{6}$").to_numpy()
+        if eng.sum() < PLACES_MIN_LSOAS:
+            continue
+        n_all = int((codes != "").sum())
+        cols = [c for c in df.columns if c != code_col and isinstance(c, str)]
+        roles: dict = {}
+        for c in cols:
+            role, _base = places_words(c)
+            text = c.replace("_", " ")
+            if _ons_has(text, _PPFI_OTHER):
+                continue
+            # A domain first: its column may carry the index's name too
+            # (ppfi_supermarket_proximity_rank), and is then the domain's.
+            doms = [k for k, (phr, ex) in PPFI_DOMAINS.items()
+                    if k != "ppfi_decile" and _ons_has(text, phr) and not _ons_has(text, ex)]
+            if len(doms) > 1:
+                continue
+            phr, ex = PPFI_DOMAINS["ppfi_decile"]
+            key = doms[0] if doms else ("ppfi_decile" if _ons_has(text, phr) and not _ons_has(text, ex) else None)
+            if key is None:
+                continue
+            roles.setdefault(key, {}).setdefault(role or "score", []).append(c)
+        if "ppfi_decile" not in roles:
+            continue
+        d = df[eng]
+        out = pd.DataFrame({"LSOA_CODE": codes[eng].to_numpy()})
+        problems: list = []
+        basis = ""
+        for key in PPFI_LSOA_KEYS:
+            got = roles.get(key) or {}
+            ranks, decs = got.get("rank") or [], got.get("dec") or []
+            if len(ranks) > 1 or len(decs) > 1:
+                problems.append(f"{key}: more than one rank or decile column ({', '.join((ranks + decs)[:4])})")
+                continue
+            rank = places_num(d[ranks[0]]).reset_index(drop=True) if ranks else None
+            dec = places_num(d[decs[0]]).reset_index(drop=True) if decs else None
+            if rank is not None and rank.notna().mean() > 0.95:
+                # Rank 1 is the highest priority if the published deciles
+                # rise with the rank; without them, as CDRC documents it.
+                rho = places_corr(rank, dec) if dec is not None else 1.0
+                if rho < -0.5:
+                    rank = -rank
+                elif dec is not None and rho < 0.5:
+                    problems.append(f"{key}: its rank and decile do not agree (rank correlation {rho:.2f})")
+                    continue
+                out[key] = places_decile(rank, worst_high=False).to_numpy()
+                basis = basis or ("reranked" if n_all > eng.sum() * 1.02 or rank.max() > eng.sum() * 1.02
+                                  else "england")
+            elif dec is not None and dec.notna().mean() > 0.95:
+                share = dec.value_counts(normalize=True)
+                if len(share) == 10 and share.between(0.08, 0.12).all():
+                    out[key] = dec.round().astype("Int64").to_numpy()
+                    basis = basis or "published"
+                else:
+                    problems.append(f"{key}: the published deciles do not split England's LSOAs into tenths "
+                                    "(they are for the whole UK), and there is no rank to put them in order "
+                                    "within England; not used")
+            else:
+                problems.append(f"{key}: no rank or decile column")
+        if "ppfi_decile" not in out.columns:
+            raise RuntimeError("ppfi: the combined index has no usable rank or decile: " + "; ".join(problems))
+        return out.drop_duplicates("LSOA_CODE").reset_index(drop=True), problems, basis
+    raise RuntimeError("ppfi: no table has English LSOA codes and a combined index (sheets: "
+                       + ", ".join(str(t[0]) for t in tables) + "; columns: "
+                       + ", ".join(str(c) for t in tables[:1] for c in list(t[2].columns)[:25]) + ")")
+
+
+def run_ppfi() -> "pd.DataFrame | None":
+    rule("Priority Places for Food Index (PPFI, CDRC)")
+    source = "ppfi"
+    cache = places_cache(source)
+    cache.mkdir(parents=True, exist_ok=True)
+    out_path = DATA_DIR / "environment" / PPFI_PARQUET
+    files = places_local_files(source, exts=(".csv", ".xlsx", ".zip"))
+    what = ("the PPFI LSOA CSV (version 2.1 or later; a free CDRC login is needed)")
+    if not files:
+        kept = places_keep(source, out_path, "no new PPFI file this run")
+        return kept if kept is not None else places_skip(source, what, PPFI_PAGE)
+    src = files[0]
+    info(f"ppfi: reading {src.name} from {cache}")
+    try:
+        tables = places_tables(src)
+    except Exception as e:
+        raise RuntimeError(f"ppfi: {src.name} could not be read ({type(e).__name__}: {e})")
+    national, problems, basis = ppfi_parse(tables)
+    scope = set(get_lsoa_ward_lookup())
+    keys = [k for k in PPFI_LSOA_KEYS if k in national.columns]
+    out, vintage = places_scope_frame(national, scope, cols=keys, source=source)
+    for k in keys:
+        out[k] = out[k].map(lambda v: int(v + 0.5) if pd.notna(v) else pd.NA).astype("Int64")
+    out["ppfi_version"] = places_version(src.name)
+    out["ppfi_basis"] = basis
+    if problems:
+        _SOURCE_NOTE[source] = "; ".join(problems)
+        warn("ppfi: " + "; ".join(problems))
+    if len(out) < 0.95 * len(scope):
+        _SOURCE_ERROR[source] = f"{src.name} has figures for {len(out):,} of the {len(scope):,} LSOAs in scope"
+    out = write_parquet_guarded(out_path, out, source=source)
+    ok(f"ppfi: {len(out):,} LSOAs, {len(keys)} measures, deciles {basis}, {vintage} LSOAs "
+       f"-> {out_path.relative_to(REPO_ROOT)}")
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Food Standards Agency food hygiene ratings (FHRS)
+# ---------------------------------------------------------------------------
+# The register of food businesses each council inspects, open with no key or
+# login. FSA's API (version 2, which must be named in an "x-api-version"
+# header) lists the councils with the address of each one's open data file
+# (FileName, an XML file), and serves their businesses page by page too. The
+# councils in the scope are found by name, together with every council in the
+# scope's FSA region, and their files are kept in .cache/fhrs/ for 20 days,
+# as the NaPTAN register is. If FSA refuses GitHub's servers, the XML files
+# can be attached to the fhrs-source release instead. Licence: believed to be
+# the Open Government Licence (data.gov.uk shows none set and points to FSA's
+# terms), not confirmed.
+#
+# Each business is placed in its LSOA by its coordinates (point in polygon),
+# else by its postcode (postcodes.io), and counted there: takeaways and
+# sandwich shops (FSA's business type "Takeaway/sandwich shop", which mixes
+# sandwich shops and bakeries with hot food takeaways, while many chains are
+# filed under restaurants), pubs, bars and nightclubs ("Pub/bar/nightclub"),
+# and of the businesses with a rating from 0 to 5, those rated 0, 1 or 2.
+# "Awaiting inspection", "exempt" and the like are not ratings. Counts per
+# LSOA are small, and per resident they run wild in town centres with few
+# residents, so the figures are shown for wards and LAs only: the LSOAs'
+# counts added up, over residents at the 2021 Census or over the rated
+# businesses. A council whose file could not be had leaves its LSOAs out
+# rather than counted as having none.
+FHRS_API = "https://api.ratings.food.gov.uk"
+FHRS_HEADERS = {"x-api-version": "2", "Accept": "application/json"}
+FHRS_MAX_AGE_DAYS = 20
+FHRS_PARQUET = "fhrs_lsoa.parquet"
+FHRS_KEYS = ("fhrs_takeaways_per_1000", "fhrs_pubs_per_1000", "fhrs_low_hygiene_pct")
+# A ward or LA with fewer rated businesses than this has no share rated 0 to 2.
+FHRS_MIN_RATED = 20
+# An LA no FSA file is named after still counts as covered when this many of
+# the businesses read are placed in it (a council FSA names differently).
+FHRS_MIN_PLACED = 100
+# Words of the FSA region names (RegionName) for each English region.
+FHRS_REGIONS = {
+    "E12000001": ("north east",), "E12000002": ("north west",), "E12000003": ("yorkshire",),
+    "E12000004": ("east midlands",), "E12000005": ("west midlands",),
+    "E12000006": ("east counties", "east of england", "eastern"), "E12000007": ("london",),
+    "E12000008": ("south east",), "E12000009": ("south west",),
+}
+_FHRS_GENERIC = {"council", "borough", "royal", "metropolitan", "district", "corporation", "the", "of",
+                 "city", "county", "and", "mbc", "dc", "bc", "cc", "upon", "on"}
+
+
+def fhrs_name_key(name: str) -> frozenset:
+    """The words of a council's name that tell it apart: "City of London
+    Corporation" and "City of London" are both {london}, "Bristol, City of"
+    and "Bristol" both {bristol}."""
+    t = iod_norm(str(name or "").replace("&", " and ").replace("'", "").replace("’", ""))
+    return frozenset(w for w in t.split() if w not in _FHRS_GENERIC)
+
+
+def fhrs_match(names: list, lads: dict) -> dict:
+    """{LAD25CD: [FSA council names]} for the scope's LAs: the councils
+    whose distinguishing words are the LA's, else the one council whose
+    words hold the LA's or are held by them."""
+    keys = {n: fhrs_name_key(n) for n in names}
+    out: dict = {}
+    for lad, lname in lads.items():
+        k = fhrs_name_key(lname)
+        if not k:
+            continue
+        exact = [n for n, kk in keys.items() if kk == k]
+        if exact:
+            out[lad] = exact
+            continue
+        near = [n for n, kk in keys.items() if kk and (kk <= k or k <= kk)]
+        if len(near) == 1:
+            out[lad] = near
+    return out
+
+
+def fhrs_rating(v) -> "int | None":
+    """0 to 5 for a hygiene rating, None for anything else ("Exempt",
+    "AwaitingInspection", Scotland's "Pass")."""
+    t = str(v if v is not None else "").strip()
+    return int(t) if re.fullmatch(r"[0-5]", t) else None
+
+
+def fhrs_kind(business_type: str) -> str:
+    """"takeaway", "pub" or "" from FSA's business type, by its words."""
+    t = iod_norm(business_type)
+    if "takeaway" in t or "take away" in t:
+        return "takeaway"
+    if re.search(r"\bpubs?\b|\bbars?\b|nightclub", t):
+        return "pub"
+    return ""
+
+
+def fhrs_read(path: Path) -> tuple:
+    """([{fhrsid, name, type, rating, postcode, lat, lng, la}], extract date
+    "YYYY-MM-DD" or "") from an FSA open data file: the XML (EstablishmentDetail
+    elements) or JSON (the API's "establishments", or the open data file's
+    nesting) layout. Tags are matched without case."""
+    path = Path(path)
+    recs: list = []
+    extract = ""
+
+    def rec_from(get, geo_get):
+        def num(x):
+            try:
+                v = float(x)
+                return v if v == v and v != 0 else None
+            except (TypeError, ValueError):
+                return None
+        return {"fhrsid": str(get("fhrsid") or ""), "name": str(get("businessname") or ""),
+                "type": str(get("businesstype") or ""), "rating": str(get("ratingvalue") or ""),
+                "postcode": str(get("postcode") or ""), "la": str(get("localauthorityname") or ""),
+                "lat": num(geo_get("latitude")), "lng": num(geo_get("longitude"))}
+
+    if path.suffix.lower() == ".xml":
+        import xml.etree.ElementTree as ET
+        for _ev, el in ET.iterparse(path, events=("end",)):
+            tag = el.tag.rsplit("}", 1)[-1].lower()
+            if tag == "extractdate" and el.text:
+                extract = extract or el.text.strip()[:10]
+            elif tag == "establishmentdetail":
+                kids = {c.tag.rsplit("}", 1)[-1].lower(): c for c in el}
+                geo = {c.tag.rsplit("}", 1)[-1].lower(): (c.text or "").strip()
+                       for c in (kids.get("geocode") if kids.get("geocode") is not None else [])}
+                recs.append(rec_from(lambda k: (kids[k].text or "").strip() if k in kids else "",
+                                     lambda k: geo.get(k)))
+                el.clear()
+        return recs, extract
+    blob = json.loads(path.read_text(encoding="utf-8-sig"))
+
+    def walk(o):
+        nonlocal extract
+        if isinstance(o, dict):
+            low = {str(k).lower(): v for k, v in o.items()}
+            if "extractdate" in low and isinstance(low["extractdate"], str):
+                extract = extract or low["extractdate"][:10]
+            if "fhrsid" in low:
+                g = low.get("geocode") or {}
+                g = {str(k).lower(): v for k, v in g.items()} if isinstance(g, dict) else {}
+                recs.append(rec_from(lambda k: low.get(k), lambda k: g.get(k)))
+                return
+            for v in o.values():
+                walk(v)
+        elif isinstance(o, list):
+            for v in o:
+                walk(v)
+    walk(blob)
+    return recs, extract
+
+
+def fhrs_authorities(sess, cache: Path) -> list:
+    """FSA's councils ({Name, RegionName, FileName, LocalAuthorityId, ...}),
+    cached for FHRS_MAX_AGE_DAYS; [] when the API does not answer."""
+    f = cache / "authorities.json"
+    if f.exists() and time.time() - f.stat().st_mtime < FHRS_MAX_AGE_DAYS * 86400:
+        try:
+            return json.loads(f.read_text(encoding="utf-8")).get("authorities") or []
+        except ValueError:
+            pass
+    try:
+        r = sess.get(f"{FHRS_API}/Authorities", headers=FHRS_HEADERS, timeout=60)
+        r.raise_for_status()
+        j = r.json()
+    except Exception as e:
+        warn(f"fhrs: FSA's list of councils did not answer ({type(e).__name__}: {e})")
+        return []
+    auths = j.get("authorities") or []
+    if auths:
+        write_json_atomic(f, {"authorities": auths})
+    return auths
+
+
+def fhrs_fetch(auth: dict, sess, cache: Path) -> "Path | None":
+    """One council's businesses in .cache/fhrs/: its open data XML file, else
+    the API's pages. A file younger than FHRS_MAX_AGE_DAYS is used as it is,
+    and an older one when a new one cannot be had."""
+    url = str(auth.get("FileName") or "").strip()
+    name = (re.sub(r"[^A-Za-z0-9._-]", "_", url.rsplit("/", 1)[-1]) if url
+            else f"FHRS_api_{auth.get('LocalAuthorityId')}.json")
+    dest = cache / name
+    if dest.exists() and time.time() - dest.stat().st_mtime < FHRS_MAX_AGE_DAYS * 86400:
+        return dest
+    if url:
+        got = places_download(url, dest, "fhrs", min_bytes=200, session=sess)
+        if got:
+            return got
+    try:
+        rows, page = [], 1
+        while True:
+            r = sess.get(f"{FHRS_API}/Establishments", headers=FHRS_HEADERS, timeout=120,
+                         params={"localAuthorityId": auth.get("LocalAuthorityId"),
+                                 "pageSize": 5000, "pageNumber": page})
+            r.raise_for_status()
+            j = r.json()
+            rows += j.get("establishments") or []
+            meta = j.get("meta") or {}
+            if page >= int(meta.get("totalPages") or 1):
+                break
+            page += 1
+        if rows:
+            api = cache / f"FHRS_api_{auth.get('LocalAuthorityId')}.json"
+            write_json_atomic(api, {"meta": {"extractDate": datetime.now(timezone.utc).strftime("%Y-%m-%d")},
+                                    "establishments": rows})
+            return api
+    except Exception as e:
+        warn(f"fhrs: {auth.get('Name')}: the API did not answer either ({type(e).__name__}: {e})")
+    return dest if dest.exists() else None
+
+
+def points_in_lsoas(lngs, lats, path: "Path | None" = None) -> list:
+    """The LSOA21CD of each point (lng, lat), "" outside every LSOA of the
+    scope, by point in polygon on data/boundaries/lsoa.geojson."""
+    import numpy as np
+    from shapely import points as shp_points
+    from shapely.geometry import shape
+    from shapely.strtree import STRtree
+    path = path or DATA_DIR / "boundaries" / "lsoa.geojson"
+    feats = json.loads(Path(path).read_text(encoding="utf-8")).get("features", [])
+    geoms, codes = [], []
+    for f in feats:
+        p = f.get("properties") or {}
+        c = str(p.get("LSOA21CD") or p.get("code") or "")
+        if c and f.get("geometry"):
+            g = shape(f["geometry"])
+            geoms.append(g if g.is_valid else g.buffer(0))
+            codes.append(c)
+    out = [""] * len(lngs)
+    if not geoms or not len(lngs):
+        return out
+    pts = shp_points(np.column_stack([np.asarray(lngs, dtype=float), np.asarray(lats, dtype=float)]))
+    hit_pt, hit_geom = STRtree(geoms).query(pts, predicate="intersects")
+    for i, j in zip(hit_pt.tolist(), hit_geom.tolist()):
+        if not out[i]:
+            out[i] = codes[j]
+    return out
+
+
+def fhrs_counts(recs: list, lsoa_of: list) -> "pd.DataFrame":
+    """Counts per LSOA from the businesses and the LSOA each was placed in
+    (lsoa_of, "" when outside the scope): every business, takeaways, pubs,
+    those with a rating of 0 to 5, and those rated 0 to 2."""
+    rows = []
+    for r, lc in zip(recs, lsoa_of):
+        if not lc:
+            continue
+        kind = fhrs_kind(r["type"])
+        rating = fhrs_rating(r["rating"])
+        rows.append((lc, kind == "takeaway", kind == "pub", rating is not None,
+                     rating is not None and rating <= 2))
+    df = pd.DataFrame(rows, columns=["LSOA21CD", "t", "p", "r", "l"])
+    if df.empty:
+        return pd.DataFrame(columns=["LSOA21CD", "fhrs_food_businesses", "fhrs_takeaways", "fhrs_pubs",
+                                     "fhrs_rated", "fhrs_rated_0_2"])
+    g = df.groupby("LSOA21CD")
+    return pd.DataFrame({"fhrs_food_businesses": g.size(), "fhrs_takeaways": g["t"].sum(),
+                         "fhrs_pubs": g["p"].sum(), "fhrs_rated": g["r"].sum(),
+                         "fhrs_rated_0_2": g["l"].sum()}).astype(int).reset_index()
+
+
+def run_fhrs() -> "pd.DataFrame | None":
+    rule("Food hygiene ratings: takeaways, pubs and low ratings (FSA)")
+    source = "fhrs"
+    cache = places_cache(source)
+    cache.mkdir(parents=True, exist_ok=True)
+    out_path = DATA_DIR / "environment" / FHRS_PARQUET
+    lookup = get_lsoa_ward_lookup()
+    lads = {lad: LAD_NAMES.get(lad, lad) for lad in sorted(SCOPE_LADS)}
+    sess = requests.Session()
+    auths = fhrs_authorities(sess, cache)
+    files: list = []
+    if auths:
+        region_words = FHRS_REGIONS.get(SCOPE_REGION, ())
+        by_name = fhrs_match([str(a.get("Name") or "") for a in auths], lads)
+        want = {n for ns in by_name.values() for n in ns}
+        want |= {str(a.get("Name") or "") for a in auths
+                 if any(w in iod_norm(a.get("RegionName")) for w in region_words)}
+        chosen = [a for a in auths if str(a.get("Name") or "") in want]
+        info(f"fhrs: {len(chosen)} of FSA's {len(auths)} councils to read "
+             f"({len(by_name)} of the scope's {len(lads)} LAs found by name)")
+        for a in chosen:
+            f = fhrs_fetch(a, sess, cache)
+            if f:
+                files.append(f)
+    else:
+        files = sorted(p for p in cache.iterdir() if p.suffix.lower() in (".xml", ".json")
+                       and p.name != "authorities.json")
+        if files:
+            info(f"fhrs: FSA did not answer; reading the {len(files)} file(s) in {cache}")
+    if not files:
+        kept = places_keep(source, out_path, "FSA's data could not be had this run")
+        return kept if kept is not None else places_skip(
+            source, "the FSA open data XML file of each council in the scope",
+            "https://ratings.food.gov.uk/open-data",
+            why="FSA's food hygiene data could not be had (its API did not answer and .cache/fhrs/ is empty)")
+    recs: list = []
+    by_file: dict = {}
+    extract = ""
+    seen: set = set()
+    for f in files:
+        try:
+            rr, ex = fhrs_read(f)
+        except Exception as e:
+            warn(f"fhrs: {f.name} could not be read ({type(e).__name__}: {e})")
+            continue
+        extract = max(extract, ex or "")
+        kept = [r for r in rr if not r["fhrsid"] or r["fhrsid"] not in seen]
+        seen |= {r["fhrsid"] for r in kept if r["fhrsid"]}
+        names = Counter(r["la"] for r in kept if r["la"])
+        by_file[f.name] = (names.most_common(1)[0][0] if names else "", len(kept))
+        recs += kept
+    if not recs:
+        raise RuntimeError(f"fhrs: none of the {len(files)} file(s) held any business")
+    have = [i for i, r in enumerate(recs) if r["lat"] is not None and r["lng"] is not None]
+    lsoa_of = [""] * len(recs)
+    placed = points_in_lsoas([recs[i]["lng"] for i in have], [recs[i]["lat"] for i in have])
+    for i, lc in zip(have, placed):
+        lsoa_of[i] = lc if lc in lookup else ""
+    no_xy = [i for i, r in enumerate(recs) if (r["lat"] is None or r["lng"] is None) and normalise_postcode(r["postcode"])]
+    if no_xy:
+        try:
+            pcs = lookup_postcodes([recs[i]["postcode"] for i in no_xy], source="fhrs")
+            for i in no_xy:
+                hit = pcs.get(normalise_postcode(recs[i]["postcode"]))
+                if hit and hit[2] in lookup:
+                    lsoa_of[i] = hit[2]
+        except RuntimeError as e:
+            warn(f"fhrs: {len(no_xy):,} businesses with no coordinates were not placed ({e})")
+    n_in = sum(1 for x in lsoa_of if x)
+    n_none = sum(1 for r in recs if r["lat"] is None and not normalise_postcode(r["postcode"]))
+    info(f"fhrs: {len(recs):,} businesses read, {n_in:,} placed in the scope's LSOAs, "
+         f"{n_none:,} with neither coordinates nor a postcode (mobile caterers, home businesses)")
+    counts = fhrs_counts(recs, lsoa_of)
+    # Which LAs the files cover: by the council named in each file, else by
+    # how many businesses are placed in the LA.
+    named = fhrs_match([n for n, _c in by_file.values() if n], lads)
+    covered = set(named)
+    lad_of = {lc: lad for lc, (_wd, lad) in lookup.items()}
+    per_lad = Counter(lad_of.get(lc) for lc in lsoa_of if lc)
+    covered |= {lad for lad, n in per_lad.items() if n >= FHRS_MIN_PLACED}
+    missing = sorted(set(lads) - covered)
+    out = pd.DataFrame({"LSOA21CD": sorted(lc for lc, lad in lad_of.items() if lad in covered)})
+    out = out.merge(counts, on="LSOA21CD", how="left").fillna(0)
+    for c in out.columns[1:]:
+        out[c] = out[c].astype(int)
+    out["fhrs_as_at"] = extract or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    if not len(out):
+        raise RuntimeError("fhrs: no LA in the scope is covered by the files read")
+    if missing:
+        _SOURCE_ERROR[source] = ("no FSA file covered " + ", ".join(f"{lads[m]} ({m})" for m in missing)
+                                 + ", so its LSOAs have no figures")
+        warn(f"fhrs: {_SOURCE_ERROR[source]}")
+    out = write_parquet_guarded(out_path, out, source=source)
+    ok(f"fhrs: {len(out):,} LSOAs in {len(covered & set(lads))} LAs, {int(out['fhrs_takeaways'].sum()):,} "
+       f"takeaways, {int(out['fhrs_pubs'].sum()):,} pubs, {int(out['fhrs_rated_0_2'].sum()):,} of "
+       f"{int(out['fhrs_rated'].sum()):,} rated businesses rated 0 to 2, as at {out['fhrs_as_at'].iloc[0]} "
+       f"-> {out_path.relative_to(REPO_ROOT)}")
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Ward, LA, LSOA and MSOA figures for the five sources above
+# ---------------------------------------------------------------------------
+def places_figures(to_area: dict, pop_by_lsoa: dict, *, what: str, lsoa_to_msoa=None) -> tuple:
+    """({area: {key: value}}, notes, covers) for wards (to_area the LSOA to
+    ward best fit) or LAs (every LSOA to its LA).
+
+    AHAH scores and drive times and the SAMHI index: averages of the LSOAs
+    weighted by Census 2021 residents (deciles are not averaged). PPFI: the
+    share of residents living in LSOAs in England's highest-priority fifth
+    (deciles 1 and 2). FSA: the LSOAs' counts added up, over residents (per
+    1,000) or over the rated businesses (rated 0 to 2), the share left out
+    under FHRS_MIN_RATED. The QOF estimates: each LSOA takes its MSOA's
+    figure, and an area is the residents-weighted mean of its LSOAs
+    (msoa_figures_to_areas); covers says how much of each area that rests on.
+    notes holds the periods and how the figures were made."""
+    out: dict = {}
+    notes: dict = {}
+    covers: dict = {}
+
+    def put(key, vals, nd):
+        for a, v in vals.items():
+            out.setdefault(a, {})[key] = round(float(v), nd)
+
+    env, outc = DATA_DIR / "environment", DATA_DIR / "outcomes"
+    ah = _lsoa_frame(env / AHAH_PARQUET, AHAH_SCORES + AHAH_TIMES + ("ahah_version",))
+    if ah and pop_by_lsoa:
+        for key in AHAH_SCORES + AHAH_TIMES:
+            per = {lc: r[key] for lc, r in ah.items() if key in r and pd.notna(r[key])}
+            if per:
+                put(key, lsoa_means_to_areas(per, to_area, pop_by_lsoa, what=f"{what} {key}"), 3)
+        v = next((str(r.get("ahah_version") or "") for r in ah.values() if r.get("ahah_version")), "")
+        notes["ahah_version"] = v
+    sa = _lsoa_frame(outc / SAMHI_PARQUET, ("samhi_index", "samhi_year", "samhi_vintage", "samhi_licence"))
+    if sa and pop_by_lsoa:
+        per = {lc: r["samhi_index"] for lc, r in sa.items() if pd.notna(r.get("samhi_index"))}
+        if per:
+            put("samhi_index", lsoa_means_to_areas(per, to_area, pop_by_lsoa, what=f"{what} samhi_index"), 3)
+        first = next(iter(sa.values()))
+        notes.update({"samhi_year": int(first["samhi_year"]) if pd.notna(first.get("samhi_year")) else None,
+                      "samhi_vintage": str(first.get("samhi_vintage") or ""),
+                      "samhi_licence": str(first.get("samhi_licence") or "")})
+    pp = _lsoa_frame(env / PPFI_PARQUET, ("ppfi_decile", "ppfi_basis", "ppfi_version"))
+    if pp and pop_by_lsoa:
+        den = {lc: pop_by_lsoa.get(lc) for lc, r in pp.items() if pd.notna(r.get("ppfi_decile"))}
+        num = {lc: (pop_by_lsoa.get(lc) or 0) if int(pp[lc]["ppfi_decile"]) <= 2 else 0 for lc in den}
+        put("ppfi_priority_pct", _summed_rate(num, den, to_area, 100.0, 1, every_lsoa=False), 1)
+        first = next(iter(pp.values()))
+        notes["ppfi_basis"] = str(first.get("ppfi_basis") or "")
+        notes["ppfi_version"] = str(first.get("ppfi_version") or "")
+    fh = _lsoa_frame(env / FHRS_PARQUET, ("fhrs_takeaways", "fhrs_pubs", "fhrs_rated", "fhrs_rated_0_2",
+                                          "fhrs_as_at"))
+    if fh and pop_by_lsoa:
+        pop = {lc: pop_by_lsoa.get(lc) for lc in fh}
+        put("fhrs_takeaways_per_1000", _summed_rate({lc: r["fhrs_takeaways"] for lc, r in fh.items()}, pop,
+                                                    to_area, 1000.0, 2, every_lsoa=True), 2)
+        put("fhrs_pubs_per_1000", _summed_rate({lc: r["fhrs_pubs"] for lc, r in fh.items()}, pop,
+                                               to_area, 1000.0, 2, every_lsoa=True), 2)
+        rated = lsoa_sums_to_areas({lc: r["fhrs_rated"] for lc, r in fh.items()}, to_area)
+        low = _summed_rate({lc: r["fhrs_rated_0_2"] for lc, r in fh.items()},
+                           {lc: r["fhrs_rated"] for lc, r in fh.items()}, to_area, 100.0, 1, every_lsoa=True)
+        put("fhrs_low_hygiene_pct", {a: v for a, v in low.items() if rated.get(a, 0) >= FHRS_MIN_RATED}, 1)
+        notes["fhrs_as_at"] = str(next(iter(fh.values())).get("fhrs_as_at") or "")
+    qof = _read_static_opt("healthcare", QOF_MSOA_PARQUET)
+    if qof is not None and not qof.empty and pop_by_lsoa:
+        l2m = lsoa_to_msoa if lsoa_to_msoa is not None else get_lsoa_to_msoa()
+        vals, covers = msoa_figures_to_areas(qof, QOF_MSOA_KEYS, l2m, to_area, pop_by_lsoa)
+        for a, rec in vals.items():
+            out.setdefault(a, {}).update({k: round(v, 2) for k, v in rec.items()})
+        per = qof["period"].dropna().astype(str) if "period" in qof.columns else pd.Series(dtype=str)
+        notes["qof_msoa_period"] = str(per.mode().iloc[0]) if len(per[per != ""]) else ""
+    return out, notes, covers
+
+
+def places_lsoa_values() -> dict:
+    """{LSOA21CD: {key: value}} for the measures shown for LSOAs: AHAH (with
+    its decile), SAMHI and the PPFI deciles. The FSA counts are too small to
+    show for an LSOA."""
+    out: dict = {}
+    env, outc = DATA_DIR / "environment", DATA_DIR / "outcomes"
+    for path, keys in ((env / AHAH_PARQUET, AHAH_KEYS), (outc / SAMHI_PARQUET, SAMHI_KEYS),
+                       (env / PPFI_PARQUET, PPFI_LSOA_KEYS)):
+        for lc, r in _lsoa_frame(path, keys).items():
+            for k in keys:
+                v = r.get(k)
+                if v is None or pd.isna(v):
+                    continue
+                out.setdefault(lc, {})[k] = int(v) if k.endswith("_decile") else round(float(v), 3)
+    return out
+
+
+def places_msoa_values(scope_msoa: set) -> dict:
+    """{MSOA21CD: {qof_est_*: value}} for the scope's MSOAs, as published."""
+    qof = _read_static_opt("healthcare", QOF_MSOA_PARQUET)
+    out: dict = {}
+    if qof is None or qof.empty or "MSOA21CD" not in qof.columns:
+        return out
+    keys = [k for k in QOF_MSOA_KEYS if k in qof.columns]
+    for rec in qof[["MSOA21CD"] + keys].to_dict("records"):
+        code = str(rec["MSOA21CD"])
+        if code not in scope_msoa:
+            continue
+        for k in keys:
+            v = rec[k]
+            if v is not None and pd.notna(v):
+                out.setdefault(code, {})[k] = round(float(v), 2)
+    return out
+
+
+def places_periods() -> dict:
+    """{key: period} for indicators.js: the AHAH and PPFI versions, the SAMHI
+    year, the QOF year and the date of the FSA extract."""
+    out: dict = {}
+    env, outc = DATA_DIR / "environment", DATA_DIR / "outcomes"
+
+    def first(path, col):
+        df = _read_parquet_opt(path) if path.exists() else None
+        if df is None or col not in df.columns:
+            return ""
+        s = df[col].dropna().astype(str)
+        s = s[s != ""]
+        return str(s.mode().iloc[0]) if len(s) else ""
+    v = first(env / AHAH_PARQUET, "ahah_version")
+    if v:
+        out.update({k: f"version {v}" for k in AHAH_KEYS})
+    y = first(outc / SAMHI_PARQUET, "samhi_year")
+    if y:
+        out.update({k: y for k in SAMHI_KEYS})
+    v = first(env / PPFI_PARQUET, "ppfi_version")
+    if v:
+        out.update({k: f"version {v}" for k in PPFI_LSOA_KEYS + ("ppfi_priority_pct",)})
+    d = first(env / FHRS_PARQUET, "fhrs_as_at")
+    if d:
+        try:
+            out.update({k: "as at " + datetime.strptime(d[:10], "%Y-%m-%d").strftime("%b %Y") for k in FHRS_KEYS})
+        except ValueError:
+            pass
+    q = _read_static_opt("healthcare", QOF_MSOA_PARQUET)
+    if q is not None and "period" in q.columns:
+        per = q["period"].dropna().astype(str)
+        per = per[per != ""]
+        if len(per):
+            out.update({k: str(per.mode().iloc[0]) for k in QOF_MSOA_KEYS if k in q.columns})
+    return out
+
 SOURCES = {
     "custom":      run_custom,
     "boundaries":  run_boundaries,
@@ -14331,6 +16000,16 @@ SOURCES = {
     "fingertips_msoa_extra": run_fingertips_msoa_extra,
     "saie":        run_saie,
     "hle_msoa":    run_hle_msoa,
+    # Healthy places (AHAH), mental health (SAMHI), GP-recorded illness by
+    # MSOA, food access (PPFI) and food outlets (FSA), one source per
+    # publisher. Each reads a file attached to its <source>-source release
+    # when its publisher cannot be reached, and is skipped, not failed,
+    # without one. fhrs places businesses in the boundaries' LSOAs.
+    "ahah":        run_ahah,
+    "samhi":       run_samhi,
+    "qof_msoa":    run_qof_msoa,
+    "ppfi":        run_ppfi,
+    "fhrs":        run_fhrs,
     "fuel_poverty": run_fuel_poverty,
     "ptal":        run_ptal,
     "crime":       run_police_crime,

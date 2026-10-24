@@ -485,6 +485,16 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
     dfle_female: "more years free of limiting illness",
     dfle_male: "more years free of limiting illness",
   };
+  // The healthy places index (AHAH) and the mental health index (SAMHI):
+  // a higher score is worse, and their deciles and the food insecurity
+  // deciles (PPFI) count from the worst tenth, so a higher decile is better.
+  ["ahah_index", "ahah_health_services", "ahah_retail", "ahah_air_quality", "ahah_green_blue"]
+    .forEach(function (k) { DIRECTION[k] = "less healthy"; });
+  DIRECTION.ahah_decile = "healthier";
+  DIRECTION.samhi_index = "worse mental health";
+  DIRECTION.samhi_decile = "better mental health";
+  ["ppfi_decile", "ppfi_supermarket_proximity_decile", "ppfi_supermarket_access_decile", "ppfi_online_decile",
+   "ppfi_nonsupermarket_decile", "ppfi_family_decile"].forEach(function (k) { DIRECTION[k] = "lower risk"; });
 
   function metaFor(key) {
     var m = (typeof OV_META === "object" && OV_META && OV_META[key]) ? OV_META[key] : null;
@@ -1040,7 +1050,6 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
       Object.keys(keys).filter(function (k) { return !isWithheld(k); }).sort().forEach(function (k) {
         var at = levelsOf(k, !!inWards[k]);
         if (!at.length) return;
-        var m = metaFor(k);
         var row = { key: k, label: shortLabel(k) };
         if (words.length) {
           var hay = (k + " " + row.label).toLowerCase();
@@ -1087,11 +1096,39 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
         out = build(cols);
         short = true;
       }
+      // And if even that is too long, the list comes in pages, each under
+      // LIST_BYTES, the groups split where a page fills; page asks for one.
+      var pages = [out];
+      if (JSON.stringify(out).length > LIST_BYTES) {
+        pages = [[]];
+        var size = 2;
+        out.forEach(function (g) {
+          var cur = null;
+          g.rows.forEach(function (r) {
+            var add = JSON.stringify(r).length + 1;
+            if (!cur || size + add > LIST_BYTES - 400) {
+              if (size + add > LIST_BYTES - 400 && pages[pages.length - 1].length) { pages.push([]); size = 2; }
+              cur = { levels: g.levels, rows: [] };
+              if (g.period) cur.period = g.period;
+              pages[pages.length - 1].push(cur);
+              size += JSON.stringify(cur).length + 1;
+            }
+            cur.rows.push(r);
+            size += add;
+          });
+        });
+      }
+      var page = Math.min(Math.max(parseInt((input && input.page) || 1, 10) || 1, 1), pages.length);
       return {
         region: map.region, la_count: map.la_count, ward_count: map.ward_count,
         search: words.length ? words.join(" ") : undefined,
+        page: pages.length > 1 ? page : undefined,
+        pages: pages.length > 1 ? pages.length : undefined,
+        more: pages.length > 1 && page < pages.length
+          ? "This is page " + page + " of " + pages.length + ". Call list_indicators with page " + (page + 1) +
+            " for the rest, or with search to find a key by its words." : undefined,
         columns: cols,
-        groups: out,
+        groups: pages[page - 1],
         note: "Each group lists the levels its indicators are available at: la (local authority, LA), " +
           "ward, msoa, lsoa and oa (output area)" + (short ? "" : ", and the period its indicators cover unless a row gives its own") + ". " +
           "Each row is one indicator, its values in the order of columns; a value missing from the end of a row is empty. " +

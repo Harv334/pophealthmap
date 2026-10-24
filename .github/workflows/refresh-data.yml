@@ -74,6 +74,25 @@ jobs:
           gh release download cqc-source --pattern '*' --dir .cache/cqc --clobber \
             || echo "No cqc-source release: care homes come from the CQC website."
 
+      # Files for the sources whose publishers need a login or may refuse
+      # cloud servers: AHAH (GeoDS), SAMHI (PLDR), the QOF estimates for
+      # MSOAs (House of Commons Library), PPFI (CDRC, which needs a login)
+      # and the FSA food hygiene files. A file downloaded in a browser and
+      # attached to a release named <source>-source is copied into
+      # .cache/<source>/, and the pipeline reads it in place of a download.
+      # Without one, each fetches its own file where it can, or is skipped
+      # with a note saying what to attach; none of them fails for lack of it.
+      - name: Fetch hand-downloaded files (AHAH, SAMHI, QOF by MSOA, PPFI, FSA)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for pair in ahah:ahah-source samhi:samhi-source qof_msoa:qof-msoa-source ppfi:ppfi-source fhrs:fhrs-source; do
+            dir=".cache/${pair%%:*}"; rel="${pair##*:}"
+            mkdir -p "$dir"
+            gh release download "$rel" --pattern '*' --dir "$dir" --clobber \
+              || echo "No $rel release: ${pair%%:*} fetches its own file or is skipped."
+          done
+
       # The pipeline isolates per-source failures and still exits 0, so the exit
       # code alone does not tell us whether a source broke. continue-on-error
       # keeps the job going either way, and the next step reads the manifest to

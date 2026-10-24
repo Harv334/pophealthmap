@@ -168,6 +168,17 @@ checks that each Fingertips profile's indicators are chosen by name from
 `data/curated/fingertips_profile_indicators.csv`, not as the first ids in
 number order. All four are offline.
 
+`test_ahah.py`, `test_samhi.py`, `test_qof_msoa.py`, `test_ppfi.py` and
+`test_fhrs.py` cover the last small-area sources, one per publisher: GeoDS's
+Access to Healthy Assets and Hazards, PLDR's Small Area Mental Health Index,
+the House of Commons Library's QOF estimates for MSOAs, CDRC's Priority
+Places for Food Index and the FSA food hygiene register. Each uses synthetic
+files laid out as the publisher's are believed to be (the docstring says
+where that comes from and that it is unverified), and checks the column
+matching and its refusals, the maths, ward and LA figures, a file attached by
+hand in `.cache/<source>/`, the skip (never a failure) when there is no file,
+and kept figures. All five are offline.
+
 `test_guards.py` and `test_guards_gp.py` copy real downloads out of `.cache/`
 to build their fixtures, so they need a populated cache. `.cache/` is not in the
 repo: run the relevant pipeline source once first, or skip them.
