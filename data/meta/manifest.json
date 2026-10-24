@@ -1,25 +1,20 @@
 {
-  "last_run": "2026-10-19T19:11:56.226652+00:00",
+  "last_run": "2026-10-24T19:33:20.225976+00:00",
   "sources": {
     "air_quality": {
-      "duration_s": 4.8,
+      "duration_s": 91.2,
       "error": "",
-      "fetched_at": "2026-10-19T18:52:16.089061+00:00",
-      "notes": "",
-      "output_path": "data/environment/air_quality_lsoa.parquet",
-      "rows_written": 4994,
-      "schema": {
-        "LSOA21CD": "str",
-        "no2_ugm3": "float64",
-        "pm10_ugm3": "float64",
-        "pm25_ugm3": "float64"
-      },
-      "status": "ok"
+      "fetched_at": "2026-10-24T19:01:19.998742+00:00",
+      "notes": "source returned no frame",
+      "output_path": "",
+      "rows_written": 0,
+      "schema": {},
+      "status": "skipped"
     },
     "boundaries": {
-      "duration_s": 18.0,
+      "duration_s": 37.4,
       "error": "",
-      "fetched_at": "2026-10-19T18:51:50.187403+00:00",
+      "fetched_at": "2026-10-24T19:00:27.272346+00:00",
       "notes": "",
       "output_path": "",
       "rows_written": 4,
@@ -30,10 +25,10 @@
       "status": "ok"
     },
     "census": {
-      "duration_s": 4.7,
+      "duration_s": 73.3,
       "error": "",
-      "fetched_at": "2026-10-19T18:52:34.781615+00:00",
-      "notes": "also wrote data/demographics/census2021_counts.parquet, data/demographics/census2021_msoa.parquet",
+      "fetched_at": "2026-10-24T19:06:35.520854+00:00",
+      "notes": "not built at LSOA level: TS003/census_pensioner_alone_pct: num=1 den=None - column match failed; TS003/census_lone_parent_dep_pct: num=1 den=None - column match failed; TS003/census_one_person_hh_pct: num=3 den=None - column match failed also wrote data/demographics/census2021_counts.parquet, data/demographics/census2021_msoa.parquet",
       "output_path": "data/demographics/census2021.parquet",
       "rows_written": 35672,
       "schema": {
@@ -48,17 +43,29 @@
         "census_disability_lot_pct": "float64",
         "census_english_hh_all_pct": "float64",
         "census_english_hh_none_pct": "float64",
+        "census_eth_bangladeshi_pct": "float64",
+        "census_eth_black_african_pct": "float64",
+        "census_eth_black_caribbean_pct": "float64",
+        "census_eth_gypsy_traveller_pct": "float64",
+        "census_eth_pakistani_pct": "float64",
+        "census_eth_roma_pct": "float64",
         "census_good_health_pct": "float64",
+        "census_hh_deprived_2plus_pct": "float64",
+        "census_hh_deprived_any_pct": "float64",
         "census_higher_managerial_pct": "float64",
+        "census_inactive_ltsick_pct": "float64",
         "census_level4_qual_pct": "float64",
         "census_mixed_pct": "float64",
+        "census_never_worked_ltu_pct": "float64",
         "census_no_car_pct": "float64",
         "census_no_qual_pct": "float64",
         "census_non_white_pct": "float64",
         "census_other_ethnic_pct": "float64",
         "census_over65_pct": "float64",
         "census_over85_pct": "float64",
+        "census_overcrowded_pct": "float64",
         "census_owned_pct": "float64",
+        "census_poor_english_pct": "float64",
         "census_population": "Int64",
         "census_private_rented_pct": "float64",
         "census_provides_unpaid_care_pct": "float64",
@@ -67,36 +74,39 @@
         "census_social_rented_pct": "float64",
         "census_under16_pct": "float64",
         "census_under5_pct": "float64",
+        "census_underoccupied_pct": "float64",
         "census_unemployed_pct": "float64",
+        "census_unpaid_care_50h_pct": "float64",
         "census_white_pct": "float64",
         "census_working_age_pct": "float64"
       },
-      "status": "ok"
+      "status": "partial"
     },
     "census_oa": {
-      "duration_s": 14.1,
+      "duration_s": 82.7,
       "error": "",
-      "fetched_at": "2026-10-19T18:52:39.467347+00:00",
-      "notes": "also wrote data/demographics/census2021_oa_counts.parquet",
+      "fetched_at": "2026-10-24T19:07:48.823072+00:00",
+      "notes": "not built at output area level (wards use LSOAs for these): TS003/census_pensioner_alone_pct: num=1 den=None - column match failed; TS003/census_lone_parent_dep_pct: num=1 den=None - column match failed; TS003/census_one_person_hh_pct: num=3 den=None - column match failed also wrote data/demographics/census2021_oa_counts.parquet",
       "output_path": "data/demographics/census2021_oa.parquet",
       "rows_written": 26369,
       "schema": {
         "lad": "str",
         "oas": "int64"
       },
-      "status": "ok"
+      "status": "partial"
     },
     "charities": {
-      "duration_s": 13.1,
+      "duration_s": 80.8,
       "error": "",
-      "fetched_at": "2026-10-19T19:11:39.815489+00:00",
+      "fetched_at": "2026-10-24T19:31:32.150095+00:00",
       "notes": "",
       "output_path": "data/vcse/charities.parquet",
-      "rows_written": 18536,
+      "rows_written": 18539,
       "schema": {
         "LAD25CD": "str",
         "LSOA21CD": "str",
         "WD25CD": "str",
+        "acc_end": "str",
         "activities": "str",
         "addr": "str",
         "areas": "str",
@@ -113,6 +123,7 @@
         "num": "int64",
         "postcode": "str",
         "registered": "str",
+        "reporting_status": "str",
         "scope": "str",
         "website": "str",
         "what_codes": "str",
@@ -125,9 +136,9 @@
       "status": "ok"
     },
     "claimant": {
-      "duration_s": 0.3,
+      "duration_s": 30.1,
       "error": "",
-      "fetched_at": "2026-10-19T18:52:53.607622+00:00",
+      "fetched_at": "2026-10-24T19:09:11.507719+00:00",
       "notes": "",
       "output_path": "data/economy/claimant_count.parquet",
       "rows_written": 4994,
@@ -142,9 +153,9 @@
       "status": "ok"
     },
     "crime": {
-      "duration_s": 844.2,
+      "duration_s": 70.0,
       "error": "",
-      "fetched_at": "2026-10-19T18:57:31.885375+00:00",
+      "fetched_at": "2026-10-24T19:30:10.913656+00:00",
       "notes": "",
       "output_path": "data/crime/police_uk_crime.parquet",
       "rows_written": 1126803,
@@ -164,7 +175,7 @@
     "custom": {
       "duration_s": 0.0,
       "error": "",
-      "fetched_at": "2026-10-19T18:51:50.187105+00:00",
+      "fetched_at": "2026-10-24T19:00:27.272066+00:00",
       "notes": "source returned no frame",
       "output_path": "",
       "rows_written": 0,
@@ -172,9 +183,9 @@
       "status": "skipped"
     },
     "dentists": {
-      "duration_s": 3.3,
+      "duration_s": 27.3,
       "error": "",
-      "fetched_at": "2026-10-19T19:11:52.890191+00:00",
+      "fetched_at": "2026-10-24T19:32:52.926255+00:00",
       "notes": "",
       "output_path": "data/healthcare/dental_practices.parquet",
       "rows_written": 1760,
@@ -196,9 +207,9 @@
       "status": "ok"
     },
     "fingertips": {
-      "duration_s": 43.0,
+      "duration_s": 114.5,
       "error": "",
-      "fetched_at": "2026-10-19T18:53:07.363399+00:00",
+      "fetched_at": "2026-10-24T19:11:08.998170+00:00",
       "notes": "",
       "output_path": "data/outcomes/fingertips.parquet",
       "rows_written": 594,
@@ -216,14 +227,15 @@
         "source_kind": "str",
         "source_name": "str",
         "upper_ci": "float64",
-        "value": "float64"
+        "value": "float64",
+        "value_note": "str"
       },
       "status": "ok"
     },
     "fingertips_msoa": {
-      "duration_s": 7.4,
+      "duration_s": 106.8,
       "error": "",
-      "fetched_at": "2026-10-19T18:53:50.368427+00:00",
+      "fetched_at": "2026-10-24T19:13:03.459323+00:00",
       "notes": "",
       "output_path": "data/outcomes/fingertips_msoa.parquet",
       "rows_written": 32559,
@@ -239,9 +251,9 @@
       "status": "ok"
     },
     "fingertips_msoa_la": {
-      "duration_s": 51.9,
+      "duration_s": 44.9,
       "error": "",
-      "fetched_at": "2026-10-19T18:53:57.757836+00:00",
+      "fetched_at": "2026-10-24T19:14:50.212289+00:00",
       "notes": "",
       "output_path": "data/outcomes/fingertips_msoa_la.parquet",
       "rows_written": 1056,
@@ -254,9 +266,9 @@
       "status": "ok"
     },
     "fingertips_profiles": {
-      "duration_s": 144.7,
+      "duration_s": 850.2,
       "error": "",
-      "fetched_at": "2026-10-19T18:54:49.662869+00:00",
+      "fetched_at": "2026-10-24T19:15:35.150710+00:00",
       "notes": "kept last run's figures for 5 indicator(s) that came back missing or incomplete: mh_91117, mort_91102, smok_92445, laprof_90851, laprof_92445",
       "output_path": "data/outcomes/fingertips_profiles.parquet",
       "rows_written": 19240,
@@ -272,18 +284,18 @@
         "profile_id": "int64",
         "source_code": "str",
         "source_kind": "str",
-        "unit": "str",
-        "value": "float64"
+        "value": "float64",
+        "value_note": "str"
       },
       "status": "partial"
     },
     "fuel_poverty": {
-      "duration_s": 17.3,
+      "duration_s": 17.4,
       "error": "",
-      "fetched_at": "2026-10-19T18:57:14.351844+00:00",
+      "fetched_at": "2026-10-24T19:29:45.374845+00:00",
       "notes": "",
       "output_path": "data/demographics/fuel_poverty.parquet",
-      "rows_written": 33756,
+      "rows_written": 33755,
       "schema": {
         "LSOA21CD": "str",
         "fuel_poverty_pct": "float64",
@@ -292,9 +304,9 @@
       "status": "ok"
     },
     "gp": {
-      "duration_s": 3.3,
+      "duration_s": 19.2,
       "error": "",
-      "fetched_at": "2026-10-19T18:52:24.477664+00:00",
+      "fetched_at": "2026-10-24T19:05:30.210532+00:00",
       "notes": "",
       "output_path": "data/healthcare/gp_practices.parquet",
       "rows_written": 1125,
@@ -315,9 +327,9 @@
       "status": "ok"
     },
     "greenblue": {
-      "duration_s": 7.9,
+      "duration_s": 15.3,
       "error": "",
-      "fetched_at": "2026-10-19T18:52:08.166442+00:00",
+      "fetched_at": "2026-10-24T19:01:04.701132+00:00",
       "notes": "",
       "output_path": "",
       "rows_written": 1,
@@ -328,9 +340,9 @@
       "status": "ok"
     },
     "hospitals": {
-      "duration_s": 3.7,
+      "duration_s": 11.3,
       "error": "",
-      "fetched_at": "2026-10-19T19:11:36.093200+00:00",
+      "fetched_at": "2026-10-24T19:31:20.889823+00:00",
       "notes": "",
       "output_path": "data/healthcare/hospitals.parquet",
       "rows_written": 111,
@@ -351,7 +363,7 @@
     "imd": {
       "duration_s": 0.0,
       "error": "",
-      "fetched_at": "2026-10-19T18:52:34.774279+00:00",
+      "fetched_at": "2026-10-24T19:06:22.592172+00:00",
       "notes": "",
       "output_path": "",
       "rows_written": 33755,
@@ -370,10 +382,56 @@
       },
       "status": "ok"
     },
+    "iod_extra": {
+      "duration_s": 1.1,
+      "error": "",
+      "fetched_at": "2026-10-24T19:06:22.597654+00:00",
+      "notes": "",
+      "output_path": "data/demographics/iod2025_extra.parquet",
+      "rows_written": 33755,
+      "schema": {
+        "LSOA21CD": "str",
+        "adult_skills_score": "float64",
+        "cyp_education_score": "float64",
+        "geo_barriers_score": "float64",
+        "idaci_decile": "int64",
+        "idaci_pct": "float64",
+        "idaci_rank": "int64",
+        "idaopi_decile": "int64",
+        "idaopi_pct": "float64",
+        "idaopi_rank": "int64",
+        "indoors_score": "float64",
+        "iod_pop_children": "int64",
+        "iod_pop_older": "int64",
+        "outdoors_score": "float64",
+        "wider_barriers_score": "float64"
+      },
+      "status": "ok"
+    },
+    "iod_indicators": {
+      "duration_s": 11.8,
+      "error": "6 of 14 columns missing or not used: iod_ks2: no File 8 column with 'key stage 2' or 'ks2'; iod_ks4: no File 8 column with 'key stage 4' or 'ks4'; iod_staying_on: no File 8 column with 'staying on'; iod_adult_quals: no File 8 column with 'qualification' or 'adult skills'; iod_english: no File 8 column with 'english language' or 'speak english' or 'english proficiency'; iod_no_central_heating: no File 8 column with 'central heating'",
+      "fetched_at": "2026-10-24T19:06:23.726146+00:00",
+      "notes": "",
+      "output_path": "data/demographics/iod2025_indicators.parquet",
+      "rows_written": 33755,
+      "schema": {
+        "LSOA21CD": "str",
+        "iod_acute_morbidity": "float64",
+        "iod_air_quality": "float64",
+        "iod_cidr": "float64",
+        "iod_he_entry": "float64",
+        "iod_housing_poor": "float64",
+        "iod_mood_anxiety": "float64",
+        "iod_road_accidents": "float64",
+        "iod_ypll": "float64"
+      },
+      "status": "failed"
+    },
     "naptan": {
       "duration_s": 0.0,
       "error": "",
-      "fetched_at": "2026-10-19T18:52:24.477445+00:00",
+      "fetched_at": "2026-10-24T19:05:30.210131+00:00",
       "notes": "source returned no frame",
       "output_path": "",
       "rows_written": 0,
@@ -381,9 +439,9 @@
       "status": "skipped"
     },
     "pcn": {
-      "duration_s": 0.0,
+      "duration_s": 1.6,
       "error": "",
-      "fetched_at": "2026-10-19T18:52:27.753231+00:00",
+      "fetched_at": "2026-10-24T19:05:49.419117+00:00",
       "notes": "",
       "output_path": "",
       "rows_written": 202,
@@ -394,9 +452,9 @@
       "status": "ok"
     },
     "pharmacies": {
-      "duration_s": 7.0,
+      "duration_s": 31.5,
       "error": "",
-      "fetched_at": "2026-10-19T18:52:27.770936+00:00",
+      "fetched_at": "2026-10-24T19:05:51.052384+00:00",
       "notes": "",
       "output_path": "data/healthcare/pharmacies.parquet",
       "rows_written": 1713,
@@ -415,22 +473,19 @@
       "status": "ok"
     },
     "ptal": {
-      "duration_s": 0.2,
-      "error": "",
-      "fetched_at": "2026-10-19T18:57:31.685916+00:00",
+      "duration_s": 8.1,
+      "error": "RuntimeError: lsoa11->lsoa21 lookup: only 0 of 4,994 LSOAs came back. Refusing to cache a partial lookup.",
+      "fetched_at": "2026-10-24T19:30:02.765323+00:00",
       "notes": "",
-      "output_path": "data/demographics/ptal.parquet",
-      "rows_written": 4835,
-      "schema": {
-        "LSOA21CD": "str",
-        "ptal_score": "float64"
-      },
-      "status": "ok"
+      "output_path": "",
+      "rows_written": 0,
+      "schema": {},
+      "status": "failed"
     },
     "qof": {
-      "duration_s": 13.5,
+      "duration_s": 87.4,
       "error": "",
-      "fetched_at": "2026-10-19T18:52:53.874670+00:00",
+      "fetched_at": "2026-10-24T19:09:41.639179+00:00",
       "notes": "",
       "output_path": "data/healthcare/qof_prevalence.parquet",
       "rows_written": 1115,
@@ -455,9 +510,9 @@
       "status": "ok"
     },
     "tfl": {
-      "duration_s": 3.6,
+      "duration_s": 159.0,
       "error": "",
-      "fetched_at": "2026-10-19T18:52:20.926630+00:00",
+      "fetched_at": "2026-10-24T19:02:51.227764+00:00",
       "notes": "",
       "output_path": "data/environment/tfl_transport_lsoa.parquet",
       "rows_written": 4994,
