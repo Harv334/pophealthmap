@@ -429,6 +429,8 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
     imd_best_decile: "The least deprived IMD decile present in this area. Deciles run 1 (the most deprived tenth nationally) to 10 (the least).",
     imd_worst_decile: "The most deprived IMD decile present in this area. Deciles run 1 (the most deprived tenth nationally) to 10 (the least).",
     imd_rank: "The LSOA's rank among England's 33,755 LSOAs by IMD 2025, where 1 is the most deprived.",
+    idaci_rank: "The LSOA's rank among England's 33,755 LSOAs by income deprivation affecting children (IDACI 2025), where 1 is the most deprived.",
+    idaopi_rank: "The LSOA's rank among England's 33,755 LSOAs by income deprivation affecting older people (IDAOPI 2025), where 1 is the most deprived.",
   };
 
   var DIRECTION = {
@@ -445,6 +447,35 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
     imd_worst_decile: "less deprived",
     imd_decile: "less deprived",
     imd_rank: "less deprived",
+    // The IoD 2025 measures beyond the IMD: IDACI, IDAOPI, the sub-domains
+    // and the underlying indicators all count up with deprivation, except
+    // the two attainment scores and the deciles and ranks.
+    idaci_pct: "more deprived",
+    idaopi_pct: "more deprived",
+    idaci_decile: "less deprived",
+    idaopi_decile: "less deprived",
+    idaci_rank: "less deprived",
+    idaopi_rank: "less deprived",
+    cyp_education_score: "more deprived",
+    adult_skills_score: "more deprived",
+    geo_barriers_score: "more deprived",
+    wider_barriers_score: "more deprived",
+    indoors_score: "more deprived",
+    outdoors_score: "more deprived",
+    iod_ypll: "more deprived",
+    iod_cidr: "more deprived",
+    iod_acute_morbidity: "more deprived",
+    iod_mood_anxiety: "more deprived",
+    iod_ks2: "less deprived",
+    iod_ks4: "less deprived",
+    iod_staying_on: "more deprived",
+    iod_he_entry: "more deprived",
+    iod_adult_quals: "more deprived",
+    iod_english: "more deprived",
+    iod_housing_poor: "more deprived",
+    iod_no_central_heating: "more deprived",
+    iod_air_quality: "more deprived",
+    iod_road_accidents: "more deprived",
   };
 
   function metaFor(key) {
@@ -453,7 +484,7 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
     var ft = FT_META[key];
     if (ft) return { desc: ft[0], u: ft[1] || undefined, src: "OHID Fingertips", g: "LA" };
     var imd = IMD_META[key];
-    return imd ? { desc: imd, u: key === "imd_rank" ? "rank" : "decile", src: "MHCLG IMD 2025", yr: "2025" } : null;
+    return imd ? { desc: imd, u: /_rank$/.test(key) ? "rank" : "decile", src: "MHCLG IMD 2025", yr: "2025" } : null;
   }
 
   function labelFor(key) {
@@ -769,7 +800,9 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
     return (typeof OA_CAVEAT === "string" ? OA_CAVEAT
       : "Each output area holds about 125 households, so a few households can change these figures a lot.") + " " + OA_NOTE;
   }
-  function isImdKey(k) { return /^imd_/.test(k) || DIRECTION[k] === "more deprived"; }
+  function isImdKey(k) {
+    return /^(imd_|idaci_|idaopi_|iod_)/.test(k) || /^(less|more) deprived$/.test(DIRECTION[k] || "");
+  }
   function caveatFor(lv, keys, within) {
     var c = [];
     if (lv === "ward" && keys.some(isBoroughLevel)) c.push(BOROUGH_CAVEAT);
@@ -917,6 +950,9 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
     return rankResult(input, lv, rows, within);
   }
 
+  // The fields of each list_indicators row, in order (see list_indicators).
+  var LIST_COLUMNS = ["key", "label", "unit", "period", "higher_means", "la_only"];
+
   var TOOLS = {
     /* The key list, kept short. It used to send every indicator's full
        description, source, year and aggregation rule, 41 KB that was then
@@ -926,7 +962,14 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
 
        Grouped by the levels each indicator is available at, so the levels
        are said once per group rather than once per key, which keeps the list
-       inside one tool result. */
+       inside one tool result.
+
+       Each indicator is a row of values in the order `columns` names them,
+       not an object repeating the same five field names: with 150 indicators
+       those names alone were about 5 KB of a result that the answer loop
+       refuses past RESULT_BYTES. The period most of a group's indicators share is
+       said once, on the group, and a row gives its own only where it differs.
+       A field missing from the end of a row is empty. */
     list_indicators: function () {
       var inWards = wardKeys(), keys = {};
       Object.keys(inWards).forEach(function (k) { keys[k] = 1; });
@@ -943,7 +986,7 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
         var m = metaFor(k);
         var row = { key: k, label: shortLabel(k) };
         if (m && m.u) row.unit = m.u;
-        if (m && m.yr) row.period = m.yr;
+        if (m && m.yr) row.period = String(m.yr);
         if (isBoroughLevel(k)) row.la_only = true;
         var hm = higherMeans(k);
         if (hm) row.higher_means = hm;
@@ -951,12 +994,30 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
         (groups[g] = groups[g] || { levels: at, indicators: [] }).indicators.push(row);
       });
       var map = regionCounts();
+      var out = Object.keys(groups).map(function (g) { return groups[g]; })
+        .sort(function (a, b) { return b.levels.length - a.levels.length; })
+        .map(function (g) {
+          var n = {}, top = null;
+          g.indicators.forEach(function (r) { if (r.period) n[r.period] = (n[r.period] || 0) + 1; });
+          Object.keys(n).forEach(function (p) { if (n[p] > 1 && (!top || n[p] > n[top])) top = p; });
+          var rows = g.indicators.map(function (r) {
+            var a = LIST_COLUMNS.map(function (c) {
+              var v = r[c];
+              return (c === "period" && v === top) || v == null ? "" : v;
+            });
+            while (a.length > 2 && a[a.length - 1] === "") a.pop();
+            return a;
+          });
+          return top ? { levels: g.levels, period: top, rows: rows } : { levels: g.levels, rows: rows };
+        });
       return {
         region: map.region, la_count: map.la_count, ward_count: map.ward_count,
-        groups: Object.keys(groups).map(function (g) { return groups[g]; })
-          .sort(function (a, b) { return b.levels.length - a.levels.length; }),
+        columns: LIST_COLUMNS,
+        groups: out,
         note: "Each group lists the levels its indicators are available at: la (local authority, LA), " +
-          "ward, msoa, lsoa and oa (output area). Deprivation deciles run 1 (most deprived) to 10 (least deprived). " +
+          "ward, msoa, lsoa and oa (output area), and the period its indicators cover unless a row gives its own. " +
+          "Each row is one indicator, its values in the order of columns; a value missing from the end of a row is empty. " +
+          "Deprivation deciles run 1 (most deprived) to 10 (least deprived). " +
           "Indicators marked la_only are published for the whole " +
           "LA, so they are the same value for every ward in " +
           "it; do not rank wards by them. Call the local authority level 'LA' " +

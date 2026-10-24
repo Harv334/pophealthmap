@@ -437,6 +437,20 @@ and say what each one means.</p>
             England's LSOAs, and decile 10 the least deprived. A ward's average
             decile is the average of its LSOAs' deciles, so it is not itself a
             decile.</td></tr>
+    <tr><td class="term">Income deprivation affecting children</td><td>Income Deprivation Affecting Children Index (IDACI)</td>
+        <td>The share of children aged 0 to 15 living in families on a low
+            income. Its partner for people aged 60 and over is income
+            deprivation affecting older people (IDAOPI). Both are part of the
+            IMD's income domain.</td></tr>
+    <tr><td class="term">Sub-domain</td><td>Sub-domain</td>
+        <td>A part of one of the IMD's domains. Education is split into
+            children and young people, and adult skills. Barriers to housing
+            and services is split into geographical and wider barriers. Living
+            environment is split into indoors and outdoors.</td></tr>
+    <tr><td class="term">Measures behind the index</td><td>Underlying indicators</td>
+        <td>The figures MHCLG combines into the IMD's domains, such as Key
+            Stage 2 results or the share of homes in poor condition, each in
+            its own units.</td></tr>
     <tr><td class="term">Core20</td><td>Core20PLUS5</td>
         <td>NHS England's plan for reducing health inequalities, which are
             unfair differences in health between groups of people. It focuses
@@ -654,7 +668,10 @@ not areas</a>).</p>
 claimant count are added up. Rates, percentages and scores are weighted by
 population, which means each LSOA counts in proportion to the number of people
 living there at the 2021 Census. Fuel poverty is a share of households, so it
-is weighted by the number of households instead.
+is weighted by the number of households instead. Income deprivation affecting
+children is weighted by the children aged 0 to 15 that MHCLG counts in each
+LSOA, and income deprivation affecting older people by the people aged 60 and
+over, so each is the share of the area's children or older people.
 <span data-cen="ward-counts" hidden>Census percentages are worked out from the
 counts behind them.</span><span data-cen="ward-weighted">Census percentages are
 averaged from their output areas, weighted by residents.</span> Counts of
@@ -662,8 +679,9 @@ stations within 1 km and bus stops within 800 metres are averaged, not added,
 because one station is close to several LSOAs. For Local Health figures and
 PTAL, a ward has no figure unless the LSOAs with figures hold at least four in
 five of its residents. Where no LA figure is published, we work out the LA's
-figure from its wards in the same way. Fuel poverty is worked out from all of
-the LA's LSOAs instead, and Census figures as explained under
+figure from its wards in the same way. Fuel poverty, and the deprivation
+measures beyond the IMD's seven domains, are worked out from all of the LA's
+LSOAs instead, and Census figures as explained under
 <a href="#census-levels">Census figures at every level</a>.</p>
 
 <h3 id="best-fit">Best fit, not exact fit</h3>
@@ -1029,6 +1047,33 @@ var SOURCES = [
     period: 'Mostly 2022 to 2023, published in 2025',
     cadence: 'No fixed timetable, with earlier editions in 2010, 2015 and 2019.',
     manifest: 'imd' },
+
+  { id: 'iod-extra',
+    name: 'Income deprivation of children and older people, and the sub-domains',
+    pub: 'MHCLG, English Indices of Deprivation 2025',
+    what: 'Income deprivation affecting children (IDACI) and older people (IDAOPI), each as a share, ' +
+          'a decile and a rank, and the six sub-domain scores: children and young people, adult skills, ' +
+          'geographical barriers, wider barriers, and the indoor and outdoor living environment.',
+    geo: 'LSOA, combined into wards and LAs. IDACI is weighted by children aged 0 to 15 and IDAOPI by ' +
+         'people aged 60 and over, as MHCLG counts them, and the sub-domains by residents. Deciles and ' +
+         'ranks are for LSOAs only',
+    period: 'Mostly 2022 to 2023, published in 2025',
+    cadence: 'With each edition of the IMD.',
+    manifest: 'iod_extra' },
+
+  { id: 'iod-indicators',
+    name: 'Measures behind the deprivation index',
+    pub: 'MHCLG, English Indices of Deprivation 2025',
+    what: 'The indicators the health, education and living environment domains are built from: years of ' +
+          'life lost to early deaths, the illness and disability ratio, emergency admissions, mood and ' +
+          'anxiety disorders, Key Stage 2 and 4 results, staying on after 16, entry to higher education, ' +
+          'adults with no or low qualifications or little English, housing in poor condition, homes ' +
+          'without central heating, air quality and road traffic accidents. Any that the 2025 edition ' +
+          'does not publish is left off the map.',
+    geo: 'LSOA, combined into wards and LAs weighted by residents',
+    period: 'Differs by indicator, published in 2025',
+    cadence: 'With each edition of the IMD.',
+    manifest: 'iod_indicators' },
 
   { id: 'fingertips',
     name: 'Fingertips: main profiles',

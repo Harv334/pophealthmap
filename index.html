@@ -3950,6 +3950,30 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
               <option value="crime_score">Crime deprivation score · LSOA</option>
               <option value="barriers_score">Barriers to housing &amp; services score · LSOA</option>
               <option value="environment_score">Living environment score · LSOA</option>
+              <option value="idaci_pct">Income deprivation affecting children (IDACI) · LSOA</option>
+              <option value="idaci_decile">IDACI decile · LSOA</option>
+              <option value="idaopi_pct">Income deprivation affecting older people (IDAOPI) · LSOA</option>
+              <option value="idaopi_decile">IDAOPI decile · LSOA</option>
+              <option value="cyp_education_score">Children and young people sub-domain · LSOA</option>
+              <option value="adult_skills_score">Adult skills sub-domain · LSOA</option>
+              <option value="geo_barriers_score">Geographical barriers sub-domain · LSOA</option>
+              <option value="wider_barriers_score">Wider barriers sub-domain · LSOA</option>
+              <option value="indoors_score">Indoors sub-domain · LSOA</option>
+              <option value="outdoors_score">Outdoors sub-domain · LSOA</option>
+              <option value="iod_ypll">Years of potential life lost · LSOA</option>
+              <option value="iod_cidr">Comparative illness and disability ratio · LSOA</option>
+              <option value="iod_acute_morbidity">Acute morbidity · LSOA</option>
+              <option value="iod_mood_anxiety">Mood and anxiety disorders · LSOA</option>
+              <option value="iod_ks2">Key Stage 2 attainment · LSOA</option>
+              <option value="iod_ks4">Key Stage 4 attainment · LSOA</option>
+              <option value="iod_staying_on">Not staying on after 16 · LSOA</option>
+              <option value="iod_he_entry">Not entering higher education · LSOA</option>
+              <option value="iod_adult_quals">Adults with no or low qualifications · LSOA</option>
+              <option value="iod_english">Adults who cannot speak English well · LSOA</option>
+              <option value="iod_housing_poor">Housing in poor condition · LSOA</option>
+              <option value="iod_no_central_heating">Homes without central heating · LSOA</option>
+              <option value="iod_air_quality">Air quality indicator · LSOA</option>
+              <option value="iod_road_accidents">Road traffic accidents · LSOA</option>
             </optgroup>
             <optgroup label="People and communities">
               <option value="census_population">Resident population · Output area</option>
@@ -5580,6 +5604,41 @@ const OV_CFG = {
   crime_score:                     { lo:"Less deprived", hi:"More deprived", wh:true,  min:-2,   max:2    },
   barriers_score:                  { lo:"Less deprived", hi:"More deprived", wh:true,  min:0,    max:60   },
   environment_score:               { lo:"Less deprived", hi:"More deprived", wh:true,  min:-2,   max:2    },
+  // IoD 2025 beyond the IMD. No ranges typed: the 2025 scales are new (the
+  // income measure changed), so they come from the measured 5th to 95th
+  // percentiles in indicators.js. IDACI and IDAOPI are shares, the
+  // sub-domains are scores, higher meaning more deprived for all of them.
+  idaci_pct:                       { lo:"Less deprived", hi:"More deprived", wh:true },
+  idaopi_pct:                      { lo:"Less deprived", hi:"More deprived", wh:true },
+  idaci_decile:                    { lo:"More deprived", hi:"Less deprived", wh:false, rev:true, min:1, max:10 },
+  idaopi_decile:                   { lo:"More deprived", hi:"Less deprived", wh:false, rev:true, min:1, max:10 },
+  // Not in the picker, like imd_rank. Here so that whatever draws it gets the direction right.
+  idaci_rank:                      { lo:"More deprived", hi:"Less deprived", wh:false, rev:true, min:1, max:33755 },
+  idaopi_rank:                     { lo:"More deprived", hi:"Less deprived", wh:false, rev:true, min:1, max:33755 },
+  cyp_education_score:             { lo:"Less deprived", hi:"More deprived", wh:true },
+  adult_skills_score:              { lo:"Less deprived", hi:"More deprived", wh:true },
+  geo_barriers_score:              { lo:"Less deprived", hi:"More deprived", wh:true },
+  wider_barriers_score:            { lo:"Less deprived", hi:"More deprived", wh:true },
+  indoors_score:                   { lo:"Less deprived", hi:"More deprived", wh:true },
+  outdoors_score:                  { lo:"Less deprived", hi:"More deprived", wh:true },
+  // The measures the domains are built from (File 8). Every one is worse
+  // when higher except the two attainment scores, which are better when
+  // higher; the pipeline checks each against its domain score before it is
+  // kept (iod_parse_file8), so the direction here is the data's.
+  iod_ypll:                        { lo:"Lower", hi:"Higher", wh:true },
+  iod_cidr:                        { lo:"Lower", hi:"Higher", wh:true },
+  iod_acute_morbidity:             { lo:"Lower", hi:"Higher", wh:true },
+  iod_mood_anxiety:                { lo:"Lower", hi:"Higher", wh:true },
+  iod_ks2:                         { lo:"Lower", hi:"Higher", wh:false },
+  iod_ks4:                         { lo:"Lower", hi:"Higher", wh:false },
+  iod_staying_on:                  { lo:"Lower", hi:"Higher", wh:true },
+  iod_he_entry:                    { lo:"Lower", hi:"Higher", wh:true },
+  iod_adult_quals:                 { lo:"Lower", hi:"Higher", wh:true },
+  iod_english:                     { lo:"Lower", hi:"Higher", wh:true },
+  iod_housing_poor:                { lo:"Lower", hi:"Higher", wh:true },
+  iod_no_central_heating:          { lo:"Lower", hi:"Higher", wh:true },
+  iod_air_quality:                 { lo:"Lower", hi:"Higher", wh:true },
+  iod_road_accidents:              { lo:"Lower", hi:"Higher", wh:true },
   // Claimant count (NOMIS CLA01). Rate is claimants per working-age resident.
   claimant_rate_pct:               { lo:"Lower", hi:"Higher", wh:true,  min:1,    max:10   },
   claimant_count:                  { lo:"Fewer", hi:"More",   wh:true,  min:0,    max:300  },
@@ -5854,6 +5913,36 @@ const CATS = [
     { k: "crime_score",                      l: "Crime",                         g: "lsoa" },
     { k: "barriers_score",                   l: "Barriers to housing & services", g: "lsoa" },
     { k: "environment_score",                l: "Living environment",            g: "lsoa" },
+    // IoD 2025 beyond the IMD, published per LSOA (Files 7 and 8) and
+    // weighted onto wards and LAs by the pipeline (iod_area_figures): IDACI
+    // by children aged 0 to 15, IDAOPI by people aged 60 and over, the rest
+    // by residents. Deciles stay LSOA-only, as imd_decile does. The picker
+    // groups them under Deprivation (SUBGROUPS), and a build without their
+    // figures leaves them out (_iodPendingFilter).
+    { k: "idaci_pct",              l: "Income deprivation affecting children (IDACI 2025)", g: "lsoa", lv: ["ward","lsoa"] },
+    { k: "idaci_decile",           l: "Children's income deprivation decile (IDACI 2025)", g: "lsoa" },
+    { k: "idaopi_pct",             l: "Income deprivation affecting older people (IDAOPI 2025)", g: "lsoa", lv: ["ward","lsoa"] },
+    { k: "idaopi_decile",          l: "Older people's income deprivation decile (IDAOPI 2025)", g: "lsoa" },
+    { k: "cyp_education_score",    l: "Children and young people's education", g: "lsoa", lv: ["ward","lsoa"] },
+    { k: "adult_skills_score",     l: "Adult skills", g: "lsoa", lv: ["ward","lsoa"] },
+    { k: "geo_barriers_score",     l: "Geographical barriers to services", g: "lsoa", lv: ["ward","lsoa"] },
+    { k: "wider_barriers_score",   l: "Wider barriers to housing", g: "lsoa", lv: ["ward","lsoa"] },
+    { k: "indoors_score",          l: "Indoor living environment", g: "lsoa", lv: ["ward","lsoa"] },
+    { k: "outdoors_score",         l: "Outdoor living environment", g: "lsoa", lv: ["ward","lsoa"] },
+    { k: "iod_ypll",               l: "Years of life lost to early deaths", g: "lsoa", lv: ["ward","lsoa"] },
+    { k: "iod_cidr",               l: "Illness and disability ratio", g: "lsoa", lv: ["ward","lsoa"] },
+    { k: "iod_acute_morbidity",    l: "Emergency admissions ratio (acute morbidity)", g: "lsoa", lv: ["ward","lsoa"] },
+    { k: "iod_mood_anxiety",       l: "Mood and anxiety disorders", g: "lsoa", lv: ["ward","lsoa"] },
+    { k: "iod_ks2",                l: "Key Stage 2 attainment", g: "lsoa", lv: ["ward","lsoa"] },
+    { k: "iod_ks4",                l: "Key Stage 4 attainment", g: "lsoa", lv: ["ward","lsoa"] },
+    { k: "iod_staying_on",         l: "Young people not staying on after 16", g: "lsoa", lv: ["ward","lsoa"] },
+    { k: "iod_he_entry",           l: "Young people not entering higher education", g: "lsoa", lv: ["ward","lsoa"] },
+    { k: "iod_adult_quals",        l: "Adults with no or low qualifications", g: "lsoa", lv: ["ward","lsoa"] },
+    { k: "iod_english",            l: "Adults who cannot speak English well", g: "lsoa", lv: ["ward","lsoa"] },
+    { k: "iod_housing_poor",       l: "Housing in poor condition", g: "lsoa", lv: ["ward","lsoa"] },
+    { k: "iod_no_central_heating", l: "Homes without central heating", g: "lsoa", lv: ["ward","lsoa"] },
+    { k: "iod_air_quality",        l: "Air quality (deprivation index measure)", g: "lsoa", lv: ["ward","lsoa"] },
+    { k: "iod_road_accidents",     l: "Road traffic accidents", g: "lsoa", lv: ["ward","lsoa"] },
   ]},
   { key: "people", label: "People and communities", ico: "users", fields: [
     { k: "census_non_white_pct",             l: "Non-White (%)",                 g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
@@ -5944,6 +6033,31 @@ const CATS = [
     { k: "crime_misc_society_12mo",          l: "Other crime",      g: "ward" },
   ]}
 ];
+
+/* The IoD 2025 measures beyond the IMD: IDACI and IDAOPI with their deciles
+   and ranks, the six sub-domains (File 7) and the underlying indicators
+   (File 8). Read by the filter that leaves them out of a build without their
+   figures, the card text and the Data export, so one list says which they
+   are. */
+const IOD_FILE7_KEYS = ['idaci_pct', 'idaci_decile', 'idaci_rank', 'idaopi_pct', 'idaopi_decile', 'idaopi_rank',
+  'cyp_education_score', 'adult_skills_score', 'geo_barriers_score', 'wider_barriers_score',
+  'indoors_score', 'outdoors_score'];
+const IOD_FILE8_KEYS = ['iod_ypll', 'iod_cidr', 'iod_acute_morbidity', 'iod_mood_anxiety', 'iod_ks2', 'iod_ks4',
+  'iod_staying_on', 'iod_he_entry', 'iod_adult_quals', 'iod_english', 'iod_housing_poor',
+  'iod_no_central_heating', 'iod_air_quality', 'iod_road_accidents'];
+const IOD_EXTRA_KEYS = new Set(IOD_FILE7_KEYS.concat(IOD_FILE8_KEYS));
+function isIodExtra(k) { return IOD_EXTRA_KEYS.has(k); }
+/* What the ward and LA figures of one are weighted by, in words. IDACI and
+   IDAOPI are weighted by their own File 7 denominators, unless the ward file
+   says the pipeline had none and fell back to residents (iod_weights). */
+const IOD_WEIGHT_WORDS = { children: 'children aged 0 to 15', older: 'people aged 60 and over' };
+function iodWeightWords(k) {
+  let w = {};
+  try { w = (typeof WARD_META === 'object' && WARD_META && WARD_META.iod_weights) || {}; } catch (e) { /* not loaded yet */ }
+  const want = k === 'idaci_pct' ? 'children' : k === 'idaopi_pct' ? 'older' : 'residents';
+  const got = w[k] || want;
+  return IOD_WEIGHT_WORDS[got] || 'residents at the 2021 Census';
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    ONE NAME FOR EACH INDICATOR
@@ -6083,6 +6197,34 @@ const IND_NAMES = {
   crime_score:       ['Crime deprivation', 'Crime domain'],
   barriers_score:    ['Barriers to housing and services', 'Barriers to Housing and Services domain'],
   environment_score: ['Living environment deprivation', 'Living Environment Deprivation domain'],
+  // The supplementary indices and the sub-domains (IoD 2025 File 7)
+  idaci_pct:           ['Income deprivation affecting children (IDACI 2025)', 'Income Deprivation Affecting Children Index (IDACI)'],
+  idaci_decile:        ['Children’s income deprivation decile (IDACI 2025)', 'Income Deprivation Affecting Children Index (IDACI): decile'],
+  idaci_rank:          ['Children’s income deprivation rank (IDACI 2025)', 'Income Deprivation Affecting Children Index (IDACI): rank'],
+  idaopi_pct:          ['Income deprivation affecting older people (IDAOPI 2025)', 'Income Deprivation Affecting Older People Index (IDAOPI)'],
+  idaopi_decile:       ['Older people’s income deprivation decile (IDAOPI 2025)', 'Income Deprivation Affecting Older People Index (IDAOPI): decile'],
+  idaopi_rank:         ['Older people’s income deprivation rank (IDAOPI 2025)', 'Income Deprivation Affecting Older People Index (IDAOPI): rank'],
+  cyp_education_score: ['Children and young people’s education', 'Children and Young People sub-domain of Education, Skills and Training'],
+  adult_skills_score:  ['Adult skills', 'Adult Skills sub-domain of Education, Skills and Training'],
+  geo_barriers_score:  ['Geographical barriers to services', 'Geographical Barriers sub-domain of Barriers to Housing and Services'],
+  wider_barriers_score: ['Wider barriers to housing', 'Wider Barriers sub-domain of Barriers to Housing and Services'],
+  indoors_score:       ['Indoor living environment', 'Indoors sub-domain of the Living Environment'],
+  outdoors_score:      ['Outdoor living environment', 'Outdoors sub-domain of the Living Environment'],
+  // The underlying indicators (IoD 2025 File 8), titled as the technical report names them
+  iod_ypll:               ['Years of life lost to early deaths', 'Years of potential life lost'],
+  iod_cidr:               ['Illness and disability ratio', 'Comparative Illness and Disability Ratio'],
+  iod_acute_morbidity:    ['Emergency admissions ratio (acute morbidity)', 'Acute morbidity'],
+  iod_mood_anxiety:       ['Mood and anxiety disorders', 'Mood and anxiety disorders'],
+  iod_ks2:                ['Key Stage 2 attainment', 'Key Stage 2 attainment'],
+  iod_ks4:                ['Key Stage 4 attainment', 'Key Stage 4 attainment'],
+  iod_staying_on:         ['Young people not staying on after 16', 'Staying on in education post 16'],
+  iod_he_entry:           ['Young people not entering higher education', 'Entry to higher education'],
+  iod_adult_quals:        ['Adults with no or low qualifications', 'Adult skills'],
+  iod_english:            ['Adults who cannot speak English well', 'English language proficiency'],
+  iod_housing_poor:       ['Housing in poor condition', 'Housing in poor condition'],
+  iod_no_central_heating: ['Homes without central heating', 'Houses without central heating'],
+  iod_air_quality:        ['Air quality (deprivation index measure)', 'Air quality'],
+  iod_road_accidents:     ['Road traffic accidents', 'Road traffic accidents'],
   // People and communities, Census 2021
   census_non_white_pct:       ['Ethnic groups other than White', 'Ethnic group: all groups other than White'],
   census_born_outside_uk_pct: ['Born outside the UK', 'Country of birth: born outside the UK'],
@@ -6227,10 +6369,15 @@ const IND_DECIMALS = {};
     'crime_theft_12mo', 'crime_burglary_12mo', 'crime_robbery_12mo', 'crime_vehicle_12mo',
     'crime_drug_offences_12mo', 'crime_public_order_12mo', 'crime_arson_12mo', 'crime_weapons_12mo',
     'crime_misc_society_12mo', 'core20_lsoa_count', 'total_lsoa_count', 'claimant_count',
-    'gb_total_uprn', 'imd_decile', 'imd_rank', 'rail_station_dist_m', 'bus_stop_dist_m'];
+    'gb_total_uprn', 'imd_decile', 'imd_rank', 'rail_station_dist_m', 'bus_stop_dist_m',
+    'idaci_decile', 'idaci_rank', 'idaopi_decile', 'idaopi_rank'];
   // PTAL has one decimal: a second suggests a precision the measure lacks.
+  // The sub-domain scores, the mood and anxiety score and the air quality
+  // and road accident measures run over a few units, so they keep two.
   const two = ['education_score', 'health_score', 'crime_score',
-    'barriers_score', 'environment_score'];
+    'barriers_score', 'environment_score', 'cyp_education_score', 'adult_skills_score',
+    'geo_barriers_score', 'wider_barriers_score', 'indoors_score', 'outdoors_score',
+    'iod_mood_anxiety', 'iod_air_quality', 'iod_road_accidents'];
   Object.keys(IND_NAMES).forEach(k => { IND_DECIMALS[k] = 1; });
   whole.forEach(k => { IND_DECIMALS[k] = 0; });
   two.forEach(k => { IND_DECIMALS[k] = 2; });
@@ -6648,6 +6795,34 @@ const OV_META = {
   barriers_score:                 { src: "MHCLG IMD 2025",       yr: "2025", g: "LSOA", u: "score",  desc: "A score for how hard it is to reach key local services and to find a decent home you can afford, where a higher score means more deprivation." },
   environment_score:              { src: "MHCLG IMD 2025",       yr: "2025", g: "LSOA", u: "score",  desc: "A score for the quality of the local environment indoors and outdoors, covering homes in poor condition or without central heating, air quality and road traffic accidents, where a higher score means more deprivation." },
 
+  // IoD 2025 beyond the IMD: the supplementary indices and sub-domains
+  // (File 7) and the underlying indicators (File 8). The src strings name
+  // which, for the card's source line and the methodology anchor.
+  idaci_pct:            { src: "MHCLG IMD 2025, supplementary indices and sub-domains", yr: "2025", g: "LSOA", u: "%", desc: "The share of children aged 0 to 15 living in families on a low income, counted from income-related benefits and tax credits, where a higher figure means more deprivation. It is part of the income domain, so it moves with income deprivation." },
+  idaci_decile:         { src: "MHCLG IMD 2025, supplementary indices and sub-domains", yr: "2025", g: "LSOA", u: "decile", desc: "Which tenth of England the LSOA falls in when all 33,755 LSOAs are ranked by income deprivation affecting children, where decile 1 is the most deprived tenth and decile 10 the least." },
+  idaopi_pct:           { src: "MHCLG IMD 2025, supplementary indices and sub-domains", yr: "2025", g: "LSOA", u: "%", desc: "The share of people aged 60 and over living on a low income, counted from income-related benefits such as Pension Credit, where a higher figure means more deprivation. It is part of the income domain, so it moves with income deprivation." },
+  idaopi_decile:        { src: "MHCLG IMD 2025, supplementary indices and sub-domains", yr: "2025", g: "LSOA", u: "decile", desc: "Which tenth of England the LSOA falls in when all 33,755 LSOAs are ranked by income deprivation affecting older people, where decile 1 is the most deprived tenth and decile 10 the least." },
+  cyp_education_score:  { src: "MHCLG IMD 2025, supplementary indices and sub-domains", yr: "2025", g: "LSOA", u: "score", desc: "A score for how children and young people living in the area do in education, from their results at school, absence and going on to higher education, where a higher score means more deprivation." },
+  adult_skills_score:   { src: "MHCLG IMD 2025, supplementary indices and sub-domains", yr: "2025", g: "LSOA", u: "score", desc: "A score for adults with no or low qualifications, or who cannot speak English well, where a higher score means more deprivation." },
+  geo_barriers_score:   { src: "MHCLG IMD 2025, supplementary indices and sub-domains", yr: "2025", g: "LSOA", u: "score", desc: "A score for how hard it is to reach everyday services such as shops, schools, GP surgeries and work, including how long the journeys take and how fast broadband is, where a higher score means more deprivation. It measures distance and travel time rather than need, so rural areas score as the most deprived and most of London as the least." },
+  wider_barriers_score: { src: "MHCLG IMD 2025, supplementary indices and sub-domains", yr: "2025", g: "LSOA", u: "score", desc: "A score for access to housing, from how affordable homes are, overcrowding and homelessness, where a higher score means more deprivation. Homelessness is counted for whole LAs, so part of this score is the same across each LA." },
+  indoors_score:        { src: "MHCLG IMD 2025, supplementary indices and sub-domains", yr: "2025", g: "LSOA", u: "score", desc: "A score for the quality of people’s homes, from measures such as homes in poor condition and how energy efficient homes are, where a higher score means more deprivation. Most of it is modelled rather than surveyed home by home." },
+  outdoors_score:       { src: "MHCLG IMD 2025, supplementary indices and sub-domains", yr: "2025", g: "LSOA", u: "score", desc: "A score for the surroundings of people’s homes, from measures such as air quality and road traffic accidents, where a higher score means more deprivation. It overlaps with the map’s own air pollution figures." },
+  iod_ypll:             { src: "MHCLG IMD 2025, underlying indicators", yr: "2025", g: "LSOA", u: "standardised rate", desc: "Early deaths, measured as the years of life lost by people who died before the age of 75, allowing for the ages and sexes of the people living there, where a higher figure means more early deaths." },
+  iod_cidr:             { src: "MHCLG IMD 2025, underlying indicators", yr: "2025", g: "LSOA", u: "ratio, where England is 100", desc: "People receiving benefits because of illness or disability, compared with what England’s rates would predict for an area with the same mix of ages and sexes. A figure of 100 matches England, and a higher figure means more illness and disability." },
+  iod_acute_morbidity:  { src: "MHCLG IMD 2025, underlying indicators", yr: "2025", g: "LSOA", u: "ratio, where England is 100", desc: "Emergency admissions to hospital, compared with what England’s rates would predict for an area with the same mix of ages and sexes. A figure of 100 matches England, and a higher figure means more emergency admissions." },
+  iod_mood_anxiety:     { src: "MHCLG IMD 2025, underlying indicators", yr: "2025", g: "LSOA", u: "score", desc: "A combined score for common mental health problems, built from prescribing, hospital admissions, suicides and health-related benefits, where a higher score means more mental ill health. The prescribing part also reflects how local GP practices work, not only need." },
+  iod_ks2:              { src: "MHCLG IMD 2025, underlying indicators", yr: "2025", g: "LSOA", u: "points", desc: "The average results of pupils living in the area in their Key Stage 2 tests at the end of primary school, where a higher figure means better results." },
+  iod_ks4:              { src: "MHCLG IMD 2025, underlying indicators", yr: "2025", g: "LSOA", u: "points", desc: "The average results of pupils living in the area in their GCSEs and other qualifications at the end of secondary school, where a higher figure means better results." },
+  iod_staying_on:       { src: "MHCLG IMD 2025, underlying indicators", yr: "2025", g: "LSOA", u: "%", desc: "The share of young people who do not stay on in school or further education after the age of 16, where a higher figure means more deprivation." },
+  iod_he_entry:         { src: "MHCLG IMD 2025, underlying indicators", yr: "2025", g: "LSOA", u: "%", desc: "The share of young people under 21 who do not go on to higher education, where a higher figure means more deprivation." },
+  iod_adult_quals:      { src: "MHCLG IMD 2025, underlying indicators", yr: "2025", g: "LSOA", u: "%", desc: "The share of adults aged 25 to 66 with no qualifications or only low ones, from the 2021 Census, where a higher figure means more deprivation." },
+  iod_english:          { src: "MHCLG IMD 2025, underlying indicators", yr: "2025", g: "LSOA", u: "%", desc: "The share of adults aged 25 to 66 who cannot speak English, or cannot speak it well, from the 2021 Census, where a higher figure means more deprivation." },
+  iod_housing_poor:     { src: "MHCLG IMD 2025, underlying indicators", yr: "2025", g: "LSOA", u: "%", desc: "The share of homes estimated to fall below the Decent Homes Standard, modelled from national housing surveys rather than inspected home by home, where a higher figure means more deprivation." },
+  iod_no_central_heating: { src: "MHCLG IMD 2025, underlying indicators", yr: "2025", g: "LSOA", u: "%", desc: "The share of homes without central heating, where a higher figure means more deprivation." },
+  iod_air_quality:      { src: "MHCLG IMD 2025, underlying indicators", yr: "2025", g: "LSOA", u: "score", desc: "A combined measure of several air pollutants, such as nitrogen dioxide and fine particles, modelled for each area, where a higher figure means poorer air. It is separate from the map’s own nitrogen dioxide and particle figures from Defra." },
+  iod_road_accidents:   { src: "MHCLG IMD 2025, underlying indicators", yr: "2025", g: "LSOA", u: "rate", desc: "Road traffic accidents in which pedestrians or cyclists were hurt, as a rate of the people who live and work in the area, where a higher figure means more accidents." },
+
 
 
 
@@ -6933,6 +7108,30 @@ function phPruneEmptyIndicators() {
   document.dispatchEvent(new CustomEvent('ph-indicators-pruned', { detail: { keys: gone } }));
   return gone;
 }
+/* The IoD 2025 measures beyond the IMD (IOD_EXTRA_KEYS) arrive with the
+   first refresh that fetches Files 7 and 8, and a File 8 indicator the
+   release turns out not to carry never arrives. Any of them the loaded
+   build has no figures for comes out of the themes and the select, in
+   London as in the regions, so none is offered as an empty map. Without the
+   measured blob nothing is known, and nothing is removed. */
+(function _iodPendingFilter() {
+  var G = (typeof PH_IND_STATS === 'object' && PH_IND_STATS && PH_IND_STATS.stats)
+    ? PH_IND_STATS.stats : null;
+  if (!G) return;
+  var gone = function (k) { return isIodExtra(k) && !G[k]; };
+  CATS.forEach(function (c) {
+    c.fields = c.fields.filter(function (f) { return !gone(f.k); });
+  });
+  var sel = document.getElementById('ov');
+  if (sel) {
+    Array.prototype.slice.call(sel.querySelectorAll('option')).forEach(function (o) {
+      if (gone(o.value)) o.remove();
+    });
+    Array.prototype.slice.call(sel.querySelectorAll('optgroup')).forEach(function (g) {
+      if (!g.querySelector('option')) g.remove();
+    });
+  }
+})();
 /* One plain-English line per indicator: what the number measures, for the
    indicator picker and library. The fuller technical note stays in OV_META.desc
    and the info panel. */
@@ -7006,6 +7205,30 @@ const OV_PLAIN = {
   crime_score: "Risk of being a victim of crime.",
   barriers_score: "How hard it is to get housing and reach local services.",
   environment_score: "Quality of homes and the local environment, including air quality and road safety.",
+  idaci_pct: "Children aged 0 to 15 living in families on a low income.",
+  idaci_decile: "Which tenth of England the neighbourhood falls in for income deprivation among children. 1 is the most deprived.",
+  idaopi_pct: "People aged 60 and over living on a low income.",
+  idaopi_decile: "Which tenth of England the neighbourhood falls in for income deprivation among older people. 1 is the most deprived.",
+  cyp_education_score: "How children and young people do at school and after it. Higher means more deprived.",
+  adult_skills_score: "Adults with few or no qualifications, or little English. Higher means more deprived.",
+  geo_barriers_score: "How far it is to shops, schools, GPs and work. Higher means more deprived, so rural areas score high.",
+  wider_barriers_score: "How affordable housing is, and overcrowding and homelessness. Higher means more deprived.",
+  indoors_score: "The condition and energy efficiency of homes. Higher means more deprived.",
+  outdoors_score: "Air quality and road safety around homes. Higher means more deprived.",
+  iod_ypll: "Years of life lost through deaths before 75, allowing for age. Higher means more early deaths.",
+  iod_cidr: "People on illness or disability benefits, compared with England, where 100 is England’s level for the same ages.",
+  iod_acute_morbidity: "Emergency hospital admissions, compared with England, where 100 is England’s level for the same ages.",
+  iod_mood_anxiety: "A combined score for common mental health problems. Higher means more.",
+  iod_ks2: "Average results at the end of primary school. Higher means better results.",
+  iod_ks4: "Average GCSE results at the end of secondary school. Higher means better results.",
+  iod_staying_on: "Young people who leave education at 16.",
+  iod_he_entry: "Young people under 21 who do not go on to university or college.",
+  iod_adult_quals: "Adults aged 25 to 66 with no or low qualifications.",
+  iod_english: "Adults aged 25 to 66 who cannot speak English well.",
+  iod_housing_poor: "Homes estimated to fall below the Decent Homes Standard.",
+  iod_no_central_heating: "Homes without central heating.",
+  iod_air_quality: "A combined score for air pollution. Higher means poorer air.",
+  iod_road_accidents: "Road accidents that hurt pedestrians or cyclists, as a rate. Higher means more.",
   census_population: "Number of people living in the area on Census day 2021.",
   census_non_white_pct: "People from an ethnic group other than White.",
   census_born_outside_uk_pct: "People born outside the UK.",
@@ -7565,7 +7788,10 @@ function wardIsSmall(rec) {
 // The overall deprivation score and its seven domains, where a higher
 // score means more deprivation.
 const IMD_SCORE_KEYS = ['imd_score', 'imd_score_ward', 'income_score', 'employment_score', 'education_score',
-  'health_score', 'crime_score', 'barriers_score', 'environment_score'];
+  'health_score', 'crime_score', 'barriers_score', 'environment_score',
+  // and the two supplementary indices and six sub-domains, which count up too
+  'idaci_pct', 'idaopi_pct', 'cyp_education_score', 'adult_skills_score', 'geo_barriers_score',
+  'wider_barriers_score', 'indoors_score', 'outdoors_score'];
 function ovContext(level, k, v, rec) {
   const n = parseFloat(v);
   if (isNaN(n) || typeof _bivIds !== 'function') return '';
@@ -7867,6 +8093,34 @@ function indicatorFacts(k) {
         : 'Working-age residents kept out of work by unemployment, sickness, disability or caring';
       f.den = k === 'income_score' ? 'All residents' : 'All residents of working age';
       f.method = 'Unlike the other domains this one is a rate, the number of people deprived in this way divided by the population, so it is shown as a percentage. MHCLG publishes it as a proportion from 0 to 1.';
+    } else if (k === 'idaci_pct' || k === 'idaopi_pct') {
+      const kids = k === 'idaci_pct';
+      const ww = iodWeightWords(k);
+      f.num = kids ? 'Children aged 0 to 15 living in families on income-related benefits or tax credits'
+        : 'People aged 60 and over on income-related benefits, such as Pension Credit';
+      f.den = kids ? 'All children aged 0 to 15' : 'All people aged 60 and over';
+      f.method = 'This is a rate, the people affected divided by everyone of that age, shown as a percentage. MHCLG publishes it as a proportion from 0 to 1. ' +
+        'It is part of the income domain, so it overlaps with income deprivation. ' +
+        (/^residents/.test(ww)
+          ? 'Ward and LA figures are averages of their LSOAs weighted by ' + ww + ', because this build had no counts of ' + (kids ? 'children' : 'older people') + ' from MHCLG. '
+          : 'Ward and LA figures are averages of their LSOAs weighted by the ' + ww + ' MHCLG counted in each, so each is the share of the area’s ' + (kids ? 'children' : 'people aged 60 and over') + '. ') +
+        'MHCLG changed how income deprivation is measured for 2025, so these figures should not be compared with the 2019 edition.';
+    } else if (k === 'idaci_decile' || k === 'idaopi_decile' || k === 'idaci_rank' || k === 'idaopi_rank') {
+      f.method = 'The rank and the decile come from the rate, so they show where an LSOA stands in England rather than how far apart two LSOAs are. They are published for LSOAs only, because an average of ranks or deciles is not a rank or a decile.';
+    } else if (IOD_FILE7_KEYS.indexOf(k) !== -1) {
+      f.method = 'MHCLG combines several indicators into each sub-domain score, and two sub-domains into each of these domains, so a score is not a count or a rate and is best used to compare one area with another. ' +
+        'Ward and LA figures are averages of their LSOAs, weighted by ' + iodWeightWords(k) + '.';
+    } else if (IOD_FILE8_KEYS.indexOf(k) !== -1) {
+      const share = indUnit(k) === '%';
+      if (share) {
+        f.num = IND_NAMES[k] ? IND_NAMES[k][0] : '';
+        f.den = /^iod_(adult_quals|english)$/.test(k) ? 'All adults aged 25 to 66'
+          : /^iod_(staying_on|he_entry)$/.test(k) ? 'All young people of that age' : 'All homes';
+      }
+      f.method = 'This is one of the indicators MHCLG builds the deprivation domains from. ' +
+        'For several of them MHCLG pulls a small area’s figure towards that of the wider area around it, so a few people cannot swing it, which also softens the highest and lowest figures. ' +
+        'The years each one covers differ, and some include the pandemic. ' +
+        'Ward and LA figures are averages of their LSOAs, weighted by ' + iodWeightWords(k) + '.';
     } else {
       f.method = 'MHCLG combines several indicators into this score, so it is not a count or a rate and is best used to compare one area with another.';
     }
@@ -7923,6 +8177,15 @@ function _publishedAt(k, nat, lv) {
   // before it: wards from MSOAs, then LAs from wards.
   lv.slice().sort((a, b) => LADDER.indexOf(b) - LADDER.indexOf(a)).forEach(l => {
     if (l === nat) return;
+    // The IoD 2025 measures beyond the IMD are weighted up from their LSOAs
+    // by the pipeline, an LA's from all of its LSOAs (iod_area_figures).
+    if (isIodExtra(k) && (l === 'ward' || l === 'borough')) {
+      const w = iodWeightWords(k);
+      out.push((l === 'ward' ? 'Ward figures are an average of the LSOAs in each ward'
+        : 'LA figures are an average of all the LSOAs in each LA') +
+        ', weighted by ' + (/^residents/.test(w) ? w : 'their ' + w) + '.');
+      return;
+    }
     const fromLsoas = nat === 'oa' && censusWardCounts() && censusWardsFromLsoas(k);
     if (l === 'borough' && fromLsoas && censusLaCounts()) {
       out.push('LA figures are calculated in the same way, from the LSOAs in each LA.');
@@ -7968,6 +8231,8 @@ function _cardSource(k) {
   if (/^ft_/.test(k)) return 'OHID, Fingertips';
   if (k === 'crime_rate_per_1000') return 'data.police.uk, with residents from the 2021 Census';
   if (/police/i.test(src)) return 'data.police.uk';
+  if (/underlying indicators/.test(src)) return 'MHCLG, English Indices of Deprivation 2025, underlying indicators';
+  if (/supplementary indices/.test(src)) return 'MHCLG, English Indices of Deprivation 2025, supplementary indices and sub-domains';
   if (/IMD|Core20/.test(src)) return 'MHCLG, English Indices of Deprivation 2025';
   if (/NOMIS CLA01/.test(src)) return 'ONS, claimant count, from Nomis';
   if (/DESNZ/.test(src)) return 'DESNZ, sub-regional fuel poverty statistics';
@@ -7985,6 +8250,8 @@ function _methAnchor(k) {
   if (k === 'core20_lsoa_count') return 'src-core20';
   const s = _cardSource(k) || '';
   if (/^ONS, Census/.test(s) || /Census 2021/.test(s) && !/police/.test(s)) return 'src-census';
+  if (/underlying indicators/.test(s)) return 'src-iod-indicators';
+  if (/supplementary indices/.test(s)) return 'src-iod-extra';
   if (/^MHCLG/.test(s)) return 'src-imd';
   if (/Local Health/.test(s)) return 'src-local-health';
   if (/^OHID, Fingertips/.test(s)) return 'src-fingertips';
@@ -8001,6 +8268,8 @@ function _cardUnit(k) {
   if (typeof ovIsStdRatio === 'function' && ovIsStdRatio(k)) return 'ratio, where England is 100';
   if (k === 'income_score') return '% of residents';
   if (k === 'employment_score') return '% of working-age residents';
+  if (k === 'idaci_pct') return '% of children aged 0 to 15';
+  if (k === 'idaopi_pct') return '% of people aged 60 and over';
   return indUnit(k);
 }
 /* Each acronym is spelled out the first time a card uses it, and only then.
@@ -11224,7 +11493,8 @@ function showWard(wn) {
     }
     // The period, unless the section's caption already gives it (the Census,
     // the IMD and the crime year).
-    const per = /^(census_|crime_|imd_|core20_|total_lsoa)/.test(f.k) ? '' : periodWords(monthWords(ovPeriodOf(f.k)));
+    const per = /^(census_|crime_|imd_|core20_|total_lsoa)/.test(f.k) || isIodExtra(f.k) ? ''
+      : periodWords(monthWords(ovPeriodOf(f.k)));
     // A district's figure that is its county's says so (see laFigCounty).
     // An MSOA estimate sits under "OHID estimates for this ward", which already
     // says so, and a count from LSOAs is added up rather than estimated.
@@ -14216,7 +14486,7 @@ function _fitFocus(bounds) {
     'Health':                   ['#AE2573', 'How people rate their own health, disability and care, and children\'s weight.'],
     'Life expectancy and deaths': ['#6B2C91', 'How long people live and what they die of, compared with England.'],
     'Hospital admissions':      ['#C2185B', 'Emergency and injury admissions to hospital, compared with England.'],
-    'Deprivation':              ['#003087', 'The Index of Multiple Deprivation 2025 and its domains. Decile 1 is the most deprived tenth of areas in England.'],
+    'Deprivation':              ['#003087', 'The Index of Multiple Deprivation 2025, its domains and sub-domains, income deprivation among children and older people, and the measures the index is built from. Decile 1 is the most deprived tenth of areas in England.'],
     'People and communities':   ['#7C2855', 'Age, ethnicity, country of birth, language and who people live with, from Census 2021.'],
     'Work, money and education': ['#00703C', 'Jobs, benefits and qualifications.'],
     'Housing':                  ['#8A6400', 'Who owns and who rents, and how crowded homes are, from Census 2021.'],
@@ -14241,6 +14511,17 @@ function _fitFocus(bounds) {
       ['Alcohol', /alcohol/],
       ['All ages', /admission/],
     ],
+    // Matched on the key, which leads the text matched. The IMD and its
+    // domains first, as before; then the IoD 2025 measures beyond them, so
+    // 24 more rows arrive as four short lists rather than one long one.
+    'Deprivation': [
+      ['The index and its domains', /^(imd_|core20_|(income|employment|education|health|crime|barriers|environment)_score )/],
+      ['Children and older people', /^(idaci|idaopi)_/],
+      ['Sub-domains', /^(cyp_education|adult_skills|geo_barriers|wider_barriers|indoors|outdoors)_score /],
+      ['Health measures behind the index', /^iod_(ypll|cidr|acute_morbidity|mood_anxiety) /],
+      ['Education measures behind the index', /^iod_(ks2|ks4|staying_on|he_entry|adult_quals|english) /],
+      ['Living environment measures behind the index', /^iod_(housing_poor|no_central_heating|air_quality|road_accidents) /],
+    ],
   };
   function subgroupsOf(g) {
     const rules = SUBGROUPS[g.label];
@@ -14252,7 +14533,10 @@ function _fitFocus(bounds) {
       const i = rules.findIndex(r => r[1].test(text));
       (i === -1 ? other : out[i]).opts.push(o);
     });
-    return out.concat(other).filter(x => x.opts.length);
+    const groups = out.concat(other).filter(x => x.opts.length);
+    // Deprivation in a build without the IoD 2025 extras is the index and
+    // its domains alone, which needs no heading of its own.
+    return g.label === 'Deprivation' && groups.length === 1 ? [{ name: '', opts: groups[0].opts }] : groups;
   }
   // Each theme's icon, from the same set as the Area profile's sections, so
   // a theme looks the same in both places. These replace the coloured dots,
@@ -14390,7 +14674,12 @@ function _fitFocus(bounds) {
     pollution: ['nitrogen dioxide', 'particles'], air: ['nitrogen dioxide', 'particles'],
     unemployment: ['claimant', 'out-of-work'], unemployed: ['claimant', 'out-of-work', 'unemployment'],
     jobless: ['claimant', 'out-of-work', 'unemployment'], benefits: ['claimant', 'out-of-work'],
-    elderly: ['65 and over', '85 and over'], older: ['65 and over', '85 and over'], pensioners: ['65 and over'],
+    elderly: ['65 and over', '85 and over', 'older people'], older: ['65 and over', '85 and over', 'older people'],
+    pensioners: ['65 and over', 'older people'],
+    gcse: ['key stage 4'], gcses: ['key stage 4'], sats: ['key stage 2'], exams: ['key stage'], attainment: ['key stage'],
+    university: ['higher education'], college: ['higher education', 'staying on'],
+    heating: ['central heating', 'fuel poverty'], damp: ['poor condition'], accidents: ['road traffic'],
+    road: ['road traffic'], anxiety: ['mood and anxiety'], idaci: ['affecting children'], idaopi: ['affecting older'],
     children: ['under 16', 'under 15', 'under 5', 'reception', 'year 6', 'child'], kids: ['under 16', 'under 15', 'under 5', 'reception', 'year 6', 'child'],
     babies: ['under 5', 'fertility'], births: ['fertility'], young: ['under 16', 'under 15', '15 to 24', '10 to 24'],
     obesity: ['obes', 'overweight'], overweight: ['obes', 'overweight'], weight: ['obes', 'overweight'],
@@ -14404,9 +14693,11 @@ function _fitFocus(bounds) {
     mortality: ['deaths'], death: ['deaths'], dying: ['deaths'], lifespan: ['life expectancy'],
     heart: ['cardiovascular', 'coronary', 'heart attack'], cardiac: ['cardiovascular', 'coronary', 'heart attack'],
     'a&e': ['emergency admissions', 'a&e'], hospital: ['admissions'],
-    mental: ['self-harm', 'mental illness', 'depression', 'suicide'], depression: ['depression', 'self-harm'],
+    mental: ['self-harm', 'mental illness', 'depression', 'suicide', 'mood and anxiety'],
+    depression: ['depression', 'self-harm', 'mood and anxiety'],
     drinking: ['alcohol'], drink: ['alcohol'], carers: ['unpaid care'], caring: ['unpaid care'],
-    disabled: ['disab'], disability: ['disab'], education: ['qualifications'], school: ['qualifications', 'reception', 'year 6'],
+    disabled: ['disab'], disability: ['disab'], education: ['qualifications', 'key stage', 'higher education'],
+    school: ['qualifications', 'reception', 'year 6', 'key stage'],
     burglaries: ['burglary'], knife: ['weapons'], knives: ['weapons'], guns: ['weapons'], drugs: ['drug'],
     antisocial: ['anti-social'], asb: ['anti-social'], vaccination: ['vaccination', 'mmr'], vaccines: ['vaccination', 'mmr'], jabs: ['vaccination', 'mmr'],
     exercise: ['physically active'], activity: ['physically active'], 'blood pressure': ['blood pressure'],
@@ -15629,6 +15920,7 @@ function showLSOA(feat) {
   let ageLsoaBlock = '';
   let envLsoaBlock = '';
   let gbLsoaBlock  = '';
+  let iodLsoaRows  = '';
   if (d) {
     const inds = d.indicators || d;
     // Each row is named from IND_NAMES and carries its unit on the figure.
@@ -15638,6 +15930,14 @@ function showLSOA(feat) {
       if (val == null) return '';
       return `<div class="sr"><span class="sl">${_esc(indLabel(k))}</span><span class="sv">${fmtNum(val, indDecimalsAt(k, 'lsoa'))}${indValueUnit(k)}</span></div>`;
     };
+    // Income deprivation among children and older people (IDACI, IDAOPI),
+    // with each one's national decile, where this build carries them.
+    iodLsoaRows = ['idaci_pct', 'idaopi_pct'].map(k => {
+      const val = inds[k];
+      if (val == null) return '';
+      const dec = inds[k.replace(/_pct$/, '_decile')];
+      return `<div class="sr"><span class="sl">${_esc(indLabel(k))}${dec != null ? `<span class="sr-meta">Decile ${_esc(dec)} of 10, where 1 is the most deprived</span>` : ''}</span><span class="sv">${fmtNum(val, indDecimalsAt(k, 'lsoa'))}${indValueUnit(k)}</span></div>`;
+    }).join('');
 
     // General census block (excludes ethnicity/age/environment — those get
     // their own blocks with stacked bars below).
@@ -15717,6 +16017,7 @@ function showLSOA(feat) {
       <div class="cat-body open" id="pl-imd">
         <div class="sr"><span class="sl">${indLabel('imd_decile')}${band ? `<span class="sr-meta">${band}</span>` : ''}</span><span class="sv" title="Decile 1 is the most deprived tenth of England and 10 the least deprived">${decile ? decile + ' of 10' : 'No figure'}</span></div>
         <div class="sr"><span class="sl">${indLabel('imd_rank')}<span class="sr-meta">Where 1 is the most deprived in England</span></span><span class="sv">${rank ? rank + ' of 33,755' : 'No figure'}</span></div>
+        ${iodLsoaRows}
       </div>
     </div>
     ${censusRows ? `<div class="cat-block">
@@ -24928,7 +25229,9 @@ var PH_SHOW = {
   // the rank of anything, so it is left out rather than averaged into a number
   // that would look like one. gb_total_uprn is the count of addresses behind
   // the green space shares, a working figure rather than one to report.
-  var RB_SKIP = { imd_rank: 1, gb_total_uprn: 1 };
+  // The IDACI and IDAOPI ranks and deciles are left out for the same reason:
+  // the area's IDACI and IDAOPI themselves are averaged instead.
+  var RB_SKIP = { imd_rank: 1, gb_total_uprn: 1, idaci_rank: 1, idaci_decile: 1, idaopi_rank: 1, idaopi_decile: 1 };
   // An average of LSOA deciles is not itself a decile, so it is reported
   // under the ward's name for the same thing, to one decimal place.
   var RB_RENAME = { imd_decile: 'imd_decile_mean' };
@@ -25668,7 +25971,7 @@ var PH_SHOW = {
     if (/^(ptal_|rail_|bus_)|^census_(no_car|active_travel|public_transport|car_to_work)_/.test(k)) return 'Transport';
     if (/^(fuel_|gb_|green_|blue_|no2_|pm25_|pm10_)/.test(k)) return 'Environment and access';
     if (/^census_(owned|social_rented|private_rented|overcrowded|underoccupied)_/.test(k)) return 'Housing';
-    if (/^(imd_|core20_|total_lsoa|census_hh_deprived_)|_score$/.test(k)) return 'Deprivation';
+    if (/^(imd_|core20_|total_lsoa|census_hh_deprived_|idaci_|idaopi_|iod_)|_score$/.test(k)) return 'Deprivation';
     if (/^crime/.test(k)) return 'Crime and safety';
     if (/^claimant|^census_(unemployed|higher_managerial|routine|level4|no_qual|never_worked|inactive_ltsick)/.test(k)) return 'Work, money and education';
     if (/^census_(good_health|bad_health|disability|provides_unpaid|unpaid_care)/.test(k)) return 'Health';
@@ -25702,6 +26005,10 @@ var PH_SHOW = {
       desc: 'The homes (residential addresses) Defra counted in the LSOA, from which its green and blue space shares are calculated.' },
     imd_rank: { from: 'imd_score', u: '', nat: 'lsoa',
       desc: 'Where the LSOA ranks among all 33,755 in England for deprivation, where 1 is the most deprived.' },
+    idaci_rank: { from: 'idaci_pct', u: '', nat: 'lsoa',
+      desc: 'Where the LSOA ranks among all 33,755 in England for income deprivation affecting children, where 1 is the most deprived.' },
+    idaopi_rank: { from: 'idaopi_pct', u: '', nat: 'lsoa',
+      desc: 'Where the LSOA ranks among all 33,755 in England for income deprivation affecting older people, where 1 is the most deprived.' },
     total_lsoa_count: { src: '', yr: '', u: 'LSOAs',
       desc: 'The LSOAs that best fit the ward under the ONS lookup.' },
   };
@@ -26106,6 +26413,8 @@ var PH_SHOW = {
     if (k === 'crime_rate_per_1000') return 'Police recorded crime from data.police.uk, with residents from the Office for National Statistics (ONS) Census 2021';
     if (/police/i.test(src)) return 'Police recorded crime and anti-social behaviour from data.police.uk';
     if (k === 'core20_lsoa_count') return 'NHS England’s Core20PLUS5 definition, applied to the English Indices of Deprivation 2025 from the Ministry of Housing, Communities and Local Government (MHCLG)';
+    if (/underlying indicators/.test(src)) return 'Ministry of Housing, Communities and Local Government (MHCLG), English Indices of Deprivation 2025, underlying indicators';
+    if (/supplementary indices/.test(src)) return 'Ministry of Housing, Communities and Local Government (MHCLG), English Indices of Deprivation 2025, supplementary indices and sub-domains';
     if (/IMD/.test(src)) return 'Ministry of Housing, Communities and Local Government (MHCLG), English Indices of Deprivation 2025';
     if (/CLA01/.test(src)) return 'Claimant count from the Office for National Statistics (ONS), published on Nomis (dataset CLA01)';
     if (/DESNZ/.test(src)) return 'Department for Energy Security and Net Zero (DESNZ), sub-regional fuel poverty statistics (Low Income Low Energy Efficiency)';
@@ -26176,7 +26485,9 @@ var PH_SHOW = {
         : 'This is published for each LSOA';
       return first + '.' + (L === 'ward'
         ? ' Each ward figure ' + (cbSums(k) ? 'is the sum of'
-            : /DESNZ/.test(src) ? 'is an average, weighted by households, of' : 'is an average, weighted by population, of') +
+            : /DESNZ/.test(src) ? 'is an average, weighted by households, of'
+            : isIodExtra(k) ? 'is an average, weighted by ' + iodWeightWords(k) + ', of'
+            : 'is an average, weighted by population, of') +
           ' the LSOAs that best fit the ward under the ONS lookup.'
         : '');
     }

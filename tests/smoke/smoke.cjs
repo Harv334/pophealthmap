@@ -1468,7 +1468,7 @@ const smallText = page => page.evaluate(() => {
       'the routine and semi-routine figure is offered only once indicators.js says it counts NS-SEC L12 and L13 alone', String(nw.routineOk));
     ok(/^Search \d+ indicators$/.test(a.count) && +a.count.match(/\d+/)[0] === a.picker.length,
       'no empty indicators: the picker counts what it offers', a.count + ' / ' + a.picker.length);
-    ok(a.askSize < 16 * 1024, 'no empty indicators: Ask\'s indicator list still fits in one tool result', String(a.askSize));
+    ok(a.askSize < 15000, 'no empty indicators: Ask\'s indicator list still fits in one tool result', String(a.askSize));
     ok(errors.length === 0, 'no page errors (no empty indicators)', errors.join(' | '));
     await page.close();
   }
@@ -3026,8 +3026,10 @@ const smallText = page => page.evaluate(() => {
     ok(profiles.every(p => p.text === 'Done with the figures.') && !bad.length && maxSize < 64 * 1024,
       'Ask: a long session of profile lookups stays under the Worker\'s 64 KB limit and every request is accepted (H18)',
       JSON.stringify({ maxSize, bad, last: profiles[profiles.length - 1].text }));
-    ok(await page.evaluate(() => JSON.stringify(PH_ASSISTANT.runTool('list_indicators', {})).length) < 16 * 1024,
-      'Ask: the indicator list fits in one tool result (under 16 KB)');
+    // The answer loop replaces any result over 15,000 characters (RESULT_BYTES)
+    // with an error, so that is the limit that matters, not the Worker's 16 KB.
+    ok(await page.evaluate(() => JSON.stringify(PH_ASSISTANT.runTool('list_indicators', {})).length) < 15000,
+      'Ask: the indicator list fits in one tool result (under the 15,000 character cap)');
     force413 = true;
     const big = await ask('one more');
     const after = await ask('again');
@@ -3227,7 +3229,7 @@ const smallText = page => page.evaluate(() => {
     ok(askNE.toggle && askNE.panel && askNE.sheetAsk && askNE.available, 'region: the North East map has the Ask button, its panel and Ask about this ward', JSON.stringify(askNE));
     const neEmpty = await emptyIndicatorAudit(page);
     ok(!neEmpty.emptyOffered.length && !neEmpty.removedHad.length &&
-       DERIVED_KEYS.every(k => neEmpty.cats.includes(k) && neEmpty.opts.includes(k)) && neEmpty.askSize < 16 * 1024,
+       DERIVED_KEYS.every(k => neEmpty.cats.includes(k) && neEmpty.opts.includes(k)) && neEmpty.askSize < 15000,
       'region: no empty indicators in the North East, and the ones worked out from its ward file are kept',
       JSON.stringify({ emptyOffered: neEmpty.emptyOffered, removedHad: neEmpty.removedHad,
         derived: DERIVED_KEYS.filter(k => !neEmpty.cats.includes(k)), askSize: neEmpty.askSize }));
@@ -4736,9 +4738,12 @@ const smallText = page => page.evaluate(() => {
         out.oaFailed = (await R('rank_areas', { indicator: 'census_population', direction: 'highest', n: 3, level: 'oa', within_la: 'Barking and Dagenham' })).error || '';
       }
       const li = PH_ASSISTANT.runTool('list_indicators', {});
-      const at = k => { const g = (li.groups || []).find(g => g.indicators.some(r => r.key === k)); return g ? g.levels.join(',') : ''; };
+      // Rows are values in the order of li.columns.
+      const ci = c => (li.columns || []).indexOf(c);
+      const has = (g, f) => (g.rows || []).some(f);
+      const at = k => { const g = (li.groups || []).find(g => has(g, r => r[ci('key')] === k)); return g ? g.levels.join(',') : ''; };
       out.list = { size: JSON.stringify(li).length, over65: at('census_over65_pct'), decile: at('imd_decile'), mean: at('imd_decile_mean'),
-        laOnly: [...new Set((li.groups || []).filter(g => g.indicators.some(r => r.la_only)).map(g => g.levels.join(',')))].join('|'), withheld: JSON.stringify(li).indexOf('"' + (PH_ASSISTANT.isWithheld('ft_smoking_prevalence_adults') ? 'ft_smoking_prevalence_adults' : 'none') + '"') };
+        laOnly: [...new Set((li.groups || []).filter(g => has(g, r => r[ci('la_only')] === true)).map(g => g.levels.join(',')))].join('|'), withheld: JSON.stringify(li).indexOf('"' + (PH_ASSISTANT.isWithheld('ft_smoking_prevalence_adults') ? 'ft_smoking_prevalence_adults' : 'none') + '"') };
       return out;
     }, HAS_OA);
     ok(A.wardSync, 'Ask levels: ward lookups still answer at once, not with a promise');
@@ -4755,11 +4760,168 @@ const smallText = page => page.evaluate(() => {
       ok(A.oaGet && /within_la or within_ward/.test(A.oaNoPlace), 'Ask levels: an output area by code within an LA, and a plain error without one', A.oaNoPlace);
       ok(/could not be loaded/.test(A.oaFailed), 'Ask levels: a file that will not load is a clear tool error', A.oaFailed);
     }
-    ok(A.list.size < 16 * 1024 && A.list.over65 === 'la,ward,msoa,lsoa' + (HAS_OA ? ',oa' : '') && A.list.decile === 'lsoa' &&
+    // 15,000 characters is the cap the answer loop puts on any one tool
+    // result (RESULT_BYTES in assistant.js), under the Worker's 16 KB.
+    ok(A.list.size < 15000 && A.list.over65 === 'la,ward,msoa,lsoa' + (HAS_OA ? ',oa' : '') && A.list.decile === 'lsoa' &&
        A.list.mean === 'la,ward' && A.list.laOnly === 'la,ward' && A.list.withheld === -1,
-      'Ask levels: list_indicators says where each indicator is, and stays under 16 KB', JSON.stringify(A.list));
+      'Ask levels: list_indicators says where each indicator is, and stays under the 15,000 character tool result cap', JSON.stringify(A.list));
     ok(!errors.length, 'no page errors (Ask levels)', errors.join(' | '));
     await page.close();
+  }
+
+  // The IoD 2025 measures beyond the IMD: IDACI and IDAOPI, the six
+  // sub-domains and the underlying indicators. Their figures arrive with a
+  // data refresh, so the page is checked twice: as shipped, where a build
+  // without them must not offer them, and with figures put into the files it
+  // reads, the way a refresh will write them (fetch_all_data.py, SOURCE 3a).
+  {
+    const KEYS = ['idaci_pct', 'idaci_decile', 'idaci_rank', 'idaopi_pct', 'idaopi_decile', 'idaopi_rank',
+      'cyp_education_score', 'adult_skills_score', 'geo_barriers_score', 'wider_barriers_score', 'indoors_score',
+      'outdoors_score', 'iod_ypll', 'iod_cidr', 'iod_acute_morbidity', 'iod_mood_anxiety', 'iod_ks2', 'iod_ks4',
+      'iod_staying_on', 'iod_he_entry', 'iod_adult_quals', 'iod_english', 'iod_housing_poor', 'iod_no_central_heating',
+      'iod_air_quality', 'iod_road_accidents'];
+    const LSOA_ONLY = ['idaci_decile', 'idaci_rank', 'idaopi_decile', 'idaopi_rank'];
+    const fake = (k, i) => {
+      const x = (i * 37 % 100) / 100;
+      if (/_decile$/.test(k)) return 1 + (i % 10);
+      if (/_rank$/.test(k)) return 1 + (i * 97 % 33755);
+      if (/_pct$/.test(k)) return Math.round((5 + 40 * x) * 10) / 10;
+      if (/_score$/.test(k)) return Math.round((-1.5 + 3 * x) * 100) / 100;
+      if (k === 'iod_cidr' || k === 'iod_acute_morbidity') return Math.round((70 + 60 * x) * 10) / 10;
+      return Math.round((1 + 30 * x) * 100) / 100;
+    };
+    const readJson = f => JSON.parse(fs.readFileSync(path.join(ROOT, f), 'utf8'));
+    const inject = async page => {
+      await page.route('**/data/map/indicators.js*', r => {
+        const t = fs.readFileSync(path.join(ROOT, 'data/map/indicators.js'), 'utf8');
+        const at = t.indexOf('var PH_IND_STATS = ');
+        const doc = JSON.parse(t.slice(at + 19, t.lastIndexOf(';')));
+        KEYS.forEach(k => {
+          const st = { n: 600, d: 500, p5: fake(k, 3), p95: fake(k, 80) };
+          doc.stats[k] = { lv: LSOA_ONLY.indexOf(k) === -1 ? { lsoa: st, ward: st, borough: st } : { lsoa: st } };
+        });
+        r.fulfill({ contentType: 'application/javascript', body: t.slice(0, at) + 'var PH_IND_STATS = ' + JSON.stringify(doc) + ';\n' });
+      });
+      for (const f of ['data/ward_core.json', 'ward_data.json']) {
+        await page.route('**/' + f + '*', r => {
+          const doc = readJson(f);
+          Object.keys(doc.wards || {}).forEach((wd, i) => {
+            const ind = doc.wards[wd].indicators = doc.wards[wd].indicators || {};
+            KEYS.filter(k => LSOA_ONLY.indexOf(k) === -1).forEach(k => { ind[k] = fake(k, i); });
+          });
+          if (doc.metadata) doc.metadata.iod_weights = { idaci_pct: 'children', idaopi_pct: 'older' };
+          r.fulfill({ contentType: 'application/json', body: JSON.stringify(doc) });
+        });
+      }
+      await page.route('**/lsoa_data.json*', r => {
+        const doc = readJson('lsoa_data.json');
+        Object.keys(doc).forEach((c, i) => { KEYS.forEach(k => { doc[c][k] = fake(k, i); }); });
+        r.fulfill({ contentType: 'application/json', body: JSON.stringify(doc) });
+      });
+      await page.route('**/borough_data.json*', r => {
+        const doc = readJson('borough_data.json');
+        Object.keys(doc).forEach((c, i) => {
+          KEYS.filter(k => LSOA_ONLY.indexOf(k) === -1).forEach(k => { (doc[c].indicators || doc[c])[k] = fake(k, i + 5); });
+        });
+        r.fulfill({ contentType: 'application/json', body: JSON.stringify(doc) });
+      });
+    };
+    const subHeads = page => page.evaluate(async () => {
+      const b = [...document.querySelectorAll('.ov-theme')].find(x => /Deprivation/.test(x.textContent));
+      if (!b) return null;
+      b.click();
+      await new Promise(r => setTimeout(r, 600));
+      return [...document.querySelectorAll('#ov-tv-list .ov-tv-sub')].map(e => e.textContent);
+    });
+
+    // As shipped: no figures for them, so none is offered, and Deprivation
+    // looks as it did.
+    {
+      const { page, errors } = await open(browser, 'index.html?t=1', DESK);
+      const r = await page.evaluate(keys => ({
+        cats: CATS.flatMap(c => c.fields.map(f => f.k)).filter(k => keys.indexOf(k) !== -1),
+        opts: [...document.querySelectorAll('#ov option')].map(o => o.value).filter(k => keys.indexOf(k) !== -1),
+        dep: ((window.PH_THEMES || []).find(t => t.label === 'Deprivation') || { keys: [] }).keys.filter(k => keys.indexOf(k) !== -1).length,
+        listed: JSON.stringify(PH_ASSISTANT.runTool('list_indicators', {})).indexOf('idaci'),
+        meta: keys.filter(k => !/_rank$/.test(k) && !(OV_META[k] && OV_CFG[k] && IND_NAMES[k])),
+      }), KEYS);
+      const subs = await subHeads(page);
+      ok(!r.cats.length && !r.opts.length && !r.dep && r.listed === -1,
+        'IoD 2025 extras: a build without their figures does not offer them, and Ask does not list them', JSON.stringify(r));
+      ok(!r.meta.length, 'IoD 2025 extras: each has its label, colour direction and card', r.meta.join(', '));
+      ok(Array.isArray(subs) && subs.length === 0, 'IoD 2025 extras: without them, Deprivation has no sub-headings', JSON.stringify(subs));
+      ok(!errors.length, 'no page errors (IoD 2025 extras, as shipped)', errors.join(' | '));
+      await page.close();
+    }
+
+    // With figures, as a refresh will write them.
+    {
+      const page = await browser.newPage({ viewport: { width: DESK.width, height: DESK.height } });
+      const errors = [];
+      page.on('pageerror', e => errors.push(e.message));
+      await inject(page);
+      await page.goto(BASE + '/index.html?t=1');
+      await page.waitForTimeout(SETTLE);
+      const r = await page.evaluate(keys => {
+        const li = PH_ASSISTANT.runTool('list_indicators', {});
+        const ci = c => li.columns.indexOf(c);
+        const find = k => { for (const g of li.groups) for (const x of g.rows) if (x[ci('key')] === k) return { levels: g.levels.join(','), row: x }; return null; };
+        const card = k => { const d = document.createElement('div'); d.innerHTML = indicatorCardHTML(k); return d.textContent; };
+        const dd = (k, name) => { const d = document.createElement('div'); d.innerHTML = indicatorCardHTML(k);
+          const dt = [...d.querySelectorAll('dt')].find(e => e.textContent === name); return dt ? dt.nextElementSibling.textContent : ''; };
+        const real = WARD_META;
+        const out = {
+          opts: [...document.querySelectorAll('#ov option')].map(o => o.value).filter(k => keys.indexOf(k) !== -1).length,
+          lv: [ovLevels('idaci_pct').join(','), ovLevels('idaci_decile').join(','), ovLevels('iod_ks2').join(',')],
+          ask: [find('idaci_pct'), find('idaci_decile'), find('iod_ks2')],
+          size: JSON.stringify(li).length,
+          idaciPub: dd('idaci_pct', 'Published at'), idaciUnit: dd('idaci_pct', 'Unit'), idaciMethod: dd('idaci_pct', 'Method'),
+          ks2: card('iod_ks2'), cidr: card('iod_cidr'), geo: card('geo_barriers_score'),
+          anchors: [_methAnchor('idaci_pct'), _methAnchor('indoors_score'), _methAnchor('iod_ypll')],
+          la: [boroughOvValue('E09000001', 'idaci_pct'), (BOROUGH_DATA.E09000001.indicators || BOROUGH_DATA.E09000001).idaci_pct],
+          dec: [indDecimals('idaci_pct'), indDecimals('idaci_decile'), indDecimals('indoors_score')],
+        };
+        WARD_META = Object.assign({}, real, { iod_weights: { idaci_pct: 'residents' } });
+        out.fallback = dd('idaci_pct', 'Method');
+        WARD_META = real;
+        return out;
+      }, KEYS);
+      const subs = await subHeads(page);
+      ok(r.opts === 24, 'IoD 2025 extras: with figures, all 24 are offered', String(r.opts));
+      ok(JSON.stringify(subs) === JSON.stringify(['The index and its domains', 'Children and older people', 'Sub-domains',
+        'Health measures behind the index', 'Education measures behind the index', 'Living environment measures behind the index']),
+        'IoD 2025 extras: Deprivation is six short lists, not one long one', JSON.stringify(subs));
+      ok(r.lv[0] === 'borough,ward,lsoa' && r.lv[1] === 'lsoa' && r.lv[2] === 'borough,ward,lsoa',
+        'IoD 2025 extras: shown for LSOAs, wards and LAs, with deciles for LSOAs only', JSON.stringify(r.lv));
+      ok(r.ask[0] && r.ask[0].levels === 'la,ward,lsoa' && r.ask[1] && r.ask[1].levels === 'lsoa' &&
+         r.ask[2] && r.ask[2].row.indexOf('less deprived') !== -1 && r.size < 15000,
+        'IoD 2025 extras: Ask lists them at the right levels, attainment the right way round, within its 15,000 character cap',
+        JSON.stringify({ ask: r.ask, size: r.size }));
+      ok(/Ward figures are an average of the LSOAs in each ward, weighted by their children aged 0 to 15\./.test(r.idaciPub) &&
+         /figures are an average of all the LSOAs in each LA, weighted by their children aged 0 to 15\./.test(r.idaciPub) &&
+         r.idaciUnit === '% of children aged 0 to 15' && /share of the area’s children/.test(r.idaciMethod) &&
+         /weighted by residents at the 2021 Census, because this build had no counts of children/.test(r.fallback),
+        'IoD 2025 extras: the IDACI card says ward and LA figures are weighted by children, or by residents when they had to be',
+        JSON.stringify([r.idaciPub, r.idaciUnit, r.fallback]));
+      ok(/a higher figure is better/.test(r.ks2) && /100 is the England level/.test(r.cidr) && /rural areas score as the most deprived/.test(r.geo),
+        'IoD 2025 extras: attainment reads as better when higher, the illness ratio against England at 100, and geographical barriers explain rural areas');
+      ok(r.anchors.join() === 'src-iod-extra,src-iod-extra,src-iod-indicators', 'IoD 2025 extras: cards link to their own source rows', r.anchors.join());
+      ok(r.la[0] === r.la[1] && r.la[0] != null, 'IoD 2025 extras: an LA shows the LA file\'s own IDACI, not an average of its wards', JSON.stringify(r.la));
+      ok(r.dec.join() === '1,0,2', 'IoD 2025 extras: one decimal for IDACI, whole deciles, two for sub-domain scores', r.dec.join());
+      // Drawn at LSOA, and named in the LSOA profile.
+      await setOv(page, 'idaci_pct');
+      await page.waitForTimeout(1500);
+      const lp = await page.evaluate(async () => {
+        await ensureLsoaImd();
+        showLSOA(LSOA_IMD.features.find(f => f.properties.ward === 'Lansbury'));
+        const t = document.getElementById('wpanel').innerText;
+        return { idaci: /Income deprivation affecting children \(IDACI 2025\)/.test(t), dec: /Decile \d+ of 10, where 1 is the most deprived/.test(t),
+          legend: (document.getElementById('ov-cur-nm') || {}).textContent || '' };
+      });
+      ok(lp.idaci && lp.dec && /IDACI/.test(lp.legend), 'IoD 2025 extras: IDACI draws, and the LSOA profile gives it with its decile', JSON.stringify(lp));
+      ok(!errors.length, 'no page errors (IoD 2025 extras, with figures)', errors.join(' | '));
+      await page.close();
+    }
   }
 
   // Ask on a region map: the same tools, reading the region's own files, with

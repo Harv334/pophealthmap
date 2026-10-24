@@ -36,6 +36,15 @@ jobs:
         run: |
           pip install pandas numpy pyarrow requests
           python3 tests/pipeline/test_census_counts.py
+      # The IoD 2025 figures beyond the IMD (IDACI, IDAOPI, the sub-domains
+      # and the underlying indicators), from synthetic Files 7 and 8: the
+      # column matching and its checks, the ward and LA weighting, and that a
+      # missing file or column is a source failure rather than a crash. The
+      # real files are read only by the data refresh.
+      - name: Check the IoD 2025 extras build
+        run: |
+          pip install openpyxl
+          python3 tests/pipeline/test_iod_extra.py
       # What stops a region pack being published (scripts/check_region_pack.py).
       - name: Check the region pack checks
         run: python3 tests/pipeline/test_region_pack.py

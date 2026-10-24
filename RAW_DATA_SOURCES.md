@@ -53,7 +53,35 @@ subsetting at this stage: the parquet holds all of England, and the London
 scoping happens when `lsoa_data.json` is built. Columns: 11 of File 7's ~60, being `LSOA21CD`, the
 overall IMD score / decile / rank, and the seven domain scores. The
 population denominators and the per-domain ranks and deciles are dropped
-as unused.
+as unused here; the next two rows keep what the map now uses of them.
+
+| File | Source | URL | Used for |
+|------|--------|-----|----------|
+| `File_7_IoD2025_All_Ranks_Scores_Deciles_Population_Denominators.csv` (again) | MHCLG | same release page | Source `iod_extra`, written to `data/demographics/iod2025_extra.parquet`: IDACI and IDAOPI (income deprivation affecting children aged 0 to 15 and people aged 60 and over) as rate, rank and decile, stored as `idaci_pct` / `idaci_rank` / `idaci_decile` and the `idaopi_` equivalents (the rate times 100); the six sub-domain scores `cyp_education_score`, `adult_skills_score`, `geo_barriers_score`, `wider_barriers_score`, `indoors_score`, `outdoors_score`; and the denominators `iod_pop_children` (dependent children aged 0 to 15) and `iod_pop_older` (aged 60 and over), which weight IDACI and IDAOPI into wards and LAs. **Downloaded at run time** until the committed parquet holds every column: the file is found on the release through the gov.uk content API by its "File 7" title, falling back to `IMD_SOURCE_URL`. A CSV dropped in `.cache/iod2025/` (or `.cache/imd2025/`) is read instead. |
+| `File_8_IoD2025_Underlying_Indicators.xlsx` (name as found on the release) | MHCLG | same release page | Source `iod_indicators`, written to `data/demographics/iod2025_indicators.parquet`: the underlying indicators `iod_ypll`, `iod_cidr`, `iod_acute_morbidity`, `iod_mood_anxiety`, `iod_ks2`, `iod_ks4`, `iod_staying_on`, `iod_he_entry`, `iod_adult_quals`, `iod_english`, `iod_housing_poor`, `iod_no_central_heating`, `iod_air_quality`, `iod_road_accidents`. Found on the release by its "File 8" or "underlying indicators" title; every sheet with an LSOA code column is read. Shares are stored as percentages and the two standardised ratios with England at 100. |
+
+**How the columns are found.** Every header is matched by keywords after
+normalising punctuation (`IOD_FILE7_FIELDS`, `IOD_FILE8_SPECS` in
+`fetch_all_data.py`), and the domain lookups rule out the narrower measures
+that share their words, so `income` and `score` can no longer pick up the
+IDACI column. Each File 7 measure must rise with its own domain, each rank and
+decile must fall as its rate rises, and each File 8 indicator must move with
+its domain score in the direction the map colours it (attainment falls as
+education deprivation rises). A column that is missing, matches twice, sits on
+the wrong scale or runs the wrong way is not used, and the source is marked
+failed in the manifest saying which. The 2025 File 8 headers were not seen
+when this was written, so the first refresh's log (`iod_indicators: <key> <-
+'<header>'`) is the place to confirm what was matched; the 2019 indicator
+set may have changed (staying on after 16 and homes without central heating
+in particular), and an indicator the release does not carry stays off the map.
+
+**Ward and LA figures.** IDACI is weighted by the File 7 children aged 0 to
+15 and IDAOPI by its people aged 60 and over, so a ward's figure is its
+income-deprived children over its children. Everything else is weighted by
+Census 2021 residents. LA figures are built from all of the LA's LSOAs and
+written to `borough_data.json`. Ranks and deciles stay LSOA-only. If File 7
+gives no denominators, IDACI and IDAOPI fall back to residents with a
+warning, and `ward_data.json` metadata `iod_weights` says so.
 
 ---
 
@@ -394,7 +422,9 @@ To rebuild from scratch, a colleague needs:
 1. **Boundaries**: 3 GeoJSONs from ONS (wards, LSOAs, LADs). Postcode and
    LSOA-to-ward geography come from APIs, so there is nothing to download.
 2. **IMD 2025**: nothing. The filtered parquet is committed; the raw File 7
-   CSV is only needed to regenerate it after a new IoD release.
+   CSV is only needed to regenerate it after a new IoD release. The IDACI,
+   IDAOPI, sub-domain and underlying indicator parquets download Files 7 and
+   8 by themselves until they are committed complete.
 3. **Census** — 15 ZIPs from NOMIS (one per TS table listed in §3).
 4. **Claimant count** — 1 CSV via the NOMIS API. The five DWP benefit
    series are not fetched; see §4 for why.
