@@ -84,6 +84,11 @@ jobs:
       - name: Run pipeline
         id: run
         continue-on-error: true
+        # The DWP benefits come from Stat-Xplore, which needs a free API key
+        # (HANDOVER.md, DWP benefits). Without the secret those sources are
+        # skipped, not failed.
+        env:
+          STAT_XPLORE_API_KEY: ${{ secrets.STAT_XPLORE_API_KEY }}
         run: python fetch_all_data.py
 
       # Four files are derived from the pipeline's own outputs rather than
