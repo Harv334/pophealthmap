@@ -106,6 +106,47 @@ after 16 and homes without central heating may be gone) keeps failing until
 its spec and its registry entries in `index.html` are removed; until then the
 map leaves it out because it has no figures.
 
+**The small-area additions** (`sape`, `claimant_youth`, `road_casualties`,
+`care_homes`, `service_access`). Each has its own entry in the manifest, so
+one that fails holds back only itself. But the region pack check
+(`scripts/check_region_pack.py`) refuses any pack with a failed or partial
+source, and the monthly region refresh passes no `allow_sources`, so a new
+source failing on a region holds that region's whole pack until it is fixed
+or the region is rebuilt by hand with `allow_sources` naming it. "Skipped" is
+not held: `claimant_youth` is skipped, with the reason in the manifest, when
+Nomis does not publish the 18 to 24 band for LSOAs.
+
+- `sape`: the newest LSOA single year of age file on ONS's dataset page. If
+  ONS refuses the runner, download it from
+  https://www.ons.gov.uk/peoplepopulationandcommunity/populationandmigration/populationestimates/datasets/lowersuperoutputareamidyearpopulationestimates
+  into `.cache/sape/` (or set `SAPE_URL`) and run
+  `python fetch_all_data.py --only sape`. A sheet whose single years do not
+  add up to its total is refused as misread.
+- `claimant_youth`: the 18 to 24 code is read from Nomis's age codelist by
+  name. Skipped is the expected outcome if Nomis does not publish it for
+  LSOAs; the indicator then stays off the map.
+- `road_casualties`: DfT's five-year casualty file, found on the data.gov.uk
+  road safety page or at its usual address (`STATS19_CASUALTY_URL`
+  overrides). A file without `casualty_adjusted_severity_serious` fails
+  rather than mixing adjusted and unadjusted figures.
+- `care_homes`: the care directory with filters, found on CQC's "Using CQC
+  data" page. If CQC refuses the runner, download the file in a browser and
+  attach it to a release called `cqc-source`; both refresh workflows copy it
+  into `.cache/cqc/`. The column names (`Location ID`, `Care home?`,
+  `Care homes beds`, `Dormant (Y/N)`) were not checked against a current
+  file, so check the first run's log: a missing column fails and names the
+  columns the file has.
+- `service_access`: needs no download. It runs after `gp`, `pharmacies` and
+  `dentists`, which leave every site in England in `.cache/service_access/`.
+  Run on its own without those files it measures only to the scope's own
+  sites and is marked partial: run `--only gp pharmacies dentists
+  service_access` instead.
+
+Public transport travel times from the Urban Big Data Centre were considered
+and not added: they are for 2011 LSOAs from a 2021 timetable, a newer Zenodo
+version's contents are unknown, and the licence of the data itself could not
+be confirmed.
+
 **Air quality** (`air_quality`). Fetched automatically: the pipeline reads the
 UK-AIR index and takes the most recent year listed for each pollutant rather
 than a pinned filename, because the filenames carry a version suffix that

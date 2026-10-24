@@ -69,7 +69,9 @@ import os
 import re
 import sys
 import time
+import urllib.parse
 import zipfile
+from html import unescape as html_unescape
 from collections import Counter
 from datetime import datetime, timezone
 from functools import lru_cache
@@ -264,6 +266,10 @@ _SOURCE_PARTIAL: dict[str, str] = {}
 # at the wrong age). main() marks them "failed" with this message, so the
 # refresh workflow raises them, while the rows that passed are still used.
 _SOURCE_ERROR: dict[str, str] = {}
+# Why a source that returned no frame had nothing to do, for its "skipped"
+# entry in the manifest (a publisher that does not publish the figures for
+# this geography, say), instead of the generic note.
+_SOURCE_NOTE: dict[str, str] = {}
 
 def carry_forward_thin(path: Path, df: "pd.DataFrame", *, key: str, source: str,
                        requested, cache_file=None,
@@ -1314,6 +1320,7 @@ def run_gp_practices() -> pd.DataFrame:
     sites = load_service_sites()
     rows = []
     dropped = 0
+    national = []          # every practice kept, in or out of scope (service_access)
     for _, r in df.iterrows():
         pc = normalise_postcode(r["Postcode"])
         hit = lookup.get(pc)
@@ -1321,11 +1328,14 @@ def run_gp_practices() -> pd.DataFrame:
             continue
         lat, lng, lsoa, lad, wd = hit
         if lad not in SCOPE_LADS:
+            if gp_practice_verdict(r["OrganisationCode"], r["Name"], sites)[0] == "keep":
+                national.append((r["OrganisationCode"], lat, lng))
             continue
         verdict, label = gp_practice_verdict(r["OrganisationCode"], r["Name"], sites)
         if verdict == "drop":
             dropped += 1
             continue
+        national.append((r["OrganisationCode"], lat, lng))
         rows.append({
             "code": r["OrganisationCode"],
             "name": title_case(r["Name"], initials=True),
@@ -1342,6 +1352,7 @@ def run_gp_practices() -> pd.DataFrame:
             "lad": LAD_NAMES.get(lad, ""),
         })
     out = pd.DataFrame(rows)
+    save_national_sites("gp", national)
     out_path = DATA_DIR / "healthcare" / "gp_practices.parquet"
     out = write_parquet_guarded(out_path, out, source="gp_practices")
     ok(f"gp_practices: {len(out):,} rows -> {out_path.relative_to(REPO_ROOT)} "
@@ -1434,12 +1445,14 @@ def run_pharmacies() -> pd.DataFrame:
     lookup = lookup_postcodes(owners.keys(), source="pharmacies", owners=owners)
 
     rows = []
+    national = []          # every pharmacy kept, in or out of scope (service_access)
     for _, r in df.iterrows():
         pc = normalise_postcode(r.get("Postcode", ""))
         hit = lookup.get(pc)
         if not hit:
             continue
         lat, lng, lsoa, lad, wd = hit
+        national.append((r.get("OrganisationCode", ""), lat, lng))
         if lad not in SCOPE_LADS:
             continue
         rows.append({
@@ -1456,6 +1469,7 @@ def run_pharmacies() -> pd.DataFrame:
             "LSOA21CD": lsoa, "WD25CD": wd, "LAD25CD": lad,
         })
     out = pd.DataFrame(rows)
+    save_national_sites("pharmacy", national)
     out_path = DATA_DIR / "healthcare" / "pharmacies.parquet"
     out = write_parquet_guarded(out_path, out, source="pharmacies")
     ok(f"pharmacies: {len(out):,} rows -> {out_path.relative_to(REPO_ROOT)}")
@@ -1684,16 +1698,19 @@ def run_dentists() -> pd.DataFrame:
     # last, sometimes under the building's name.
     by_code: dict[str, dict] = {}
     n_prison = 0
+    national = []          # high street practices, in or out of scope (service_access)
     for _, r in df.iterrows():
         pc = normalise_postcode(r["Postcode"])
         hit = lookup.get(pc)
         if not hit:
             continue
         lat, lng, lsoa, lad, wd = hit
-        if lad not in SCOPE_LADS:
-            continue
         lines = [title_case(r[f"AddressLine{i}"]) for i in range(1, 5)]
         verdict = dental_verdict(r["Name"], " ".join(lines))
+        if verdict == "":
+            national.append((r["OrganisationCode"], lat, lng))
+        if lad not in SCOPE_LADS:
+            continue
         if verdict is None:
             n_prison += 1
             continue
@@ -1725,6 +1742,7 @@ def run_dentists() -> pd.DataFrame:
     rows = list(by_code.values())
 
     out = pd.DataFrame(rows)
+    save_national_sites("dentist", national)
     out_path = DATA_DIR / "healthcare" / "dental_practices.parquet"
     out = write_parquet_guarded(out_path, out, source="dentists")
     ok(f"dentists: {len(out):,} NHS practices from ODS -> "
@@ -7360,6 +7378,31 @@ def build_ward_data() -> dict:
         if wards_mo:
             sources["_claimant_month"] = wards_mo
 
+    # --- Distances to services, population estimates, claimants aged 18 to
+    # 24, road casualties and care home beds, from the LSOAs that best fit
+    # each ward: counts added up before dividing, distances averaged by
+    # residents (small_area_figures).
+    sa_vals, sa_notes = small_area_figures(lsoa_to_ward, pop_by_lsoa, what="ward")
+    for wd, vals in sa_vals.items():
+        if wd in wards:
+            wards[wd]["indicators"].update(vals)
+    if sa_vals:
+        n_by: dict = {}
+        for wd, vals in sa_vals.items():
+            if wd in wards:
+                for k in vals:
+                    n_by[k] = n_by.get(k, 0) + 1
+        info("small-area additions -> wards: " + ", ".join(f"{k} {n:,}" for k, n in sorted(n_by.items())))
+    for key, name in (("service_access_origin", "service_access"), ("sape_year", "sape"),
+                      ("claimant_18_24_month", "claimant_youth"), ("road_ksi_years", "road_casualties"),
+                      ("care_homes_as_at", "care_homes")):
+        if key in sa_notes:
+            sources[name] = {"service_access": "NHS ODS registers (distances measured here)",
+                             "sape": "ONS mid-year population estimates (SAPE)",
+                             "claimant_youth": "NOMIS NM_162_1, claimants aged 18 to 24",
+                             "road_casualties": "DfT STATS19 road casualties",
+                             "care_homes": "CQC care directory"}[name]
+
     # --- Core20: how many of a ward's LSOAs, and residents, are Core20 -------
     # NHS England's Core20PLUS5 defines Core20 for LSOAs: the most deprived
     # fifth of England's, deprivation deciles 1 and 2. There is no such thing
@@ -7428,6 +7471,12 @@ def build_ward_data() -> dict:
             # and IDAOPI, "residents" (Census 2021) for the rest, or for
             # those two when File 7 gave no denominators.
             "iod_weights": iod_weights_used,
+            # For the small-area additions: where the distances are measured
+            # from ("pwc", ONS's population-weighted centroids, "centroid",
+            # the middle of each LSOA's shape, or "mixed"), the year of the
+            # population estimates, the claimant month, the road casualty
+            # years and the date of the CQC file.
+            "small_area": sa_notes,
         },
     }
 
@@ -7574,6 +7623,18 @@ def build_borough_data() -> dict:
         to_la = {lc: lad for lc, (_wd, lad) in get_lsoa_ward_lookup().items() if lad}
         iod_la, _ = iod_area_figures(iod_frames, to_la, pops, what=LA_WORD)
         for lad, vals in iod_la.items():
+            out.setdefault(lad, {}).update(vals)
+    # The small-area additions for each LA from all of its LSOAs, made as the
+    # ward figures are (small_area_figures): counts added up before dividing,
+    # distances averaged by residents.
+    cen_sa = _read_parquet_opt(demo / "census2021.parquet")
+    pops_sa = ({} if cen_sa is None or cen_sa.empty or "census_population" not in cen_sa.columns
+               else dict(zip(cen_sa["LSOA21CD"].astype(str),
+                             pd.to_numeric(cen_sa["census_population"], errors="coerce").fillna(0))))
+    to_la_sa = {lc: lad for lc, (_wd, lad) in get_lsoa_ward_lookup().items() if lad}
+    sa_la, _ = small_area_figures(to_la_sa, pops_sa, what=LA_WORD)
+    for lad, vals in sa_la.items():
+        if lad in SCOPE_LADS or lad in out:
             out.setdefault(lad, {}).update(vals)
     info(f"borough_data: {len(out):,} {LA_WORD}s, {n_vals:,} published values, "
          f"{n_cen:,} Census figures from summed counts")
@@ -7798,6 +7859,21 @@ def build_lsoa_data() -> dict:
                     continue
                 out[code][c] = (int(v) if c in ("claimant_count", "claimant_yoy_change")
                                 else round(float(v), 2))
+
+    # Distances to services, population estimates and police.uk crime for
+    # each LSOA (small_area_lsoa_values). The crime keys are the ward ones,
+    # counted from the same points.
+    pops_l = ({} if cen is None or cen.empty or "census_population" not in cen.columns
+              else dict(zip(cen["LSOA21CD"].astype(str),
+                            pd.to_numeric(cen["census_population"], errors="coerce").fillna(0))))
+    n_sa: dict = {}
+    for code, vals in small_area_lsoa_values(pops_l).items():
+        if code in out:
+            out[code].update(vals)
+            for k in vals:
+                n_sa[k] = n_sa.get(k, 0) + 1
+    if n_sa:
+        info("small-area additions -> LSOAs: " + ", ".join(f"{k} {n:,}" for k, n in sorted(n_sa.items())))
 
     # Scope to the LSOAs the map can actually render. The IMD parquet is
     # national, so without this the file carries all 33,755 English LSOAs:
@@ -8098,6 +8174,7 @@ REGISTER_KEYS = {
                    "bus_stop_dist_m", "bus_stops_800m"),
     "naptan":     ("rail_station_dist_m", "rail_stations_1km",
                    "bus_stop_dist_m", "bus_stops_800m"),
+    "service_access": ("gp_dist_km", "pharmacy_dist_km", "dentist_dist_km"),
 }
 
 
@@ -8137,6 +8214,7 @@ def _indicator_periods() -> dict[str, str]:
         _read_parquet_opt(DATA_DIR / "demographics" / "fuel_poverty.parquet"))
     if fp_year:
         out["fuel_poverty_pct"] = fp_year
+    out.update(small_area_periods())
 
     try:
         sources = json.loads(MANIFEST_PATH.read_text(encoding="utf-8")).get("sources") or {}
@@ -9824,6 +9902,1405 @@ def run_pcn() -> pd.DataFrame:
     return pd.DataFrame([{"code": c, "practices": len(p["practices"])} for c, p in pcns.items()])
 
 
+# ============================================================================
+# SMALL-AREA ADDITIONS: services, population estimates, youth claimants,
+# road casualties and care home beds
+# ============================================================================
+# Five sources, each with its own manifest entry, so one that fails or has
+# nothing to fetch never marks an older source partial or failed:
+#
+#   service_access   distance to the nearest GP practice, pharmacy and NHS
+#                    dentist, measured here from the registers above
+#   sape             ONS mid-year population estimates for LSOAs
+#   claimant_youth   Nomis claimant count aged 18 to 24, by LSOA
+#   road_casualties  DfT STATS19 casualties killed or seriously injured, by
+#                    the LSOA the casualty lives in
+#   care_homes       CQC care homes and their registered beds
+#
+# Ward and LA figures are made in build_ward_data and build_borough_data by
+# small_area_figures: counts summed over the LSOAs that best fit each ward
+# (and over all of an LA's LSOAs) before dividing, and the distances as
+# averages weighted by residents. The crime figures for LSOAs need no new
+# source: crime_by_lsoa reads the police.uk file the crime source writes.
+
+# ---------------------------------------------------------------------------
+# Distance to services, from the GP, pharmacy and dental registers
+# ---------------------------------------------------------------------------
+# The registers are cut to the scope's councils before they are written, and
+# for an LSOA near the edge of the scope the nearest practice is often just
+# over it. So each register fetch also keeps every site it would keep in
+# England (save_national_sites), and the distances are measured against those.
+# A run without them (--only service_access on a fresh checkout) falls back to
+# the scope's own files and marks the source partial, because edge LSOAs then
+# read too far.
+SERVICE_KINDS = {
+    # register: (the scope's parquet in data/healthcare, the indicator key)
+    "gp":       ("gp_practices.parquet",     "gp_dist_km"),
+    "pharmacy": ("pharmacies.parquet",       "pharmacy_dist_km"),
+    "dentist":  ("dental_practices.parquet", "dentist_dist_km"),
+}
+SERVICE_KEYS = tuple(v[1] for v in SERVICE_KINDS.values())
+SERVICE_ACCESS_PARQUET = "service_access_lsoa.parquet"
+# A national file older than this is from some earlier run, not this one.
+SERVICE_NATIONAL_MAX_AGE_DAYS = 45
+# ONS's LSOA 2021 population-weighted centroids. Tried by name first, then
+# found in the service list, as the output area lookups are.
+LSOA_PWC_SERVICES = ["LSOA_PopCentroids_EW_2021_V4", "LSOA_PopCentroids_EW_2021_V3",
+                     "LSOA_PopCentroids_EW_2021_V2", "LSOA_PopCentroids_EW_2021"]
+
+
+def _service_sites_dir() -> Path:
+    return CACHE_DIR / "service_access"
+
+
+def save_national_sites(kind: str, rows) -> None:
+    """Every site of one register the map keeps, in or out of scope, as
+    (code, lat, lng), for run_service_access. Never fails the register."""
+    try:
+        df = pd.DataFrame(list(rows), columns=["code", "lat", "lng"])
+        df = df.dropna(subset=["lat", "lng"]).drop_duplicates("code")
+        if df.empty:
+            return
+        d = _service_sites_dir()
+        d.mkdir(parents=True, exist_ok=True)
+        write_atomic(d / f"{kind}_sites.csv", df.to_csv(index=False))
+        info(f"service_access: {len(df):,} {kind} sites in England kept for the distances")
+    except Exception as e:
+        warn(f"service_access: could not keep the national {kind} sites ({e})")
+
+
+def _service_sites(kind: str) -> tuple[list, str]:
+    """[(lat, lng), ...] for one register, and where they came from:
+    "england" (the national file from this run's register fetch) or "scope"
+    (the scope's own parquet, which lacks the sites over its edge)."""
+    f = _service_sites_dir() / f"{kind}_sites.csv"
+    if f.exists() and _days_since(datetime.fromtimestamp(f.stat().st_mtime, timezone.utc).isoformat()) \
+            <= SERVICE_NATIONAL_MAX_AGE_DAYS:
+        try:
+            df = pd.read_csv(f)
+            pts = [(float(a), float(b)) for a, b in zip(df["lat"], df["lng"])
+                   if pd.notna(a) and pd.notna(b)]
+            if pts:
+                return pts, "england"
+        except Exception as e:
+            warn(f"service_access: {f.name} unreadable ({e})")
+    pq_name = SERVICE_KINDS[kind][0]
+    df = _read_parquet_opt(DATA_DIR / "healthcare" / pq_name)
+    if df is None or df.empty or not {"lat", "lng"}.issubset(df.columns):
+        return [], "none"
+    if kind == "dentist" and "kind" in df.columns:
+        # High street practices only: not orthodontics, hospital, community
+        # or urgent services, which take referrals rather than patients.
+        df = df[df["kind"].fillna("") == ""]
+    pts = [(float(a), float(b)) for a, b in zip(df["lat"], df["lng"]) if pd.notna(a) and pd.notna(b)]
+    return pts, "scope"
+
+
+def _lsoa_pwc_service() -> str | None:
+    """The ONS LSOA 2021 population-weighted centroid service, by a known
+    name or from the service list, or None."""
+    for name in LSOA_PWC_SERVICES:
+        try:
+            r = requests.get(f"{ONS_SERVICES}/{name}/FeatureServer/0?f=json", timeout=60)
+            if r.ok and "fields" in r.json():
+                return name
+        except Exception:
+            continue
+    try:
+        r = requests.get(f"{ONS_SERVICES}?f=json", timeout=120)
+        names = [x["name"] for x in r.json().get("services", [])]
+    except Exception as e:
+        warn(f"service_access: could not list ONS services ({type(e).__name__}: {e})")
+        return None
+    return pick_lsoa_pwc_service(names)
+
+
+def pick_lsoa_pwc_service(names) -> str | None:
+    """The newest LSOA 2021 population-weighted centroid layer in a list of
+    ONS service names (PopCentroids or PWC, 2021, not 2011 or output areas)."""
+    cands = [n for n in names
+             if re.search(r"(?i)lsoa", n) and re.search(r"(?i)pop_?centroid|_pwc", n)
+             and re.search(r"2021", n) and not re.search(r"(?i)2011", n)]
+    return sorted(cands)[-1] if cands else None
+
+
+def get_lsoa_pwc(codes) -> dict:
+    """{LSOA21CD: (easting, northing)}, the population-weighted centroid in
+    British National Grid metres, for the codes asked for; {} when ONS does
+    not answer, in which case the middle of each LSOA's shape is used."""
+    cache = CACHE_DIR / "ons_lookup" / f"LSOA21_PWC_{SCOPE_KEY}.json"
+    want = sorted(set(codes))
+    if cache.exists():
+        try:
+            blob = json.loads(cache.read_text(encoding="utf-8"))
+            if blob and all(c in blob for c in want):
+                return {c: tuple(blob[c]) for c in want}
+        except (OSError, ValueError):
+            pass
+    layer = _lsoa_pwc_service()
+    if not layer:
+        warn("service_access: no ONS population-weighted centroid service found")
+        return {}
+    url = f"{ONS_SERVICES}/{layer}/FeatureServer/0/query"
+    try:
+        meta = requests.get(f"{ONS_SERVICES}/{layer}/FeatureServer/0?f=json", timeout=60).json()
+        fields = [f.get("name", "") for f in meta.get("fields", [])]
+        code_f = next((f for f in fields if f.upper() == "LSOA21CD"), None) \
+            or next((f for f in fields if "LSOA21CD" in f.upper()), None)
+        if not code_f:
+            warn(f"service_access: {layer} has no LSOA21CD field ({', '.join(fields[:8])})")
+            return {}
+        out: dict = {}
+        for i in range(0, len(want), 200):
+            batch = want[i:i + 200]
+            payload = _http_json("POST", url, source="ONS LSOA centroids", form_body={
+                "where": f"{code_f} IN (" + ",".join(f"'{c}'" for c in batch) + ")",
+                "outFields": code_f, "returnGeometry": "true", "outSR": 27700,
+                "f": "json", "resultRecordCount": 2000,
+            }, timeout=180)
+            for feat in (payload or {}).get("features", []):
+                a = feat.get("attributes") or {}
+                g = feat.get("geometry") or {}
+                if a.get(code_f) and g.get("x") is not None and g.get("y") is not None:
+                    out[a[code_f]] = (float(g["x"]), float(g["y"]))
+    except Exception as e:
+        warn(f"service_access: population-weighted centroids from {layer} failed "
+             f"({type(e).__name__}: {e})")
+        return {}
+    if len(out) < len(want) * 0.99:
+        warn(f"service_access: {layer} gave centroids for only {len(out):,} of "
+             f"{len(want):,} LSOAs")
+        if not out:
+            return {}
+    write_json_atomic(cache, {c: list(v) for c, v in out.items()})
+    ok(f"service_access: {len(out):,} population-weighted LSOA centroids ({layer})")
+    return out
+
+
+def lsoa_shape_centres() -> dict:
+    """{LSOA21CD: (easting, northing)}: the centroid of each LSOA's shape, or
+    a point inside it when the centroid falls outside (a crescent or a
+    river-split LSOA), from data/boundaries/lsoa.geojson."""
+    from shapely.geometry import shape
+    from shapely.ops import transform as shp_transform
+    from pyproj import Transformer
+    path = DATA_DIR / "boundaries" / "lsoa.geojson"
+    if not path.exists():
+        return {}
+    to_bng = Transformer.from_crs(4326, 27700, always_xy=True).transform
+    out: dict = {}
+    for feat in json.loads(path.read_text(encoding="utf-8")).get("features", []):
+        p = feat.get("properties") or {}
+        code = str(p.get("LSOA21CD") or p.get("code") or "")
+        if not code.startswith("E01") or not feat.get("geometry"):
+            continue
+        geom = shp_transform(to_bng, shape(feat["geometry"]))
+        if not geom.is_valid:
+            geom = geom.buffer(0)
+        if geom.is_empty:
+            continue
+        pt = geom.centroid
+        if not geom.contains(pt):
+            pt = geom.representative_point()
+        out[code] = (pt.x, pt.y)
+    return out
+
+
+def service_distances(origins: dict, sites: dict) -> dict:
+    """{LSOA21CD: {key: km}}: the straight-line distance from each origin
+    (easting, northing) to the nearest site of each kind, in kilometres to
+    three places. sites is {key: [(easting, northing), ...]}; a kind with no
+    sites gives no figure."""
+    from shapely.geometry import Point
+    from shapely.strtree import STRtree
+    out: dict = {c: {} for c in origins}
+    for key, pts in sites.items():
+        if not pts:
+            continue
+        geoms = [Point(x, y) for x, y in pts]
+        tree = STRtree(geoms)
+        for code, (x, y) in origins.items():
+            o = Point(x, y)
+            near = tree.nearest(o)
+            out[code][key] = round(o.distance(geoms[int(near)]) / 1000.0, 3)
+    return out
+
+
+def run_service_access() -> "pd.DataFrame | None":
+    rule("Distance to the nearest GP practice, pharmacy and NHS dentist")
+    from pyproj import Transformer
+    codes = sorted(get_lsoa_ward_lookup())
+    if not codes:
+        raise RuntimeError("service_access: no LSOAs in scope")
+    pwc = get_lsoa_pwc(codes)
+    shapes = lsoa_shape_centres() if len(pwc) < len(codes) else {}
+    origins, origin_kind = {}, {}
+    for c in codes:
+        if c in pwc:
+            origins[c], origin_kind[c] = pwc[c], "pwc"
+        elif c in shapes:
+            origins[c], origin_kind[c] = shapes[c], "centroid"
+    if not origins:
+        raise RuntimeError("service_access: no LSOA centroids, from ONS or from "
+                           "data/boundaries/lsoa.geojson; run the boundaries source first")
+    n_pwc = sum(1 for v in origin_kind.values() if v == "pwc")
+    if n_pwc < len(origins):
+        warn(f"service_access: {len(origins) - n_pwc:,} of {len(origins):,} LSOAs measured from "
+             "the middle of their shape, not their population-weighted centre")
+    to_bng = Transformer.from_crs(4326, 27700, always_xy=True).transform
+    sites: dict = {}
+    from_scope, missing = [], []
+    for kind, (_pq, key) in SERVICE_KINDS.items():
+        pts, where = _service_sites(kind)
+        if not pts:
+            missing.append(kind)
+            continue
+        if where == "scope":
+            from_scope.append(kind)
+        sites[key] = [to_bng(lng, lat) for lat, lng in pts]
+        info(f"service_access: {len(pts):,} {kind} sites ({where})")
+    if not sites:
+        raise RuntimeError("service_access: no GP, pharmacy or dental sites to measure to; "
+                           "run the gp, pharmacies and dentists sources first")
+    dist = service_distances(origins, sites)
+    out = pd.DataFrame([{"LSOA21CD": c, **dist[c], "origin": origin_kind[c]} for c in sorted(origins)])
+    out_path = DATA_DIR / "environment" / SERVICE_ACCESS_PARQUET
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out = write_parquet_guarded(out_path, out, source="service_access")
+    if missing:
+        _SOURCE_ERROR["service_access"] = (
+            f"no {', '.join(missing)} sites were found, so "
+            + ", ".join(SERVICE_KINDS[k][1] for k in missing) + " has no figures")
+    elif from_scope:
+        _SOURCE_PARTIAL["service_access"] = (
+            f"the {', '.join(from_scope)} distances were measured to the sites inside the scope "
+            "only (no national file from a register fetch in this run), so LSOAs near the "
+            "edge may read too far")
+    meds = ", ".join(f"{k} {out[k].median():.2f} km" for k in SERVICE_KEYS if k in out.columns)
+    ok(f"service_access: {len(out):,} LSOAs ({n_pwc:,} from population-weighted centroids), "
+       f"median {meds} -> {out_path.relative_to(REPO_ROOT)}")
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Crime by LSOA (from the police.uk file the crime source writes)
+# ---------------------------------------------------------------------------
+# Every crime already carries the LSOA its point falls in. The ward figures
+# stay exactly as they are: they count the crimes inside each ward's own
+# boundary, which is closer to the ward than adding up the LSOAs that best
+# fit it would be (in London that differs by more than a tenth in 318 of 704
+# wards). LSOAs and wards both nest in LAs, so both add up to the same LA
+# total. The LSOA keys are the ward keys, so the map offers one indicator at
+# two levels rather than two indicators.
+CRIME_LSOA_GROUPS = {
+    "crime_violence_12mo": ("violent-crime",),
+    "crime_burglary_12mo": ("burglary",),
+    "crime_robbery_12mo":  ("robbery",),
+    "crime_theft_12mo":    ("other-theft", "shoplifting", "bicycle-theft", "theft-from-the-person"),
+    "crime_asb_12mo":      ("anti-social-behaviour",),
+}
+
+
+def crime_by_lsoa(crime: "pd.DataFrame | None", pop_by_lsoa: dict) -> dict:
+    """{LSOA21CD: {crime_total, crime_rate_per_1000, crime_*_12mo}} for every
+    LSOA with at least one police.uk record. The total leaves anti-social
+    behaviour out, as the ward total does, and the rate is per 1,000 usual
+    residents at the 2021 Census, to one place, as the map works out the
+    ward rate."""
+    if crime is None or crime.empty or "LSOA21CD" not in crime.columns:
+        return {}
+    c = crime[crime["LSOA21CD"].fillna("").astype(str).str.startswith("E01")]
+    if c.empty:
+        return {}
+    lsoas = c["LSOA21CD"].astype(str).unique()
+    cat = c["category"].astype(str) if "category" in c.columns else pd.Series("", index=c.index)
+    tot = c[~cat.isin(CRIME_TOTAL_EXCLUDES)].groupby("LSOA21CD").size().reindex(lsoas, fill_value=0)
+    out: dict = {lc: {"crime_total": int(n)} for lc, n in tot.items()}
+    if "category" in c.columns:
+        for key, cats in CRIME_LSOA_GROUPS.items():
+            n = c[cat.isin(cats)].groupby("LSOA21CD").size().reindex(lsoas, fill_value=0)
+            for lc, v in n.items():
+                out[lc][key] = int(v)
+    for lc, rec in out.items():
+        pop = float(pop_by_lsoa.get(lc, 0) or 0)
+        if pop > 0:
+            rec["crime_rate_per_1000"] = round(rec["crime_total"] / pop * 1000, 1)
+    return out
+
+
+# ---------------------------------------------------------------------------
+# ONS mid-year population estimates for LSOAs (SAPE)
+# ---------------------------------------------------------------------------
+# The single year of age file, by sex, for LSOAs on their 2021 boundaries. Its
+# address changes every release, so it is found on ONS's dataset pages (the
+# page itself and its /data JSON), newest year first. SAPE_URL overrides, and
+# a file put in .cache/sape/ by hand is used as it is.
+#
+# Layout, as archive/patch_population_mid2024.py read the November 2025
+# edition (sapelsoasyoa20222024.xlsx): one sheet per year, "Mid-2024 LSOA
+# 2021", a header row with "LSOA 2021 Code" and "Total", then F0 to F90 and M0
+# to M90, where 90 means 90 and over. sape_parse_table checks that the single
+# years add up to the total before anything is kept.
+#
+# These are added beside the Census figures, not in place of them: the
+# claimant and crime rates keep their Census 2021 denominators, because
+# moving them would change almost every published rate at once.
+SAPE_PAGES = [
+    "https://www.ons.gov.uk/peoplepopulationandcommunity/populationandmigration/"
+    "populationestimates/datasets/lowersuperoutputareamidyearpopulationestimates",
+    "https://www.ons.gov.uk/peoplepopulationandcommunity/populationandmigration/"
+    "populationestimates/datasets/lowersuperoutputareamidyearpopulationestimatesnationalstatistics",
+]
+SAPE_URL_OVERRIDE = os.environ.get("SAPE_URL", "")
+SAPE_PARQUET = "sape_lsoa.parquet"
+# Count columns written to the parquet: (first age, last age or None for "and over").
+SAPE_BANDS = {
+    "sape_age0_15":   (0, 15),
+    "sape_age16_64":  (16, 64),
+    "sape_age65plus": (65, None),
+    "sape_age75plus": (75, None),
+    "sape_age18_24":  (18, 24),
+}
+# The shares the map shows, each a band over the population.
+SAPE_SHARES = {
+    "sape_age0_15_pct":   "sape_age0_15",
+    "sape_age16_64_pct":  "sape_age16_64",
+    "sape_age65plus_pct": "sape_age65plus",
+    "sape_age75plus_pct": "sape_age75plus",
+}
+SAPE_KEYS = ("sape_population",) + tuple(SAPE_SHARES)
+# A row whose single years miss its total by more than this is a misread.
+SAPE_TOTAL_TOLERANCE = 1
+
+
+def _norm_head(s) -> str:
+    """A header, lower case, with punctuation as spaces."""
+    return re.sub(r"[^a-z0-9+]+", " ", str(s if s is not None else "").replace("﻿", "").lower()).strip()
+
+
+def _year_of(name: str) -> int:
+    ys = [int(y) for y in re.findall(r"(?:19|20)\d{2}", str(name))]
+    return max(ys) if ys else 0
+
+
+def sape_pick(urls) -> str | None:
+    """The newest LSOA single-year-of-age estimates file among links, by
+    the latest year in its name; None if there is none."""
+    def name(u):
+        return urllib.parse.unquote(str(u)).rsplit("/", 1)[-1].lower()
+    cands = [u for u in dict.fromkeys(urls)
+             if re.search(r"\.(xlsx|zip)$", name(u))
+             and "lsoa" in name(u) and re.search(r"syoa|singleyear", name(u))]
+    if not cands:
+        return None
+    return max(cands, key=lambda u: (_year_of(name(u)), name(u)))
+
+
+def _ons_page_files(page: str, sess) -> list:
+    """Links to the files on an ONS dataset page: from its HTML and from the
+    page's /data JSON, whose editions list their downloads."""
+    base = "https://www.ons.gov.uk"
+    urls: list = []
+    try:
+        r = sess.get(page, timeout=60)
+        if r.ok:
+            for href in re.findall(r'href="([^"]+?\.(?:xlsx|zip))"', r.text):
+                urls.append(href if href.startswith("http") else base + href)
+    except Exception as e:
+        warn(f"sape: could not read {page} ({type(e).__name__}: {e})")
+    try:
+        j = sess.get(page.rstrip("/") + "/data", timeout=60).json()
+        for ed in (j.get("datasets") or []):
+            uri = (ed or {}).get("uri")
+            if not uri:
+                continue
+            jj = sess.get(base + uri + "/data", timeout=60).json()
+            for d in (jj.get("downloads") or []):
+                f = (d or {}).get("file")
+                if f:
+                    urls.append(f"{base}/file?uri={uri}/{f}")
+    except Exception as e:
+        warn(f"sape: could not read {page}/data ({type(e).__name__}: {e})")
+    return urls
+
+
+def sape_age_columns(header: list) -> tuple[dict, str]:
+    """{age: [column positions]} for the single years in a header row, and
+    how they were found ("sex" for F0..F90 and M0..M90, "persons" for 0..90).
+    Every age from 0 to the top one must be there, for each sex."""
+    by_sex: dict = {}
+    plain: dict = {}
+    for i, h in enumerate(header):
+        t = str(h if h is not None else "").strip()
+        m = re.fullmatch(r"(?i)([FM])\s*(\d{1,2})\s*\+?", t)
+        if m:
+            by_sex.setdefault(m.group(1).upper(), {})[int(m.group(2))] = i
+            continue
+        m = re.fullmatch(r"(?i)(?:age(?:d)?\s*)?(\d{1,2})\s*\+?(?:\s*(?:and over|plus))?", t)
+        if m:
+            plain[int(m.group(1))] = i
+    def full(d):
+        return bool(d) and max(d) >= 85 and all(a in d for a in range(0, max(d) + 1))
+    if set(by_sex) == {"F", "M"} and full(by_sex["F"]) and full(by_sex["M"]) \
+            and max(by_sex["F"]) == max(by_sex["M"]):
+        return {a: [by_sex["F"][a], by_sex["M"][a]] for a in by_sex["F"]}, "sex"
+    if full(plain):
+        return {a: [i] for a, i in plain.items()}, "persons"
+    return {}, ""
+
+
+def sape_parse_table(rows, scope=None) -> tuple["pd.DataFrame", str]:
+    """The estimates from one sheet's rows (lists of cells, header anywhere
+    above the data): LSOA21CD, sape_population and the SAPE_BANDS counts.
+    Returns (frame, problem); problem is "" when the sheet was read, and the
+    frame is empty when it was not."""
+    it = iter(rows)
+    header = None
+    for row in it:
+        cells = list(row or [])
+        heads = [_norm_head(c) for c in cells]
+        code_i = next((i for i, h in enumerate(heads)
+                       if "lsoa" in h and "code" in h and "2011" not in h), None)
+        tot_i = next((i for i, h in enumerate(heads) if h in ("total", "all ages", "persons all ages")), None)
+        if code_i is not None and tot_i is not None:
+            header = cells
+            break
+    if header is None:
+        return pd.DataFrame(), "no header row with an LSOA 2021 code column and a Total column"
+    ages, how = sape_age_columns(header)
+    if not ages:
+        return pd.DataFrame(), "no complete set of single years of age (F0 to F90 and M0 to M90)"
+    top = max(ages)
+    recs: list = []
+    bad = 0
+    for row in it:
+        cells = list(row or [])
+        if len(cells) <= code_i:
+            continue
+        code = str(cells[code_i] or "").strip()
+        if not re.fullmatch(r"E01\d{6}", code):
+            continue
+        if scope is not None and code not in scope:
+            continue
+        def num(i):
+            try:
+                v = cells[i]
+                return float(v) if v not in (None, "") else 0.0
+            except (IndexError, TypeError, ValueError):
+                return 0.0
+        by_age = {a: sum(num(i) for i in idx) for a, idx in ages.items()}
+        total = num(tot_i)
+        if abs(sum(by_age.values()) - total) > SAPE_TOTAL_TOLERANCE:
+            bad += 1
+        rec = {"LSOA21CD": code, "sape_population": int(round(total))}
+        for key, (lo, hi) in SAPE_BANDS.items():
+            hi_ = top if hi is None else hi
+            rec[key] = int(round(sum(v for a, v in by_age.items() if lo <= a <= hi_)))
+        recs.append(rec)
+    if not recs:
+        return pd.DataFrame(), "no English LSOA rows under the header"
+    if bad > max(1, len(recs) * 0.01):
+        return pd.DataFrame(), (f"the single years of age do not add up to the total in {bad:,} of "
+                                f"{len(recs):,} LSOAs, so the columns were misread")
+    return pd.DataFrame(recs).drop_duplicates("LSOA21CD"), ""
+
+
+def sape_read_file(path: Path, scope=None) -> tuple["pd.DataFrame", int, str]:
+    """(frame, year, problem) from a downloaded estimates file: an .xlsx (the
+    newest "Mid-YYYY LSOA 2021" sheet), a .csv, or a .zip holding either."""
+    path = Path(path)
+    if path.suffix.lower() == ".zip":
+        with zipfile.ZipFile(path) as z:
+            inner = [n for n in z.namelist() if n.lower().endswith((".xlsx", ".csv"))]
+            if not inner:
+                return pd.DataFrame(), 0, f"{path.name} holds no .xlsx or .csv"
+            best = max(inner, key=lambda n: (_year_of(n), "syoa" in n.lower(), n))
+            tmp = path.with_name(Path(best).name)
+            tmp.write_bytes(z.read(best))
+        return sape_read_file(tmp, scope)
+    if path.suffix.lower() == ".csv":
+        df = pd.read_csv(path, header=None, dtype=str, keep_default_na=False)
+        out, problem = sape_parse_table(df.itertuples(index=False, name=None), scope)
+        return out, _year_of(path.name), problem
+    import openpyxl
+    wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+    try:
+        names = list(wb.sheetnames)
+        dated = [n for n in names if re.search(r"(?i)mid\W*(?:19|20)\d{2}", n)
+                 and re.search(r"(?i)lsoa", n) and not re.search(r"(?i)2011", n)]
+        order = sorted(dated, key=_year_of, reverse=True) + [n for n in names if n not in dated]
+        last = "no sheet with LSOA estimates"
+        for n in order:
+            out, problem = sape_parse_table(wb[n].iter_rows(values_only=True), scope)
+            if not problem:
+                return out, _year_of(n) or _year_of(path.name), ""
+            last = f"sheet {n!r}: {problem}"
+        return pd.DataFrame(), 0, last
+    finally:
+        wb.close()
+
+
+def run_sape() -> "pd.DataFrame":
+    rule("ONS mid-year population estimates for LSOAs (SAPE)")
+    cache_dir = CACHE_DIR / "sape"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    out_path = DATA_DIR / "demographics" / SAPE_PARQUET
+    prev = _read_parquet_opt(out_path) if out_path.exists() else None
+    scope = set(get_lsoa_ward_lookup())
+
+    def fail(msg):
+        msg += (". Download the LSOA single year of age file from "
+                f"{SAPE_PAGES[0]} into {cache_dir} (or set SAPE_URL) and rerun "
+                "`python fetch_all_data.py --only sape`.")
+        if prev is not None and len(prev):
+            warn(f"sape: {msg}")
+            _SOURCE_ERROR["sape"] = msg + " The figures stay as last written."
+            return prev
+        raise RuntimeError(msg)
+
+    url = SAPE_URL_OVERRIDE
+    if not url:
+        sess = browser_session(referer="https://www.ons.gov.uk/")
+        found: list = []
+        for page in SAPE_PAGES:
+            found += _ons_page_files(page, sess)
+        url = sape_pick(found) or ""
+        if url:
+            info(f"sape: newest file on the ONS pages is {urllib.parse.unquote(url).rsplit('/', 1)[-1]}")
+    local = sorted([p for p in cache_dir.iterdir() if p.suffix.lower() in (".xlsx", ".zip", ".csv")],
+                   key=lambda p: (_year_of(p.name), p.stat().st_mtime))
+    src = None
+    if url:
+        name = re.sub(r"[^A-Za-z0-9._-]", "_", urllib.parse.unquote(url).rsplit("/", 1)[-1])
+        dest = cache_dir / name
+        if not dest.exists() or dest.stat().st_size < 100_000:
+            try:
+                r = browser_session(referer="https://www.ons.gov.uk/").get(url, timeout=600)
+                r.raise_for_status()
+                if len(r.content) < 100_000:
+                    raise RuntimeError(f"only {len(r.content):,} bytes")
+                write_bytes_atomic(dest, r.content)
+            except Exception as e:
+                warn(f"sape: could not download {url} ({type(e).__name__}: {e})")
+        if dest.exists():
+            src = dest
+    if src is None and local:
+        src = local[-1]
+        info(f"sape: using {src.name} from {cache_dir}")
+    if src is None:
+        return fail("no LSOA population estimates file was found on the ONS pages")
+    try:
+        out, year, problem = sape_read_file(src, scope or None)
+    except Exception as e:
+        return fail(f"{src.name} could not be read ({type(e).__name__}: {e})")
+    if problem or out.empty:
+        return fail(f"{src.name}: {problem or 'no rows'}")
+    out["sape_year"] = int(year) if year else pd.NA
+    if scope and len(out) < len(scope) * 0.99:
+        _SOURCE_ERROR["sape"] = (f"{src.name} has estimates for {len(out):,} of the "
+                                 f"{len(scope):,} LSOAs in scope")
+    out = write_parquet_guarded(out_path, out.sort_values("LSOA21CD").reset_index(drop=True),
+                                source="sape")
+    ok(f"sape: {len(out):,} LSOAs, mid-{year}, {int(out['sape_population'].sum()):,} people "
+       f"-> {out_path.relative_to(REPO_ROOT)}")
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Claimant count aged 18 to 24, by LSOA (Nomis NM_162_1)
+# ---------------------------------------------------------------------------
+# The request run_claimant_count makes, for one age band. The band's code is
+# looked up by its name in the dataset's age codelist rather than typed in,
+# and the response is checked by AGE_NAME. Whether Nomis publishes the band
+# for LSOAs was not confirmed (the fact check could not reach Nomis): if it
+# does not, the source is "skipped" and says so, and nothing is written.
+#
+# Nomis rounds every LSOA count to the nearest 5, so these counts are only
+# summed into wards and LAs and never shown for an LSOA. The base is people
+# aged 18 to 24 in the ONS mid-year estimates (sape), because the Census
+# tables the map reads have no 18 to 24 band.
+NOMIS_API = "https://www.nomisweb.co.uk/api/v01/dataset"
+CLAIMANT_DATASET = "NM_162_1"
+CLAIMANT_YOUTH_PARQUET = "claimant_18_24.parquet"
+CLAIMANT_YOUTH_MAX_AGE_DAYS = 20
+# "Aged 18-24", "Aged 18 to 24" or with an en dash (written as an escape here,
+# so the source holds no dash; pandas' pyarrow regex engine does not read
+# \u escapes itself).
+AGE_18_24 = r"\b18\s*(?:-|to|" + "\u2013" + r")\s*24\b"
+
+
+def nomis_codelist(obj) -> dict:
+    """{code: description} from a Nomis SDMX-JSON codelist response."""
+    out: dict = {}
+
+    def walk(o):
+        if isinstance(o, dict):
+            d = o.get("description")
+            if "value" in o and isinstance(d, dict) and isinstance(d.get("value"), str):
+                out[str(o["value"])] = d["value"]
+            for v in o.values():
+                walk(v)
+        elif isinstance(o, list):
+            for v in o:
+                walk(v)
+    walk(obj)
+    return out
+
+
+def claimant_youth_code(codes: dict) -> str | None:
+    """The code of the 18 to 24 band in an age codelist, by its name."""
+    hits = [c for c, d in codes.items()
+            if re.search(AGE_18_24, str(d), re.I)]
+    return sorted(hits, key=lambda c: (len(codes[c]), c))[0] if hits else None
+
+
+def claimant_youth_parse(df: "pd.DataFrame") -> tuple["pd.DataFrame", str]:
+    """(LSOA21CD, claimant_count_18_24, claimant_18_24_month) for the latest
+    month in a Nomis CSV, and a problem ("" when it was read)."""
+    need = {"GEOGRAPHY_CODE", "DATE", "OBS_VALUE"}
+    if not need.issubset(df.columns):
+        return pd.DataFrame(), f"unexpected columns {list(df.columns)[:8]}"
+    if "AGE_NAME" in df.columns:
+        names = df["AGE_NAME"].astype(str)
+        df = df[names.str.contains(AGE_18_24, case=False, regex=True)]
+        if df.empty:
+            return pd.DataFrame(), "no rows for ages 18 to 24 (AGE_NAME: " + \
+                ", ".join(sorted(set(names))[:5]) + ")"
+    df = df.assign(OBS_VALUE=pd.to_numeric(df["OBS_VALUE"], errors="coerce"))
+    df = df[df["GEOGRAPHY_CODE"].astype(str).str.match(r"^E01\d{6}$")]
+    if df.empty or df["OBS_VALUE"].notna().sum() == 0:
+        return pd.DataFrame(), "no figures for LSOAs"
+    latest = sorted(df["DATE"].dropna().astype(str).unique())[-1]
+    m = df[df["DATE"].astype(str) == latest].groupby("GEOGRAPHY_CODE", as_index=False)["OBS_VALUE"].first()
+    out = m.rename(columns={"GEOGRAPHY_CODE": "LSOA21CD", "OBS_VALUE": "claimant_count_18_24"})
+    out["claimant_18_24_month"] = latest
+    return out.dropna(subset=["claimant_count_18_24"]).reset_index(drop=True), ""
+
+
+def run_claimant_youth() -> "pd.DataFrame | None":
+    rule("NOMIS claimant count aged 18 to 24 (NM_162, LSOA)")
+    cache_dir = CACHE_DIR / "claimant"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    cache = cache_dir / f"claimant_18_24_{SCOPE_KEY}_latest.csv"
+    codes = sorted(get_lsoa_ward_lookup())
+    if not codes:
+        raise RuntimeError("claimant_youth: no LSOAs in scope")
+    stale = (not cache.exists() or cache.stat().st_size < 1024 or
+             _days_since(datetime.fromtimestamp(cache.stat().st_mtime, timezone.utc).isoformat())
+             > CLAIMANT_YOUTH_MAX_AGE_DAYS)
+    if stale:
+        meta = _http_json("GET", f"{NOMIS_API}/{CLAIMANT_DATASET}/age.def.sdmx.json",
+                          source="claimant_youth", timeout=60)
+        ages = nomis_codelist(meta or {})
+        code = claimant_youth_code(ages)
+        if not code:
+            msg = (f"Nomis lists no 18 to 24 band in the {CLAIMANT_DATASET} age codelist "
+                   f"({'; '.join(list(ages.values())[:8]) or 'empty'})")
+            warn(f"claimant_youth: {msg}")
+            if not ages:
+                raise RuntimeError(f"claimant_youth: {msg}")
+            _SOURCE_NOTE["claimant_youth"] = msg
+            return None
+        info(f"claimant_youth: age code {code} ({ages[code]})")
+        base = (f"{NOMIS_API}/{CLAIMANT_DATASET}.data.csv?date=latest&gender=0&age={code}"
+                "&measures=20100")
+        parts: list = []
+        header = None
+        for i in range(0, len(codes), 500):
+            r = requests.get(base + "&geography=" + ",".join(codes[i:i + 500]), timeout=180)
+            if r.status_code in (400, 404) and i == 0:
+                # Nomis refuses a cell it does not publish, such as an age
+                # band for a geography it is not released for.
+                _SOURCE_NOTE["claimant_youth"] = (
+                    f"Nomis refused ages 18 to 24 by LSOA (HTTP {r.status_code}: "
+                    f"{r.text[:160].strip()}), so it does not publish the band for LSOAs")
+                warn(f"claimant_youth: {_SOURCE_NOTE['claimant_youth']}")
+                return None
+            r.raise_for_status()
+            body = r.content
+            nl = body.find(b"\n")
+            if nl < 0:
+                continue
+            if header is None:
+                header = body[:nl + 1]
+                parts.append(body)
+            else:
+                parts.append(body[nl + 1:])
+        if not parts:
+            _SOURCE_NOTE["claimant_youth"] = ("Nomis returned nothing for ages 18 to 24 by LSOA, "
+                                              "so it does not publish the band for LSOAs")
+            warn(f"claimant_youth: {_SOURCE_NOTE['claimant_youth']}")
+            return None
+        write_bytes_atomic(cache, b"".join(parts))
+    try:
+        df = pd.read_csv(cache, dtype=str, low_memory=False)
+    except pd.errors.EmptyDataError:
+        df = pd.DataFrame()
+    out, problem = claimant_youth_parse(df)
+    if problem:
+        _SOURCE_NOTE["claimant_youth"] = (f"Nomis gave no claimant count aged 18 to 24 for LSOAs "
+                                          f"({problem}), so there is nothing to show")
+        warn(f"claimant_youth: {_SOURCE_NOTE['claimant_youth']}")
+        cache.unlink(missing_ok=True)
+        return None
+    out_path = DATA_DIR / "economy" / CLAIMANT_YOUTH_PARQUET
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out = write_parquet_guarded(out_path, out, source="claimant_youth")
+    ok(f"claimant_youth: {len(out):,} LSOAs, month {out['claimant_18_24_month'].iloc[0]}, "
+       f"{int(out['claimant_count_18_24'].sum()):,} claimants aged 18 to 24 "
+       f"-> {out_path.relative_to(REPO_ROOT)}")
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Road casualties killed or seriously injured (DfT STATS19)
+# ---------------------------------------------------------------------------
+# DfT's casualty file for the last five years. Each casualty carries the LSOA
+# they live in (lsoa_of_casualty, blank for people living outside England and
+# Wales), so the figure is a rate among residents, wherever the collision
+# happened. Counting collisions where they happen and dividing by residents
+# would make every ward with a main road look dangerous to live in.
+#
+# Seriously injured is DfT's adjusted figure (casualty_adjusted_severity_
+# serious, a probability for each casualty), because forces using the CRASH
+# system, the Met among them, record more injuries as serious than the rest.
+# A file without the adjusted column is refused rather than mixed.
+#
+# Which LSOA vintage lsoa_of_casualty uses was not confirmed. A code in the
+# 2021 set is used as it is; a 2011 code that no longer exists is shared
+# among the 2021 LSOAs drawn from it, by their Census 2021 residents, so no
+# casualty is lost or counted twice.
+STATS19_PAGES = [
+    "https://www.data.gov.uk/dataset/cb7ae6f0-4be6-4935-9277-47e5ce24a11f/road-safety-data",
+]
+STATS19_BASE = "https://data.dft.gov.uk/road-accident-safety-data/"
+STATS19_DEFAULT = STATS19_BASE + "dft-road-casualty-statistics-casualty-last-5-years.csv"
+STATS19_URL_OVERRIDE = os.environ.get("STATS19_CASUALTY_URL", "")
+ROAD_CASUALTIES_PARQUET = "road_casualties_lsoa.parquet"
+STATS19_MAX_AGE_DAYS = 30
+STATS19_YEARS = 5
+
+
+def stats19_pick(urls) -> str | None:
+    """The casualty file for the last five years among links, else None."""
+    def name(u):
+        return str(u).rsplit("/", 1)[-1].lower()
+    cas = [u for u in dict.fromkeys(urls) if "casualt" in name(u) and name(u).endswith(".csv")
+           and "collision" not in name(u) and "vehicle" not in name(u) and "guide" not in name(u)]
+    five = [u for u in cas if re.search(r"last.?5.?years|last.?five.?years", name(u))]
+    return five[0] if five else None
+
+
+def stats19_columns(cols) -> tuple[dict, list]:
+    """{role: column} for the casualty file's columns, and what is missing."""
+    norm = {c: _norm_head(c).replace(" ", "_") for c in cols}
+    def find(*pats, exclude=()):
+        for c, n in norm.items():
+            if all(re.search(p, n) for p in pats) and not any(re.search(x, n) for x in exclude):
+                return c
+        return None
+    got = {
+        "year": find(r"^(collision|accident)_year$") or find(r"year$", exclude=(r"age",)),
+        "severity": find(r"^casualty_severity$"),
+        "serious_adj": find(r"adjusted_severity_serious"),
+        "lsoa": find(r"lsoa_of_casualty"),
+    }
+    missing = [k for k, v in got.items() if not v]
+    return got, missing
+
+
+def stats19_ksi_by_lsoa(df: "pd.DataFrame", cols: dict) -> tuple[dict, list]:
+    """({lsoa code: casualties killed or seriously injured}, [years]) over the
+    latest STATS19_YEARS years in the file, by home LSOA. A fatal casualty
+    counts 1, any other its adjusted chance of having been seriously hurt."""
+    years = pd.to_numeric(df[cols["year"]], errors="coerce")
+    have = sorted(int(y) for y in years.dropna().unique())
+    keep_years = have[-STATS19_YEARS:]
+    d = df[years.isin(keep_years)]
+    sev = d[cols["severity"]].astype(str).str.strip().str.lower()
+    fatal = sev.isin(["1", "1.0", "fatal"])
+    serious = sev.isin(["2", "2.0", "serious"])
+    adj = pd.to_numeric(d[cols["serious_adj"]], errors="coerce").clip(0, 1)
+    # A blank adjusted figure falls back to the casualty's own severity, so a
+    # serious injury without one still counts rather than vanishing.
+    adj = adj.where(adj.notna(), serious.astype(float))
+    ksi = fatal.astype(float) + (~fatal).astype(float) * adj
+    code = d[cols["lsoa"]].astype(str).str.strip()
+    s = ksi.groupby(code).sum()
+    return {c: float(v) for c, v in s.items() if re.fullmatch(r"E01\d{6}", c)}, keep_years
+
+
+def counts_to_lsoa21(counts: dict, scope: set, rows: list, pop21: dict) -> tuple[dict, int]:
+    """{LSOA21CD: count} for the scope from counts keyed by LSOA codes of
+    either vintage. A code in the scope is kept as it is. A 2011 code that
+    no longer exists is shared among the scope's 2021 LSOAs drawn from it in
+    proportion to their Census 2021 residents (equally without them), so the
+    total is kept. Returns the counts and how many 2011 codes were shared."""
+    out: dict = {}
+    for c, v in counts.items():
+        if c in scope:
+            out[c] = out.get(c, 0.0) + v
+    kids: dict = {}
+    for p11, c21, _chg in rows:
+        if c21 in scope and p11 not in scope:
+            kids.setdefault(p11, [])
+            if c21 not in kids[p11]:
+                kids[p11].append(c21)
+    shared = 0
+    for p11, ks in kids.items():
+        v = counts.get(p11)
+        if not v:
+            continue
+        shared += 1
+        w = [float(pop21.get(k, 0) or 0) for k in ks]
+        tot = sum(w)
+        for k, wk in zip(ks, w):
+            out[k] = out.get(k, 0.0) + v * (wk / tot if tot > 0 else 1 / len(ks))
+    return out, shared
+
+
+def run_road_casualties() -> "pd.DataFrame":
+    rule("Road casualties killed or seriously injured (DfT STATS19)")
+    cache_dir = CACHE_DIR / "stats19"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    scope = set(get_lsoa_ward_lookup())
+    url = STATS19_URL_OVERRIDE
+    if not url:
+        found: list = []
+        sess = browser_session(referer="https://www.data.gov.uk/")
+        for page in STATS19_PAGES:
+            try:
+                r = sess.get(page, timeout=60)
+                if r.ok:
+                    found += re.findall(r'href="([^"]+\.csv)"', r.text)
+            except Exception as e:
+                warn(f"road_casualties: could not read {page} ({type(e).__name__}: {e})")
+        url = stats19_pick(found) or ""
+        if not url:
+            warn("road_casualties: the data.gov.uk page listed no five-year casualty file; "
+                 f"trying {STATS19_DEFAULT}")
+            url = STATS19_DEFAULT
+    dest = cache_dir / url.rsplit("/", 1)[-1]
+    fresh = dest.exists() and dest.stat().st_size > 1_000_000 and _days_since(
+        datetime.fromtimestamp(dest.stat().st_mtime, timezone.utc).isoformat()) <= STATS19_MAX_AGE_DAYS
+    if not fresh:
+        info(f"road_casualties: downloading {url}")
+        try:
+            r = requests.get(url, timeout=600)
+            r.raise_for_status()
+            if len(r.content) < 1_000_000:
+                raise RuntimeError(f"only {len(r.content):,} bytes")
+            write_bytes_atomic(dest, r.content)
+        except Exception as e:
+            if not dest.exists():
+                raise RuntimeError(f"road_casualties: could not download {url} "
+                                   f"({type(e).__name__}: {e})")
+            warn(f"road_casualties: download failed ({e}); using the cached {dest.name}")
+    head = pd.read_csv(dest, nrows=0, encoding="utf-8-sig")
+    cols, missing = stats19_columns(head.columns)
+    if missing:
+        raise RuntimeError(f"road_casualties: {dest.name} has no column for "
+                           f"{', '.join(missing)} (columns: {', '.join(map(str, head.columns[:25]))})")
+    df = pd.read_csv(dest, usecols=list(cols.values()), dtype=str, low_memory=False, encoding="utf-8-sig")
+    by_code, years = stats19_ksi_by_lsoa(df, cols)
+    if len(years) < STATS19_YEARS:
+        warn(f"road_casualties: the file covers only {len(years)} years ({years})")
+    cen = _read_parquet_opt(DATA_DIR / "demographics" / "census2021.parquet")
+    pop = {} if cen is None or "census_population" not in cen.columns else dict(
+        zip(cen["LSOA21CD"].astype(str), pd.to_numeric(cen["census_population"], errors="coerce").fillna(0)))
+    rows: list = []
+    if any(c not in scope and c.startswith("E01") for c in by_code):
+        try:
+            rows = get_lsoa11_lsoa21_rows()
+        except Exception as e:
+            warn(f"road_casualties: the LSOA 2011 to 2021 lookup failed ({e}); "
+                 "casualties with a retired 2011 code are left out")
+    counts, shared = counts_to_lsoa21(by_code, scope, rows, pop)
+    if shared:
+        info(f"road_casualties: {shared:,} LSOA 2011 codes shared among their 2021 LSOAs")
+    span = f"{years[0]} to {years[-1]}" if years else ""
+    out = pd.DataFrame({"LSOA21CD": sorted(scope)})
+    out["road_ksi_5yr"] = out["LSOA21CD"].map(lambda c: round(counts.get(c, 0.0), 3))
+    out["road_ksi_years"] = span
+    out_path = DATA_DIR / "environment" / ROAD_CASUALTIES_PARQUET
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    if not counts:
+        raise RuntimeError(f"road_casualties: no casualty in {dest.name} lives in an LSOA in scope")
+    out = write_parquet_guarded(out_path, out, source="road_casualties")
+    ok(f"road_casualties: {out['road_ksi_5yr'].sum():,.0f} killed or seriously injured residents "
+       f"of {len(out):,} LSOAs, {span} -> {out_path.relative_to(REPO_ROOT)}")
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Care homes and their beds (CQC)
+# ---------------------------------------------------------------------------
+# The pipeline did not read CQC before. CQC's "Using CQC data" page links a
+# monthly "Care directory with filters" file, which carries the number of
+# beds each care home is registered for; its address changes every month, so
+# it is found on the page. CQC_CARE_DIRECTORY_URL overrides, and a file put in
+# .cache/cqc/ by hand (or from a cqc-source release, as the workflows do) is
+# used when the page cannot be read.
+#
+# The column names come from memory of CQC's files ("Location ID", "Care
+# home?", "Care homes beds", "Dormant (Y/N)", "Location Postal Code"), not
+# from a file seen this year, so they are matched by their words, and a file
+# without a location, postcode or beds column fails the source rather than
+# reporting no beds.
+#
+# Beds are registered places, not residents, and include homes for younger
+# adults. Per 100 people aged 75 and over they say how much care home
+# capacity an area has, not how many of its own residents need it, and one
+# large home decides an LSOA's figure, so it is shown for wards and LAs only.
+CQC_PAGE = "https://www.cqc.org.uk/about-us/transparency/using-cqc-data"
+CQC_URL_OVERRIDE = os.environ.get("CQC_CARE_DIRECTORY_URL", "")
+CARE_HOMES_PARQUET = "care_homes.parquet"
+CQC_MAX_AGE_DAYS = 32
+
+
+def cqc_pick(urls) -> str | None:
+    """The care directory with filters among links (else the active
+    locations file), newest by the date in its name; None if neither."""
+    def name(u):
+        return urllib.parse.unquote(str(u)).rsplit("/", 1)[-1].lower()
+    ok_ext = [u for u in dict.fromkeys(urls) if re.search(r"\.(ods|xlsx|csv|zip)$", name(u))]
+    def stamp(u):
+        m = re.findall(r"(20\d{2})[-_ ]?(\d{2})[-_ ]?(\d{2})?", name(u))
+        return max(m) if m else ("", "", "")
+    for test in (lambda n: "directory" in n and "filter" in n,
+                 lambda n: "active" in n and "location" in n):
+        hits = [u for u in ok_ext if test(name(u).replace("_", " ").replace("-", " "))]
+        if hits:
+            return max(hits, key=stamp)
+    return None
+
+
+# A cell, empty and self-closing (<table:table-cell/>, or several of them as
+# table:number-columns-repeated) or with content. The self-closing form is
+# tried first: _GB_CELL, written for the green space table, which has no
+# blank cells, reads an empty cell and the one after it as one cell, which
+# would shift every later column of a CQC row one place left.
+_ODS_CELL = re.compile(
+    rb"<table:(?:covered-)?table-cell([^>]*?)/>"
+    rb"|<table:(?:covered-)?table-cell([^>]*)>((?:(?!</table:(?:covered-)?table-cell>).)*)"
+    rb"</table:(?:covered-)?table-cell>", re.DOTALL)
+
+
+def ods_parse_row(row_xml: bytes) -> list:
+    """The cells of one .ods row, an empty cell kept as "" in its place."""
+    cells = []
+    for m in _ODS_CELL.finditer(row_xml):
+        empty = m.group(2) is None
+        attrs = (m.group(1) if empty else m.group(2)) or b""
+        inner = b"" if empty else (m.group(3) or b"")
+        vm = _GB_VALUE.search(attrs)
+        if vm:
+            val = vm.group(1).decode("utf-8", errors="replace")
+        else:
+            bits = [_GB_TAG.sub(b"", x).decode("utf-8", errors="replace").strip()
+                    for x in _GB_TEXT_P.findall(inner)]
+            val = " ".join(b for b in bits if b)
+        rm = _GB_REPEAT.search(attrs)
+        reps = int(rm.group(1)) if rm else 1
+        cells.extend([val] * (1 if reps > 200 and val == "" else min(reps, 200)))
+    while cells and cells[-1] == "":
+        cells.pop()
+    return [html_unescape(c) for c in cells]
+
+
+def ods_rows(path: Path):
+    """Each row of every sheet in an .ods file as (sheet, [cells]), streamed
+    from content.xml."""
+    CHUNK = 16 * 1024 * 1024
+    with zipfile.ZipFile(path) as zf, zf.open("content.xml") as fp:
+        carry, cur = b"", None
+        while True:
+            data = fp.read(CHUNK)
+            if not data and not carry:
+                break
+            chunk = carry + data if data else carry
+            pos, N = 0, len(chunk)
+            while pos < N:
+                if cur is None:
+                    m = _GB_TABLE_OPEN.search(chunk, pos)
+                    if m is None:
+                        break
+                    cur = m.group(1).decode("utf-8", errors="replace")
+                    pos = m.end()
+                    continue
+                r = _GB_ROW_OPEN.search(chunk, pos)
+                close = _GB_TABLE_CLOSE.search(chunk, pos, r.start() if r else N)
+                if close:
+                    pos, cur = close.end(), None
+                    continue
+                if r is None:
+                    break
+                rc = _GB_ROW_END.search(chunk, r.end())
+                if rc is None:
+                    break
+                yield cur, ods_parse_row(chunk[r.end():rc.start()])
+                pos = rc.end()
+            carry = chunk[pos:]
+            if not data:
+                break
+
+
+def cqc_read_table(path: Path) -> "pd.DataFrame":
+    """The locations table of a CQC file (.ods, .xlsx, .csv or a .zip of
+    one), from the first row that names a location ID down."""
+    path = Path(path)
+    if path.suffix.lower() == ".zip":
+        with zipfile.ZipFile(path) as z:
+            inner = [n for n in z.namelist() if n.lower().endswith((".ods", ".xlsx", ".csv"))]
+            if not inner:
+                raise RuntimeError(f"{path.name} holds no .ods, .xlsx or .csv")
+            tmp = path.with_name(Path(inner[0]).name)
+            tmp.write_bytes(z.read(inner[0]))
+        return cqc_read_table(tmp)
+    def tagged_rows():
+        """(sheet, cells) for every row, sheet by sheet, read lazily."""
+        if path.suffix.lower() == ".csv":
+            text = path.read_bytes().decode("utf-8-sig", errors="replace")
+            for row in csv.reader(io.StringIO(text)):
+                yield "csv", row
+        elif path.suffix.lower() == ".xlsx":
+            import openpyxl
+            wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+            try:
+                for n in wb.sheetnames:
+                    for row in wb[n].iter_rows(values_only=True):
+                        yield n, list(row)
+            finally:
+                wb.close()
+        else:
+            yield from ods_rows(path)
+
+    seen: dict = {}
+    sheet, cols, body = None, None, []
+    for name, row in tagged_rows():
+        if cols is not None:
+            if name != sheet:
+                break                      # the table ends with its sheet
+            body.append(row)
+            continue
+        seen[name] = seen.get(name, 0) + 1
+        if seen[name] > 50:
+            continue
+        heads = [_norm_head(c) for c in row]
+        if any("location id" in h and "provider" not in h for h in heads):
+            sheet, cols = name, [str(c if c is not None else "").strip() for c in row]
+    if cols is None:
+        raise RuntimeError(f"{path.name}: no sheet has a 'Location ID' header row")
+    width = len(cols)
+    named: dict = {}
+    for i, c in enumerate(cols):          # blank or repeated headings made unique
+        c = c or f"column {i + 1}"
+        named[c] = named.get(c, 0) + 1
+        cols[i] = c if named[c] == 1 else f"{c} ({named[c]})"
+    body = [list(r) + [None] * (width - len(r)) if len(r) < width else list(r)[:width] for r in body]
+    return pd.DataFrame(body, columns=cols)
+
+
+def cqc_care_homes(df: "pd.DataFrame") -> "pd.DataFrame":
+    """One row per active care home with beds: location_id, name, postcode,
+    beds, nursing (True, False or None), lat, lng. Raises naming the columns
+    when a location, postcode or beds column cannot be found."""
+    heads = {c: _norm_head(c) for c in df.columns}
+
+    def col(test, prefer=None):
+        hits = [c for c, h in heads.items() if test(h)]
+        if prefer:
+            best = [c for c in hits if prefer(heads[c])]
+            if best:
+                return best[0]
+        return hits[0] if hits else None
+    c_id = col(lambda h: "location id" in h and "provider" not in h and "ods" not in h)
+    c_name = col(lambda h: h in ("location name", "name") or (h.endswith(" name") and "location" in h),
+                 prefer=lambda h: h == "location name")
+    c_pc = col(lambda h: "postcode" in h or "postal code" in h, prefer=lambda h: "location" in h)
+    c_beds = col(lambda h: "beds" in h and "provider" not in h)
+    c_flag = col(lambda h: h in ("care home", "care home y n") or h.startswith("care home ") and h.endswith(" y n"))
+    c_with = col(lambda h: "care home service with nursing" in h)
+    c_without = col(lambda h: "care home service without nursing" in h)
+    c_dormant = col(lambda h: "dormant" in h)
+    c_lat = col(lambda h: "latitude" in h)
+    c_lng = col(lambda h: "longitude" in h)
+    missing = [n for n, c in (("location ID", c_id), ("postcode", c_pc), ("care home beds", c_beds)) if not c]
+    if missing:
+        raise RuntimeError("CQC file has no column for " + ", ".join(missing) +
+                           " (columns: " + ", ".join(map(str, list(df.columns)[:30])) + ")")
+
+    def yes(s):
+        return s.astype(str).str.strip().str.upper().isin(["Y", "YES", "TRUE", "1"])
+    beds = pd.to_numeric(df[c_beds], errors="coerce")
+    keep = beds.fillna(0) > 0
+    if c_flag:
+        keep &= yes(df[c_flag])
+    elif c_with or c_without:
+        keep &= (yes(df[c_with]) if c_with else False) | (yes(df[c_without]) if c_without else False)
+    if c_dormant:
+        keep &= ~yes(df[c_dormant])
+    d = df[keep]
+    out = pd.DataFrame({
+        "location_id": d[c_id].astype(str).str.strip(),
+        "name": d[c_name].astype(str).str.strip() if c_name else "",
+        "postcode": d[c_pc].astype(str).str.strip(),
+        "beds": beds[keep].astype(int),
+    })
+    out["nursing"] = (yes(d[c_with]).values if c_with else None)
+    out["lat"] = pd.to_numeric(d[c_lat], errors="coerce").values if c_lat else float("nan")
+    out["lng"] = pd.to_numeric(d[c_lng], errors="coerce").values if c_lng else float("nan")
+    out = out[out["location_id"] != ""].drop_duplicates("location_id")
+    return out.reset_index(drop=True)
+
+
+def run_care_homes() -> "pd.DataFrame":
+    rule("Care homes and their beds (CQC care directory)")
+    cache_dir = CACHE_DIR / "cqc"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    url = CQC_URL_OVERRIDE
+    if not url:
+        try:
+            r = browser_session(referer="https://www.cqc.org.uk/").get(CQC_PAGE, timeout=60)
+            r.raise_for_status()
+            links = [h if h.startswith("http") else "https://www.cqc.org.uk" + h
+                     for h in re.findall(r'href="([^"]+)"', r.text)]
+            url = cqc_pick(links) or ""
+            if not url:
+                warn(f"care_homes: {CQC_PAGE} lists no care directory file")
+        except Exception as e:
+            warn(f"care_homes: could not read {CQC_PAGE} ({type(e).__name__}: {e})")
+    src = None
+    if url:
+        dest = cache_dir / re.sub(r"[^A-Za-z0-9._-]", "_", urllib.parse.unquote(url).rsplit("/", 1)[-1].split("?")[0])
+        if not dest.exists() or dest.stat().st_size < 50_000:
+            try:
+                rr = browser_session(referer=CQC_PAGE).get(url, timeout=600)
+                rr.raise_for_status()
+                if len(rr.content) < 50_000:
+                    raise RuntimeError(f"only {len(rr.content):,} bytes")
+                write_bytes_atomic(dest, rr.content)
+            except Exception as e:
+                warn(f"care_homes: could not download {url} ({type(e).__name__}: {e})")
+        if dest.exists():
+            src = dest
+    if src is None:
+        local = [p for p in cache_dir.iterdir() if p.suffix.lower() in (".ods", ".xlsx", ".csv", ".zip")]
+        local = [p for p in local if _days_since(datetime.fromtimestamp(
+            p.stat().st_mtime, timezone.utc).isoformat()) <= CQC_MAX_AGE_DAYS * 3]
+        if local:
+            src = max(local, key=lambda p: p.stat().st_mtime)
+            info(f"care_homes: using {src.name} from {cache_dir}")
+    if src is None:
+        raise RuntimeError(
+            f"care_homes: no CQC care directory file. Download 'Care directory with filters' "
+            f"from {CQC_PAGE} into {cache_dir} (or attach it to a cqc-source release, or set "
+            f"CQC_CARE_DIRECTORY_URL) and rerun `python fetch_all_data.py --only care_homes`.")
+    homes = cqc_care_homes(cqc_read_table(src))
+    if homes.empty:
+        raise RuntimeError(f"care_homes: {src.name} lists no active care home with beds")
+    info(f"care_homes: {len(homes):,} active care homes in {src.name}, {int(homes['beds'].sum()):,} beds")
+    owners = {normalise_postcode(p): n for p, n in zip(homes["postcode"], homes["name"]) if normalise_postcode(p)}
+    lookup = lookup_postcodes(owners.keys(), source="care_homes", owners=owners)
+    scope = get_lsoa_ward_lookup()
+    rows = []
+    for rec in homes.to_dict("records"):
+        hit = lookup.get(normalise_postcode(rec["postcode"]))
+        if hit:
+            lat, lng, lsoa, lad, wd = hit
+        elif pd.notna(rec.get("lat")) and pd.notna(rec.get("lng")):
+            codes = _codes_from_point(float(rec["lat"]), float(rec["lng"]))
+            if not codes:
+                continue
+            lat, lng = float(rec["lat"]), float(rec["lng"])
+            lsoa, lad, wd = codes
+        else:
+            continue
+        if lsoa not in scope:
+            continue
+        rows.append({**{k: rec[k] for k in ("location_id", "name", "postcode", "beds", "nursing")},
+                     "lat": lat, "lng": lng, "LSOA21CD": lsoa,
+                     "WD25CD": scope[lsoa][0], "LAD25CD": scope[lsoa][1],
+                     "as_at": datetime.fromtimestamp(src.stat().st_mtime, timezone.utc).strftime("%Y-%m-%d")})
+    out = pd.DataFrame(rows)
+    out_path = DATA_DIR / "healthcare" / CARE_HOMES_PARQUET
+    out = write_parquet_guarded(out_path, out, source="care_homes")
+    if len(out):
+        ok(f"care_homes: {len(out):,} care homes in scope, {int(out['beds'].sum()):,} beds "
+           f"-> {out_path.relative_to(REPO_ROOT)}")
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Ward and LA figures for the measures above
+# ---------------------------------------------------------------------------
+SMALL_AREA_RATE_KEYS = ("claimant_18_24_pct", "road_ksi_per_1000", "care_home_beds_per_100_75plus")
+
+
+def _lsoa_frame(path: Path, cols) -> dict:
+    """{LSOA21CD: {col: value}} from a parquet, for the columns it has."""
+    df = _read_parquet_opt(path) if path.exists() else None
+    if df is None or df.empty or "LSOA21CD" not in df.columns:
+        return {}
+    have = [c for c in cols if c in df.columns]
+    return {str(r["LSOA21CD"]): {c: r[c] for c in have} for r in df[["LSOA21CD"] + have].to_dict("records")}
+
+
+def _summed_rate(num: dict, den: dict, to_area: dict, scale: float, ndigits: int,
+                 every_lsoa: bool) -> dict:
+    """{area: scale * sum(num) / sum(den)} over the LSOAs of each area. With
+    every_lsoa, an LSOA missing from num counts as 0 (a count of events); without
+    it, only LSOAs with both a numerator and a base are used."""
+    n_sum: dict = {}
+    d_sum: dict = {}
+    for lc, area in to_area.items():
+        if not area:
+            continue
+        d = den.get(lc)
+        if d is None or pd.isna(d) or float(d) <= 0:
+            continue
+        n = num.get(lc)
+        if n is None or pd.isna(n):
+            if not every_lsoa:
+                continue
+            n = 0.0
+        n_sum[area] = n_sum.get(area, 0.0) + float(n)
+        d_sum[area] = d_sum.get(area, 0.0) + float(d)
+    return {a: round(scale * n_sum[a] / d, ndigits) for a, d in d_sum.items() if d > 0}
+
+
+def small_area_figures(to_area: dict, pop_by_lsoa: dict, *, what: str) -> tuple[dict, dict]:
+    """({area: {key: value}}, notes) for the small-area measures, for wards
+    (to_area the LSOA to ward best fit) or LAs (every LSOA to its LA).
+
+    Distances: averages of the LSOAs weighted by Census 2021 residents.
+    Population estimates: the LSOAs' counts added up, and each share their
+    band over their population. Youth claimants, road casualties and care home
+    beds: the LSOAs' counts added up over their bases added up (people aged
+    18 to 24 and aged 75 and over from the estimates, residents from the
+    Census). notes holds each one's period and how distances were measured."""
+    demo = DATA_DIR / "demographics"
+    out: dict = {}
+    notes: dict = {}
+
+    def put(key, vals):
+        for a, v in vals.items():
+            out.setdefault(a, {})[key] = v
+
+    sa = _lsoa_frame(DATA_DIR / "environment" / SERVICE_ACCESS_PARQUET, SERVICE_KEYS + ("origin",))
+    if sa:
+        for key in SERVICE_KEYS:
+            per = {lc: r[key] for lc, r in sa.items() if key in r and pd.notna(r[key])}
+            if per and pop_by_lsoa:
+                put(key, {a: round(v, 3) for a, v in lsoa_means_to_areas(
+                    per, to_area, pop_by_lsoa, what=f"{what} {key}").items()})
+        kinds = {r.get("origin") for r in sa.values()}
+        notes["service_access_origin"] = ("pwc" if kinds == {"pwc"} else
+                                          "centroid" if kinds == {"centroid"} else "mixed")
+
+    sape = _lsoa_frame(demo / SAPE_PARQUET, ("sape_population", "sape_year") + tuple(SAPE_BANDS))
+    if sape:
+        pops = {lc: r["sape_population"] for lc, r in sape.items()}
+        put("sape_population", {a: int(v) for a, v in lsoa_sums_to_areas(pops, to_area).items()})
+        for key, band in SAPE_SHARES.items():
+            put(key, _summed_rate({lc: r.get(band) for lc, r in sape.items()}, pops, to_area,
+                                  100.0, 1, every_lsoa=False))
+        yrs = {int(r["sape_year"]) for r in sape.values() if pd.notna(r.get("sape_year"))}
+        if yrs:
+            notes["sape_year"] = max(yrs)
+
+    cy = _lsoa_frame(DATA_DIR / "economy" / CLAIMANT_YOUTH_PARQUET,
+                     ("claimant_count_18_24", "claimant_18_24_month"))
+    if cy:
+        if sape:
+            put("claimant_18_24_pct", _summed_rate(
+                {lc: r["claimant_count_18_24"] for lc, r in cy.items()},
+                {lc: r.get("sape_age18_24") for lc, r in sape.items()},
+                to_area, 100.0, 1, every_lsoa=False))
+            notes["claimant_18_24_month"] = str(next(iter(cy.values())).get("claimant_18_24_month") or "")
+        else:
+            warn(f"{what}: no population estimates (sape), so the claimant rate aged 18 to 24 "
+                 "has no base and is left out")
+
+    rc = _lsoa_frame(DATA_DIR / "environment" / ROAD_CASUALTIES_PARQUET, ("road_ksi_5yr", "road_ksi_years"))
+    if rc and pop_by_lsoa:
+        put("road_ksi_per_1000", _summed_rate(
+            {lc: r["road_ksi_5yr"] for lc, r in rc.items()},
+            {lc: pop_by_lsoa.get(lc) for lc in rc}, to_area, 1000.0, 2, every_lsoa=True))
+        notes["road_ksi_years"] = str(next(iter(rc.values())).get("road_ksi_years") or "")
+
+    ch_path = DATA_DIR / "healthcare" / CARE_HOMES_PARQUET
+    ch = _read_parquet_opt(ch_path) if ch_path.exists() else None
+    if ch is not None and not ch.empty and {"LSOA21CD", "beds"}.issubset(ch.columns):
+        if sape:
+            beds = ch.groupby("LSOA21CD")["beds"].sum().to_dict()
+            put("care_home_beds_per_100_75plus", _summed_rate(
+                beds, {lc: r.get("sape_age75plus") for lc, r in sape.items()},
+                to_area, 100.0, 1, every_lsoa=True))
+            if "as_at" in ch.columns and ch["as_at"].notna().any():
+                notes["care_homes_as_at"] = str(ch["as_at"].dropna().max())
+        else:
+            warn(f"{what}: no population estimates (sape), so care home beds per 100 people "
+                 "aged 75 and over has no base and is left out")
+    return out, notes
+
+
+def small_area_lsoa_values(pop_by_lsoa: dict) -> dict:
+    """{LSOA21CD: {key: value}} for the measures shown for LSOAs: the
+    distances, the population estimates and the police.uk crime figures.
+    Youth claimants, road casualties and care home beds are too few per LSOA
+    to show there."""
+    out: dict = {}
+    sa = _lsoa_frame(DATA_DIR / "environment" / SERVICE_ACCESS_PARQUET, SERVICE_KEYS)
+    for lc, r in sa.items():
+        for k in SERVICE_KEYS:
+            if k in r and pd.notna(r[k]):
+                out.setdefault(lc, {})[k] = round(float(r[k]), 3)
+    sape = _lsoa_frame(DATA_DIR / "demographics" / SAPE_PARQUET, ("sape_population",) + tuple(SAPE_BANDS))
+    for lc, r in sape.items():
+        p = r.get("sape_population")
+        if p is None or pd.isna(p):
+            continue
+        rec = out.setdefault(lc, {})
+        rec["sape_population"] = int(p)
+        for key, band in SAPE_SHARES.items():
+            v = r.get(band)
+            if p > 0 and v is not None and pd.notna(v):
+                rec[key] = round(100.0 * float(v) / float(p), 1)
+    crime = _read_parquet_opt(DATA_DIR / "crime" / "police_uk_crime.parquet")
+    for lc, rec in crime_by_lsoa(crime, pop_by_lsoa).items():
+        out.setdefault(lc, {}).update(rec)
+    return out
+
+
+def small_area_periods() -> dict:
+    """{key: period} for the small-area measures, for indicators.js."""
+    out: dict = {}
+    demo = DATA_DIR / "demographics"
+    sape = _read_parquet_opt(demo / SAPE_PARQUET) if (demo / SAPE_PARQUET).exists() else None
+    if sape is not None and "sape_year" in sape.columns and sape["sape_year"].notna().any():
+        y = f"mid-{int(pd.to_numeric(sape['sape_year'], errors='coerce').max())}"
+        for k in SAPE_KEYS:
+            out[k] = y
+    cy_p = DATA_DIR / "economy" / CLAIMANT_YOUTH_PARQUET
+    cy = _read_parquet_opt(cy_p) if cy_p.exists() else None
+    if cy is not None and "claimant_18_24_month" in cy.columns and cy["claimant_18_24_month"].notna().any():
+        out["claimant_18_24_pct"] = _month_label(str(cy["claimant_18_24_month"].dropna().iloc[0]))
+    rc_p = DATA_DIR / "environment" / ROAD_CASUALTIES_PARQUET
+    rc = _read_parquet_opt(rc_p) if rc_p.exists() else None
+    if rc is not None and "road_ksi_years" in rc.columns and rc["road_ksi_years"].notna().any():
+        out["road_ksi_per_1000"] = str(rc["road_ksi_years"].dropna().iloc[0])
+    ch_p = DATA_DIR / "healthcare" / CARE_HOMES_PARQUET
+    ch = _read_parquet_opt(ch_p) if ch_p.exists() else None
+    if ch is not None and "as_at" in ch.columns and ch["as_at"].notna().any():
+        try:
+            out["care_home_beds_per_100_75plus"] = "as at " + datetime.strptime(
+                str(ch["as_at"].dropna().max()), "%Y-%m-%d").strftime("%b %Y")
+        except ValueError:
+            pass
+    return out
+
+
 SOURCES = {
     "custom":      run_custom,
     "boundaries":  run_boundaries,
@@ -9853,6 +11330,14 @@ SOURCES = {
     "hospitals":   run_hospitals,
     "charities":   run_charities,
     "dentists":    run_dentists,
+    # The small-area additions, each in its own manifest entry. After the GP,
+    # pharmacy and dental registers, which leave the national site files
+    # service_access measures to.
+    "sape":        run_sape,
+    "claimant_youth": run_claimant_youth,
+    "road_casualties": run_road_casualties,
+    "care_homes":  run_care_homes,
+    "service_access": run_service_access,
 }
 
 def write_manifest(source_records: dict) -> None:
@@ -9928,6 +11413,7 @@ def main() -> int:
             _MANIFEST_WRITES.pop(s, None)
             _SOURCE_PARTIAL.pop(s, None)
             _SOURCE_ERROR.pop(s, None)
+            _SOURCE_NOTE.pop(s, None)
             t0 = time.time()
             rec: dict = {"status": "ok", "error": "", "notes": "",
                          "fetched_at": datetime.now(timezone.utc).isoformat(),
@@ -9939,7 +11425,7 @@ def main() -> int:
                     # with no Hospital.csv. Not a failure, but not a success
                     # either, so it is distinguishable in the manifest.
                     rec["status"] = "skipped"
-                    rec["notes"] = "source returned no frame"
+                    rec["notes"] = _SOURCE_NOTE.get(s) or "source returned no frame"
                 elif hasattr(df, "columns"):
                     rec["rows_written"] = int(len(df))
                     rec["schema"] = {str(c): str(t) for c, t in df.dtypes.items()}

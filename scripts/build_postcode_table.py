@@ -125,6 +125,11 @@ NATIVE = [
      "Census 2021 (TS007)" if _AGE_OK else "Census 2021 (TS007A)", "2021"),
     ("census_over65_pct",      "Aged 65 and over (%)",          "Census 2021 (TS007A)", "2021"),
     ("census_over85_pct",      "Aged 85 and over (%)",          "Census 2021 (TS007A)", "2021"),
+    ("sape_population",        "Population, mid-year estimate", "ONS mid-year population estimates", "mid-year"),
+    ("sape_age0_15_pct",       "Aged 0 to 15, mid-year estimate (%)", "ONS mid-year population estimates", "mid-year"),
+    ("sape_age16_64_pct",      "Aged 16 to 64, mid-year estimate (%)", "ONS mid-year population estimates", "mid-year"),
+    ("sape_age65plus_pct",     "Aged 65 and over, mid-year estimate (%)", "ONS mid-year population estimates", "mid-year"),
+    ("sape_age75plus_pct",     "Aged 75 and over, mid-year estimate (%)", "ONS mid-year population estimates", "mid-year"),
 
     ("census_white_pct",         "White (%)",                   "Census 2021 (TS021)", "2021"),
     ("census_asian_pct",         "Asian or Asian British (%)",  "Census 2021 (TS021)", "2021"),
@@ -197,6 +202,11 @@ MODELLED = [
     ("rail_station_dist_m",  "Distance to nearest station from LSOA centroid (m)",  "TfL Unified API", "live"),
     ("rail_stations_1km",    "Stations within 1 km of LSOA centroid",               "TfL Unified API", "live"),
     ("claimant_rate_pct",    "Claimant rate (%)",                                   "NOMIS NM_162 over population", "latest month"),
+    ("gp_dist_km",           "Distance to nearest GP practice from LSOA centre (km)", "NHS ODS register, measured here", "live"),
+    ("pharmacy_dist_km",     "Distance to nearest pharmacy from LSOA centre (km)",    "NHS ODS register, measured here", "live"),
+    ("dentist_dist_km",      "Distance to nearest NHS dentist from LSOA centre (km)", "NHS ODS register, measured here", "live"),
+    ("crime_total",          "Crimes in the LSOA, 12 months",                       "data.police.uk points, counted here", "12 months"),
+    ("crime_rate_per_1000",  "Crimes per 1,000 residents, 12 months",               "data.police.uk over Census 2021 residents", "12 months"),
 ]
 
 GEOGRAPHY = [
@@ -398,7 +408,7 @@ def tidy(v, key):
     except (TypeError, ValueError):
         return v
     if key in ("census_population", "imd_rank", "claimant_count", "gb_total_uprn",
-               "imd_decile", "bus_stops_800m", "rail_stations_1km"):
+               "imd_decile", "bus_stops_800m", "rail_stations_1km", "sape_population", "crime_total"):
         return str(int(round(f)))
     if f == int(f):
         return str(int(f))
