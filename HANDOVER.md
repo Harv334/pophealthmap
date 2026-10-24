@@ -20,6 +20,7 @@ Three things are worth doing anyway:
 | Monthly, one minute | Open **Actions** and check the last "Refresh data" run is green |
 | If a run fails | It opens an issue naming the source that broke. `data/meta/manifest.json` says what happened |
 | Once a year | Read "What will go stale" below |
+| Once, about ten minutes | Add a Stat-Xplore API key, to switch on the DWP benefit figures (see "DWP benefits" below) |
 
 ---
 
@@ -176,17 +177,102 @@ downloaded in a browser and attached to the build. Without it, PCNs show their
 practices but no catchment (`has_catchments` is false in
 `data/map/pcn.json`).
 
-**DWP benefits** (no source key; withdrawn). Retired rather than broken. The
-pipeline had been asking NOMIS for five dataset ids that turned out to be an
-occupation survey, a business register and an employment survey rather than
-benefits, which is why every request returned an empty body while still
-answering 200. Looking the real ones up by name settles it: PIP and Universal
-Credit are not on NOMIS in any form, and ESA, Pension Credit, Carer's
-Allowance, DLA and Attendance Allowance all stop at November 2018 on
-small-area geographies that predate LSOA 2021. The live figures are on DWP
-Stat-Xplore, which needs a registered API key and its own query language, so
-adding them back means writing a new client rather than repairing the old
-one. The claimant count (`claimant`, NOMIS CLA01) is unaffected.
+**DWP benefits** (`dwp_uc_people`, `dwp_uc_households`, `dwp_pip`,
+`dwp_dla_children`, `dwp_attendance_allowance`, `dwp_carers_allowance`,
+`dwp_pension_credit`, `dwp_cilif`). See "DWP benefits" below. Until a key is
+added all eight are `skipped`, which is expected and opens no issue. With a
+key, a failure names what was wrong: a refused key, an error from
+Stat-Xplore, or a database or field whose label no longer matches (the
+message lists the nearest labels it found). Re-run with
+`python fetch_all_data.py --only dwp_uc_people` (and so on), with
+`STAT_XPLORE_API_KEY` set in your shell.
+
+### DWP benefits
+
+Universal Credit, Personal Independence Payment (PIP), Disability Living
+Allowance for children, Attendance Allowance, Carer's Allowance, Pension Credit
+and children in relative low income families come from DWP's Stat-Xplore. Its
+API needs a free key that belongs to a person, so the pipeline cannot get one
+by itself. Until you add one, these figures are not fetched and the map does
+not offer them.
+
+**To switch them on:**
+
+1. Register for a free account at https://stat-xplore.dwp.gov.uk (the
+   registration link is on the login page), and confirm it from the email
+   Stat-Xplore sends.
+2. Sign in and copy your API key. It is shown on your account page once you
+   are signed in; Stat-Xplore's help pages, under "Open Data API", say where.
+3. In this repository on GitHub, open **Settings**, then **Secrets and
+   variables**, then **Actions**, and choose **New repository secret**. Name
+   it `STAT_XPLORE_API_KEY` exactly, paste the key as the value, and save.
+4. Open **Actions**, choose **Refresh data** and **Run workflow** (or wait for
+   the 15th). **Refresh regions** passes the same secret to each region's
+   build, so the regions pick it up too.
+
+The key goes only to the pipeline step of `refresh-data.yml` and
+`build-region.yml`; nothing else in the workflows sees it. If you replace the
+key, update the secret; nothing else changes.
+
+**What the run log says.** Without a key, each of the eight sources prints
+its heading ("DWP Stat-Xplore: people on Universal Credit (LSOA)" and so on)
+and one line, `dwp_uc_people: skipped, no Stat-Xplore API key, ...`, and the
+manifest records `"status": "skipped"` with a note saying the same. With a
+key, the first source prints how many databases Stat-Xplore lists, and each
+source then prints the ids it chose, for example:
+
+```
+[..] dwp_uc_people: database str:database:... ('People on Universal Credit', in Universal Credit)
+[..] dwp_uc_people: measure ...; date field ... ('Month'), latest ... (May 2026)
+[..] dwp_uc_people: LSOA level ... ('National - Regional - LA - OAs, Lower Layer Super Output Areas') in field ...
+[..] dwp_uc_people: the LSOA values are 2021 LSOAs (...); 4,994 of the 4,994 this scope needs are there
+[..] dwp_uc_people: 4,994 LSOA values in 5 table request(s) of at most 1,000 (1 cell(s) each)
+[OK] dwp_uc_people: 4,994 LSOAs, May 2026, ... people on Universal Credit (... requests) -> data/economy/dwp_uc_people_lsoa.parquet
+```
+
+On that first run, check four things: that each database named is the one
+you would expect (the labels are matched by pattern, in `SX_DATABASES`);
+that the date is the newest release; whether each benefit's LSOAs are "2021"
+or "2011" (2011 ones are moved onto 2021 LSOAs through the ONS lookup, which
+is expected for some of the older benefits); and how many cells are
+"withheld or blank". In London each LSOA source should write 4,994 rows, one
+per LSOA, and `dwp_cilif` one row per ward of each LA it could match. The
+export then logs `small-area additions -> wards: dwp_uc_people_pct ...` with a
+count for each new key, and the map offers them from that build on.
+
+**Things that are expected to need a look.** The fact checks behind these
+sources could not reach Stat-Xplore, so a few points are unconfirmed and the
+pipeline handles them either way:
+
+- PIP by main disabling condition may not be published for LSOAs. If not,
+  `dwp_pip` is ok with a note, and only the three condition figures are left
+  out.
+- Universal Credit households: the payment filter is used only if a field
+  offers an "In payment" value. The log says which.
+- Limited capability for work is taken twelve months before the newest
+  month, because assessments are backdated (`SX_LCW_LAG_MONTHS`).
+- PIP, DLA, Attendance Allowance, Carer's Allowance and Pension Credit are
+  shown for wards and LAs only. If the log shows they are on 2021 LSOAs with
+  few withheld cells, their LSOA figures can be switched on by setting the
+  fourth value of their row in `DWP_SHARES` to `True` and giving their
+  `CATS` rows in index.html `g: "lsoa", lv: ["ward","lsoa"]`.
+- Stat-Xplore caps the cells in one table. `SX_MAX_CELLS` and `SX_GEO_BATCH`
+  keep each request small; lower them if Stat-Xplore refuses a table as too
+  big.
+
+**Children in low income families and ward boundaries.** DWP publishes these
+for wards, not LSOAs, and its ward boundaries can lag the 2025 wards the map
+uses. The pipeline matches DWP's wards to the map's by code and uses an LA
+only when every one of its 2025 wards is there; the manifest note names any
+LA left out, and if none matches the source is skipped. It does not force an
+older ward onto a newer one, because a redrawn ward is a different place. To
+use older wards properly you would need to share each old ward's count among
+the new wards that overlap it, weighted by where its children live: the ONS
+output area to ward best-fit lookups for both ward years, and the Census 2021
+children aged 0 to 15 for each output area, give the weights. Until then the
+simplest course is to wait for DWP's next release (each spring), which
+usually moves to the latest wards. OHID's LA figure for the same measure stays
+on the map either way.
 
 ### Rebuilding every region and the England view
 

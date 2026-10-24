@@ -12033,7 +12033,7 @@ def statxplore_age_band(label) -> tuple | None:
     """(first age, last age) of an age band's label: "0-4", "5 to 10",
     "Under 16", "16+", "65 and over", "7". None for an unknown age or a label
     that is not an age."""
-    t = str(label or "").lower().replace("–", "-")      # dash-ok: reading DWP's labels
+    t = str(label or "").lower().replace("\u2013", "-")      # an en dash, written as an escape
     if re.search(r"unknown|missing|not known|unavailable", t):
         return None
     m = re.search(r"under\s*(\d{1,3})", t)

@@ -502,6 +502,19 @@ and say what each one means.</p>
         <td>The point ONS places in each LSOA where most of its people live,
             used here to measure distances from, rather than the middle of its
             shape.</td></tr>
+    <tr><td class="term">Limited capability for work</td><td>LCW and LCWRA</td>
+        <td>DWP's finding, after a work capability assessment, that someone on
+            Universal Credit is too ill or disabled to work (limited capability
+            for work) or also to prepare for work (limited capability for work
+            and work-related activity).</td></tr>
+    <tr><td class="term">Relative low income</td><td>Below 60% of median income before housing costs</td>
+        <td>A family whose income, before paying for housing, is below 60% of
+            the middle income in the UK that year. DWP counts the children in
+            these families from benefit and tax credit records.</td></tr>
+    <tr><td class="term">Rounded counts</td><td>Statistical disclosure control</td>
+        <td>DWP adjusts or rounds small counts before publishing them, so that
+            no one can be identified. Figures for small areas are approximate,
+            and adding them up does not give exactly DWP's own totals.</td></tr>
     <tr><td class="term">PTAL</td><td>Public Transport Accessibility Level</td>
         <td>TfL's measure of how well connected a place is to public transport.
             It uses bands from 0 to 6b, shown here on a 0 to 8 scale where 8 is
@@ -537,7 +550,13 @@ and say what each one means.</p>
             sites, the list of PCNs, and the GP registration figures (published
             under the NHS Digital name).</td></tr>
     <tr><td class="term">DWP</td><td>Department for Work and Pensions</td>
-        <td>The claimant count, with ONS.</td></tr>
+        <td>The claimant count, with ONS, and the benefit figures on Stat-Xplore:
+            Universal Credit, Personal Independence Payment, Disability Living
+            Allowance, Attendance Allowance, Carer's Allowance, Pension Credit and
+            children in low income families.</td></tr>
+    <tr><td class="term">Stat-Xplore</td><td>Stat-Xplore</td>
+        <td>DWP's service for its benefit statistics, which we read through its
+            open data API with an account key.</td></tr>
     <tr><td class="term">DESNZ</td><td>Department for Energy Security and Net Zero</td>
         <td>The fuel poverty figures.</td></tr>
     <tr><td class="term">Defra</td><td>Department for Environment, Food and Rural Affairs</td>
@@ -718,6 +737,20 @@ population estimates are added up into wards and LAs in the same way, and the
 distances to GP practices, pharmacies and dentists are averaged, weighted by
 population.</p>
 
+<p>The DWP benefit figures from Stat-Xplore are made the same way: DWP's counts
+for each LSOA are added up for each ward and LA, and so are the people they are
+counted out of, before dividing. Universal Credit is also shown for LSOAs,
+because its counts there are in the tens to hundreds. Personal Independence
+Payment, Disability Living Allowance, Attendance Allowance, Carer's Allowance
+and Pension Credit are shown for wards and LAs only, because their counts for
+an LSOA are small. DWP rounds or adjusts small counts to protect privacy, so an
+LSOA whose count it withholds is left out with its base, and an area missing
+more than a fifth of its base has no figure. Where DWP publishes a benefit on
+the LSOAs of 2011, each count is moved onto the LSOAs of 2021 through the ONS
+lookup, a split LSOA's count shared among its parts by residents. Children in
+low income families are published by DWP for wards, and are used only where
+DWP's wards are the 2025 wards the map draws.</p>
+
 <h3 id="best-fit">Best fit, not exact fit</h3>
 
 <p>The ONS lookups give each LSOA to the one ward it mostly sits in, based on
@@ -840,13 +873,15 @@ no catchment.</p>
 
 <h3 id="gap-benefits">Benefits other than the claimant count</h3>
 
-<p>The map does not yet include benefits other than the claimant count, such as
-Universal Credit, Personal Independence Payment, Employment and Support
-Allowance, Carer's Allowance and Pension Credit. Current figures for these
-by LSOA are only published through DWP's Stat-Xplore service. Nomis has either
-never carried them or stops in 2018 on older boundaries. The claimant count,
-which covers people claiming benefits because they are unemployed, is
-included.</p>
+<p>Current figures for Universal Credit, Personal Independence Payment,
+Disability Living Allowance, Attendance Allowance, Carer's Allowance, Pension
+Credit and children in low income families by small area are published only
+through DWP's Stat-Xplore service, which needs an account key. Nomis has either
+never carried them or stops in 2018 on older boundaries. The map reads them
+from Stat-Xplore once its key has been set up, and until a data refresh has
+fetched them they are left out of every list. Employment and Support Allowance
+is not included. The claimant count, which covers people claiming benefits
+because they are unemployed, is included.</p>
 
 <h2 id="appendix">Technical appendix</h2>
 
@@ -1218,6 +1253,108 @@ var SOURCES = [
     cadence: 'Yearly, each September.',
     manifest: 'road_casualties' },
 
+  // DWP benefits from Stat-Xplore. Each is fetched only once the site owner has
+  // added a Stat-Xplore key; until then its manifest entry is "skipped", and
+  // `skipped` says so here instead of "Updated".
+  { id: 'dwp-uc-people',
+    name: 'People on Universal Credit',
+    pub: 'DWP, through Stat-Xplore, with ONS mid-year population estimates',
+    what: 'People on Universal Credit, in or out of work, as a share of residents aged 16 to 64. ' +
+          'DWP rounds or adjusts small counts, so small areas are approximate.',
+    geo: 'LSOA, built by DWP from the output areas of 2021, and added up into wards and LAs',
+    period: 'The latest month published',
+    ind: 'dwp_uc_people_pct',
+    cadence: 'Every three months, with a figure for each month.',
+    manifest: 'dwp_uc_people',
+    skipped: 'Waiting for a Stat-Xplore key' },
+
+  { id: 'dwp-uc-households',
+    name: 'Households on Universal Credit',
+    pub: 'DWP, through Stat-Xplore, with households from the 2021 Census',
+    what: 'Households on Universal Credit as a share of all households; those with limited ' +
+          'capability for work, for a month a year before the latest because assessments are ' +
+          'backdated; and the share of them with children. DWP rounds or adjusts small counts.',
+    geo: 'LSOA, built by DWP from the output areas of 2021, and added up into wards and LAs',
+    period: 'The latest quarter published',
+    ind: 'dwp_uc_hh_pct',
+    cadence: 'Every three months, for February, May, August and November.',
+    manifest: 'dwp_uc_households',
+    skipped: 'Waiting for a Stat-Xplore key' },
+
+  { id: 'dwp-pip',
+    name: 'Personal Independence Payment',
+    pub: 'DWP, through Stat-Xplore, with ONS mid-year population estimates',
+    what: 'People entitled to Personal Independence Payment as a share of residents aged 16 and ' +
+          'over, in all and for the three main conditions: psychiatric, musculoskeletal and ' +
+          'neurological. Shown for wards and LAs only, because LSOA counts are small and rounded.',
+    geo: 'LSOA counts, added up into wards and LAs',
+    period: 'The latest quarter published',
+    ind: 'dwp_pip_pct',
+    cadence: 'Every three months.',
+    manifest: 'dwp_pip',
+    skipped: 'Waiting for a Stat-Xplore key' },
+
+  { id: 'dwp-dla',
+    name: 'Disability Living Allowance for children',
+    pub: 'DWP, through Stat-Xplore, with ONS mid-year population estimates',
+    what: 'Children aged 0 to 15 receiving Disability Living Allowance, as a share of children ' +
+          'of that age. Shown for wards and LAs only, because LSOA counts are small and rounded.',
+    geo: 'LSOA counts, added up into wards and LAs',
+    period: 'March of the latest year published',
+    ind: 'dwp_dla_child_pct',
+    cadence: 'Once a year since 2026.',
+    manifest: 'dwp_dla_children',
+    skipped: 'Waiting for a Stat-Xplore key' },
+
+  { id: 'dwp-aa',
+    name: 'Attendance Allowance',
+    pub: 'DWP, through Stat-Xplore, with ONS mid-year population estimates',
+    what: 'People entitled to Attendance Allowance as a share of residents aged 66 and over. ' +
+          'Shown for wards and LAs only, because LSOA counts are small and rounded.',
+    geo: 'LSOA counts, moved onto the LSOAs of 2021 where DWP uses those of 2011, and added up into wards and LAs',
+    period: 'March of the latest year published',
+    ind: 'dwp_aa_pct',
+    cadence: 'Once a year since 2026.',
+    manifest: 'dwp_attendance_allowance',
+    skipped: 'Waiting for a Stat-Xplore key' },
+
+  { id: 'dwp-carers',
+    name: 'Carer\'s Allowance',
+    pub: 'DWP, through Stat-Xplore, with ONS mid-year population estimates',
+    what: 'People paid Carer\'s Allowance as a share of residents aged 16 and over. Shown for ' +
+          'wards and LAs only, because LSOA counts are small and rounded.',
+    geo: 'LSOA counts, added up into wards and LAs',
+    period: 'March of the latest year published',
+    ind: 'dwp_carers_pct',
+    cadence: 'Once a year since 2026.',
+    manifest: 'dwp_carers_allowance',
+    skipped: 'Waiting for a Stat-Xplore key' },
+
+  { id: 'dwp-pension-credit',
+    name: 'Pension Credit',
+    pub: 'DWP, through Stat-Xplore, with ONS mid-year population estimates',
+    what: 'Pension Credit claims per 100 residents aged 66 and over. A couple makes one claim. ' +
+          'Shown for wards and LAs only, because LSOA counts are small and rounded.',
+    geo: 'LSOA counts, added up into wards and LAs',
+    period: 'March of the latest year published',
+    ind: 'dwp_pension_credit_per_100',
+    cadence: 'Once a year since 2026.',
+    manifest: 'dwp_pension_credit',
+    skipped: 'Waiting for a Stat-Xplore key' },
+
+  { id: 'dwp-cilif',
+    name: 'Children in low income families',
+    pub: 'DWP and HM Revenue and Customs, through Stat-Xplore, with ONS mid-year population estimates',
+    what: 'Children aged 0 to 15 in families with relative low income before housing costs, as a ' +
+          'share of children of that age, for wards. An LA whose wards DWP has not yet redrawn to ' +
+          'the 2025 boundaries is left out rather than matched to other wards.',
+    geo: 'Ward, as DWP publishes it, and added up into LAs',
+    period: 'The latest financial year published',
+    ind: 'dwp_cilif_pct',
+    cadence: 'Once a year, in spring.',
+    manifest: 'dwp_cilif',
+    skipped: 'Waiting for a Stat-Xplore key' },
+
   { id: 'care-homes',
     name: 'Care home beds',
     pub: 'Care Quality Commission (CQC), with ONS mid-year population estimates',
@@ -1476,6 +1613,9 @@ Array.prototype.forEach.call(document.querySelectorAll('table.stack'), labelTabl
         '<br><span class="small">Some indicators keep their earlier figures, each ' +
         'labelled with its own period.</span>';
     }
+    // A source that waits for something to be set up says what, rather than
+    // "Updated" for a run that fetched nothing.
+    if (s.status === 'skipped' && rec.skipped) return esc(rec.skipped);
     return when ? 'Updated on ' + esc(when) : 'Updated';
   }
 
