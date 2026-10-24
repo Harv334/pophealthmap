@@ -250,6 +250,22 @@ s2["IoD2025 Living Env Domain"] = s2["IoD2025 Living Env Domain"].drop(columns=[
 s2["IoD2025 Living Env Domain"]["Air quality indicator (modelled 2025)"] = LIVING["Air quality indicator"]
 s2["IoD2025 Education Domain"]["Key Stage 2 attainment (average points score) indicator"] *= -1
 s2["IoD2025 Health Domain"]["Acute morbidity indicator"] *= 1000
+# The IoD 2025 layout, as the October 2026 refresh listed it: adult skills
+# and English proficiency as one "Adult skills and English language
+# proficiency indicator". It is taken as the adult skills figure, and English
+# proficiency on its own is reported missing.
+s5 = {k: v.copy() for k, v in SHEETS.items()}
+e5 = s5["IoD2025 Education Domain"]
+e5["Adult skills and English language proficiency indicator"] = e5[
+    "Adult skills: proportion of adults aged 25 to 66 with no or low qualifications"]
+s5["IoD2025 Education Domain"] = e5.drop(columns=[
+    "Adult skills: proportion of adults aged 25 to 66 with no or low qualifications",
+    "English language proficiency indicator"])
+ind5, problems5, matched5 = p.iod_parse_file8(s5, PARENT)
+check("IoD 2025's combined adult skills and English column is read as adult skills",
+      "iod_adult_quals" in ind5.columns and "English language" in matched5.get("iod_adult_quals", "")
+      and "iod_english" not in ind5.columns and any(x.startswith("iod_english: no File 8 column") for x in problems5),
+      str(matched5.get("iod_adult_quals")) + " | " + "; ".join(problems5))
 ind2, problems8b, _ = p.iod_parse_file8(s2, PARENT)
 check("a missing indicator (central heating) is reported",
       any(x.startswith("iod_no_central_heating: no File 8 column") for x in problems8b), "; ".join(problems8b))

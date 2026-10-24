@@ -3979,7 +3979,7 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
               <option value="iod_ks4">Key Stage 4 attainment · LSOA</option>
               <option value="iod_staying_on">Not staying on after 16 · LSOA</option>
               <option value="iod_he_entry">Not entering higher education · LSOA</option>
-              <option value="iod_adult_quals">Adults with no or low qualifications · LSOA</option>
+              <option value="iod_adult_quals">Adult skills and English proficiency · LSOA</option>
               <option value="iod_english">Adults who cannot speak English well · LSOA</option>
               <option value="iod_housing_poor">Housing in poor condition · LSOA</option>
               <option value="iod_no_central_heating">Homes without central heating · LSOA</option>
@@ -6023,7 +6023,7 @@ const CATS = [
     { k: "iod_ks4",                l: "Key Stage 4 attainment", g: "lsoa", lv: ["ward","lsoa"] },
     { k: "iod_staying_on",         l: "Young people not staying on after 16", g: "lsoa", lv: ["ward","lsoa"] },
     { k: "iod_he_entry",           l: "Young people not entering higher education", g: "lsoa", lv: ["ward","lsoa"] },
-    { k: "iod_adult_quals",        l: "Adults with no or low qualifications", g: "lsoa", lv: ["ward","lsoa"] },
+    { k: "iod_adult_quals",        l: "Adult skills and English proficiency", g: "lsoa", lv: ["ward","lsoa"] },
     { k: "iod_english",            l: "Adults who cannot speak English well", g: "lsoa", lv: ["ward","lsoa"] },
     { k: "iod_housing_poor",       l: "Housing in poor condition", g: "lsoa", lv: ["ward","lsoa"] },
     { k: "iod_no_central_heating", l: "Homes without central heating", g: "lsoa", lv: ["ward","lsoa"] },
@@ -6490,7 +6490,7 @@ const IND_NAMES = {
   iod_ks4:                ['Key Stage 4 attainment', 'Key Stage 4 attainment'],
   iod_staying_on:         ['Young people not staying on after 16', 'Staying on in education post 16'],
   iod_he_entry:           ['Young people not entering higher education', 'Entry to higher education'],
-  iod_adult_quals:        ['Adults with no or low qualifications', 'Adult skills'],
+  iod_adult_quals:        ['Adult skills and English proficiency', 'Adult skills and English language proficiency'],
   iod_english:            ['Adults who cannot speak English well', 'English language proficiency'],
   iod_housing_poor:       ['Housing in poor condition', 'Housing in poor condition'],
   iod_no_central_heating: ['Homes without central heating', 'Houses without central heating'],
@@ -7125,7 +7125,7 @@ const OV_META = {
   iod_ks4:              { src: "MHCLG IMD 2025, underlying indicators", yr: "2025", g: "LSOA", u: "points", desc: "The average results of pupils living in the area in their GCSEs and other qualifications at the end of secondary school, where a higher figure means better results." },
   iod_staying_on:       { src: "MHCLG IMD 2025, underlying indicators", yr: "2025", g: "LSOA", u: "%", desc: "The share of young people who do not stay on in school or further education after the age of 16, where a higher figure means more deprivation." },
   iod_he_entry:         { src: "MHCLG IMD 2025, underlying indicators", yr: "2025", g: "LSOA", u: "%", desc: "The share of young people under 21 who do not go on to higher education, where a higher figure means more deprivation." },
-  iod_adult_quals:      { src: "MHCLG IMD 2025, underlying indicators", yr: "2025", g: "LSOA", u: "%", desc: "The share of adults aged 25 to 66 with no qualifications or only low ones, from the 2021 Census, where a higher figure means more deprivation." },
+  iod_adult_quals:      { src: "MHCLG IMD 2025, underlying indicators", yr: "2025", g: "LSOA", u: "%", desc: "The share of adults aged 25 to 66 with no qualifications or only low ones, or who cannot speak English well, from the 2021 Census. IoD 2025 measures the two together. A higher figure means more deprivation." },
   iod_english:          { src: "MHCLG IMD 2025, underlying indicators", yr: "2025", g: "LSOA", u: "%", desc: "The share of adults aged 25 to 66 who cannot speak English, or cannot speak it well, from the 2021 Census, where a higher figure means more deprivation." },
   iod_housing_poor:     { src: "MHCLG IMD 2025, underlying indicators", yr: "2025", g: "LSOA", u: "%", desc: "The share of homes estimated to fall below the Decent Homes Standard, modelled from national housing surveys rather than inspected home by home, where a higher figure means more deprivation." },
   iod_no_central_heating: { src: "MHCLG IMD 2025, underlying indicators", yr: "2025", g: "LSOA", u: "%", desc: "The share of homes without central heating, where a higher figure means more deprivation." },
@@ -7567,7 +7567,7 @@ const OV_PLAIN = {
   iod_ks4: "Average GCSE results at the end of secondary school. Higher means better results.",
   iod_staying_on: "Young people who leave education at 16.",
   iod_he_entry: "Young people under 21 who do not go on to university or college.",
-  iod_adult_quals: "Adults aged 25 to 66 with no or low qualifications.",
+  iod_adult_quals: "Adults with no or low qualifications, or who cannot speak English well.",
   iod_english: "Adults aged 25 to 66 who cannot speak English well.",
   iod_housing_poor: "Homes estimated to fall below the Decent Homes Standard.",
   iod_no_central_heating: "Homes without central heating.",

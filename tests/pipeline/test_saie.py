@@ -143,6 +143,18 @@ o3, pr3, _ = p.saie_parse([(n, "", d) for n, d in swapped.items()])
 check("after housing costs above before housing costs: neither is used",
       "saie_net_bhc" not in o3.columns and "saie_net_ahc" not in o3.columns and "saie_total_income" in o3.columns
       and any("wrong way round" in x for x in pr3), "; ".join(pr3))
+# As the first real refresh found: after housing costs above before in some
+# MSOAs (13% there), which the two equivalence scales allow where housing is
+# cheap. Both are still used.
+cross = dict(AHC)
+for m in list(MSOAS)[: max(1, len(MSOAS) // 8)]:
+    cross[m] = BHC[m] + 500
+mixed = dict(SHEETS)
+mixed["Net income after housing costs"] = sheet("Net annual income after housing costs (£)", cross)
+o4, pr4, _ = p.saie_parse([(n, "", d) for n, d in mixed.items()])
+check("after housing costs above before in a few MSOAs: both are still used",
+      "saie_net_bhc" in o4.columns and "saie_net_ahc" in o4.columns
+      and not any("wrong way round" in x for x in pr4), "; ".join(pr4))
 two = dict(SHEETS)
 two["Total income, second table"] = sheet("Total annual income (£)", TOTAL)
 o4, pr4, _ = p.saie_parse([(n, "", d) for n, d in two.items()])

@@ -2095,8 +2095,15 @@ IOD_FILE8_SPECS = (
      (("staying on",),), ()),
     ("iod_he_entry",           "education_score",   +1, "share",
      (("higher education",),), ()),
+    # IoD 2025 prints adult skills and English proficiency as one indicator
+    # ("Adult skills and English language proficiency indicator"), which this
+    # takes; the 2019 workbook had them apart, and iod_english then took the
+    # second. The October 2026 header list has no Key Stage 2, Key Stage 4,
+    # staying on or central heating indicator either; their entries stay so
+    # a later release that prints them is read, and meanwhile the source
+    # notes them and the map leaves them out.
     ("iod_adult_quals",        "education_score",   +1, "share",
-     (("qualification",), ("adult skills",)), ("english",)),
+     (("qualification",), ("adult skills",)), ()),
     ("iod_english",            "education_score",   +1, "share",
      (("english language",), ("speak english",), ("english proficiency",)),
      ("qualification", "adult skills")),
@@ -6137,13 +6144,21 @@ def saie_parse(tables: list) -> tuple:
         b, a = cols["saie_net_bhc"], cols["saie_net_ahc"]
         both = a.notna() & b.notna()
         below = (a[both] <= b[both]).mean() if both.sum() else 1.0
-        if below < 0.95:
+        # Both are equivalised, but on different scales: a single adult's
+        # income is divided by 0.67 before housing costs and by 0.58 after, so
+        # where housing costs are low (outright owners, say) the after figure
+        # can come out higher. The first refresh found it below in 87% of
+        # MSOAs. Columns the wrong way round would put it below in few, so
+        # only a minority below is taken to mean that.
+        if below < 0.5:
             problems.append(f"after housing costs is below before housing costs for only {below:.0%} of "
                             "MSOAs, so the two columns may be the wrong way round; neither is used")
             for k in ("saie_net_bhc", "saie_net_ahc"):
                 for sfx in ("", CI_LOWER, CI_UPPER):
                     cols.pop(k + sfx, None)
                     matched.pop(k + sfx, None)
+        else:
+            info(f"saie: after housing costs is below before housing costs in {below:.0%} of MSOAs")
     out = pd.DataFrame(cols, index=idx).reset_index()
     return out, problems, matched
 
@@ -12208,25 +12223,56 @@ def run_claimant_youth() -> "pd.DataFrame | None":
 # 2021 set is used as it is; a 2011 code that no longer exists is shared
 # among the 2021 LSOAs drawn from it, by their Census 2021 residents, so no
 # casualty is lost or counted twice.
+#
+# The October 2026 refresh found no five-year link on the data.gov.uk page and
+# a 404 at the old five-year address, so the files are looked for on three
+# pages (data.gov.uk, its catalogue API and DfT's own gov.uk page), and when
+# there is no five-year file the latest five single-year casualty files are
+# read together instead.
 STATS19_PAGES = [
     "https://www.data.gov.uk/dataset/cb7ae6f0-4be6-4935-9277-47e5ce24a11f/road-safety-data",
+    "https://ckan.publishing.service.gov.uk/api/action/package_show?id=cb7ae6f0-4be6-4935-9277-47e5ce24a11f",
+    "https://www.gov.uk/government/statistical-data-sets/road-safety-open-data",
 ]
 STATS19_BASE = "https://data.dft.gov.uk/road-accident-safety-data/"
 STATS19_DEFAULT = STATS19_BASE + "dft-road-casualty-statistics-casualty-last-5-years.csv"
+STATS19_YEAR_FILE = STATS19_BASE + "dft-road-casualty-statistics-casualty-{year}.csv"
 STATS19_URL_OVERRIDE = os.environ.get("STATS19_CASUALTY_URL", "")
 ROAD_CASUALTIES_PARQUET = "road_casualties_lsoa.parquet"
 STATS19_MAX_AGE_DAYS = 30
 STATS19_YEARS = 5
 
 
-def stats19_pick(urls) -> str | None:
-    """The casualty file for the last five years among links, else None."""
+def _stats19_casualty_links(urls) -> list:
     def name(u):
         return str(u).rsplit("/", 1)[-1].lower()
-    cas = [u for u in dict.fromkeys(urls) if "casualt" in name(u) and name(u).endswith(".csv")
-           and "collision" not in name(u) and "vehicle" not in name(u) and "guide" not in name(u)]
-    five = [u for u in cas if re.search(r"last.?5.?years|last.?five.?years", name(u))]
+    return [u for u in dict.fromkeys(urls) if "casualt" in name(u) and name(u).endswith(".csv")
+            and "collision" not in name(u) and "vehicle" not in name(u) and "guide" not in name(u)]
+
+
+def stats19_pick(urls) -> str | None:
+    """The casualty file for the last five years among links, else None."""
+    five = [u for u in _stats19_casualty_links(urls)
+            if re.search(r"last.?5.?years|last.?five.?years", str(u).rsplit("/", 1)[-1].lower())]
     return five[0] if five else None
+
+
+def stats19_pick_years(urls, n: int = None) -> list:
+    """The single-year casualty files among links, newest n of them (newest
+    first), for when there is no five-year file. A "1979 to latest" file is
+    not a single year and is not taken."""
+    n = STATS19_YEARS if n is None else n
+    by_year = {}
+    for u in _stats19_casualty_links(urls):
+        m = re.search(r"casualty-(\d{4})\.csv$", str(u).rsplit("/", 1)[-1].lower())
+        if m:
+            by_year.setdefault(int(m.group(1)), u)
+    return [by_year[y] for y in sorted(by_year, reverse=True)[:n]]
+
+
+def stats19_links_from(text: str) -> list:
+    """Every CSV link in a page or a catalogue API answer."""
+    return re.findall(r'(https?://[^"\'\s<>]+?\.csv)', text or "")
 
 
 def stats19_columns(cols) -> tuple[dict, list]:
@@ -12302,44 +12348,73 @@ def run_road_casualties() -> "pd.DataFrame":
     cache_dir = CACHE_DIR / "stats19"
     cache_dir.mkdir(parents=True, exist_ok=True)
     scope = set(get_lsoa_ward_lookup())
-    url = STATS19_URL_OVERRIDE
-    if not url:
+    urls = [STATS19_URL_OVERRIDE] if STATS19_URL_OVERRIDE else []
+    if not urls:
         found: list = []
         sess = browser_session(referer="https://www.data.gov.uk/")
         for page in STATS19_PAGES:
             try:
                 r = sess.get(page, timeout=60)
                 if r.ok:
-                    found += re.findall(r'href="([^"]+\.csv)"', r.text)
+                    links = stats19_links_from(r.text)
+                    info(f"road_casualties: {len(_stats19_casualty_links(links))} casualty files listed on {page}")
+                    found += links
             except Exception as e:
                 warn(f"road_casualties: could not read {page} ({type(e).__name__}: {e})")
-        url = stats19_pick(found) or ""
-        if not url:
-            warn("road_casualties: the data.gov.uk page listed no five-year casualty file; "
-                 f"trying {STATS19_DEFAULT}")
-            url = STATS19_DEFAULT
-    dest = cache_dir / url.rsplit("/", 1)[-1]
-    fresh = dest.exists() and dest.stat().st_size > 1_000_000 and _days_since(
-        datetime.fromtimestamp(dest.stat().st_mtime, timezone.utc).isoformat()) <= STATS19_MAX_AGE_DAYS
-    if not fresh:
-        info(f"road_casualties: downloading {url}")
-        try:
-            r = requests.get(url, timeout=600)
-            r.raise_for_status()
-            if len(r.content) < 1_000_000:
-                raise RuntimeError(f"only {len(r.content):,} bytes")
-            write_bytes_atomic(dest, r.content)
-        except Exception as e:
-            if not dest.exists():
-                raise RuntimeError(f"road_casualties: could not download {url} "
-                                   f"({type(e).__name__}: {e})")
-            warn(f"road_casualties: download failed ({e}); using the cached {dest.name}")
-    head = pd.read_csv(dest, nrows=0, encoding="utf-8-sig")
-    cols, missing = stats19_columns(head.columns)
-    if missing:
-        raise RuntimeError(f"road_casualties: {dest.name} has no column for "
-                           f"{', '.join(missing)} (columns: {', '.join(map(str, head.columns[:25]))})")
-    df = pd.read_csv(dest, usecols=list(cols.values()), dtype=str, low_memory=False, encoding="utf-8-sig")
+        five = stats19_pick(found)
+        urls = [five] if five else stats19_pick_years(found)
+        if not urls:
+            # Nothing listed anywhere: the five-year file at its old address,
+            # then the single years at DfT's usual names, newest first.
+            this = datetime.now(timezone.utc).year
+            urls = [STATS19_DEFAULT] + [STATS19_YEAR_FILE.format(year=y) for y in range(this - 1, this - 8, -1)]
+            warn("road_casualties: no casualty file was listed on the pages; trying DfT's usual names")
+    # A five-year file is read on its own; single-year files, up to five of
+    # them, together.
+    dests: list = []
+    for url in urls:
+        if len(dests) >= STATS19_YEARS:
+            break
+        dest = cache_dir / url.rsplit("/", 1)[-1]
+        fresh = dest.exists() and dest.stat().st_size > 100_000 and _days_since(
+            datetime.fromtimestamp(dest.stat().st_mtime, timezone.utc).isoformat()) <= STATS19_MAX_AGE_DAYS
+        if not fresh:
+            info(f"road_casualties: downloading {url}")
+            try:
+                r = requests.get(url, timeout=600)
+                r.raise_for_status()
+                if len(r.content) < 100_000:
+                    raise RuntimeError(f"only {len(r.content):,} bytes")
+                write_bytes_atomic(dest, r.content)
+            except Exception as e:
+                if not dest.exists():
+                    warn(f"road_casualties: could not download {url} ({type(e).__name__}: {e})")
+                    continue
+                warn(f"road_casualties: download failed ({e}); using the cached {dest.name}")
+        if stats19_pick([url]):
+            dests = [dest]
+            break
+        dests.append(dest)
+    if not dests:
+        raise RuntimeError("road_casualties: could not download any DfT casualty file (tried "
+                           + ", ".join(u.rsplit("/", 1)[-1] for u in urls[:8]) + ")")
+    frames = []
+    cols = None
+    for dest in dests:
+        head = pd.read_csv(dest, nrows=0, encoding="utf-8-sig")
+        c, missing = stats19_columns(head.columns)
+        if missing:
+            raise RuntimeError(f"road_casualties: {dest.name} has no column for "
+                               f"{', '.join(missing)} (columns: {', '.join(map(str, head.columns[:25]))})")
+        f = pd.read_csv(dest, usecols=list(c.values()), dtype=str, low_memory=False, encoding="utf-8-sig")
+        if cols is None:
+            cols = c
+        frames.append(f.rename(columns={v: cols[k] for k, v in c.items()}))
+    if len(dests) > 1:
+        info(f"road_casualties: no five-year file, so {len(dests)} single-year files: "
+             + ", ".join(d.name for d in dests))
+    df = pd.concat(frames, ignore_index=True)
+    dest = dests[0]
     by_code, years = stats19_ksi_by_lsoa(df, cols)
     if len(years) < STATS19_YEARS:
         warn(f"road_casualties: the file covers only {len(years)} years ({years})")

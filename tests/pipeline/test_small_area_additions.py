@@ -446,6 +446,41 @@ with open(f, "a", encoding="utf-8") as fh:
 check("a file without DfT's adjusted severity is refused, not mixed",
       raises(p.run_road_casualties, contains="serious_adj"))
 
+# No five-year file (the October 2026 refresh found none and a 404 at the old
+# address): the newest five single-year files, from any of the pages.
+B = "https://data.dft.gov.uk/road-accident-safety-data/"
+listed = [B + f"dft-road-casualty-statistics-casualty-{y}.csv" for y in range(2018, 2026)] + [
+    B + "dft-road-casualty-statistics-casualty-1979-latest-published-year.csv",
+    B + "dft-road-casualty-statistics-collision-2025.csv"]
+check("with no five-year file, the newest five single years are taken, not the 1979 to latest file",
+      p.stats19_pick(listed) is None and [u[-8:-4] for u in p.stats19_pick_years(listed)] == ["2025", "2024", "2023", "2022", "2021"],
+      str(p.stats19_pick_years(listed)))
+ckan = json.dumps({"result": {"resources": [{"url": u} for u in listed]}})
+check("links are read from the catalogue API's JSON as well as from a page",
+      set(p.stats19_links_from(ckan)) == set(listed) and
+      p.stats19_links_from('<a href="' + listed[0] + '">2018</a>') == [listed[0]])
+for old in (tmp / "cache/stats19").iterdir():
+    old.unlink()
+by_year = {y: STATS[STATS["collision_year"].astype(int) == y] for y in sorted(STATS["collision_year"].astype(int).unique())}
+for y, part in by_year.items():
+    fy = tmp / f"cache/stats19/dft-road-casualty-statistics-casualty-{y}.csv"
+    part.to_csv(fy, index=False)
+    with open(fy, "a", encoding="utf-8") as fh:
+        fh.write(("," * (len(part.columns) - 1) + "\n") * 30000)
+p.STATS19_URL_OVERRIDE = ""
+
+
+class _Page:
+    ok, status_code = True, 200
+    text = ckan
+
+
+p.browser_session = lambda **k: type("S", (), {"get": lambda self, url, timeout=None: _Page()})()
+rc2 = p.run_road_casualties()
+check("the single-year files read together give the same counts as the five-year file",
+      rc2.set_index("LSOA21CD")["road_ksi_5yr"].round(6).to_dict() == r.round(6).to_dict(),
+      str(rc2.set_index("LSOA21CD")["road_ksi_5yr"].to_dict()))
+
 # ---------------------------------------------------------------------------
 print("=== care_homes: the CQC file ===")
 links = ["https://www.cqc.org.uk/sites/default/files/2026-10/01_October_2026_HSCA_Active_Locations.ods",
