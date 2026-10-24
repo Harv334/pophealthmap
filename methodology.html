@@ -252,6 +252,17 @@ area that looks high on the colour scale is often still similar to England by
 this test. Ward and LA figures are worked out from MSOA figures and have no
 test. Neither do the few MSOA figures estimated from 2011 areas.</p>
 
+<h4 id="modelled">Modelled figures come with a range</h4>
+
+<p>Some figures are not counted but modelled. ONS's household income figures
+and its healthy and disability-free life expectancy for MSOAs are worked out
+from surveys and records, because too few people in each MSOA are surveyed to
+measure them directly. ONS gives each MSOA figure a 95% confidence interval,
+which is the range the true figure is very likely to be in. Hover over an MSOA
+to see it. Many neighbouring MSOAs have ranges that overlap, so they are not
+clearly different. Ward and LA figures are worked out from MSOA figures and
+have no range.</p>
+
 <h3 id="reading-areas">How a figure reaches an area</h3>
 
 <p>The full method is under <a href="#placing">How figures are placed onto
@@ -275,7 +286,8 @@ the claimant count and the number of services are added up. Rates, percentages
 and scores are weighted by population. This means each small area counts in
 proportion to the number of people living there at the 2021 Census. Fuel
 poverty is a share of households, so it is weighted by the number of
-households instead. Counts of stations within 1 km and bus stops within 800
+households instead. Household income is an average over households, so it is
+weighted by households too. Counts of stations within 1 km and bus stops within 800
 metres are averaged, not added, because one station is close to several LSOAs.
 So a ward's figure is what its average resident has nearby. <span data-cen="ward-weighted">Census
 percentages are combined from their output areas by weighting too, as explained
@@ -290,12 +302,14 @@ proportion to where its people live.</p>
 <p>Where a figure is not published for LAs, we work out each LA's figure from
 its wards in the same way. This gives the rate for all of the LA's residents,
 rather than a simple average of wards of different sizes. Fuel poverty is
-worked out from all of the LA's LSOAs, weighted by households. An LA figure
+worked out from all of the LA's LSOAs, weighted by households, and household
+income from all of the LA's MSOAs, weighted by households. An LA figure
 worked out like this can differ slightly from a figure the council or a publisher gives, which may use a
 different population or year. For OHID's Local Health indicators the
 difference can be bigger. Life expectancy and ratios compared with England
 cannot be averaged exactly, and OHID's own LA figures can cover a different
-period. So the map says under its key that these LA figures are our estimates.
+period. The same is true of ONS's healthy and disability-free life
+expectancy, which ONS publishes for MSOAs only. So the map says under its key that these LA figures are our estimates.
 It also leaves the City of London out of their LA rankings, and the Area
 profile shows OHID's own LA figures. Where our data includes OHID's LA figure
 for one of these indicators, the map uses it instead.</p>
@@ -456,13 +470,31 @@ and say what each one means.</p>
             unfair differences in health between groups of people. It focuses
             on the most deprived fifth of England's LSOAs, which are
             deprivation deciles 1 and 2.</td></tr>
-    <tr><td class="term">Ratio where England is 100</td><td>Indirectly standardised admission or
-            mortality ratio</td>
-        <td>Admissions or deaths compared with the number you would expect if
-            England's rates applied to the area's own mix of ages and sexes.
-            100 is as expected, 120 is 20% more and 80 is 20% fewer. It is not
-            a rate per 100 people. Most of the Local Health admissions and
-            deaths figures are these.</td></tr>
+    <tr><td class="term">Ratio where England is 100</td><td>Indirectly standardised admission,
+            mortality or incidence ratio</td>
+        <td>Admissions, deaths or new cancer cases compared with the number you
+            would expect if England's rates applied to the area's own mix of
+            ages and sexes. 100 is as expected, 120 is 20% more and 80 is 20%
+            fewer. It is not a rate per 100 people. Most of the Local Health
+            admissions, deaths and cancer figures are these.</td></tr>
+    <tr><td class="term">Healthy life expectancy</td><td>Healthy life expectancy (HLE) at birth</td>
+        <td>The number of years a newborn could expect to live in good or very
+            good health. Disability-free life expectancy (DFLE) is the years
+            they could expect to live without an illness or disability that
+            limits day-to-day activities. ONS's figures for MSOAs come from
+            deaths over 2019 to 2023 and from what people said about their
+            health at the 2021 Census.</td></tr>
+    <tr><td class="term">Household income after housing costs</td><td>Net equivalised household income after housing costs</td>
+        <td>A household's income after tax, once rent, mortgage interest,
+            water rates and buildings insurance are paid. Before housing costs
+            is the same income before those are paid. Both are adjusted for the
+            size of the household (equivalised), so that households of
+            different sizes can be compared.</td></tr>
+    <tr><td class="term">Modelled estimate</td><td>Model-based estimate</td>
+        <td>A figure worked out from a statistical model, using survey answers
+            and records for the area, where too few people are surveyed in a
+            small area to measure it directly. It comes with a confidence
+            interval.</td></tr>
     <tr><td class="term">Age-standardised rate</td><td>Directly standardised rate</td>
         <td>A rate adjusted to a standard mix of ages, so that areas with older
             or younger residents can be compared fairly.</td></tr>
@@ -691,7 +723,8 @@ not areas</a>).</p>
 claimant count are added up. Rates, percentages and scores are weighted by
 population, which means each LSOA counts in proportion to the number of people
 living there at the 2021 Census. Fuel poverty is a share of households, so it
-is weighted by the number of households instead. Income deprivation affecting
+is weighted by the number of households instead, and so is household income,
+which is an average over households. Income deprivation affecting
 children is weighted by the children aged 0 to 15 that MHCLG counts in each
 LSOA, and income deprivation affecting older people by the people aged 60 and
 over, so each is the share of the area's children or older people.
@@ -699,13 +732,18 @@ over, so each is the share of the area's children or older people.
 counts behind them.</span><span data-cen="ward-weighted">Census percentages are
 averaged from their output areas, weighted by residents.</span> Counts of
 stations within 1 km and bus stops within 800 metres are averaged, not added,
-because one station is close to several LSOAs. For Local Health figures and
+because one station is close to several LSOAs. Figures published for MSOAs,
+from Local Health and from ONS, reach wards through their LSOAs: each LSOA
+takes its MSOA's figure, and the ward's figure is the average of its LSOAs,
+weighted by residents, or by households for household income. For Local Health figures and
 PTAL, a ward has no figure unless the LSOAs with figures hold at least four in
-five of its residents. Where no LA figure is published, we work out the LA's
+five of its residents. The same rule applies to ONS's MSOA figures, counted in
+households for income. Where no LA figure is published, we work out the LA's
 figure from its wards in the same way. Fuel poverty, and the deprivation
 measures beyond the IMD's seven domains, are worked out from all of the LA's
-LSOAs instead, and Census figures as explained under
-<a href="#census-levels">Census figures at every level</a>.</p>
+LSOAs instead. Household income is worked out from all of the LA's MSOAs,
+which sit wholly inside it, weighted by households. Census figures are worked
+out as explained under <a href="#census-levels">Census figures at every level</a>.</p>
 
 <p>A few figures are rates made from counts we add up ourselves. For the
 claimant rate aged 18 to 24, residents killed or seriously injured on the
@@ -761,8 +799,9 @@ measure.</p>
 LSOAs. But many LSOAs cross a ward boundary (see
 <a href="#lsoas-and-wards">LSOAs do not sit inside wards</a>), so MSOAs and
 wards do not fit inside one another. Where an MSOA edge matches a ward edge, it
-is by chance. Local Health figures are published for MSOAs, and they reach
-wards through the LSOAs the two share.</p>
+is by chance. Local Health figures are published for MSOAs, and so are ONS's
+household income estimates and its healthy and disability-free life
+expectancy. All of them reach wards through the LSOAs the two share.</p>
 
 <h3 id="estimated">Figures estimated from 2011 areas are marked</h3>
 
@@ -1145,6 +1184,43 @@ var SOURCES = [
             'expectancy 2019 to 2023.',
     cadence: 'Differs by indicator, and most are yearly.',
     manifest: 'fingertips_msoa' },
+
+  { id: 'local-health-extra',
+    name: 'Fingertips: Local Health, birth weight and cancer',
+    pub: 'OHID',
+    what: 'Low birth weight of live babies, and new cases of cancer (all cancers, breast, ' +
+          'bowel, lung and prostate) compared with England. Each one is shown only where ' +
+          'OHID publishes figures for at least half of a region\'s MSOAs, with ranges narrow ' +
+          'enough to tell areas apart, so a series that is mostly withheld is left off the map.',
+    geo: 'MSOA, combined into wards weighted by residents. LA figures are OHID\'s own where it publishes them',
+    period: 'Differs by indicator and is shown beside each legend. Low birth weight combines ' +
+            'the five years 2018 to 2022.',
+    cadence: 'Differs by indicator, and most are yearly.',
+    manifest: 'fingertips_msoa_extra' },
+
+  { id: 'saie',
+    name: 'Income estimates for small areas',
+    pub: 'ONS',
+    what: 'The average (mean) yearly income of households: total income before tax, and ' +
+          'income after tax before and after housing costs, adjusted for household size. ' +
+          'These are modelled estimates, each with a 95% confidence interval.',
+    geo: 'MSOA, combined into wards and LAs weighted by households',
+    period: 'Financial year ending 2023 (April 2022 to March 2023)',
+    cadence: 'Every few years, with no date yet for the next edition.',
+    manifest: 'saie' },
+
+  { id: 'hle-msoa',
+    name: 'Healthy and disability-free life expectancy for small areas',
+    pub: 'ONS',
+    what: 'Healthy life expectancy and disability-free life expectancy at birth, for women and ' +
+          'men, from deaths and from the health questions of the 2021 Census. Each is an ' +
+          'estimate with a 95% confidence interval. ONS says these should not be compared ' +
+          'with its survey-based figures for LAs or its earlier MSOA estimates.',
+    geo: 'MSOA, combined into wards weighted by residents. LA figures are ONS\'s own where the ' +
+         'release has them, and otherwise our estimates from wards',
+    period: '2019 to 2023',
+    cadence: 'After each census.',
+    manifest: 'hle_msoa' },
 
   { id: 'qof',
     name: 'Quality and Outcomes Framework',

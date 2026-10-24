@@ -385,9 +385,13 @@ const smallText = page => page.evaluate(() => {
             } finally { WARD_META = realMeta; BOROUGH_DATA = realBd; }
           });
         }
+        // A series added before its first fetch has no upload date in
+        // FT_INFO yet; its card then says how often, in one sentence, and
+        // gives no date rather than a wrong one.
         if (/^ft_\d+$/.test(k) && FT_INFO[k.slice(3)]) {
-          const u = dd('Updates');
-          if (!/\b\d{1,2} (January|February|March|April|May|June|July|August|September|October|November|December) \d{4}\b/.test(u) ||
+          const u = dd('Updates'), dated = !!FT_INFO[k.slice(3)][3];
+          const hasDate = /\b\d{1,2} (January|February|March|April|May|June|July|August|September|October|November|December) \d{4}\b/.test(u);
+          if ((dated ? !hasDate : hasDate || !/every one to three years/.test(u)) ||
               /\d{2}\/\d{2}\/\d{4}/.test(u) || (u.match(/\./g) || []).length !== 1) out.ft.push(k);
         }
       }
@@ -5099,6 +5103,175 @@ const smallText = page => page.evaluate(() => {
           'Small-area additions: when ONS gave no centroids, the GP distance card says it is measured from the middle of each LSOA', r.gpMethod);
       }
       ok(!errors.length, 'no page errors (small-area additions, with figures, ' + origin + ')', errors.join(' | '));
+      await page.close();
+    }
+  }
+
+  // The MSOA additions: ONS household income (SAIE) and healthy and
+  // disability-free life expectancy, and Local Health low birth weight and
+  // cancer incidence. All arrive with the next refresh, so as shipped none is
+  // offered; with figures (injected here as a refresh writes them) each sits
+  // in its theme at MSOA, ward and LA, an MSOA shows ONS's 95% range beside
+  // a modelled figure, the Data export carries the limits as columns, and
+  // Ask lists them within its 15,000 character cap.
+  {
+    const KEYS = ['ft_93092', 'ft_93234', 'ft_93235', 'ft_93236', 'ft_93237', 'ft_93238',
+      'hle_female', 'hle_male', 'dfle_female', 'dfle_male', 'saie_total_income', 'saie_net_bhc', 'saie_net_ahc'];
+    const MODELLED = KEYS.filter(k => !/^ft_/.test(k));
+    const fake = (k, i) => {
+      const x = (i * 37 % 100) / 100;
+      if (/^saie_/.test(k)) return Math.round(25000 + 60000 * x);
+      if (/^(hle|dfle)_/.test(k)) return Math.round((55 + 15 * x) * 100) / 100;
+      if (k === 'ft_93092') return Math.round((3 + 9 * x) * 10) / 10;
+      return Math.round((70 + 60 * x) * 10) / 10;
+    };
+    const readJson = f => JSON.parse(fs.readFileSync(path.join(ROOT, f), 'utf8'));
+    const inject = async page => {
+      await page.route('**/data/map/indicators.js*', r => {
+        const t = fs.readFileSync(path.join(ROOT, 'data/map/indicators.js'), 'utf8');
+        const at = t.indexOf('var PH_IND_STATS = ');
+        const doc = JSON.parse(t.slice(at + 19, t.lastIndexOf(';')));
+        KEYS.forEach(k => {
+          const st = { n: 600, d: 500, p5: fake(k, 3), p95: fake(k, 80) };
+          doc.stats[k] = { lv: { msoa: st, ward: st, borough: st } };
+        });
+        r.fulfill({ contentType: 'application/javascript', body: t.slice(0, at) + 'var PH_IND_STATS = ' + JSON.stringify(doc) + ';\n' });
+      });
+      for (const f of ['data/ward_core.json', 'data/ward_rest.json', 'ward_data.json']) {
+        await page.route('**/' + f + '*', r => {
+          const doc = readJson(f);
+          Object.keys(doc.wards || {}).forEach((wd, i) => {
+            const ind = doc.wards[wd].indicators = doc.wards[wd].indicators || {};
+            KEYS.filter(k => (f === 'data/ward_rest.json') === /^ft_/.test(k) || f === 'ward_data.json')
+              .forEach(k => { ind[k] = fake(k, i); });
+          });
+          r.fulfill({ contentType: 'application/json', body: JSON.stringify(doc) });
+        });
+      }
+      await page.route('**/msoa_data.json*', r => {
+        const doc = readJson('msoa_data.json');
+        Object.keys(doc).forEach((c, i) => {
+          KEYS.forEach(k => { doc[c][k] = fake(k, i); });
+          MODELLED.forEach(k => {
+            const v = fake(k, i), w = /^saie_/.test(k) ? 4000 : 3;
+            doc[c][k + '_lci'] = Math.round((v - w) * 100) / 100;
+            doc[c][k + '_uci'] = Math.round((v + w) * 100) / 100;
+          });
+          doc[c].ft_93092_vs = 'S';
+        });
+        r.fulfill({ contentType: 'application/json', body: JSON.stringify(doc) });
+      });
+      // LA figures for income (the pipeline's household-weighted ones) and
+      // OHID's for low birth weight; none for life expectancy, which the map
+      // then estimates from wards.
+      await page.route('**/borough_data.json*', r => {
+        const doc = readJson('borough_data.json');
+        Object.keys(doc).forEach((c, i) => {
+          ['saie_total_income', 'saie_net_bhc', 'saie_net_ahc', 'ft_93092'].forEach(k => { (doc[c].indicators || doc[c])[k] = fake(k, i + 5); });
+        });
+        r.fulfill({ contentType: 'application/json', body: JSON.stringify(doc) });
+      });
+    };
+
+    // As shipped: no figures for them, so none is offered anywhere.
+    {
+      const { page, errors } = await open(browser, 'index.html?t=1', DESK);
+      const r = await page.evaluate(keys => ({
+        cats: CATS.flatMap(c => c.fields.map(f => f.k)).filter(k => keys.indexOf(k) !== -1),
+        opts: [...document.querySelectorAll('#ov option')].map(o => o.value).filter(k => keys.indexOf(k) !== -1),
+        themes: [].concat(...(window.PH_THEMES || []).map(t => t.keys)).filter(k => keys.indexOf(k) !== -1),
+        listed: keys.filter(k => JSON.stringify(PH_ASSISTANT.runTool('list_indicators', {})).indexOf('"' + k + '"') !== -1),
+        empty: keys.filter(k => PH_EMPTY_IND.has(k)).length,
+        meta: keys.filter(k => !(OV_META[k] && OV_CFG[k] && IND_NAMES[k] && OV_PLAIN[k] && PH_EMPTY_FIELDS[k])),
+      }), KEYS);
+      ok(!r.cats.length && !r.opts.length && !r.themes.length && !r.listed.length && r.empty === KEYS.length,
+        'MSOA additions: a build without their figures does not offer them, and Ask does not list them', JSON.stringify(r));
+      ok(!r.meta.length, 'MSOA additions: each has its label, colour direction, card and plain line', r.meta.join(', '));
+      ok(!errors.length, 'no page errors (MSOA additions, as shipped)', errors.join(' | '));
+      await page.close();
+    }
+
+    // With figures, as a refresh will write them.
+    {
+      const page = await browser.newPage({ viewport: { width: DESK.width, height: DESK.height } });
+      const errors = [];
+      page.on('pageerror', e => errors.push(e.message));
+      await inject(page);
+      await page.goto(BASE + '/index.html?t=1');
+      await page.waitForTimeout(SETTLE);
+      await page.evaluate(() => typeof ensureMsoaData === 'function' && ensureMsoaData());
+      await page.waitForFunction(() => typeof MSOA_DATA !== 'undefined' && Object.keys(MSOA_DATA).length > 0 &&
+        Object.values(MSOA_DATA).some(d => d.saie_net_bhc_lci != null), null, { timeout: 30000 }).catch(() => {});
+      const r = await page.evaluate(keys => {
+        const li = PH_ASSISTANT.runTool('list_indicators', {});
+        const ci = c => li.columns.indexOf(c);
+        const find = k => { for (const g of li.groups) for (const x of g.rows) if (x[ci('key')] === k) return { levels: g.levels.join(','), row: x }; return null; };
+        const theme = k => ((window.PH_THEMES || []).find(t => t.keys.includes(k)) || {}).label || '';
+        const dd = (k, name) => { const d = document.createElement('div'); d.innerHTML = indicatorCardHTML(k);
+          const dt = [...d.querySelectorAll('dt')].find(e => e.textContent === name); return dt ? dt.nextElementSibling.textContent : ''; };
+        const code = Object.keys(MSOA_DATA)[0];
+        const tmp = document.createElement('div');
+        tmp.innerHTML = ovIntervalHTML('msoa', code, 'saie_net_bhc');
+        const la = Object.keys(BOROUGH_DATA)[0];
+        return {
+          opts: [...document.querySelectorAll('#ov option')].map(o => o.value).filter(k => keys.indexOf(k) !== -1).length,
+          themes: keys.map(theme),
+          lv: [ovLevels('saie_net_bhc').join(','), ovLevels('hle_female').join(','), ovLevels('ft_93092').join(',')],
+          ask: [find('saie_net_bhc'), find('hle_female'), find('ft_93234')],
+          size: JSON.stringify(li).length,
+          range: tmp.textContent, rangeWard: ovIntervalHTML('ward', code, 'saie_net_bhc'),
+          rangeLh: ovIntervalHTML('msoa', code, 'ft_93092'),
+          money: fmtOv(38450, 'saie_net_ahc'), dec: [indDecimals('saie_net_bhc'), indDecimals('hle_male')],
+          ratio: ovIsStdRatio('ft_93237'), desc: [OV_CFG.ft_93235.descriptive, OV_CFG.ft_93238.descriptive, OV_CFG.ft_93237.descriptive],
+          saiePub: dd('saie_net_bhc', 'Published at'), saieMethod: dd('saie_net_ahc', 'Method'),
+          hlePub: dd('hle_female', 'Published at'), hleUnit: dd('hle_female', 'Unit'),
+          cancerCounted: dd('ft_93234', 'Counted'), lbwCounted: dd('ft_93092', 'Counted'),
+          anchors: [_methAnchor('saie_net_bhc'), _methAnchor('dfle_male'), _methAnchor('ft_93092'), _methAnchor('ft_93227')],
+          laSaie: [boroughOvValue(la, 'saie_net_bhc'), (BOROUGH_DATA[la].indicators || BOROUGH_DATA[la]).saie_net_bhc],
+          laEst: [laIsWardEstimate('hle_female'), laIsWardEstimate('saie_net_bhc'), laIsWardEstimate('ft_93092')],
+        };
+      }, KEYS);
+      ok(r.opts === KEYS.length, 'MSOA additions: with figures, all thirteen are offered', String(r.opts));
+      ok(r.themes.slice(0, 6).every(t => t === 'Health') && r.themes.slice(6, 10).every(t => t === 'Life expectancy and deaths') &&
+         r.themes.slice(10).every(t => t === 'Work, money and education'),
+        'MSOA additions: birth weight and cancer under Health, healthy life expectancy under Life expectancy, income under Work', r.themes.join(', '));
+      ok(r.lv.every(l => l === 'borough,ward,msoa'), 'MSOA additions: shown for MSOAs, wards and LAs', JSON.stringify(r.lv));
+      ok(r.ask.every(a => a && a.levels === 'la,ward,msoa') && r.ask[0].row.indexOf('more income') !== -1 && r.size < 15000,
+        'MSOA additions: Ask lists them at the right levels, income the right way round, within its 15,000 character cap',
+        JSON.stringify({ ask: r.ask, size: r.size }));
+      ok(/^95% range £[\d,]+ to £[\d,]+$/.test(r.range) && r.rangeWard === '' && r.rangeLh === '',
+        'MSOA additions: an MSOA shows ONS\'s 95% range beside a modelled figure, and a ward or a Local Health figure has none', r.range);
+      ok(r.money === '£38,450' && r.dec.join() === '0,1', 'MSOA additions: income in whole pounds with a pound sign, life expectancy to one place',
+        r.money + ' ' + r.dec.join());
+      ok(r.ratio && r.desc[0] && r.desc[1] && !r.desc[2],
+        'MSOA additions: cancer figures read as ratios to England, and breast and prostate are not coloured better or worse', JSON.stringify(r.desc));
+      ok(/ONS publishes these estimates for MSOAs\./.test(r.saiePub) && /where its households are/.test(r.saiePub) &&
+         /all the MSOAs in each LA, weighted by households/.test(r.saiePub) && /rent, mortgage interest/.test(r.saieMethod),
+        'MSOA additions: the income card says wards and LAs are weighted by households, and what housing costs are', r.saiePub);
+      ok(/where its residents are/.test(r.hlePub) && /our estimates/.test(r.hlePub) && r.hleUnit === 'years',
+        'MSOA additions: the healthy life expectancy card says wards are weighted by residents and LA figures are estimates', r.hlePub);
+      ok(/new cases of cancer/i.test(r.cancerCounted) && /under 2,500 grams/.test(r.lbwCounted),
+        'MSOA additions: the cancer and birth weight cards say what is counted', r.cancerCounted + ' | ' + r.lbwCounted);
+      ok(r.anchors.join() === 'src-saie,src-hle-msoa,src-local-health-extra,src-local-health',
+        'MSOA additions: cards link to their own source rows', r.anchors.join());
+      ok(r.laSaie[0] === r.laSaie[1] && r.laSaie[0] != null && r.laEst.join() === 'true,false,false',
+        'MSOA additions: an LA shows the LA file\'s income, and life expectancy without an LA figure is marked as our estimate', JSON.stringify([r.laSaie, r.laEst]));
+      // The Data export at MSOA: the limits are columns beside their figure,
+      // never indicators of their own.
+      await page.click('.mode-btn[data-mode="csv"]');
+      await page.waitForTimeout(600);
+      await page.evaluate(() => PH_CSV.setLevel('msoa'));
+      await page.waitForTimeout(1500);
+      const ex = await page.evaluate(() => {
+        const cols = [...document.querySelectorAll('#cb-cols input[data-col]')].map(b => b.getAttribute('data-col'));
+        PH_CSV.pick('saie_net_bhc');
+        return { cols, head: PH_CSV.buildFor('msoa').header };
+      });
+      ok(ex.cols.includes('saie_net_bhc') && !ex.cols.some(c => /_(lci|uci)$/.test(c)),
+        'MSOA additions: the Data export offers income at MSOA, and not its limits as indicators', ex.cols.filter(c => /saie|_lci|_uci/.test(c)).join(', '));
+      ok(ex.head.some(h => /household income.*lower 95% limit/i.test(h)) && ex.head.some(h => /household income.*upper 95% limit/i.test(h)),
+        'MSOA additions: an MSOA export with income carries its lower and upper 95% limits', ex.head.join(' | '));
+      ok(!errors.length, 'no page errors (MSOA additions, with figures)', errors.join(' | '));
       await page.close();
     }
   }
