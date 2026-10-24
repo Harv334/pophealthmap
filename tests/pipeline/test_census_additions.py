@@ -139,7 +139,10 @@ def tables(codes, rows, level, hyphen=True, ts029_detail=True, drop=()):
             "Household deprivation: Household is deprived in three dimensions": agg(dep[3]),
             "Household deprivation: Household is deprived in four dimensions": agg(dep[4])}),
         "TS003": pd.DataFrame({**code,
-            "Household composition: Total: All households": agg(comp_tot),
+            # The refresh showed the real file has no "All households" here;
+            # both spellings are tried.
+            ("Household composition: Total: All households" if hyphen else
+             "Household composition: Total; measures: Value"): agg(comp_tot),
             # The hyphen-less variant gives the group as a Total column; the
             # hyphenated one as a parent above its leaves.
             (f"Household composition: {one}" if hyphen else f"Household composition: {one}: Total"):

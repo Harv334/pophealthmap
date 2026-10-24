@@ -264,6 +264,10 @@ _SOURCE_PARTIAL: dict[str, str] = {}
 # at the wrong age). main() marks them "failed" with this message, so the
 # refresh workflow raises them, while the rows that passed are still used.
 _SOURCE_ERROR: dict[str, str] = {}
+# Sources that are fine but have something worth knowing in the manifest, such
+# as an optional column the publisher no longer prints. main() adds it to the
+# notes of an "ok" source; it does not change the status.
+_SOURCE_NOTE: dict[str, str] = {}
 
 def carry_forward_thin(path: Path, df: "pd.DataFrame", *, key: str, source: str,
                        requested, cache_file=None,
@@ -2084,11 +2088,16 @@ IOD_FILE8_SPECS = (
     ("iod_road_accidents",     "environment_score", +1, "value",
      (("road traffic",),), ("noise",)),
 )
-# A rank, decile or sub-domain column must never be taken for an indicator,
+# A rank, decile or domain score column must never be taken for an indicator,
 # and nor must a part of one: the 2019 workbook lists the four pollutants as
 # "Nitrogen dioxide (component of air quality indicator)" and so on, beside
-# "Air quality indicator" itself.
-IOD_FILE8_EXCLUDE = ("rank", "decile", "sub domain", "domain score", "component")
+# "Air quality indicator" itself. "Sub domain" on its own is not excluded: the
+# October 2026 refresh found no Key Stage 2, Key Stage 4, staying on, adult
+# skills or English proficiency column, and one possible reason is a header
+# that names the sub-domain it belongs to. A sub-domain score still reads
+# "... sub domain score", which "domain score" catches. When anything is
+# missing the run log lists every header (iod_headers).
+IOD_FILE8_EXCLUDE = ("rank", "decile", "domain score", "component")
 # Below this many LSOAs with figures a direction check is not attempted.
 IOD_CHECK_MIN_N = 200
 # The weakest agreement with its domain an indicator may show and still be
@@ -2473,11 +2482,44 @@ def _iod_write(name: str, out: "pd.DataFrame", source: str) -> "pd.DataFrame":
     return out
 
 
+def iod_headers(sheets: dict) -> list:
+    """Every header of every sheet, as "sheet: header", for the log."""
+    out = []
+    for name, df in (sheets or {}).items():
+        for c in getattr(df, "columns", []):
+            if isinstance(c, str) and c.strip() and not c.startswith("Unnamed"):
+                out.append(f"{name}: {c.strip()}")
+    return out
+
+
+def iod_problems_fail(want: list, found: list, problems: list, prev, optional: bool) -> bool:
+    """Whether a run's problems mean the source failed.
+
+    For File 7 (optional False) any problem does. For File 8 (optional True)
+    an indicator the release does not print is not a failure: the map leaves
+    out an indicator with no figures, and the IoD 2025 workbook may simply not
+    carry every 2019 indicator. It fails when anything else went wrong (a
+    column on the wrong scale, running the wrong way, too thin, or matched
+    twice), when it lost an indicator the committed parquet had, or when it
+    found fewer than half of them."""
+    if not optional:
+        return True
+    missing = [k for k in want if k not in found]
+    had = set(prev.columns) if prev is not None and hasattr(prev, "columns") else set()
+    if any(k in had for k in missing):
+        return True
+    if len(found) * 2 < len(want):
+        return True
+    return any(": no File 8 column with " not in p for p in problems)
+
+
 def _iod_run(source: str, number: int, name: str, want: list, exts: tuple,
-             words: tuple, override: str, parse) -> "pd.DataFrame":
+             words: tuple, override: str, parse, optional: bool = False) -> "pd.DataFrame":
     """The shared body of run_iod_extra and run_iod_indicators: the raw file
     if one is on disk, else the committed parquet when it is complete, else a
-    download; then parse(sheets) -> (frame, problems, matched)."""
+    download; then parse(sheets) -> (frame, problems, matched). optional says
+    an indicator the file does not print is reported but is not a failure
+    (iod_problems_fail)."""
     raw = _iod_raw_files(number)
     prev = _iod_committed(name)
     if not raw:
@@ -2509,6 +2551,10 @@ def _iod_run(source: str, number: int, name: str, want: list, exts: tuple,
         if k in matched:
             info(f"{source}: {k} <- {matched[k]!r}")
     found = [k for k in want if k in out.columns]
+    if problems:
+        # Every header, so the next look at the log can say why.
+        heads = iod_headers(sheets)
+        info(f"{source}: File {number} headers: " + " | ".join(heads))
     if not found:
         msg = f"none of the expected columns was found in {src.name}: " + "; ".join(problems[:6])
         if prev is not None and len(prev):
@@ -2516,8 +2562,13 @@ def _iod_run(source: str, number: int, name: str, want: list, exts: tuple,
             return prev
         raise RuntimeError(msg)
     if problems:
-        _iod_fail(source, f"{len(want) - len(found)} of {len(want)} columns missing or "
-                          "not used: " + "; ".join(problems))
+        msg = (f"{len(want) - len(found)} of {len(want)} columns missing or "
+               "not used: " + "; ".join(problems))
+        if iod_problems_fail(want, found, problems, prev, optional):
+            _iod_fail(source, msg)
+        else:
+            warn(f"{source}: {msg}")
+            _SOURCE_NOTE[source] = msg if len(msg) <= 2000 else msg[:1997] + "..."
     out = _iod_write(name, out, source)
     info(f"{source}: {len(found)} of {len(want)} columns")
     return out
@@ -2553,7 +2604,7 @@ def run_iod_indicators() -> pd.DataFrame:
 
     return _iod_run("iod_indicators", 8, IOD_INDICATORS_PARQUET, want,
                     (".xlsx", ".csv", ".ods"), (("underlying", "indicators"),),
-                    IOD_FILE8_URL_OVERRIDE, parse)
+                    IOD_FILE8_URL_OVERRIDE, parse, optional=True)
 
 
 # Weighted into wards and LAs by their own File 7 denominators, so a ward's
@@ -3470,14 +3521,19 @@ def _census_frame(level: str = "lsoa") -> pd.DataFrame | None:
     #     all full-time students and all aged 66 years and over
     # Lone parents living with their own parents fall under other household
     # types, so the lone parent figure is a lower bound.
+    # The all households column is "Household composition: Total" in the
+    # Nomis file (the October 2026 refresh found no "all households" in it),
+    # and a group may carry its own Total, so the denominator is the Total
+    # that names no group.
+    ts003_den_ex = ("person household", "family", "other household")
     attach("census_pensioner_alone_pct", "TS003", [("person household", "aged 66")],
-           den_kw=("total", "all households"), expect=1)
+           den_exclude=ts003_den_ex, expect=1)
     attach("census_lone_parent_dep_pct", "TS003", [("lone parent", "dependent children")],
-           num_exclude=("non-dependent",), den_kw=("total", "all households"), expect=1)
+           num_exclude=("non-dependent",), den_exclude=ts003_den_ex, expect=1)
     t = tables.get("TS003")
     if t is not None:
         cc = _cen_code_col(t)
-        den_col = _cen_find(t, "total", "all households")
+        den_col = _cen_find(t, "total", exclude=ts003_den_ex)
         one = _cen_group_cols(t, "person household")
         if not (cc and den_col and one):
             miss(f"TS003/census_one_person_hh_pct: num={len(one)} den={den_col} - column match failed")
@@ -5496,10 +5552,53 @@ def _ptal_discover_url() -> str | None:
     return (current or urls)[0]
 
 
-# The ONS best-fit lookup from the LSOAs of 2011 to those of 2021, with its
-# change indicator: U unchanged, S split, M merged, X a complex redraw.
-LSOA11_LSOA21_LOOKUP = ("https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/"
-                        "services/LSOA11_LSOA21_LAD22_EW_LU/FeatureServer/0/query")
+# The ONS lookup from the LSOAs of 2011 to those of 2021, with its change
+# indicator: U unchanged, S split, M merged, X a complex redraw. ONS reissues
+# these services with a version suffix, as it did the MSOA one (_v2); the
+# October 2026 refresh got no rows from the unsuffixed name. So the service is
+# found by name, trying the known ones and then the list of ONS services.
+LSOA11_LSOA21_LAYERS = ["LSOA11_LSOA21_LAD22_EW_LU_v2", "LSOA11_LSOA21_LAD22_EW_LU",
+                        "LSOA11_LSOA21_LAD22_EW_LU_v3"]
+LSOA11_LSOA21_FIELDS = ("LSOA11CD", "LSOA21CD", "CHGIND")
+
+
+def _lsoa11_lsoa21_layer() -> tuple:
+    """(service name, {upper-case field: field as ONS spells it}) of the ONS
+    LSOA 2011 to 2021 lookup, or (None, {}) with the reasons logged."""
+    def fields_of(name):
+        r = requests.get(f"{ONS_SERVICES}/{name}/FeatureServer/0?f=json", timeout=60)
+        if not r.ok:
+            return {}
+        j = r.json()
+        if j.get("error"):
+            return {}
+        return {f["name"].upper(): f["name"] for f in j.get("fields", []) if f.get("name")}
+
+    tried = []
+    for name in LSOA11_LSOA21_LAYERS:
+        try:
+            f = fields_of(name)
+        except Exception as e:
+            tried.append(f"{name} ({type(e).__name__})")
+            continue
+        if all(k in f for k in LSOA11_LSOA21_FIELDS):
+            return name, f
+        tried.append(f"{name} ({'no such service' if not f else 'missing fields'})")
+    try:
+        r = requests.get(f"{ONS_SERVICES}?f=json", timeout=120)
+        names = [x["name"] for x in r.json().get("services", [])]
+        for name in sorted((n for n in names if re.match(r"(?i)^LSOA11_LSOA21_LAD\d\d_EW_LU", n)),
+                           reverse=True):
+            if name in LSOA11_LSOA21_LAYERS:
+                continue
+            f = fields_of(name)
+            if all(k in f for k in LSOA11_LSOA21_FIELDS):
+                return name, f
+            tried.append(f"{name} (missing fields)")
+    except Exception as e:
+        tried.append(f"service list ({type(e).__name__}: {e})")
+    warn("lsoa11->lsoa21 lookup: no ONS service answered: " + "; ".join(tried))
+    return None, {}
 
 
 def get_lsoa11_lsoa21_rows() -> list:
@@ -5514,22 +5613,32 @@ def get_lsoa11_lsoa21_rows() -> list:
         except ValueError:
             pass
     codes = sorted(get_lsoa_ward_lookup())
+    layer, fields = _lsoa11_lsoa21_layer()
+    if not layer:
+        raise RuntimeError("lsoa11->lsoa21 lookup: no ONS service found (see the warning above)")
+    f11, f21, fchg = (fields[k] for k in LSOA11_LSOA21_FIELDS)
+    url = f"{ONS_SERVICES}/{layer}/FeatureServer/0/query"
     rows: list = []
     seen: set = set()
     for i in range(0, len(codes), 120):
         batch = codes[i:i + 120]
         payload = {
-            "where": "LSOA21CD IN (" + ",".join(f"'{c}'" for c in batch) + ")",
-            "outFields": "LSOA11CD,LSOA21CD,CHGIND",
+            "where": f"{f21} IN (" + ",".join(f"'{c}'" for c in batch) + ")",
+            "outFields": f"{f11},{f21},{fchg}",
             "returnGeometry": "false",
             "f": "json",
             "resultRecordCount": 4000,
         }
-        r = requests.post(LSOA11_LSOA21_LOOKUP, data=payload, timeout=180)
+        r = requests.post(url, data=payload, timeout=180)
         r.raise_for_status()
-        for feat in r.json().get("features", []):
+        j = r.json()
+        # ArcGIS reports a bad query with HTTP 200 and an error body, which
+        # read as no rows at all; say what it was instead.
+        if j.get("error"):
+            raise RuntimeError(f"lsoa11->lsoa21 lookup ({layer}): {j['error']}")
+        for feat in j.get("features", []):
             a = feat.get("attributes", {})
-            key = (a.get("LSOA11CD"), a.get("LSOA21CD"), (a.get("CHGIND") or "").strip().upper())
+            key = (a.get(f11), a.get(f21), (a.get(fchg) or "").strip().upper())
             if key[0] and key[1] and key not in seen:
                 seen.add(key)
                 rows.append(key)
@@ -5538,7 +5647,7 @@ def get_lsoa11_lsoa21_rows() -> list:
         raise RuntimeError(f"lsoa11->lsoa21 lookup: only {len(have):,} of {len(codes):,} "
                            f"LSOAs came back. Refusing to cache a partial lookup.")
     cache.write_text(json.dumps(rows), encoding="utf-8")
-    ok(f"ONS lookup: {len(have):,} LSOAs (2021) -> 2011 parents")
+    ok(f"ONS lookup: {len(have):,} LSOAs (2021) -> 2011 parents ({layer})")
     return rows
 
 
@@ -9928,6 +10037,7 @@ def main() -> int:
             _MANIFEST_WRITES.pop(s, None)
             _SOURCE_PARTIAL.pop(s, None)
             _SOURCE_ERROR.pop(s, None)
+            _SOURCE_NOTE.pop(s, None)
             t0 = time.time()
             rec: dict = {"status": "ok", "error": "", "notes": "",
                          "fetched_at": datetime.now(timezone.utc).isoformat(),
@@ -9961,6 +10071,8 @@ def main() -> int:
                         # map is right, just partly older than the date says.
                         rec["status"] = "partial"
                         rec["notes"] = _SOURCE_PARTIAL[s]
+                    elif s in _SOURCE_NOTE:
+                        rec["notes"] = _SOURCE_NOTE[s]
             except Exception as e:
                 rec["status"] = "failed"
                 rec["error"] = f"{type(e).__name__}: {e}"

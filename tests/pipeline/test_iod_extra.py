@@ -400,10 +400,38 @@ with pd.ExcelWriter(x8) as xw:
     for name, frame in s3.items():
         frame.to_excel(xw, sheet_name=name[:31], index=False)
 p._SOURCE_ERROR.clear()
+p._SOURCE_NOTE.clear()
 part = p.run_iod_indicators()
-check("a missing column is a source failure that still writes the rest",
+check("an indicator the file does not print is noted, not failed, and the rest is written",
       "iod_acute_morbidity" not in part.columns and "iod_ypll" in part.columns
-      and "iod_acute_morbidity" in p._SOURCE_ERROR.get("iod_indicators", ""), p._SOURCE_ERROR.get("iod_indicators", ""))
+      and "iod_indicators" not in p._SOURCE_ERROR
+      and "iod_acute_morbidity" in p._SOURCE_NOTE.get("iod_indicators", ""),
+      p._SOURCE_ERROR.get("iod_indicators", "") + " | " + p._SOURCE_NOTE.get("iod_indicators", ""))
+# The same file again, when the committed parquet had that indicator: lost, so failed.
+pd.read_parquet(d / p.IOD_INDICATORS_PARQUET).assign(iod_acute_morbidity=1.0).to_parquet(
+    d / p.IOD_INDICATORS_PARQUET, index=False)
+p._SOURCE_ERROR.clear()
+p._SOURCE_NOTE.clear()
+p.run_iod_indicators()
+check("an indicator the committed parquet had and this file lacks is a failure",
+      "iod_acute_morbidity" in p._SOURCE_ERROR.get("iod_indicators", ""), p._SOURCE_ERROR.get("iod_indicators", ""))
+check("the rule: fewer than half found fails; a wrong-way column fails; a missing new one does not",
+      p.iod_problems_fail(["a", "b", "c", "d"], ["a"], ["b: no File 8 column with 'b'"], None, True)
+      and p.iod_problems_fail(["a", "b"], ["a"], ["b ('s': 'c') should rise as x rises; not used"], None, True)
+      and not p.iod_problems_fail(["a", "b", "c"], ["a", "b"], ["c: no File 8 column with 'c'"], None, True)
+      and p.iod_problems_fail(["a", "b", "c"], ["a", "b"], ["c: no File 8 column with 'c'"], None, False))
+# A header that names its sub-domain is still read (only a sub-domain score is not).
+s4 = {k: v.copy() for k, v in SHEETS.items()}
+s4["IoD2025 Education Domain"] = s4["IoD2025 Education Domain"].rename(columns={
+    "Key Stage 2 attainment (average points score) indicator":
+    "Children and Young People Sub-domain: Key Stage 2 attainment (average points score) indicator"})
+with pd.ExcelWriter(x8) as xw:
+    for name, frame in s4.items():
+        frame.to_excel(xw, sheet_name=name[:31], index=False)
+(d / p.IOD_INDICATORS_PARQUET).unlink()
+p._SOURCE_ERROR.clear()
+sub = p.run_iod_indicators()
+check("a header naming its sub-domain is read", "iod_ks2" in sub.columns, ", ".join(sub.columns))
 
 print("=== registered as sources, after the IMD ===")
 order = list(p.SOURCES)
