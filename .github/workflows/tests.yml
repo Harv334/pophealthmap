@@ -66,6 +66,11 @@ jobs:
           python3 tests/pipeline/test_census_additions.py
           python3 tests/pipeline/test_small_area_additions.py
           python3 tests/pipeline/test_lsoa11_lookup.py
+      # The DWP Stat-Xplore client, offline against a fake Stat-Xplore: no key
+      # is a skip, never a failure; the schema is walked by label; requests
+      # are batched; 2011 LSOAs are bridged; rounded and withheld cells.
+      - name: Check the DWP benefits client
+        run: python3 tests/pipeline/test_stat_xplore.py
       # What stops a region pack being published (scripts/check_region_pack.py).
       - name: Check the region pack checks
         run: python3 tests/pipeline/test_region_pack.py

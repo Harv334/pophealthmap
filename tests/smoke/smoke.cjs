@@ -5357,6 +5357,179 @@ const smallText = page => page.evaluate(() => {
     }
   }
 
+  // The DWP benefits from Stat-Xplore (fetch_all_data.py, DWP BENEFITS, FROM
+  // STAT-XPLORE). The pipeline fetches them only once the owner has added a
+  // Stat-Xplore key, so the page is checked as shipped, where each is offered
+  // exactly when the build has figures for it (none until then, all of them
+  // after), and with figures put into the files the way the pipeline writes
+  // them.
+  {
+    const DWP_LSOA = ['dwp_uc_people_pct', 'dwp_uc_hh_pct', 'dwp_uc_hh_lcw_pct', 'dwp_uc_hh_children_pct'];
+    const DWP_WARD = ['dwp_pip_pct', 'dwp_pip_psych_pct', 'dwp_pip_msk_pct', 'dwp_pip_neuro_pct', 'dwp_dla_child_pct',
+      'dwp_aa_pct', 'dwp_carers_pct', 'dwp_pension_credit_per_100', 'dwp_cilif_pct'];
+    const KEYS = DWP_LSOA.concat(DWP_WARD);
+    const ANCHORS = ['src-dwp-uc-people', 'src-dwp-uc-households', 'src-dwp-pip', 'src-dwp-dla', 'src-dwp-aa',
+      'src-dwp-carers', 'src-dwp-pension-credit', 'src-dwp-cilif'];
+    const fake = (k, i) => Math.round((1 + 20 * ((i * 37 % 100) / 100)) * 10) / 10;
+    const readJson = f => JSON.parse(fs.readFileSync(path.join(ROOT, f), 'utf8'));
+
+    // As shipped: offered in the picker, the select, the themes and Ask
+    // exactly when the build has figures for it.
+    {
+      const { page, errors } = await open(browser, 'index.html?t=1', DESK);
+      const r = await page.evaluate(keys => {
+        const stats = typeof PH_IND_STATS === 'object' && PH_IND_STATS && PH_IND_STATS.stats;
+        const has = k => !stats || _indStatsHas(k) || _indLoadedHas(k);
+        const listed = JSON.stringify(PH_ASSISTANT.runTool('list_indicators', {}));
+        const cats = CATS.flatMap(c => c.fields.map(f => f.k));
+        const opts = [...document.querySelectorAll('#ov option')].map(o => o.value);
+        const themes = [].concat(...(window.PH_THEMES || []).map(t => t.keys));
+        return {
+          figures: keys.filter(has),
+          wrong: keys.filter(k => [cats.includes(k), opts.includes(k), themes.includes(k),
+            listed.indexOf('"' + k + '"') !== -1].some(x => x !== has(k))),
+          meta: keys.filter(k => !(OV_META[k] && OV_CFG[k] && IND_NAMES[k] && OV_PLAIN[k] && saInfo(k) &&
+            (PH_EMPTY_FIELDS[k] || cats.includes(k)))),
+        };
+      }, KEYS);
+      ok(!r.wrong.length, 'DWP benefits: each is offered in the picker, the select, the themes and Ask exactly when the build has its figures (' +
+        r.figures.length + ' of ' + KEYS.length + ' have them)', JSON.stringify(r));
+      ok(!r.meta.length, 'DWP benefits: each has its label, colour direction, plain line, card and theme', r.meta.join(', '));
+      ok(!errors.length, 'no page errors (DWP benefits, as shipped)', errors.join(' | '));
+      await page.close();
+    }
+
+    // With figures, as a refresh with the key will write them.
+    {
+      const page = await browser.newPage({ viewport: { width: DESK.width, height: DESK.height } });
+      const errors = [];
+      page.on('pageerror', e => errors.push(e.message));
+      await page.route('**/data/map/indicators.js*', r => {
+        const t = fs.readFileSync(path.join(ROOT, 'data/map/indicators.js'), 'utf8');
+        const at = t.indexOf('var PH_IND_STATS = ');
+        const doc = JSON.parse(t.slice(at + 19, t.lastIndexOf(';')));
+        KEYS.forEach(k => {
+          const st = { n: 600, d: 500, p5: fake(k, 3), p95: fake(k, 80) };
+          doc.stats[k] = { lv: DWP_LSOA.indexOf(k) !== -1 ? { lsoa: st, ward: st, borough: st } : { ward: st, borough: st },
+            yr: k === 'dwp_uc_hh_lcw_pct' ? 'May 2025' : k === 'dwp_cilif_pct' ? '2024/25' : 'May 2026' };
+        });
+        r.fulfill({ contentType: 'application/javascript', body: t.slice(0, at) + 'var PH_IND_STATS = ' + JSON.stringify(doc) + ';\n' });
+      });
+      for (const f of ['data/ward_core.json', 'ward_data.json']) {
+        await page.route('**/' + f + '*', r => {
+          const doc = readJson(f);
+          Object.keys(doc.wards || {}).forEach((wd, i) => {
+            const ind = doc.wards[wd].indicators = doc.wards[wd].indicators || {};
+            KEYS.forEach(k => { ind[k] = fake(k, i); });
+          });
+          r.fulfill({ contentType: 'application/json', body: JSON.stringify(doc) });
+        });
+      }
+      await page.route('**/lsoa_data.json*', r => {
+        const doc = readJson('lsoa_data.json');
+        Object.keys(doc).forEach((c, i) => { DWP_LSOA.forEach(k => { doc[c][k] = fake(k, i); }); });
+        r.fulfill({ contentType: 'application/json', body: JSON.stringify(doc) });
+      });
+      await page.route('**/borough_data.json*', r => {
+        const doc = readJson('borough_data.json');
+        Object.keys(doc).forEach((c, i) => { KEYS.forEach(k => { (doc[c].indicators || doc[c])[k] = fake(k, i + 5); }); });
+        r.fulfill({ contentType: 'application/json', body: JSON.stringify(doc) });
+      });
+      await page.goto(BASE + '/index.html?t=1');
+      await page.waitForTimeout(SETTLE);
+      const r = await page.evaluate(keys => {
+        const li = PH_ASSISTANT.runTool('list_indicators', {});
+        const ci = c => li.columns.indexOf(c);
+        const find = k => { for (const g of li.groups) for (const x of g.rows) if (x[ci('key')] === k) return g.levels.join(','); return null; };
+        const dd = (k, name) => { const d = document.createElement('div'); d.innerHTML = indicatorCardHTML(k);
+          const dt = [...d.querySelectorAll('dt')].find(e => e.textContent === name); return dt ? dt.nextElementSibling.textContent : ''; };
+        const card = k => { const d = document.createElement('div'); d.innerHTML = indicatorCardHTML(k); return d.textContent; };
+        const theme = k => ((window.PH_THEMES || []).find(t => t.keys.indexOf(k) !== -1) || {}).label || '';
+        return {
+          opts: [...document.querySelectorAll('#ov option')].map(o => o.value).filter(k => keys.indexOf(k) !== -1).length,
+          lv: keys.map(k => k + '=' + ovLevels(k).join(',')),
+          ask: keys.map(k => k + '=' + find(k)),
+          size: JSON.stringify(li).length,
+          themes: [...new Set(keys.map(theme))],
+          ucPub: dd('dwp_uc_people_pct', 'Published at'), ucUnit: dd('dwp_uc_people_pct', 'Unit'),
+          ucMethod: dd('dwp_uc_people_pct', 'Method'), ucCard: card('dwp_uc_people_pct'),
+          lcwCard: card('dwp_uc_hh_lcw_pct'), lcwPeriod: (OV_META.dwp_uc_hh_lcw_pct || {}).yr,
+          childUnit: dd('dwp_uc_hh_children_pct', 'Unit'), childDen: dd('dwp_uc_hh_children_pct', 'Out of'),
+          pipPub: dd('dwp_pip_pct', 'Published at'), pipUnit: dd('dwp_pip_pct', 'Unit'),
+          pcUnit: dd('dwp_pension_credit_per_100', 'Unit'), cilPub: dd('dwp_cilif_pct', 'Published at'),
+          src: card('dwp_aa_pct'),
+          anchors: keys.map(_methAnchor),
+          la: [boroughOvValue('E09000001', 'dwp_pip_pct'), (BOROUGH_DATA.E09000001.indicators || BOROUGH_DATA.E09000001).dwp_pip_pct],
+          dec: keys.map(k => indDecimals(k)),
+          colour: keys.filter(k => !(OV_CFG[k] && OV_CFG[k].wh === true && !OV_CFG[k].descriptive)),
+          twin: indSameAs('ft_child_poverty_low_income'),
+          twinOf: Object.keys(IND_SAME_AS).filter(k => /^dwp_/.test(k) || /^dwp_/.test(IND_SAME_AS[k])),
+          dashes: keys.filter(k => /[–—]/.test(card(k) + (OV_PLAIN[k] || '') + indLabel(k))),
+        };
+      }, KEYS);
+      ok(r.opts === KEYS.length, 'DWP benefits: with figures, all ' + KEYS.length + ' are offered', String(r.opts));
+      ok(r.lv.every(x => /^dwp_uc_/.test(x) ? /=borough,ward,lsoa$/.test(x) : /=borough,ward$/.test(x)),
+        'DWP benefits: Universal Credit for LSOAs, wards and LAs; the rest for wards and LAs only', r.lv.join(' '));
+      ok(r.ask.every(x => /^dwp_uc_/.test(x) ? /=la,ward,lsoa$/.test(x) : /=la,ward$/.test(x)) && r.size < 15000,
+        'DWP benefits: Ask lists them at the right levels, within its 15,000 character cap', JSON.stringify({ ask: r.ask, size: r.size }));
+      ok(r.themes.length === 1 && r.themes[0] === 'Work, money and education', 'DWP benefits: all sit in Work, money and education', r.themes.join(', '));
+      ok(/DWP publishes these counts for LSOAs on Stat-Xplore/.test(r.ucPub) && /add up the counts and the people aged 16 to 64/.test(r.ucPub) &&
+         r.ucUnit === '% of residents aged 16 to 64' && /rounds or adjusts small counts/.test(r.ucMethod) && /Stat-Xplore/.test(r.ucCard),
+        'DWP benefits: the Universal Credit card says it is from Stat-Xplore, rounded, and summed into wards and LAs', JSON.stringify([r.ucPub, r.ucUnit, r.ucMethod]));
+      ok(/a year before the latest/.test(r.lcwCard) && /backdated/.test(r.lcwCard) && r.lcwPeriod === 'May 2025',
+        'DWP benefits: the limited capability for work card says its month is a year back, because assessments are backdated', r.lcwCard.slice(0, 400));
+      ok(r.childUnit === '% of households on Universal Credit' && /households on Universal Credit/i.test(r.childDen),
+        'DWP benefits: UC households with children are a share of UC households', JSON.stringify([r.childUnit, r.childDen]));
+      ok(/add up the counts and the people aged 16 and over/.test(r.pipPub) && r.pipUnit === '% of residents aged 16 and over' &&
+         r.pcUnit === 'claims per 100 residents aged 66 and over' && /DWP's own counts for each ward/.test(r.cilPub),
+        'DWP benefits: PIP over residents aged 16 and over, Pension Credit as claims per 100, children in low income families from DWP\'s ward counts',
+        JSON.stringify([r.pipPub, r.pipUnit, r.pcUnit, r.cilPub]));
+      ok(/Department for Work and Pensions \(DWP\)/.test(r.src) && /DWP, Stat-Xplore, with/.test(r.src),
+        'DWP benefits: cards name DWP in full once and credit Stat-Xplore', r.src.slice(0, 300));
+      ok(r.anchors.every(a => ANCHORS.indexOf(a) !== -1), 'DWP benefits: cards link to their own source rows', r.anchors.join());
+      ok(r.la[0] === r.la[1] && r.la[0] != null, 'DWP benefits: an LA shows the LA file\'s own figure, not an average of its wards', JSON.stringify(r.la));
+      ok(r.dec.every(d => d === 1), 'DWP benefits: one decimal place', r.dec.join());
+      ok(!r.colour.length, 'DWP benefits: coloured as measures of need, the way the claimant rate is', r.colour.join(', '));
+      ok(r.twin === '' && !r.twinOf.length,
+        'DWP benefits: OHID\'s LA child poverty series stays in Compare and Query beside the DWP ward measure, which may not cover every LA',
+        JSON.stringify([r.twin, r.twinOf]));
+      ok(!r.dashes.length, 'DWP benefits: no em or en dash in their labels and cards', r.dashes.join(', '));
+      await setOv(page, 'dwp_uc_people_pct');
+      await page.waitForTimeout(1500);
+      const legend = await page.evaluate(() => (document.getElementById('ov-cur-nm') || {}).textContent || '');
+      ok(/Universal Credit/.test(legend), 'DWP benefits: People on Universal Credit draws', legend);
+      ok(!errors.length, 'no page errors (DWP benefits, with figures)', errors.join(' | '));
+      await page.close();
+    }
+
+    // The methodology page: a source row for each, and a source still waiting
+    // for its key says so rather than "Updated".
+    {
+      const page = await browser.newPage({ viewport: { width: DESK.width, height: DESK.height } });
+      const errors = [];
+      page.on('pageerror', e => errors.push(e.message));
+      await page.route('**/data/meta/manifest.json*', r => {
+        const doc = readJson('data/meta/manifest.json');
+        doc.sources = doc.sources || {};
+        doc.sources.dwp_uc_people = { status: 'skipped', error: '', notes: 'no Stat-Xplore API key', fetched_at: '2026-10-24T10:00:00+00:00' };
+        doc.sources.dwp_pip = { status: 'ok', error: '', notes: '', fetched_at: '2026-10-24T10:00:00+00:00' };
+        r.fulfill({ contentType: 'application/json', body: JSON.stringify(doc) });
+      });
+      await page.goto(BASE + '/methodology.html');
+      await page.waitForTimeout(2500);
+      const m = await page.evaluate(ids => ({
+        missing: ids.filter(id => !document.getElementById(id)),
+        uc: ((document.getElementById('src-dwp-uc-people') || {}).textContent || ''),
+        pip: ((document.getElementById('src-dwp-pip') || {}).textContent || ''),
+      }), ANCHORS);
+      ok(!m.missing.length, 'DWP benefits: the methodology page has a source row for each', m.missing.join(', '));
+      ok(/Waiting for a Stat-Xplore key/.test(m.uc) && !/Updated on/.test(m.uc) && /Updated on/.test(m.pip),
+        'DWP benefits: a source skipped for want of its key says it is waiting, one that ran says when', JSON.stringify(m));
+      ok(!errors.length, 'no page errors (methodology, DWP sources)', errors.join(' | '));
+      await page.close();
+    }
+  }
+
   // Ask on a region map: the same tools, reading the region's own files, with
   // every result naming the region and no London place in any of them.
   if (HAS_NE) {

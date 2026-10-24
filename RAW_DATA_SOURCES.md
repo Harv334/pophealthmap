@@ -171,7 +171,7 @@ its MSOA's figure (Census 2021 households, residents if those are missing).
 LAs: household-weighted mean of all their MSOAs. The limits stay at MSOA.
 Not comparable with earlier editions (2011 MSOAs, a different model).
 
-### The DWP benefit series are not here, and cannot be
+### The DWP benefit series are not on NOMIS
 
 This table used to list five more: PIP `NM_208_1`, Universal Credit
 `NM_210_1`, ESA `NM_209_1`, Carer's Allowance `NM_189_1` and Pension
@@ -205,12 +205,73 @@ variants publish at `TYPE304` / `TYPE307` / `TYPE312`, which predate
 LSOA 2021 and would not join to anything else in this repo.
 
 **The live route is DWP Stat-Xplore**, `https://stat-xplore.dwp.gov.uk/webapi/rest/v1/`.
-It needs a free account and an API key sent as an `APIKey` header — the
-endpoint answers `401` without one — and it speaks its own query
-language rather than NOMIS's. Adding these back means writing a
-Stat-Xplore client, not repairing the NOMIS one. The broken source was
-removed rather than left failing, because a source that always fails
-teaches everyone to ignore the failure list.
+It needs a free account and an API key sent as an `APIKey` header (the
+endpoint answers `401` without one), and it speaks its own query
+language rather than NOMIS's. The broken NOMIS source was removed rather
+than left failing, because a source that always fails teaches everyone to
+ignore the failure list. The Stat-Xplore client below replaces it.
+
+### DWP benefits from Stat-Xplore
+
+Eight sources in `fetch_all_data.py` ("DWP BENEFITS, FROM STAT-XPLORE"),
+each with its own manifest entry. They read the key from the environment
+variable `STAT_XPLORE_API_KEY`, which the refresh and region workflows set
+from the repository secret of the same name (HANDOVER.md, "DWP benefits").
+**Without the key each is `skipped`, with a note naming the secret, and
+nothing is fetched or changed.** Stat-Xplore is published under the Open
+Government Licence v3.0.
+
+The API: `GET schema` (the top folder), `GET schema/{id}` (a folder,
+database, field or value set, with its children) and `POST table` (a
+database, a measure, and for each field a recode of the values wanted).
+Nothing is typed in by id. The client walks the catalogue's folders, picks
+each database by its label (the newest of several that fit), takes its
+count measure, its date field and newest value, and the LSOA (or ward) level
+of the geography of where people live, and logs every id it chose. The
+geography values go in batches of at most 1,000 and 5,000 cells per table
+request; 429 and server errors are retried with a pause (`Retry-After` is
+honoured), and an error body, a refused key or an answer of the wrong shape
+fails that source with the message. The JSON layout read is the API's
+published documentation as remembered when this was written; the first run
+with a key is the check (see HANDOVER.md for what its log says).
+
+| Source | Database, matched by label | Count | Written to | Map keys (levels) | Base |
+|--------|----------------------------|-------|------------|-------------------|------|
+| `dwp_uc_people` | People on Universal Credit | all people, newest month | `data/economy/dwp_uc_people_lsoa.parquet` | `dwp_uc_people_pct` (LSOA, ward, LA) | residents aged 16 to 64, mid-year estimates |
+| `dwp_uc_households` | Households on Universal Credit | households in payment where that value exists; with Child Entitlement; with Limited Capability for Work Entitlement (LCW or LCWRA) 12 months before the newest month, because assessments are backdated | `data/economy/dwp_uc_households_lsoa.parquet` | `dwp_uc_hh_pct`, `dwp_uc_hh_lcw_pct` (Census 2021 households), `dwp_uc_hh_children_pct` (UC households) (LSOA, ward, LA) | households at the 2021 Census; UC households |
+| `dwp_pip` | PIP Cases with Entitlement | all, and by main disabling condition (psychiatric, musculoskeletal general and regional, neurological) where offered | `data/economy/dwp_pip_lsoa.parquet` | `dwp_pip_pct`, `dwp_pip_psych_pct`, `dwp_pip_msk_pct`, `dwp_pip_neuro_pct` (ward, LA) | residents aged 16 and over |
+| `dwp_dla_children` | DLA Cases with Entitlement (in payment if not found) | ages 0 to 15, from the age bands | `data/economy/dwp_dla_children_lsoa.parquet` | `dwp_dla_child_pct` (ward, LA) | children aged 0 to 15 |
+| `dwp_attendance_allowance` | Attendance Allowance cases with entitlement | all | `data/economy/dwp_attendance_allowance_lsoa.parquet` | `dwp_aa_pct` (ward, LA) | residents aged 66 and over (`sape_age66plus`) |
+| `dwp_carers_allowance` | Carer's Allowance Cases in Payment (never the entitled count, which includes pensioners paid their State Pension instead) | all | `data/economy/dwp_carers_allowance_lsoa.parquet` | `dwp_carers_pct` (ward, LA) | residents aged 16 and over |
+| `dwp_pension_credit` | Pension Credit | claims (a couple makes one) | `data/economy/dwp_pension_credit_lsoa.parquet` | `dwp_pension_credit_per_100` (ward, LA) | residents aged 66 and over |
+| `dwp_cilif` | Children in Low Income Families: Relative Low Income | children aged 0 to 15, by ward, before housing costs | `data/economy/dwp_cilif_ward.parquet` | `dwp_cilif_pct` (ward, LA) | children aged 0 to 15 in the LSOAs that best fit each ward |
+
+- **Vintage.** Universal Credit uses the output areas of 2021 since its
+  October 2025 release. For the rest it was not confirmed, so it is read
+  from the codes: a value set holding any English LSOA code above
+  `E01033768` (the last of 2011) is on 2021 boundaries; one without is a
+  2011 set, asked for the 2011 parents of the scope's LSOAs and moved onto
+  2021 LSOAs through `get_lsoa11_lsoa21_rows`, a split LSOA's count shared
+  among its parts by Census 2021 residents and a merged one added up.
+- **Rounded and withheld cells.** DWP adjusts or rounds small counts. A cell
+  that is empty, not a number or marked (`..`, `*`) is no figure, never 0:
+  that LSOA is left out of its ward and LA, count and base alike, and an
+  area whose LSOAs with a count hold under four fifths of its base has no
+  figure. The counts are used as published, so sums do not match DWP's own
+  ward or LA totals exactly.
+- **Levels.** LSOA, ward and LA for Universal Credit; wards and LAs only for
+  the rest, because their small-area geography and vintage were not
+  confirmed and their LSOA counts are small. Ward figures add up the LSOAs
+  that best fit each ward, LA figures all of the LA's LSOAs, counts before
+  dividing.
+- **CiLIF wards.** DWP's ward list is matched to the map's 2025 wards by
+  code. An LA is used only when every one of its wards is there; the others
+  are named in the manifest note, and if no LA matches the source is
+  skipped. Wards of an older vintage are not forced onto the 2025 wards
+  (HANDOVER.md says what would be needed).
+- **Not added:** Employment and Support Allowance, the absolute low income
+  measure, and the after housing costs estimates (published by DWP as ODS
+  tables, not on Stat-Xplore).
 
 ---
 
@@ -542,8 +603,8 @@ To rebuild from scratch, a colleague needs:
    IDAOPI, sub-domain and underlying indicator parquets download Files 7 and
    8 by themselves until they are committed complete.
 3. **Census** — 15 ZIPs from NOMIS (one per TS table listed in §3).
-4. **Claimant count** — 1 CSV via the NOMIS API. The five DWP benefit
-   series are not fetched; see §4 for why.
+4. **Claimant count**: 1 CSV via the NOMIS API. The DWP benefits come from
+   Stat-Xplore instead (§4), and only with a free API key.
 5. **Fuel poverty** — 1 DESNZ XLSX.
 6. **Green/blue space access** — 1 Defra ODS (≈46 MB zipped, 1.37 GB uncompressed).
 7. **QOF** — 16 CSVs from Fingertips (one per indicator).
@@ -585,6 +646,7 @@ equivalent open licence.
 | ONS mid-year population estimates (LSOA) | Yearly (last: November 2025, mid-2024) | Automatic; the newest file on the dataset page is taken |
 | DfT STATS19 casualties | Yearly (final figures each September) | Automatic; re-downloaded after 30 days |
 | CQC care directory | Monthly | Automatic; the newest file on the page is taken |
+| DWP Stat-Xplore | Universal Credit and PIP every three months; DLA, Attendance Allowance, Carer's Allowance and Pension Credit once a year (March) since 2026; low income families each spring | Automatic once `STAT_XPLORE_API_KEY` is set; the newest period is taken each run |
 | Distances to services | With the NHS registers | Every run that fetches the GP, pharmacy and dental registers |
 | ONS small area income estimates | Every few years (FYE 2023 in Dec 2025, next not announced) | Static. Delete `data/demographics/saie_msoa.parquet` to take a new edition |
 | ONS health state life expectancy for MSOAs | After each census | Static. Delete `data/outcomes/hle_msoa.parquet` to take a revised edition |

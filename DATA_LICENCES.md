@@ -65,7 +65,8 @@ uk-air.defra.gov.uk; the site asks for the domain as well as the department.
 | GP practices (epraccur) | NHS England Organisation Data Service | OGL v3 | |
 | Pharmacies (edispensary) | NHS England Organisation Data Service | OGL v3 | |
 | QOF prevalence, public health outcomes | OHID Fingertips | OGL v3 | |
-| Claimant count, DWP benefits | DWP and ONS, via Nomis | OGL v3 | |
+| Claimant count | DWP and ONS, via Nomis | OGL v3 | |
+| DWP benefits: Universal Credit, PIP, DLA, Attendance Allowance, Carer's Allowance, Pension Credit, children in low income families | Department for Work and Pensions (with HMRC for low income families), via Stat-Xplore | OGL v3 | Read through Stat-Xplore's open data API with a free personal API key (HANDOVER.md). The key is for access only and does not change the licence. Counts are rounded or adjusted by DWP for disclosure control; the general OGL statement covers attribution |
 | Sub-regional fuel poverty | DESNZ | OGL v3 | |
 | Access to green and blue space | Defra, with ONS, OS and Natural England | OGL v3 | Official statistic in development |
 | Background air quality (NO₂, PM2.5, PM10) | Defra UK-AIR, Pollution Climate Mapping | OGL v3 | Modelled, not measured. Acknowledge Defra as the source, per the wording above |

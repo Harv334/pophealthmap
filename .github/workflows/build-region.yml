@@ -127,6 +127,10 @@ jobs:
       - name: Run pipeline for the region
         # -u: unbuffered, so the log shows each source as it runs. Buffered, a
         # slow source left the log silent for hours with no clue which it was.
+        # The Stat-Xplore key for the DWP benefits (HANDOVER.md); without the
+        # secret those sources are skipped, not failed.
+        env:
+          STAT_XPLORE_API_KEY: ${{ secrets.STAT_XPLORE_API_KEY }}
         run: python -u fetch_all_data.py --scope "${{ inputs.scope }}" --skip tfl ptal
 
       # The loading screen's ward map for this region (map/loader.js), drawn

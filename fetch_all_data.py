@@ -37,6 +37,9 @@ No cache needed - the script hits these APIs directly (cached between runs):
   - ONS Open Geography   (LSOA 2021 -> ward 2025 best-fit lookup)
   - NHS ODS Data Search  (epraccur GP + edispensary pharmacy registers,
                           both ETag-revalidated so an unchanged file is a 304)
+  - DWP Stat-Xplore      (benefit caseloads; only with a free API key in the
+                          STAT_XPLORE_API_KEY environment variable, and
+                          skipped without one)
 
 ------------------------------------------------------------------------------
 USAGE
@@ -4006,6 +4009,10 @@ def run_claimant_count() -> pd.DataFrame:
 # Adding it back means writing a Stat-Xplore client, not repairing this one.
 # Deleting the broken version is the honest state in the meantime: a source
 # that always fails teaches everyone to ignore the failure list.
+#
+# That client now exists: "DWP BENEFITS, FROM STAT-XPLORE", further down. It
+# stays dormant, each of its sources "skipped" with a note rather than
+# failed, until the owner adds a key as the STAT_XPLORE_API_KEY secret.
 # ============================================================================
 
 # ============================================================================
@@ -8853,6 +8860,8 @@ def build_ward_data() -> dict:
                              "claimant_youth": "NOMIS NM_162_1, claimants aged 18 to 24",
                              "road_casualties": "DfT STATS19 road casualties",
                              "care_homes": "CQC care directory"}[name]
+    for name in (sa_notes.get("dwp") or {}):
+        sources[name] = DWP_SOURCE_NAMES.get(name, "DWP Stat-Xplore")
 
     # --- Core20: how many of a ward's LSOAs, and residents, are Core20 -------
     # NHS England's Core20PLUS5 defines Core20 for LSOAs: the most deprived
@@ -11813,6 +11822,9 @@ SAPE_BANDS = {
     "sape_age65plus": (65, None),
     "sape_age75plus": (75, None),
     "sape_age18_24":  (18, 24),
+    # State Pension age in 2026, the base of Attendance Allowance and Pension
+    # Credit (DWP BENEFITS, FROM STAT-XPLORE).
+    "sape_age66plus": (66, None),
 }
 # The shares the map shows, each a band over the population.
 SAPE_SHARES = {
@@ -12855,6 +12867,12 @@ def small_area_figures(to_area: dict, pop_by_lsoa: dict, *, what: str) -> tuple[
         else:
             warn(f"{what}: no population estimates (sape), so care home beds per 100 people "
                  "aged 75 and over has no base and is left out")
+    # The DWP benefits from Stat-Xplore, made the same way: counts added up
+    # over bases added up (dwp_area_figures).
+    dv, dn = dwp_area_figures(to_area, what=what, level="ward" if what == "ward" else "la")
+    for a, vals in dv.items():
+        out.setdefault(a, {}).update(vals)
+    notes.update(dn)
     return out, notes
 
 
@@ -12882,6 +12900,9 @@ def small_area_lsoa_values(pop_by_lsoa: dict) -> dict:
                 rec[key] = round(100.0 * float(v) / float(p), 1)
     crime = _read_parquet_opt(DATA_DIR / "crime" / "police_uk_crime.parquet")
     for lc, rec in crime_by_lsoa(crime, pop_by_lsoa).items():
+        out.setdefault(lc, {}).update(rec)
+    # Universal Credit, whose LSOA counts are large enough to show.
+    for lc, rec in dwp_lsoa_values().items():
         out.setdefault(lc, {}).update(rec)
     return out
 
@@ -12911,6 +12932,1374 @@ def small_area_periods() -> dict:
                 str(ch["as_at"].dropna().max()), "%Y-%m-%d").strftime("%b %Y")
         except ValueError:
             pass
+    out.update(dwp_periods())
+    return out
+
+
+# ============================================================================
+# DWP BENEFITS, FROM STAT-XPLORE
+# ============================================================================
+# DWP publishes its benefit caseloads on Stat-Xplore, not on Nomis (see
+# "SOURCE 3b: DWP benefits - RETIRED" above for why the old fetch went). This
+# is a small client for its open data API,
+#
+#     https://stat-xplore.dwp.gov.uk/webapi/rest/v1/
+#       GET  schema          the top folder of the catalogue
+#       GET  schema/{id}     one folder, database, field or value set, with
+#                            its children
+#       POST table           a table: a database, a measure, and for each
+#                            field a recode naming the values wanted
+#
+# with the key in an APIKey header on every request. The key belongs to a
+# person: the owner registers on Stat-Xplore and adds it as the repository
+# secret STAT_XPLORE_API_KEY, which the refresh and region workflows pass to
+# the pipeline step (HANDOVER.md, "DWP benefits"). Without it every source
+# below is "skipped" with a note saying so, never "failed", so no region pack
+# is held up, and the map keeps what it had.
+#
+# Nothing here is addressed by an id typed in by hand. The database, measure,
+# field and value ids are found by walking the schema and matching labels:
+# the database whose label names Universal Credit people, its residence-based
+# LSOA level, its newest month. Every id chosen is logged, so the first run
+# with a key shows exactly what was picked. The JSON layout read here (nodes
+# with id, label, type, location and children; a table answer with "fields",
+# each holding "items", and "cubes", holding each measure's "values" nested
+# one list per field) is the API's published documentation as remembered
+# when this was written, not checked against a live answer from this
+# sandbox, so each step checks what it gets and says what it found when that
+# is not what was expected.
+#
+# Disclosure control: DWP adjusts or rounds small counts (Universal Credit by
+# adding a little random error to every cell, the older benefits by
+# rounding), and a cell can come back empty or marked as too small to show.
+# Such a cell is no figure, never 0: an LSOA without one is left out of its
+# ward and LA, count and base alike, and an area whose LSOAs with counts hold
+# under WARD_MIN_COVER of its base gets no figure. Counts are otherwise used
+# as published, so a ward or LA figure, made by adding up its LSOAs, will not
+# match a total DWP publishes for it exactly. The map says the counts are
+# rounded.
+#
+# Geography: Universal Credit has been built from the output areas of 2021
+# since its October 2025 release, so its LSOAs are 2021 LSOAs. For the other
+# benefits the vintage was not confirmed, so it is read from the value set:
+# a set holding any LSOA code first issued in 2021 is on 2021 boundaries, one
+# without is on 2011 boundaries and is moved onto 2021 LSOAs through the ONS
+# lookup (get_lsoa11_lsoa21_rows), a split LSOA's count shared among its parts
+# by their residents.
+#
+# Levels: LSOA, ward and LA for Universal Credit, whose small-area geography
+# is confirmed and whose counts per LSOA are in the tens to hundreds. Wards
+# and LAs only for PIP, DLA, Attendance Allowance, Carer's Allowance and
+# Pension Credit, from summed LSOA counts over summed bases, because their
+# LSOA level and vintage were not confirmed and their counts per LSOA are
+# small. Children in relative low income families are published for wards,
+# and used only where DWP's wards are the map's 2025 wards.
+#
+# The bases: residents of each age from ONS's mid-year estimates (sape), and
+# households from the 2021 Census. A count from 2026 over a base from 2021 to
+# 2024 runs a little high where the population has grown since.
+STAT_XPLORE_API = "https://stat-xplore.dwp.gov.uk/webapi/rest/v1/"
+STAT_XPLORE_KEY_ENV = "STAT_XPLORE_API_KEY"
+# Stat-Xplore refuses a table with too many cells, so the geography values go
+# in batches that keep each request well under its cap, whatever it is now.
+SX_MAX_CELLS = 5000
+SX_GEO_BATCH = 1000
+# A gentle pace: one request at a time with a pause between them, and after a
+# 429 or a server error a longer wait (Retry-After when the API sends one).
+SX_PAUSE_S = 0.5
+SX_ATTEMPTS = 4
+SX_RETRY_S = 10.0
+SX_TIMEOUT = 180
+SX_SCHEMA_DEPTH = 6
+SX_MAX_CANDIDATES = 4
+# The LSOA level must hold at least this share of the LSOAs the scope needs,
+# or it is the wrong level or the wrong vintage.
+SX_MIN_FOUND = 0.9
+# The last LSOA code of 2011 in England. Every English code above it was
+# first issued for the LSOAs of 2021 (1,945 of the 33,755), so a value set
+# holding any of them is on 2021 boundaries.
+LSOA11_LAST_E01 = 33768
+# Assessments for limited capability for work are backdated, so the newest
+# months undercount these households, by up to two years' worth of
+# decisions (the fact check). The figure is taken from the newest month at
+# least this many months older than the latest, and the card says so.
+SX_LCW_LAG_MONTHS = 12
+# A category that means "not this one".
+SX_NOT = r"(?i)^\s*(?:no|not|without|none)\b|unknown|missing|not known"
+_sx_sleep = time.sleep          # the tests replace it
+_SX_SCHEMA: dict = {}           # schema answers, shared by every source in a run
+_SX_CATALOGUE: dict = {}        # the databases found by walking the folders
+
+SX_PARQUETS = {
+    "dwp_uc_people":            "dwp_uc_people_lsoa.parquet",
+    "dwp_uc_households":        "dwp_uc_households_lsoa.parquet",
+    "dwp_pip":                  "dwp_pip_lsoa.parquet",
+    "dwp_dla_children":         "dwp_dla_children_lsoa.parquet",
+    "dwp_attendance_allowance": "dwp_attendance_allowance_lsoa.parquet",
+    "dwp_carers_allowance":     "dwp_carers_allowance_lsoa.parquet",
+    "dwp_pension_credit":       "dwp_pension_credit_lsoa.parquet",
+    "dwp_cilif":                "dwp_cilif_ward.parquet",
+}
+# How each database is recognised: every pattern in want must match its label
+# with the folders above it, and none in avoid its own label. Among several
+# that fit, the one with the newest period wins, then the one prefer names
+# first. Carer's Allowance must be the in-payment count: the entitled count
+# includes pensioners whose State Pension overlaps it, and would map where
+# pensioners live.
+SX_DATABASES = {
+    "dwp_uc_people": dict(
+        what="people on Universal Credit",
+        want=(r"universal credit|\bUC\b", r"\bpeople\b"),
+        avoid=(r"\bstarts?\b", r"\bhouseholds?\b", r"claimant count", r"\bflows?\b")),
+    "dwp_uc_households": dict(
+        what="households on Universal Credit",
+        want=(r"universal credit|\bUC\b", r"\bhouseholds?\b"),
+        avoid=(r"\bstarts?\b", r"\bpeople\b", r"\bflows?\b")),
+    "dwp_pip": dict(
+        what="Personal Independence Payment cases with entitlement",
+        want=(r"\bPIP\b|personal independence payment", r"entitle"),
+        avoid=(r"registration", r"clearance", r"reconsideration", r"appeal", r"review", r"\bstarts?\b")),
+    "dwp_dla_children": dict(
+        what="Disability Living Allowance cases",
+        want=(r"\bDLA\b|disability living allowance", r"entitle|in payment"),
+        avoid=(r"\bstarts?\b", r"clearance"), prefer=(r"entitle",)),
+    "dwp_attendance_allowance": dict(
+        what="Attendance Allowance cases",
+        want=(r"\bAA\b|attendance allowance", r"entitle|in payment"),
+        avoid=(r"\bstarts?\b", r"clearance"), prefer=(r"entitle",)),
+    "dwp_carers_allowance": dict(
+        what="Carer's Allowance cases in payment",
+        want=(r"\bCA\b|carer.?s allowance", r"in payment"),
+        avoid=(r"\bstarts?\b", r"entitle")),
+    "dwp_pension_credit": dict(
+        what="Pension Credit",
+        want=(r"pension credit|\bPC\b",),
+        avoid=(r"\bstarts?\b", r"application", r"\bflows?\b", r"clearance")),
+    "dwp_cilif": dict(
+        what="children in relative low income families",
+        want=(r"low income", r"relative"), avoid=(r"absolute",), level="ward"),
+}
+# PIP by the main disabling condition DWP records. Whether Stat-Xplore crosses
+# it with small areas was not confirmed, so a missing field or a refused
+# table leaves these three out with a note, and PIP itself stands.
+SX_PIP_CONDITION_FIELD = r"(?i)disabling condition|disability (?:category|condition)|main condition"
+SX_PIP_CONDITIONS = {"psych": r"(?i)psychiatric", "msk": r"(?i)musculoskeletal", "neuro": r"(?i)neurolog"}
+
+
+class StatXploreError(RuntimeError):
+    """Stat-Xplore refused a request or answered with something unreadable."""
+
+
+def statxplore_key() -> str:
+    return (os.environ.get(STAT_XPLORE_KEY_ENV) or "").strip()
+
+
+SX_NO_KEY_NOTE = ("no Stat-Xplore API key, so no DWP figures were fetched and the map keeps what it "
+                  "had. Register free at stat-xplore.dwp.gov.uk and add the key as the repository "
+                  f"secret {STAT_XPLORE_KEY_ENV} (HANDOVER.md, DWP benefits)")
+
+
+def _sx_type(node) -> str:
+    return str((node or {}).get("type") or "").strip().upper()
+
+
+def _sx_label(node) -> str:
+    return str((node or {}).get("label") or "").strip()
+
+
+def statxplore_error_text(obj) -> str:
+    """The message of a Stat-Xplore error body, or "" when obj is not one.
+    A schema node or a table answer is never an error, whatever else it
+    carries."""
+    if not isinstance(obj, dict) or any(k in obj for k in ("cubes", "children", "fields")):
+        return ""
+    parts = []
+    for k in ("error", "errors", "message", "messages", "detail", "description"):
+        v = obj.get(k)
+        if v:
+            parts.append(v if isinstance(v, str) else json.dumps(v)[:300])
+    if parts:
+        return "; ".join(parts)
+    st = obj.get("status") or obj.get("statusCode")
+    if st is not None and str(st).strip().lower() not in ("200", "ok", "success"):
+        return f"status {st}"
+    return ""
+
+
+class StatXplore:
+    """The open data API, one request at a time. Schema answers are kept for
+    the run in _SX_SCHEMA, so the catalogue is walked once however many
+    sources ask."""
+
+    def __init__(self, key: str, *, source: str, base: str = STAT_XPLORE_API):
+        self.key = key
+        self.source = source
+        self.base = base.rstrip("/") + "/"
+        self.requests = 0
+
+    def _call(self, method: str, path: str, body=None):
+        url = self.base + path
+        headers = {"APIKey": self.key, "Accept": "application/json"}
+        last = "no attempt made"
+        for i in range(SX_ATTEMPTS):
+            if self.requests:
+                _sx_sleep(SX_PAUSE_S)
+            self.requests += 1
+            wait = SX_RETRY_S * (3 ** i)
+            try:
+                if method == "POST":
+                    r = requests.post(url, headers=headers, json=body, timeout=SX_TIMEOUT)
+                else:
+                    r = requests.get(url, headers=headers, timeout=SX_TIMEOUT)
+            except requests.RequestException as e:
+                last = f"{type(e).__name__}: {e}"
+                r = None
+            if r is not None:
+                code = int(r.status_code)
+                text = str(getattr(r, "text", "") or "")[:300]
+                if code in (401, 403):
+                    raise StatXploreError(
+                        f"{self.source}: Stat-Xplore refused the API key (HTTP {code}) for {path}. "
+                        f"Check the {STAT_XPLORE_KEY_ENV} secret: {text}")
+                if code == 429 or code >= 500:
+                    last = f"HTTP {code}"
+                    ra = (getattr(r, "headers", None) or {}).get("Retry-After")
+                    if ra and str(ra).strip().isdigit():
+                        wait = float(ra)
+                else:
+                    try:
+                        j = r.json()
+                    except ValueError:
+                        raise StatXploreError(f"{self.source}: Stat-Xplore answered {path} with HTTP "
+                                              f"{code} and a body that is not JSON: {text!r}") from None
+                    msg = statxplore_error_text(j)
+                    if code >= 400 or msg:
+                        raise StatXploreError(f"{self.source}: Stat-Xplore answered {path} with an error "
+                                              f"(HTTP {code}): {msg or json.dumps(j)[:300]}")
+                    return j
+            if i < SX_ATTEMPTS - 1:
+                _sx_sleep(min(wait, 300.0))
+        raise StatXploreError(f"{self.source}: Stat-Xplore did not answer {path} after "
+                              f"{SX_ATTEMPTS} attempts ({last})")
+
+    def node(self, ident=None) -> dict:
+        """A schema node with its children: the catalogue's top folder
+        without ident."""
+        key = (self.base, ident or "")
+        if key not in _SX_SCHEMA:
+            path = "schema" if not ident else "schema/" + urllib.parse.quote(str(ident), safe=":")
+            j = self._call("GET", path)
+            if not isinstance(j, dict):
+                raise StatXploreError(f"{self.source}: the schema answer for {ident or 'the top folder'} "
+                                      f"is a {type(j).__name__}, not an object")
+            _SX_SCHEMA[key] = j
+        return _SX_SCHEMA[key]
+
+    def children(self, ident=None) -> list:
+        kids = self.node(ident).get("children")
+        return [c for c in kids if isinstance(c, dict) and c.get("id")] if isinstance(kids, list) else []
+
+    def table(self, query: dict) -> dict:
+        return self._call("POST", "table", query)
+
+
+def statxplore_databases(sx: StatXplore) -> list:
+    """[{id, label, path}] for every database in the catalogue, found by
+    walking its folders (path is the folders above it)."""
+    out: list = []
+    seen: set = set()
+    todo = [(None, "", 0)]
+    while todo:
+        ident, path, depth = todo.pop(0)
+        for c in sx.children(ident):
+            cid = c["id"]
+            if cid in seen:
+                continue
+            seen.add(cid)
+            t = _sx_type(c)
+            if t == "DATABASE":
+                out.append({"id": cid, "label": _sx_label(c), "path": path})
+            elif t == "FOLDER" and depth < SX_SCHEMA_DEPTH:
+                todo.append((cid, (path + " > " if path else "") + _sx_label(c), depth + 1))
+    return out
+
+
+def _sx_catalogue(sx: StatXplore) -> list:
+    if sx.base not in _SX_CATALOGUE:
+        dbs = statxplore_databases(sx)
+        info(f"{sx.source}: Stat-Xplore lists {len(dbs)} databases")
+        _SX_CATALOGUE[sx.base] = dbs
+    return _SX_CATALOGUE[sx.base]
+
+
+def statxplore_match(dbs: list, want, avoid=()) -> list:
+    """The databases whose label, with the folders above it, matches every
+    pattern in want, and whose own label matches none in avoid."""
+    out = []
+    for d in dbs:
+        full = ((d.get("path") or "") + " > " + d["label"]).strip(" >")
+        if all(re.search(w, full, re.I) for w in want) and \
+                not any(re.search(a, d["label"], re.I) for a in avoid):
+            out.append(d)
+    return out
+
+
+def statxplore_parts(sx: StatXplore, db_id: str) -> tuple[list, list]:
+    """(measures, fields) of a database: its COUNT and MEASURE nodes and its
+    FIELD nodes, looking inside any folders it groups them in."""
+    measures: list = []
+    fields: list = []
+    seen: set = set()
+    todo = [(db_id, 0)]
+    while todo:
+        ident, depth = todo.pop(0)
+        for c in sx.children(ident):
+            if c["id"] in seen:
+                continue
+            seen.add(c["id"])
+            t = _sx_type(c)
+            if t in ("COUNT", "MEASURE"):
+                measures.append(c)
+            elif t == "FIELD":
+                fields.append(c)
+            elif t in ("FOLDER", "GROUP") and depth < 3:
+                todo.append((c["id"], depth + 1))
+    return measures, fields
+
+
+def statxplore_measure(measures: list, pattern=None):
+    """The count to tabulate: a COUNT measure (the one whose label matches
+    pattern, if any does), else a MEASURE whose label says it counts
+    something. Never an amount or an average. None when there is none."""
+    counts = [m for m in measures if _sx_type(m) == "COUNT"] or \
+        [m for m in measures if re.search(r"(?i)\b(people|households|cases|claimants|claims|children|number|count)\b",
+                                          _sx_label(m)) and not re.search(r"(?i)amount|average|mean|£", _sx_label(m))]
+    if pattern:
+        hit = [m for m in counts if re.search(pattern, _sx_label(m), re.I)]
+        if hit:
+            return hit[0]
+    return counts[0] if counts else None
+
+
+def statxplore_valuesets(sx: StatXplore, field: dict) -> list:
+    """A field's value sets, or the field itself when its values hang straight
+    under it."""
+    kids = sx.children(field["id"])
+    vs = [c for c in kids if _sx_type(c) == "VALUESET"]
+    if vs:
+        return vs
+    return [field] if any(_sx_type(c) == "VALUE" for c in kids) else []
+
+
+def statxplore_values(sx: StatXplore, valueset: dict) -> list:
+    return [c for c in sx.children(valueset["id"]) if _sx_type(c) == "VALUE"]
+
+
+def statxplore_field_values(sx: StatXplore, field: dict) -> list:
+    """The values of the first of a field's value sets that has any."""
+    for vs in statxplore_valuesets(sx, field):
+        vals = statxplore_values(sx, vs)
+        if vals:
+            return vals
+    return []
+
+
+SX_DATE_LABEL = (r"(?i)^\s*(?:month|quarter|year|date|period|time|financial year|"
+                 r"reference (?:month|date|period|year))\b")
+
+
+def statxplore_date_field(fields: list):
+    """The field that holds the dates, by its label ("Month", "Quarter",
+    "Year"), else by DATE in its id. None when there is none."""
+    hits = [f for f in fields if re.search(SX_DATE_LABEL, _sx_label(f))]
+    if not hits:
+        hits = [f for f in fields if re.search(r"(?<![A-Z])DATE", str(f.get("id") or "").upper())]
+    return hits[0] if hits else None
+
+
+_SX_MONTHS = {m: i for i, m in enumerate(
+    ("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"), 1)}
+
+
+def statxplore_period(label, ident="") -> tuple | None:
+    """(year, month, kind) of a date value from its label (or the end of its
+    id), for sorting and for saying which period a figure is. kind is
+    "month", "fy" (a financial year, dated to its March) or "year". None for
+    a value that is not a date."""
+    t = str(label or "")
+    m = re.search(r"(?i)\b(?:fye|financial year end(?:ing)?|year end(?:ing)?)\s*(?:march\s*)?((?:19|20)\d{2})\b", t)
+    if m:
+        return (int(m.group(1)), 3, "fy")
+    m = re.search(r"\b((?:19|20)\d{2})\s*/\s*(\d{2}|\d{4})\b", t)
+    if m:
+        y1, y2 = int(m.group(1)), int(m.group(2))
+        y2 = (y1 // 100) * 100 + y2 if y2 < 100 else y2
+        if y2 == y1 + 1:
+            return (y2, 3, "fy")
+    m = re.search(r"(?i)\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?[\s'/-]*((?:19|20)\d{2}|\d{2})\b", t)
+    if m:
+        y = int(m.group(2))
+        return (y + 2000 if y < 100 else y, _SX_MONTHS[m.group(1).lower()], "month")
+    m = re.search(r"(?i)\b((?:19|20)\d{2})\s*-?\s*q([1-4])\b", t) or re.search(r"(?i)\bq([1-4])\s*((?:19|20)\d{2})\b", t)
+    if m:
+        a, b = m.group(1), m.group(2)
+        y, q = (int(a), int(b)) if len(a) == 4 else (int(b), int(a))
+        return (y, 3 * q, "month")
+    m = re.search(r"\b((?:19|20)\d{2})[-/]?(0[1-9]|1[0-2])\b", t)
+    if m:
+        return (int(m.group(1)), int(m.group(2)), "month")
+    m = re.fullmatch(r"\s*((?:19|20)\d{2})\s*(?:\((?:p|r)\))?\s*", t, re.I)
+    if m:
+        return (int(m.group(1)), 12, "year")
+    tail = str(ident or "").rsplit(":", 1)[-1]
+    m = re.fullmatch(r"((?:19|20)\d{2})(0[1-9]|1[0-2])", tail)
+    if m:
+        return (int(m.group(1)), int(m.group(2)), "month")
+    return None
+
+
+def statxplore_period_label(p) -> str:
+    """'May 2026', '2024/25' or '2025'."""
+    y, m, kind = p
+    if kind == "fy":
+        return f"{y - 1}/{str(y)[2:]}"
+    if kind == "year":
+        return str(y)
+    return datetime(y, m, 1).strftime("%B %Y")
+
+
+def statxplore_pick_period(values: list, lag_months: int = 0):
+    """(value, period) of the newest dated value, or with lag_months of the
+    newest at least that many months older than it (the newest when there is
+    none so old). (None, None) when no value is a date."""
+    dated = []
+    for v in values:
+        p = statxplore_period(_sx_label(v), v.get("id"))
+        if p:
+            dated.append((p, v))
+    if not dated:
+        return None, None
+    dated.sort(key=lambda x: (x[0][0], x[0][1]))
+    newest = dated[-1]
+    if lag_months:
+        top = newest[0][0] * 12 + newest[0][1]
+        older = [x for x in dated if x[0][0] * 12 + x[0][1] <= top - lag_months]
+        if older:
+            return older[-1][1], older[-1][0]
+    return newest[1], newest[0]
+
+
+# The levels, by the label of the value set (or of a field holding just one
+# level), and what they must not be mistaken for.
+SX_LEVEL_LABEL = {
+    "lsoa": (r"(?i)lower\s*layer\s*super\s*output|\blsoas?\b", r"(?i)middle|\bmsoa"),
+    "ward": (r"(?i)\bwards?\b", r"(?i)parliament|constituenc"),
+}
+SX_GEO_FIELD = (r"(?i)geograph|national|region|\bLAs?\b|local authorit|output area|\bOAs?\b|"
+                r"super output|\blsoas?\b|\bwards?\b")
+# Where the office handling the claim is, rather than where the claimant lives.
+SX_GEO_AVOID = r"(?i)jobcentre|\bjcp\b|workplace|office"
+SX_CODE = {"lsoa": re.compile(r"(?<![A-Z0-9])([EW]01\d{6})(?![0-9])"),
+           "ward": re.compile(r"(?<![A-Z0-9])([EW]05\d{6})(?![0-9])")}
+
+
+def statxplore_geo(sx: StatXplore, fields: list, level: str):
+    """(field, value set) holding the level in the geography of where people
+    live, or None. A residence-based field and a 2021 label are preferred."""
+    want, avoid = SX_LEVEL_LABEL[level]
+    found = []
+    for f in fields:
+        fl = _sx_label(f)
+        if re.search(SX_GEO_AVOID, fl) or not re.search(SX_GEO_FIELD, fl):
+            continue
+        for vs in statxplore_valuesets(sx, f):
+            vl = fl if vs is f else _sx_label(vs)
+            if re.search(want, vl) and not re.search(avoid, vl):
+                found.append((f, vs))
+    if not found:
+        return None
+    found.sort(key=lambda x: (0 if re.search(r"(?i)residen", _sx_label(x[0])) else 1,
+                              0 if "2021" in _sx_label(x[1]) + _sx_label(x[0]) else 1))
+    return found[0]
+
+
+def statxplore_code(value: dict, level: str) -> str | None:
+    """The LSOA (E01, W01) or ward (E05, W05) code of a value, from the end of
+    its id, else its id, else its label."""
+    ident = str(value.get("id") or "")
+    for t in (ident.rsplit(":", 1)[-1], ident, _sx_label(value)):
+        m = SX_CODE[level].search(t)
+        if m:
+            return m.group(1)
+    return None
+
+
+def statxplore_lsoa_vintage(label: str, codes) -> str:
+    """"2021" when the codes include any English LSOA code first issued in
+    2021, else "2011". The label is only a fallback for a set with no English
+    codes: a 2021 set always holds some of the new ones."""
+    nums = [int(c[3:]) for c in codes if str(c).startswith("E01") and str(c)[3:].isdigit()]
+    if any(n > LSOA11_LAST_E01 for n in nums):
+        return "2021"
+    if not nums and re.search(r"2021", label or ""):
+        return "2021"
+    return "2011"
+
+
+def statxplore_dataset(sx: StatXplore, *, what: str, want, avoid=(), prefer=(),
+                       level: str = "lsoa", measure=None) -> dict:
+    """The database for one benefit, found by label, with its count measure,
+    its date field and newest period, and its geography at level. Raises
+    StatXploreError, saying what was found, when no database fits."""
+    src = sx.source
+    dbs = _sx_catalogue(sx)
+    cands = statxplore_match(dbs, want, avoid)
+    level_word = "LSOA" if level == "lsoa" else level
+    if not cands:
+        near = [d["label"] for d in dbs if re.search(want[0], (d.get("path") or "") + " " + d["label"], re.I)][:8]
+        raise StatXploreError(f"{src}: no Stat-Xplore database is labelled as {what}"
+                              + (f"; the nearest are: {'; '.join(near)}" if near else f" among the {len(dbs)} listed"))
+    usable: list = []
+    why: list = []
+    for d in cands[:SX_MAX_CANDIDATES]:
+        measures, fields = statxplore_parts(sx, d["id"])
+        m = statxplore_measure(measures, measure)
+        dfield = statxplore_date_field(fields)
+        dvals = statxplore_field_values(sx, dfield) if dfield else []
+        dv, per = statxplore_pick_period(dvals)
+        geo = statxplore_geo(sx, fields, level)
+        miss = [n for n, x in (("count measure", m), ("date field", dfield), ("dated value", dv),
+                                (f"{level_word} level", geo)) if not x]
+        if miss:
+            why.append(f"{d['label']!r} has no {', no '.join(miss)}")
+            continue
+        usable.append({
+            "db": d["id"], "db_label": d["label"], "db_path": d.get("path") or "",
+            "measure": m["id"], "measure_label": _sx_label(m), "fields": fields,
+            "date_field": dfield["id"], "date_label": _sx_label(dfield), "date_values": dvals,
+            "date_value": dv["id"], "period": per, "period_label": statxplore_period_label(per),
+            "geo_field": geo[0]["id"], "geo_valueset": geo[1],
+            "geo_label": _sx_label(geo[0]) if geo[1] is geo[0] else f"{_sx_label(geo[0])}, {_sx_label(geo[1])}",
+            "level": level,
+        })
+    if not usable:
+        raise StatXploreError(f"{src}: no Stat-Xplore database for {what} can be used: " + "; ".join(why))
+
+    def rank(u):
+        pr = next((i for i, p in enumerate(prefer) if re.search(p, u["db_label"], re.I)), len(prefer))
+        return (-(u["period"][0] * 12 + u["period"][1]), pr, len(u["db_label"]))
+    usable.sort(key=rank)
+    best = usable[0]
+    if len(usable) > 1:
+        info(f"{src}: {len(usable)} databases fit; taking the newest: "
+             + "; ".join(f"{u['db_label']!r} to {u['period_label']}" for u in usable))
+    info(f"{src}: database {best['db']} ({best['db_label']!r}, in {best['db_path'] or 'the top folder'})")
+    info(f"{src}: measure {best['measure']} ({best['measure_label']!r}); date field {best['date_field']} "
+         f"({best['date_label']!r}), latest {best['date_value']} ({best['period_label']})")
+    info(f"{src}: {level_word} level {best['geo_valueset']['id']} ({best['geo_label']!r}) in field {best['geo_field']}")
+    for d in why:
+        info(f"{src}: passed over {d}")
+    return best
+
+
+def statxplore_groups(sx: StatXplore, ds: dict, field_pat: str, named: dict, *,
+                      drop=None, avoid_field=None, rest: bool = True):
+    """(field id, groups of value ids, {name: group index}, {name: labels},
+    field label) for a field found by its label: one group for each name in
+    named (name: pattern) that some value matches and drop does not, then,
+    with rest, one group of every other value, so the groups add up to the
+    whole. None when there is no such field or no name matches."""
+    for f in ds["fields"]:
+        fl = _sx_label(f)
+        if not re.search(field_pat, fl) or (avoid_field and re.search(avoid_field, fl)):
+            continue
+        for vs in statxplore_valuesets(sx, f):
+            vals = statxplore_values(sx, vs)
+            taken: set = set()
+            groups: list = []
+            index: dict = {}
+            labels: dict = {}
+            for name, pat in named.items():
+                hit = [v for v in vals if v["id"] not in taken and re.search(pat, _sx_label(v))
+                       and not (drop and re.search(drop, _sx_label(v)))]
+                if hit:
+                    index[name] = len(groups)
+                    groups.append([v["id"] for v in hit])
+                    labels[name] = [_sx_label(v) for v in hit]
+                    taken.update(v["id"] for v in hit)
+            if index:
+                others = [v["id"] for v in vals if v["id"] not in taken]
+                if rest and others:
+                    groups.append(others)
+                return f["id"], groups, index, labels, fl
+    return None
+
+
+def statxplore_age_band(label) -> tuple | None:
+    """(first age, last age) of an age band's label: "0-4", "5 to 10",
+    "Under 16", "16+", "65 and over", "7". None for an unknown age or a label
+    that is not an age."""
+    t = str(label or "").lower().replace("\u2013", "-")      # an en dash, written as an escape
+    if re.search(r"unknown|missing|not known|unavailable", t):
+        return None
+    m = re.search(r"under\s*(\d{1,3})", t)
+    if m:
+        return (0, int(m.group(1)) - 1)
+    m = re.search(r"(\d{1,3})\s*(?:-|to)\s*(\d{1,3})", t)
+    if m:
+        return (int(m.group(1)), int(m.group(2)))
+    m = re.search(r"(\d{1,3})\s*(?:\+|and over|or over|and above|plus|or more)", t)
+    if m:
+        return (int(m.group(1)), 200)
+    m = re.fullmatch(r"\s*(?:aged?\s*)?(\d{1,3})(?:\s*years?(?:\s*old)?)?\s*", t)
+    if m:
+        return (int(m.group(1)), int(m.group(1)))
+    return None
+
+
+def statxplore_ages_upto(values: list, last_age: int) -> tuple[list, str]:
+    """(value ids of the bands that together make ages 0 to last_age,
+    problem). A band running across last_age, bands that overlap or leave an
+    age out, give no ids and say why."""
+    bands = [(b, v) for v in values for b in [statxplore_age_band(_sx_label(v))] if b]
+    keep = [(b, v) for b, v in bands if b[1] <= last_age]
+    across = [v for b, v in bands if b[0] <= last_age < b[1]]
+    if across:
+        return [], f"the band {_sx_label(across[0])!r} runs across age {last_age}"
+    ages: list = []
+    for (lo, hi), _v in keep:
+        ages.extend(range(lo, hi + 1))
+    if not keep or sorted(set(ages)) != list(range(0, last_age + 1)):
+        return [], (f"the bands do not make ages 0 to {last_age} "
+                    f"({', '.join(_sx_label(v) for v in values[:12])})")
+    if len(ages) != len(set(ages)):
+        return [], f"the bands up to {last_age} overlap ({', '.join(_sx_label(v) for _b, v in keep)})"
+    return [v["id"] for _b, v in keep], ""
+
+
+def statxplore_ages(sx: StatXplore, ds: dict, last_age: int) -> tuple:
+    """(field id, [[value ids]], labels) restricting a table to ages 0 to
+    last_age through the database's age field. Raises when no age field
+    makes those ages, because without it the count is everyone's."""
+    why = []
+    fields = [f for f in ds["fields"] if re.search(r"(?i)^\s*age\b", _sx_label(f))
+              and not re.search(r"(?i)pension|date|start", _sx_label(f))]
+    for f in fields:
+        for vs in statxplore_valuesets(sx, f):
+            vals = statxplore_values(sx, vs)
+            ids, problem = statxplore_ages_upto(vals, last_age)
+            if ids:
+                labels = [_sx_label(v) for v in vals if v["id"] in ids]
+                info(f"{sx.source}: ages 0 to {last_age} from {_sx_label(f)!r} ({f['id']}): {', '.join(labels)}")
+                return f["id"], [ids], labels
+            why.append(f"{_sx_label(f)!r}: {problem}")
+    raise StatXploreError(
+        f"{sx.source}: no age field in {ds['db_label']!r} makes ages 0 to {last_age}"
+        + (": " + "; ".join(why) if why else
+           f" (its fields: {', '.join(_sx_label(f) for f in ds['fields'][:15])})"))
+
+
+def statxplore_filter(sx: StatXplore, ds: dict, field_pat: str, value_pat: str):
+    """(field id, [[value id]], label) keeping one value of a field found by
+    label, or None when there is no such field or value."""
+    g = statxplore_groups(sx, ds, field_pat, {"keep": value_pat}, rest=False)
+    if not g:
+        return None
+    fid, groups, _index, labels, flabel = g
+    return fid, groups, f"{flabel}: {', '.join(labels['keep'])}"
+
+
+def statxplore_query(db: str, measure: str, recodes: list) -> dict:
+    """The body of a table request: one dimension per recode, each recode a
+    field and its groups of value ids, with no totals."""
+    return {"database": db, "measures": [measure],
+            "recodes": {f: {"map": g, "total": False} for f, g in recodes},
+            "dimensions": [[f] for f, _g in recodes]}
+
+
+def statxplore_cell(v) -> float | None:
+    """A cell as a count, or None when DWP withheld it: a cell that is empty,
+    not a number, or marked (".." or "*", say). Never 0 for a withheld cell."""
+    if isinstance(v, dict):
+        return statxplore_cell(v.get("value"))
+    if v is None or isinstance(v, bool):
+        return None
+    if isinstance(v, (int, float)):
+        return None if v != v else max(0.0, float(v))
+    try:
+        f = float(str(v).strip().replace(",", ""))
+    except ValueError:
+        return None
+    return None if f != f else max(0.0, f)
+
+
+def statxplore_cube(resp, measure: str, dims: list) -> tuple[list, dict]:
+    """(items of each dimension, {index tuple: cell}) from a table answer,
+    the dimensions in the order of dims (field ids). Raises on an error body
+    or an answer whose shape does not match what was asked."""
+    if not isinstance(resp, dict):
+        raise StatXploreError(f"the table answer is a {type(resp).__name__}, not an object")
+    msg = statxplore_error_text(resp)
+    if msg:
+        raise StatXploreError(f"the table answer is an error: {msg}")
+    cubes = resp.get("cubes")
+    if not isinstance(cubes, dict) or not cubes:
+        raise StatXploreError("the table answer has no cubes (it has " + ", ".join(map(str, list(resp)[:8])) + ")")
+    cube = cubes.get(measure)
+    if cube is None and len(cubes) == 1:
+        cube = next(iter(cubes.values()))
+    if not isinstance(cube, dict) or "values" not in cube:
+        raise StatXploreError(f"the table answer has no values for {measure}")
+    fields = resp.get("fields")
+    if not isinstance(fields, list) or len(fields) != len(dims):
+        raise StatXploreError(f"the table answer has {len(fields) if isinstance(fields, list) else 'no'} "
+                              f"fields, not {len(dims)}")
+    ids = [str((f or {}).get("uri") or (f or {}).get("id") or "") for f in fields]
+    order = list(range(len(dims)))
+    if all(ids) and sorted(ids) == sorted(dims) and len(set(ids)) == len(ids):
+        order = [ids.index(d) for d in dims]
+    items_in = [list((f or {}).get("items") or []) for f in fields]
+    cells_in: dict = {}
+
+    def walk(arr, idx):
+        if len(idx) == len(fields):
+            cells_in[tuple(idx)] = arr
+            return
+        n = len(items_in[len(idx)])
+        if not isinstance(arr, list) or len(arr) != n:
+            raise StatXploreError(f"the cube does not match its fields ({n} items at depth {len(idx)}, "
+                                  f"{len(arr) if isinstance(arr, list) else 'no list of'} values)")
+        for i, a in enumerate(arr):
+            walk(a, idx + [i])
+    walk(cube["values"], [])
+    items = [items_in[order[d]] for d in range(len(dims))]
+    cells = {tuple(idx[order[d]] for d in range(len(dims))): v for idx, v in cells_in.items()}
+    return items, cells
+
+
+def statxplore_counts(sx: StatXplore, ds: dict, geo_ids: dict, *, split=None, filters=(),
+                      date_value=None) -> dict:
+    """{geography code: [cell per group of split]} for the values in geo_ids
+    ({code: value id}) at the dataset's date (or date_value), restricted by
+    filters ((field id, [[value ids]]) each) and crossed with split (field
+    id, groups), in batches that keep each request under SX_MAX_CELLS
+    cells. A cell DWP withheld is None."""
+    groups = split[1] if split else [None]
+    per_geo = len(groups)
+    for _f, g in filters:
+        per_geo *= max(1, len(g))
+    size = max(1, min(SX_GEO_BATCH, SX_MAX_CELLS // max(1, per_geo)))
+    by_value = {v: c for c, v in geo_ids.items()}
+    codes = sorted(geo_ids)
+    out: dict = {}
+    n_req = 0
+    for i in range(0, len(codes), size):
+        batch = codes[i:i + size]
+        recodes = [(ds["geo_field"], [[geo_ids[c]] for c in batch]),
+                   (ds["date_field"], [[date_value or ds["date_value"]]])]
+        recodes += [(f, g) for f, g in filters]
+        if split:
+            recodes.append((split[0], split[1]))
+        dims = [f for f, _g in recodes]
+        resp = sx.table(statxplore_query(ds["db"], ds["measure"], recodes))
+        n_req += 1
+        try:
+            items, cells = statxplore_cube(resp, ds["measure"], dims)
+        except StatXploreError as e:
+            raise StatXploreError(f"{sx.source}: {e}") from None
+        geo = []
+        for it in items[0]:
+            uris = [str(u) for u in ((it or {}).get("uris") or [])]
+            c = next((by_value[u] for u in uris if u in by_value), None)
+            if c is None:
+                c = statxplore_code({"id": uris[0] if uris else "",
+                                     "label": " ".join(map(str, (it or {}).get("labels") or []))}, ds["level"])
+            geo.append(c)
+        gidx = [0]
+        if split:
+            gidx = []
+            for j, it in enumerate(items[-1]):
+                uris = {str(u) for u in ((it or {}).get("uris") or [])}
+                gidx.append(next((n for n, g in enumerate(split[1]) if uris & set(g)), None if uris else j))
+        for idx, v in cells.items():
+            c = geo[idx[0]]
+            if c is None or c not in geo_ids:
+                continue
+            k = gidx[idx[-1]] if split else 0
+            if k is None:
+                continue
+            out.setdefault(c, [None] * len(groups))[k] = statxplore_cell(v)
+    info(f"{sx.source}: {len(codes):,} {ds['level'].upper()} values in {n_req} table request(s) "
+         f"of at most {size:,} ({per_geo} cell(s) each)")
+    return out
+
+
+def counts11_to_lsoa21(counts11: dict, rows: list, pop21: dict) -> dict:
+    """{LSOA21CD: count} from counts keyed by 2011 LSOA codes, through the
+    ONS lookup rows [(LSOA11CD, LSOA21CD, CHGIND)]. A 2011 LSOA's count goes
+    to the 2021 LSOAs drawn from it, shared by their Census 2021 residents
+    (equally without them) when it was split, so no one is lost or counted
+    twice; a 2021 LSOA merged from several takes the sum. A 2011 LSOA with no
+    figure (withheld, or not in the table) leaves every 2021 LSOA drawn from
+    it without one (None), rather than with part of a sum."""
+    kids: dict = {}
+    for p11, c21, _chg in rows:
+        kids.setdefault(p11, [])
+        if c21 not in kids[p11]:
+            kids[p11].append(c21)
+    out: dict = {}
+    blank: set = set()
+    for p11, ks in kids.items():
+        v = counts11.get(p11)
+        if v is None or pd.isna(v):
+            blank.update(ks)
+            continue
+        w = [float(pop21.get(k, 0) or 0) for k in ks]
+        tot = sum(w)
+        for k, wk in zip(ks, w):
+            out[k] = out.get(k, 0.0) + float(v) * (wk / tot if tot > 0 else 1.0 / len(ks))
+    for k in blank:
+        out[k] = None
+    return out
+
+
+def _sx_pop21() -> dict:
+    cen = _read_parquet_opt(DATA_DIR / "demographics" / "census2021.parquet")
+    if cen is None or "census_population" not in cen.columns:
+        return {}
+    return dict(zip(cen["LSOA21CD"].astype(str), pd.to_numeric(cen["census_population"], errors="coerce").fillna(0)))
+
+
+def statxplore_lsoa_ids(sx: StatXplore, ds: dict) -> tuple[dict, str, list]:
+    """({LSOA code: value id} to ask for, vintage, ONS lookup rows for a
+    2011 set). The codes are the scope's 2021 LSOAs, or for a 2011 set the
+    2011 LSOAs they were drawn from. Kept on ds for the dataset's other
+    tables."""
+    if "_ids" in ds:
+        return ds["_ids"]
+    vals = statxplore_values(sx, ds["geo_valueset"])
+    codes: dict = {}
+    for v in vals:
+        c = statxplore_code(v, "lsoa")
+        if c and c not in codes:
+            codes[c] = v["id"]
+    if not codes:
+        raise StatXploreError(f"{sx.source}: the LSOA level ({ds['geo_label']!r}) holds no LSOA codes; "
+                              f"its first values are {'; '.join(_sx_label(v) for v in vals[:3]) or 'none'}")
+    vintage = statxplore_lsoa_vintage(ds["geo_label"], codes)
+    scope = set(get_lsoa_ward_lookup())
+    rows: list = []
+    if vintage == "2021":
+        want = scope
+    else:
+        rows = get_lsoa11_lsoa21_rows()
+        want = {r[0] for r in rows}
+    found = {c: codes[c] for c in sorted(want) if c in codes}
+    share = len(found) / len(want) if want else 0.0
+    info(f"{sx.source}: the LSOA values are {vintage} LSOAs ({len(codes):,} in all); "
+         f"{len(found):,} of the {len(want):,} this scope needs are there"
+         + (" (moved onto 2021 LSOAs through the ONS lookup)" if vintage == "2011" else ""))
+    if share < SX_MIN_FOUND:
+        raise StatXploreError(f"{sx.source}: the LSOA level ({ds['geo_label']!r}, {vintage} codes) holds only "
+                              f"{len(found):,} of the {len(want):,} LSOAs this scope needs, so it is the "
+                              "wrong level or the wrong vintage")
+    if share < 0.99:
+        warn(f"{sx.source}: {len(want) - len(found):,} LSOAs this scope needs are not in Stat-Xplore's list, "
+             "so they have no figure")
+    ds["_ids"] = (found, vintage, rows)
+    return ds["_ids"]
+
+
+def statxplore_lsoa_counts(sx: StatXplore, ds: dict, **kw) -> tuple[dict, dict]:
+    """({LSOA21CD: [cell per group]}, facts) for the scope's LSOAs, moved
+    onto 2021 LSOAs when the dataset is on 2011 ones. facts: vintage, and
+    how many cells are withheld or blank."""
+    found, vintage, rows = statxplore_lsoa_ids(sx, ds)
+    raw = statxplore_counts(sx, ds, found, **kw)
+    n = len(kw["split"][1]) if kw.get("split") else 1
+    if vintage == "2021":
+        out = {c: list(raw.get(c) or [None] * n) for c in found}
+    else:
+        pop = _sx_pop21()
+        out = {}
+        for j in range(n):
+            col = counts11_to_lsoa21({c: (raw.get(c) or [None] * n)[j] for c in found}, rows, pop)
+            for c, v in col.items():
+                out.setdefault(c, [None] * n)[j] = v
+    withheld = sum(1 for r in out.values() for v in r if v is None)
+    if withheld:
+        info(f"{sx.source}: {withheld:,} of {len(out) * n:,} cells are withheld or blank, kept as no figure (not 0)")
+    return out, {"vintage": vintage, "withheld": withheld}
+
+
+def _sx_sum(cells) -> float | None:
+    """The groups of a split added up: the whole. None if any is withheld."""
+    if not cells or any(v is None for v in cells):
+        return None
+    return float(sum(cells))
+
+
+def _sx_frame(rows: dict, cols: dict, key: str = "LSOA21CD") -> "pd.DataFrame":
+    """One row per area from {code: [cells]}, a column per {name: position};
+    a withheld cell is NaN."""
+    codes = sorted(rows)
+    df = pd.DataFrame({key: codes})
+    for name, j in cols.items():
+        df[name] = pd.array([rows[c][j] if rows[c][j] is not None else float("nan") for c in codes], dtype="float64")
+    return df
+
+
+def _sx_col(rows: dict, codes, j: int) -> "pd.array":
+    """Position j of each code's cells, NaN where withheld or missing."""
+    def get(c):
+        r = rows.get(c) or []
+        return r[j] if len(r) > j and r[j] is not None else float("nan")
+    return pd.array([get(c) for c in codes], dtype="float64")
+
+
+def _sx_need(source: str, df: "pd.DataFrame", col: str) -> None:
+    if df.empty or col not in df.columns or df[col].notna().sum() == 0:
+        raise StatXploreError(f"{source}: Stat-Xplore gave no {col} figure for any area in scope")
+
+
+def _sx_run(source: str, title: str, build) -> "pd.DataFrame | None":
+    """Run one Stat-Xplore source: skipped with a note when there is no key,
+    otherwise build(sx) -> (frame, summary), or None when it set its own
+    note, and the frame written to data/economy/."""
+    rule(title)
+    key = statxplore_key()
+    if not key:
+        _SOURCE_NOTE[source] = SX_NO_KEY_NOTE
+        info(f"{source}: skipped, {SX_NO_KEY_NOTE}")
+        return None
+    sx = StatXplore(key, source=source)
+    res = build(sx)
+    if res is None:
+        return None
+    df, summary = res
+    path = DATA_DIR / "economy" / SX_PARQUETS[source]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    out = write_parquet_guarded(path, df, source=source)
+    ok(f"{source}: {summary} ({sx.requests} requests) -> {path.relative_to(REPO_ROOT)}")
+    return out
+
+
+def _sx_simple(sx: StatXplore, col: str, what: str) -> tuple:
+    """One count per LSOA at the newest period: Attendance Allowance,
+    Carer's Allowance, Pension Credit."""
+    ds = statxplore_dataset(sx, **SX_DATABASES[sx.source])
+    counts, facts = statxplore_lsoa_counts(sx, ds)
+    df = _sx_frame(counts, {col: 0})
+    df[f"{col}_period"] = ds["period_label"]
+    df["lsoa_vintage"] = facts["vintage"]
+    _sx_need(sx.source, df, col)
+    return df, f"{len(df):,} LSOAs, {ds['period_label']}, {df[col].sum():,.0f} {what}"
+
+
+def run_dwp_uc_people() -> "pd.DataFrame | None":
+    def build(sx):
+        ds = statxplore_dataset(sx, **SX_DATABASES["dwp_uc_people"])
+        counts, facts = statxplore_lsoa_counts(sx, ds)
+        df = _sx_frame(counts, {"uc_people": 0})
+        df["uc_people_period"] = ds["period_label"]
+        df["lsoa_vintage"] = facts["vintage"]
+        _sx_need(sx.source, df, "uc_people")
+        return df, f"{len(df):,} LSOAs, {ds['period_label']}, {df['uc_people'].sum():,.0f} people on Universal Credit"
+    return _sx_run("dwp_uc_people", "DWP Stat-Xplore: people on Universal Credit (LSOA)", build)
+
+
+def run_dwp_uc_households() -> "pd.DataFrame | None":
+    """Households on Universal Credit, those with a child element, and those
+    with limited capability for work (LCW or LCWRA), from one database. The
+    two splits were confirmed in the fact check, so a missing one marks the
+    source failed, with the rest written."""
+    def build(sx):
+        src = sx.source
+        ds = statxplore_dataset(sx, **SX_DATABASES[src])
+        filters = []
+        pay = statxplore_filter(sx, ds, r"(?i)\bpayment\b", r"(?i)^\s*in payment\s*$")
+        if pay:
+            filters.append(pay[:2])
+            info(f"{src}: counting households in payment ({pay[2]})")
+        else:
+            info(f"{src}: no field with an \"In payment\" value, so every household on Universal Credit is counted")
+        problems = []
+        child = statxplore_groups(sx, ds, r"(?i)^\s*child entitlement", {"children": r"(?i)\bchild"}, drop=SX_NOT)
+        if child:
+            fid, groups, index, labels, flabel = child
+            info(f"{src}: children from {flabel!r} ({fid}): {', '.join(labels['children'])}")
+            counts, facts = statxplore_lsoa_counts(sx, ds, split=(fid, groups), filters=filters)
+            rows = {c: [r[index["children"]], _sx_sum(r)] for c, r in counts.items()}
+        else:
+            problems.append("Stat-Xplore has no Child Entitlement field in this database any more, so UC "
+                            "households with children are left out")
+            counts, facts = statxplore_lsoa_counts(sx, ds, filters=filters)
+            rows = {c: [None, r[0]] for c, r in counts.items()}
+        df = _sx_frame(rows, {"uc_hh_children": 0, "uc_hh": 1})
+        df["uc_hh_period"] = ds["period_label"]
+        lcw = statxplore_groups(sx, ds, r"(?i)limited capability for work", {"lcw": r"(?i)\blcw|limited capability"},
+                                drop=SX_NOT)
+        if lcw:
+            fid, groups, index, labels, flabel = lcw
+            dv, per = statxplore_pick_period(ds["date_values"], SX_LCW_LAG_MONTHS)
+            info(f"{src}: limited capability for work from {flabel!r} ({fid}): {', '.join(labels['lcw'])}, "
+                 f"at {statxplore_period_label(per)} ({dv['id']}), {SX_LCW_LAG_MONTHS} months before the latest, "
+                 "because assessments are backdated")
+            lc, _f = statxplore_lsoa_counts(sx, ds, split=(fid, groups), filters=filters, date_value=dv["id"])
+            df["uc_hh_lcw"] = _sx_col(lc, df["LSOA21CD"], index["lcw"])
+            df["uc_hh_lcw_period"] = statxplore_period_label(per)
+        else:
+            problems.append("Stat-Xplore has no Limited Capability for Work Entitlement field in this database "
+                            "any more, so those households are left out")
+        df["uc_hh_in_payment"] = bool(pay)
+        df["lsoa_vintage"] = facts["vintage"]
+        _sx_need(src, df, "uc_hh")
+        if problems:
+            _SOURCE_ERROR[src] = "; ".join(problems)
+            warn(f"{src}: {_SOURCE_ERROR[src]}")
+        return df, (f"{len(df):,} LSOAs, {ds['period_label']}, {df['uc_hh'].sum():,.0f} households on Universal Credit"
+                    + (f", {df['uc_hh_children'].sum():,.0f} with children" if child else "")
+                    + (f", {df['uc_hh_lcw'].sum():,.0f} with limited capability for work at "
+                       f"{df['uc_hh_lcw_period'].iloc[0]}" if lcw else ""))
+    return _sx_run("dwp_uc_households", "DWP Stat-Xplore: households on Universal Credit (LSOA)", build)
+
+
+def run_dwp_pip() -> "pd.DataFrame | None":
+    """PIP cases with entitlement, and by main disabling condition where
+    Stat-Xplore crosses it with small areas (not confirmed, so its absence is
+    a note, not a failure)."""
+    def build(sx):
+        src = sx.source
+        ds = statxplore_dataset(sx, **SX_DATABASES[src])
+        counts, facts = statxplore_lsoa_counts(sx, ds)
+        df = _sx_frame(counts, {"pip": 0})
+        df["pip_period"] = ds["period_label"]
+        df["lsoa_vintage"] = facts["vintage"]
+        _sx_need(src, df, "pip")
+        cond = statxplore_groups(sx, ds, SX_PIP_CONDITION_FIELD, SX_PIP_CONDITIONS,
+                                 avoid_field=r"(?i)sub.?(?:category|group)|specific")
+        got = []
+        if not cond:
+            _SOURCE_NOTE[src] = ("Stat-Xplore offers no main disabling condition field here, so PIP by "
+                                 "condition is left out")
+        else:
+            fid, groups, index, labels, flabel = cond
+            info(f"{src}: conditions from {flabel!r} ({fid}): "
+                 + "; ".join(f"{n}: {', '.join(v)}" for n, v in labels.items()))
+            try:
+                cc, _f = statxplore_lsoa_counts(sx, ds, split=(fid, groups))
+            except StatXploreError as e:
+                if "refused the API key" in str(e):
+                    raise
+                cc = None
+                _SOURCE_NOTE[src] = (f"the table of PIP by main disabling condition for LSOAs could not be "
+                                     f"read, so PIP by condition is left out ({e})")
+                warn(f"{src}: {_SOURCE_NOTE[src]}")
+            if cc is not None:
+                for name in SX_PIP_CONDITIONS:
+                    if name in index:
+                        df[f"pip_{name}"] = _sx_col(cc, df["LSOA21CD"], index[name])
+                        got.append(name)
+                gone = [n for n in SX_PIP_CONDITIONS if n not in index]
+                if gone:
+                    _SOURCE_NOTE[src] = (f"no category matched {', '.join(gone)} in {flabel!r}, so "
+                                         "those are left out")
+        return df, (f"{len(df):,} LSOAs, {ds['period_label']}, {df['pip'].sum():,.0f} people entitled to PIP"
+                    + (f", by condition: {', '.join(got)}" if got else ""))
+    return _sx_run("dwp_pip", "DWP Stat-Xplore: Personal Independence Payment (LSOA, for wards and LAs)", build)
+
+
+def run_dwp_dla_children() -> "pd.DataFrame | None":
+    """Children aged 0 to 15 with Disability Living Allowance, through the
+    database's age field (a table without it would count adults too)."""
+    def build(sx):
+        ds = statxplore_dataset(sx, **SX_DATABASES[sx.source])
+        age = statxplore_ages(sx, ds, 15)
+        counts, facts = statxplore_lsoa_counts(sx, ds, filters=[age[:2]])
+        df = _sx_frame(counts, {"dla_child": 0})
+        df["dla_child_period"] = ds["period_label"]
+        df["lsoa_vintage"] = facts["vintage"]
+        _sx_need(sx.source, df, "dla_child")
+        return df, (f"{len(df):,} LSOAs, {ds['period_label']}, {df['dla_child'].sum():,.0f} children aged 0 to 15 "
+                    "receiving DLA")
+    return _sx_run("dwp_dla_children", "DWP Stat-Xplore: Disability Living Allowance, children (LSOA, for wards and LAs)",
+                   build)
+
+
+def run_dwp_attendance_allowance() -> "pd.DataFrame | None":
+    return _sx_run("dwp_attendance_allowance", "DWP Stat-Xplore: Attendance Allowance (LSOA, for wards and LAs)",
+                   lambda sx: _sx_simple(sx, "aa", "Attendance Allowance claimants"))
+
+
+def run_dwp_carers_allowance() -> "pd.DataFrame | None":
+    return _sx_run("dwp_carers_allowance", "DWP Stat-Xplore: Carer's Allowance in payment (LSOA, for wards and LAs)",
+                   lambda sx: _sx_simple(sx, "ca", "Carer's Allowance claimants in payment"))
+
+
+def run_dwp_pension_credit() -> "pd.DataFrame | None":
+    return _sx_run("dwp_pension_credit", "DWP Stat-Xplore: Pension Credit (LSOA, for wards and LAs)",
+                   lambda sx: _sx_simple(sx, "pc", "Pension Credit claims"))
+
+
+def run_dwp_cilif() -> "pd.DataFrame | None":
+    """Children aged 0 to 15 in relative low income families, by ward. Used
+    only for LAs all of whose 2025 wards are in DWP's ward list by code: a
+    ward of another vintage is a different patch, and is not forced onto the
+    map's wards (HANDOVER.md says what would be needed)."""
+    def build(sx):
+        src = sx.source
+        ds = statxplore_dataset(sx, **SX_DATABASES[src])
+        age = statxplore_ages(sx, ds, 15)
+        vals = statxplore_values(sx, ds["geo_valueset"])
+        codes: dict = {}
+        for v in vals:
+            c = statxplore_code(v, "ward")
+            if c and c not in codes:
+                codes[c] = v["id"]
+        if not codes:
+            raise StatXploreError(f"{src}: the ward level ({ds['geo_label']!r}) holds no ward codes")
+        by_la: dict = {}
+        for wd, lad in _ward_to_lad().items():
+            if lad in SCOPE_LADS:
+                by_la.setdefault(lad, []).append(wd)
+        complete = {la: sorted(wds) for la, wds in by_la.items() if all(w in codes for w in wds)}
+        n_scope = sum(len(w) for w in by_la.values())
+        n_found = sum(1 for wds in by_la.values() for w in wds if w in codes)
+        years = sorted(set(re.findall(r"(?:19|20)\d{2}", ds["geo_label"])))
+        vint = f" (labelled {', '.join(years)})" if years else ""
+        info(f"{src}: DWP's wards{vint} hold {n_found:,} of this scope's {n_scope:,} 2025 wards by code; "
+             f"{len(complete)} of {len(by_la)} LAs have every ward")
+        if not complete:
+            _SOURCE_NOTE[src] = (f"DWP's ward geography{vint} holds {n_found:,} of this scope's {n_scope:,} 2025 "
+                                 "wards, and no LA has all of them, so it is an older ward vintage and is not "
+                                 "forced onto the map's wards (HANDOVER.md, DWP benefits)")
+            warn(f"{src}: {_SOURCE_NOTE[src]}")
+            return None
+        if len(complete) < len(by_la):
+            left = sorted(set(by_la) - set(complete))
+            _SOURCE_NOTE[src] = (f"{len(left)} LA(s) left out because DWP's wards{vint} are not their 2025 wards: "
+                                 + ", ".join(LAD_NAMES.get(la, la) for la in left))
+            warn(f"{src}: {_SOURCE_NOTE[src]}")
+        ids = {w: codes[w] for wds in complete.values() for w in wds}
+        raw = statxplore_counts(sx, ds, ids, filters=[age[:2]])
+        recs = [{"WD25CD": w, "LAD25CD": la,
+                 "cilif_rel_0_15": (raw.get(w) or [None])[0]} for la, wds in complete.items() for w in wds]
+        df = pd.DataFrame(recs).sort_values("WD25CD").reset_index(drop=True)
+        df["cilif_rel_0_15"] = pd.to_numeric(df["cilif_rel_0_15"], errors="coerce").astype("float64")
+        df["cilif_period"] = ds["period_label"]
+        _sx_need(src, df, "cilif_rel_0_15")
+        return df, (f"{len(df):,} wards in {len(complete)} LAs, {ds['period_label']}, "
+                    f"{df['cilif_rel_0_15'].sum():,.0f} children aged 0 to 15 in relative low income families")
+    return _sx_run("dwp_cilif", "DWP Stat-Xplore: children in relative low income families (ward)", build)
+
+
+# ---------------------------------------------------------------------------
+# Ward, LA and LSOA figures for the DWP benefits
+# ---------------------------------------------------------------------------
+# key: (source, count column, base, also for LSOAs, period column). The bases
+# are named in DWP_BASES; "uc_hh" is the source's own column of all UC
+# households, the base of the share of them with children.
+DWP_SHARES = {
+    "dwp_uc_people_pct":          ("dwp_uc_people", "uc_people", "age16_64", True, "uc_people_period"),
+    "dwp_uc_hh_pct":              ("dwp_uc_households", "uc_hh", "households", True, "uc_hh_period"),
+    "dwp_uc_hh_lcw_pct":          ("dwp_uc_households", "uc_hh_lcw", "households", True, "uc_hh_lcw_period"),
+    "dwp_uc_hh_children_pct":     ("dwp_uc_households", "uc_hh_children", "uc_hh", True, "uc_hh_period"),
+    "dwp_pip_pct":                ("dwp_pip", "pip", "age16plus", False, "pip_period"),
+    "dwp_pip_psych_pct":          ("dwp_pip", "pip_psych", "age16plus", False, "pip_period"),
+    "dwp_pip_msk_pct":            ("dwp_pip", "pip_msk", "age16plus", False, "pip_period"),
+    "dwp_pip_neuro_pct":          ("dwp_pip", "pip_neuro", "age16plus", False, "pip_period"),
+    "dwp_dla_child_pct":          ("dwp_dla_children", "dla_child", "age0_15", False, "dla_child_period"),
+    "dwp_aa_pct":                 ("dwp_attendance_allowance", "aa", "age66plus", False, "aa_period"),
+    "dwp_carers_pct":             ("dwp_carers_allowance", "ca", "age16plus", False, "ca_period"),
+    "dwp_pension_credit_per_100": ("dwp_pension_credit", "pc", "age66plus", False, "pc_period"),
+}
+DWP_CILIF_KEY = "dwp_cilif_pct"
+DWP_BASES = {
+    "households": "households at the 2021 Census",
+    "age0_15": "children aged 0 to 15 (ONS mid-year estimates)",
+    "age16_64": "residents aged 16 to 64 (ONS mid-year estimates)",
+    "age16plus": "residents aged 16 and over (ONS mid-year estimates)",
+    "age66plus": "residents aged 66 and over (ONS mid-year estimates)",
+    "uc_hh": "households on Universal Credit",
+}
+DWP_SOURCE_NAMES = {
+    "dwp_uc_people": "DWP Stat-Xplore, people on Universal Credit",
+    "dwp_uc_households": "DWP Stat-Xplore, households on Universal Credit",
+    "dwp_pip": "DWP Stat-Xplore, Personal Independence Payment",
+    "dwp_dla_children": "DWP Stat-Xplore, Disability Living Allowance",
+    "dwp_attendance_allowance": "DWP Stat-Xplore, Attendance Allowance",
+    "dwp_carers_allowance": "DWP Stat-Xplore, Carer's Allowance",
+    "dwp_pension_credit": "DWP Stat-Xplore, Pension Credit",
+    "dwp_cilif": "DWP Stat-Xplore, children in low income families",
+}
+
+
+def _dwp_frames() -> dict:
+    """{source: {LSOA21CD: {column: value}}} for the DWP parquets on disk."""
+    cols: dict = {}
+    for _k, (src, col, _base, _l, pcol) in DWP_SHARES.items():
+        cols.setdefault(src, set()).update((col, pcol, "uc_hh"))
+    out = {}
+    for src, cs in cols.items():
+        fr = _lsoa_frame(DATA_DIR / "economy" / SX_PARQUETS[src], sorted(cs))
+        if fr:
+            out[src] = fr
+    return out
+
+
+def dwp_bases(need) -> dict:
+    """{base: {LSOA21CD: count}} for the bases in need: households from the
+    Census counts, ages from the mid-year estimates. A base whose file or
+    column is missing is left out, and its figures with it."""
+    out: dict = {}
+    if "households" in need:
+        hh = census_households_by_lsoa(_read_parquet_opt(DATA_DIR / "demographics" / "census2021_counts.parquet"))
+        if hh:
+            out["households"] = hh
+    if need & {"age0_15", "age16_64", "age16plus", "age66plus"}:
+        sape = _lsoa_frame(DATA_DIR / "demographics" / SAPE_PARQUET,
+                           ("sape_age0_15", "sape_age16_64", "sape_age65plus", "sape_age66plus"))
+
+        def col(c):
+            return {lc: float(r[c]) for lc, r in sape.items() if c in r and r[c] is not None and pd.notna(r[c])}
+        a, b = col("sape_age16_64"), col("sape_age65plus")
+        for name, vals in (("age0_15", col("sape_age0_15")), ("age16_64", a), ("age66plus", col("sape_age66plus")),
+                           ("age16plus", {lc: a[lc] + b[lc] for lc in a if lc in b})):
+            if vals:
+                out[name] = vals
+    return out
+
+
+def dwp_summed_rate(num: dict, den: dict, to_area: dict, *, scale: float = 100.0, ndigits: int = 1,
+                    min_cover: float = WARD_MIN_COVER) -> dict:
+    """{area: scale * summed count / summed base} over the LSOAs of each area.
+    An LSOA whose count is withheld (None or NaN) or missing is left out of the
+    count and the base alike, and an area whose LSOAs with a count hold less
+    than min_cover of its base gets no figure, rather than the figure of a
+    corner of it."""
+    n_sum: dict = {}
+    d_sum: dict = {}
+    d_all: dict = {}
+    for lc, area in to_area.items():
+        if not area:
+            continue
+        d = den.get(lc)
+        if d is None or pd.isna(d) or float(d) <= 0:
+            continue
+        d_all[area] = d_all.get(area, 0.0) + float(d)
+        n = num.get(lc)
+        if n is None or pd.isna(n):
+            continue
+        n_sum[area] = n_sum.get(area, 0.0) + float(n)
+        d_sum[area] = d_sum.get(area, 0.0) + float(d)
+    return {a: round(scale * n_sum[a] / d, ndigits) for a, d in d_sum.items()
+            if d > 0 and d >= min_cover * d_all[a]}
+
+
+def dwp_cilif_figures(to_area: dict, *, level: str, age0_15: dict) -> tuple[dict, str]:
+    """({area: % of children aged 0 to 15 in relative low income families},
+    period). A ward's count is DWP's own, over the children of the LSOAs
+    that best fit it; an LA's is its wards' counts added up (only where none
+    is withheld) over the children of all its LSOAs."""
+    path = DATA_DIR / "economy" / SX_PARQUETS["dwp_cilif"]
+    cf = _read_parquet_opt(path) if path.exists() else None
+    if cf is None or cf.empty or not {"WD25CD", "LAD25CD", "cilif_rel_0_15"}.issubset(cf.columns):
+        return {}, ""
+    per = str(cf["cilif_period"].dropna().iloc[0]) if "cilif_period" in cf.columns and cf["cilif_period"].notna().any() else ""
+    if not age0_15:
+        warn("dwp_cilif: no children aged 0 to 15 from the mid-year estimates (sape), so the "
+             "low income figure has no base and is left out")
+        return {}, per
+    den: dict = {}
+    for lc, area in to_area.items():
+        d = age0_15.get(lc)
+        if area and d is not None and pd.notna(d):
+            den[area] = den.get(area, 0.0) + float(d)
+    num: dict = {}
+    v = pd.to_numeric(cf["cilif_rel_0_15"], errors="coerce")
+    if level == "ward":
+        num = {str(w): float(x) for w, x in zip(cf["WD25CD"], v) if pd.notna(x)}
+    else:
+        for la, g in v.groupby(cf["LAD25CD"].astype(str)):
+            if g.notna().all():
+                num[la] = float(g.sum())
+    return {a: round(100.0 * n / den[a], 1) for a, n in num.items() if den.get(a, 0) > 0}, per
+
+
+def dwp_area_figures(to_area: dict, *, what: str, level: str) -> tuple[dict, dict]:
+    """({area: {key: value}}, notes) for the DWP benefits, for wards (to_area
+    the LSOA to ward best fit, level "ward") or LAs (every LSOA to its LA):
+    the LSOAs' counts added up over their bases added up (dwp_summed_rate).
+    notes["dwp"] holds each source's period."""
+    out: dict = {}
+    notes: dict = {}
+    frames = _dwp_frames()
+    cil = DATA_DIR / "economy" / SX_PARQUETS["dwp_cilif"]
+    if not frames and not cil.exists():
+        return out, notes
+    need = {base for src, _c, base, _l, _p in DWP_SHARES.values() if src in frames}
+    if cil.exists():
+        need.add("age0_15")
+    bases = dwp_bases(need)
+    for key, (src, col, base, _lsoa, pcol) in DWP_SHARES.items():
+        fr = frames.get(src)
+        if not fr:
+            continue
+        num = {lc: r.get(col) for lc, r in fr.items() if col in r}
+        if not any(x is not None and pd.notna(x) for x in num.values()):
+            continue
+        den = {lc: r.get("uc_hh") for lc, r in fr.items()} if base == "uc_hh" else bases.get(base) or {}
+        if not den:
+            warn(f"{what}: {key} has no base ({DWP_BASES[base]}), so it is left out rather than "
+                 "divided by something else")
+            continue
+        for a, val in dwp_summed_rate(num, den, to_area).items():
+            out.setdefault(a, {})[key] = val
+        per = next((str(r[pcol]) for r in fr.values() if r.get(pcol)), "")
+        notes.setdefault("dwp", {})[src] = per
+    cvals, cper = dwp_cilif_figures(to_area, level=level, age0_15=bases.get("age0_15") or {})
+    for a, val in cvals.items():
+        out.setdefault(a, {})[DWP_CILIF_KEY] = val
+    if cvals:
+        notes.setdefault("dwp", {})["dwp_cilif"] = cper
+    return out, notes
+
+
+def dwp_lsoa_values() -> dict:
+    """{LSOA21CD: {key: value}} for the DWP shares shown for LSOAs (Universal
+    Credit). An LSOA whose count is withheld has no figure."""
+    out: dict = {}
+    frames = _dwp_frames()
+    if not frames:
+        return out
+    need = {base for src, _c, base, lsoa, _p in DWP_SHARES.values() if src in frames and lsoa}
+    bases = dwp_bases(need)
+    for key, (src, col, base, lsoa, _p) in DWP_SHARES.items():
+        fr = frames.get(src)
+        if not lsoa or not fr:
+            continue
+        den = {lc: r.get("uc_hh") for lc, r in fr.items()} if base == "uc_hh" else bases.get(base) or {}
+        for lc, r in fr.items():
+            n, d = r.get(col), den.get(lc)
+            if n is None or d is None or pd.isna(n) or pd.isna(d) or float(d) <= 0:
+                continue
+            out.setdefault(lc, {})[key] = round(100.0 * float(n) / float(d), 1)
+    return out
+
+
+def dwp_periods() -> dict:
+    """{key: period} for the DWP figures, for indicators.js."""
+    out: dict = {}
+    for key, (src, col, _base, _l, pcol) in DWP_SHARES.items():
+        path = DATA_DIR / "economy" / SX_PARQUETS[src]
+        df = _read_parquet_opt(path) if path.exists() else None
+        if df is not None and col in df.columns and pcol in df.columns and df[col].notna().any() \
+                and df[pcol].notna().any():
+            out[key] = str(df[pcol].dropna().iloc[0])
+    path = DATA_DIR / "economy" / SX_PARQUETS["dwp_cilif"]
+    cf = _read_parquet_opt(path) if path.exists() else None
+    if cf is not None and "cilif_period" in cf.columns and cf["cilif_period"].notna().any():
+        out[DWP_CILIF_KEY] = str(cf["cilif_period"].dropna().iloc[0])
     return out
 
 
@@ -12956,6 +14345,17 @@ SOURCES = {
     "road_casualties": run_road_casualties,
     "care_homes":  run_care_homes,
     "service_access": run_service_access,
+    # DWP benefits from Stat-Xplore, one entry each, so one that fails never
+    # hides the others. After sape, whose estimates are their bases. Each is
+    # "skipped", with a note, until STAT_XPLORE_API_KEY is set.
+    "dwp_uc_people": run_dwp_uc_people,
+    "dwp_uc_households": run_dwp_uc_households,
+    "dwp_pip":     run_dwp_pip,
+    "dwp_dla_children": run_dwp_dla_children,
+    "dwp_attendance_allowance": run_dwp_attendance_allowance,
+    "dwp_carers_allowance": run_dwp_carers_allowance,
+    "dwp_pension_credit": run_dwp_pension_credit,
+    "dwp_cilif":   run_dwp_cilif,
 }
 
 def write_manifest(source_records: dict) -> None:

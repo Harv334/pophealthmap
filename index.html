@@ -4033,6 +4033,19 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
               <option value="saie_total_income">Average household income before tax · MSOA</option>
               <option value="saie_net_bhc">Average household income after tax, before housing costs · MSOA</option>
               <option value="saie_net_ahc">Average household income after tax and housing costs · MSOA</option>
+              <option value="dwp_uc_people_pct">People on Universal Credit (%) · LSOA</option>
+              <option value="dwp_uc_hh_pct">Households on Universal Credit (%) · LSOA</option>
+              <option value="dwp_uc_hh_lcw_pct">Universal Credit households with limited capability for work (%) · LSOA</option>
+              <option value="dwp_uc_hh_children_pct">Universal Credit households with children (% of UC households) · LSOA</option>
+              <option value="dwp_pip_pct">Personal Independence Payment claimants (%) · Ward</option>
+              <option value="dwp_pip_psych_pct">PIP for a psychiatric condition (%) · Ward</option>
+              <option value="dwp_pip_msk_pct">PIP for a musculoskeletal condition (%) · Ward</option>
+              <option value="dwp_pip_neuro_pct">PIP for a neurological condition (%) · Ward</option>
+              <option value="dwp_dla_child_pct">Children receiving Disability Living Allowance (%) · Ward</option>
+              <option value="dwp_aa_pct">Attendance Allowance claimants (%) · Ward</option>
+              <option value="dwp_carers_pct">Carer's Allowance claimants (%) · Ward</option>
+              <option value="dwp_pension_credit_per_100">Pension Credit claims per 100 aged 66 and over · Ward</option>
+              <option value="dwp_cilif_pct">Children in relative low income families (%) · Ward</option>
             </optgroup>
             <optgroup label="Housing and transport">
               <option value="census_no_car_pct">No car/van % · Output area</option>
@@ -5690,6 +5703,22 @@ const OV_CFG = {
   // Claimants aged 18 to 24 over people aged 18 to 24 (ONS mid-year
   // estimates), for wards and LAs from summed LSOA counts.
   claimant_18_24_pct:              { lo:"Lower", hi:"Higher", wh:true },
+  // DWP benefits from Stat-Xplore (fetch_all_data.py, DWP BENEFITS, FROM
+  // STAT-XPLORE). Measures of need, coloured the way the claimant rate is;
+  // ranges from indicators.js.
+  dwp_uc_people_pct:               { lo:"Lower", hi:"Higher", wh:true },
+  dwp_uc_hh_pct:                   { lo:"Lower", hi:"Higher", wh:true },
+  dwp_uc_hh_lcw_pct:               { lo:"Lower", hi:"Higher", wh:true },
+  dwp_uc_hh_children_pct:          { lo:"Lower", hi:"Higher", wh:true },
+  dwp_pip_pct:                     { lo:"Lower", hi:"Higher", wh:true },
+  dwp_pip_psych_pct:               { lo:"Lower", hi:"Higher", wh:true },
+  dwp_pip_msk_pct:                 { lo:"Lower", hi:"Higher", wh:true },
+  dwp_pip_neuro_pct:               { lo:"Lower", hi:"Higher", wh:true },
+  dwp_dla_child_pct:               { lo:"Lower", hi:"Higher", wh:true },
+  dwp_aa_pct:                      { lo:"Lower", hi:"Higher", wh:true },
+  dwp_carers_pct:                  { lo:"Lower", hi:"Higher", wh:true },
+  dwp_pension_credit_per_100:      { lo:"Fewer", hi:"More",   wh:true },
+  dwp_cilif_pct:                   { lo:"Lower", hi:"Higher", wh:true },
   // Household language (Census 2021, TS025). "All adults English" is the
   // fully-English-speaking household share; "no people English" flags where
   // services may need interpreting, so wh:true on that one. Both are
@@ -6088,6 +6117,22 @@ const CATS = [
     { k: "saie_total_income",                l: "Average household income before tax", g: "msoa", lv: ["ward","msoa"] },
     { k: "saie_net_bhc",                     l: "Average household income after tax, before housing costs", g: "msoa", lv: ["ward","msoa"] },
     { k: "saie_net_ahc",                     l: "Average household income after tax and housing costs", g: "msoa", lv: ["ward","msoa"] },
+    // DWP benefits from Stat-Xplore. Universal Credit for LSOAs, wards and
+    // LAs; the rest for wards and LAs only, from summed LSOA counts, and the
+    // low income figure from DWP's own ward counts (DWP_SA below).
+    { k: "dwp_uc_people_pct",                l: "People on Universal Credit (%)", g: "lsoa", lv: ["ward","lsoa"] },
+    { k: "dwp_uc_hh_pct",                    l: "Households on Universal Credit (%)", g: "lsoa", lv: ["ward","lsoa"] },
+    { k: "dwp_uc_hh_lcw_pct",                l: "Universal Credit households with limited capability for work (%)", g: "lsoa", lv: ["ward","lsoa"] },
+    { k: "dwp_uc_hh_children_pct",           l: "Universal Credit households with children (%)", g: "lsoa", lv: ["ward","lsoa"] },
+    { k: "dwp_pip_pct",                      l: "Personal Independence Payment claimants (%)", g: "ward" },
+    { k: "dwp_pip_psych_pct",                l: "PIP for a psychiatric condition (%)", g: "ward" },
+    { k: "dwp_pip_msk_pct",                  l: "PIP for a musculoskeletal condition (%)", g: "ward" },
+    { k: "dwp_pip_neuro_pct",                l: "PIP for a neurological condition (%)", g: "ward" },
+    { k: "dwp_dla_child_pct",                l: "Children receiving Disability Living Allowance (%)", g: "ward" },
+    { k: "dwp_aa_pct",                       l: "Attendance Allowance claimants (%)", g: "ward" },
+    { k: "dwp_carers_pct",                   l: "Carer's Allowance claimants (%)", g: "ward" },
+    { k: "dwp_pension_credit_per_100",       l: "Pension Credit claims per 100 aged 66 and over", g: "ward" },
+    { k: "dwp_cilif_pct",                    l: "Children in relative low income families (%)", g: "ward" },
   ]},
   { key: "housing", label: "Housing and transport", ico: "home", fields: [
     { k: "census_owned_pct",                 l: "Owner occupied (%)",            g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
@@ -6297,6 +6342,86 @@ SMALL_AREA.care_home_beds_per_100_75plus = {
     method: 'Beds are registered places, not residents, and they include homes for younger adults with a disability or mental health needs. ' +
       'So this says how much care home capacity an area has rather than how many of its own residents need care, and one large home lifts a ward\'s figure a long way. ' +
       'It is shown for wards and LAs only, because most LSOAs have no care home at all.',
+  }),
+};
+/* DWP benefits from Stat-Xplore (fetch_all_data.py, DWP BENEFITS, FROM
+   STAT-XPLORE). The pipeline fetches them only once the owner has added a
+   Stat-Xplore API key, so until then no build has their figures and the
+   empty-indicator rule keeps them out of every list. One row each: [what
+   is counted, the base, the card's unit, the methodology anchor, the
+   cadence (DWP_CADENCE), what to know]. The base is [its words in the ward
+   sentence, the card's "Out of", the source of the base for the card]. */
+const DWP_ROUNDED = 'DWP rounds or adjusts small counts to protect people\'s privacy, so figures for small areas are approximate, ' +
+  'and adding up LSOAs does not give exactly the total DWP publishes for a ward or LA. ' +
+  'An LSOA whose count DWP withholds is left out, with its base, and an area missing more than a fifth of its base has no figure.';
+const DWP_EST = ['people aged 16 to 64', 'residents aged 16 to 64 in ONS\'s mid-year population estimates', 'ONS mid-year population estimates'];
+const DWP_16 = ['people aged 16 and over', 'residents aged 16 and over in ONS\'s mid-year population estimates', 'ONS mid-year population estimates'];
+const DWP_66 = ['people aged 66 and over', 'residents aged 66 and over, State Pension age in 2026, in ONS\'s mid-year population estimates', 'ONS mid-year population estimates'];
+const DWP_HH = ['households', 'households at the 2021 Census', 'households from the 2021 Census'];
+const DWP_CADENCE = {
+  uc: 'DWP publishes these every three months, with a figure for each month, and we refresh them here every month.',
+  hh: 'DWP publishes these every three months, for February, May, August and November, and we refresh them here every month.',
+  pip: 'DWP publishes these every three months, and we refresh them here every month.',
+  year: 'DWP has published these once a year, for March, since 2026, and we refresh them here every month.',
+};
+const DWP_SA = {
+  dwp_uc_people_pct: ['People on Universal Credit, in or out of work', DWP_EST, '% of residents aged 16 to 64', 'src-dwp-uc-people', 'uc',
+    'Universal Credit is for people of working age, up to State Pension age, so a few claimants are 65 and the rate runs a little high. The count is more recent than the estimates, so it also runs a little high where many people have moved in since.'],
+  dwp_uc_hh_pct: ['Households on Universal Credit', DWP_HH, '% of households', 'src-dwp-uc-households', 'hh',
+    'DWP counts a household as one adult or a couple with any children, so a home shared by adults who claim separately counts more than once. The rate runs high where many homes are shared, and can go over what is possible. Where Stat-Xplore offers it, only households paid that month are counted.'],
+  dwp_uc_hh_lcw_pct: ['Households on Universal Credit where someone is assessed as having limited capability for work, or for work and work-related activity, because of illness or disability', DWP_HH, '% of households', 'src-dwp-uc-households', 'hh',
+    'Assessments are backdated, so DWP\'s newest months undercount these households. The figure is for a month a year before the latest, and it may still rise a little. People waiting for an assessment are not counted. It counts households, not people, among all households at the 2021 Census.'],
+  dwp_uc_hh_children_pct: ['Households on Universal Credit that receive the child element, because they look after a child or young person', ['households on Universal Credit', 'households on Universal Credit in the same month', ''], '% of households on Universal Credit', 'src-dwp-uc-households', 'hh',
+    'It describes who claims Universal Credit in the area, not child poverty: rent, childcare and earnings all decide who can claim, so more working families claim where rents are high.'],
+  dwp_pip_pct: ['People entitled to Personal Independence Payment, for the extra costs of a long-term illness or disability', DWP_16, '% of residents aged 16 and over', 'src-dwp-pip', 'pip',
+    'People who claim before State Pension age can keep it after, so the base is everyone aged 16 and over. Counts for each LSOA are small, so it is shown for wards and LAs only.'],
+  dwp_pip_psych_pct: ['People entitled to Personal Independence Payment whose main disabling condition is psychiatric, such as anxiety, depression or a psychotic illness', DWP_16, '% of residents aged 16 and over', 'src-dwp-pip', 'pip',
+    'Only the main condition DWP records is counted, so a mental health condition alongside another main condition is not. It is shown for wards and LAs only, because the counts for each LSOA are small.'],
+  dwp_pip_msk_pct: ['People entitled to Personal Independence Payment whose main disabling condition is musculoskeletal, such as arthritis or back pain', DWP_16, '% of residents aged 16 and over', 'src-dwp-pip', 'pip',
+    'Only the main condition DWP records is counted. It is shown for wards and LAs only, because the counts for each LSOA are small.'],
+  dwp_pip_neuro_pct: ['People entitled to Personal Independence Payment whose main disabling condition is neurological, such as epilepsy, multiple sclerosis or Parkinson\'s disease', DWP_16, '% of residents aged 16 and over', 'src-dwp-pip', 'pip',
+    'Only the main condition DWP records is counted. It is shown for wards and LAs only, because the counts for each LSOA are small.'],
+  dwp_dla_child_pct: ['Children aged 0 to 15 receiving Disability Living Allowance', ['children aged 0 to 15', 'children aged 0 to 15 in ONS\'s mid-year population estimates', 'ONS mid-year population estimates'], '% of children aged 0 to 15', 'src-dwp-dla', 'year',
+    'It counts children whose families have claimed, so it reflects awareness of the benefit and help to claim as well as need, and it has risen as more children are diagnosed with autism or ADHD. It is shown for wards and LAs only, because the counts for each LSOA are small.'],
+  dwp_aa_pct: ['People entitled to Attendance Allowance, for people over State Pension age who need help with personal care because of illness or disability', DWP_66, '% of residents aged 66 and over', 'src-dwp-aa', 'year',
+    'Not everyone who could get it claims, so a high figure can mean good advice and help to claim as well as more need. It is shown for wards and LAs only.'],
+  dwp_carers_pct: ['People paid Carer\'s Allowance for caring for someone at least 35 hours a week', DWP_16, '% of residents aged 16 and over', 'src-dwp-carers', 'year',
+    'Only carers who earn little, and who care for someone on a disability benefit, can get it, and carers paid a State Pension instead are not counted, so it counts far fewer people than the Census figure for unpaid carers. It is shown for wards and LAs only.'],
+  dwp_pension_credit_per_100: ['Pension Credit claims, which top up a low income in retirement', DWP_66, 'claims per 100 residents aged 66 and over', 'src-dwp-pension-credit', 'year',
+    'A couple makes one claim, so this counts claims rather than people. Many people who could get it do not claim. Claims rose when the Winter Fuel Payment was tied to Pension Credit in 2024, so compare places rather than years. It is shown for wards and LAs only.'],
+};
+Object.keys(DWP_SA).forEach(k => {
+  const [num, base, unit, anchor, cad, note] = DWP_SA[k];
+  const what = k === 'dwp_uc_hh_children_pct' ? 'the households on Universal Credit, and those with the child element,'
+    : 'the counts and the ' + base[0];
+  const lsoa = /^dwp_uc_/.test(k);
+  SMALL_AREA[k] = {
+    by: lsoa ? 'DWP publishes these counts for LSOAs on Stat-Xplore, and we turn them into a rate for each LSOA, ward and LA.'
+      : 'DWP publishes these counts for LSOAs on Stat-Xplore, and we add them up for each ward and LA.',
+    ward: 'Ward figures add up ' + what + ' in the LSOAs that best fit each ward' + SA_SUMMED,
+    borough: 'LA figures add them up in the same way for all the LSOAs in each LA.',
+    card: 'DWP, Stat-Xplore' + (base[2] ? ', with ' + base[2] : ''),
+    full: 'Department for Work and Pensions (DWP), benefit statistics on Stat-Xplore' +
+      (base[2] ? ', with ' + base[2].replace(/^ONS /, 'Office for National Statistics (ONS) ') : ''),
+    anchor: anchor,
+    unit: unit,
+    facts: () => ({ num: num, den: base[1].charAt(0).toUpperCase() + base[1].slice(1), cadence: DWP_CADENCE[cad], method: note + ' ' + DWP_ROUNDED }),
+  };
+});
+SMALL_AREA.dwp_cilif_pct = {
+  by: 'DWP publishes these counts for wards on Stat-Xplore, and we divide them by the children living there.',
+  ward: 'Ward figures are DWP\'s own counts for each ward, over the children aged 0 to 15 of the LSOAs that best fit it.',
+  borough: 'LA figures add up the counts of the LA\'s wards, over all the children aged 0 to 15 in its LSOAs.',
+  card: 'DWP, Stat-Xplore, children in low income families, with ONS mid-year population estimates',
+  full: 'Department for Work and Pensions (DWP) and HM Revenue and Customs, children in low income families on Stat-Xplore, with Office for National Statistics (ONS) mid-year population estimates',
+  anchor: 'src-dwp-cilif',
+  unit: '% of children aged 0 to 15',
+  facts: () => ({
+    num: 'Children aged 0 to 15 in families whose income, before housing costs, is below 60% of the middle income in the UK, counted from benefit and tax credit records',
+    den: 'Children aged 0 to 15 in ONS\'s mid-year population estimates',
+    cadence: 'DWP publishes these once a year, in spring, for the financial year before, and we refresh them here every month.',
+    method: 'It counts families known to DWP and HM Revenue and Customs through benefits and tax credits, so it can miss families who claim nothing. ' +
+      'DWP rounds small counts, and its wards must be the 2025 wards the map uses: an LA whose wards DWP has not yet redrawn is left out rather than matched to other wards.',
   }),
 };
 function saInfo(k) { return Object.prototype.hasOwnProperty.call(SMALL_AREA, k) ? SMALL_AREA[k] : null; }
@@ -6544,6 +6669,20 @@ const IND_NAMES = {
   saie_total_income:               ['Average household income before tax', 'Total annual household income (mean, modelled)'],
   saie_net_bhc:                    ['Average household income after tax, before housing costs', 'Net annual household income before housing costs, equivalised (mean, modelled)'],
   saie_net_ahc:                    ['Average household income after tax and housing costs', 'Net annual household income after housing costs, equivalised (mean, modelled)'],
+  // DWP benefits from Stat-Xplore
+  dwp_uc_people_pct:               ['People on Universal Credit', 'People on Universal Credit as a share of residents aged 16 to 64'],
+  dwp_uc_hh_pct:                   ['Households on Universal Credit', 'Households on Universal Credit as a share of households at the 2021 Census'],
+  dwp_uc_hh_lcw_pct:               ['Universal Credit households with limited capability for work', 'Households on Universal Credit with limited capability for work or for work-related activity, as a share of all households'],
+  dwp_uc_hh_children_pct:          ['Universal Credit households with children', 'Households on Universal Credit with the child element, as a share of households on Universal Credit'],
+  dwp_pip_pct:                     ['Personal Independence Payment claimants', 'People entitled to Personal Independence Payment as a share of residents aged 16 and over'],
+  dwp_pip_psych_pct:               ['PIP for a psychiatric condition', 'People entitled to Personal Independence Payment mainly for a psychiatric disorder, as a share of residents aged 16 and over'],
+  dwp_pip_msk_pct:                 ['PIP for a musculoskeletal condition', 'People entitled to Personal Independence Payment mainly for a musculoskeletal disease, as a share of residents aged 16 and over'],
+  dwp_pip_neuro_pct:               ['PIP for a neurological condition', 'People entitled to Personal Independence Payment mainly for a neurological disease, as a share of residents aged 16 and over'],
+  dwp_dla_child_pct:               ['Children receiving Disability Living Allowance', 'Children aged 0 to 15 with Disability Living Allowance as a share of children aged 0 to 15'],
+  dwp_aa_pct:                      ['Attendance Allowance claimants', 'People entitled to Attendance Allowance as a share of residents aged 66 and over'],
+  dwp_carers_pct:                  ['Carer\'s Allowance claimants', 'People paid Carer\'s Allowance as a share of residents aged 16 and over'],
+  dwp_pension_credit_per_100:      ['Pension Credit claims', 'Pension Credit claims per 100 residents aged 66 and over'],
+  dwp_cilif_pct:                   ['Children in relative low income families', 'Children aged 0 to 15 in relative low income families, before housing costs'],
   // Housing and transport
   census_owned_pct:            ['Home ownership', 'Tenure of household: owned'],
   census_social_rented_pct:    ['Social renting', 'Tenure of household: social rented'],
@@ -6603,6 +6742,9 @@ const IND_SAME_AS = {
   // OHID's 2024/25 MSOA series and ONS's current claimant rate both divide
   // claimants by working-age residents (Stonebridge reads 11.3% on each).
   ft_93097:                  'claimant_rate_pct',
+  // Not ft_child_poverty_low_income and dwp_cilif_pct: DWP's ward figures
+  // are left out for an LA whose wards DWP has not redrawn, so OHID's LA
+  // series can cover LAs the ward measure does not. Both are offered.
 };
 
 function indLabel(k) {
@@ -7059,6 +7201,21 @@ const OV_META = {
   ft_suicide_rate: { src: "OHID Fingertips", yr: "2022 - 24", g: "LA (upper tier)", u: "per 100,000", desc: "Deaths from suicide per 100,000 people, published only for the whole LA." },
   core20_lsoa_count:              { src: "NHSE Core20PLUS5",     yr: "2025", g: "Ward", u: "LSOAs",  desc: "The number of the ward's LSOAs that are among the most deprived 20% in England, meaning deprivation deciles 1 and 2, which NHS England calls Core20 in its Core20PLUS5 approach." },
   claimant_rate_pct:              { src: "NOMIS CLA01",          yr: "August 2026", g: "Ward/LSOA", u: "%", desc: "People aged 16 to 64 claiming Universal Credit or Jobseeker's Allowance mainly because they are out of work, as a share of residents aged " + AGE_WORK + " at the 2021 Census." },
+  // DWP benefits from Stat-Xplore (fetch_all_data.py, DWP BENEFITS, FROM
+  // STAT-XPLORE). Periods come from indicators.js; the counts are rounded.
+  dwp_uc_people_pct:              { src: "DWP Stat-Xplore, people on Universal Credit, with ONS mid-year population estimates", yr: "latest release", g: "LSOA", u: "%", desc: "People on Universal Credit, in or out of work, as a share of residents aged 16 to 64. DWP rounds or adjusts small counts to protect privacy, so figures for small areas are approximate. Universal Credit is for people of working age, up to State Pension age, so a few claimants are 65 and the rate runs a little high." },
+  dwp_uc_hh_pct:                  { src: "DWP Stat-Xplore, households on Universal Credit, with households from the 2021 Census", yr: "latest release", g: "LSOA", u: "%", desc: "Households on Universal Credit as a share of all households at the 2021 Census. DWP counts one adult or a couple with any children as a household, so a home shared by adults who claim separately counts more than once, and the rate runs high where many homes are shared. DWP rounds or adjusts small counts, so figures for small areas are approximate." },
+  dwp_uc_hh_lcw_pct:              { src: "DWP Stat-Xplore, households on Universal Credit, with households from the 2021 Census", yr: "a year before the latest release", g: "LSOA", u: "%", desc: "Households on Universal Credit where someone has been assessed as having limited capability for work, or for work and work-related activity, because of illness or disability, as a share of all households at the 2021 Census. Assessments are backdated, so the newest months undercount: the figure is for a month a year before the latest, and it may still rise a little. DWP rounds or adjusts small counts." },
+  dwp_uc_hh_children_pct:         { src: "DWP Stat-Xplore, households on Universal Credit", yr: "latest release", g: "LSOA", u: "% of UC households", desc: "Of the households on Universal Credit, the share that receive the child element because they look after a child or young person. It describes who claims Universal Credit, not child poverty, because rent, childcare and earnings all decide who can claim. DWP rounds or adjusts small counts." },
+  dwp_pip_pct:                    { src: "DWP Stat-Xplore, Personal Independence Payment, with ONS mid-year population estimates", yr: "latest release", g: "Ward, from LSOA counts", u: "%", desc: "People entitled to Personal Independence Payment (PIP), a benefit for the extra costs of a long-term illness or disability, as a share of residents aged 16 and over. People who claim before State Pension age can keep it after, so the base is everyone aged 16 and over. DWP rounds or adjusts small counts, so it is shown for wards and LAs, made by adding up their LSOAs." },
+  dwp_pip_psych_pct:              { src: "DWP Stat-Xplore, Personal Independence Payment, with ONS mid-year population estimates", yr: "latest release", g: "Ward, from LSOA counts", u: "%", desc: "People entitled to Personal Independence Payment whose main disabling condition is psychiatric, such as anxiety, depression or a psychotic illness, as a share of residents aged 16 and over. Only the main condition DWP records counts, so a mental health condition alongside another main condition does not. DWP rounds or adjusts small counts." },
+  dwp_pip_msk_pct:                { src: "DWP Stat-Xplore, Personal Independence Payment, with ONS mid-year population estimates", yr: "latest release", g: "Ward, from LSOA counts", u: "%", desc: "People entitled to Personal Independence Payment whose main disabling condition is musculoskeletal, such as arthritis or back pain, as a share of residents aged 16 and over. Only the main condition DWP records counts. DWP rounds or adjusts small counts." },
+  dwp_pip_neuro_pct:              { src: "DWP Stat-Xplore, Personal Independence Payment, with ONS mid-year population estimates", yr: "latest release", g: "Ward, from LSOA counts", u: "%", desc: "People entitled to Personal Independence Payment whose main disabling condition is neurological, such as epilepsy, multiple sclerosis or Parkinson's disease, as a share of residents aged 16 and over. Only the main condition DWP records counts. DWP rounds or adjusts small counts." },
+  dwp_dla_child_pct:              { src: "DWP Stat-Xplore, Disability Living Allowance, with ONS mid-year population estimates", yr: "latest release", g: "Ward, from LSOA counts", u: "%", desc: "Children aged 0 to 15 receiving Disability Living Allowance, as a share of all children of that age. It counts children whose families have claimed, so it reflects awareness of the benefit and help to claim as well as need. DWP rounds or adjusts small counts, so it is shown for wards and LAs only." },
+  dwp_aa_pct:                     { src: "DWP Stat-Xplore, Attendance Allowance, with ONS mid-year population estimates", yr: "latest release", g: "Ward, from LSOA counts", u: "%", desc: "People entitled to Attendance Allowance, for people over State Pension age who need help with personal care because of illness or disability, as a share of residents aged 66 and over. Not everyone who could get it claims, so a high figure can mean good advice and help to claim as well as more need. DWP rounds or adjusts small counts." },
+  dwp_carers_pct:                 { src: "DWP Stat-Xplore, Carer's Allowance, with ONS mid-year population estimates", yr: "latest release", g: "Ward, from LSOA counts", u: "%", desc: "People paid Carer's Allowance for caring for someone at least 35 hours a week, as a share of residents aged 16 and over. Only carers who earn little, and who care for someone on a disability benefit, can get it, so it counts far fewer people than the Census figure for unpaid carers. DWP rounds or adjusts small counts." },
+  dwp_pension_credit_per_100:     { src: "DWP Stat-Xplore, Pension Credit, with ONS mid-year population estimates", yr: "latest release", g: "Ward, from LSOA counts", u: "claims per 100", desc: "Pension Credit claims for every 100 residents aged 66 and over. Pension Credit tops up a low income in retirement, and a couple makes one claim, so this counts claims rather than people. Many people who could get it do not claim, and claims rose when the Winter Fuel Payment was tied to it in 2024. DWP rounds or adjusts small counts." },
+  dwp_cilif_pct:                  { src: "DWP Stat-Xplore, children in low income families, with ONS mid-year population estimates", yr: "latest release", g: "Ward", u: "%", desc: "Children aged 0 to 15 in families whose income, before housing costs, is below 60% of the middle income in the UK, as a share of children of that age. DWP and HM Revenue and Customs count families through benefits and tax credits, so families who claim nothing can be missed. DWP publishes the counts for wards, and rounds small ones." },
   claimant_18_24_pct:             { src: "ONS claimant count by age (Nomis NM_162_1), with ONS mid-year population estimates", yr: "latest month", g: "Ward, from LSOA counts", u: "%", desc: "People aged 18 to 24 claiming Universal Credit or Jobseeker's Allowance mainly because they are out of work, as a share of everyone aged 18 to 24 living in the area. Some people on Universal Credit who are in low-paid work count too, and students are counted where they live in term time, so areas with many students have lower rates." },
 
   // Environment + access
@@ -7617,6 +7774,19 @@ const OV_PLAIN = {
   saie_total_income: "The average yearly income of households here before tax, as ONS estimates it.",
   saie_net_bhc: "Average yearly household income after tax, before rent or mortgage, adjusted for household size.",
   saie_net_ahc: "Average yearly household income after tax and housing costs, adjusted for household size.",
+  dwp_uc_people_pct: "People of working age on Universal Credit, in or out of work.",
+  dwp_uc_hh_pct: "Households on Universal Credit, out of all households.",
+  dwp_uc_hh_lcw_pct: "Households on Universal Credit where someone is too ill or disabled to work, or to prepare for work.",
+  dwp_uc_hh_children_pct: "Households on Universal Credit that look after a child, out of all households on Universal Credit.",
+  dwp_pip_pct: "Adults getting Personal Independence Payment for a long-term illness or disability.",
+  dwp_pip_psych_pct: "Adults getting Personal Independence Payment mainly for a mental health condition.",
+  dwp_pip_msk_pct: "Adults getting Personal Independence Payment mainly for a condition of the joints, bones or muscles.",
+  dwp_pip_neuro_pct: "Adults getting Personal Independence Payment mainly for a condition of the brain or nerves.",
+  dwp_dla_child_pct: "Children aged 0 to 15 getting Disability Living Allowance.",
+  dwp_aa_pct: "People of pension age getting Attendance Allowance because they need help with personal care.",
+  dwp_carers_pct: "People paid Carer's Allowance for caring for someone at least 35 hours a week.",
+  dwp_pension_credit_per_100: "Pension Credit claims, which top up a low income in retirement, per 100 people aged 66 and over.",
+  dwp_cilif_pct: "Children aged 0 to 15 in families on a relatively low income.",
   census_no_car_pct: "Households without a car or van.",
   census_social_rented_pct: "Households renting from the council or a housing association.",
   census_private_rented_pct: "Households renting from a private landlord.",
@@ -8734,6 +8904,7 @@ const CARD_ACRONYMS = [
   ['TfL', 'Transport for London (TfL)'],
   ['DfT', 'the Department for Transport (DfT)'],
   ['CQC', 'the Care Quality Commission (CQC)'],
+  ['DWP', 'the Department for Work and Pensions (DWP)'],
 ];
 function _spellOnce() {
   const seen = {};
@@ -14788,6 +14959,7 @@ function _fitFocus(bounds) {
     [/police/i,             'police.uk'],
     [/\bcqc\b/i,            'CQC'],
     [/\bdft\b|stats19/i,     'DfT'],
+    [/stat-xplore|\bdwp\b/i, 'DWP'],
     [/census/i,             'ONS'],
     [/fingertips|ohid/i,    'OHID'],
     [/mhclg|\bimd\b|core20/i, 'MHCLG'],
@@ -15156,9 +15328,9 @@ function _fitFocus(bounds) {
     poverty: ['deprivation', 'low-income', 'income'], poor: ['deprivation', 'income'], deprived: ['deprivation'],
     pollution: ['nitrogen dioxide', 'particles'], air: ['nitrogen dioxide', 'particles'],
     unemployment: ['claimant', 'out-of-work'], unemployed: ['claimant', 'out-of-work', 'unemployment'],
-    jobless: ['claimant', 'out-of-work', 'unemployment'], benefits: ['claimant', 'out-of-work'],
+    jobless: ['claimant', 'out-of-work', 'unemployment'], benefits: ['claimant', 'out-of-work', 'universal credit', 'personal independence', 'allowance', 'pension credit'],
     elderly: ['65 and over', '85 and over', 'older people', '75 and over'], older: ['65 and over', '85 and over', 'older people', '75 and over'],
-    pensioners: ['65 and over', 'older people'],
+    pensioners: ['65 and over', 'older people', 'pension credit', 'attendance allowance'],
     gcse: ['key stage 4'], gcses: ['key stage 4'], sats: ['key stage 2'], exams: ['key stage'], attainment: ['key stage'],
     university: ['higher education'], college: ['higher education', 'staying on'],
     heating: ['central heating', 'fuel poverty'], damp: ['poor condition'], accidents: ['road traffic'],
@@ -15176,9 +15348,9 @@ function _fitFocus(bounds) {
     mortality: ['deaths'], death: ['deaths'], dying: ['deaths'], lifespan: ['life expectancy'],
     heart: ['cardiovascular', 'coronary', 'heart attack'], cardiac: ['cardiovascular', 'coronary', 'heart attack'],
     'a&e': ['emergency admissions', 'a&e'], hospital: ['admissions'],
-    mental: ['self-harm', 'mental illness', 'depression', 'suicide', 'mood and anxiety'],
+    mental: ['self-harm', 'mental illness', 'depression', 'suicide', 'mood and anxiety', 'psychiatric'],
     depression: ['depression', 'self-harm', 'mood and anxiety'],
-    drinking: ['alcohol'], drink: ['alcohol'], carers: ['unpaid care'], caring: ['unpaid care'],
+    drinking: ['alcohol'], drink: ['alcohol'], carers: ['unpaid care', "carer's allowance"], caring: ['unpaid care', "carer's allowance"],
     disabled: ['disab'], disability: ['disab', 'disability-free'], education: ['qualifications', 'key stage', 'higher education'],
     school: ['qualifications', 'reception', 'year 6', 'key stage'],
     burglaries: ['burglary'], knife: ['weapons'], knives: ['weapons'], guns: ['weapons'], drugs: ['drug'],
@@ -15202,6 +15374,8 @@ function _fitFocus(bounds) {
     prostate: ['prostate cancer'], screening: ['screening', 'breast cancer'], birthweight: ['birth weight'],
     newborn: ['birth weight'], pregnancy: ['birth weight', 'fertility'], healthy: ['healthy life expectancy'],
     'good health': ['healthy life expectancy', 'good/very good health'],
+    uc: ['universal credit'], pip: ['personal independence', 'pip for'], dla: ['disability living'], welfare: ['universal credit', 'claimant', 'allowance'],
+    'child poverty': ['low income', 'low-income'], 'low income': ['low income', 'low-income', 'pension credit'], psychiatric: ['psychiatric'],
   };
   // Shared with the Data export search, so the same everyday words work there.
   window.PH_SEARCH_TERMS = q => searchTerms(q);
@@ -21990,6 +22164,12 @@ var PH_SHOW = {
     // Claimants aged 18 to 24, and residents killed or seriously injured on
     // the roads. Care home beds and the population estimates are descriptive.
     claimant_18_24_pct: 'high-bad',         road_ksi_per_1000: 'high-bad',
+    // The DWP benefits, measures of need read the way the claimant rate is.
+    dwp_uc_people_pct: 'high-bad', dwp_uc_hh_pct: 'high-bad', dwp_uc_hh_lcw_pct: 'high-bad',
+    dwp_uc_hh_children_pct: 'high-bad', dwp_pip_pct: 'high-bad', dwp_pip_psych_pct: 'high-bad',
+    dwp_pip_msk_pct: 'high-bad', dwp_pip_neuro_pct: 'high-bad', dwp_dla_child_pct: 'high-bad',
+    dwp_aa_pct: 'high-bad', dwp_carers_pct: 'high-bad', dwp_pension_credit_per_100: 'high-bad',
+    dwp_cilif_pct: 'high-bad',
     // MUST be listed here. ptal_score ends in _score, and the fallback below
     // reads that shape as an IMD domain score and returns 'high-bad'. PTAL is
     // the opposite: 8 is the best-connected band. Without this entry Compare
@@ -26484,6 +26664,7 @@ var PH_SHOW = {
     if (/^sape_/.test(k)) return 'People and communities';
     if (/^road_ksi_/.test(k)) return 'Crime and safety';
     if (/^care_home_/.test(k)) return 'Health';
+    if (/^dwp_/.test(k)) return 'Work, money and education';
     if (/^census_(owned|social_rented|private_rented|overcrowded|underoccupied)_/.test(k)) return 'Housing';
     if (/^(imd_|core20_|total_lsoa|census_hh_deprived_|idaci_|idaopi_|iod_)|_score$/.test(k)) return 'Deprivation';
     if (/^crime/.test(k)) return 'Crime and safety';
