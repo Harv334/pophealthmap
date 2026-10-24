@@ -378,12 +378,15 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
    * has no ft_age_checked, and its adult smoking figure is the 18 to 64
    * breakdown OHID itself flags or withholds, so that one is left out. Ask
    * leaves out the same ones as the map, so it cannot quote a figure the map
-   * does not show.
+   * does not show. That includes the Census routine and semi-routine figure
+   * until indicators.js says it was rebuilt from NS-SEC L12 and L13 alone
+   * (census_routine_classes), since older files also counted L7 to L9.
    */
   function withheldKeys() {
     var s = (typeof PH_IND_STATS === "object" && PH_IND_STATS) ? PH_IND_STATS : {};
-    if (s.ft_age_checked) return s.ft_age_mismatch || [];
-    return ["ft_smoking_prevalence_adults"];
+    var out = s.ft_age_checked ? (s.ft_age_mismatch || []).slice() : ["ft_smoking_prevalence_adults"];
+    if (s.census_routine_classes !== "L12-L13") out.push("census_routine_semi_routine_pct");
+    return out;
   }
   function isWithheld(key) { return withheldKeys().indexOf(key) !== -1; }
   function shownOnly(ind) {
@@ -886,7 +889,7 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
 
   function withheldError(key) {
     return { error: "'" + key + "' is left out of this version of the map until the data " +
-      "is refreshed, because the published figure is not the headline one. Call " +
+      "is refreshed, because the figure stored for it is not the one the map describes. Call " +
       "list_indicators for valid keys." };
   }
 

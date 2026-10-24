@@ -45,6 +45,10 @@ accessibility violation fails it. The four pages are opened with the device
 set to dark, and checked for the shared stylesheet (`pages.css`), the same
 header and footer, and a light page. The 404 page's links are absolute to
 pophealth.uk, so the suite answers those requests from the working copy.
+It checks that no list (the picker, Query, Compare, Data export or Ask)
+offers an indicator the loaded data holds no figures for, that the ones the
+page works out from the ward file stay, and that a new one appears once
+indicators.js lists it.
 It also checks the names: every indicator is named from the one label table
 (`IND_NAMES`), Compare offers each measure once, and the old names (Soc rent,
 Boards, metric, VCSE, Borough or Local authority as the level) are gone.
@@ -138,6 +142,16 @@ and LA percentages are the summed numerator counts over the summed
 denominator counts, that output area counts added up to LSOAs give the LSOA
 percentages, and that the files the map reads keep their shape. It needs
 pandas and numpy but no network.
+
+`test_census_additions.py` does the same for the Census tables added or fixed
+in October 2026: routine and semi-routine is NS-SEC L12 and L13 only (not L7
+to L9 as well), household deprivation comes from TS011, and household
+composition, spoken English, overcrowding, 50 hours of care, long-term
+sickness and six detailed ethnic groups are counted from the columns the
+publisher prints. It checks the ward and LA figures from the counts, wards
+built from LSOAs when the output area file lacks a figure, and that a label
+that does not match or a table that did not download writes nothing and marks
+the census source partial.
 
 `test_guards.py` and `test_guards_gp.py` copy real downloads out of `.cache/`
 to build their fixtures, so they need a populated cache. `.cache/` is not in the

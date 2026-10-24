@@ -6,6 +6,12 @@ These changes are written and tested, and reach the site with the next data refr
 
 Census percentages for wards and LAs are calculated from the summed counts of their output areas: the households with no car or van in a ward's output areas, for example, divided by all their households. A measure of households is therefore a share of households rather than an average weighted by residents. Each indicator card, the Area profile, the Data export notes and the methodology page describe whichever method built the figures on screen, so they change with the data.
 
+Seventeen Census 2021 indicators are added, each for output areas, LSOAs, MSOAs, wards and LAs: households deprived in two or more dimensions and in at least one (from the household deprivation table, TS011), people not working because of long-term sickness or disability, people who have never worked or are long-term unemployed, unpaid care of 50 or more hours a week, people who cannot speak English well or at all, one-person households, people aged 66 and over living alone, lone parents with dependent children, overcrowded and under-occupied homes, and six detailed ethnic groups (Bangladeshi, Pakistani, Black African, Black Caribbean, Gypsy or Irish Traveller, and Roma). Household deprivation had been read from the wrong table (TS044, which is accommodation type), so no figure was ever made. Where ONS publishes less detail for output areas, as it may for spoken English, ward and LA figures are made from LSOA counts instead.
+
+The routine and semi-routine jobs figure counted intermediate jobs and small employers as well, about twice the true share. It now counts semi-routine and routine occupations only, and is left out of the map, the reports and Ask until the refresh rebuilds it.
+
+An indicator with no figures in the data that is loaded is no longer offered in the indicator picker, the second indicator list or Ask, and Query, Compare and the Data export list only indicators with figures, so a new indicator appears once a refresh has made its figures. The card for OHID's out-of-work benefit measure now says how it differs from the claimant rate.
+
 Ask is now on each region's map as well as London's. It is told which region's map is open, so it ranks and compares that region's own areas, and its example questions there name no places. The England map still has no Ask panel, because it holds too many areas to look up at once.
 
 ## 1.0.0, 16 October 2026

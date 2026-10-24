@@ -417,6 +417,21 @@ and say what each one means.</p>
             income, employment, education, health, crime, access to housing and
             services, and living environment. A higher score means more
             deprived.</td></tr>
+    <tr><td class="term">Households deprived in two or more dimensions</td><td>Household deprivation dimensions (Census 2021)</td>
+        <td>A simple Census measure, separate from the deprivation score. ONS
+            counts a household as deprived in education, employment, health
+            and disability, or housing from its answers, and publishes how
+            many of the four apply. It is not the Index of Multiple
+            Deprivation, and the two should not be compared.</td></tr>
+    <tr><td class="term">Overcrowded homes</td><td>Occupancy rating for bedrooms of -1 or less</td>
+        <td>Homes with fewer bedrooms than the bedroom standard says the
+            household needs. Under-occupied homes have at least two more than
+            they need.</td></tr>
+    <tr><td class="term">Socio-economic classification</td><td>National Statistics Socio-economic Classification (NS-SEC)</td>
+        <td>ONS's grouping of people aged 16 and over by the kind of job they
+            do or last did, from higher managerial and professional jobs to
+            routine jobs, with groups for people who have never worked or are
+            long-term unemployed and for full-time students.</td></tr>
     <tr><td class="term">Decile</td><td>Decile</td>
         <td>A tenth. Deprivation decile 1 is the most deprived tenth of
             England's LSOAs, and decile 10 the least deprived. A ward's average
@@ -887,7 +902,7 @@ thirds of a metre.</p>
     <tr><th>Source</th><th>Dataset or code</th></tr>
   </thead>
   <tbody>
-    <tr><td class="term">Census 2021</td><td>Nomis bulk downloads of the Census 2021 topic summary tables (<code>TS001</code> and others), for output areas, LSOAs and MSOAs</td></tr>
+    <tr><td class="term">Census 2021</td><td>Nomis bulk downloads of the Census 2021 topic summary tables, for output areas, LSOAs and MSOAs: <code>TS001</code>, <code>TS003</code>, <code>TS004</code>, <code>TS007</code>, <code>TS007A</code>, <code>TS011</code>, <code>TS021</code>, <code>TS025</code>, <code>TS029</code>, <code>TS037</code>, <code>TS038</code>, <code>TS039</code>, <code>TS045</code>, <code>TS052</code>, <code>TS054</code>, <code>TS061</code>, <code>TS062</code>, <code>TS066</code> and <code>TS067</code></td></tr>
     <tr><td class="term">Claimant count</td><td>Nomis <code>CLA01</code> (Universal Credit and Jobseeker's Allowance claimants)</td></tr>
     <tr><td class="term">Index of Multiple Deprivation</td><td>File 7 of the English Indices of Deprivation 2025 (scores, ranks, deciles and population denominators)</td></tr>
     <tr><td class="term">OHID main profiles</td><td>Fingertips area type <code>501</code> (districts and unitary authorities) first, then <code>502</code> (upper-tier LAs). Where neither has a figure under the LA's code, its old code is tried, and then its county's figure, labelled as the county's, through Fingertips' county to district lookup</td></tr>
@@ -996,8 +1011,9 @@ var SOURCES = [
   { id: 'census',
     name: 'Census 2021',
     pub: 'ONS, through Nomis',
-    what: '32 indicators: health, disability, ethnicity, age, housing, tenure, ' +
-          'qualifications, occupation, travel to work, household language and unpaid care.',
+    what: 'Health, disability, unpaid care, age, ethnicity, language and spoken English, ' +
+          'who people live with, tenure, overcrowding, household deprivation, qualifications, ' +
+          'work, occupation and travel to work.',
     // Set again by censusMethod below from what the latest data build says.
     geo: 'Output area, LSOA and MSOA, as ONS publishes them, and averaged here, weighted by population, into wards and LAs',
     period: 'Census day, 21 March 2021',

@@ -96,6 +96,36 @@ const overlaps = (a, b) => !!(a && b && a.l < b.r && a.r > b.l && a.t < b.b && a
 const setOv = (page, k) => page.evaluate(k => {
   const s = document.getElementById('ov'); s.value = k; s.dispatchEvent(new Event('change'));
 }, k);
+/* No empty indicators (NO EMPTY INDICATORS in index.html). What every list
+   offers against what the loaded build holds: a key has figures when
+   indicators.js lists it (through its alias), when a loaded ward holds a
+   number for it, or when the output area index lists it. */
+const emptyIndicatorAudit = page => page.evaluate(() => {
+  const G = PH_IND_STATS.stats;
+  const isNum = v => v !== null && v !== undefined && v !== '' && typeof v !== 'object' && isFinite(Number(v));
+  const inWards = k => Object.values(WARD_DATA_BY_CODE).some(w => isNum((w.indicators || {})[resolveOvField(k)]));
+  const has = k => !!(G[resolveOvField(k)] || G[k]) || inWards(k) ||
+    !!(OA_INDEX && OA_INDEX.keys.indexOf(k) !== -1) || !!(OV_CFG[k] && OV_CFG[k]._custom);
+  const cats = [].concat(...CATS.map(c => c.fields.map(f => f.k)));
+  const opts = [...document.querySelectorAll('#ov option')].map(o => o.value).filter(v => v !== 'none');
+  const picker = [].concat(...(window.PH_THEMES || []).map(t => t.keys));
+  const li = PH_ASSISTANT.runTool('list_indicators', {});
+  const ask = [].concat(...li.groups.map(g => g.indicators.map(r => r.key)));
+  const offered = [...new Set(cats.concat(opts, picker, ask))];
+  return {
+    empty: [...PH_EMPTY_IND], offered, cats, opts, picker, ask,
+    emptyOffered: offered.filter(k => !has(k)),
+    removedHad: [...PH_EMPTY_IND].filter(has),
+    notListed: cats.filter(k => !G[k]),
+    count: document.getElementById('ov-search').placeholder,
+    askSize: JSON.stringify(li).length,
+  };
+});
+// The keys indicators.js never lists, because the page works them out from
+// the ward file: they must survive the rule.
+const DERIVED_KEYS = ['crime_rate_per_1000', 'imd_score_ward', 'crime_violence_12mo', 'crime_asb_12mo', 'crime_theft_12mo',
+  'crime_burglary_12mo', 'crime_robbery_12mo', 'crime_vehicle_12mo', 'crime_drug_offences_12mo', 'crime_public_order_12mo',
+  'crime_arson_12mo', 'crime_weapons_12mo', 'crime_misc_society_12mo'];
 
 /* One icon set (workplan 2.9). Text that people read may hold arrows and
    symbols in a sentence, but nothing drawn as an icon: no emoji, no carets,
@@ -295,7 +325,18 @@ const smallText = page => page.evaluate(() => {
         vintage: !document.getElementById('data-vintage') && !!document.querySelector('#ov-theme-view #core20-toggle'),
       };
       const BAD = /File_7|LSOA bridge|CLA01|NOMIS|=|\bi\.e\.|\be\.g\.|[\u2013\u2014]|→|pop-weighted|Offences \(|Public Order|Criminal Damage|Against the Person|Against Society|Deprivation domain|Domain score|'(Very )?(Good|Bad)'/;
+      // An indicator this build has no figures for is out of the registry (NO
+      // EMPTY INDICATORS), as is one withheld until a refresh; its row goes
+      // back while its card is read, so the card it will have once it is
+      // offered is checked too.
       Object.keys(OV_META).forEach(k => {
+        const back = (typeof PH_EMPTY_FIELDS === 'object' && PH_EMPTY_FIELDS[k]) ||
+          (typeof PH_HELD_FIELDS === 'object' && PH_HELD_FIELDS[k]) || null;
+        const home = back && CATS.find(c => c.key === back.cat);
+        if (home) home.fields.push(back.field);
+        try { checkCard(k); } finally { if (home) home.fields.splice(home.fields.indexOf(back.field), 1); }
+      });
+      function checkCard(k) {
         const d = document.createElement('div');
         d.innerHTML = indicatorCardHTML(k);
         const t = d.querySelector('.ic-t');
@@ -325,13 +366,16 @@ const smallText = page => page.evaluate(() => {
               c.innerHTML = indicatorCardHTML(k);
               const dd2 = name => { const dt = [...c.querySelectorAll('dt')].find(e => e.textContent === name); return dt ? dt.nextElementSibling.textContent : ''; };
               const m = dd2('Method'), pub = dd2('Published at');
+              // A figure ONS does not publish for output areas (not in the
+              // output area index) is built from LSOA counts, and says so.
+              const unit = wc && censusWardsFromLsoas(k) ? 'LSOAs' : 'output areas';
               const right = k === 'census_population' ? /sum the residents of the output areas/.test(m)
-                : (wc ? /ward figure is calculated from the counts of the output areas/.test(m) &&
-                        /Ward figures are calculated from the counts of the output areas in each ward/.test(pub)
+                : (wc ? new RegExp('ward figure is calculated from the counts of the ' + unit).test(m) &&
+                        new RegExp('Ward figures are calculated from the counts of the ' + unit + ' in each ward').test(pub)
                       : /ward figure is an average of the output areas that best fit the ward under the ONS lookup, weighted by their residents/.test(m) &&
                         /Ward figures are an average of the output areas in each ward, weighted by population/.test(pub)) &&
-                  (lc ? /LA figure is calculated from the counts of the output areas in its wards/.test(m) &&
-                        /LA\b.{0,40} figures are calculated (in the same way, from|from the counts of) the output areas in each LA/.test(pub)
+                  (lc ? new RegExp('LA figure is calculated from the counts of the ' + unit + ' in its wards').test(m) &&
+                        new RegExp('LA\\b.{0,40} figures are calculated (in the same way, from|from the counts of) the ' + unit + ' in each LA').test(pub)
                       : /LA figure is an average of its ward figures, weighted by population/.test(m) &&
                         /LA\b.{0,40} figures are an average of the ward figures, weighted by population/.test(pub));
               if (!right || /(add up|sum) the LSOAs/.test(m + ' ' + pub) ||
@@ -344,7 +388,7 @@ const smallText = page => page.evaluate(() => {
           if (!/\b\d{1,2} (January|February|March|April|May|June|July|August|September|October|November|December) \d{4}\b/.test(u) ||
               /\d{2}\/\d{2}\/\d{4}/.test(u) || (u.match(/\./g) || []).length !== 1) out.ft.push(k);
         }
-      });
+      }
       return out;
     });
     ok(c23.controls && c23.closeAtTop, 'one About this indicator control, and the card closes from its top', JSON.stringify(c23));
@@ -1375,6 +1419,99 @@ const smallText = page => page.evaluate(() => {
     await checkAxe(page, 'Data export with three sizes of area');
     await page.click('#cb-preview');
     ok(errors.length === 0, 'no page errors (Data export)', errors.join(' | '));
+    await page.close();
+  }
+
+  // No empty indicators: an indicator with no figures in the loaded build is
+  // offered nowhere (picker, second indicator, Query, Compare, Data export,
+  // Ask), and nothing with figures goes, including the thirteen keys the
+  // page works out from the ward file, which indicators.js does not list.
+  // The Census routine figure is withheld until indicators.js says it was
+  // rebuilt from NS-SEC L12 and L13 alone.
+  {
+    const { page, errors } = await open(browser, 'index.html?t=1', DESK);
+    const a = await emptyIndicatorAudit(page);
+    ok(!a.emptyOffered.length, 'no empty indicators: everything the picker, the hidden select and Ask offer has figures in this build',
+      a.emptyOffered.join(', '));
+    ok(!a.removedHad.length, 'no empty indicators: the rule took out only indicators with no figures', a.removedHad.join(', '));
+    const derivedOk = DERIVED_KEYS.filter(k => !(a.cats.includes(k) && a.opts.includes(k) && a.picker.includes(k)));
+    ok(!derivedOk.length,
+      'no empty indicators: the thirteen keys worked out from the ward file (crime categories and rate, ward IMD score) are still offered',
+      derivedOk.join(', '));
+    ok(DERIVED_KEYS.filter(k => /^crime_/.test(k)).every(k => a.ask.includes(k)),
+      'no empty indicators: and Ask still lists the crime ones', DERIVED_KEYS.filter(k => !a.ask.includes(k)).join(', '));
+    const NEWK = ['census_hh_deprived_2plus_pct', 'census_overcrowded_pct', 'census_eth_roma_pct', 'census_poor_english_pct',
+      'census_inactive_ltsick_pct', 'census_pensioner_alone_pct', 'census_unpaid_care_50h_pct', 'census_never_worked_ltu_pct'];
+    const nw = await page.evaluate(NEWK => {
+      const G = PH_IND_STATS.stats;
+      PH_QUERY.apply({ services: [], scope: '', conds: [['census_bad_health_pct', 'gte', '0']] });
+      const query = [...document.querySelectorAll('.q-f-ind option')].map(o => o.value);
+      return { query, built: NEWK.filter(k => G[k]), routineOk: CENSUS_ROUTINE_OK,
+        meta: NEWK.every(k => OV_META[k] && OV_CFG[k] && IND_NAMES[k] && OV_PLAIN[k]) };
+    }, NEWK);
+    await page.click('.mode-btn[data-mode="compare"]');
+    await page.waitForTimeout(800);
+    const compare = await page.evaluate(() => [...document.querySelectorAll('#cmp-add-metric option')].map(o => o.value).filter(Boolean));
+    await page.click('.mode-btn[data-mode="csv"]');
+    await page.waitForTimeout(600);
+    await page.click('#cb-level button[data-lvl="ward"]');
+    await page.waitForTimeout(400);
+    const exportCols = await page.evaluate(() => [...document.querySelectorAll('#cb-cols input[data-col]')].map(b => b.getAttribute('data-col')));
+    const lists = { query: nw.query, compare, exportCols };
+    const unbuilt = NEWK.filter(k => !nw.built.includes(k));
+    ok(nw.meta && nw.query.length > 50 && compare.length > 50 && exportCols.length > 50 &&
+       unbuilt.every(k => a.empty.includes(k) && !a.offered.includes(k) && !Object.values(lists).some(l => l.includes(k))),
+      'no empty indicators: the new Census indicators, until a build has figures for them, are in no list (picker, Query, Compare, Data export, Ask)',
+      unbuilt.filter(k => !a.empty.includes(k) || a.offered.includes(k) || Object.values(lists).some(l => l.includes(k))).join(', '));
+    const routineAnywhere = a.offered.includes('census_routine_semi_routine_pct') || Object.values(lists).some(l => l.includes('census_routine_semi_routine_pct'));
+    ok(nw.routineOk ? routineAnywhere : !routineAnywhere,
+      'the routine and semi-routine figure is offered only once indicators.js says it counts NS-SEC L12 and L13 alone', String(nw.routineOk));
+    ok(/^Search \d+ indicators$/.test(a.count) && +a.count.match(/\d+/)[0] === a.picker.length,
+      'no empty indicators: the picker counts what it offers', a.count + ' / ' + a.picker.length);
+    ok(a.askSize < 16 * 1024, 'no empty indicators: Ask\'s indicator list still fits in one tool result', String(a.askSize));
+    ok(errors.length === 0, 'no page errors (no empty indicators)', errors.join(' | '));
+    await page.close();
+  }
+  // Without indicators.js nothing can be shown empty, so nothing is taken out.
+  {
+    const { isMobile, hasTouch, ...viewport } = DESK;
+    const page = await browser.newPage({ viewport });
+    const errors = [];
+    page.on('pageerror', e => errors.push(e.message));
+    await page.route('**/data/map/indicators.js*', r => r.fulfill({ status: 404, body: '' }));
+    await page.goto(BASE + '/index.html?t=1');
+    await page.waitForTimeout(SETTLE);
+    const noBlob = await page.evaluate(() => ({ blob: typeof PH_IND_STATS === 'object' && !!PH_IND_STATS,
+      empty: PH_EMPTY_IND.size, crime: !!document.querySelector('#ov option[value="crime_rate_per_1000"]') }));
+    ok(!noBlob.blob && noBlob.empty === 0 && noBlob.crime, 'no empty indicators: without indicators.js nothing is taken out', JSON.stringify(noBlob));
+    ok(errors.length === 0, 'no page errors (no indicators.js)', errors.join(' | '));
+    await page.close();
+  }
+  // And once a build has figures for a new indicator, it is offered: here an
+  // indicators.js that lists overcrowding and says the routine figure was
+  // rebuilt, as the next refresh's will.
+  {
+    const { isMobile, hasTouch, ...viewport } = DESK;
+    const page = await browser.newPage({ viewport });
+    const errors = [];
+    page.on('pageerror', e => errors.push(e.message));
+    const real = fs.readFileSync(path.join(ROOT, 'data/map/indicators.js'), 'utf8');
+    const built = real.replace(/"census_routine_classes":"[^"]*",?/, '')
+      .replace('"stats":{', '"census_routine_classes":"L12-L13","stats":{"census_overcrowded_pct":{"lv":{"ward":{"n":600,"d":500,"p5":2,"p95":15}}},');
+    await page.route('**/data/map/indicators.js*', r => r.fulfill({ status: 200, contentType: 'text/javascript', body: built }));
+    await page.goto(BASE + '/index.html?t=1');
+    await page.waitForTimeout(SETTLE);
+    const later = await page.evaluate(() => ({
+      over: ['#ov option[value="census_overcrowded_pct"]'].every(s => document.querySelector(s)) &&
+        [].concat(...PH_THEMES.map(t => t.keys)).includes('census_overcrowded_pct') &&
+        (PH_THEMES.find(t => t.keys.includes('census_overcrowded_pct')) || {}).label === 'Housing',
+      routine: !!document.querySelector('#ov option[value="census_routine_semi_routine_pct"]') && !phWithheld('census_routine_semi_routine_pct') &&
+        !PH_ASSISTANT.isWithheld('census_routine_semi_routine_pct'),
+      deprived: !!document.querySelector('#ov option[value="census_hh_deprived_2plus_pct"]') }));
+    ok(later.over && later.routine && !later.deprived,
+      'no empty indicators: a new indicator is offered, under its theme, once indicators.js lists it, and the routine figure once it is rebuilt',
+      JSON.stringify(later));
+    ok(errors.length === 0, 'no page errors (a later build)', errors.join(' | '));
     await page.close();
   }
 
@@ -3088,6 +3225,12 @@ const smallText = page => page.evaluate(() => {
         sheetAsk: !!b && !b.hidden && b.getBoundingClientRect().width > 0, available: !!(window.PH_ASSISTANT && PH_ASSISTANT.available) };
     });
     ok(askNE.toggle && askNE.panel && askNE.sheetAsk && askNE.available, 'region: the North East map has the Ask button, its panel and Ask about this ward', JSON.stringify(askNE));
+    const neEmpty = await emptyIndicatorAudit(page);
+    ok(!neEmpty.emptyOffered.length && !neEmpty.removedHad.length &&
+       DERIVED_KEYS.every(k => neEmpty.cats.includes(k) && neEmpty.opts.includes(k)) && neEmpty.askSize < 16 * 1024,
+      'region: no empty indicators in the North East, and the ones worked out from its ward file are kept',
+      JSON.stringify({ emptyOffered: neEmpty.emptyOffered, removedHad: neEmpty.removedHad,
+        derived: DERIVED_KEYS.filter(k => !neEmpty.cats.includes(k)), askSize: neEmpty.askSize }));
     // B6: the most deprived ten LSOAs are the ten with the lowest national
     // rank, not the first ten in the file (which were all in Gateshead).
     await setOv(page, 'imd_decile');

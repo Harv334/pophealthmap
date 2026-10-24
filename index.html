@@ -3884,6 +3884,7 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
               <option value="census_disability_any_pct">Disability (any) % · Output area</option>
               <option value="census_disability_lot_pct">Disability (limited a lot) % · Output area</option>
               <option value="census_provides_unpaid_care_pct">Provides unpaid care % · Output area</option>
+              <option value="census_unpaid_care_50h_pct">Unpaid care, 50 or more hours a week % · Output area</option>
               <option value="ft_a_e_attendance_under_5">A&E attendances, ages 0 to 4 · LA</option>
               <option value="ft_cervical_screening_25_49">Cancer screening coverage: cervical (25 to 49) · LA</option>
               <option value="ft_child_poverty_low_income">Children in relative low income families (under 16) · LA</option>
@@ -3959,6 +3960,12 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
               <option value="census_black_pct">Black / Black British % · Output area</option>
               <option value="census_mixed_pct">Mixed / Multiple % · Output area</option>
               <option value="census_other_ethnic_pct">Other ethnic group % · Output area</option>
+              <option value="census_eth_bangladeshi_pct">Bangladeshi % · Output area</option>
+              <option value="census_eth_pakistani_pct">Pakistani % · Output area</option>
+              <option value="census_eth_black_african_pct">Black African % · Output area</option>
+              <option value="census_eth_black_caribbean_pct">Black Caribbean % · Output area</option>
+              <option value="census_eth_gypsy_traveller_pct">Gypsy or Irish Traveller % · Output area</option>
+              <option value="census_eth_roma_pct">Roma % · Output area</option>
               <option value="census_under16_pct">Under 15 % · Output area</option>
               <option value="census_under5_pct">Under 5 % · Output area</option>
               <option value="census_working_age_pct">Aged 15 to 64 % · Output area</option>
@@ -3966,6 +3973,10 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
               <option value="census_over85_pct">85+ % · Output area</option>
               <option value="census_english_hh_all_pct">All adults in the household have English as a main language % · Output area</option>
               <option value="census_english_hh_none_pct">No one in the household has English as a main language % · Output area</option>
+              <option value="census_poor_english_pct">Cannot speak English well or at all % · Output area</option>
+              <option value="census_one_person_hh_pct">One-person households % · Output area</option>
+              <option value="census_pensioner_alone_pct">Living alone, aged 66 and over % · Output area</option>
+              <option value="census_lone_parent_dep_pct">Lone parents with dependent children % · Output area</option>
             </optgroup>
             <optgroup label="Work, money and education">
               <option value="census_unemployed_pct">Unemployed % · Output area</option>
@@ -3973,6 +3984,10 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
               <option value="census_level4_qual_pct">Level 4+ qualifications % · Output area</option>
               <option value="census_higher_managerial_pct">Higher managerial/professional % · Output area</option>
               <option value="census_routine_semi_routine_pct">Routine/semi-routine % · Output area</option>
+              <option value="census_never_worked_ltu_pct">Never worked or long-term unemployed % · Output area</option>
+              <option value="census_inactive_ltsick_pct">Long-term sick or disabled, not working % · Output area</option>
+              <option value="census_hh_deprived_2plus_pct">Households deprived in two or more dimensions % · Output area</option>
+              <option value="census_hh_deprived_any_pct">Households deprived in at least one dimension % · Output area</option>
               <option value="claimant_rate_pct">Claimant rate, working age (%) · LSOA</option>
             </optgroup>
             <optgroup label="Housing and transport">
@@ -3980,6 +3995,8 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
               <option value="census_social_rented_pct">Social rented % · Output area</option>
               <option value="census_private_rented_pct">Private rented % · Output area</option>
               <option value="census_owned_pct">Owner occupied % · Output area</option>
+              <option value="census_overcrowded_pct">Overcrowded homes % · Output area</option>
+              <option value="census_underoccupied_pct">Under-occupied homes % · Output area</option>
               <option value="census_active_travel_pct">Walk/cycle to work % · Output area</option>
               <option value="census_public_transport_pct">Public transport to work % · Output area</option>
               <option value="census_car_to_work_pct">Car/van to work % · Output area</option>
@@ -5402,6 +5419,7 @@ const OV_CFG = {
   // Unpaid care is descriptive: more carers is more need for carer support,
   // and it is also more people looking after one another. Neither is "worse".
   census_provides_unpaid_care_pct: { lo:"Lower", hi:"Higher", wh:true,  min:2,    max:10,   descriptive:true },
+  census_unpaid_care_50h_pct:      { lo:"Lower", hi:"Higher", wh:true,  min:0.5,  max:5,    descriptive:true },
   // Crime (ward total, 12 months)
   crime_total:                     { lo:"Fewer", hi:"More",   wh:true,  min:200,  max:5000 },
   // Per 1,000 residents. Capped near the 95th percentile: a handful of
@@ -5455,12 +5473,28 @@ const OV_CFG = {
   census_social_rented_pct:        { lo:"Less",  hi:"More",   wh:false, min:5,    max:50,   descriptive:true },
   census_private_rented_pct:       { lo:"Less",  hi:"More",   wh:false, min:10,   max:60,   descriptive:true },
   census_no_car_pct:               { lo:"Lower", hi:"Higher", wh:false, min:20,   max:70,   descriptive:true },
+  // Overcrowding (TS052, a bedroom or more short of the bedroom standard) is a
+  // recognised harm to health, so it keeps a direction. Spare bedrooms are
+  // how homes are used, not a hardship, so that one is descriptive.
+  census_overcrowded_pct:          { lo:"Lower", hi:"Higher", wh:true,  min:1,    max:20   },
+  census_underoccupied_pct:        { lo:"Lower", hi:"Higher", wh:false, min:10,   max:60,   descriptive:true },
   // Economy & education. Occupation mix (NS-SEC) is descriptive: ranking a ward
   // "worst" for its share of routine jobs is a verdict on who lives there.
   // Qualifications keep a direction, as the IMD education domain does.
   census_unemployed_pct:           { lo:"Lower", hi:"Higher", wh:true,  min:2,    max:10   },
   census_higher_managerial_pct:    { lo:"Lower", hi:"Higher", wh:false, min:15,   max:60,   descriptive:true },
-  census_routine_semi_routine_pct: { lo:"Lower", hi:"Higher", wh:true,  min:5,    max:25,   descriptive:true },
+  // NS-SEC L12 and L13 only: about 22% across England and Wales, lower in
+  // London. (Built before the fix, it also counted L7 to L9 and ran near 45%;
+  // see CENSUS_ROUTINE_OK.)
+  census_routine_semi_routine_pct: { lo:"Lower", hi:"Higher", wh:true,  min:5,    max:30,   descriptive:true },
+  // NS-SEC L14. Descriptive like the rest of the classification: "never
+  // worked" takes in people who stayed at home to care for a family.
+  census_never_worked_ltu_pct:     { lo:"Lower", hi:"Higher", wh:true,  min:2,    max:14,   descriptive:true },
+  census_inactive_ltsick_pct:      { lo:"Lower", hi:"Higher", wh:true,  min:1,    max:8    },
+  // Household deprivation dimensions (TS011). Two or more separates areas
+  // far better than one or more, which about half of all households meet.
+  census_hh_deprived_2plus_pct:    { lo:"Lower", hi:"Higher", wh:true,  min:5,    max:35   },
+  census_hh_deprived_any_pct:      { lo:"Lower", hi:"Higher", wh:true,  min:30,   max:65   },
   census_level4_qual_pct:          { lo:"Lower", hi:"Higher", wh:false, min:30,   max:80   },
   census_no_qual_pct:              { lo:"Lower", hi:"Higher", wh:true,  min:5,    max:25   },
   // Ethnicity (top-level Census 2021 groups). Descriptive, not health
@@ -5470,6 +5504,20 @@ const OV_CFG = {
   census_black_pct:                { lo:"Lower", hi:"Higher", wh:false, min:1,    max:40,   descriptive:true },
   census_mixed_pct:                { lo:"Lower", hi:"Higher", wh:false, min:2,    max:12,   descriptive:true },
   census_other_ethnic_pct:         { lo:"Lower", hi:"Higher", wh:false, min:2,    max:20,   descriptive:true },
+  // Six of the detailed groups (TS021 leaves). Gypsy or Irish Traveller and
+  // Roma are well under 1% almost everywhere, so their ramps are short.
+  census_eth_bangladeshi_pct:      { lo:"Lower", hi:"Higher", wh:false, min:0,    max:20,   descriptive:true },
+  census_eth_pakistani_pct:        { lo:"Lower", hi:"Higher", wh:false, min:0,    max:15,   descriptive:true },
+  census_eth_black_african_pct:    { lo:"Lower", hi:"Higher", wh:false, min:0,    max:20,   descriptive:true },
+  census_eth_black_caribbean_pct:  { lo:"Lower", hi:"Higher", wh:false, min:0,    max:10,   descriptive:true },
+  census_eth_gypsy_traveller_pct:  { lo:"Lower", hi:"Higher", wh:false, min:0,    max:1,    descriptive:true },
+  census_eth_roma_pct:             { lo:"Lower", hi:"Higher", wh:false, min:0,    max:1,    descriptive:true },
+  // Household composition (TS003), shares of households. Descriptive: who
+  // people live with is a fact about an area, though living alone in later
+  // life and lone parenthood both bring needs services plan for.
+  census_one_person_hh_pct:        { lo:"Lower", hi:"Higher", wh:false, min:15,   max:50,   descriptive:true },
+  census_pensioner_alone_pct:      { lo:"Lower", hi:"Higher", wh:true,  min:4,    max:20,   descriptive:true },
+  census_lone_parent_dep_pct:      { lo:"Lower", hi:"Higher", wh:true,  min:2,    max:15,   descriptive:true },
   // Age profile. Descriptive. A higher 85+ share does mean more frail-elderly
   // care need, and "highest" already says so without calling a ward "worst".
   census_under16_pct:              { lo:"Lower", hi:"Higher", wh:false, min:10,   max:28,   descriptive:true },
@@ -5541,6 +5589,10 @@ const OV_CFG = {
   // descriptive: a main language other than English is not a deficit.
   census_english_hh_all_pct:       { lo:"Lower", hi:"Higher", wh:false, min:40,   max:95,   descriptive:true },
   census_english_hh_none_pct:      { lo:"Lower", hi:"Higher", wh:true,  min:0,    max:30,   descriptive:true },
+  // Proficiency in English (TS029), per person aged 3 and over. Like the
+  // household language figures: it marks a need for interpreting, not a
+  // deficit in the people it counts.
+  census_poor_english_pct:         { lo:"Lower", hi:"Higher", wh:true,  min:0,    max:8,    descriptive:true },
   // Travel to work (Census 2021, TS061). Descriptive: how people get to work
   // follows where they live and work (and the Census fell in a lockdown), so
   // a ward is not ranked better or worse for its share of drivers or walkers.
@@ -5737,6 +5789,7 @@ const CATS = [
     { k: "census_disability_any_pct",        l: "Disability, any (%)",           g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_disability_lot_pct",        l: "Disability, limited a lot (%)", g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_provides_unpaid_care_pct",  l: "Provides unpaid care (%)",      g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
+    { k: "census_unpaid_care_50h_pct",       l: "Unpaid care, 50 or more hours a week (%)", g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "ft_93280", l: "Fuel poverty (low income, low energy efficiency methodology)", g: "msoa", lv: ["ward","msoa"] },
     { k: "ft_93097", l: "Unemployment: people claiming out of work benefit (aged 16 to 64)", g: "msoa", lv: ["ward","msoa"] },
     { k: "ft_93098", l: "Long-term unemployment: people claiming out of work benefit for over 12 months (aged 16 to 64)", g: "msoa", lv: ["ward","msoa"] },
@@ -5815,13 +5868,33 @@ const CATS = [
     { k: "census_black_pct",                 l: "Black / Black British (%)",     g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_mixed_pct",                 l: "Mixed / Multiple (%)",          g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_other_ethnic_pct",          l: "Other ethnic group (%)",        g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
+    // Six detailed groups. Gypsy or Irish Traveller and Roma are counted in
+    // handfuls per output area, and ONS perturbs small counts, so they open
+    // by ward, where the figures are steadier.
+    { k: "census_eth_bangladeshi_pct",       l: "Bangladeshi (%)",               g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
+    { k: "census_eth_pakistani_pct",         l: "Pakistani (%)",                 g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
+    { k: "census_eth_black_african_pct",     l: "Black African (%)",             g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
+    { k: "census_eth_black_caribbean_pct",   l: "Black Caribbean (%)",           g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
+    { k: "census_eth_gypsy_traveller_pct",   l: "Gypsy or Irish Traveller (%)",  g: "oa", lv: ["ward","msoa","lsoa"], open: "ward" },
+    { k: "census_eth_roma_pct",              l: "Roma (%)",                      g: "oa", lv: ["ward","msoa","lsoa"], open: "ward" },
     { k: "census_english_hh_all_pct",        l: "All adults in the household have English as a main language (%)", g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_english_hh_none_pct",       l: "No one in the household has English as a main language (%)", g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
+    { k: "census_poor_english_pct",          l: "Cannot speak English well or at all (%)", g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
+    { k: "census_one_person_hh_pct",         l: "One-person households (%)",     g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
+    { k: "census_pensioner_alone_pct",       l: "Living alone, aged 66 and over (%)", g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
+    { k: "census_lone_parent_dep_pct",       l: "Lone parents with dependent children (%)", g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
   ]},
   { key: "economy", label: "Work, money and education", ico: "briefcase", fields: [
     { k: "census_unemployed_pct",            l: "Unemployed (%)",                g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_higher_managerial_pct",     l: "Higher managerial (%)",         g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_routine_semi_routine_pct",  l: "Routine/semi-routine (%)",      g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
+    { k: "census_never_worked_ltu_pct",      l: "Never worked or long-term unemployed (%)", g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
+    { k: "census_inactive_ltsick_pct",       l: "Long-term sick or disabled, not working (%)", g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
+    // Household deprivation (TS011). Listed here so the Deprivation group
+    // stays the IoD's own; the picker and the profile show these two
+    // under Deprivation (MOVE and PROFILE_MOVE).
+    { k: "census_hh_deprived_2plus_pct",     l: "Households deprived in two or more dimensions (%)", g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
+    { k: "census_hh_deprived_any_pct",       l: "Households deprived in at least one dimension (%)", g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_level4_qual_pct",           l: "Level 4+ qualifications (%)",   g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_no_qual_pct",               l: "No qualifications (%)",         g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "claimant_count",                   l: "Claimant count",                g: "lsoa" },
@@ -5831,6 +5904,8 @@ const CATS = [
     { k: "census_owned_pct",                 l: "Owner occupied (%)",            g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_social_rented_pct",         l: "Social rented (%)",             g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_private_rented_pct",        l: "Private rented (%)",            g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
+    { k: "census_overcrowded_pct",           l: "Overcrowded homes (%)",         g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
+    { k: "census_underoccupied_pct",         l: "Under-occupied homes (%)",      g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_no_car_pct",                l: "No car/van (%)",                g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_active_travel_pct",         l: "Walk/cycle to work (%)",        g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_public_transport_pct",      l: "Public transport to work (%)",  g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
@@ -5917,6 +5992,15 @@ const AGE_CHILD_CAP = CENSUS_AGE_OK ? 'Under 16' : 'Under 15';
    The picker, the profile, Compare, the Data export and Ask all skip these. */
 const FT_WITHHELD = new Set((typeof PH_IND_STATS === 'object' && PH_IND_STATS && PH_IND_STATS.ft_age_checked)
   ? (PH_IND_STATS.ft_age_mismatch || []) : ['ft_smoking_prevalence_adults']);
+/* The Census routine and semi-routine figure is withheld the same way until
+   a refresh rebuilds it. Files built before the fix counted NS-SEC L7
+   (intermediate) and L8 and L9 (small employers) with L12 and L13, about
+   twice the true share, and the counts cannot be split again here.
+   indicators.js says census_routine_classes "L12-L13" once every Census
+   level has been rebuilt; Ask reads the same flag. */
+const CENSUS_ROUTINE_OK = !!(typeof PH_IND_STATS === 'object' && PH_IND_STATS &&
+  PH_IND_STATS.census_routine_classes === 'L12-L13');
+if (!CENSUS_ROUTINE_OK) FT_WITHHELD.add('census_routine_semi_routine_pct');
 function phWithheld(k) { return FT_WITHHELD.has(k); }
 const IND_NAMES = {
   // At a glance
@@ -5931,6 +6015,7 @@ const IND_NAMES = {
   census_disability_any_pct:       ['Disabled residents (all)', 'Disabled under the Equality Act'],
   census_disability_lot_pct:       ['Disabled residents (limited a lot)', 'Disabled under the Equality Act: day-to-day activities limited a lot'],
   census_provides_unpaid_care_pct: ['Unpaid carers', 'Provision of unpaid care: provides any unpaid care'],
+  census_unpaid_care_50h_pct:      ['Unpaid care, 50 or more hours a week', 'Provision of unpaid care: provides 50 or more hours unpaid care a week'],
   // Health, OHID Local Health (published for MSOAs)
   ft_93280:  ['Fuel poverty (OHID, 2023)', 'Fuel poverty (low income, low energy efficiency methodology)'],
   ft_93097:  ['Out-of-work benefit claimants', 'Unemployment: people claiming out of work benefit (aged 16 to 64)'],
@@ -6011,12 +6096,26 @@ const IND_NAMES = {
   census_black_pct:           ['Black or Black British', 'Ethnic group: Black, Black British, Black Welsh, Caribbean or African'],
   census_mixed_pct:           ['Mixed or multiple ethnic groups', 'Ethnic group: Mixed or Multiple ethnic groups'],
   census_other_ethnic_pct:    ['Other ethnic group', 'Ethnic group: Other ethnic group'],
+  census_eth_bangladeshi_pct:     ['Bangladeshi', 'Ethnic group: Asian, Asian British or Asian Welsh: Bangladeshi'],
+  census_eth_pakistani_pct:       ['Pakistani', 'Ethnic group: Asian, Asian British or Asian Welsh: Pakistani'],
+  census_eth_black_african_pct:   ['Black African', 'Ethnic group: Black, Black British, Black Welsh, Caribbean or African: African'],
+  census_eth_black_caribbean_pct: ['Black Caribbean', 'Ethnic group: Black, Black British, Black Welsh, Caribbean or African: Caribbean'],
+  census_eth_gypsy_traveller_pct: ['Gypsy or Irish Traveller', 'Ethnic group: White: Gypsy or Irish Traveller'],
+  census_eth_roma_pct:            ['Roma', 'Ethnic group: White: Roma'],
   census_english_hh_all_pct:  ['All adults in the household have English as a main language', 'Household language: all adults in household have English as a main language'],
   census_english_hh_none_pct: ['No one in the household has English as a main language', 'Household language: no people in household have English as a main language'],
+  census_poor_english_pct:    ['Cannot speak English well or at all', 'Proficiency in English language: cannot speak English well or cannot speak English'],
+  census_one_person_hh_pct:   ['One-person households', 'Household composition: one-person household'],
+  census_pensioner_alone_pct: ['Living alone, aged 66 and over', 'Household composition: one-person household, aged 66 years and over'],
+  census_lone_parent_dep_pct: ['Lone parents with dependent children', 'Household composition: lone parent family with dependent children'],
   // Work, money and education
   census_unemployed_pct:           ['Unemployment (Census 2021)', 'Economic activity status: unemployed'],
   census_higher_managerial_pct:    ['Higher managerial and professional', 'Socio-economic classification: higher managerial, administrative and professional occupations'],
   census_routine_semi_routine_pct: ['Routine and semi-routine jobs', 'Socio-economic classification: semi-routine and routine occupations'],
+  census_never_worked_ltu_pct:     ['Never worked or long-term unemployed', 'Socio-economic classification: never worked and long-term unemployed'],
+  census_inactive_ltsick_pct:      ['Long-term sick or disabled, not working', 'Economic activity status: economically inactive, long-term sick or disabled'],
+  census_hh_deprived_2plus_pct:    ['Households deprived in two or more dimensions', 'Household deprivation: deprived in two, three or four dimensions'],
+  census_hh_deprived_any_pct:      ['Households deprived in at least one dimension', 'Household deprivation: deprived in one or more dimensions'],
   census_level4_qual_pct:          ['Degree-level qualifications', 'Highest level of qualification: Level 4 qualifications and above'],
   census_no_qual_pct:              ['No qualifications', 'Highest level of qualification: no qualifications'],
   claimant_count:                  ['Claimant count', 'Claimant count'],
@@ -6025,6 +6124,8 @@ const IND_NAMES = {
   census_owned_pct:            ['Home ownership', 'Tenure of household: owned'],
   census_social_rented_pct:    ['Social renting', 'Tenure of household: social rented'],
   census_private_rented_pct:   ['Private renting', 'Tenure of household: private rented'],
+  census_overcrowded_pct:      ['Overcrowded homes', 'Occupancy rating for bedrooms: -1 or less'],
+  census_underoccupied_pct:    ['Under-occupied homes', 'Occupancy rating for bedrooms: +2 or more'],
   census_no_car_pct:           ['No car or van', 'Car or van availability: no cars or vans in household'],
   census_active_travel_pct:    ['Walk or cycle to work', 'Method of travel to workplace: on foot or by bicycle'],
   census_public_transport_pct: ['Public transport to work', 'Method of travel to workplace: bus, train, underground, metro, light rail or tram'],
@@ -6430,6 +6531,11 @@ const OV_META = {
   census_disability_any_pct:      { src: "Census 2021 (TS038)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of residents who are disabled under the Equality Act, because a long-term health problem or disability limits their day-to-day activities a little or a lot." },
   census_disability_lot_pct:      { src: "Census 2021 (TS038)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of residents whose day-to-day activities are limited a lot by a long-term health problem or disability, the more severe of the two groups the Equality Act counts as disabled." },
   census_provides_unpaid_care_pct:{ src: "Census 2021 (TS039)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of residents aged 5 and over who give unpaid care to someone because of a long-term illness, a disability or old age." },
+  census_unpaid_care_50h_pct:     { src: "Census 2021 (TS039)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of residents aged 5 and over who give 50 or more hours of unpaid care a week to someone because of a long-term illness, a disability or old age. These carers are part of the unpaid carers figure. The rate is not adjusted for age, so places with more older residents tend to have more." },
+  census_inactive_ltsick_pct:     { src: "Census 2021 (TS066)",  yr: "2021", g: "Output area", u: "%",       desc: "Residents aged 16 and over who were neither working nor looking for work because of long-term sickness or disability, as a share of all residents of that age. People over State Pension age who are ill mostly describe themselves as retired, so this is mainly about people of working age, but because the base is everyone aged 16 and over it reads lower than a working-age rate. It describes work, not health, so it differs from the disability figures." },
+  census_never_worked_ltu_pct:    { src: "Census 2021 (TS062)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of residents aged 16 and over who have never had a paid job or have been out of work for a long time, one group of the socio-economic classification ONS publishes. People who have never worked include many who stayed at home to care for a family, so the figure is higher in some communities and among older women for reasons that have little to do with jobs. The base is everyone aged 16 and over, students included." },
+  census_hh_deprived_2plus_pct:   { src: "Census 2021 (TS011)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of households deprived in two or more of the four dimensions ONS measures from Census answers. A household counts in education when no one has qualifications at level 2, such as five good GCSEs, and no one aged 16 to 18 is a full-time student; in employment when someone is unemployed or long-term sick; in health when someone is in bad health or disabled; and in housing when the home is overcrowded, shared or has no central heating. ONS calls these simple measures from the Census, not to be compared with the Index of Multiple Deprivation." },
+  census_hh_deprived_any_pct:     { src: "Census 2021 (TS011)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of households deprived in at least one of the four dimensions ONS measures from Census answers: education, employment, health and disability, and housing. About half of all households in England count, so this varies less between places than the share deprived in two or more. ONS calls these simple measures from the Census, not to be compared with the Index of Multiple Deprivation." },
   census_unemployed_pct:          { src: "Census 2021 (TS066)",  yr: "2021", g: "Output area", u: "%",       desc: "Residents aged 16 and over who were out of work and looking for a job, as a share of all residents of that age. Because the base includes people who are retired, studying or not looking for work, it reads lower than the usual unemployment rate." },
   census_no_qual_pct:             { src: "Census 2021 (TS067)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of residents aged 16 and over who have no formal qualifications." },
   census_level4_qual_pct:         { src: "Census 2021 (TS067)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of residents aged 16 and over whose highest qualification is at Level 4 or above, such as a degree, a higher national diploma or a professional qualification." },
@@ -6437,6 +6543,8 @@ const OV_META = {
   census_social_rented_pct:       { src: "Census 2021 (TS054)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of households renting their home from a council or a housing association." },
   census_private_rented_pct:      { src: "Census 2021 (TS054)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of households renting their home privately, from a landlord, a letting agency or someone else." },
   census_owned_pct:               { src: "Census 2021 (TS054)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of households that own their home outright or with a mortgage or loan, not counting shared ownership." },
+  census_overcrowded_pct:         { src: "Census 2021 (TS052)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of households with at least one bedroom fewer than they need under the bedroom standard, which allows a bedroom for each couple, each other adult aged 21 or over, each pair of young people aged 10 to 20 of the same sex, and each pair of children under 10. It is a share of households, so it understates how many people are affected, because overcrowded households tend to be large." },
+  census_underoccupied_pct:       { src: "Census 2021 (TS052)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of households with at least two more bedrooms than they need under the bedroom standard, often older people whose children have left home. It describes how homes are used rather than a hardship." },
   census_non_white_pct:           { src: "Census 2021 (TS021)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of residents who identified with any ethnic group other than White." },
   census_born_outside_uk_pct:     { src: "Census 2021 (TS004)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of residents who were born outside the UK." },
   census_white_pct:               { src: "Census 2021 (TS021)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of residents who identified with any White ethnic group, including White British, White Irish and other White groups." },
@@ -6444,15 +6552,25 @@ const OV_META = {
   census_black_pct:               { src: "Census 2021 (TS021)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of residents who identified as Black, Black British, Black Welsh, Caribbean or African." },
   census_mixed_pct:               { src: "Census 2021 (TS021)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of residents who identified with a mixed or multiple ethnic group." },
   census_other_ethnic_pct:        { src: "Census 2021 (TS021)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of residents who identified with another ethnic group, such as Arab." },
+  census_eth_bangladeshi_pct:     { src: "Census 2021 (TS021)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of residents who identified as Bangladeshi, one of the Asian, Asian British or Asian Welsh groups." },
+  census_eth_pakistani_pct:       { src: "Census 2021 (TS021)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of residents who identified as Pakistani, one of the Asian, Asian British or Asian Welsh groups." },
+  census_eth_black_african_pct:   { src: "Census 2021 (TS021)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of residents who identified as African, one of the Black, Black British, Black Welsh, Caribbean or African groups. People of mixed White and Black African heritage are counted in the mixed groups instead." },
+  census_eth_black_caribbean_pct: { src: "Census 2021 (TS021)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of residents who identified as Caribbean, one of the Black, Black British, Black Welsh, Caribbean or African groups. People of mixed White and Black Caribbean heritage are counted in the mixed groups instead." },
+  census_eth_gypsy_traveller_pct: { src: "Census 2021 (TS021)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of residents who identified as Gypsy or Irish Traveller, one of the White groups. The numbers are small and these communities are thought to be undercounted, and ONS adds a little noise to small counts to protect privacy, so output area and LSOA figures can mislead. Ward and LA figures are steadier." },
+  census_eth_roma_pct:            { src: "Census 2021 (TS021)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of residents who identified as Roma, one of the White groups, which the Census offered for the first time in 2021. The numbers are small, and ONS adds a little noise to small counts to protect privacy, so output area and LSOA figures can mislead. Ward and LA figures are steadier." },
+  census_one_person_hh_pct:       { src: "Census 2021 (TS003)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of households with one person living alone, at any age." },
+  census_pensioner_alone_pct:     { src: "Census 2021 (TS003)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of households that are one person aged 66 or over living alone. The Census uses 66, the State Pension age in 2021. It is a share of households rather than of older people, and people in care homes are not counted, because the Census counts them in communal establishments." },
+  census_lone_parent_dep_pct:     { src: "Census 2021 (TS003)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of households that are a lone parent living with at least one dependent child, meaning a child under 16 or aged 16 to 18 in full-time education. A lone parent who lives with their own parents is counted among other households, so the true share is a little higher." },
   census_under16_pct:             { src: CENSUS_AGE_OK ? "Census 2021 (TS007)" : "Census 2021 (TS007A)", yr: "2021", g: "Output area", u: "%",       desc: "The share of residents aged " + AGE_CHILD + "." + (CENSUS_AGE_OK ? "" : " The Census tables this version of the map uses group ages in fives, so the youngest bands stop at 14.") },
   census_under5_pct:              { src: "Census 2021 (TS007A)", yr: "2021", g: "Output area", u: "%",       desc: "The share of residents aged under 5." },
   census_working_age_pct:         { src: CENSUS_AGE_OK ? "Census 2021 (TS007)" : "Census 2021 (TS007A)", yr: "2021", g: "Output area", u: "%",       desc: CENSUS_AGE_OK ? "The share of residents aged 16 to 64, the ages usually counted as working age." : "The share of residents aged 15 to 64. Working age is usually counted from 16, but the Census tables this version of the map uses group ages in fives, so this band starts at 15." },
   census_over65_pct:              { src: "Census 2021 (TS007A)", yr: "2021", g: "Output area", u: "%",       desc: "The share of residents aged 65 and over." },
   census_over85_pct:              { src: "Census 2021 (TS007A)", yr: "2021", g: "Output area", u: "%",       desc: "The share of residents aged 85 and over." },
   census_higher_managerial_pct:   { src: "Census 2021 (TS062)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of residents aged 16 and over in higher managerial, administrative and professional jobs, using the socio-economic classification ONS publishes." },
-  census_routine_semi_routine_pct:{ src: "Census 2021 (TS062)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of residents aged 16 and over in semi-routine and routine jobs, such as care, retail, cleaning or driving, using the socio-economic classification ONS publishes." },
+  census_routine_semi_routine_pct:{ src: "Census 2021 (TS062)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of residents aged 16 and over in semi-routine and routine jobs, such as care, retail, cleaning or driving, using the socio-economic classification ONS publishes. Intermediate jobs and small employers are not counted. The base is everyone aged 16 and over, including students and people who have never worked." },
   census_english_hh_all_pct:      { src: "Census 2021 (TS025)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of households where every adult has English as a main language. It records the language people name as their main one rather than how well they speak English, so a household fluent in English can still fall outside it." },
   census_english_hh_none_pct:     { src: "Census 2021 (TS025)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of households where nobody has English as a main language. It records the language people name as their main one rather than how well they speak English, and adults in these households may still speak English well." },
+  census_poor_english_pct:        { src: "Census 2021 (TS029)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of residents aged 3 and over whose main language is not English and who cannot speak English well or at all, as they or someone in their household answered. Unlike the household language figures it is about each person's spoken English, so it is the closer guide to where interpreting is needed. People who have arrived since March 2021 are not counted." },
   census_active_travel_pct:       { src: "Census 2021 (TS061)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of working residents who usually travel to work on foot or by bicycle." },
   census_public_transport_pct:    { src: "Census 2021 (TS061)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of working residents who usually travel to work by bus, train, underground, metro, light rail or tram." },
   census_car_to_work_pct:         { src: "Census 2021 (TS061)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of working residents who usually travel to work by car or van." },
@@ -6538,7 +6656,7 @@ const OV_META = {
 
 
   ft_93280                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2023", g: "MSOA", u: "%", desc: "The share of households in fuel poverty, which means they have a low income and live in a home that is costly to heat, so a lower figure is better." },
-  ft_93097                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2024/25", g: "MSOA", u: "%", desc: "People aged 16 to 64 claiming out-of-work benefits, as a share of all residents of that age, so a lower figure is better." },
+  ft_93097                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2024/25", g: "MSOA", u: "%", desc: "People aged 16 to 64 claiming out-of-work benefits, as a share of all residents of that age, so a lower figure is better. It comes from the same claimant count as the claimant rate, but OHID takes a whole financial year and publishes it for MSOAs, while the claimant rate is the latest month for each LSOA, so the claimant rate is the more recent of the two." },
   ft_93098                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2024/25", g: "MSOA", u: "per 1,000", desc: "People aged 16 to 64 who have claimed Jobseeker’s Allowance for more than 12 months, per 1,000 residents of that age, so a lower figure is better. Universal Credit claimants are not counted, because how long they have claimed is not published, so these figures are very low." },
   ft_93105                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2022/23 - 24/25", g: "MSOA", u: "%", desc: "The share of Reception children, aged 4 to 5, measured as living with obesity, including severe obesity, with three school years combined so that the figures are steadier. A lower figure is better." },
   ft_93106                      : { src: "OHID Fingertips (Local Health, MSOA → ward via LSOA bridge)", yr: "2022/23 - 24/25", g: "MSOA", u: "%", desc: "The share of Reception children, aged 4 to 5, measured as overweight or living with obesity, with three school years combined so that the figures are steadier. A lower figure is better." },
@@ -6666,7 +6784,9 @@ const OV_META = {
    itself rather than reads (the per-category crime counts, the crime rate and
    the ward IMD score), which indicators.js never lists, for London either.
    London is untouched: this returns at once. Runs here, with the custom
-   indicators, because the picker builds its model from the <select> once. */
+   indicators, because the picker builds its model from the <select> once.
+   The general rule below (NO EMPTY INDICATORS) then checks every build,
+   London too, against the figures that load, including those exceptions. */
 (function _regionIndicatorFilter() {
   if (PH_IS_LONDON) return;
   var G = (typeof PH_IND_STATS === 'object' && PH_IND_STATS && PH_IND_STATS.stats)
@@ -6699,12 +6819,16 @@ const OV_META = {
       PH_AREA + ' build left out: ' + dropped.join(', '));
   }
 })();
-/* The withheld LA series (FT_WITHHELD) come out of the themes and the
-   hidden select, in every region, so nothing that lists indicators from
-   either offers them. */
+/* The withheld series (FT_WITHHELD: LA series at the wrong age, and the
+   Census routine figure until it is rebuilt) come out of the themes and
+   the hidden select, in every region, so nothing that lists indicators
+   from either offers them. Their rows are kept in PH_HELD_FIELDS, so a test
+   can check the card each will have once it is offered again. */
+var PH_HELD_FIELDS = {};
 (function _withheldIndicatorFilter() {
   if (!FT_WITHHELD.size) return;
   CATS.forEach(function (c) {
+    c.fields.forEach(function (f) { if (phWithheld(f.k)) PH_HELD_FIELDS[f.k] = { cat: c.key, field: f }; });
     c.fields = c.fields.filter(function (f) { return !phWithheld(f.k); });
   });
   var sel = document.getElementById('ov');
@@ -6714,6 +6838,101 @@ const OV_META = {
     });
   }
 })();
+/* ═══════════════════════════════════════════════════════════════════════════
+   NO EMPTY INDICATORS
+
+   An indicator with no figures in the build that is loaded is not offered
+   anywhere. A new indicator reaches the registry before the pipeline has
+   run for it, and until then choosing it would draw a grey map. Taking it
+   out of CATS and the hidden select takes it out of the picker (told by the
+   ph-indicators-pruned event), the second indicator's list and Ask, which
+   lists CATS. Query, Compare and the Data export already build their lists
+   from the figures themselves.
+
+   indicators.js settles most keys. The pipeline measures it from the very
+   payloads this page loads (ward, LSOA, MSOA and LA), so a key it lists has
+   figures. A key it does not list may still have them, because the page
+   works some out for itself from the ward file: the crime categories, total
+   and rate from crime_by_category, and the ward IMD score, which is
+   imd_score under another key (OV_FIELD_ALIAS). So nothing goes on the
+   blob's word alone. Once the ward figures are in and those have been
+   worked out, a key the blob does not list stays if any loaded payload
+   holds a figure for it (the ward file, the LA, MSOA or LSOA files where
+   they have loaded, or the output area index), and goes only if none does.
+   An ft_ series could be in the ward file's second half, so a missing one
+   waits for that half.
+
+   Without indicators.js nothing is taken out, as before: the LSOA and MSOA
+   files load only when asked for, so a key missing from the ward file may
+   still have figures in them. Custom indicators bring their own figures.
+   This runs before the loading screen goes, so an empty indicator is never
+   on screen; PH_EMPTY_IND keeps what was taken out, for the smoke tests and
+   for anything that needs to ask (indHasFigures).
+   ═══════════════════════════════════════════════════════════════════════════ */
+const PH_EMPTY_IND = new Set();
+// Each one's registry row and theme, kept so a test can check the card it
+// will have once a build has figures for it.
+const PH_EMPTY_FIELDS = {};
+function indHasFigures(k) { return !PH_EMPTY_IND.has(k); }
+function _indStatsHas(k) {
+  const G = PH_IND_STATS.stats;
+  const st = G[resolveOvField(k)] || G[k];
+  return !!(st && st.lv && Object.keys(st.lv).some(l => st.lv[l] && st.lv[l].n > 0));
+}
+function _indLoadedHas(k) {
+  const f = resolveOvField(k);
+  const isNum = v => v !== null && v !== undefined && v !== '' && typeof v !== 'boolean' &&
+    typeof v !== 'object' && isFinite(Number(v));
+  const any = (recs, nested) => {
+    if (!recs || typeof recs !== 'object') return false;
+    for (const c in recs) {
+      const r = recs[c];
+      const ind = r && (nested ? r.indicators : (r.indicators || r));
+      if (ind && isNum(ind[f])) return true;
+    }
+    return false;
+  };
+  try {
+    return any(WARD_DATA_BY_CODE, true) || any(BOROUGH_DATA, false) || any(MSOA_DATA, false) ||
+      any(LSOA_DATA, false) || !!(OA_INDEX && Array.isArray(OA_INDEX.keys) && OA_INDEX.keys.indexOf(k) !== -1);
+  } catch (e) {
+    return true;            // a payload this cannot read yet proves nothing
+  }
+}
+function phPruneEmptyIndicators() {
+  if (!(typeof PH_IND_STATS === 'object' && PH_IND_STATS && PH_IND_STATS.stats)) return [];
+  const sel = document.getElementById('ov');
+  const keys = new Set();
+  CATS.forEach(c => (c.fields || []).forEach(f => { if (f && f.k) keys.add(f.k); }));
+  if (sel) Array.prototype.forEach.call(sel.querySelectorAll('option'), o => {
+    if (o.value && o.value !== 'none') keys.add(o.value);
+  });
+  const gone = [];
+  keys.forEach(k => {
+    if (PH_EMPTY_IND.has(k) || (OV_CFG[k] && OV_CFG[k]._custom)) return;
+    if (_indStatsHas(k) || _indLoadedHas(k)) return;
+    if (/^ft_/.test(k) && !_wardDetailDone) return;   // decided when the second half lands
+    PH_EMPTY_IND.add(k);
+    gone.push(k);
+  });
+  if (!gone.length) return gone;
+  CATS.forEach(c => {
+    (c.fields || []).forEach(f => { if (f && PH_EMPTY_IND.has(f.k)) PH_EMPTY_FIELDS[f.k] = { cat: c.key, field: f }; });
+    c.fields = (c.fields || []).filter(f => !(f && PH_EMPTY_IND.has(f.k)));
+  });
+  if (sel) {
+    Array.prototype.slice.call(sel.querySelectorAll('option')).forEach(o => {
+      if (PH_EMPTY_IND.has(o.value)) o.remove();
+    });
+    Array.prototype.slice.call(sel.querySelectorAll('optgroup')).forEach(g => {
+      if (!g.querySelector('option')) g.remove();
+    });
+    if (PH_EMPTY_IND.has(sel.value)) sel.value = 'none';
+  }
+  console.info('[indicators] ' + gone.length + ' with no figures in this build left out: ' + gone.join(', '));
+  document.dispatchEvent(new CustomEvent('ph-indicators-pruned', { detail: { keys: gone } }));
+  return gone;
+}
 /* One plain-English line per indicator: what the number measures, for the
    indicator picker and library. The fuller technical note stays in OV_META.desc
    and the info panel. */
@@ -6723,6 +6942,7 @@ const OV_PLAIN = {
   census_disability_any_pct: "People whose day-to-day activities are limited by a health problem or disability.",
   census_disability_lot_pct: "People whose day-to-day activities are limited a lot by a health problem or disability.",
   census_provides_unpaid_care_pct: "People who look after a relative, friend or neighbour without being paid.",
+  census_unpaid_care_50h_pct: "People who give 50 or more hours of unpaid care a week.",
   ft_a_e_attendance_under_5: "How often children under 5 go to A&E, per 1,000 children.",
   ft_cervical_screening_25_49: "Women aged 25 to 49 who are up to date with cervical screening.",
   ft_child_poverty_low_income: "Children under 16 living in families on a low income.",
@@ -6768,7 +6988,7 @@ const OV_PLAIN = {
   ft_93105: "Children aged 4 to 5 living with obesity.",
   ft_93106: "Children aged 4 to 5 who are overweight or living with obesity.",
   ft_93231: "Emergency admissions for stroke, compared with England, where 100 is England’s level for the same ages.",
-  ft_93097: "People aged 16 to 64 claiming out-of-work benefits.",
+  ft_93097: "People aged 16 to 64 claiming out-of-work benefits over a whole financial year. The claimant rate is the latest month.",
   ft_93114: "Hospital admissions of children under 5 for injuries, per 10,000.",
   ft_93219: "Hospital admissions of children under 15 for injuries, per 10,000.",
   ft_93224: "Hospital admissions of 15 to 24 year olds for injuries, per 10,000.",
@@ -6794,6 +7014,12 @@ const OV_PLAIN = {
   census_black_pct: "People from a Black or Black British ethnic group.",
   census_mixed_pct: "People from a Mixed or Multiple ethnic group.",
   census_other_ethnic_pct: "People from another ethnic group, such as Arab.",
+  census_eth_bangladeshi_pct: "People who identified as Bangladeshi.",
+  census_eth_pakistani_pct: "People who identified as Pakistani.",
+  census_eth_black_african_pct: "People who identified as Black African.",
+  census_eth_black_caribbean_pct: "People who identified as Black Caribbean.",
+  census_eth_gypsy_traveller_pct: "People who identified as Gypsy or Irish Traveller. Small numbers, so best read by ward.",
+  census_eth_roma_pct: "People who identified as Roma. Small numbers, so best read by ward.",
   census_under16_pct: "Residents aged " + AGE_CHILD + ".",
   census_under5_pct: "Residents aged under 5.",
   census_working_age_pct: "Residents aged " + AGE_WORK + ".",
@@ -6801,7 +7027,15 @@ const OV_PLAIN = {
   census_over85_pct: "Residents aged 85 and over.",
   census_english_hh_all_pct: "Households where every adult has English as a main language.",
   census_english_hh_none_pct: "Households where no one has English as a main language. They may still speak English well.",
+  census_poor_english_pct: "People who cannot speak English well or at all.",
+  census_one_person_hh_pct: "Households of one person living alone.",
+  census_pensioner_alone_pct: "Households of one person aged 66 or over living alone.",
+  census_lone_parent_dep_pct: "Households of a lone parent with dependent children.",
   census_unemployed_pct: "People aged 16 and over who are looking for work.",
+  census_inactive_ltsick_pct: "People aged 16 and over not working because of long-term sickness or disability.",
+  census_never_worked_ltu_pct: "People aged 16 and over who have never had a paid job or have been out of work a long time.",
+  census_hh_deprived_2plus_pct: "Households the Census counts as deprived in two or more of education, employment, health and housing.",
+  census_hh_deprived_any_pct: "Households the Census counts as deprived in at least one of education, employment, health and housing.",
   census_no_qual_pct: "People aged 16 and over with no qualifications.",
   census_level4_qual_pct: "People aged 16 and over with a degree or equivalent.",
   census_higher_managerial_pct: "People in senior managerial and professional jobs.",
@@ -6810,6 +7044,8 @@ const OV_PLAIN = {
   census_no_car_pct: "Households without a car or van.",
   census_social_rented_pct: "Households renting from the council or a housing association.",
   census_private_rented_pct: "Households renting from a private landlord.",
+  census_overcrowded_pct: "Households with fewer bedrooms than they need.",
+  census_underoccupied_pct: "Households with at least two more bedrooms than they need.",
   census_owned_pct: "Households that own their home, outright or with a mortgage.",
   census_active_travel_pct: "Working people who walk or cycle to work.",
   census_public_transport_pct: "Working people who take a bus, train or tube to work.",
@@ -7447,7 +7683,28 @@ const CENSUS_BASE = {
   // All residents of that age, not only those in work or looking for it.
   TS066: ['Residents who were unemployed', 'All usual residents aged 16 and over, whether or not they were working or looking for work'],
   TS067: ['Residents with that highest qualification', 'Usual residents aged 16 and over'],
+  TS003: ['Households of that kind', 'All households'],
+  TS011: ['Households deprived in that many dimensions', 'All households'],
+  TS029: ['Residents who cannot speak English well or at all', 'Usual residents aged 3 and over'],
+  TS052: ['Households with that many bedrooms against the bedroom standard', 'All households'],
 };
+// Where one table gives two quite different figures, the figure's own words.
+const CENSUS_BASE_KEY = {
+  census_unpaid_care_50h_pct: ['Residents providing 50 or more hours of unpaid care a week', 'Usual residents aged 5 and over'],
+  census_never_worked_ltu_pct: ['Residents who have never worked or are long-term unemployed', 'Usual residents aged 16 and over'],
+  census_inactive_ltsick_pct: ['Residents not working or looking for work because they are long-term sick or disabled',
+    'All usual residents aged 16 and over, whether or not they were working or looking for work'],
+};
+/* A Census figure ONS does not publish for output areas (it publishes less
+   detail there, as it may for spoken English) has its wards and LAs made
+   from the counts of their LSOAs instead (_census_ward_inputs in the
+   pipeline). That is so when the output area index is in and lists no such
+   key while the build has figures for it; the cards then say LSOAs. */
+function censusWardsFromLsoas(k) {
+  return /^census_.+_pct$/.test(k) && !!(OA_INDEX && Array.isArray(OA_INDEX.keys) && OA_INDEX.keys.length) &&
+    OA_INDEX.keys.indexOf(k) === -1 &&
+    !!(typeof PH_IND_STATS === 'object' && PH_IND_STATS && PH_IND_STATS.stats && PH_IND_STATS.stats[k]);
+}
 // What the Local Health rates and shares count, and out of whom. The ratios
 // and life expectancies share one rule each, in indicatorFacts.
 const FT_COUNTED = {
@@ -7530,7 +7787,7 @@ function indicatorFacts(k) {
   }
   const ts = (src.match(/\((TS\d+A?)\)/) || [])[1];
   if (ts && CENSUS_BASE[ts]) {
-    [f.num, f.den] = CENSUS_BASE[ts];
+    [f.num, f.den] = CENSUS_BASE_KEY[k] || CENSUS_BASE[ts];
     f.cadence = 'ONS runs a census every ten years, so these figures describe Census day, 21 March 2021, and the next census is due in 2031.';
     // Each output area is placed in the ward it best fits. A ward file built
     // from counts (censusWardCounts) sums those output areas' numerators over
@@ -7539,8 +7796,15 @@ function indicatorFacts(k) {
     // (censusLaCounts), and otherwise its wards averaged by population.
     // Residents are summed either way.
     const wc = censusWardCounts(), lc = censusLaCounts();
+    const fromLsoas = wc && censusWardsFromLsoas(k);
     f.method = k === 'census_population'
       ? 'For wards we sum the residents of the output areas that best fit each ward under the ONS lookup, so the totals can differ a little from the ward tables ONS publishes.'
+      : fromLsoas
+      ? 'Each figure is the count divided by its base, as a percentage. ONS does not publish this figure for output areas, so ' +
+        'a ward figure is calculated from the counts of the LSOAs that best fit the ward under the ONS lookup' +
+        (lc ? ', and an LA figure is calculated from the counts of the LSOAs in its wards'
+            : ', and an LA figure is an average of its ward figures, weighted by population') +
+        ', so the figures can differ a little from the tables ONS publishes for wards and LAs.'
       : 'Each figure is the count divided by its base, as a percentage. ' +
         (wc ? 'A ward figure is calculated from the counts of the output areas that best fit the ward under the ONS lookup'
             : 'A ward figure is an average of the output areas that best fit the ward under the ONS lookup, weighted by their residents') +
@@ -7631,7 +7895,9 @@ function indicatorFacts(k) {
 function _publishedBy(k) {
   const m = (typeof OV_META === 'object' && OV_META[k]) || {};
   const src = String(m.src || '');
-  if (/\(TS\d+A?\)/.test(src)) return 'ONS publishes these figures for output areas, LSOAs and MSOAs.';
+  if (/\(TS\d+A?\)/.test(src)) return (censusWardCounts() && censusWardsFromLsoas(k))
+    ? 'ONS publishes these figures for LSOAs and MSOAs.'
+    : 'ONS publishes these figures for output areas, LSOAs and MSOAs.';
   if (/^ft_\d+$/.test(k)) return 'OHID publishes these figures for MSOAs.';
   if (/^ft_/.test(k)) return 'OHID publishes these figures only for each LA as a whole.';
   if (/police/i.test(src)) return 'We count the crimes in each ward from the locations the police publish.';
@@ -7657,7 +7923,14 @@ function _publishedAt(k, nat, lv) {
   // before it: wards from MSOAs, then LAs from wards.
   lv.slice().sort((a, b) => LADDER.indexOf(b) - LADDER.indexOf(a)).forEach(l => {
     if (l === nat) return;
-    if (l === 'borough') {
+    const fromLsoas = nat === 'oa' && censusWardCounts() && censusWardsFromLsoas(k);
+    if (l === 'borough' && fromLsoas && censusLaCounts()) {
+      out.push('LA figures are calculated in the same way, from the LSOAs in each LA.');
+    } else if (l === 'ward' && fromLsoas) {
+      out.push('Ward figures are calculated from the counts of the LSOAs in each ward.');
+    } else if (l === 'oa' && fromLsoas) {
+      // Not offered: there are no output area figures.
+    } else if (l === 'borough') {
       out.push(laSums(k) ? 'LA figures are the sum of the ward figures.'
         : nat === 'oa' && censusLaCounts()
         ? (censusWardCounts() ? 'LA figures are calculated in the same way, from the output areas in each LA.'
@@ -7850,8 +8123,10 @@ function indicatorCardHTML(k) {
   // The rows shown first are read first, then the technical details.
   const say = _spellOnce();
   const desc = say(m.desc);
+  // A Census figure with no output area figures is published from LSOAs up.
+  const lsoaUp = nat === 'oa' && censusWardCounts() && censusWardsFromLsoas(k);
   const age = ovAgeNote(k), caution = say([ovCaution(k), laNotesCaution(k),
-    nat === 'oa' && k !== 'census_population' ? OA_CAVEAT_CARD : ''].filter(Boolean).join(' '));
+    nat === 'oa' && !lsoaUp && k !== 'census_population' ? OA_CAVEAT_CARD : ''].filter(Boolean).join(' '));
   const how = say(_cardHowToRead(k));
   const source = say(_cardSource(k));
   const num = say(f.num), den = say(f.den);
@@ -7880,7 +8155,7 @@ function indicatorCardHTML(k) {
     '<dl class="ic">' +
     row('Counted', e(num)) +
     row('Out of', e(den)) +
-    row('Published at', nat ? '<span class="ov-lv-nat">' + e(nm(nat)) + '</span>' +
+    row('Published at', nat ? '<span class="ov-lv-nat">' + e(nm(lsoaUp ? 'lsoa' : nat)) + '</span>' +
       (pub.length ? ' <span class="ic-sub">' + e(pub.join(' ')) + '</span>' : '') : '') +
     row('Compared with England', e(vsEng)) +
     row('Unit', e(_cardUnit(k))) +
@@ -10478,6 +10753,9 @@ function ensureWardDetail() {
       }
       _wardDetailDone = true;
       _wardDetailLoading = null;
+      // An ft_ series indicators.js does not list was left for this half to
+      // settle (see NO EMPTY INDICATORS).
+      phPruneEmptyIndicators();
 
       /* Everything derived from the indicator set was derived from half of it.
          The cached key list, the per-indicator ranges and the distribution
@@ -10739,7 +11017,8 @@ function monthWords(s) {
    Local Health benefit measures sit under Work with the other unemployment
    figures, fertility under People, and Local Health's fuel poverty beside the
    newer DESNZ figure under Environment. */
-const PROFILE_MOVE = { ft_93097: 'economy', ft_93098: 'economy', ft_93089: 'people', ft_93280: 'environment' };
+const PROFILE_MOVE = { ft_93097: 'economy', ft_93098: 'economy', ft_93089: 'people', ft_93280: 'environment',
+  census_hh_deprived_2plus_pct: 'imd2025', census_hh_deprived_any_pct: 'imd2025' };
 /* Built per LSOA and added up to wards by the pipeline, but not drawn by
    ward on the map. The ward figure is real, so the profile shows it. */
 const PROFILE_FROM_LSOA = new Set(['claimant_count', 'claimant_rate_pct']);
@@ -12108,7 +12387,8 @@ function _generateWardReport(_reportWindow, wn, opts) {
     // Direction and descriptive come from OV_CFG, the one place they are
     // set, so a report bar cannot disagree with the map and the rankings.
     // A row without an entry keeps its own.
-    const data = (rows || []).map(r => {
+    // A figure withheld until a refresh (phWithheld) is not drawn here either.
+    const data = (rows || []).filter(r => !(r.k && phWithheld(r.k))).map(r => {
       const cfg = (r.k && typeof OV_CFG === 'object' && OV_CFG[r.k]) || null;
       return {...r, wh: cfg ? !!cfg.wh : r.wh, descriptive: cfg ? !!cfg.descriptive : r.descriptive,
               v: r.v == null ? null : parseFloat(r.v), ref: r.ref == null ? null : parseFloat(r.ref)};
@@ -13864,7 +14144,9 @@ function _fitFocus(bounds) {
   // its figures are rather than finding nothing.
   const councilOnly = [];
   const MOVE = { ft_93097: 'Work, money and education', ft_93098: 'Work, money and education',
-                 ft_93089: 'People and communities' };
+                 ft_93089: 'People and communities',
+                 // Census household deprivation sits with the IoD, after it.
+                 census_hh_deprived_2plus_pct: 'Deprivation', census_hh_deprived_any_pct: 'Deprivation' };
   /* Transport is its own theme: car ownership and travel to work from
      Housing, and the station and bus stop measures from Environment. What is
      left of Housing & transport is tenure, so it is called Housing. */
@@ -13935,9 +14217,9 @@ function _fitFocus(bounds) {
     'Life expectancy and deaths': ['#6B2C91', 'How long people live and what they die of, compared with England.'],
     'Hospital admissions':      ['#C2185B', 'Emergency and injury admissions to hospital, compared with England.'],
     'Deprivation':              ['#003087', 'The Index of Multiple Deprivation 2025 and its domains. Decile 1 is the most deprived tenth of areas in England.'],
-    'People and communities':   ['#7C2855', 'Age, ethnicity, country of birth and language, from Census 2021.'],
+    'People and communities':   ['#7C2855', 'Age, ethnicity, country of birth, language and who people live with, from Census 2021.'],
     'Work, money and education': ['#00703C', 'Jobs, benefits and qualifications.'],
-    'Housing':                  ['#8A6400', 'Who owns and who rents, from Census 2021.'],
+    'Housing':                  ['#8A6400', 'Who owns and who rents, and how crowded homes are, from Census 2021.'],
     'Transport':                ['#0072CE', 'Car ownership, how people get to work, and how far it is to a station or bus stop.'],
     'Environment and access':   ['#006F79', 'Air pollution, fuel poverty and access to green and blue space.'],
     'Crime and safety':         ['#B3261E', 'Street-level crime from police.uk over the last 12 months.'],
@@ -14128,6 +14410,12 @@ function _fitFocus(bounds) {
     burglaries: ['burglary'], knife: ['weapons'], knives: ['weapons'], guns: ['weapons'], drugs: ['drug'],
     antisocial: ['anti-social'], asb: ['anti-social'], vaccination: ['vaccination', 'mmr'], vaccines: ['vaccination', 'mmr'], jabs: ['vaccination', 'mmr'],
     exercise: ['physically active'], activity: ['physically active'], 'blood pressure': ['blood pressure'],
+    alone: ['living alone', 'one-person'], lonely: ['living alone'], loneliness: ['living alone'],
+    'single parent': ['lone parent'], 'single parents': ['lone parent'], families: ['lone parent'],
+    overcrowding: ['overcrowded'], crowded: ['overcrowded'], crowding: ['overcrowded'], bedrooms: ['overcrowded', 'under-occupied'],
+    travellers: ['traveller'], gypsies: ['gypsy'], interpreting: ['speak english'], interpreters: ['speak english'],
+    sick: ['long-term sick'], sickness: ['long-term sick'], 'out of work': ['long-term sick', 'out-of-work', 'claimant'],
+    workless: ['never worked', 'long-term sick', 'claimant'],
   };
   // Shared with the Data export search, so the same everyday words work there.
   window.PH_SEARCH_TERMS = q => searchTerms(q);
@@ -14291,6 +14579,24 @@ function _fitFocus(bounds) {
 
   // Anything else that changes the overlay re-syncs the picker.
   sel.addEventListener('change', () => setTimeout(() => { render(); if (libTheme) renderLib(); }, 0));
+  // An indicator the loaded build holds no figures for is dropped from the
+  // registry once the ward figures are in (NO EMPTY INDICATORS): forget it
+  // here too, with its theme if that empties, the count in the search box
+  // and the themes the Data export groups by.
+  document.addEventListener('ph-indicators-pruned', e => {
+    const gone = new Set((e.detail && e.detail.keys) || []);
+    if (!gone.size) return;
+    const keep = list => { for (let i = list.length - 1; i >= 0; i--) if (gone.has(list[i].value)) list.splice(i, 1); };
+    model.forEach(g => keep(g.opts));
+    for (let i = model.length - 1; i >= 0; i--) if (!model[i].opts.length) model.splice(i, 1);
+    keep(all); keep(councilOnly);
+    gone.forEach(k => { delete byVal[k]; });
+    for (let i = KEY.length - 1; i >= 0; i--) if (gone.has(KEY[i][0])) KEY.splice(i, 1);
+    window.PH_THEMES = model.map(g => ({ label: g.label, keys: g.opts.map(o => o.value) }));
+    searchEl.placeholder = 'Search ' + all.length + ' indicators';
+    if (libTheme && !model.some(g => g.label === libTheme)) libTheme = null;
+    render(); if (libTheme) renderLib();
+  });
   // Output areas load after the picker is built; refresh each indicator's levels.
   document.addEventListener('ph-levels-changed', () => {
     all.forEach(o => { o.levels = (typeof ovLevels === 'function') ? ovLevels(o.value) : o.levels; });
@@ -15542,7 +15848,8 @@ function _buildLSOAReportHtml(code) {
     // Direction and descriptive come from OV_CFG, the one place they are
     // set, so a report bar cannot disagree with the map and the rankings.
     // A row without an entry keeps its own.
-    const data = (rows || []).map(r => {
+    // A figure withheld until a refresh (phWithheld) is not drawn here either.
+    const data = (rows || []).filter(r => !(r.k && phWithheld(r.k))).map(r => {
       const cfg = (r.k && typeof OV_CFG === 'object' && OV_CFG[r.k]) || null;
       return {...r, wh: cfg ? !!cfg.wh : r.wh, descriptive: cfg ? !!cfg.descriptive : r.descriptive,
               v: r.v == null ? null : parseFloat(r.v), ref: r.ref == null ? null : parseFloat(r.ref)};
@@ -20220,6 +20527,10 @@ async function loadData() {
     injectCrimeCategories();
     scaleShareDomainsIn(WARD_DATA_BY_CODE);
     scaleShareDomainsIn(WARD_DATA);
+    // With the ward figures in and the page's own worked out, any indicator
+    // the build holds no figure for leaves every list before the loading
+    // screen goes (see NO EMPTY INDICATORS).
+    phPruneEmptyIndicators();
 
 
     // lsoa_data.json is no longer fetched here. At 7.8 MB it was the largest
@@ -20861,6 +21172,8 @@ var PH_SHOW = {
     census_level4_qual_pct: 'high-good',    claimant_rate_pct: 'high-bad',
     claimant_count: 'high-bad',             fuel_poverty_pct: 'high-bad',
     core20_lsoa_count: 'high-bad',
+    census_inactive_ltsick_pct: 'high-bad', census_overcrowded_pct: 'high-bad',
+    census_hh_deprived_2plus_pct: 'high-bad', census_hh_deprived_any_pct: 'high-bad',
     gb_commitment_pct: 'high-good',         green_commitment_pct: 'high-good',
     green_doorstep_pct: 'high-good',        green_local_pct: 'high-good',
     green_neighbourhood_pct: 'high-good',   blue_commitment_pct: 'high-good',
@@ -25354,11 +25667,11 @@ var PH_SHOW = {
     }
     if (/^(ptal_|rail_|bus_)|^census_(no_car|active_travel|public_transport|car_to_work)_/.test(k)) return 'Transport';
     if (/^(fuel_|gb_|green_|blue_|no2_|pm25_|pm10_)/.test(k)) return 'Environment and access';
-    if (/^census_(owned|social_rented|private_rented)_/.test(k)) return 'Housing';
-    if (/^(imd_|core20_|total_lsoa)|_score$/.test(k)) return 'Deprivation';
+    if (/^census_(owned|social_rented|private_rented|overcrowded|underoccupied)_/.test(k)) return 'Housing';
+    if (/^(imd_|core20_|total_lsoa|census_hh_deprived_)|_score$/.test(k)) return 'Deprivation';
     if (/^crime/.test(k)) return 'Crime and safety';
-    if (/^claimant|^census_(unemployed|higher_managerial|routine|level4|no_qual)/.test(k)) return 'Work, money and education';
-    if (/^census_(good_health|bad_health|disability|provides_unpaid)/.test(k)) return 'Health';
+    if (/^claimant|^census_(unemployed|higher_managerial|routine|level4|no_qual|never_worked|inactive_ltsick)/.test(k)) return 'Work, money and education';
+    if (/^census_(good_health|bad_health|disability|provides_unpaid|unpaid_care)/.test(k)) return 'Health';
     if (/^census_/.test(k)) return 'People and communities';
     return 'Other';
   }
