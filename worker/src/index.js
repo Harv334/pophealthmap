@@ -323,8 +323,14 @@ const TOOLS = [
     description:
       "List the indicator keys available, with their human labels, grouped by the " +
       "levels each is available at. Call this first if you are unsure what an " +
-      "indicator is called or whether it exists at a level.",
-    input_schema: { type: "object", properties: {} },
+      "indicator is called or whether it exists at a level. Give search to list only " +
+      "the keys whose key or label holds every word of it.",
+    input_schema: {
+      type: "object",
+      properties: {
+        search: { type: "string", description: "Optional words to narrow the list, for example \"income\" or \"life expectancy\"." },
+      },
+    },
   },
 ];
 

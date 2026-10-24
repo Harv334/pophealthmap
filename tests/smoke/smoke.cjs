@@ -96,6 +96,58 @@ const overlaps = (a, b) => !!(a && b && a.l < b.r && a.r > b.l && a.t < b.b && a
 const setOv = (page, k) => page.evaluate(k => {
   const s = document.getElementById('ov'); s.value = k; s.dispatchEvent(new Event('change'));
 }, k);
+/* A build without some indicators' figures, made from this one: the page is
+   served indicators.js and the area files with those keys taken out (and,
+   for lsoaOnly, just their LSOA figures), so the checks of what a build
+   without them offers hold whatever the real data now holds. */
+async function stripFigures(page, keys, { lsoaOnly = [] } = {}) {
+  const gone = k => keys.indexOf(k) !== -1 || keys.some(x => k === x + '_lci' || k === x + '_uci' || k === x + '_vs');
+  const goneLsoa = k => gone(k) || lsoaOnly.indexOf(k) !== -1;
+  const read = f => JSON.parse(fs.readFileSync(path.join(ROOT, f), 'utf8'));
+  await page.route('**/data/map/indicators.js*', r => {
+    const t = fs.readFileSync(path.join(ROOT, 'data/map/indicators.js'), 'utf8');
+    const at = t.indexOf('var PH_IND_STATS = ');
+    const doc = JSON.parse(t.slice(at + 19, t.lastIndexOf(';')));
+    keys.forEach(k => { delete doc.stats[k]; });
+    lsoaOnly.forEach(k => { if (doc.stats[k] && doc.stats[k].lv) delete doc.stats[k].lv.lsoa; });
+    r.fulfill({ contentType: 'application/javascript', body: t.slice(0, at) + 'var PH_IND_STATS = ' + JSON.stringify(doc) + ';\n' });
+  });
+  for (const f of ['data/ward_core.json', 'data/ward_rest.json', 'ward_data.json']) {
+    if (!fs.existsSync(path.join(ROOT, f))) continue;
+    await page.route('**/' + f + '*', r => {
+      const doc = read(f);
+      Object.values(doc.wards || {}).forEach(w => { Object.keys(w.indicators || {}).forEach(k => { if (gone(k)) delete w.indicators[k]; }); });
+      r.fulfill({ contentType: 'application/json', body: JSON.stringify(doc) });
+    });
+  }
+  for (const [f, drop] of [['lsoa_data.json', goneLsoa], ['msoa_data.json', gone]]) {
+    await page.route('**/' + f + '*', r => {
+      const doc = read(f);
+      Object.values(doc).forEach(rec => { Object.keys(rec || {}).forEach(k => { if (drop(k)) delete rec[k]; }); });
+      r.fulfill({ contentType: 'application/json', body: JSON.stringify(doc) });
+    });
+  }
+  await page.route('**/borough_data.json*', r => {
+    const doc = read('borough_data.json');
+    Object.values(doc).forEach(rec => { const ind = (rec && rec.indicators) || rec || {}; Object.keys(ind).forEach(k => { if (gone(k)) delete ind[k]; }); });
+    r.fulfill({ contentType: 'application/json', body: JSON.stringify(doc) });
+  });
+}
+// The crime figures the pipeline also makes for LSOAs. Several checks below
+// use the crime rate as their indicator with ward figures only, as it was
+// when they were written; they run on a build without its LSOA figures.
+const CRIME_LSOA = ['crime_total', 'crime_rate_per_1000', 'crime_violence_12mo', 'crime_burglary_12mo',
+  'crime_robbery_12mo', 'crime_theft_12mo', 'crime_asb_12mo'];
+async function openWithout(browser, url, vp, keys, opts) {
+  const { isMobile, hasTouch, ...viewport } = vp;
+  const page = await browser.newPage({ viewport, isMobile: !!isMobile, hasTouch: !!hasTouch });
+  const errors = [];
+  page.on('pageerror', e => errors.push(e.message));
+  await stripFigures(page, keys, opts);
+  await page.goto(BASE + '/' + url);
+  await page.waitForTimeout(SETTLE);
+  return { page, errors };
+}
 /* No empty indicators (NO EMPTY INDICATORS in index.html). What every list
    offers against what the loaded build holds: a key has figures when
    indicators.js lists it (through its alias), when a loaded ward holds a
@@ -168,9 +220,9 @@ const smallText = page => page.evaluate(() => {
   const opts = process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {};
   const browser = await chromium.launch(opts);
 
-  // London, desktop
+  // London, desktop (crime by ward only, see CRIME_LSOA)
   {
-    const { page, errors } = await open(browser, 'index.html?t=1', DESK);
+    const { page, errors } = await openWithout(browser, 'index.html?t=1', DESK, [], { lsoaOnly: CRIME_LSOA });
     ok(await page.evaluate(() => { let n = 0; wLyr.eachLayer(() => n++); return n; }) > 600, 'London wards drawn');
     await checkAxe(page, 'London on open');
     // One icon set and fewer component styles (workplan 2.9).
@@ -976,9 +1028,10 @@ const smallText = page => page.evaluate(() => {
     await page.close();
   }
 
-  // Search, the header and getting around (workplan 2.11).
+  // Search, the header and getting around (workplan 2.11). Crime by ward
+  // only, see CRIME_LSOA.
   {
-    const { page, errors } = await open(browser, 'index.html?t=1', DESK);
+    const { page, errors } = await openWithout(browser, 'index.html?t=1', DESK, [], { lsoaOnly: CRIME_LSOA });
     const DASH = /[–—]/;
     // The header: Copy link in view, Presentation view and the palette
     // behind More, the panel button saying what it will do in step with
@@ -2688,7 +2741,9 @@ const smallText = page => page.evaluate(() => {
     await old.p.close();
 
     // A level the indicator has no figures at is not applied, so the key
-    // never describes colours that are not drawn.
+    // never describes colours that are not drawn (crime by ward only, see
+    // CRIME_LSOA).
+    await stripFigures(page, [], { lsoaOnly: CRIME_LSOA });
     await page.goto(BASE + '/index.html?ov=crime_rate_per_1000&lvl=lsoa&t=1');
     await page.waitForTimeout(SETTLE);
     const lv = await page.evaluate(() => ({ lvl: currentDataLevel, has: ovHasLevel('crime_rate_per_1000', 'lsoa'), land: _ovLandingLevel('crime_rate_per_1000') }));
@@ -3758,6 +3813,9 @@ const smallText = page => page.evaluate(() => {
     for (const [name, patch] of [['skipped', { naptan: 'skipped', custom: 'skipped' }], ['failed', { naptan: 'skipped', crime: 'failed' }]]) {
       const m = JSON.parse(JSON.stringify(real));
       m.last_run = '2026-10-17T21:56:04+00:00';
+      // Every source ok first, so a real failure on the day of a refresh does
+      // not count here; only the statuses this check sets do.
+      Object.keys(m.sources).forEach(k => { m.sources[k] = Object.assign({}, m.sources[k], { status: 'ok' }); });
       Object.keys(patch).forEach(k => { m.sources[k] = Object.assign({}, m.sources[k] || {}, { status: patch[k] }); });
       const page = await browser.newPage({ viewport: DESK });
       await page.route('**/data/meta/manifest.json', r => r.fulfill({ contentType: 'application/json', body: JSON.stringify(m) }));
@@ -3993,7 +4051,11 @@ const smallText = page => page.evaluate(() => {
         coverOk: covered.length > 0 && covered.every(w => Object.keys(w.cover).every(k => w.cover[k] >= 80 && w.cover[k] < 100 && w.indicators[k] != null)),
         ncg: byName('New Cross Gate').indicators ? byName('New Cross Gate').indicators.ft_932831 : 'missing',
         poplar: byName('Poplar').indicators ? byName('Poplar').indicators.ft_93259 : null,
-        rv: byName('Royal Victoria').indicators ? byName('Royal Victoria').indicators.ptal_score : 'missing',
+        // Royal Victoria was the example until the LSOA 2011 to 2021 lookup
+        // was mended (October 2026): its new LSOAs now take their 2011
+        // parents' PTAL, and 684 wards have a figure, up from 593. A City of
+        // London ward, whose LSOAs lie mostly in its neighbours, still has none.
+        rv: byName('Bassishaw').indicators ? byName('Bassishaw').indicators.ptal_score : 'missing',
         c20: byName('Hornsey').core20_pop_pct,
         cnt: !!(cnt && cnt.keys && cnt.keys.indexOf('census_social_rented_pct') !== -1 && Object.keys(cnt.rows).length > 4000),
       };
@@ -4139,6 +4201,8 @@ const smallText = page => page.evaluate(() => {
     await page.route('https://api.postcodes.io/**', r => r.fulfill({ status: 200, contentType: 'application/json',
       body: JSON.stringify({ status: 200, result: { postcode: 'M1 1AE', latitude: 53.4774, longitude: -2.2309,
         region: 'North West', admin_ward: 'Piccadilly', admin_district: 'Manchester', codes: {} } }) }));
+    // Crime by ward only, see CRIME_LSOA.
+    await stripFigures(page, [], { lsoaOnly: CRIME_LSOA });
     await page.goto(BASE + '/index.html?t=1');
     await page.waitForTimeout(SETTLE);
     ok(await page.evaluate(() => !document.querySelector('meta[property="og:url"]') && !!document.querySelector('link[rel="canonical"]')),
@@ -4843,10 +4907,12 @@ const smallText = page => page.evaluate(() => {
       return [...document.querySelectorAll('#ov-tv-list .ov-tv-sub')].map(e => e.textContent);
     });
 
-    // As shipped: no figures for them, so none is offered, and Deprivation
-    // looks as it did.
+    // A build without their figures: none is offered, and Deprivation looks
+    // as it did before them (so without the Census household deprivation
+    // measures either, which came in with them).
     {
-      const { page, errors } = await open(browser, 'index.html?t=1', DESK);
+      const { page, errors } = await openWithout(browser, 'index.html?t=1', DESK,
+        KEYS.concat(['census_hh_deprived_any_pct', 'census_hh_deprived_2plus_pct']));
       const r = await page.evaluate(keys => ({
         cats: CATS.flatMap(c => c.fields.map(f => f.k)).filter(k => keys.indexOf(k) !== -1),
         opts: [...document.querySelectorAll('#ov option')].map(o => o.value).filter(k => keys.indexOf(k) !== -1),
@@ -4897,9 +4963,13 @@ const smallText = page => page.evaluate(() => {
       }, KEYS);
       const subs = await subHeads(page);
       ok(r.opts === 24, 'IoD 2025 extras: with figures, all 24 are offered', String(r.opts));
-      ok(JSON.stringify(subs) === JSON.stringify(['The index and its domains', 'Children and older people', 'Sub-domains',
-        'Health measures behind the index', 'Education measures behind the index', 'Living environment measures behind the index']),
-        'IoD 2025 extras: Deprivation is six short lists, not one long one', JSON.stringify(subs));
+      // Household deprivation (Census 2021) has its own list when the build
+      // has its figures.
+      const hhDep = /"census_hh_deprived_any_pct"/.test(fs.readFileSync(path.join(ROOT, 'data/map/indicators.js'), 'utf8'));
+      ok(JSON.stringify(subs) === JSON.stringify(['The index and its domains'].concat(hhDep ? ['Household deprivation (Census 2021)'] : [],
+        ['Children and older people', 'Sub-domains', 'Health measures behind the index', 'Education measures behind the index',
+          'Living environment measures behind the index'])),
+        'IoD 2025 extras: Deprivation is short lists, not one long one', JSON.stringify(subs));
       ok(r.lv[0] === 'borough,ward,lsoa' && r.lv[1] === 'lsoa' && r.lv[2] === 'borough,ward,lsoa',
         'IoD 2025 extras: shown for LSOAs, wards and LAs, with deciles for LSOAs only', JSON.stringify(r.lv));
       ok(r.ask[0] && r.ask[0].levels === 'la,ward,lsoa' && r.ask[1] && r.ask[1].levels === 'lsoa' &&
@@ -4994,10 +5064,10 @@ const smallText = page => page.evaluate(() => {
       });
     };
 
-    // As shipped: no figures for them, so none is offered, and crime is
-    // drawn for wards only.
+    // A build without their figures: none is offered, and without LSOA crime
+    // figures crime is drawn for wards and LAs only.
     {
-      const { page, errors } = await open(browser, 'index.html?t=1', DESK);
+      const { page, errors } = await openWithout(browser, 'index.html?t=1', DESK, KEYS, { lsoaOnly: CRIME });
       const r = await page.evaluate(keys => ({
         cats: CATS.flatMap(c => c.fields.map(f => f.k)).filter(k => keys.indexOf(k) !== -1),
         opts: [...document.querySelectorAll('#ov option')].map(o => o.value).filter(k => keys.indexOf(k) !== -1),
@@ -5170,15 +5240,18 @@ const smallText = page => page.evaluate(() => {
       await page.route('**/borough_data.json*', r => {
         const doc = readJson('borough_data.json');
         Object.keys(doc).forEach((c, i) => {
-          ['saie_total_income', 'saie_net_bhc', 'saie_net_ahc', 'ft_93092'].forEach(k => { (doc[c].indicators || doc[c])[k] = fake(k, i + 5); });
+          const ind = doc[c].indicators || doc[c];
+          ['saie_total_income', 'saie_net_bhc', 'saie_net_ahc', 'ft_93092'].forEach(k => { ind[k] = fake(k, i + 5); });
+          // The real file may hold ONS's own LA life expectancy; this build has none.
+          ['hle_female', 'hle_male', 'dfle_female', 'dfle_male'].forEach(k => { delete ind[k]; });
         });
         r.fulfill({ contentType: 'application/json', body: JSON.stringify(doc) });
       });
     };
 
-    // As shipped: no figures for them, so none is offered anywhere.
+    // A build without their figures: none is offered anywhere.
     {
-      const { page, errors } = await open(browser, 'index.html?t=1', DESK);
+      const { page, errors } = await openWithout(browser, 'index.html?t=1', DESK, KEYS);
       const r = await page.evaluate(keys => ({
         cats: CATS.flatMap(c => c.fields.map(f => f.k)).filter(k => keys.indexOf(k) !== -1),
         opts: [...document.querySelectorAll('#ov option')].map(o => o.value).filter(k => keys.indexOf(k) !== -1),

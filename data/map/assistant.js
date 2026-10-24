@@ -569,6 +569,39 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
     return out;
   }
 
+  /* A whole area's figures, made to fit one tool result. With every
+     indicator on the map, a ward's labelled figures came to about 19 KB,
+     past RESULT_BYTES, so asking for a ward with no indicator list got the
+     model nothing. When the labelled form would not fit, each figure becomes
+     a row of values in the order of columns, as list_indicators sends its
+     rows: the period most of them share is said once, a row gives its own
+     only where it differs, and empty values at the end are left off. The
+     labels are in list_indicators. A request that names its indicators is
+     never shortened. */
+  var FIGURE_COLUMNS = ["value", "unit", "period", "range_95"];
+  var AREA_BYTES = 12000;
+  function fitArea(out, input) {
+    if ((Array.isArray(input.indicators) && input.indicators.length) ||
+        JSON.stringify(out).length <= AREA_BYTES) return out;
+    var figs = out.indicators || {}, n = {}, top = null;
+    Object.keys(figs).forEach(function (k) { var p = figs[k].period; if (p) n[p] = (n[p] || 0) + 1; });
+    Object.keys(n).forEach(function (p) { if (!top || n[p] > n[top]) top = p; });
+    var rows = {};
+    Object.keys(figs).forEach(function (k) {
+      var f = figs[k];
+      var a = [f.v, f.unit || "", f.period && f.period !== top ? f.period : "", f.range_95 || ""];
+      while (a.length > 1 && a[a.length - 1] === "") a.pop();
+      rows[k] = a;
+    });
+    out.indicators = rows;
+    out.columns = FIGURE_COLUMNS;
+    if (top) out.period = top;
+    out.note = "Too many indicators to label each one here: each is a row of values in the order of columns, " +
+      "the period is the one given above unless a row has its own, and list_indicators gives each key's label. " +
+      "Call get_area again with indicators to have the ones you need labelled.";
+    return out;
+  }
+
   // ---- the small areas: MSOA, LSOA and output area ------------------------
   /* Read from the files the map itself loads for these levels, through its
      own loaders, so Ask quotes the figures the map draws and a second copy of
@@ -888,7 +921,7 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
       }
     }
     out.caveat = caveatFor(lv, Object.keys(out.indicators), within);
-    return out;
+    return fitArea(out, input);
   }
 
   async function smallCompare(input, lv) {
@@ -970,6 +1003,9 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
 
   // The fields of each list_indicators row, in order (see list_indicators).
   var LIST_COLUMNS = ["key", "label", "unit", "period", "higher_means", "la_only"];
+  // The longest the full list may be before its unit and period columns are
+  // left out (list_indicators); RESULT_BYTES less room for the rest.
+  var LIST_BYTES = 13500;
 
   var TOOLS = {
     /* The key list, kept short. It used to send every indicator's full
@@ -988,7 +1024,7 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
        refuses past RESULT_BYTES. The period most of a group's indicators share is
        said once, on the group, and a row gives its own only where it differs.
        A field missing from the end of a row is empty. */
-    list_indicators: function () {
+    list_indicators: function (input) {
       var inWards = wardKeys(), keys = {};
       Object.keys(inWards).forEach(function (k) { keys[k] = 1; });
       if (typeof CATS !== "undefined" && Array.isArray(CATS)) {
@@ -997,12 +1033,19 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
         });
       }
       Object.keys(SMALL_ONLY).forEach(function (k) { keys[k] = 1; });
+      // An optional search narrows the list to the keys whose key or label
+      // holds every word of it ("income", "life expectancy").
+      var words = String((input && input.search) || "").toLowerCase().split(/\s+/).filter(Boolean);
       var groups = {};
       Object.keys(keys).filter(function (k) { return !isWithheld(k); }).sort().forEach(function (k) {
         var at = levelsOf(k, !!inWards[k]);
         if (!at.length) return;
         var m = metaFor(k);
         var row = { key: k, label: shortLabel(k) };
+        if (words.length) {
+          var hay = (k + " " + row.label).toLowerCase();
+          if (!words.every(function (w) { return hay.indexOf(w) !== -1; })) return;
+        }
         if (m && m.u) row.unit = m.u;
         if (m && m.yr) row.period = String(m.yr);
         if (isBoroughLevel(k)) row.la_only = true;
@@ -1012,29 +1055,47 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
         (groups[g] = groups[g] || { levels: at, indicators: [] }).indicators.push(row);
       });
       var map = regionCounts();
-      var out = Object.keys(groups).map(function (g) { return groups[g]; })
-        .sort(function (a, b) { return b.levels.length - a.levels.length; })
-        .map(function (g) {
-          var n = {}, top = null;
-          g.indicators.forEach(function (r) { if (r.period) n[r.period] = (n[r.period] || 0) + 1; });
-          Object.keys(n).forEach(function (p) { if (n[p] > 1 && (!top || n[p] > n[top])) top = p; });
-          var rows = g.indicators.map(function (r) {
-            var a = LIST_COLUMNS.map(function (c) {
-              var v = r[c];
-              return (c === "period" && v === top) || v == null ? "" : v;
+      // The rows for a set of columns: each a row of values in their order,
+      // the period most of a group's rows share said once on the group.
+      function build(cols) {
+        return Object.keys(groups).map(function (g) { return groups[g]; })
+          .sort(function (a, b) { return b.levels.length - a.levels.length; })
+          .map(function (g) {
+            var n = {}, top = null;
+            if (cols.indexOf("period") !== -1) {
+              g.indicators.forEach(function (r) { if (r.period) n[r.period] = (n[r.period] || 0) + 1; });
+              Object.keys(n).forEach(function (p) { if (n[p] > 1 && (!top || n[p] > n[top])) top = p; });
+            }
+            var rows = g.indicators.map(function (r) {
+              var a = cols.map(function (c) {
+                var v = r[c];
+                return (c === "period" && v === top) || v == null ? "" : v;
+              });
+              while (a.length > 2 && a[a.length - 1] === "") a.pop();
+              return a;
             });
-            while (a.length > 2 && a[a.length - 1] === "") a.pop();
-            return a;
+            return top ? { levels: g.levels, period: top, rows: rows } : { levels: g.levels, rows: rows };
           });
-          return top ? { levels: g.levels, period: top, rows: rows } : { levels: g.levels, rows: rows };
-        });
+      }
+      var cols = LIST_COLUMNS, out = build(cols), short = false;
+      // With every indicator on the map the full list nears the size one tool
+      // result may be (RESULT_BYTES). Past LIST_BYTES the unit and period
+      // columns are left out: get_area, compare_areas and rank_areas give
+      // both for every figure they return.
+      if (JSON.stringify(out).length > LIST_BYTES) {
+        cols = LIST_COLUMNS.filter(function (c) { return c !== "unit" && c !== "period"; });
+        out = build(cols);
+        short = true;
+      }
       return {
         region: map.region, la_count: map.la_count, ward_count: map.ward_count,
-        columns: LIST_COLUMNS,
+        search: words.length ? words.join(" ") : undefined,
+        columns: cols,
         groups: out,
         note: "Each group lists the levels its indicators are available at: la (local authority, LA), " +
-          "ward, msoa, lsoa and oa (output area), and the period its indicators cover unless a row gives its own. " +
+          "ward, msoa, lsoa and oa (output area)" + (short ? "" : ", and the period its indicators cover unless a row gives its own") + ". " +
           "Each row is one indicator, its values in the order of columns; a value missing from the end of a row is empty. " +
+          (short ? "Units and periods are left out to keep the list short; get_area, compare_areas and rank_areas give them. " : "") +
           "Deprivation deciles run 1 (most deprived) to 10 (least deprived). " +
           "Indicators marked la_only are published for the whole " +
           "LA, so they are the same value for every ward in " +
@@ -1062,7 +1123,7 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
       // The indicators asked for, or every one the area has.
       shownInd = figures(shownInd, wantedKeys(input, shownInd));
       var boroughLevel = Object.keys(shownInd).filter(isBoroughLevel);
-      return {
+      return fitArea({
         name: hit.area.name, level: levelWord(lv), la: hit.area.lad || undefined,
         indicators: shownInd,
         // A ward profile mixes ward figures with borough ones. Name which are
@@ -1070,7 +1131,7 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
         la_level_indicators: (lv === "ward" && boroughLevel.length)
           ? boroughLevel : undefined,
         caveat: caveatFor(lv, Object.keys(shownInd)),
-      };
+      }, input);
     },
 
     compare_areas: function (input) {
