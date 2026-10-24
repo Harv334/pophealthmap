@@ -272,6 +272,11 @@ _SOURCE_ERROR: dict[str, str] = {}
 # for an "ok" source, an optional column the publisher no longer prints. It
 # never changes the status.
 _SOURCE_NOTE: dict[str, str] = {}
+# Sources that ran and had nothing to ship for a reason that is the
+# publisher's, not a failure (every new Local Health series withheld in this
+# region, say). main() marks them "skipped" with this as the note, which the
+# region pack check lets through.
+_SOURCE_SKIPPED: dict[str, str] = {}
 
 def carry_forward_thin(path: Path, df: "pd.DataFrame", *, key: str, source: str,
                        requested, cache_file=None,
@@ -4645,7 +4650,9 @@ def run_fingertips() -> pd.DataFrame:
 # wrong id still returns a full set of plausible numbers under your own label.
 # Typing several hundred more by hand would be the same bet at twenty times the
 # stake. So the ids and their names both come from the API, and the name that
-# ends up on the map is the publisher's own.
+# ends up on the map is the publisher's own. Which of a profile's indicators
+# are taken is a list of those names (FINGERTIPS_PROFILE_WANTED), matched
+# against the profile's metadata again on every run.
 #
 #   profiles                                   -> the 38 profiles
 #   indicator_metadata/by_profile_id?...       -> every indicator id + its name
@@ -4681,10 +4688,90 @@ FINGERTIPS_PROFILES = [
 ]
 
 # A profile can carry a couple of hundred indicators and most of them are
-# breakdowns of a headline. Past this many per profile the picker stops being
-# something anyone can read, so the most recently published are taken and the
-# rest reported rather than silently dropped.
+# breakdowns of a headline. Past this many per profile the list stops being
+# something anyone can read, so this is a cap on what is taken.
 FINGERTIPS_PER_PROFILE = int(os.environ.get("FINGERTIPS_PER_PROFILE", "40"))
+
+# Which indicators are taken from each profile, by name. This used to be the
+# first FINGERTIPS_PER_PROFILE ids in numerical order, which is arbitrary: the
+# oldest ids came first, so the Public Health Outcomes Framework gave its B, C,
+# D and E sections and never its life expectancy. The list is one row per
+# indicator wanted, in the order of preference, with Fingertips' own name as
+# the profile's metadata gives it and the id it had when it was checked. An
+# id whose name still matches is taken; otherwise the name is looked for in
+# the profile, so a renumbered indicator is still found; a name that is not
+# there is logged, never guessed at. Every name came from the API, through
+# data/outcomes/fingertips_profiles.parquet, so none was typed by hand. The
+# map draws nothing from that parquet; what reads it is the QOF name check
+# (QOF_INDICATORS, tests/pipeline/test_qof_labels.py), so every QOF
+# prevalence it names is on the list, as is every FINGERTIPS_INDICATORS id
+# the parquet held.
+FINGERTIPS_PROFILE_WANTED = REPO_ROOT / "data" / "curated" / "fingertips_profile_indicators.csv"
+# PHOF writes its section code in front of each name ("A01b - Life
+# expectancy at birth"), which other profiles leave off.
+_FT_NAME_CODE = re.compile(r"^\s*[A-Z]\d{2}[a-z]?(?:\s*\([ivx]+\))?\s*-\s+")
+
+
+def ft_profile_name_key(name: str) -> str:
+    """A Fingertips name as the profile matching compares it: without a
+    PHOF section code, lower case, punctuation and spacing ignored."""
+    return iod_norm(_FT_NAME_CODE.sub("", str(name or "")))
+
+
+def ft_profile_wanted(path: "Path | None" = None) -> dict:
+    """{profile_id: [(indicator_id or None, name), ...]} in the file's
+    order, from FINGERTIPS_PROFILE_WANTED. {} when the file is missing."""
+    path = FINGERTIPS_PROFILE_WANTED if path is None else path
+    out: dict = {}
+    try:
+        with open(path, newline="", encoding="utf-8") as fh:
+            for row in csv.DictReader(fh):
+                try:
+                    pid = int(str(row.get("profile_id", "")).strip())
+                except ValueError:
+                    continue
+                name = str(row.get("indicator_name") or "").strip()
+                raw = str(row.get("indicator_id") or "").strip()
+                if not name:
+                    continue
+                out.setdefault(pid, []).append((int(raw) if raw.isdigit() else None, name))
+    except OSError as e:
+        warn(f"fingertips profiles: no list of wanted indicators ({e})")
+    return out
+
+
+def ft_pick_profile_indicators(inds: dict, wanted: list, cap: int) -> tuple:
+    """(chosen ids, wanted names not found, [(name, listed id, id found)]).
+
+    inds is the profile's {id: name} from its metadata, wanted the profile's
+    rows of FINGERTIPS_PROFILE_WANTED. A listed id is taken when its name in
+    the metadata still matches (the first fourteen letters, as
+    _ft_name_mismatch compares them, so a small rewording passes); otherwise
+    the id whose name is the same once codes, case and punctuation are set
+    aside. A name matching nothing, or matching two ids, is reported and
+    not taken. At most cap ids, in the order wanted."""
+    by_name: dict = {}
+    for i, nm in inds.items():
+        by_name.setdefault(ft_profile_name_key(nm), []).append(i)
+    chosen: list = []
+    missing: list = []
+    moved: list = []
+    for wid, name in wanted:
+        hit = None
+        if wid is not None and wid in inds and not _ft_name_mismatch(
+                _FT_NAME_CODE.sub("", name), _FT_NAME_CODE.sub("", inds[wid])):
+            hit = wid
+        else:
+            ids = by_name.get(ft_profile_name_key(name), [])
+            if len(ids) == 1:
+                hit = ids[0]
+                if wid is not None and hit != wid:
+                    moved.append((name, wid, hit))
+        if hit is None:
+            missing.append(name)
+        elif hit not in chosen:
+            chosen.append(hit)
+    return chosen[:cap], missing, moved
 
 
 def _ft_profile_indicators(profile_id: int, cache_dir: "Path") -> dict[int, str]:
@@ -4728,15 +4815,29 @@ def run_fingertips_profiles() -> pd.DataFrame:
     # which lets carry_forward_thin keep them rather than lose the profile.
     requested: set = set()
     unread: set = set()
+    wanted_all = ft_profile_wanted()
+    not_found: list = []
     for profile_id, prefix, label in FINGERTIPS_PROFILES:
         inds = _ft_profile_indicators(profile_id, cache_dir)
         if not inds:
             unread.add(profile_id)
             continue
-        chosen = sorted(inds)[:FINGERTIPS_PER_PROFILE]
+        # By name, from the list of wanted indicators, rather than the first
+        # ids in numerical order (FINGERTIPS_PROFILE_WANTED).
+        wanted = wanted_all.get(profile_id, [])
+        if not wanted:
+            warn(f"  {label}: no wanted indicators listed for profile {profile_id} in "
+                 f"{FINGERTIPS_PROFILE_WANTED.name}; none taken")
+            continue
+        chosen, missing, moved = ft_pick_profile_indicators(inds, wanted, FINGERTIPS_PER_PROFILE)
+        for name, old, new in moved:
+            info(f"  {label}: {name!r} is now id {new} (listed as {old})")
+        for name in missing:
+            warn(f"  {label}: wanted indicator not found in profile {profile_id}'s metadata: {name!r}")
+            not_found.append(f"{profile_id}: {name}")
         requested.update(f"{prefix}_{i}" for i in chosen)
-        if len(inds) > len(chosen):
-            info(f"  {label}: {len(inds)} indicators published, taking {len(chosen)}")
+        info(f"  {label}: {len(chosen)} of {len(wanted)} wanted indicators found by name "
+             f"({len(inds)} published, at most {FINGERTIPS_PER_PROFILE} taken)")
         kept = 0
         for ind_id in chosen:
             cache = cache_dir / f"ind_{ind_id}.csv"
@@ -4815,6 +4916,9 @@ def run_fingertips_profiles() -> pd.DataFrame:
     n_ind = out["indicator_short"].nunique() if not out.empty else 0
     ok(f"fingertips_profiles: {len(out):,} rows, {n_ind} indicators "
        f"-> {out_path.relative_to(REPO_ROOT)}")
+    if not_found:
+        info(f"fingertips_profiles: {len(not_found)} wanted indicator(s) not found by name; "
+             f"edit data/curated/{FINGERTIPS_PROFILE_WANTED.name} if OHID renamed them")
     return out
 
 # ============================================================================
@@ -4834,8 +4938,15 @@ def run_fingertips_profiles() -> pd.DataFrame:
 # Ward is not an option: area type 8 exists but returns nothing for these, so
 # MSOA is the finest published geography and it has to be bridged to wards.
 #
-# Low birth weight (93092) is not listed. It has no London MSOA figures, so it
-# could only ever appear in the picker as an indicator with nothing to draw.
+# Low birth weight of live babies (93092) is not in this list but in
+# FINGERTIPS_MSOA_EXTRA below, with the five cancer incidence ratios. It was
+# taken out in October 2026 on the belief that it had no London MSOA figures,
+# but the September 2026 raw snapshot (scripts/fingertips_msoa_raw.csv) holds
+# 237 of them for 2018 to 2022, on 2021 MSOA codes. Rather than trust either
+# check, the extra source runs per-series checks on every download (coverage,
+# withheld values, interval width) and ships a series only if it passes, so
+# an empty or withheld series is dropped by the pipeline, never offered as an
+# indicator with nothing to draw.
 FINGERTIPS_MSOA_AREA_TYPE = 3   # Middle Super Output Area
 FINGERTIPS_MSOA_INDICATORS = [
     93465, 93233, 93229, 93227, 93115, 93280, 93089, 93232, 93241, 93240,
@@ -4995,9 +5106,16 @@ def ft_msoa_drop_bare_zeros(ftm: pd.DataFrame) -> pd.DataFrame:
     return ftm[~bare]
 
 
-def _ft_msoa_variant(ind_id, df, name, want_msoa, rows, missing_codes) -> int:
+def _ft_msoa_variant(ind_id, df, name, want_msoa, rows, missing_codes,
+                     detail: bool = False) -> int:
     """Latest period per MSOA, 2011 codes bridged, rows appended. Returns the
-    number of figures bridged from 2011 codes."""
+    number of figures bridged from 2011 codes.
+
+    With detail=True (the extra series, FINGERTIPS_MSOA_EXTRA) each row also
+    keeps its 95% limits and OHID's note, and a value OHID withholds (its
+    note says so, or its limits run backwards, as _ft_value_with_ci reads a
+    placeholder) is stored as missing, so ft_msoa_series_check counts it as
+    withheld rather than as a figure."""
     bridged = 0
     if "Time period Sortable" in df.columns:
         df = df.sort_values("Time period Sortable").groupby("Area Code", as_index=False).tail(1)
@@ -5041,7 +5159,7 @@ def _ft_msoa_variant(ind_id, df, name, want_msoa, rows, missing_codes) -> int:
     got = set(df["Area Code"])
     missing_codes |= (want_msoa - got)
     for _, row in df.iterrows():
-        rows.append({
+        rec = {
             "MSOA21CD": row["Area Code"],
             "indicator_id": int(ind_id),
             "indicator_name": name,
@@ -5049,7 +5167,20 @@ def _ft_msoa_variant(ind_id, df, name, want_msoa, rows, missing_codes) -> int:
             "period": row.get("Time period", ""),
             "vs_england": FT_VS_CODES.get(str(row.get(FT_VS_ENGLAND_COL, "")).strip(), ""),
             "estimated": bool(row.get("_estimated", False) is True),
-        })
+        }
+        if detail:
+            est = rec["estimated"]
+            value, lower, upper = _ft_value_with_ci(row)
+            note = _ft_note(row.get("Value note"))
+            if any(w in note.lower() for w in FT_WITHHELD_NOTES):
+                value = lower = upper = None
+            # A figure carried from 2011 areas keeps its value, but the
+            # limits were for the 2011 area.
+            rec.update({"value": rec["value"] if est else value,
+                        "lower_ci": None if est else lower,
+                        "upper_ci": None if est else upper,
+                        "value_note": note})
+        rows.append(rec)
 
     return bridged
 
@@ -5220,6 +5351,1077 @@ def run_fingertips_msoa_la() -> pd.DataFrame:
     n_ind = out["indicator_id"].nunique() if not out.empty else 0
     ok(f"fingertips local health LA: {len(out):,} rows, {n_ind} indicators "
        f"-> {out_path.relative_to(REPO_ROOT)}")
+    return out
+
+
+# ============================================================================
+# SOURCE 5d: Fingertips Local Health, low birth weight and cancer incidence
+# ============================================================================
+# Low birth weight of live babies (93092, five years pooled) and the five
+# cancer incidence ratios (93234 to 93238, England = 100), at MSOA as Local
+# Health publishes them and for whole LAs. They have never been on the map,
+# and whether Fingertips still returns MSOA rows for the cancer series could
+# not be checked from here, so they are a source of their own,
+# fingertips_msoa_extra: a series that does not come back cannot mark the
+# established Local Health sources partial or failed, which would stop every
+# region pack from publishing.
+#
+# Each series ships only if ft_msoa_series_check passes it for this scope.
+# OHID's own blanks are taken out first: a value its note says is withheld, a
+# placeholder whose limits run backwards, and a 0 with no England comparison
+# (ft_msoa_drop_bare_zeros). A series is then dropped, with a log line, when
+# it has no figures, when its figures cover under FT_MSOA_MIN_COVER of the
+# scope's MSOAs, or when its median 95% interval is wider either side than
+# FT_MSOA_CI_REL_MAX of the figure. A dropped series writes no rows, so the
+# map leaves it out (the no-empty-indicator rule), and indicators.js lists it
+# under known_gaps, so a region where OHID publishes too little for it is not
+# held back by London having it (scripts/check_region_pack.py). Its LA
+# figures ship only beside its MSOA ones.
+#
+# The id and the words its Fingertips name must hold. The names are OHID's
+# (scripts/fingertips_metadata.json); the words allow for the longer form a
+# catalogue mirror gives, "Incidence of all cancers, standardised incidence
+# ratio", so a rewording does not drop a real series, while a wrong id does.
+FINGERTIPS_MSOA_EXTRA = [
+    (93092, "Low birth weight of live babies",     ("low birth weight",)),
+    (93234, "Cancer incidence: all cancers",       ("incidence", "all cancers")),
+    (93235, "Cancer incidence: breast cancer",     ("incidence", "breast")),
+    (93236, "Cancer incidence: colorectal cancer", ("incidence", "colorectal")),
+    (93237, "Cancer incidence: lung cancer",       ("incidence", "lung")),
+    (93238, "Cancer incidence: prostate cancer",   ("incidence", "prostate")),
+]
+FT_MSOA_EXTRA_PARQUET = "fingertips_msoa_extra.parquet"
+FT_MSOA_EXTRA_LA_PARQUET = "fingertips_msoa_extra_la.parquet"
+FT_MSOA_EXTRA_CHECKS = "fingertips_msoa_extra_checks.json"
+# A series with figures for fewer of the scope's MSOAs than this is not
+# shipped. Every established Local Health series covers over 90% of London's
+# MSOAs, and long-term claimants, the thinnest, 65% once its bare zeros go.
+FT_MSOA_MIN_COVER = 0.5
+# A median interval wider either side than the figure itself (a ratio of
+# 100 with limits of 0 and 200) cannot tell one MSOA from another.
+FT_MSOA_CI_REL_MAX = 1.0
+FT_MSOA_EXTRA_COLUMNS = ["MSOA21CD", "indicator_id", "indicator_name", "value", "period",
+                         "vs_england", "estimated", "lower_ci", "upper_ci", "value_note"]
+
+
+def ft_base_id(out_id: int) -> int:
+    """The Fingertips id a Local Health series was fetched under: the men's
+    figures of a sex-split series are kept under FT_MALE_ID(id), a sixth
+    digit on the five-digit id."""
+    return int(out_id) // 10 if int(out_id) > 99999 else int(out_id)
+
+
+def ft_msoa_series_check(rows: list, n_scope: int, *, min_cover: float = FT_MSOA_MIN_COVER,
+                         ci_rel_max: float = FT_MSOA_CI_REL_MAX) -> tuple:
+    """(ships, why, facts) for one Local Health MSOA series in this scope.
+
+    rows are the series' in-scope rows as _ft_msoa_variant writes them with
+    detail=True. A figure counts when it has a value and is not a bare zero
+    (a 0 with no England comparison, which ft_msoa_drop_bare_zeros drops);
+    the rest are withheld. The series ships when it has figures for at least
+    min_cover of the n_scope MSOAs and, where at least three figures carry
+    limits, the median half-width of their 95% intervals is at most
+    ci_rel_max of the figure."""
+    def usable(r):
+        v = r.get("value")
+        if v is None or v != v:
+            return False
+        return not (float(v) == 0 and not str(r.get("vs_england") or "").strip())
+    figs = [r for r in rows if usable(r)]
+    n_rows, n_val = len(rows), len(figs)
+    withheld = n_rows - n_val
+    cover = n_val / n_scope if n_scope else 0.0
+    rel = sorted((float(r["upper_ci"]) - float(r["lower_ci"])) / 2 / abs(float(r["value"]))
+                 for r in figs
+                 if r.get("lower_ci") is not None and r.get("upper_ci") is not None
+                 and r["lower_ci"] == r["lower_ci"] and r["upper_ci"] == r["upper_ci"]
+                 and float(r["value"]) != 0)
+    med = None
+    if len(rel) >= 3:
+        m = len(rel) // 2
+        med = rel[m] if len(rel) % 2 else (rel[m - 1] + rel[m]) / 2
+    facts = {"rows": n_rows, "figures": n_val, "withheld": withheld, "msoas": n_scope,
+             "cover": round(cover, 3), "ci_half_width": None if med is None else round(med, 3)}
+    if not n_rows:
+        return False, "no figures for any MSOA in this area", facts
+    if not n_val:
+        return False, f"all {n_rows} of its MSOA figures are withheld", facts
+    if cover < min_cover:
+        return False, (f"figures for only {n_val:,} of the {n_scope:,} MSOAs ({cover:.0%}, under "
+                       f"{min_cover:.0%}), with {withheld:,} withheld"), facts
+    if med is not None and med > ci_rel_max:
+        return False, (f"its median 95% interval runs {med:.0%} of the figure either side "
+                       f"(over {ci_rel_max:.0%}), so it cannot tell one MSOA from another"), facts
+    return True, (f"figures for {n_val:,} of the {n_scope:,} MSOAs ({cover:.0%}), {withheld:,} withheld"
+                  + ("" if med is None else f", median 95% interval {med:.0%} of the figure either side")), facts
+
+
+def _ft_extra_download(cache: "Path", url: str) -> tuple:
+    """(frame or None, error or ""). A frame of None with no error means
+    Fingertips answered with no rows, which is not cached, so the next run
+    asks again. An error is a download that failed."""
+    if not cache.exists():
+        try:
+            r = _ft_get(url, timeout=180)
+        except Exception as e:
+            return None, f"{type(e).__name__}: {e}"
+        if len(r.content.splitlines()) < 2:
+            return None, ""
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        cache.write_bytes(r.content)
+        time.sleep(1.0)
+    try:
+        df = pd.read_csv(cache, dtype=str, low_memory=False)
+    except (pd.errors.EmptyDataError, OSError, ValueError):
+        return None, ""
+    if df.empty or "Area Code" not in df.columns:
+        return None, ""
+    return df, ""
+
+
+def _ft_name_has(actual: str, words: tuple) -> bool:
+    """Whether a Fingertips name holds every one of words, as normalised."""
+    n = iod_norm(actual)
+    return all(iod_norm(w) in n for w in words)
+
+
+def run_fingertips_msoa_extra() -> "pd.DataFrame | None":
+    rule("OHID Fingertips Local Health: low birth weight and cancer incidence (MSOA and LA)")
+    cache_dir = CACHE_DIR / "fingertips_msoa_extra"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    out_dir = DATA_DIR / "outcomes"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    want_msoa = set(get_lsoa_to_msoa().values())
+    rows: list = []
+    checks: dict = {}
+    errors: list = []
+    shipped: set = set()
+    failed_ids: set = set()
+    names: dict = {}
+    try:
+        prev_checks = json.loads((out_dir / FT_MSOA_EXTRA_CHECKS).read_text(encoding="utf-8")).get("series") or {}
+    except (OSError, ValueError, AttributeError):
+        prev_checks = {}
+    for ind_id, label, words in FINGERTIPS_MSOA_EXTRA:
+        url = (f"https://fingertips.phe.org.uk/api/all_data/csv/by_indicator_id"
+               f"?indicator_ids={ind_id}&child_area_type_id={FINGERTIPS_MSOA_AREA_TYPE}"
+               f"&parent_area_type_id=15")
+        df, err = _ft_extra_download(cache_dir / f"ind_{ind_id}_p15.csv", url)
+        if err:
+            warn(f"fingertips msoa extra {ind_id} ({label}): download failed ({err})")
+            failed_ids |= {ind_id, FT_MALE_ID(ind_id)}
+            # A series the last check dropped for OHID's reasons stays dropped
+            # on that verdict; one with no verdict yet is a failure (unless
+            # last run's figures stand in for it, below).
+            before = {k: v for k, v in prev_checks.items() if k in (str(ind_id), str(FT_MALE_ID(ind_id)))
+                      and isinstance(v, dict)}
+            if before and all(v.get("kind") == "publisher" and not v.get("ships") for v in before.values()):
+                for k, v in before.items():
+                    checks[k] = dict(v, why=f"{v.get('why', '')} (last run's check; this run could not "
+                                            f"download it: {err})")
+                continue
+            errors.append(({ind_id, FT_MALE_ID(ind_id)}, f"{ind_id} ({label}): {err}"))
+            checks[str(ind_id)] = {"ships": False, "kind": "error", "why": f"download failed: {err}"}
+            continue
+        if df is None:
+            why = "Fingertips returned no MSOA rows"
+            warn(f"fingertips msoa extra {ind_id} ({label}): {why}; not shipped")
+            checks[str(ind_id)] = {"ships": False, "kind": "publisher", "why": why}
+            continue
+        actual = str(df["Indicator Name"].iloc[0]) if "Indicator Name" in df.columns and len(df) else ""
+        if actual and not _ft_name_has(actual, words):
+            why = f"the download is {actual!r}, not {label!r}"
+            warn(f"fingertips msoa extra {ind_id}: {why}; not shipped. Check the id.")
+            errors.append((set(), f"{ind_id}: {why}"))
+            checks[str(ind_id)] = {"ships": False, "kind": "name", "why": why}
+            continue
+        name = actual or label
+        if "Area Type" in df.columns:
+            df = df[df["Area Type"].astype(str).str.contains("MSOA", na=False)]
+        # As run_fingertips_msoa: Persons where published, else women under
+        # the id and men under FT_MALE_ID(id). Breast and prostate cancer
+        # come for one sex only and are kept as they are.
+        variants = [(int(ind_id), df, name)]
+        if "Sex" in df.columns:
+            sexes = set(df["Sex"].dropna().astype(str))
+            if "Persons" in sexes:
+                variants = [(int(ind_id), df[df["Sex"] == "Persons"], name)]
+            elif {"Female", "Male"} <= sexes:
+                variants = [(int(ind_id), df[df["Sex"] == "Female"], name + " (women)"),
+                            (FT_MALE_ID(int(ind_id)), df[df["Sex"] == "Male"], name + " (men)")]
+        for out_id, d, nm in variants:
+            vrows: list = []
+            if not d.empty:
+                _ft_msoa_variant(out_id, d, nm, want_msoa, vrows, set(), detail=True)
+            ships, why, facts = ft_msoa_series_check(vrows, len(want_msoa))
+            checks[str(out_id)] = {"ships": ships, "kind": "publisher", "why": why, **facts}
+            names[out_id] = nm
+            if ships:
+                ok(f"fingertips msoa extra {out_id} ({nm}): ships, {why}")
+                rows.extend(vrows)
+                shipped.add(out_id)
+            else:
+                warn(f"fingertips msoa extra {out_id} ({nm}): not shipped, {why}")
+
+    out = pd.DataFrame(rows, columns=FT_MSOA_EXTRA_COLUMNS)
+    out_path = out_dir / FT_MSOA_EXTRA_PARQUET
+    # Last run's rows come back only for a series that this run could not
+    # download (or that came back thin). One the checks dropped stays dropped.
+    out = carry_forward_thin(out_path, out, key="indicator_id", source="fingertips_msoa_extra",
+                             requested=shipped | failed_ids,
+                             cache_file=lambda k: cache_dir / f"ind_{int(k)}_p15.csv")
+    kept_ids = set(int(i) for i in out["indicator_id"].unique()) if len(out) else set()
+    for i in sorted(kept_ids - shipped):
+        checks.setdefault(str(i), {})["ships"] = True
+        checks[str(i)]["kind"] = "carried"
+        checks[str(i)]["why"] = "last run's figures, kept because this run could not download them"
+    write_json_atomic(out_dir / FT_MSOA_EXTRA_CHECKS,
+                      {"checked": datetime.now(timezone.utc).isoformat(), "series": checks}, pretty=True)
+
+    # OHID's own LA figures, for the series that ship at MSOA only.
+    la_rows: list = []
+    base_ids = sorted({ft_base_id(i) for i in kept_ids})
+    for ind_id in base_ids:
+        url = (f"https://fingertips.phe.org.uk/api/all_data/csv/by_indicator_id"
+               f"?indicator_ids={ind_id}&child_area_type_id={FINGERTIPS_LA_LOWER_TIER}"
+               f"&parent_area_type_id=15")
+        df, err = _ft_extra_download(cache_dir / f"ind_{ind_id}_la{FINGERTIPS_LA_LOWER_TIER}.csv", url)
+        if err:
+            warn(f"fingertips msoa extra LA {ind_id}: download failed ({err}); "
+                 "its LA figures are worked out from wards instead")
+            continue
+        if df is None:
+            info(f"fingertips msoa extra LA {ind_id}: no LA rows; its LA figures are worked out from wards")
+            continue
+        df = ft_codes_to_current(df)
+        df = df[df["Area Code"].isin(SCOPE_LADS)]
+        la_rows.extend(r for r in _ft_la_latest(df, ind_id) if r["indicator_id"] in kept_ids)
+    la = pd.DataFrame(la_rows, columns=["LAD25CD", "indicator_id", "value", "period"])
+    la_path = out_dir / FT_MSOA_EXTRA_LA_PARQUET
+    la = carry_forward_thin(la_path, la, key="indicator_id", source="fingertips_msoa_extra",
+                            requested=kept_ids)
+    la = la[la["indicator_id"].isin(kept_ids)] if len(la) else la
+
+    # A download that failed is a failure only when no earlier figures
+    # stand in for it; one whose last figures were kept is "partial"
+    # (carry_forward_thin). A wrong name is always a failure.
+    errors = [msg for ids, msg in errors if not (ids & kept_ids)]
+    if out.empty:
+        # Nothing ships. Written empty rather than kept, because a series the
+        # checks dropped must leave the map, and the old file would put it back.
+        write_parquet_atomic(out_path, out)
+        write_parquet_atomic(la_path, la.iloc[0:0] if len(la) else la)
+        _record_write(out_path, 0)
+        if errors:
+            raise RuntimeError("no low birth weight or cancer incidence series could be downloaded "
+                               "from Fingertips: " + "; ".join(errors))
+        msg = ("no series shipped: " + "; ".join(f"{i} {c.get('why', '')}" for i, c in checks.items()))
+        warn(f"fingertips_msoa_extra: {msg}")
+        _SOURCE_SKIPPED["fingertips_msoa_extra"] = msg[:2000]
+        return None
+    write_parquet_atomic(out_path, out)
+    _record_write(out_path, len(out))
+    write_parquet_atomic(la_path, la)
+    _record_write(la_path, len(la))
+    ok(f"fingertips msoa extra: {len(out):,} rows, {out['indicator_id'].nunique()} series across "
+       f"{out['MSOA21CD'].nunique():,} MSOAs -> {out_path.relative_to(REPO_ROOT)}; "
+       f"{len(la):,} LA rows -> {la_path.relative_to(REPO_ROOT)}")
+    if errors:
+        _SOURCE_ERROR["fingertips_msoa_extra"] = "; ".join(errors)[:2000]
+    return out
+
+
+# ============================================================================
+# SOURCE 6: ONS datasets found from their landing page
+# ============================================================================
+# Two ONS releases are read here: the small area income estimates (SAIE) and
+# the health state life expectancies for MSOAs. ONS gives each dataset a
+# landing page that lists its editions, and every page on the ONS site is also
+# JSON at <page>/data: a landing page lists its editions ("datasets"), an
+# edition its files ("downloads"), and a file is served at
+# /file?uri=<edition>/<file>. So the file is found from the landing page by
+# the edition's name and date rather than remembered as an asset URL, which
+# would point at one release. Where the landing page does not answer, the
+# release's bulletin is read for its related datasets, and then ONS's search
+# for the dataset's title; the landing page's HTML links are the last resort.
+# Every page that is read and every file that is found is logged, so a first
+# run in GitHub Actions shows exactly where each file came from.
+ONS_BASE = "https://www.ons.gov.uk"
+ONS_SEARCH_API = "https://api.beta.ons.gov.uk/v1/search"
+# The last 2011 MSOA code. Every MSOA redrawn at the 2021 Census has a code
+# above it, so a file holding none is on the 2011 boundaries.
+MSOA_LAST_2011 = "E02006934"
+
+
+def _ons_get_json(path: str, sess, timeout: int = 60):
+    """The JSON behind an ONS page (path, or a full URL), or None."""
+    url = path if path.startswith("http") else ONS_BASE + path
+    url = url.split("?")[0].rstrip("/") + "/data"
+    try:
+        r = sess.get(url, timeout=timeout)
+        r.raise_for_status()
+        return r.json()
+    except Exception as e:
+        info(f"ons: {url} did not answer as JSON ({type(e).__name__}: {e})")
+        return None
+
+
+def _ons_title(j) -> str:
+    d = (j or {}).get("description") or {}
+    return str(d.get("title") or (j or {}).get("title") or "")
+
+
+def _ons_landing_files(uri: str, sess) -> list:
+    """[{"edition", "uri", "file", "url", "release_date"}] for the files of
+    every edition on one dataset landing page; [] when it has none."""
+    out: list = []
+    j = _ons_get_json(uri, sess)
+    for ed in ((j or {}).get("datasets") or []):
+        euri = str((ed or {}).get("uri") or "").rstrip("/")
+        if not euri:
+            continue
+        ej = _ons_get_json(euri, sess) or {}
+        desc = ej.get("description") or {}
+        edition = str(desc.get("edition") or euri.rsplit("/", 1)[-1])
+        for d in (ej.get("downloads") or []):
+            f = str((d or {}).get("file") or "").strip()
+            if f:
+                out.append({"edition": edition, "uri": euri, "file": f,
+                            "url": f"{ONS_BASE}/file?uri={euri}/{f}",
+                            "release_date": str(desc.get("releaseDate") or "")})
+    if out:
+        return out
+    # The page itself, for a landing page whose JSON did not list editions.
+    try:
+        r = sess.get(ONS_BASE + uri, timeout=60)
+        r.raise_for_status()
+        for href in dict.fromkeys(re.findall(r'href="(/file\?uri=[^"]+)"', r.text)):
+            path = href.split("uri=", 1)[1]
+            f = path.rsplit("/", 1)[-1]
+            euri = path.rsplit("/", 1)[0]
+            out.append({"edition": euri.rsplit("/", 1)[-1], "uri": euri, "file": f,
+                        "url": ONS_BASE + href.replace("&amp;", "&"), "release_date": ""})
+    except Exception as e:
+        info(f"ons: {ONS_BASE + uri} did not answer ({type(e).__name__}: {e})")
+    return out
+
+
+def ons_dataset_files(landing: tuple, bulletins: tuple = (), search: str = "",
+                      title_words: tuple = ()) -> list:
+    """Every file of the first ONS dataset found, from its landing page.
+
+    landing are known landing page paths, tried first. bulletins are paths
+    of the release's bulletin, whose related datasets are tried next, and
+    search is a title to look for with ONS's search; a page found either way
+    is used only if its title holds every one of title_words."""
+    sess = browser_session(referer=ONS_BASE + "/")
+    tried: set = set()
+
+    def titled(uri):
+        if not title_words:
+            return True
+        t = iod_norm(_ons_title(_ons_get_json(uri, sess)))
+        return bool(t) and all(iod_norm(w) in t for w in title_words)
+
+    def attempt(uri, check):
+        uri = "/" + str(uri or "").split("ons.gov.uk", 1)[-1].lstrip("/")
+        if uri in tried or "/datasets/" not in uri:
+            return []
+        tried.add(uri)
+        if check and not titled(uri):
+            info(f"ons: {uri} is not the dataset wanted; skipped")
+            return []
+        files = _ons_landing_files(uri, sess)
+        if files:
+            info(f"ons: {len(files)} file(s) on {ONS_BASE}{uri}")
+        return files
+
+    for uri in landing:
+        files = attempt(uri, False)
+        if files:
+            return files
+    for b in bulletins:
+        j = _ons_get_json(b, sess) or {}
+        rels = [(rel or {}).get("uri") for rel in (j.get("relatedData") or []) + (j.get("relatedDatasets") or [])]
+        if not rels:
+            # The bulletin page itself, whose related data section links its
+            # datasets; "latest" redirects to the newest edition.
+            try:
+                r = sess.get(ONS_BASE + b, timeout=60)
+                r.raise_for_status()
+                rels = list(dict.fromkeys(m.split("?")[0].split("#")[0] for m in
+                                          re.findall(r'href="((?:https://www\.ons\.gov\.uk)?/[^"]*/datasets/[^"]+)"', r.text)))
+            except Exception as e:
+                info(f"ons: {ONS_BASE + b} did not answer ({type(e).__name__}: {e})")
+        for rel in rels:
+            files = attempt(rel, True)
+            if files:
+                return files
+    if search:
+        try:
+            r = sess.get(ONS_SEARCH_API, params={"q": search, "content_type": "dataset_landing_page"},
+                         timeout=60)
+            r.raise_for_status()
+            j = r.json()
+            items = j.get("items") or j.get("results") or []
+        except Exception as e:
+            info(f"ons: search for {search!r} did not answer ({type(e).__name__}: {e})")
+            items = []
+        for it in items:
+            files = attempt((it or {}).get("uri") or (it or {}).get("url"), True)
+            if files:
+                return files
+    return []
+
+
+def ons_year_of(text: str) -> int:
+    """The latest year an edition's name or path names, or 0."""
+    years = [int(y) for y in re.findall(r"(?:19|20)\d{2}", str(text or ""))]
+    return max(years) if years else 0
+
+
+# Words in a file name that mark it as about the data rather than the data.
+_ONS_NOT_DATA = ("technical", "quality", "notes", "methodology", "guidance", "metadata", "lookup", "glossary")
+
+
+def ons_pick_latest(files: list, exts: tuple, words: tuple = ()) -> "dict | None":
+    """The file of the newest edition (by the latest year its name or path
+    names, then its release date), in the first of exts it is published in,
+    and within one edition a data file before a notes or quality one.
+    words, when given, must all be in the file's name or edition (as
+    normalised)."""
+    def named(f):
+        t = iod_norm(f.get("edition", "") + " " + f.get("file", "") + " " + f.get("uri", ""))
+        return all(iod_norm(w) in t for w in words)
+    cands = [f for f in files if named(f) and str(f.get("file", "")).lower().endswith(exts)]
+    if not cands:
+        return None
+    def rank(f):
+        fn = iod_norm(f.get("file", ""))
+        return (max(ons_year_of(f.get("edition")), ons_year_of(f.get("uri"))),
+                str(f.get("release_date") or ""),
+                not any(w in fn for w in _ONS_NOT_DATA),
+                -exts.index(next(e for e in exts if f["file"].lower().endswith(e))))
+    return max(cands, key=rank)
+
+
+def _ons_download(f: dict, cache: "Path", source: str) -> "Path | None":
+    """Download one ONS file into cache, or None (with a warning)."""
+    url = f["url"]
+    dest = cache / re.sub(r"[^A-Za-z0-9._-]", "_", f.get("file") or url.rsplit("/", 1)[-1])
+    try:
+        info(f"{source}: downloading {url} (edition {f.get('edition', '')!r})")
+        r = browser_session(referer=ONS_BASE + "/").get(url, timeout=300)
+        r.raise_for_status()
+        head = r.content[:200].lstrip().lower()
+        if len(r.content) < 10_000 or head.startswith((b"<!doctype", b"<html")):
+            raise RuntimeError(f"got {len(r.content):,} bytes that are not the file")
+        cache.mkdir(parents=True, exist_ok=True)
+        if dest.suffix.lower() == ".zip":
+            # A zipped release: its largest spreadsheet is the data.
+            with zipfile.ZipFile(io.BytesIO(r.content)) as z:
+                inner = sorted((i for i in z.infolist() if i.filename.lower().endswith((".xlsx", ".xls", ".csv"))
+                                and not any(w in iod_norm(i.filename) for w in _ONS_NOT_DATA)),
+                               key=lambda i: i.file_size, reverse=True)
+                if not inner:
+                    raise RuntimeError(f"{dest.name} holds no spreadsheet")
+                dest = cache / re.sub(r"[^A-Za-z0-9._-]", "_", inner[0].filename.rsplit("/", 1)[-1])
+                write_bytes_atomic(dest, z.read(inner[0]))
+                info(f"{source}: took {inner[0].filename} from the zip")
+        else:
+            write_bytes_atomic(dest, r.content)
+        write_json_atomic(dest.with_suffix(dest.suffix + ".release.json"), f, pretty=True)
+    except Exception as e:
+        warn(f"{source}: download failed ({type(e).__name__}: {e})")
+        return None
+    return dest
+
+
+def ons_code_header(v) -> bool:
+    """Whether a header cell names an area code column: "MSOA code",
+    "MSOA21CD", "Area code" and the like."""
+    n = iod_norm(v)
+    return bool(re.search(r"\b(?:msoa|area|geography|lad|local authority|ons)\s*(?:20)?(?:11|21)?\s*(?:codes?|cd)\b"
+                          r"|\bmsoa(?:11|21)cd\b|\bareacd\b|^codes?$", n))
+
+
+def ons_tables(src: "Path") -> list:
+    """[(sheet name, the text above its header, frame)] for every table of a
+    release file with an area code header: one for a CSV, one per sheet of a
+    workbook, each read from its header row."""
+    if src.suffix.lower() == ".csv":
+        try:
+            df = pd.read_csv(src, encoding="utf-8-sig", dtype=str, low_memory=False)
+        except UnicodeDecodeError:
+            df = pd.read_csv(src, encoding="latin-1", dtype=str, low_memory=False)
+        return [(src.stem, "", df)]
+    xl = pd.ExcelFile(src)
+    out = []
+    for name in xl.sheet_names:
+        try:
+            top = xl.parse(name, header=None, nrows=25, dtype=str)
+        except Exception:
+            continue
+        hdr = None
+        for i, row in enumerate(top.itertuples(index=False)):
+            if any(isinstance(v, str) and ons_code_header(v) for v in row):
+                hdr = i
+                break
+        if hdr is None:
+            continue
+        title = " ".join(str(v) for v in top.iloc[:hdr].to_numpy().ravel()
+                         if isinstance(v, str) and v.strip())
+        out.append((str(name), title, xl.parse(name, header=hdr, dtype=str)))
+    return out
+
+
+def ons_code_col(df: "pd.DataFrame"):
+    """The area code column: of the headers that name one, the column
+    holding the most MSOA codes, else the most English area codes, so a
+    table with both an MSOA and an LA code column reads by MSOA."""
+    cands = [c for c in df.columns if isinstance(c, str) and ons_code_header(c)]
+    if not cands:
+        return None
+    def score(c):
+        v = df[c].astype(str).str.strip()
+        return (int(v.str.match(r"^E02\d{6}$").sum()), int(v.str.match(r"^E0\d{7}$").sum()))
+    return max(cands, key=score)
+
+
+def ons_num(s: "pd.Series") -> "pd.Series":
+    """Figures as numbers: thousands separators and pound signs set aside,
+    and ONS's markers for a missing figure (":", "[x]", "..") read as none."""
+    t = s.astype(str).str.replace(r"[£,\s]", "", regex=True)
+    return pd.to_numeric(t.where(~t.str.fullmatch(r"\[?[a-z:.\-]*\]?", case=False)), errors="coerce")
+
+
+def ons_period(text: str) -> str:
+    """The period an edition describes, written as the map writes periods:
+    "Financial year ending 2023" as "2022/23", and "2019 to 2023" as
+    "2019 - 23", which periodWords reads as "2019 to 2023". "" when the text
+    names no period."""
+    t = iod_norm(text)
+    m = re.search(r"(?:financial year ending|financialyearending|\bfye)\s*(?:march\s*)?((?:19|20)\d{2})", t)
+    if m:
+        y = int(m.group(1))
+        return f"{y - 1}/{str(y)[2:]}"
+    m = re.search(r"((?:19|20)\d{2})\s*(?:to|and)\s*((?:19|20)\d{2})", t) or \
+        re.search(r"((?:19|20)\d{2})to((?:19|20)\d{2})", str(text or "").lower())
+    if m:
+        return f"{m.group(1)} - {m.group(2)[2:]}"
+    return ""
+
+
+def _ons_committed(subdir: str, name: str):
+    """The committed national parquet for this scope (copied in from the
+    national one when a region has none), or None."""
+    out_path = DATA_DIR / subdir / name
+    national = NATIONAL_DATA_DIR / subdir / name
+    if not out_path.exists() and national.exists() and national != out_path:
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_bytes(national.read_bytes())
+    if not out_path.exists():
+        return None
+    try:
+        return pd.read_parquet(out_path)
+    except Exception as e:
+        warn(f"{name} unreadable ({e})")
+        return None
+
+
+def _ons_write(subdir: str, name: str, out: "pd.DataFrame", source: str, what: str) -> "pd.DataFrame":
+    """Write the parquet, unless it already holds exactly this."""
+    out_path = DATA_DIR / subdir / name
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    if out_path.exists():
+        try:
+            previous = pd.read_parquet(out_path)
+        except Exception:
+            previous = None
+        if previous is not None and previous.equals(out):
+            ok(f"{source}: {len(out):,} {what}, unchanged from the committed parquet")
+            _record_write(out_path, len(out))
+            return out
+    out = write_parquet_guarded(out_path, out, source=source)
+    ok(f"{source}: {len(out):,} {what} -> {out_path.relative_to(REPO_ROOT)}")
+    return out
+
+
+def _ons_static_file(source: str, cache: "Path", prev, want: list, override: str,
+                     find, how: str):
+    """(raw file or None, committed frame or None) for a static ONS release:
+    a file dropped in cache wins; else a complete committed parquet is used
+    with no download; else the file is found (find() -> file dict) and
+    downloaded. Raises, or marks the source failed keeping prev, with what
+    to do, when there is no file."""
+    raw = sorted((p for p in cache.glob("*") if p.suffix.lower() in (".xlsx", ".xls", ".csv")),
+                 key=lambda p: p.stat().st_size, reverse=True) if cache.is_dir() else []
+    if raw:
+        return raw[0], None
+    if prev is not None and len(prev) and all(k in prev.columns for k in want):
+        ok(f"{source}: {len(prev):,} rows from the committed parquet "
+           "(static between releases; no download needed)")
+        return None, prev
+    f = {"url": override, "file": override.split("?")[0].rsplit("/", 1)[-1], "edition": ""} if override else find()
+    got = _ons_download(f, cache, source) if f else None
+    if got is None:
+        msg = (f"the {how} file could not be found or downloaded from ONS, so "
+               + ("the figures stay as last committed" if prev is not None and len(prev)
+                  else "there are no figures yet")
+               + f". Download it from the ONS dataset page into {cache} and rerun "
+               f"`python fetch_all_data.py --only {source}`.")
+        if prev is not None and len(prev):
+            _iod_fail(source, msg)
+            return None, prev
+        raise RuntimeError(msg)
+    return got, None
+
+
+def _ons_release(src: "Path") -> dict:
+    """What the download step recorded about a file's edition, or {}."""
+    p = src.with_suffix(src.suffix + ".release.json")
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def _ons_has(text: str, phrases: tuple) -> bool:
+    """Whether normalised text holds any of phrases, each as whole words."""
+    t = " " + iod_norm(text) + " "
+    return any(" " + iod_norm(p) + " " in t for p in phrases)
+
+
+# ---------------------------------------------------------------------------
+# ONS small area income estimates (SAIE), MSOA, financial year ending 2023
+# ---------------------------------------------------------------------------
+# Modelled mean household income for each MSOA in England and Wales, from the
+# Family Resources Survey and Census and administrative data, with 95%
+# confidence intervals. The FYE 2023 edition (10 December 2025) is the first
+# on the 2021 MSOAs; earlier editions are on 2011 ones and are not used.
+# Three of its measures are taken, each a mean in pounds a year: total
+# household income, and net household income before and after housing costs,
+# which ONS equivalises (adjusts for the size and make-up of the household).
+# Static between releases, like the IMD: the committed parquet is used as it
+# is once complete. To take a new edition, delete
+# data/demographics/saie_msoa.parquet or drop the file in .cache/saie/.
+SAIE_LANDING = ("/employmentandlabourmarket/peopleinwork/earningsandworkinghours/datasets/"
+                "smallareaincomeestimatesformiddlelayersuperoutputareasenglandandwales",)
+SAIE_BULLETINS = ("/peoplepopulationandcommunity/personalandhouseholdfinances/incomeandwealth/"
+                  "bulletins/smallareamodelbasedincomeestimates/latest",)
+SAIE_SEARCH = "Income estimates for small areas, England and Wales"
+SAIE_TITLE_WORDS = ("income", "small areas")
+SAIE_URL_OVERRIDE = os.environ.get("SAIE_URL", "")
+SAIE_CACHE = CACHE_DIR / "saie"
+SAIE_PARQUET = "saie_msoa.parquet"
+# (key, phrases that name the measure, phrases that rule a text out). "Net
+# annual income" with no housing costs in its name is not taken.
+SAIE_MEASURES = (
+    ("saie_total_income", ("total annual income", "total household income", "total income"), ("net",)),
+    ("saie_net_bhc",      ("before housing costs", "before housing cost"), ("after housing",)),
+    ("saie_net_ahc",      ("after housing costs", "after housing cost"), ("before housing",)),
+)
+SAIE_KEYS = [m[0] for m in SAIE_MEASURES]
+# The interval columns kept beside each figure at MSOA, the level ONS
+# publishes them for.
+CI_LOWER, CI_UPPER = "_lci", "_uci"
+
+
+def is_interval_key(k: str) -> bool:
+    """A 95% limit kept beside a figure (saie_net_bhc_lci), not a figure."""
+    return str(k).endswith((CI_LOWER, CI_UPPER))
+
+
+def _saie_role(h: str) -> str:
+    """lower, upper, width (the interval's size, not used) or estimate."""
+    t = " " + iod_norm(h) + " "
+    if " lower " in t or " lci " in t or " lcl " in t:
+        return "lower"
+    if " upper " in t or " uci " in t or " ucl " in t:
+        return "upper"
+    if any(w in t for w in (" interval ", " confidence ", " limit ", " standard error ")):
+        return "width"
+    return "estimate"
+
+
+def saie_parse(tables: list) -> tuple:
+    """(frame, problems, matched) from the tables of a SAIE workbook.
+
+    A column is a measure's when its header names it, or when the sheet's
+    name and title name exactly one measure and the header names none (a
+    sheet per measure, whose limits are headed "Lower confidence limit (£)").
+    Only rows with an English MSOA code are read. A measure matched by two
+    columns, on the wrong scale, or found nowhere is reported and not used;
+    so are limits that do not bracket the figure. Raises RuntimeError when no
+    table has English MSOA codes, or when the file is on the 2011 MSOAs."""
+    found: dict = {k: {"estimate": [], "lower": [], "upper": []} for k in SAIE_KEYS}
+    all_codes: set = set()
+    for name, title, df in tables:
+        code_col = ons_code_col(df)
+        if code_col is None:
+            continue
+        codes = df[code_col].astype(str).str.strip()
+        keep = codes.str.match(r"^E02\d{6}$").to_numpy()
+        if not keep.any():
+            continue
+        rows, rcodes = df[keep], codes[keep]
+        all_codes |= set(rcodes)
+        ctx = name + " " + title
+        ctx_m = [k for k, phr, ex in SAIE_MEASURES if _ons_has(ctx, phr) and not _ons_has(ctx, ex)]
+        for c in rows.columns:
+            if c == code_col or not isinstance(c, str):
+                continue
+            own = [k for k, phr, ex in SAIE_MEASURES if _ons_has(c, phr) and not _ons_has(c, ex)]
+            if len(own) == 1:
+                key = own[0]
+            elif not own and len(ctx_m) == 1 and not _ons_has(c, ("code", "name", "region", "country",
+                                                                 "local authority", "msoa")):
+                key = ctx_m[0]
+            else:
+                continue
+            role = _saie_role(c)
+            if role == "width":
+                continue
+            found[key][role].append((name, c, pd.Series(ons_num(rows[c]).to_numpy(), index=rcodes.to_numpy())))
+    if not all_codes:
+        raise RuntimeError("no table in the file has English MSOA codes (sheets: "
+                           + ", ".join(str(t[0]) for t in tables) + ")")
+    if not any(c > MSOA_LAST_2011 for c in all_codes):
+        raise RuntimeError(f"the file's MSOA codes are all {MSOA_LAST_2011} or below, so it is on the "
+                           "2011 MSOAs (an edition before FYE 2023); it is not used")
+    idx = pd.Index(sorted(all_codes), name="MSOA21CD")
+    cols: dict = {}
+    problems: list = []
+    matched: dict = {}
+    for key in SAIE_KEYS:
+        est = found[key]["estimate"]
+        if not est:
+            problems.append(f"{key}: no column for it in any sheet")
+            continue
+        if len(est) > 1:
+            problems.append(f"{key}: {len(est)} columns match (" + "; ".join(f"'{s}': '{c}'" for s, c, _ in est[:4])
+                            + "), so none is used")
+            continue
+        sheet, col, s = est[0]
+        s = s[~s.index.duplicated()].reindex(idx)
+        v = s.dropna()
+        if v.empty:
+            problems.append(f"{key} ('{sheet}': '{col}') has no figures")
+            continue
+        med = float(v.median())
+        if not 5_000 <= med <= 300_000:
+            problems.append(f"{key} ('{sheet}': '{col}') has a median of {med:,.0f}, which is not pounds a "
+                            "year (a weekly or thousands figure?); not used")
+            continue
+        if s.notna().sum() < 0.9 * len(idx):
+            problems.append(f"{key} ('{sheet}': '{col}') has figures for only {int(s.notna().sum()):,} "
+                            f"of {len(idx):,} MSOAs")
+        cols[key] = s
+        matched[key] = f"{sheet}: {col}"
+        lo = [x for x in found[key]["lower"] if x[0] == sheet]
+        hi = [x for x in found[key]["upper"] if x[0] == sheet]
+        if len(lo) == 1 and len(hi) == 1:
+            l = lo[0][2][~lo[0][2].index.duplicated()].reindex(idx)
+            u = hi[0][2][~hi[0][2].index.duplicated()].reindex(idx)
+            both = s.notna() & l.notna() & u.notna()
+            fits = ((l <= s) & (s <= u))[both]
+            if both.sum() and fits.mean() >= 0.95:
+                cols[key + CI_LOWER], cols[key + CI_UPPER] = l, u
+                matched[key + "_ci"] = f"{lo[0][1]} / {hi[0][1]}"
+            else:
+                problems.append(f"{key}: its limits do not bracket the figure for "
+                                f"{(1 - fits.mean()) if both.sum() else 1:.0%} of MSOAs; shown without them")
+        else:
+            problems.append(f"{key}: no single pair of 95% limits beside it in '{sheet}'; shown without them")
+    if "saie_net_bhc" in cols and "saie_net_ahc" in cols:
+        b, a = cols["saie_net_bhc"], cols["saie_net_ahc"]
+        both = a.notna() & b.notna()
+        below = (a[both] <= b[both]).mean() if both.sum() else 1.0
+        if below < 0.95:
+            problems.append(f"after housing costs is below before housing costs for only {below:.0%} of "
+                            "MSOAs, so the two columns may be the wrong way round; neither is used")
+            for k in ("saie_net_bhc", "saie_net_ahc"):
+                for sfx in ("", CI_LOWER, CI_UPPER):
+                    cols.pop(k + sfx, None)
+                    matched.pop(k + sfx, None)
+    out = pd.DataFrame(cols, index=idx).reset_index()
+    return out, problems, matched
+
+
+def run_saie() -> pd.DataFrame:
+    rule("ONS small area income estimates (MSOA, financial year ending 2023)")
+    source = "saie"
+    prev = _ons_committed("demographics", SAIE_PARQUET)
+
+    def find():
+        files = ons_dataset_files(SAIE_LANDING, SAIE_BULLETINS, SAIE_SEARCH, SAIE_TITLE_WORDS)
+        f = ons_pick_latest(files, (".xlsx", ".xls", ".csv", ".zip"))
+        if f:
+            info(f"{source}: newest edition is {f['edition']!r}, file {f['file']}")
+        else:
+            warn(f"{source}: no spreadsheet found on the ONS dataset page ({ONS_BASE}{SAIE_LANDING[0]})")
+        return f
+
+    src, kept = _ons_static_file(source, SAIE_CACHE, prev, SAIE_KEYS, SAIE_URL_OVERRIDE, find,
+                                 "small area income estimates")
+    if src is None:
+        return kept
+    info(f"{source}: reading {src.name}")
+    try:
+        tables = ons_tables(src)
+    except Exception as e:
+        raise RuntimeError(f"{src.name} could not be read: {type(e).__name__}: {e}")
+    out, problems, matched = saie_parse(tables)
+    for k, v in matched.items():
+        info(f"{source}: {k} <- {v!r}")
+    found = [k for k in SAIE_KEYS if k in out.columns]
+    if not found:
+        msg = f"none of the income measures was found in {src.name}: " + "; ".join(problems[:6])
+        if prev is not None and len(prev):
+            _iod_fail(source, msg)
+            return prev
+        raise RuntimeError(msg)
+    rel = _ons_release(src)
+    out["period"] = (ons_period(rel.get("edition", "")) or ons_period(rel.get("uri", ""))
+                     or ons_period(src.name) or ons_period(" ".join(t[1] for t in tables)))
+    if not out["period"].iloc[0]:
+        warn(f"{source}: the edition's period could not be read; the map will say none")
+    missing = [k for k in SAIE_KEYS if k not in out.columns]
+    if missing:
+        _iod_fail(source, f"{len(missing)} of {len(SAIE_KEYS)} measures missing or not used: "
+                          + "; ".join(problems))
+    elif problems:
+        warn(f"{source}: " + "; ".join(problems))
+    out = _ons_write("demographics", SAIE_PARQUET, out, source, "MSOAs")
+    info(f"{source}: {len(found)} of {len(SAIE_KEYS)} measures, period {out['period'].iloc[0] or 'unknown'}")
+    return out
+
+
+# ---------------------------------------------------------------------------
+# ONS healthy and disability-free life expectancy at birth, MSOA, 2019 to 2023
+# ---------------------------------------------------------------------------
+# "Health state life expectancy estimates for Middle layer Super Output
+# Areas, England and Wales: 2019 to 2023": healthy life expectancy (HLE, the
+# years expected in good or very good health) and disability-free life
+# expectancy (DFLE, the years expected free of an illness or disability that
+# limits day-to-day activity), at birth, for women and men, with 95%
+# confidence intervals. The health states come from the Census 2021
+# questions, so the boundaries should be the 2021 MSOAs; a file whose codes
+# are all 2011 ones is refused. ONS says these are not comparable with its
+# survey-based LA figures or with the earlier MSOA estimates for 2009 to
+# 2013. ONS revised the bulletin once, so the edition the file came from is
+# logged and kept with the figures. Static between releases, like SAIE.
+HLE_LANDING = ("/peoplepopulationandcommunity/healthandsocialcare/healthandlifeexpectancies/datasets/"
+               "healthstatelifeexpectancyestimatesformiddlelayersuperoutputareasenglandandwales",)
+HLE_BULLETINS = ("/peoplepopulationandcommunity/healthandsocialcare/healthandlifeexpectancies/bulletins/"
+                 "healthstatelifeexpectancyestimatesformiddlelayersuperoutputareasenglandandwales/latest",)
+HLE_SEARCH = "Health state life expectancy estimates for Middle layer Super Output Areas"
+HLE_TITLE_WORDS = ("life expectancy", "middle layer")
+HLE_URL_OVERRIDE = os.environ.get("HLE_MSOA_URL", "")
+HLE_CACHE = CACHE_DIR / "hle_msoa"
+HLE_PARQUET = "hle_msoa.parquet"
+HLE_LA_PARQUET = "hle_msoa_la.parquet"
+# (measure, phrases or abbreviations that name it, phrases that rule a header out)
+HLE_MEASURES = (
+    ("hle",  ("healthy life expectancy", "hle"), ("proportion", "percentage", "disability")),
+    ("dfle", ("disability free life expectancy", "disability-free life expectancy", "dfle"),
+     ("proportion", "percentage")),
+)
+HLE_SEXES = (("female", ("female", "females", "women", "f")), ("male", ("male", "males", "men", "m")))
+HLE_KEYS = [f"{m}_{s}" for m, _, _ in HLE_MEASURES for s, _ in HLE_SEXES]
+# The ages that mean "at birth" in an age column.
+_HLE_BIRTH = re.compile(r"^(?:0|00|<1|under 1|less than 1|at birth|birth|0?0 ?(?:to|-) ?0?[14]|aged? 0|0 years?|0 yrs?)$")
+
+
+def _hle_measure(text: str) -> list:
+    return [m for m, phr, ex in HLE_MEASURES if _ons_has(text, phr) and not _ons_has(text, ex)]
+
+
+def _hle_sex_of(text: str) -> str:
+    """female, male or "" for a header or a cell. Female first, since
+    "female" holds "male"; single letters only as a whole cell."""
+    t = iod_norm(text)
+    for sex, words in HLE_SEXES:
+        if any((w == t) if len(w) == 1 else (" " + w + " " in " " + t + " ") for w in words):
+            return sex
+    return ""
+
+
+def hle_parse(tables: list) -> tuple:
+    """(MSOA frame, LA frame, problems, matched) from the tables of the
+    health state life expectancy file.
+
+    Long tables (a sex column, perhaps an age column) and wide ones (the sex
+    in each header) are both read; with an age column only the at-birth rows
+    are kept. MSOA rows are those with an English MSOA code, LA rows those
+    with an English LA code (E06, E07, E08, E09), which ONS's own LA figures
+    of the same method would carry. A figure matched by two columns, outside
+    40 to 90 years, or found nowhere is reported and not used. Raises
+    RuntimeError when no table has English MSOA codes, or when the file is
+    on the 2011 MSOAs."""
+    found: dict = {}
+    msoa_codes: set = set()
+    for name, title, df in tables:
+        code_col = ons_code_col(df)
+        if code_col is None:
+            continue
+        codes = df[code_col].astype(str).str.strip()
+        is_msoa = codes.str.match(r"^E02\d{6}$")
+        is_la = codes.str.match(r"^E0[6789]\d{6}$")
+        if not (is_msoa.any() or is_la.any()):
+            continue
+        cols = [c for c in df.columns if isinstance(c, str)]
+        sex_col = next((c for c in cols if iod_norm(c) in ("sex", "gender")), None)
+        age_col = next((c for c in cols if re.match(r"^age(?: group| band| at)?$", iod_norm(c))), None)
+        frame = df
+        if age_col is not None:
+            ages = frame[age_col].astype(str).str.strip().str.lower()
+            birth = ages.str.match(_HLE_BIRTH)
+            if not birth.any():
+                found.setdefault("_age", []).append(f"'{name}' has an age column with no at-birth rows")
+                continue
+            frame = frame[birth.to_numpy()]
+            codes = frame[code_col].astype(str).str.strip()
+            is_msoa = codes.str.match(r"^E02\d{6}$")
+            is_la = codes.str.match(r"^E0[6789]\d{6}$")
+        msoa_codes |= set(codes[is_msoa])
+        ctx_m = _hle_measure(name + " " + title)
+        groups = [("", frame)]
+        if sex_col is not None:
+            sx = frame[sex_col].astype(str).map(_hle_sex_of)
+            groups = [(s, frame[(sx == s).to_numpy()]) for s, _ in HLE_SEXES]
+        for sex_g, g in groups:
+            gc = g[code_col].astype(str).str.strip()
+            for c in cols:
+                if c in (code_col, sex_col, age_col):
+                    continue
+                own = _hle_measure(c)
+                m = own[0] if len(own) == 1 else (ctx_m[0] if not own and len(ctx_m) == 1 else None)
+                if m is None:
+                    continue
+                sex = sex_g or _hle_sex_of(c)
+                if not sex:
+                    continue
+                role = _saie_role(c)
+                if role == "width":
+                    continue
+                vals = pd.Series(ons_num(g[c]).to_numpy(), index=gc.to_numpy())
+                found.setdefault((f"{m}_{sex}", role), []).append((name, c, vals))
+    problems = list(found.pop("_age", []))
+    if not msoa_codes:
+        raise RuntimeError("no table in the file has English MSOA codes at birth (sheets: "
+                           + ", ".join(str(t[0]) for t in tables) + ")")
+    if not any(c > MSOA_LAST_2011 for c in msoa_codes):
+        raise RuntimeError(f"the file's MSOA codes are all {MSOA_LAST_2011} or below, so it is on the "
+                           "2011 MSOAs; it is not used")
+    m_idx = pd.Index(sorted(msoa_codes), name="MSOA21CD")
+    m_cols: dict = {}
+    l_cols: dict = {}
+    matched: dict = {}
+    for key in HLE_KEYS:
+        est = found.get((key, "estimate"), [])
+        heads = list(dict.fromkeys((s, c) for s, c, _ in est))
+        if not est:
+            problems.append(f"{key}: no column for it in any sheet")
+            continue
+        if len(heads) > 1:
+            problems.append(f"{key}: {len(heads)} columns match (" + "; ".join(f"'{s}': '{c}'" for s, c in heads[:4])
+                            + "), so none is used")
+            continue
+        sheet, col = heads[0]
+        s = pd.concat([x[2] for x in est])
+        s = s[~s.index.duplicated()]
+        v = s[s.index.isin(m_idx)].dropna()
+        if v.empty or not 40 <= float(v.median()) <= 90:
+            problems.append(f"{key} ('{sheet}': '{col}') " + ("has no MSOA figures" if v.empty else
+                            f"has a median of {float(v.median()):.1f}, which is not years of life at birth")
+                            + "; not used")
+            continue
+        sm = s.reindex(m_idx)
+        if sm.notna().sum() < 0.9 * len(m_idx):
+            problems.append(f"{key} ('{col}') has figures for only {int(sm.notna().sum()):,} of {len(m_idx):,} MSOAs")
+        m_cols[key] = sm
+        matched[key] = f"{sheet}: {col}"
+        la = s[s.index.str.match(r"^E0[6789]\d{6}$")]
+        if len(la):
+            l_cols[key] = la
+        lo = [x for x in found.get((key, "lower"), []) if x[0] == sheet]
+        hi = [x for x in found.get((key, "upper"), []) if x[0] == sheet]
+        if len({x[1] for x in lo}) == 1 and len({x[1] for x in hi}) == 1:
+            l = pd.concat([x[2] for x in lo]); l = l[~l.index.duplicated()].reindex(m_idx)
+            u = pd.concat([x[2] for x in hi]); u = u[~u.index.duplicated()].reindex(m_idx)
+            both = sm.notna() & l.notna() & u.notna()
+            fits = ((l <= sm) & (sm <= u))[both]
+            if both.sum() and fits.mean() >= 0.95:
+                m_cols[key + CI_LOWER], m_cols[key + CI_UPPER] = l, u
+                matched[key + "_ci"] = f"{lo[0][1]} / {hi[0][1]}"
+            else:
+                problems.append(f"{key}: its limits do not bracket the figure; shown without them")
+        else:
+            problems.append(f"{key}: no single pair of 95% limits beside it in '{sheet}'; shown without them")
+    msoa = pd.DataFrame(m_cols, index=m_idx).reset_index()
+    if l_cols:
+        la_df = pd.DataFrame(l_cols)
+        la_df.index.name = "LAD25CD"
+        la_df = la_df.reset_index()
+    else:
+        la_df = pd.DataFrame(columns=["LAD25CD"])
+    return msoa, la_df, problems, matched
+
+
+def run_hle_msoa() -> pd.DataFrame:
+    rule("ONS healthy and disability-free life expectancy at birth (MSOA, 2019 to 2023)")
+    source = "hle_msoa"
+    prev = _ons_committed("outcomes", HLE_PARQUET)
+
+    def find():
+        files = ons_dataset_files(HLE_LANDING, HLE_BULLETINS, HLE_SEARCH, HLE_TITLE_WORDS)
+        f = ons_pick_latest(files, (".xlsx", ".xls", ".csv", ".zip"))
+        if f:
+            info(f"{source}: newest edition is {f['edition']!r}, file {f['file']}")
+        else:
+            warn(f"{source}: no spreadsheet found on the ONS dataset page ({ONS_BASE}{HLE_LANDING[0]})")
+        return f
+
+    src, kept = _ons_static_file(source, HLE_CACHE, prev, HLE_KEYS, HLE_URL_OVERRIDE, find,
+                                 "health state life expectancy")
+    if src is None:
+        return kept
+    info(f"{source}: reading {src.name}")
+    try:
+        tables = ons_tables(src)
+    except Exception as e:
+        raise RuntimeError(f"{src.name} could not be read: {type(e).__name__}: {e}")
+    msoa, la, problems, matched = hle_parse(tables)
+    for k, v in matched.items():
+        info(f"{source}: {k} <- {v!r}")
+    found = [k for k in HLE_KEYS if k in msoa.columns]
+    if not found:
+        msg = f"none of the life expectancy measures was found in {src.name}: " + "; ".join(problems[:6])
+        if prev is not None and len(prev):
+            _iod_fail(source, msg)
+            return prev
+        raise RuntimeError(msg)
+    rel = _ons_release(src)
+    period = (ons_period(rel.get("edition", "")) or ons_period(rel.get("uri", ""))
+              or ons_period(src.name) or ons_period(" ".join(t[1] for t in tables)))
+    if not period:
+        warn(f"{source}: the edition's period could not be read; the map will say none")
+    msoa["period"] = period
+    msoa["edition"] = str(rel.get("edition") or rel.get("release_date") or src.name)
+    info(f"{source}: edition {msoa['edition'].iloc[0]!r}, period {period}")
+    missing = [k for k in HLE_KEYS if k not in msoa.columns]
+    if missing:
+        _iod_fail(source, f"{len(missing)} of {len(HLE_KEYS)} figures missing or not used: "
+                          + "; ".join(problems))
+    elif problems:
+        warn(f"{source}: " + "; ".join(problems))
+    out = _ons_write("outcomes", HLE_PARQUET, msoa, source, "MSOAs")
+    if len(la):
+        la["period"] = period
+        _ons_write("outcomes", HLE_LA_PARQUET, la, source, "LAs (ONS's own LA figures)")
+    else:
+        info(f"{source}: the file has no LA rows, so LA figures are worked out from wards on the map")
     return out
 
 
@@ -7042,6 +8244,66 @@ def fuel_poverty_by_area(fp: "pd.DataFrame | None", lsoa_to_area: dict,
     return lsoa_means_to_areas(per_lsoa, lsoa_to_area, pop_by_lsoa, what=what)
 
 
+def _read_static_opt(subdir: str, name: str):
+    """A static national parquet (SAIE, health state life expectancy): this
+    scope's copy, else the national one, else None, without a warning, since
+    a build before the source first runs simply has none."""
+    for base in (DATA_DIR, NATIONAL_DATA_DIR):
+        p = base / subdir / name
+        if p.exists():
+            try:
+                return pd.read_parquet(p)
+            except Exception as e:
+                warn(f"{name} unreadable ({e})")
+                return None
+    return None
+
+
+def saie_weights(pop_by_lsoa: dict, *, what: str = "income") -> tuple:
+    """({LSOA21CD: weight}, "households" or "residents") for the income
+    figures, which are means over households: households at the 2021 Census,
+    or residents with a warning when the household counts are missing.
+    ({}, "") when there are neither."""
+    hh = census_households_by_lsoa(_read_parquet_opt(DATA_DIR / "demographics" / "census2021_counts.parquet"))
+    if hh:
+        return hh, "households"
+    if pop_by_lsoa:
+        warn(f"{what}: no Census household counts (census2021_counts.parquet), so it is "
+             "weighted by residents instead of households")
+        return pop_by_lsoa, "residents"
+    warn(f"{what}: no Census households or residents to weight by; no figures made")
+    return {}, ""
+
+
+def msoa_figures_to_areas(frame: "pd.DataFrame", keys, lsoa_to_msoa: dict, lsoa_to_area: dict,
+                          weights: dict, *, min_cover: float = WARD_MIN_COVER) -> tuple:
+    """({area: {key: value}}, {key: (values, cover)}) for figures published
+    per MSOA (frame keyed by MSOA21CD), placed onto areas through the LSOAs:
+    each LSOA takes its MSOA's figure and an area is the weighted mean of its
+    LSOAs, as bridge_to_wards makes the Local Health ward figures. MSOAs do
+    not nest in wards, so a ward over two MSOAs blends them by where its
+    weight (households or residents) lies; they do nest in LAs, so an LA's
+    figure is its MSOAs weighted by theirs. An area under min_cover has no
+    figure. {} when there is nothing to weight by."""
+    out: dict = {}
+    covers: dict = {}
+    if frame is None or frame.empty or "MSOA21CD" not in frame.columns or not weights:
+        return out, covers
+    by = frame.drop_duplicates("MSOA21CD").set_index(frame.drop_duplicates("MSOA21CD")["MSOA21CD"].astype(str))
+    for key in keys:
+        if key not in by.columns:
+            continue
+        per_msoa = {m: float(v) for m, v in pd.to_numeric(by[key], errors="coerce").items() if pd.notna(v)}
+        per_lsoa = {lc: per_msoa[ms] for lc, ms in lsoa_to_msoa.items() if ms in per_msoa}
+        if not per_lsoa:
+            continue
+        vals, cover = bridge_to_wards(per_lsoa, lsoa_to_area, weights, min_cover=min_cover)
+        for a, v in vals.items():
+            out.setdefault(a, {})[key] = v
+        covers[key] = (vals, cover)
+    return out, covers
+
+
 def record_cover(wards: dict, cover: dict, key: str, vals: dict) -> int:
     """Write a ward's coverage for one indicator into ward["cover"][key], as a
     whole percentage, where it has a figure that rests on less than all of its
@@ -7115,6 +8377,39 @@ def crime_total_by_ward(crime):
     if "category" in crime.columns:
         crime = crime[~crime["category"].astype(str).isin(CRIME_TOTAL_EXCLUDES)]
     return crime.groupby("WD25CD").size().reindex(wards, fill_value=0)
+
+
+def local_health_msoa_frame() -> "pd.DataFrame | None":
+    """The Local Health MSOA figures in one frame: fingertips_msoa.parquet
+    and the series of FINGERTIPS_MSOA_EXTRA that passed their checks, with
+    bare zeros dropped (ft_msoa_drop_bare_zeros). None when neither has
+    rows. A series in both keeps the established file's rows."""
+    outc = DATA_DIR / "outcomes"
+    frames = [_read_parquet_opt(outc / "fingertips_msoa.parquet")]
+    if (outc / FT_MSOA_EXTRA_PARQUET).exists():
+        frames.append(pd.read_parquet(outc / FT_MSOA_EXTRA_PARQUET))
+    frames = [f for f in frames if f is not None and not f.empty and "indicator_id" in f.columns]
+    if not frames:
+        return None
+    ftm = frames[0] if len(frames) == 1 else pd.concat(frames, ignore_index=True)
+    if len(frames) > 1:
+        ftm = ftm.drop_duplicates(["MSOA21CD", "indicator_id"], keep="first")
+    return ft_msoa_drop_bare_zeros(ftm)
+
+
+def local_health_la_frame() -> "pd.DataFrame | None":
+    """OHID's own LA figures for the Local Health series, established and
+    extra, in one frame (see local_health_msoa_frame). None when neither
+    file has rows."""
+    outc = DATA_DIR / "outcomes"
+    frames = [_read_parquet_opt(outc / "fingertips_msoa_la.parquet")]
+    if (outc / FT_MSOA_EXTRA_LA_PARQUET).exists():
+        frames.append(pd.read_parquet(outc / FT_MSOA_EXTRA_LA_PARQUET))
+    frames = [f for f in frames if f is not None and not f.empty]
+    if not frames:
+        return None
+    lh = frames[0] if len(frames) == 1 else pd.concat(frames, ignore_index=True)
+    return lh.drop_duplicates(["LAD25CD", "indicator_id"], keep="first") if len(frames) > 1 else lh
 
 
 def build_ward_data() -> dict:
@@ -7256,7 +8551,7 @@ def build_ward_data() -> dict:
     # rests on its other LSOAs only, so the share of residents covered is
     # recorded, and a ward under WARD_MIN_COVER gets no figure (see
     # bridge_to_wards).
-    ftm = ft_msoa_drop_bare_zeros(_read_parquet_opt(DATA_DIR / "outcomes" / "fingertips_msoa.parquet"))
+    ftm = local_health_msoa_frame()
     if ftm is not None and not ftm.empty:
         sources["health_msoa"] = "OHID Fingertips (Local Health, MSOA)"
         lsoa_to_ward = get_lsoa_to_ward()
@@ -7409,6 +8704,35 @@ def build_ward_data() -> dict:
     if fp is not None:
         sources["fuel_poverty"] = "DESNZ sub-regional fuel poverty (LILEE)"
         sources["_fuel_poverty_year"] = _fuel_poverty_period(fp)
+
+    # --- ONS figures published for MSOAs: income, and healthy and
+    # disability-free life expectancy. As with Local Health, each LSOA takes
+    # its MSOA's figure and the ward is the weighted mean of its LSOAs, with
+    # no figure under WARD_MIN_COVER. Income is a mean over households, so it
+    # is weighted by households (Census 2021); life expectancy by residents,
+    # as the Local Health life expectancy is. The intervals stay at MSOA.
+    saie_weight = ""
+    saie = _read_static_opt("demographics", SAIE_PARQUET)
+    hle = _read_static_opt("outcomes", HLE_PARQUET)
+    if (saie is not None and not saie.empty) or (hle is not None and not hle.empty):
+        lsoa_to_msoa = get_lsoa_to_msoa()
+        if saie is not None and not saie.empty:
+            sources["saie"] = "ONS small area income estimates (MSOA)"
+            weights, saie_weight = saie_weights(pop_by_lsoa, what="ward income")
+            vals, covers = msoa_figures_to_areas(saie, SAIE_KEYS, lsoa_to_msoa, lsoa_to_ward, weights)
+            for wd, rec in vals.items():
+                if wd in wards:
+                    wards[wd]["indicators"].update({k: round(v) for k, v in rec.items()})
+            for key, (kv, cover) in covers.items():
+                record_cover(wards, cover, key, kv)
+        if hle is not None and not hle.empty and pop_by_lsoa:
+            sources["hle_msoa"] = "ONS health state life expectancy (MSOA)"
+            vals, covers = msoa_figures_to_areas(hle, HLE_KEYS, lsoa_to_msoa, lsoa_to_ward, pop_by_lsoa)
+            for wd, rec in vals.items():
+                if wd in wards:
+                    wards[wd]["indicators"].update({k: round(v, 2) for k, v in rec.items()})
+            for key, (kv, cover) in covers.items():
+                record_cover(wards, cover, key, kv)
 
     pt = _read_parquet_opt(DATA_DIR / "demographics" / "ptal.parquet")
     # A ward with figures for under four in five of its residents is left
@@ -7589,6 +8913,10 @@ def build_ward_data() -> dict:
             # population estimates, the claimant month, the road casualty
             # years and the date of the CQC file.
             "small_area": sa_notes,
+            # What the ward income figures are weighted by: "households"
+            # (Census 2021), or "residents" when the household counts were
+            # missing.
+            "saie_weight": saie_weight,
         },
     }
 
@@ -7690,7 +9018,7 @@ def build_borough_data() -> dict:
     # OHID's own LA figures for the Local Health indicators, under the key
     # the MSOA and ward figures carry (ft_<id>), so the map shows OHID's LA
     # figure rather than its estimate from wards (run_fingertips_msoa_la).
-    lh = _read_parquet_opt(DATA_DIR / "outcomes" / "fingertips_msoa_la.parquet")
+    lh = local_health_la_frame()
     if lh is not None and not lh.empty:
         out_la_lh = local_health_la_values(lh)
         for lad, vals in out_la_lh.items():
@@ -7748,6 +9076,37 @@ def build_borough_data() -> dict:
     for lad, vals in sa_la.items():
         if lad in SCOPE_LADS or lad in out:
             out.setdefault(lad, {}).update(vals)
+    # ONS income for each LA from all of its MSOAs, which nest in LAs,
+    # weighted by households as the wards are (msoa_figures_to_areas). ONS
+    # publishes no LA figure in this release, and the map would otherwise
+    # average the wards by residents.
+    saie = _read_static_opt("demographics", SAIE_PARQUET)
+    if saie is not None and not saie.empty:
+        cen_l = _read_parquet_opt(demo / "census2021.parquet")
+        pops = ({} if cen_l is None or cen_l.empty or "census_population" not in cen_l.columns
+                else dict(zip(cen_l["LSOA21CD"].astype(str),
+                              pd.to_numeric(cen_l["census_population"], errors="coerce").fillna(0))))
+        to_la = {lc: lad for lc, (_wd, lad) in get_lsoa_ward_lookup().items() if lad}
+        weights, _ = saie_weights(pops, what=f"{LA_WORD} income")
+        vals, _ = msoa_figures_to_areas(saie, SAIE_KEYS, get_lsoa_to_msoa(), to_la, weights)
+        for lad, rec in vals.items():
+            out.setdefault(lad, {}).update({k: round(v) for k, v in rec.items()})
+    # Healthy and disability-free life expectancy: ONS's own LA figures where
+    # the MSOA release carries them, under the same keys. Without them the map
+    # works an LA figure out from its wards and says it is an estimate, as for
+    # the Local Health life expectancy.
+    hle_la = _read_static_opt("outcomes", HLE_LA_PARQUET)
+    if hle_la is not None and not hle_la.empty and "LAD25CD" in hle_la.columns:
+        hle_la = ft_codes_to_current(hle_la.rename(columns={"LAD25CD": "Area Code"})).rename(
+            columns={"Area Code": "LAD25CD"})
+        for rec in hle_la.to_dict("records"):
+            lad = str(rec.get("LAD25CD") or "")
+            if lad not in SCOPE_LADS:
+                continue
+            for k in HLE_KEYS:
+                v = rec.get(k)
+                if v is not None and pd.notna(v):
+                    out.setdefault(lad, {})[k] = round(float(v), 2)
     info(f"borough_data: {len(out):,} {LA_WORD}s, {n_vals:,} published values, "
          f"{n_cen:,} Census figures from summed counts")
     return out
@@ -7785,7 +9144,7 @@ def build_msoa_data() -> dict:
                 v = row[col]
                 if pd.notna(v):
                     rec[col] = int(v) if col == "census_population" else round(float(v), 4)
-    ftm = ft_msoa_drop_bare_zeros(_read_parquet_opt(DATA_DIR / "outcomes" / "fingertips_msoa.parquet"))
+    ftm = local_health_msoa_frame()
     if ftm is None or ftm.empty:
         warn("msoa_data: no fingertips_msoa parquet")
         ftm = pd.DataFrame(columns=["MSOA21CD", "indicator_id", "value"])
@@ -7804,6 +9163,31 @@ def build_msoa_data() -> dict:
         # Carried from 2011 codes, so an estimate for the 2021 area.
         if bool(row.get("estimated", False)) is True:
             out[code][f"ft_{int(row['indicator_id'])}_est"] = 1
+
+    # ONS's income estimates and health state life expectancies, as
+    # published for each MSOA, each with its 95% limits (<key>_lci and
+    # <key>_uci) where ONS gives them. Both files are national, so only this
+    # scope's MSOAs are written. Income is in whole pounds.
+    statics = [(_read_static_opt("demographics", SAIE_PARQUET), SAIE_KEYS, 0),
+               (_read_static_opt("outcomes", HLE_PARQUET), HLE_KEYS, 2)]
+    if any(f is not None and not f.empty for f, _, _ in statics):
+        try:
+            scope_msoa = set(get_lsoa_to_msoa().values())
+        except Exception as e:
+            warn(f"msoa_data: no LSOA to MSOA lookup ({e}); income and health state life expectancy left out")
+            scope_msoa = set()
+        for frame, keys, nd in statics:
+            if frame is None or frame.empty or "MSOA21CD" not in frame.columns:
+                continue
+            cols = [c for k in keys for c in (k, k + CI_LOWER, k + CI_UPPER) if c in frame.columns]
+            for rec in frame[["MSOA21CD"] + cols].to_dict("records"):
+                code = str(rec["MSOA21CD"])
+                if code not in scope_msoa:
+                    continue
+                for c in cols:
+                    v = rec[c]
+                    if v is not None and pd.notna(v):
+                        out.setdefault(code, {})[c] = int(round(float(v))) if nd == 0 else round(float(v), nd)
 
     n_vals = sum(len(v) for v in out.values())
     info(f"msoa_data: {len(out):,} MSOAs, {n_vals:,} published values, none derived")
@@ -8315,7 +9699,7 @@ def _indicator_periods() -> dict[str, str]:
         for key, s in df.groupby(key_col)["period"]:
             out[f"{prefix}{key}"] = str(s.astype(str).mode().iloc[0]).strip()
 
-    msoa = _read_parquet_opt(DATA_DIR / "outcomes" / "fingertips_msoa.parquet")
+    msoa = local_health_msoa_frame()
     if msoa is not None and "indicator_id" in msoa.columns:
         _modal(msoa.assign(indicator_id=msoa["indicator_id"].astype(int)),
                "indicator_id", "ft_")
@@ -8327,6 +9711,19 @@ def _indicator_periods() -> dict[str, str]:
     if fp_year:
         out["fuel_poverty_pct"] = fp_year
     out.update(small_area_periods())
+    # The ONS MSOA releases carry the period their edition names.
+    for subdir, name, keys in (("demographics", SAIE_PARQUET, SAIE_KEYS),
+                               ("outcomes", HLE_PARQUET, HLE_KEYS)):
+        f = _read_static_opt(subdir, name)
+        if f is None or f.empty or "period" not in f.columns:
+            continue
+        per = f["period"].fillna("").astype(str).str.strip()
+        per = per[per != ""]
+        if per.empty:
+            continue
+        for k in keys:
+            if k in f.columns:
+                out[k] = str(per.mode().iloc[0])
 
     try:
         sources = json.loads(MANIFEST_PATH.read_text(encoding="utf-8")).get("sources") or {}
@@ -8413,7 +9810,8 @@ def build_indicator_stats(ward_data: dict, lsoa_data: dict,
             if not isinstance(inds, dict):
                 continue
             for k, v in inds.items():
-                if k in SKIP or k.startswith("_"):
+                # A 95% limit rides beside its figure and is not one itself.
+                if k in SKIP or k.startswith("_") or is_interval_key(k):
                     continue
                 if isinstance(v, bool) or not isinstance(v, (int, float)):
                     continue
@@ -8462,7 +9860,11 @@ def build_indicator_stats(ward_data: dict, lsoa_data: dict,
          f"period carried for {dated}")
     age_bands = census_age_bands()
     ft_bad = ft_age_mismatches()
-    return {
+    gaps = local_health_known_gaps()
+    if gaps:
+        info(f"indicator stats: {len(gaps)} Local Health series not shipped here, listed as known gaps: "
+             + ", ".join(gaps))
+    out = {
         "generated": datetime.now(timezone.utc).isoformat(),
         # How the Census ward figures were made, for the methodology page,
         # which reads this file rather than the much larger ward file.
@@ -8490,8 +9892,30 @@ def build_indicator_stats(ward_data: dict, lsoa_data: dict,
         # check ran, so a file written before it existed is treated with care.
         "ft_age_checked": ft_bad is not None,
         "ft_age_mismatch": sorted(ft_bad or []),
+        # Local Health series that this scope does not ship because OHID
+        # publishes too little of them here (ft_msoa_series_check), so the
+        # region pack check does not hold a region back for lacking a series
+        # London has (scripts/check_region_pack.py). A series that failed to
+        # download is not listed: that is a failure, not a gap. Written only
+        # when there are some, so a build with none keeps the file as it was.
+        "known_gaps": gaps,
         "stats": stats,
     }
+    if not gaps:
+        out.pop("known_gaps")
+    return out
+
+
+def local_health_known_gaps() -> list:
+    """ft_ keys of the FINGERTIPS_MSOA_EXTRA series this scope's last run
+    checked and did not ship, for the publisher's reasons."""
+    try:
+        rec = json.loads((DATA_DIR / "outcomes" / FT_MSOA_EXTRA_CHECKS).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    series = (rec or {}).get("series") or {}
+    return sorted(f"ft_{i}" for i, c in series.items()
+                  if isinstance(c, dict) and not c.get("ships") and c.get("kind") == "publisher")
 
 
 def census_age_bands() -> str:
@@ -9014,8 +10438,10 @@ def run_greenblue() -> pd.DataFrame:
 #   https://uk-air.defra.gov.uk/data/pcm-data
 #
 # Air quality is the environmental exposure with the clearest link to outcomes
-# this map already carries — respiratory admissions, cardiovascular disease,
-# low birth weight — and until now nothing here measured it.
+# this map carries: respiratory admissions and cardiovascular disease from
+# Local Health, and low birth weight where OHID's figures for the region pass
+# the per-series checks (FINGERTIPS_MSOA_EXTRA). Before this source nothing
+# here measured air quality.
 #
 # Three properties of the published files are handled rather than assumed,
 # because each one fails silently if guessed wrong:
@@ -11436,6 +12862,11 @@ SOURCES = {
     "fingertips_msoa": run_fingertips_msoa,
     "fingertips_msoa_la": run_fingertips_msoa_la,
     "fingertips_profiles": run_fingertips_profiles,
+    # New series in sources of their own, so one that fails cannot mark an
+    # established source partial or failed (which stops region packs).
+    "fingertips_msoa_extra": run_fingertips_msoa_extra,
+    "saie":        run_saie,
+    "hle_msoa":    run_hle_msoa,
     "fuel_poverty": run_fuel_poverty,
     "ptal":        run_ptal,
     "crime":       run_police_crime,
@@ -11526,6 +12957,7 @@ def main() -> int:
             _SOURCE_PARTIAL.pop(s, None)
             _SOURCE_ERROR.pop(s, None)
             _SOURCE_NOTE.pop(s, None)
+            _SOURCE_SKIPPED.pop(s, None)
             t0 = time.time()
             rec: dict = {"status": "ok", "error": "", "notes": "",
                          "fetched_at": datetime.now(timezone.utc).isoformat(),
@@ -11537,7 +12969,8 @@ def main() -> int:
                     # with no Hospital.csv. Not a failure, but not a success
                     # either, so it is distinguishable in the manifest.
                     rec["status"] = "skipped"
-                    rec["notes"] = _SOURCE_NOTE.get(s) or "source returned no frame"
+                    rec["notes"] = (_SOURCE_SKIPPED.get(s) or _SOURCE_NOTE.get(s)
+                                    or "source returned no frame")
                 elif hasattr(df, "columns"):
                     rec["rows_written"] = int(len(df))
                     rec["schema"] = {str(c): str(t) for c, t in df.dtypes.items()}

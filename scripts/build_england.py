@@ -151,6 +151,9 @@ def level_stats(records: list) -> dict:
     vals: dict = {}
     for rec in records:
         for k, v in ((rec or {}).get("indicators") or rec or {}).items():
+            # A 95% limit beside a figure (saie_net_bhc_lci) is not an indicator.
+            if str(k).endswith(("_lci", "_uci")):
+                continue
             if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v):
                 vals.setdefault(k, []).append(float(v))
     out = {}

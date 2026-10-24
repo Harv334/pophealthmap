@@ -16,6 +16,10 @@ Checks, each an error unless noted:
   3. Every Local Health series London has (ft_ and a number, in London's
      data/map/indicators.js) is in this region's too, unless it is listed as a
      known gap, in "known_gaps" in scopes/<scope>.json or in indicators.js.
+     A series from a source the region's pack was built before (its manifest
+     has no record of that source, NEWER_SOURCES) is not required of it
+     either: the pack cannot hold it until it is rebuilt, and its rebuild is
+     checked in full.
   4. Against the pack it would replace (--previous): no indicator key that pack
      had has gone, and ward_data.json holds at least 90% as many values.
 
@@ -37,6 +41,27 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 LOCAL_HEALTH = re.compile(r"^ft_\d+$")
 MIN_SHARE = 0.9
+# Sources added after packs were first built, and the file in London's build
+# that names the Local Health series each one makes ("series", keyed by id).
+NEWER_SOURCES = {
+    "fingertips_msoa_extra": "data/outcomes/fingertips_msoa_extra_checks.json",
+}
+
+
+def newer_series(london: pathlib.Path, sources: dict) -> set:
+    """ft_ keys London's newer sources make, for each such source this pack's
+    manifest does not record (it was built before the source existed)."""
+    out: set = set()
+    for name, rel in NEWER_SOURCES.items():
+        if name in (sources or {}):
+            continue
+        f = london / rel
+        try:
+            series = (json.loads(f.read_text(encoding="utf-8")) or {}).get("series") or {}
+        except (OSError, ValueError):
+            continue
+        out |= {f"ft_{i}" for i in series}
+    return out
 
 
 def read_stats(path: pathlib.Path) -> dict | None:
@@ -75,6 +100,7 @@ def check(pack: pathlib.Path, scope: str = "", previous: pathlib.Path | None = N
     scope = scope or pack.name
 
     manifest = pack / "meta" / "manifest.json"
+    m: dict = {}
     if not manifest.exists():
         problems.append("no meta/manifest.json")
     else:
@@ -102,7 +128,7 @@ def check(pack: pathlib.Path, scope: str = "", previous: pathlib.Path | None = N
         ls = read_stats(london / "data" / "map" / "indicators.js") or {}
         want = {k for k in (ls.get("stats") or {}) if LOCAL_HEALTH.match(k)}
         have = set((stats.get("stats") or {}).keys())
-        missing = sorted(want - have - gaps)
+        missing = sorted(want - have - gaps - newer_series(london, m.get("sources") or {}))
         if missing:
             problems.append(f"{len(missing)} Local Health series London has are missing and not "
                             f"listed as known gaps: {', '.join(missing)}")

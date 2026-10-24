@@ -146,6 +146,30 @@ responses at 25,000 rows, which is why we chunk by LSOA.
 
 The Nomis dataset id `NM_2014_1` for the same estimates was not confirmed, so
 the ONS file is used instead.
+### ONS small area income estimates (`saie`)
+
+ONS, *Income estimates for small areas, England and Wales: financial year
+ending 2023* (published 10 December 2025, accredited official statistics),
+the first edition on the 2021 MSOAs. Modelled from the Family Resources
+Survey with Census and administrative data. Three measures, each a mean in
+pounds a year with 95% confidence limits: total annual household income
+(`saie_total_income`), and net household income before (`saie_net_bhc`) and
+after (`saie_net_ahc`) housing costs, equivalised. Found by discovery from the
+dataset landing page
+(`/employmentandlabourmarket/peopleinwork/earningsandworkinghours/datasets/smallareaincomeestimatesformiddlelayersuperoutputareasenglandandwales`),
+read as JSON for its editions and files, then the bulletin
+(`.../bulletins/smallareamodelbasedincomeestimates/latest`) for its related
+datasets, then ONS's search; the newest edition's spreadsheet is taken.
+`SAIE_URL` overrides with a direct link, and a file dropped in `.cache/saie/`
+is read instead. Columns are matched by the measure's words in the header or
+the sheet's title; a measure matched twice, on the wrong scale (not pounds a
+year), or with after housing costs above before housing costs is reported and
+not used, and a file on the 2011 MSOAs is refused. Output:
+`data/demographics/saie_msoa.parquet` (English MSOAs, national), static
+between releases. Wards: household-weighted mean of their LSOAs, each taking
+its MSOA's figure (Census 2021 households, residents if those are missing).
+LAs: household-weighted mean of all their MSOAs. The limits stay at MSOA.
+Not comparable with earlier editions (2011 MSOAs, a different model).
 
 ### The DWP benefit series are not here, and cannot be
 
@@ -238,6 +262,70 @@ returned: hypertension, diabetes, COPD, CHD, CKD, heart failure and depression.
 
 > Swap area_type_id for different geographies: `3` MSOA, `6` LA,
 > `7` GP practice, `15` STP/ICB.
+
+### 5a. Local Health: low birth weight and cancer incidence (`fingertips_msoa_extra`)
+
+Six Local Health series, fetched at MSOA (area type 3, England as parent) and
+for LAs (area type 501), in a source of their own so that one that does not
+come back cannot mark the established Local Health sources partial or failed.
+
+| Fingertips ID | Fingertips name | Map key |
+|--------------|-----------------|---------|
+| 93092 | Low birth weight of live babies (%, five years pooled; 2018 - 22 in the September 2026 snapshot) | `ft_93092` |
+| 93234 | Cancer incidence: all cancers (ratio, England = 100) | `ft_93234` |
+| 93235 | Cancer incidence: breast cancer | `ft_93235` |
+| 93236 | Cancer incidence: colorectal cancer | `ft_93236` |
+| 93237 | Cancer incidence: lung cancer | `ft_93237` |
+| 93238 | Cancer incidence: prostate cancer | `ft_93238` |
+
+Each series ships only if `ft_msoa_series_check` passes it for the scope:
+figures for at least half of the scope's MSOAs once OHID's withheld values,
+placeholders and bare zeros are taken out, and a median 95% interval no wider
+either side than the figure. A dropped series writes no rows, is logged with
+its reason, and is listed under `known_gaps` in `data/map/indicators.js`, so
+the region pack check does not hold back a region where OHID publishes too
+little of it. Every verdict is written to
+`data/outcomes/fingertips_msoa_extra_checks.json`. Outputs:
+`data/outcomes/fingertips_msoa_extra.parquet` (MSOA, with limits and OHID's
+note) and `fingertips_msoa_extra_la.parquet` (OHID's own LA figures, for the
+series that ship). Wards come from MSOAs through their LSOAs, weighted by
+residents, as for every Local Health series. Whether Fingertips still returns
+MSOA rows for the cancer series could not be checked offline; the first
+GitHub Actions run settles it.
+
+### 5b. ONS healthy and disability-free life expectancy for MSOAs (`hle_msoa`)
+
+ONS, *Health state life expectancy estimates for Middle layer Super Output
+Areas, England and Wales: 2019 to 2023*. Healthy life expectancy (HLE) and
+disability-free life expectancy (DFLE) at birth, for females and males, with
+95% confidence intervals, from deaths in 2019 to 2023 and the Census 2021
+health questions. Found by discovery: the dataset landing page
+(`/peoplepopulationandcommunity/healthandsocialcare/healthandlifeexpectancies/datasets/healthstatelifeexpectancyestimatesformiddlelayersuperoutputareasenglandandwales`)
+is read as JSON (`<page>/data`) for its editions and their files, then the
+bulletin's related datasets, then ONS's search; the newest edition's
+spreadsheet is taken. `HLE_MSOA_URL` overrides with a direct link, and a file
+dropped in `.cache/hle_msoa/` is read instead. A file whose MSOA codes are
+all 2011 ones is refused. Output: `data/outcomes/hle_msoa.parquet` (MSOA,
+national, with limits, period and edition) and, where the file has LA rows,
+`hle_msoa_la.parquet`. Static between releases: once the parquet is complete
+it is used with no download. Wards: residents-weighted mean of their LSOAs,
+each taking its MSOA's figure. LAs: ONS's own rows where present, otherwise
+the map's estimate from wards, marked as such. ONS says these are not
+comparable with its survey-based LA figures or the 2009 to 2013 MSOA
+estimates.
+
+### 5c. Fingertips profiles: which indicators are taken (`fingertips_profiles`)
+
+`run_fingertips_profiles` takes the indicators named in
+`data/curated/fingertips_profile_indicators.csv` (profile id, the id when it
+was checked, and Fingertips' own name), matched against each profile's
+indicator metadata on every run, at most `FINGERTIPS_PER_PROFILE` (40) per
+profile. An id whose name still matches is taken; otherwise the id now under
+that name; a name found nowhere is logged ("wanted indicator not found in
+profile N's metadata") and not guessed at. It used to take the first 40 ids in
+numerical order, which left out the Public Health Outcomes Framework's life
+expectancy. The list keeps every QOF prevalence that `QOF_INDICATORS` is
+checked against.
 
 ---
 
@@ -469,6 +557,9 @@ To rebuild from scratch, a colleague needs:
 13. **Population estimates**: 1 ONS XLSX (LSOA single year of age).
 14. **Road casualties**: 1 DfT CSV (the casualty file for the last five years).
 15. **Care homes**: 1 CQC care directory file (ODS, XLSX or CSV).
+16. **Household income (SAIE)** and **healthy and disability-free life
+    expectancy for MSOAs**: nothing, once their parquets are committed. Each is
+    found on its ONS dataset page by the first refresh.
 
 **Total raw data:** ≈ 350–450 MB uncompressed, from 9 distinct source
 organisations. All files are free and published under OGL or
@@ -495,6 +586,8 @@ equivalent open licence.
 | DfT STATS19 casualties | Yearly (final figures each September) | Automatic; re-downloaded after 30 days |
 | CQC care directory | Monthly | Automatic; the newest file on the page is taken |
 | Distances to services | With the NHS registers | Every run that fetches the GP, pharmacy and dental registers |
+| ONS small area income estimates | Every few years (FYE 2023 in Dec 2025, next not announced) | Static. Delete `data/demographics/saie_msoa.parquet` to take a new edition |
+| ONS health state life expectancy for MSOAs | After each census | Static. Delete `data/outcomes/hle_msoa.parquet` to take a revised edition |
 
 ---
 

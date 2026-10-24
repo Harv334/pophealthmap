@@ -45,6 +45,27 @@ jobs:
         run: |
           pip install openpyxl
           python3 tests/pipeline/test_iod_extra.py
+      # The MSOA additions, offline on synthetic files: ONS income and
+      # health state life expectancy found from their landing pages and
+      # parsed, the Local Health birth weight and cancer series and their
+      # per-series checks, wards and LAs from MSOAs, and the Fingertips
+      # profiles chosen by name. Each failure path is a source failure or a
+      # skip in the manifest, never a crash.
+      - name: Check the MSOA additions and the profile choice
+        run: |
+          python3 tests/pipeline/test_saie.py
+          python3 tests/pipeline/test_hle_msoa.py
+          python3 tests/pipeline/test_local_health_extra.py
+          python3 tests/pipeline/test_fingertips_profiles.py
+      # The Census additions and the LSOA additions, offline: the new Census
+      # shares and their counts, distances to services, mid-year estimates,
+      # youth claimants, road casualties, care home beds and crime by LSOA,
+      # and the ONS LSOA 2011 to 2021 lookup finding its service by name.
+      - name: Check the Census and LSOA additions
+        run: |
+          python3 tests/pipeline/test_census_additions.py
+          python3 tests/pipeline/test_small_area_additions.py
+          python3 tests/pipeline/test_lsoa11_lookup.py
       # What stops a region pack being published (scripts/check_region_pack.py).
       - name: Check the region pack checks
         run: python3 tests/pipeline/test_region_pack.py
