@@ -1514,7 +1514,10 @@ const smallText = page => page.evaluate(() => {
       routine: !!document.querySelector('#ov option[value="census_routine_semi_routine_pct"]') && !phWithheld('census_routine_semi_routine_pct') &&
         !PH_ASSISTANT.isWithheld('census_routine_semi_routine_pct'),
       deprived: !!document.querySelector('#ov option[value="census_hh_deprived_2plus_pct"]') }));
-    ok(later.over && later.routine && !later.deprived,
+    // Household deprivation in two or more dimensions is offered exactly when
+    // the build's own indicators.js lists it (it does once a refresh has run).
+    const depListed = /"census_hh_deprived_2plus_pct"/.test(real);
+    ok(later.over && later.routine && later.deprived === depListed,
       'no empty indicators: a new indicator is offered, under its theme, once indicators.js lists it, and the routine figure once it is rebuilt',
       JSON.stringify(later));
     ok(errors.length === 0, 'no page errors (a later build)', errors.join(' | '));
