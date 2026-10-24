@@ -75,9 +75,36 @@ bottom of `fetch_all_data.py` and in `data/meta/manifest.json`.
 automatically, by profile rather than by a list of indicator ids. Both the ids
 and the names come from the API, so an indicator cannot end up on the map
 under the wrong label, which is what happened when that list was maintained by
-hand. To re-run: `python fetch_all_data.py --only fingertips_profiles`. Set
-`FINGERTIPS_PER_PROFILE` to change how many indicators are taken from each
+hand. Which of each profile's indicators are taken is the list in
+`data/curated/fingertips_profile_indicators.csv`, by Fingertips' own name; a
+name the profile no longer has is logged as "wanted indicator not found in
+profile N's metadata", and the fix is to edit that row (or remove it). To
+re-run: `python fetch_all_data.py --only fingertips_profiles`. Set
+`FINGERTIPS_PER_PROFILE` to change the cap on how many are taken from each
 profile.
+
+**Local Health, birth weight and cancer** (`fingertips_msoa_extra`). Fetched
+automatically, in a source of its own. Each of the six series ships only if
+OHID publishes figures for at least half of the region's MSOAs with narrow
+enough intervals; the log says `ships` or `not shipped` with the reason for
+each, and `data/outcomes/fingertips_msoa_extra_checks.json` keeps the
+verdicts. A series that is not shipped for the publisher's reasons is a known
+gap, not a failure, and needs nobody. "Skipped" in the manifest means none
+shipped. "Failed" means a download failed with no earlier figures to keep, or
+an id now holds a differently named indicator (check the id in
+`FINGERTIPS_MSOA_EXTRA`). To re-run: `python fetch_all_data.py --only
+fingertips_msoa_extra`.
+
+**Household income and health state life expectancy** (`saie`, `hle_msoa`).
+ONS releases found on their dataset pages, then static once their parquets
+(`data/demographics/saie_msoa.parquet`, `data/outcomes/hle_msoa.parquet`) hold
+every column. The log lists each match as `<key> <- '<sheet>: <header>'` and
+names the edition taken. For a file it cannot find, download the newest
+spreadsheet from the ONS dataset page into `.cache/saie/` or `.cache/hle_msoa/`
+(or set `SAIE_URL` or `HLE_MSOA_URL`) and run
+`python fetch_all_data.py --only saie hle_msoa`. For a header that changed,
+edit the words in `SAIE_MEASURES` or `HLE_MEASURES`. To take a new edition,
+delete the parquet and run the source again.
 
 **Fuel poverty** (`fuel_poverty`). Fetched automatically: the pipeline reads
 the gov.uk collection, picks the newest sub-regional release by the year in

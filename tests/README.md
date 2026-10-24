@@ -153,6 +153,21 @@ built from LSOAs when the output area file lacks a figure, and that a label
 that does not match or a table that did not download writes nothing and marks
 the census source partial.
 
+`test_saie.py` and `test_hle_msoa.py` cover the two ONS MSOA releases, ONS's
+income estimates for small areas and its healthy and disability-free life
+expectancy, from synthetic workbooks laid out as ONS lays them out: finding
+the newest edition from the dataset landing page (its JSON, its links, the
+bulletin's related datasets, ONS's search), matching the columns and their
+95% limits, refusing a file on the 2011 MSOAs, wards and LAs weighted by
+households for income and by residents for life expectancy, and the failure
+paths. `test_local_health_extra.py` covers low birth weight and cancer
+incidence from Local Health and the per-series checks that decide whether
+each ships (coverage, withheld values, interval width), with the skipped,
+partial and failed outcomes in the manifest. `test_fingertips_profiles.py`
+checks that each Fingertips profile's indicators are chosen by name from
+`data/curated/fingertips_profile_indicators.csv`, not as the first ids in
+number order. All four are offline.
+
 `test_guards.py` and `test_guards_gp.py` copy real downloads out of `.cache/`
 to build their fixtures, so they need a populated cache. `.cache/` is not in the
 repo: run the relevant pipeline source once first, or skip them.
