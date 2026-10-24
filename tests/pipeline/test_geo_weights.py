@@ -113,6 +113,9 @@ p.get_oa_to_ward = lambda: {}
 p.get_lsoa_to_ward = lambda: dict(L2W)
 p.get_lsoa_ward_lookup = lambda: {l: (wd, "E09000001") for l, wd in L2W.items()}
 p._ward_to_lad = lambda: {"W1": "E09000001", "W2": "E09000001"}
+# The LSOA to MSOA lookup is asked for once the national MSOA files (ONS
+# income, healthy life expectancy) are committed; none is needed here.
+p.get_lsoa_to_msoa = lambda: {}
 try:
     wd_out = p.build_ward_data()
     w1 = wd_out["wards"]["W1"]["indicators"]
