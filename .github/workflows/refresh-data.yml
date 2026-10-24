@@ -62,6 +62,18 @@ jobs:
             || echo "No pcn-source release: PCNs will be built without catchments."
           ls -la .cache/gp_reg
 
+      # CQC's care directory, for care home beds. The pipeline finds the file
+      # on cqc.org.uk itself; if CQC refuses cloud servers, as NHS Digital
+      # does, a copy downloaded in a browser can be attached to a cqc-source
+      # release, and the pipeline uses it when the page cannot be read.
+      - name: Fetch the CQC care directory fallback (for care home beds)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p .cache/cqc
+          gh release download cqc-source --pattern '*' --dir .cache/cqc --clobber \
+            || echo "No cqc-source release: care homes come from the CQC website."
+
       # The pipeline isolates per-source failures and still exits 0, so the exit
       # code alone does not tell us whether a source broke. continue-on-error
       # keeps the job going either way, and the next step reads the manifest to

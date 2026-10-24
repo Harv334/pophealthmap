@@ -71,7 +71,12 @@ uk-air.defra.gov.uk; the site asks for the domain as well as the department.
 | Background air quality (NO₂, PM2.5, PM10) | Defra UK-AIR, Pollution Climate Mapping | OGL v3 | Modelled, not measured. Acknowledge Defra as the source, per the wording above |
 | Stops and stations (distances, counts) | Transport for London, Unified API | **OGL v2 with TfL amendments** | Not OGL v3. Requires all three attribution statements above, or the licence terminates |
 | PTAL | Greater London Authority, London Datastore | OGL v3 | TfL's accessibility banding, republished by the GLA in the LSOA Atlas |
-| Street crime | data.police.uk (Home Office) | OGL v3 | |
+| Street crime | data.police.uk (Home Office) | OGL v3 | Counted into wards and, from the next refresh, LSOAs |
+| Mid-year population estimates for LSOAs | ONS | OGL v3 | Use the ONS wording above |
+| Claimant count aged 18 to 24 | DWP and ONS, via Nomis | OGL v3 | |
+| Road casualties (STATS19) | Department for Transport | OGL v3 | |
+| Care home beds (care directory with filters) | Care Quality Commission | OGL v3 | CQC asks to be named as the source; every file and report holding the figure says "contains Care Quality Commission (CQC) data" (`PH_CREDIT_CQC`) |
+| Distance to GP practices, pharmacies and dentists | Measured here from the NHS ODS registers, sites placed with the ONS Postcode Directory (postcodes.io) | OGL v3 | Carries the OS and Royal Mail notices above (`PH_CREDIT_ONSPD`); the LSOA centres are ONS's population-weighted centroids (OGL v3) |
 | Charity register | Charity Commission for England and Wales | OGL v3 | |
 | NHS trust sites (hospitals) | NHS Organisation Data Service | OGL v3 | |
 | Basemap tiles | CARTO, from OpenStreetMap contributors; Esri (World Light Gray fallback, World Imagery satellite) | ODbL 1.0 (OSM); CARTO and Esri terms | Attribution rendered by the map itself, and kept in Presentation view with a caption naming the tile provider |

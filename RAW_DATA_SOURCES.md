@@ -23,6 +23,7 @@ Ward 2025, GP practice, postcode.
 | `Local_Authority_Districts_Boundaries_UK_BFC` (GeoJSON) | ONS Open Geography Portal | https://geoportal.statistics.gov.uk/datasets/ons::local-authority-districts-may-2024-boundaries-uk-bfc | Borough outlines (`BOROUGH_GJ`) |
 | postcodes.io bulk API (no download) | postcodes.io, over the ONS Postcode Directory | https://api.postcodes.io/postcodes (POST, up to 100 postcodes per request) | Postcode → LSOA 2021 / ward / borough + coordinates, for GP practices, pharmacies, hospitals and charity HQs. Replaces the ONSPD zip. |
 | `LSOA21_WD25_LAD25_EW_LU_v2` (no download) | ONS Open Geography Portal feature service | https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/LSOA21_WD25_LAD25_EW_LU_v2/FeatureServer/0/query | Official LSOA 2021 → ward 2025 → LAD 2025 best-fit lookup. Every LSOA-derived ward indicator is aggregated through it. |
+| LSOA 2021 population-weighted centroids (no download) | ONS Open Geography Portal feature service | Tried as `LSOA_PopCentroids_EW_2021_V4` (then V3, V2), else found in the service list at https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services?f=json | The points the GP, pharmacy and dentist distances are measured from (`service_access`). Cached in `.cache/ons_lookup/`. Without it the distances are measured from the middle of each LSOA's shape, and the ward file's `metadata.small_area.service_access_origin` says `centroid`. |
 
 > **On the retired ONSPD download.** The pipeline used to need the ~250 MB
 > quarterly ONS Postcode Directory zip for two jobs: geocoding postcodes,
@@ -126,6 +127,7 @@ comma-separated LSOA 2021 codes (London: 4,994).
 | Dataset | NOMIS ID | What we pull |
 |---------|----------|--------------|
 | **Claimant count (CLA01)** | `NM_162_1` | Monthly claimant count at LSOA; we compute rate ÷ working-age population |
+| **Claimant count aged 18 to 24** (source `claimant_youth`) | `NM_162_1` | The same request for one age band. The band's code is read from `https://www.nomisweb.co.uk/api/v01/dataset/NM_162_1/age.def.sdmx.json` by its name ("18" to "24"), not typed in, and the response is checked by `AGE_NAME`. Whether Nomis publishes the band for LSOAs was not confirmed: if the codelist has no such band, or Nomis refuses or returns nothing for LSOAs, the source is "skipped" with the reason in the manifest. Written to `data/economy/claimant_18_24.parquet`. Counts are rounded to 5, so the rate (`claimant_18_24_pct`) is shown for wards and LAs only: claimants and people aged 18 to 24 (from the mid-year estimates below) are added up over the LSOAs before dividing. |
 
 **Download template:**
 ```
@@ -135,6 +137,15 @@ https://www.nomisweb.co.uk/api/v01/dataset/{ID}.data.csv?date=latest&geography={
 Limit `geography` lists to ~500 LSOA codes per request to keep the URL
 under 8 kB. Concatenate the chunks. NOMIS silently caps unregistered
 responses at 25,000 rows, which is why we chunk by LSOA.
+
+### Mid-year population estimates (ONS)
+
+| File | Source | URL | Used for |
+|------|--------|-----|----------|
+| LSOA population estimates by single year of age (`sapelsoasyoa20222024.xlsx` in the November 2025 edition) | ONS | https://www.ons.gov.uk/peoplepopulationandcommunity/populationandmigration/populationestimates/datasets/lowersuperoutputareamidyearpopulationestimates | Source `sape`. Found on that page (and its `/data` JSON) as the newest file whose name has `lsoa` and `syoa`; `SAPE_URL` overrides, and a file put in `.cache/sape/` by hand is used when the page lists none. The newest `Mid-YYYY LSOA 2021` sheet is read: `LSOA 2021 Code`, `Total`, then `F0` to `F90` and `M0` to `M90` (90 meaning 90 and over). The single years must add up to `Total`, or nothing is kept. Written to `data/demographics/sape_lsoa.parquet` as counts (population, 0 to 15, 16 to 64, 65+, 75+, 18 to 24) and shown as `sape_population` and four age shares for LSOAs, wards and LAs (counts added up). The Census figures stay the base of the existing rates: moving them would change almost every rate on the map at once. |
+
+The Nomis dataset id `NM_2014_1` for the same estimates was not confirmed, so
+the ONS file is used instead.
 
 ### The DWP benefit series are not here, and cannot be
 
@@ -372,6 +383,12 @@ would silently be mostly guesswork.
 
 ---
 
+### 6e. Road casualties (DfT STATS19)
+
+| File | Source | URL | Used for |
+|------|--------|-----|----------|
+| `dft-road-casualty-statistics-casualty-last-5-years.csv` | DfT, road safety data | Found on https://www.data.gov.uk/dataset/cb7ae6f0-4be6-4935-9277-47e5ce24a11f/road-safety-data, else https://data.dft.gov.uk/road-accident-safety-data/dft-road-casualty-statistics-casualty-last-5-years.csv; `STATS19_CASUALTY_URL` overrides | Source `road_casualties`. Columns found by name: `collision_year` (or `accident_year`), `casualty_severity` (1 fatal), `casualty_adjusted_severity_serious` and `lsoa_of_casualty`. A fatal casualty counts 1, any other its adjusted chance of a serious injury, over the latest five years in the file. Counted by the casualty's home LSOA, not where the collision happened. A home code in the 2021 set is used as it is; a retired 2011 code is shared among its 2021 LSOAs by Census 2021 residents (ONS LSOA 2011 to 2021 lookup). A file without the adjusted column is refused. Written to `data/environment/road_casualties_lsoa.parquet`; `road_ksi_per_1000` is shown for wards and LAs from summed counts over Census 2021 residents. |
+
 ## 7. Services — GP, pharmacy, dentist
 
 | File | Source | URL | Used for |
@@ -380,6 +397,8 @@ would silently be mostly guesswork.
 | GP list-size / registered patients CSV | NHS Digital — "Patients Registered at a GP Practice" | https://digital.nhs.uk/data-and-information/publications/statistical/patients-registered-at-a-gp-practice | Sizes the GP marker on the map. Download the monthly "gp-reg-pat-prac-all.csv". |
 | `edispensary` extract (pharmacies, no download) | NHS ODS Data Search and Export | https://www.odsdatasearchandexport.nhs.uk/api/getReport?report=edispensary | Pharmacy name + postcode. Headerless 27-column ODS CSV, same layout as epraccur. Fetched by the pipeline and revalidated by ETag. |
 | `ets` extract (NHS trust sites, no download) | NHS ODS Data Search and Export | https://www.odsdatasearchandexport.nhs.uk/api/getReport?report=ets | Hospital sites. ODS has no hospital category, so a site is recovered from the records filed at its postcode. Headerless, and the status column is blank: a site is open until it has a close date. |
+| Distance to the nearest GP practice, pharmacy and NHS dentist (nothing to download) | Measured here from the three registers above | | Source `service_access`, after `gp`, `pharmacies` and `dentists`. Each register fetch also writes every site it keeps in England to `.cache/service_access/<kind>_sites.csv` (dentists: high street practices only), so an LSOA near the scope's edge is measured to the nearest site even when it is in the next LA. Straight-line km from the LSOA's population-weighted centroid (§1), in British National Grid. Written to `data/environment/service_access_lsoa.parquet` as `gp_dist_km`, `pharmacy_dist_km` and `dentist_dist_km`; ward and LA figures are averages weighted by Census 2021 residents. Without the national files (a `--only service_access` run on a fresh checkout) it measures to the scope's own sites and marks the source partial. |
+| Care directory with filters | Care Quality Commission | Found on https://www.cqc.org.uk/about-us/transparency/using-cqc-data (`CQC_CARE_DIRECTORY_URL` overrides; a file in `.cache/cqc/`, or attached to a `cqc-source` release, is used when the page cannot be read) | Source `care_homes`. The table is read from its `Location ID` header row (.ods, .xlsx or .csv). Kept: `Care home?` = Y, not `Dormant`, with `Care homes beds` above 0, one row per location. The column names were not checked against a current file, so a file without a location, postcode or beds column fails the source rather than reporting no beds. Homes are placed by postcode (postcodes.io) in their LSOA. Written to `data/healthcare/care_homes.parquet`; `care_home_beds_per_100_75plus` is shown for wards and LAs from summed beds over people aged 75 and over in the mid-year estimates. Licence OGL v3, with CQC named as the source. |
 
 ---
 
@@ -401,6 +420,15 @@ https://register-of-charities.charitycommission.gov.uk/register/full-register-do
 | File | Source | URL | Used for |
 |------|--------|-----|----------|
 | `<YYYY-MM>-{force}-street.csv` — monthly street-crime archives for Metropolitan, City of London | data.police.uk | https://data.police.uk/data/ (under "Custom download") | Crime points, aggregated to ward. We pull the last 12 months. |
+
+Each crime is placed in the ward and the LSOA whose boundary holds its point.
+Ward figures count the crimes inside each ward. `lsoa_data.json` carries the
+same keys for each LSOA (`crime_total`, `crime_rate_per_1000` per 1,000
+Census 2021 residents, and violence, burglary, robbery, theft and anti-social
+behaviour), counted from the same points (`crime_by_lsoa`), so the map shows one
+indicator at two levels. Ward figures are not rebuilt from the LSOAs: in London
+the LSOAs that best fit a ward hold a tenth more or fewer of its crimes in 318
+of 704 wards.
 
 Select the Metropolitan Police and City of London forces for full coverage. Each month is one ZIP; inside,
 one CSV per force per month.
@@ -438,6 +466,9 @@ To rebuild from scratch, a colleague needs:
 11. **Air quality** — 3 Defra PCM CSVs (≈10 MB each, UK-wide 1 km grid).
 12. **Transport** — nothing to download. 43 paged JSON calls to the TfL
     Unified API, cached under `.cache/tfl/`.
+13. **Population estimates**: 1 ONS XLSX (LSOA single year of age).
+14. **Road casualties**: 1 DfT CSV (the casualty file for the last five years).
+15. **Care homes**: 1 CQC care directory file (ODS, XLSX or CSV).
 
 **Total raw data:** ≈ 350–450 MB uncompressed, from 9 distinct source
 organisations. All files are free and published under OGL or
@@ -460,6 +491,10 @@ equivalent open licence.
 | NHS ODS (GP practices + pharmacies) | Monthly | Automatic. The pipeline revalidates by ETag on every run and re-downloads only when the extract actually changes |
 | Charity Commission | Monthly | Monthly |
 | Crime (police.uk) | Monthly (3-month lag) | Quarterly is enough |
+| ONS mid-year population estimates (LSOA) | Yearly (last: November 2025, mid-2024) | Automatic; the newest file on the dataset page is taken |
+| DfT STATS19 casualties | Yearly (final figures each September) | Automatic; re-downloaded after 30 days |
+| CQC care directory | Monthly | Automatic; the newest file on the page is taken |
+| Distances to services | With the NHS registers | Every run that fetches the GP, pharmacy and dental registers |
 
 ---
 
@@ -473,8 +508,10 @@ equivalent open licence.
   `lsoa_data.json` (LSOA-level indicators) and `ward_data.json`
   (ward-level indicators + geometry metadata). Everything above feeds
   into those two JSONs.
-- LSOA 2021 is the authoritative small-area unit; NOMIS calls it
-  `TYPE298` on the claimant endpoint. Any data that still comes
+- LSOA 2021 is the authoritative small-area unit. The claimant requests
+  send explicit LSOA 2021 codes rather than a Nomis geography type (`TYPE298`
+  looks like the 2011 LSOA type, beside `TYPE297` for 2011 MSOAs, so it is not
+  used). Any data that still comes
   in LSOA 2011 codes (DESNZ is the main one) aligns 1:1 with LSOA 2021
   for the London boroughs, so no re-mapping is needed.
 - All authoritative URLs are stable landing pages — deep links to
