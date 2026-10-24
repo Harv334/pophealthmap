@@ -110,7 +110,7 @@ const emptyIndicatorAudit = page => page.evaluate(() => {
   const opts = [...document.querySelectorAll('#ov option')].map(o => o.value).filter(v => v !== 'none');
   const picker = [].concat(...(window.PH_THEMES || []).map(t => t.keys));
   const li = PH_ASSISTANT.runTool('list_indicators', {});
-  const ask = [].concat(...li.groups.map(g => g.indicators.map(r => r.key)));
+  const ask = [].concat(...li.groups.map(g => g.rows.map(r => r[0])));
   const offered = [...new Set(cats.concat(opts, picker, ask))];
   return {
     empty: [...PH_EMPTY_IND], offered, cats, opts, picker, ask,
