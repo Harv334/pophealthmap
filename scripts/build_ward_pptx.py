@@ -36,6 +36,13 @@ try:
         "data/map/indicators.js").read_text(encoding="utf-8").replace(" ", "")
 except OSError:
     AGE_OK = False
+# The routine and semi-routine figure is left out until indicators.js says it
+# was rebuilt from NS-SEC L12 and L13 alone; older files also counted L7 to L9.
+try:
+    ROUTINE_OK = '"census_routine_classes":"L12-L13"' in (_Path(__file__).resolve().parent.parent /
+        "data/map/indicators.js").read_text(encoding="utf-8").replace(" ", "")
+except OSError:
+    ROUTINE_OK = False
 from pathlib import Path
 from statistics import median
 
@@ -470,7 +477,9 @@ def slide_demographics(prs, ward, wd):
         {'l': 'No qualifications',   'v': fnum(inds.get('census_no_qual_pct')),               'ref': median(ward_vals(wd, 'census_no_qual_pct')) if ward_vals(wd, 'census_no_qual_pct') else None,                 'wh': True},
         {'l': 'Level 4+ qual',       'v': fnum(inds.get('census_level4_qual_pct')),           'ref': median(ward_vals(wd, 'census_level4_qual_pct')) if ward_vals(wd, 'census_level4_qual_pct') else None,             'wh': False},
         {'l': 'Higher managerial',   'v': fnum(inds.get('census_higher_managerial_pct')),     'ref': median(ward_vals(wd, 'census_higher_managerial_pct')) if ward_vals(wd, 'census_higher_managerial_pct') else None, 'wh': False},
+    ] + ([
         {'l': 'Routine/semi',        'v': fnum(inds.get('census_routine_semi_routine_pct')),  'ref': median(ward_vals(wd, 'census_routine_semi_routine_pct')) if ward_vals(wd, 'census_routine_semi_routine_pct') else None, 'wh': True},
+    ] if ROUTINE_OK else []) + [
         {'l': 'No-Eng household',    'v': fnum(inds.get('census_english_hh_none_pct')),       'ref': median(ward_vals(wd, 'census_english_hh_none_pct')) if ward_vals(wd, 'census_english_hh_none_pct') else None,         'wh': True},
     ], 'Demographic indicators vs NWL median (red = direction-of-concern, green = strength)',
        width=12, height=3.4)

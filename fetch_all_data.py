@@ -1886,20 +1886,33 @@ def run_imd2025() -> pd.DataFrame:
 #   census_born_outside_uk_pct     TS004  (country of birth)
 #   census_good_health_pct / bad   TS037  (general health)
 #   census_disability_any / lot    TS038  (disability, Equality Act)
-#   census_provides_unpaid_care_pct TS039
-#   census_housing_deprived_pct    TS044  (household deprivation, any dim.)
+#   census_provides_unpaid_care_pct / unpaid_care_50h_pct  TS039
+#   census_hh_deprived_any_pct / hh_deprived_2plus_pct  TS011  (household
+#                                  deprivation dimensions; TS044 is
+#                                  accommodation type, which this once read)
 #   census_no_car_pct              TS045
 #   census_owned_pct / social_rented / private_rented  TS054  (tenure)
-#   census_higher_managerial_pct / routine_semi_routine_pct  TS062  (NS-SEC)
-#   census_unemployed_pct          TS066
+#   census_higher_managerial_pct / routine_semi_routine_pct /
+#     never_worked_ltu_pct         TS062  (NS-SEC L1-L3, L12+L13, L14)
+#   census_unemployed_pct / inactive_ltsick_pct  TS066
 #   census_no_qual_pct / level4_qual_pct  TS067
+#   census_pensioner_alone_pct / lone_parent_dep_pct / one_person_hh_pct  TS003
+#   census_poor_english_pct        TS029  (proficiency in English)
+#   census_overcrowded_pct / underoccupied_pct  TS052  (bedrooms)
+#   census_eth_*_pct               TS021  (six detailed ethnic groups)
 
 CENSUS_TABLES = [
     "TS001", "TS004", "TS007A", "TS021", "TS037", "TS038", "TS039",
-    "TS044", "TS045", "TS054", "TS062", "TS066", "TS067",
+    "TS011", "TS045", "TS054", "TS062", "TS066", "TS067",
+    # Household composition, proficiency in English and occupancy rating
+    # (bedrooms). Each is published for output areas upwards; TS029's output
+    # area file may carry only the main language split, in which case wards
+    # and LAs are built from its LSOA counts (see _census_ward_inputs).
+    "TS003", "TS029", "TS052",
     # Phase-A expansion. Only tables that ship LSOA CSV + whose contents
     # match our intended indicators remain.
     #   TS025 = Household language (English/Welsh) — household-level.
+    #           (Proficiency in English, per person, is TS029 above.)
     #   TS061 = Method of travel to work — matches intent.
     # Dropped (document here):
     #   TS022 (Religion)                — no LSOA CSV
@@ -2037,6 +2050,57 @@ def _cen_findall(df: pd.DataFrame, *kws, exclude=()) -> list[str]:
     return out
 
 
+def _cen_label(c: str) -> str:
+    """A column name without the "; measures: Value" some Nomis files add."""
+    return re.sub(r";\s*measures:.*$", "", str(c), flags=re.I).strip()
+
+
+def _cen_leaf(c: str) -> str:
+    """The last segment of a Nomis label, lower case, with a typographic
+    minus read as a hyphen: "Occupancy rating for bedrooms: -1" -> "-1"."""
+    return _cen_label(c).rsplit(":", 1)[-1].strip().lower().replace("−", "-")
+
+
+def _cen_leaf_col(df: pd.DataFrame, head: str, parent: str, leaf: str) -> str | None:
+    """The column labelled "<head>: <parent...>: <leaf>", exactly three
+    segments, whose parent starts with `parent` and whose leaf is `leaf`
+    (all compared in lower case)."""
+    for c in df.columns:
+        parts = [p.strip().lower() for p in _cen_label(c).split(":")]
+        if (len(parts) == 3 and parts[0] == head and parts[1].startswith(parent)
+                and parts[2] == leaf):
+            return c
+    return None
+
+
+def _cen_group_cols(df: pd.DataFrame, *kws) -> list[str]:
+    """The columns that make up one group, counted once: its own total when
+    the table has one ("...: One-person household: Total"), otherwise the
+    group's parent or, failing that, its leaves (_cen_findall)."""
+    cols = _cen_findall(df, *kws)
+    tot = [c for c in cols if _cen_leaf(c) == "total"]
+    return tot[:1] if tot else cols
+
+
+# The detailed ethnic groups taken from TS021: key -> (parent, leaf).
+CENSUS_ETHNIC_DETAIL = {
+    "census_eth_gypsy_traveller_pct": ("white", "gypsy or irish traveller"),
+    "census_eth_roma_pct":            ("white", "roma"),
+    "census_eth_bangladeshi_pct":     ("asian", "bangladeshi"),
+    "census_eth_pakistani_pct":       ("asian", "pakistani"),
+    "census_eth_black_african_pct":   ("black", "african"),
+    "census_eth_black_caribbean_pct": ("black", "caribbean"),
+}
+
+# What _census_frame could not build, by level ("lsoa", "msoa", "oa").
+_CENSUS_MISSES: dict = {}
+# Keys ONS may not publish for output areas: the OA files carry less detail
+# (TS029's proficiency bands, and the fact-check could not confirm TS021's
+# leaf columns there). Their wards and LAs come from LSOA counts when the OA
+# file lacks them, so the OA build is not marked partial for these.
+CENSUS_OA_MAY_LACK = ("census_poor_english_pct", "TS029:") + tuple(CENSUS_ETHNIC_DETAIL)
+
+
 def _cen_pct(df: pd.DataFrame, num_cols: list[str], den_col: str) -> "pd.Series":
     """Compute (sum(numerator) / denominator) * 100, as a float Series."""
     num, den = _cen_counts(df, num_cols, den_col)
@@ -2141,11 +2205,19 @@ def run_census2021() -> pd.DataFrame:
     out = _census_frame("lsoa")
     if out is None or out.empty:
         return pd.DataFrame()
+    partial = []
     if _CENSUS_AGE_PROBLEMS:
         # Usable, with the older bands the map labels honestly, but not what
         # was meant to be built, so the refresh workflow raises it.
-        _SOURCE_PARTIAL["census"] = ("under 16 and working age built from TS007A's "
-                                     "0 to 14 and 15 to 64: " + "; ".join(_CENSUS_AGE_PROBLEMS))
+        partial.append("under 16 and working age built from TS007A's "
+                       "0 to 14 and 15 to 64: " + "; ".join(_CENSUS_AGE_PROBLEMS))
+    if _CENSUS_MISSES.get("lsoa"):
+        # A table that did not download or a label that did not match: the
+        # indicators it feeds are left out of this build (the map offers no
+        # indicator without figures), and the refresh workflow raises it.
+        partial.append("not built at LSOA level: " + "; ".join(_CENSUS_MISSES["lsoa"]))
+    if partial:
+        _SOURCE_PARTIAL["census"] = " | ".join(partial)
     # The figures file keeps its shape for everything that reads it; the
     # counts behind each percentage go beside it, for the ward and LA build.
     out, counts = _census_split(out, "LSOA21CD")
@@ -2244,17 +2316,23 @@ def _census_age_check(t7, code_col, ages, total_col, t7a=None) -> "str | None":
 def _record_census_age_bands(level: str, bands: str) -> None:
     """Note which ages the under 16 and working age figures at this level
     cover, beside the census parquets, for build_indicator_stats."""
-    p = DATA_DIR / "demographics" / "census2021_age_bands.json"
+    _record_census_level("census2021_age_bands.json", level, bands)
+
+
+def _record_census_level(name: str, level: str, value: str) -> None:
+    """Note one fact about how a census level was built, in a small JSON
+    file of {level: value} beside the census parquets."""
+    p = DATA_DIR / "demographics" / name
     try:
         rec = json.loads(p.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         rec = {}
-    rec[level] = bands
+    rec[level] = value
     try:
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(json.dumps(rec, indent=1, sort_keys=True) + "\n", encoding="utf-8")
     except OSError as e:
-        warn(f"census2021: could not record the age bands ({e})")
+        warn(f"census2021: could not record {name} ({e})")
 
 
 def _census_frame(level: str = "lsoa") -> pd.DataFrame | None:
@@ -2262,12 +2340,25 @@ def _census_frame(level: str = "lsoa") -> pd.DataFrame | None:
     column called LSOA21CD whatever the level (the OA build renames it).
     One set of rules for both levels, so an output area and its LSOA are
     computed the same way."""
+    # What could not be built at this level, and why: a table that did not
+    # download, or columns that did not match. run_census2021 marks the
+    # source partial when the LSOA level has any, so the refresh workflow
+    # raises it rather than the key quietly going missing from the map.
+    misses = _CENSUS_MISSES.setdefault(level, [])
+    misses.clear()
+
+    def miss(msg: str) -> None:
+        warn(f"  {msg}")
+        misses.append(msg)
+
     tables: dict[str, pd.DataFrame] = {}
     for tab in CENSUS_TABLES:
         df = _fetch_census_table(tab, level)
         if df is not None:
             tables[tab] = df
             info(f"  {tab}: {len(df):,} rows x {len(df.columns)} cols")
+        elif tab not in ("TS007",):   # TS007 has its own fallback to TS007A
+            misses.append(f"{tab}: no {level.upper()} file")
 
     if "TS001" not in tables:
         warn("census2021: TS001 (population) missing - can't anchor, skipping")
@@ -2294,14 +2385,21 @@ def _census_frame(level: str = "lsoa") -> pd.DataFrame | None:
     # Helper: compute one metric from a table and merge onto `out` by LSOA.
     # silent=True suppresses the "column match failed" warning — useful when
     # the caller has an explicit fallback branch right after.
+    # expect is the number of numerator columns the keywords must find. A
+    # different number means the publisher's labels are not the ones the
+    # keywords were written for, and the figure would count the wrong
+    # people, so nothing is written and the miss is recorded.
     def attach(key: str, tab: str, num_kw_list: list[tuple], den_kw=("total",),
-               den_exclude=(), num_exclude=(), silent: bool = False):
+               den_exclude=(), num_exclude=(), silent: bool = False,
+               expect: "int | None" = None):
         nonlocal out
         t = tables.get(tab)
         if t is None:
             return
         cc = _cen_code_col(t)
         if not cc:
+            if not silent:
+                miss(f"{tab}/{key}: no area code column")
             return
         num_cols: list[str] = []
         for kws in num_kw_list:
@@ -2311,7 +2409,11 @@ def _census_frame(level: str = "lsoa") -> pd.DataFrame | None:
         den_col = _cen_find(t, *den_kw, exclude=den_exclude)
         if not num_cols or not den_col:
             if not silent:
-                warn(f"  {tab}/{key}: num={len(num_cols)} den={den_col} - column match failed")
+                miss(f"{tab}/{key}: num={len(num_cols)} den={den_col} - column match failed")
+            return
+        if expect is not None and len(num_cols) != expect:
+            miss(f"{tab}/{key}: expected {expect} numerator column(s), found "
+                 f"{len(num_cols)} ({'; '.join(num_cols[:4])}) - not written")
             return
         num, den = _cen_counts(t, num_cols, den_col)
         merge_counts(key, t[cc], num, den)
@@ -2458,13 +2560,31 @@ def _census_frame(level: str = "lsoa") -> pd.DataFrame | None:
             den = pd.to_numeric(t[tot_col], errors="coerce")
             for key, col in parents.items():
                 if not col:
-                    warn(f"  TS021/{key}: parent column not found")
+                    miss(f"TS021/{key}: parent column not found")
                     continue
                 merge_counts(key, t[cc], pd.to_numeric(t[col], errors="coerce"), den)
             # Derive non-white as 100 - white (kept for back-compat with the UI).
             if parents.get("census_white_pct"):
                 merge_counts("census_non_white_pct", t[cc],
                              den - pd.to_numeric(t[parents["census_white_pct"]], errors="coerce"), den)
+            # Six of the nineteen detailed groups, each a leaf column with two
+            # colons under its parent, matched on the parent and the leaf's
+            # own name rather than on column order:
+            #   Ethnic group: White: Gypsy or Irish Traveller
+            #   Ethnic group: White: Roma                (new in 2021)
+            #   Ethnic group: Asian, Asian British or Asian Welsh: Bangladeshi
+            #   Ethnic group: Asian, Asian British or Asian Welsh: Pakistani
+            #   Ethnic group: Black, Black British, Black Welsh, Caribbean or African: African
+            #   Ethnic group: Black, Black British, Black Welsh, Caribbean or African: Caribbean
+            # The base is the same total as the five parents. Gypsy or Irish
+            # Traveller and Roma counts are small, and ONS perturbs small
+            # counts, so the map opens them at ward level.
+            for key, (parent, leaf) in CENSUS_ETHNIC_DETAIL.items():
+                col = _cen_leaf_col(t, "ethnic group", parent, leaf)
+                if not col:
+                    miss(f"TS021/{key}: no '{parent}: {leaf}' column")
+                    continue
+                merge_counts(key, t[cc], pd.to_numeric(t[col], errors="coerce"), den)
 
     # TS037 general health -----------------------------------------------
     # "Very good health" + "Good health" for good; "Bad health" + "Very bad health" for bad.
@@ -2493,17 +2613,41 @@ def _census_frame(level: str = "lsoa") -> pd.DataFrame | None:
             tot = pd.to_numeric(t[tot_col], errors="coerce")
             merge_counts("census_provides_unpaid_care_pct", t[cc],
                          tot - pd.to_numeric(t[none_col], errors="coerce"), tot)
+    # 50 or more hours a week, over the same base (residents aged 5 and
+    # over). The hour bands come as parents with finer bands under them
+    # ("Provides 20 to 49 hours ...: Provides 20 to 34 hours ..."), and
+    # _cen_findall keeps a parent over its children, so a band is never
+    # counted twice; expect=1 stops anything else slipping in.
+    attach("census_unpaid_care_50h_pct", "TS039", [("50 or more hours",)], expect=1)
 
-    # TS044 household deprivation (any of 4 dimensions) ------------------
-    t = tables.get("TS044")
+    # TS011 household deprivation ----------------------------------------
+    # ONS counts a household as deprived in a dimension (education,
+    # employment, health and disability, housing) from its other Census
+    # answers, and publishes how many dimensions each household is deprived
+    # in: "Household is not deprived in any dimension", "Household is
+    # deprived in one dimension", and so on up to four. Any dimension is the
+    # total less those deprived in none; two or more is two, three and four
+    # added up. Until 2026 this read TS044, which is accommodation type, so
+    # its columns never matched and no figure was ever written.
+    t = tables.get("TS011")
     if t is not None:
         cc = _cen_code_col(t)
-        none_col = _cen_find(t, "not deprived in any dimension") or _cen_find(t, "not deprived")
         tot_col = _cen_find(t, "total")
-        if cc and none_col and tot_col:
+        none_col = _cen_find(t, "not deprived in any dimension")
+        multi = [c for n in ("two", "three", "four")
+                 for c in _cen_findall(t, f"deprived in {n} dimensions")]
+        if not (cc and tot_col and none_col):
+            miss(f"TS011/census_hh_deprived_any_pct: total={tot_col} none={none_col} - column match failed")
+        else:
             tot = pd.to_numeric(t[tot_col], errors="coerce")
-            merge_counts("census_housing_deprived_pct", t[cc],
+            merge_counts("census_hh_deprived_any_pct", t[cc],
                          tot - pd.to_numeric(t[none_col], errors="coerce"), tot)
+            if len(multi) != 3:
+                miss(f"TS011/census_hh_deprived_2plus_pct: expected the two, three and four "
+                     f"dimension columns, found {len(multi)} - not written")
+            else:
+                n2, d2 = _cen_counts(t, multi, tot_col)
+                merge_counts("census_hh_deprived_2plus_pct", t[cc], n2, d2)
 
     # TS045 car/van ------------------------------------------------------
     attach("census_no_car_pct", "TS045",
@@ -2521,11 +2665,28 @@ def _census_frame(level: str = "lsoa") -> pd.DataFrame | None:
            [("private rented",)])
 
     # TS062 NS-SEC -------------------------------------------------------
-    # L1-L3 = higher managerial/professional; L7+L8 = semi-routine + routine
+    # The table publishes its groups by their L numbers, each under
+    # "National Statistics Socio-economic Classification (NS-SEC): ":
+    #   L1, L2 and L3 Higher managerial, administrative and professional
+    #   L4, L5 and L6 Lower managerial, administrative and professional
+    #   L7 Intermediate occupations
+    #   L8 and L9 Small employers and own account workers
+    #   L10 and L11 Lower supervisory and technical occupations
+    #   L12 Semi-routine occupations
+    #   L13 Routine occupations
+    #   L14.1 and L14.2 Never worked and long-term unemployed
+    #   L15 Full-time students
+    # Routine and semi-routine is L12 and L13. The keywords used to include
+    # "l7 " and "l8 ", which took in intermediate occupations and small
+    # employers too and roughly doubled the figure (London LSOAs averaged
+    # 38%); the 7 and 8 of the analytic classes are not these L numbers.
     attach("census_higher_managerial_pct", "TS062",
            [("l1, l2 and l3",), ("higher managerial",)])
     attach("census_routine_semi_routine_pct", "TS062",
-           [("l7 ",), ("l8 ",), ("routine occupations",), ("semi-routine",)])
+           [("routine occupations",)], expect=2)
+    # L14.1 and L14.2 are one category in this table, so "never worked" and
+    # "long-term unemployed" cannot be separated here.
+    attach("census_never_worked_ltu_pct", "TS062", [("never worked",)], expect=1)
 
     # TS066 economic activity -------------------------------------------
     # First attempt scopes the denominator to "economically active"; if the
@@ -2539,6 +2700,12 @@ def _census_frame(level: str = "lsoa") -> pd.DataFrame | None:
         # Fallback: use "all categories" total
         attach("census_unemployed_pct", "TS066",
                [("unemployed",)])
+    # Economically inactive because of long-term sickness or disability,
+    # over all residents aged 16 and over (the table's total, the same base
+    # as unemployment above). TS066 has no age split, so this cannot be
+    # made a 16 to 64 rate. "Sick or disabled" avoids depending on the
+    # hyphen in "Long-term".
+    attach("census_inactive_ltsick_pct", "TS066", [("sick or disabled",)], expect=1)
 
     # TS067 qualifications ----------------------------------------------
     attach("census_no_qual_pct", "TS067",
@@ -2546,12 +2713,73 @@ def _census_frame(level: str = "lsoa") -> pd.DataFrame | None:
     attach("census_level4_qual_pct", "TS067",
            [("level 4 qualifications",)])
 
+    # TS003 household composition ----------------------------------------
+    # Shares of all households. ONS writes "One-person household" with a
+    # hyphen and the 2021 tables use 66 and over (State Pension age), so
+    # the keywords are "person household" and "aged 66", which match the
+    # label with or without the hyphen. The leaves are:
+    #   One-person household: Aged 66 years and over / Other
+    #   Single family household: All aged 66 years and over
+    #   Single family household: ... Lone parent family: With dependent
+    #     children / All children non-dependent
+    #   Other household types: With dependent children / Other, including
+    #     all full-time students and all aged 66 years and over
+    # Lone parents living with their own parents fall under other household
+    # types, so the lone parent figure is a lower bound.
+    attach("census_pensioner_alone_pct", "TS003", [("person household", "aged 66")],
+           den_kw=("total", "all households"), expect=1)
+    attach("census_lone_parent_dep_pct", "TS003", [("lone parent", "dependent children")],
+           num_exclude=("non-dependent",), den_kw=("total", "all households"), expect=1)
+    t = tables.get("TS003")
+    if t is not None:
+        cc = _cen_code_col(t)
+        den_col = _cen_find(t, "total", "all households")
+        one = _cen_group_cols(t, "person household")
+        if not (cc and den_col and one):
+            miss(f"TS003/census_one_person_hh_pct: num={len(one)} den={den_col} - column match failed")
+        else:
+            n1, d1 = _cen_counts(t, one, den_col)
+            merge_counts("census_one_person_hh_pct", t[cc], n1, d1)
+
+    # TS029 proficiency in English ---------------------------------------
+    # Residents aged 3 and over whose main language is not English who
+    # "Cannot speak English well" or "Cannot speak English", over the
+    # table's total. ONS publishes less detail for output areas, so the OA
+    # file may carry only the main language split; then this is missing at
+    # OA level and wards and LAs are built from the LSOA counts instead.
+    attach("census_poor_english_pct", "TS029", [("cannot speak english",)], expect=2)
+
+    # TS052 occupancy rating for bedrooms --------------------------------
+    # The bedrooms a household has against the bedrooms the bedroom standard
+    # says it needs: +2 or more, +1, 0, -1, -2 or less. Overcrowded is -1 or
+    # less; under-occupied is +2 or more. Matched on the last segment of the
+    # label, so "+1" can never be read as "-1". TS052 rather than TS053
+    # (rooms), whose room counts came from Valuation Office records.
+    t = tables.get("TS052")
+    if t is not None:
+        cc = _cen_code_col(t)
+        den_col = _cen_find(t, "total")
+        over = [c for c in t.columns if re.match(r"-1(?!\d)|-2 or (less|fewer)", _cen_leaf(c))]
+        under = [c for c in t.columns if re.match(r"\+2 or more", _cen_leaf(c))]
+        if not (cc and den_col) or len(over) != 2:
+            miss(f"TS052/census_overcrowded_pct: expected the -1 and -2 or less columns, "
+                 f"found {len(over)} (total={den_col}) - not written")
+        else:
+            n_o, d_o = _cen_counts(t, over, den_col)
+            merge_counts("census_overcrowded_pct", t[cc], n_o, d_o)
+        if not (cc and den_col) or len(under) != 1:
+            miss(f"TS052/census_underoccupied_pct: expected one +2 or more column, "
+                 f"found {len(under)} (total={den_col}) - not written")
+        else:
+            n_u, d_u = _cen_counts(t, under, den_col)
+            merge_counts("census_underoccupied_pct", t[cc], n_u, d_u)
+
     # Note on dropped Phase-A tables (documented for future revisit):
     #   TS022 (Religion)    — Nomis bulk zip has no LSOA CSV sheet.
     #   TS024 (Language)    — Nomis bulk zip has no LSOA CSV sheet.
     #   TS041               — LSOA CSV only carries "Number of households"
     #                         (total count), not one-person/lone-parent
-    #                         breakdown. Sub-category needs a different TS.
+    #                         breakdown. That breakdown is TS003, above.
     #   TS059               — LSOA CSV is hours worked, not accommodation
     #                         type; accommodation table isn't shipped at LSOA.
     #   TS068               — LSOA CSV is schoolchild/student indicator,
@@ -2560,9 +2788,8 @@ def _census_frame(level: str = "lsoa") -> pd.DataFrame | None:
     # If Nomis re-ships these at LSOA in future, restore the attach() calls.
 
     # TS025 household language (English/Welsh) --------------------------
-    # Despite the TS025 code (which in the Nomis catalogue is labelled
-    # "Proficiency in English"), the bulk LSOA zip actually ships
-    # household-language rows:
+    # TS025 is household language, as its rows show (proficiency in
+    # English, per person, is TS029, above). The bulk LSOA zip ships:
     #   * "All adults in household have English/Welsh as a main language"
     #   * "At least one but not all adults..."
     #   * "No adults in household, but at least one person aged 3-15..."
@@ -2596,6 +2823,11 @@ def _census_frame(level: str = "lsoa") -> pd.DataFrame | None:
     if "census_population" in out.columns:
         out["census_population"] = pd.to_numeric(out["census_population"], errors="coerce").astype("Int64")
     _record_census_age_bands(level, bands)
+    # Which NS-SEC groups the routine figure at this level counts, so the
+    # map can tell a file built since the L7 and L8 fix from one built
+    # before it (census_routine_classes in indicators.js).
+    _record_census_level("census2021_nssec.json", level,
+                         "L12-L13" if "census_routine_semi_routine_pct" in out.columns else "")
     return out
 
 
@@ -2642,6 +2874,15 @@ def run_census_oa() -> pd.DataFrame:
     if frame is None or frame.empty:
         warn("census_oa: no OA census figures")
         return pd.DataFrame()
+    # A key missing at OA level is built for wards and LAs from its LSOA
+    # counts instead (_census_ward_inputs). ONS publishes less detail for
+    # output areas, so for some keys that is expected; anything else is
+    # raised as partial.
+    oa_miss = [m for m in _CENSUS_MISSES.get("oa", [])
+               if not any(k in m for k in CENSUS_OA_MAY_LACK)]
+    if oa_miss:
+        _SOURCE_PARTIAL["census_oa"] = ("not built at output area level (wards use "
+                                        "LSOAs for these): " + "; ".join(oa_miss))
     frame = frame.rename(columns={"LSOA21CD": "OA21CD"})
     frame, counts = _census_split(frame, "OA21CD")
     frame = frame.set_index("OA21CD")
@@ -5667,12 +5908,59 @@ def _census_ward_inputs():
     if oa_to_ward:
         cnt = _read_parquet_opt(demo / "census2021_oa_counts.parquet")
         info(f"census -> wards from {len(cen_oa):,} output areas (ONS OA->ward best fit)")
-        return (cen_oa.rename(columns={"OA21CD": "LSOA21CD"}),
-                None if cnt is None else cnt.rename(columns={"OA21CD": "LSOA21CD"}),
-                oa_to_ward)
+        return _census_add_lsoa_only(
+            cen_oa.rename(columns={"OA21CD": "LSOA21CD"}),
+            None if cnt is None else cnt.rename(columns={"OA21CD": "LSOA21CD"}),
+            oa_to_ward)
     return (_read_parquet_opt(demo / "census2021.parquet"),
             _read_parquet_opt(demo / "census2021_counts.parquet"),
             get_lsoa_to_ward())
+
+
+def _census_add_lsoa_only(figs, counts, oa_to_ward):
+    """The output area inputs, plus LSOA rows for any percentage the LSOA
+    counts hold and the output area counts do not.
+
+    ONS publishes less detail for output areas (TS029's proficiency bands
+    may be missing there), so a key can exist for LSOAs only. Its wards and
+    LAs are then built from the counts of the LSOAs that best fit them,
+    rather than left blank. The LSOA rows carry only those keys and no
+    population, so nothing built from output areas is counted twice, and an
+    LSOA code never equals an output area code, so one lookup serves both."""
+    if counts is None or counts.empty:
+        return figs, counts, oa_to_ward
+    demo = DATA_DIR / "demographics"
+    l_cnt = _read_parquet_opt(demo / "census2021_counts.parquet")
+    if l_cnt is None or l_cnt.empty or "LSOA21CD" not in l_cnt.columns:
+        return figs, counts, oa_to_ward
+
+    def has(frame, k):
+        n, d = k + CEN_NUM, k + CEN_DEN
+        return (n in frame.columns and d in frame.columns
+                and bool((pd.to_numeric(frame[n], errors="coerce").notna()
+                          & pd.to_numeric(frame[d], errors="coerce").gt(0)).any()))
+    keys = sorted({c[:-len(CEN_NUM)] for c in l_cnt.columns if c.endswith(CEN_NUM)})
+    only = [k for k in keys if has(l_cnt, k) and not has(counts, k)]
+    if not only:
+        return figs, counts, oa_to_ward
+    lsoa_to_ward = get_lsoa_to_ward()
+    extra = l_cnt[["LSOA21CD"] + [c for k in only for c in (k + CEN_NUM, k + CEN_DEN)]].copy()
+    extra["LSOA21CD"] = extra["LSOA21CD"].astype(str)
+    extra = extra[extra["LSOA21CD"].isin(lsoa_to_ward)]
+    xf = pd.DataFrame({"LSOA21CD": extra["LSOA21CD"].values})
+    for k in only:
+        n = pd.to_numeric(extra[k + CEN_NUM], errors="coerce").values
+        d = pd.to_numeric(extra[k + CEN_DEN], errors="coerce").values
+        xf[k] = n / pd.Series(d).replace(0, float("nan")).values * 100
+    info(f"census -> wards: {', '.join(only)} from LSOA counts (not in the output area files)")
+    figs = pd.concat([figs.drop(columns=[k for k in only if k in figs.columns]), xf],
+                     ignore_index=True)
+    counts = pd.concat([counts.drop(columns=[c for k in only for c in (k + CEN_NUM, k + CEN_DEN)
+                                             if c in counts.columns]),
+                        extra.reset_index(drop=True)], ignore_index=True)
+    lookup = dict(oa_to_ward)
+    lookup.update(lsoa_to_ward)
+    return figs, counts, lookup
 
 
 def _ward_to_lad() -> dict:
@@ -7194,6 +7482,11 @@ def build_indicator_stats(ward_data: dict, lsoa_data: dict,
         # five-year bands of TS007A, which give 0 to 14 and 15 to 64, and the
         # map says so.
         "census_age_bands": age_bands,
+        # "L12-L13" when census_routine_semi_routine_pct counts NS-SEC L12
+        # and L13 only at every level. Files built before that fix also
+        # counted L7 and L8 to L9, about twice the true share, and the map
+        # leaves the indicator out until this says the figures were rebuilt.
+        "census_routine_classes": census_routine_classes(),
         # The LA Fingertips series whose stored age is not the headline age
         # (FT_HEADLINE_AGE). The map leaves these out; ft_age_checked says the
         # check ran, so a file written before it existed is treated with care.
@@ -7213,6 +7506,22 @@ def census_age_bands() -> str:
         return "0-14"
     vals = {v for v in (rec or {}).values() if isinstance(v, str)}
     return "0-15" if vals == {"0-15"} else "0-14"
+
+
+def census_routine_classes() -> str:
+    """'L12-L13' when every census level on disk built the routine and
+    semi-routine figure from NS-SEC L12 and L13 alone, else ''. A level
+    built before that fix (it also counted L7 and L8 to L9) has no entry in
+    census2021_nssec.json; the levels that ran are the ones the age bands
+    record lists, since _census_frame writes both."""
+    demo = DATA_DIR / "demographics"
+    try:
+        ran = json.loads((demo / "census2021_age_bands.json").read_text(encoding="utf-8"))
+        rec = json.loads((demo / "census2021_nssec.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return ""
+    levels = [lv for lv, v in (ran or {}).items() if isinstance(v, str)]
+    return "L12-L13" if levels and all((rec or {}).get(lv) == "L12-L13" for lv in levels) else ""
 
 
 def ft_age_mismatches() -> "list | None":

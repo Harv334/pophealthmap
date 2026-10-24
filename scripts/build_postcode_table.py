@@ -85,6 +85,20 @@ def _census_age_ok() -> bool:
 
 
 _AGE_OK = _census_age_ok()
+
+
+def _census_routine_ok() -> bool:
+    """True when indicators.js says the routine and semi-routine figure was
+    rebuilt from NS-SEC L12 and L13 alone (census_routine_classes). Files
+    built before that also counted L7 to L9, so the column is left out."""
+    try:
+        t = (REPO / "data/map/indicators.js").read_text(encoding="utf-8")
+        return '"census_routine_classes":"L12-L13"' in t.replace(" ", "")
+    except OSError:
+        return False
+
+
+_ROUTINE_OK = _census_routine_ok()
 ONSPD_ZIP = REPO / ".cache" / "onspd" / "ONSPD_FEB_2026_UK.zip"
 ONSPD_MEMBER = "Data/ONSPD_FEB_2026_UK.csv"
 
@@ -117,21 +131,35 @@ NATIVE = [
     ("census_black_pct",         "Black or Black British (%)",  "Census 2021 (TS021)", "2021"),
     ("census_mixed_pct",         "Mixed or multiple (%)",       "Census 2021 (TS021)", "2021"),
     ("census_other_ethnic_pct",  "Other ethnic group (%)",      "Census 2021 (TS021)", "2021"),
+    ("census_eth_bangladeshi_pct",     "Bangladeshi (%)",          "Census 2021 (TS021)", "2021"),
+    ("census_eth_pakistani_pct",       "Pakistani (%)",            "Census 2021 (TS021)", "2021"),
+    ("census_eth_black_african_pct",   "Black African (%)",        "Census 2021 (TS021)", "2021"),
+    ("census_eth_black_caribbean_pct", "Black Caribbean (%)",      "Census 2021 (TS021)", "2021"),
+    ("census_eth_gypsy_traveller_pct", "Gypsy or Irish Traveller (%)", "Census 2021 (TS021)", "2021"),
+    ("census_eth_roma_pct",            "Roma (%)",                 "Census 2021 (TS021)", "2021"),
     ("census_non_white_pct",     "Not White (%)",               "Census 2021 (TS021)", "2021"),
     ("census_born_outside_uk_pct", "Born outside the UK (%)",   "Census 2021 (TS004)", "2021"),
     ("census_english_hh_all_pct",  "All adults in the household have English as a main language (%)", "Census 2021 (TS025)", "2021"),
     ("census_english_hh_none_pct", "No one in the household has English as a main language (%)", "Census 2021 (TS025)", "2021"),
+    ("census_poor_english_pct",    "Cannot speak English well or at all (%)", "Census 2021 (TS029)", "2021"),
+    ("census_one_person_hh_pct",   "One-person households (%)",  "Census 2021 (TS003)", "2021"),
+    ("census_pensioner_alone_pct", "Living alone, aged 66 and over (% of households)", "Census 2021 (TS003)", "2021"),
+    ("census_lone_parent_dep_pct", "Lone parents with dependent children (% of households)", "Census 2021 (TS003)", "2021"),
 
     ("census_good_health_pct",  "Good or very good health (%)", "Census 2021 (TS037)", "2021"),
     ("census_bad_health_pct",   "Bad or very bad health (%)",   "Census 2021 (TS037)", "2021"),
     ("census_disability_any_pct", "Disabled - any limitation (%)", "Census 2021 (TS038)", "2021"),
     ("census_disability_lot_pct", "Disabled - limited a lot (%)",  "Census 2021 (TS038)", "2021"),
     ("census_provides_unpaid_care_pct", "Provides unpaid care (%)", "Census 2021 (TS039)", "2021"),
+    ("census_unpaid_care_50h_pct", "Unpaid care, 50 or more hours a week (%)", "Census 2021 (TS039)", "2021"),
 
     ("census_owned_pct",           "Owner occupied (%)",        "Census 2021 (TS054)", "2021"),
     ("census_social_rented_pct",   "Social rented (%)",         "Census 2021 (TS054)", "2021"),
     ("census_private_rented_pct",  "Private rented (%)",        "Census 2021 (TS054)", "2021"),
-    ("census_housing_deprived_pct", "Deprived in at least one dimension (%)", "Census 2021 (TS044)", "2021"),
+    ("census_overcrowded_pct",     "Overcrowded homes, bedrooms (%)", "Census 2021 (TS052)", "2021"),
+    ("census_underoccupied_pct",   "Under-occupied homes, bedrooms (%)", "Census 2021 (TS052)", "2021"),
+    ("census_hh_deprived_2plus_pct", "Households deprived in two or more dimensions (%)", "Census 2021 (TS011)", "2021"),
+    ("census_hh_deprived_any_pct", "Households deprived in at least one dimension (%)", "Census 2021 (TS011)", "2021"),
 
     ("census_no_car_pct",          "No car or van (%)",         "Census 2021 (TS045)", "2021"),
     ("census_car_to_work_pct",     "Travel to work by car or van (%)", "Census 2021 (TS061)", "2021"),
@@ -139,6 +167,8 @@ NATIVE = [
     ("census_active_travel_pct",   "Walk or cycle to work (%)", "Census 2021 (TS061)", "2021"),
 
     ("census_unemployed_pct",      "Unemployed (%)",            "Census 2021 (TS066)", "2021"),
+    ("census_inactive_ltsick_pct", "Long-term sick or disabled, not working (%)", "Census 2021 (TS066)", "2021"),
+    ("census_never_worked_ltu_pct", "Never worked or long-term unemployed (%)", "Census 2021 (TS062)", "2021"),
     ("census_higher_managerial_pct",    "Higher managerial occupations (%)", "Census 2021 (TS062)", "2021"),
     ("census_routine_semi_routine_pct", "Routine or semi-routine occupations (%)", "Census 2021 (TS062)", "2021"),
     ("census_no_qual_pct",         "No qualifications (%)",     "Census 2021 (TS067)", "2021"),
@@ -393,14 +423,18 @@ def main():
     wards = json.loads((REPO / "ward_data.json").read_text(encoding="utf-8"))["wards"]
 
     metrics = [] if args.columns == "none" else list(NATIVE)
+    if not _ROUTINE_OK:
+        metrics = [m for m in metrics if m[0] != "census_routine_semi_routine_pct"]
+        print("  left out until the data is rebuilt: Routine or semi-routine occupations")
     if args.columns == "all":
         metrics += [(k, lab + " [modelled]", s, y) for k, lab, s, y in MODELLED]
 
     # A column that is empty for every LSOA would still get a heading, and a
-    # heading is a promise. census_housing_deprived_pct was exactly that: the
-    # pipeline codes TS044 behind a guard that silently skips when a column
-    # match fails, so the key never reaches lsoa_data.json, and the extract
-    # carried 180,983 empty cells under "Deprived in at least one dimension".
+    # heading is a promise. Household deprivation was exactly that: the
+    # pipeline read it from TS044 (accommodation type, not deprivation) behind
+    # a guard that silently skipped when a column match failed, so the key
+    # never reached lsoa_data.json, and the extract carried 180,983 empty
+    # cells under "Deprived in at least one dimension". It is TS011 now.
     # Checked rather than hardcoded, so the next one cannot repeat it.
     has_value = set()
     for v in lsoa.values():

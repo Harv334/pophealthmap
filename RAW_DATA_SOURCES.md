@@ -66,22 +66,27 @@ every geography level. LSOA-level CSVs inside are named
 | Table | URL pattern | What it gives us |
 |-------|-------------|------------------|
 | **TS001** — Usual resident population | https://www.nomisweb.co.uk/output/census/2021/census2021-ts001.zip | `census_population` |
+| **TS003** — Household composition | https://www.nomisweb.co.uk/output/census/2021/census2021-ts003.zip | `census_one_person_hh_pct`, `census_pensioner_alone_pct` (one-person households aged 66 and over), `census_lone_parent_dep_pct` (lone parents with dependent children), all as shares of households |
 | **TS004** — Country of birth | https://www.nomisweb.co.uk/output/census/2021/census2021-ts004.zip | `census_born_outside_uk_pct` |
 | **TS007A** — Age by 5-year bands | https://www.nomisweb.co.uk/output/census/2021/census2021-ts007a.zip | Under 16 / 18-64 / 65+ / 85+ % |
-| **TS021** — Ethnic group | https://www.nomisweb.co.uk/output/census/2021/census2021-ts021.zip | White / Asian / Black / Mixed / Other / non-white % |
+| **TS011** — Households by deprivation dimensions | https://www.nomisweb.co.uk/output/census/2021/census2021-ts011.zip | `census_hh_deprived_2plus_pct` (two, three or four dimensions), `census_hh_deprived_any_pct` (total less "not deprived in any dimension") |
+| **TS021** — Ethnic group | https://www.nomisweb.co.uk/output/census/2021/census2021-ts021.zip | White / Asian / Black / Mixed / Other / non-white %, and six detailed groups from the leaf columns: `census_eth_bangladeshi_pct`, `_pakistani_`, `_black_african_`, `_black_caribbean_`, `_gypsy_traveller_`, `_roma_` |
 | **TS025** — Household language | https://www.nomisweb.co.uk/output/census/2021/census2021-ts025.zip | `census_english_hh_all_pct`, `census_english_hh_none_pct` |
+| **TS029** — Proficiency in English language | https://www.nomisweb.co.uk/output/census/2021/census2021-ts029.zip | `census_poor_english_pct` (cannot speak English well, or at all, over residents aged 3 and over). The output area file may carry only the main language split; then wards and LAs are built from the LSOA counts |
 | **TS037** — General health | https://www.nomisweb.co.uk/output/census/2021/census2021-ts037.zip | Good/bad health % |
 | **TS038** — Disability | https://www.nomisweb.co.uk/output/census/2021/census2021-ts038.zip | `census_disability_any_pct`, `census_disability_lot_pct` |
-| **TS039** — Provision of unpaid care | https://www.nomisweb.co.uk/output/census/2021/census2021-ts039.zip | `census_provides_unpaid_care_pct` |
-| **TS044** — Household deprivation | https://www.nomisweb.co.uk/output/census/2021/census2021-ts044.zip | `census_housing_deprived_pct` |
+| **TS039** — Provision of unpaid care | https://www.nomisweb.co.uk/output/census/2021/census2021-ts039.zip | `census_provides_unpaid_care_pct`, `census_unpaid_care_50h_pct` (50 or more hours a week) |
 | **TS045** — Car or van availability | https://www.nomisweb.co.uk/output/census/2021/census2021-ts045.zip | `census_no_car_pct` |
+| **TS052** — Occupancy rating for bedrooms | https://www.nomisweb.co.uk/output/census/2021/census2021-ts052.zip | `census_overcrowded_pct` (-1 or less), `census_underoccupied_pct` (+2 or more), as shares of households |
 | **TS054** — Tenure | https://www.nomisweb.co.uk/output/census/2021/census2021-ts054.zip | Owner / social / private rented % |
 | **TS061** — Method of travel to work | https://www.nomisweb.co.uk/output/census/2021/census2021-ts061.zip | Active / public transport / car to work % |
-| **TS062** — NS-SEC | https://www.nomisweb.co.uk/output/census/2021/census2021-ts062.zip | Higher managerial / routine-semi-routine % |
-| **TS066** — Economic activity status | https://www.nomisweb.co.uk/output/census/2021/census2021-ts066.zip | `census_unemployed_pct` |
+| **TS062** — NS-SEC | https://www.nomisweb.co.uk/output/census/2021/census2021-ts062.zip | Higher managerial (L1 to L3), routine and semi-routine (L12 and L13 only), `census_never_worked_ltu_pct` (L14.1 and L14.2) % |
+| **TS066** — Economic activity status | https://www.nomisweb.co.uk/output/census/2021/census2021-ts066.zip | `census_unemployed_pct`, `census_inactive_ltsick_pct` (economically inactive: long-term sick or disabled, over residents aged 16 and over) |
 | **TS067** — Highest qualifications | https://www.nomisweb.co.uk/output/census/2021/census2021-ts067.zip | `census_level4_qual_pct`, `census_no_qual_pct` |
 
 > TS009 was considered but its LSOA CSV doesn't ship in the bulk zip — use TS007A for age instead.
+>
+> TS044 is accommodation type, not household deprivation. The pipeline read it for household deprivation until October 2026, found none of the columns it looked for and wrote nothing; household deprivation is TS011. A column or table the pipeline cannot find is now reported, and the census source is marked partial in the manifest.
 
 ---
 
