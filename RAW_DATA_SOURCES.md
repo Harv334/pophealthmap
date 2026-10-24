@@ -531,6 +531,31 @@ one CSV per force per month.
 
 ---
 
+## 11. Healthy places, mental health, recorded illness and food
+
+Five sources, one per publisher, each with its own entry in the manifest
+(fetch_all_data.py, "HEALTHY PLACES, MENTAL HEALTH, RECORDED ILLNESS, FOOD
+ACCESS AND FOOD OUTLETS"). Any of them may sit behind a login or on a host
+that refuses GitHub's servers, so each reads a file from `.cache/<source>/`
+first, and both refresh workflows copy into that folder whatever is attached
+to a GitHub release named `<source>-source` (`ahah-source`, `samhi-source`,
+`qof-msoa-source`, `ppfi-source`, `fhrs-source`). With no file and no way to
+fetch one, the source is **skipped** with a note in the manifest saying what
+to download from where and which release to attach it to. It never fails for
+lack of a file, so it never holds back a region pack. A file that is there but
+reads wrong does fail. With no new file, the figures an earlier run wrote are
+kept.
+
+| Source | Publisher and file | Where it is found | Used for |
+|--------|--------------------|-------------------|----------|
+| `ahah` | GeoDS (University of Liverpool), Access to Healthy Assets and Hazards (AHAH) version 5.1 (20 May 2026), LSOA 2021 | GeoDS's own record of the dataset (`https://data.geods.ac.uk/api/3/action/package_show?id=access-to-healthy-assets-hazards-ahah`, then the dataset id `8fa47a8b-345c-438d-a8c3-0ac758ee12be`), else the links on https://data.geods.ac.uk/dataset/access-to-healthy-assets-hazards-ahah. The LSOA data file, CSV before Parquet; never the variable dictionary, the methodology or Scotland's data zones. Whether a free GeoDS login is needed was not confirmed: a login page in place of the file counts as no file. Used only when the record names an open licence (it is listed under the Open Government Licence) | The overall index and its four domains (health services, retail hazards, air quality, green and blue space) as `ahah_index`, `ahah_health_services`, `ahah_retail`, `ahah_air_quality`, `ahah_green_blue` (higher is a less healthy place), and the drive time in minutes by car to the nearest fast food outlet, pub, off-licence, gambling outlet and tobacconist (`ahah_fast_food_min`, `ahah_pubs_min`, `ahah_off_licence_min`, `ahah_gambling_min`, `ahah_tobacco_min`). The column names of 5.1 were not seen, so columns are matched by their words: a release prefix such as `ah5` is set aside, then the base names of earlier releases (`ffood`, `pubs`, `off`, `gamb`, `tob`, `h`, `r`, `e`, `g`, `ahah`) or spelled-out headers; ranks and percentiles are not taken. A measure matched twice or not at all is reported and left out. Refused: a file on the 2011 LSOAs, a release before 5 (which measured distance, not minutes), drive times whose median is not minutes, and scores that rise with the drive times to outlets (the documented direction is the other way). `ahah_decile` is worked out here from the index across England's LSOAs, 1 the least healthy tenth. Written to `data/environment/ahah_lsoa.parquet` (this scope's LSOAs). Wards and LAs: averages of the LSOAs weighted by Census 2021 residents; the decile stays LSOA only |
+| `samhi` | PLDR (University of Liverpool), Small Area Mental Health Index (SAMHI) version 4.00 | The CSV links on https://pldr.org/dataset/2noyv/small-area-mental-health-index-samhi, the wide file before the long one. Used only when that page names an open licence (the licence was not confirmed by the fact-check), or when the file was attached by hand to `samhi-source` | `samhi_index` (higher is worse mental health) for the latest year in the file, long (a year column) or wide (the year in the column name), and `samhi_decile`, worked out here across England, 1 the worst tenth. Its LSOA vintage was not confirmed: a file with no code above E01033768 (the last 2011 code) is bridged to 2021 with the ONS lookup (an unchanged or split LSOA takes its 2011 figure, a merged or redrawn one the average of its parents). Written to `data/outcomes/samhi_lsoa.parquet` with the year, the vintage and the licence it was used under. Wards and LAs: averages weighted by residents |
+| `qof_msoa` | House of Commons Library, "Constituency data: health conditions", modelled estimates of GP-recorded prevalence from QOF 2024/25, MSOA | A spreadsheet linked from https://commonslibrary.parliament.uk/constituency-data-how-healthy-is-your-area/ whose name or link text says MSOA, health, condition, prevalence or QOF; failing that, MSOA files in the GitHub project `local-health-data-from-QOF` when the page links to it. The layout was not seen | `qof_est_<condition>_pct` for up to 20 conditions (AF, asthma, cancer, CHD, CKD, COPD, dementia, depression, diabetes, epilepsy, heart failure, hypertension, learning disability, serious mental illness, non-diabetic hyperglycaemia, obesity, osteoporosis, PAD, rheumatoid arthritis, stroke and TIA): long tables (a condition column beside a prevalence column) and wide ones (a column per condition) are both read, counts and age-standardised columns left out, proportions turned into percentages. A file on the 2011 MSOAs is refused. Written to `data/healthcare/qof_msoa.parquet` (every English MSOA) with the QOF year. Wards: each LSOA takes its MSOA's figure and a ward is the average of its LSOAs weighted by residents, with no figure under 80% cover (`msoa_figures_to_areas`); LAs from their MSOAs the same way |
+| `ppfi` | CDRC, Priority Places for Food Index (PPFI) version 2.1 (July 2024), LSOA 2021 | Never fetched: the download needs a free CDRC login (https://data.cdrc.ac.uk/node/2515). Read from `.cache/ppfi/`, filled from the `ppfi-source` release | The combined index and five domains as England deciles, 1 the highest priority: `ppfi_decile`, `ppfi_supermarket_proximity_decile`, `ppfi_supermarket_access_decile`, `ppfi_online_decile`, `ppfi_nonsupermarket_decile`, `ppfi_family_decile`. The fuel poverty domain (the map has DESNZ's figure) and socio-demographic barriers (which repeats the IMD) are left out. The ranks may be for the whole UK, so deciles are worked out again within England from the ranks, their direction taken from the published deciles; deciles with no ranks are used only if they split England's LSOAs into tenths. Written to `data/environment/ppfi_lsoa.parquet`. Wards and LAs: `ppfi_priority_pct`, the share of residents (Census 2021) living in LSOAs in deciles 1 and 2 |
+| `fhrs` | Food Standards Agency (FSA), food hygiene rating scheme | FSA's API, version 2 (`https://api.ratings.food.gov.uk/Authorities`, with the header `x-api-version: 2`, no key), for each council's open data XML file (its `FileName`), or the API's pages of establishments when there is no file. The scope's councils are found by name, with every council in the scope's FSA region. Files are kept in `.cache/fhrs/` for 20 days | Each business is placed in its LSOA by its coordinates (point in polygon on the LSOA boundaries), else its postcode (postcodes.io), and counted: every business, takeaways and sandwich shops (business type "Takeaway/sandwich shop"), pubs, bars and nightclubs ("Pub/bar/nightclub"), businesses with a rating of 0 to 5, and those rated 0, 1 or 2 ("Awaiting inspection", "Exempt" and the like are not ratings). Written to `data/environment/fhrs_lsoa.parquet`. Wards and LAs only, from summed counts: `fhrs_takeaways_per_1000` and `fhrs_pubs_per_1000` over Census 2021 residents, and `fhrs_low_hygiene_pct` over the rated businesses (none under 20 rated). An LA whose file could not be had leaves its LSOAs out and fails the source, rather than counting them as having no businesses |
+
+---
+
 ## Minimum download checklist to reproduce the map
 
 To rebuild from scratch, a colleague needs:
@@ -560,6 +585,16 @@ To rebuild from scratch, a colleague needs:
 16. **Household income (SAIE)** and **healthy and disability-free life
     expectancy for MSOAs**: nothing, once their parquets are committed. Each is
     found on its ONS dataset page by the first refresh.
+17. **AHAH**: 1 GeoDS file (the LSOA CSV), found by the pipeline unless a
+    login is needed; then attach it to the `ahah-source` release.
+18. **SAMHI**: 1 PLDR CSV, found by the pipeline when PLDR's page names an open
+    licence; otherwise attach it to `samhi-source`.
+19. **QOF estimates for MSOAs**: 1 House of Commons Library spreadsheet, found
+    on its page if it links one; otherwise attach it to `qof-msoa-source`.
+20. **PPFI**: 1 CDRC CSV, always by hand (free CDRC login), attached to
+    `ppfi-source`.
+21. **Food hygiene ratings**: nothing; one FSA XML file per council, fetched by
+    the pipeline (or attached to `fhrs-source` if FSA refuses GitHub).
 
 **Total raw data:** ≈ 350–450 MB uncompressed, from 9 distinct source
 organisations. All files are free and published under OGL or
@@ -588,6 +623,11 @@ equivalent open licence.
 | Distances to services | With the NHS registers | Every run that fetches the GP, pharmacy and dental registers |
 | ONS small area income estimates | Every few years (FYE 2023 in Dec 2025, next not announced) | Static. Delete `data/demographics/saie_msoa.parquet` to take a new edition |
 | ONS health state life expectancy for MSOAs | After each census | Static. Delete `data/outcomes/hle_msoa.parquet` to take a revised edition |
+| AHAH (GeoDS) | Irregular (version 4 in 2024, 5.1 in May 2026) | Static: the file stays in `.cache/ahah/`. Attach a new version to `ahah-source` to take it |
+| SAMHI (PLDR) | Irregular (v4.00 latest) | Static: the file stays in `.cache/samhi/`. Attach a new version to `samhi-source` |
+| QOF estimates for MSOAs (House of Commons Library) | Yearly, after each QOF year (usually autumn) | Attach the new file to `qof-msoa-source`, or clear `.cache/qof_msoa/` so the page is read again |
+| PPFI (CDRC) | Irregular (v2.1 in July 2024) | By hand: attach a new version to `ppfi-source` |
+| FSA food hygiene ratings | Daily | Automatic; each council's file is fetched again after 20 days |
 
 ---
 
