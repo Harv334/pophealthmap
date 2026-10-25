@@ -189,11 +189,10 @@ Rules that matter:
   writing your answer and never contradict them. If results_are says "the
   lowest values; higher = more deprived", those rows are the LEAST deprived
   areas, and saying they have the highest scores would be wrong twice over.
-- imd_decile_mean is an average of deciles, not a decile. A value of 3 means the
-  typical LSOA there sits in the third decile, among roughly the 30 per cent
-  most deprived nationally. Do not say an area is "in the most deprived tenth"
-  unless the value is 1. Getting this wrong overstates deprivation, which is
-  the worst direction to be wrong in for this data.
+- imd_decile is published for LSOAs only. A ward or LA has an IMD score, the
+  average of its LSOAs' scores, not a decile: do not say a ward or LA is "in
+  the most deprived tenth" from its score. Getting this wrong overstates
+  deprivation, which is the worst direction to be wrong in for this data.
 - Rates and percentages are not counts. Do not add percentages together.
 - Each figure in a tool result comes as v (the value) with its label, unit and
   period. Use the label for what the figure is, not a guess from the key.
@@ -272,7 +271,7 @@ const TOOLS = [
         indicators: {
           type: "array",
           items: { type: "string" },
-          description: "Optional indicator keys to return, e.g. ft_life_expectancy_female; all of them if left out",
+          description: "Optional indicator keys to return, e.g. ft_93283; all of them if left out",
         },
       },
       required: ["name", "level"],

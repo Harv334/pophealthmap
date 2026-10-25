@@ -124,11 +124,6 @@ NATIVE = [
      "Census 2021 (TS007)" if _AGE_OK else "Census 2021 (TS007A)", "2021"),
     ("census_over65_pct",      "Aged 65 and over (%)",          "Census 2021 (TS007A)", "2021"),
     ("census_over85_pct",      "Aged 85 and over (%)",          "Census 2021 (TS007A)", "2021"),
-    ("sape_population",        "Population, mid-year estimate", "ONS mid-year population estimates", "mid-year"),
-    ("sape_age0_15_pct",       "Aged 0 to 15, mid-year estimate (%)", "ONS mid-year population estimates", "mid-year"),
-    ("sape_age16_64_pct",      "Aged 16 to 64, mid-year estimate (%)", "ONS mid-year population estimates", "mid-year"),
-    ("sape_age65plus_pct",     "Aged 65 and over, mid-year estimate (%)", "ONS mid-year population estimates", "mid-year"),
-    ("sape_age75plus_pct",     "Aged 75 and over, mid-year estimate (%)", "ONS mid-year population estimates", "mid-year"),
 
     ("census_white_pct",         "White (%)",                   "Census 2021 (TS021)", "2021"),
     ("census_asian_pct",         "Asian or Asian British (%)",  "Census 2021 (TS021)", "2021"),
@@ -141,9 +136,7 @@ NATIVE = [
     ("census_eth_black_caribbean_pct", "Black Caribbean (%)",      "Census 2021 (TS021)", "2021"),
     ("census_eth_gypsy_traveller_pct", "Gypsy or Irish Traveller (%)", "Census 2021 (TS021)", "2021"),
     ("census_eth_roma_pct",            "Roma (%)",                 "Census 2021 (TS021)", "2021"),
-    ("census_non_white_pct",     "Not White (%)",               "Census 2021 (TS021)", "2021"),
     ("census_born_outside_uk_pct", "Born outside the UK (%)",   "Census 2021 (TS004)", "2021"),
-    ("census_english_hh_all_pct",  "All adults in the household have English as a main language (%)", "Census 2021 (TS025)", "2021"),
     ("census_english_hh_none_pct", "No one in the household has English as a main language (%)", "Census 2021 (TS025)", "2021"),
     ("census_poor_english_pct",    "Cannot speak English well or at all (%)", "Census 2021 (TS029)", "2021"),
     ("census_one_person_hh_pct",   "One-person households (%)",  "Census 2021 (TS003)", "2021"),
@@ -163,7 +156,6 @@ NATIVE = [
     ("census_overcrowded_pct",     "Overcrowded homes, bedrooms (%)", "Census 2021 (TS052)", "2021"),
     ("census_underoccupied_pct",   "Under-occupied homes, bedrooms (%)", "Census 2021 (TS052)", "2021"),
     ("census_hh_deprived_2plus_pct", "Households deprived in two or more dimensions (%)", "Census 2021 (TS011)", "2021"),
-    ("census_hh_deprived_any_pct", "Households deprived in at least one dimension (%)", "Census 2021 (TS011)", "2021"),
 
     ("census_no_car_pct",          "No car or van (%)",         "Census 2021 (TS045)", "2021"),
     ("census_car_to_work_pct",     "Travel to work by car or van (%)", "Census 2021 (TS061)", "2021"),
@@ -187,7 +179,6 @@ NATIVE = [
 MODELLED = [
     ("no2_ugm3",   "Nitrogen dioxide (ug/m3)",  "Defra PCM 1 km model", "2023"),
     ("pm25_ugm3",  "PM2.5 (ug/m3)",             "Defra PCM 1 km model", "2023"),
-    ("pm10_ugm3",  "PM10 (ug/m3)",              "Defra PCM 1 km model", "2023"),
     ("green_doorstep_pct",      "Green space - doorstep (%)",      "Defra green and blue, per Output Area", "2023"),
     ("green_local_pct",         "Green space - local (%)",         "Defra green and blue, per Output Area", "2023"),
     ("green_neighbourhood_pct", "Green space - neighbourhood (%)", "Defra green and blue, per Output Area", "2023"),
@@ -203,7 +194,6 @@ MODELLED = [
     ("gp_dist_km",           "Distance to nearest GP practice from LSOA centre (km)", "NHS ODS register, measured here", "live"),
     ("pharmacy_dist_km",     "Distance to nearest pharmacy from LSOA centre (km)",    "NHS ODS register, measured here", "live"),
     ("dentist_dist_km",      "Distance to nearest NHS dentist from LSOA centre (km)", "NHS ODS register, measured here", "live"),
-    ("crime_total",          "Crimes in the LSOA, 12 months",                       "data.police.uk points, counted here", "12 months"),
     ("crime_rate_per_1000",  "Crimes per 1,000 residents, 12 months",               "data.police.uk over Census 2021 residents", "12 months"),
 ]
 
@@ -216,7 +206,6 @@ GEOGRAPHY = [
     ("local_authority",      "Local authority",              "ONS", "2024"),
     ("local_authority_code", "Local authority code",         "ONS", "2024"),
     ("ward_imd_score_mean",  "Ward IMD score (mean of its LSOAs)",  "Computed here from MHCLG IMD 2025", "2025"),
-    ("ward_imd_decile_mean", "Ward IMD decile (mean of its LSOAs)", "Computed here from MHCLG IMD 2025", "2025"),
     ("latitude",             "Latitude",                     "ONSPD FEB 2026", "2026"),
     ("longitude",            "Longitude",                    "ONSPD FEB 2026", "2026"),
 ]
@@ -229,8 +218,6 @@ BLANK_REASON = {
         "are City of London wards: the City has 25 wards sharing a handful of "
         "LSOAs, and the ONS best-fit lookup names only 684 of London's 704 wards. "
         "The LSOA figures on these rows are complete.",
-    "ward_imd_decile_mean":
-        "As the ward IMD score above.",
 }
 
 PROVENANCE = """Built {built} by scripts/build_postcode_table.py, in
@@ -399,7 +386,7 @@ def tidy(v, key):
     except (TypeError, ValueError):
         return v
     if key in ("census_population", "imd_rank", "claimant_count", "gb_total_uprn",
-               "imd_decile", "bus_stops_800m", "rail_stations_1km", "sape_population", "crime_total"):
+               "imd_decile", "bus_stops_800m", "rail_stations_1km"):
         return str(int(round(f)))
     if f == int(f):
         return str(int(f))
@@ -503,7 +490,6 @@ def main():
                        tidy(li.get("imd_rank"), "imd_rank"),
                        wc, wr.get("name", g.get("ward", "")),
                        tidy(wi.get("imd_score"), "ward_imd"),
-                       tidy(wi.get("imd_decile_mean"), "ward_imd"),
                        wr.get("lad", g.get("borough", "")), wr.get("lad_code", ""),
                        row[i_la], row[i_lo]]
                 if args.terminated:

@@ -36,7 +36,7 @@ for tname in sys.argv[1:]:
         inds = w.get('indicators', {})
         ft = {k: v for k, v in inds.items() if k.startswith('ft_')}
         ft_id = {k: v for k, v in ft.items() if k[3:].isdigit()}     # ft_93283
-        ft_named = {k: v for k, v in ft.items() if not k[3:].isdigit()}  # ft_life_expectancy_male
+        ft_named = {k: v for k, v in ft.items() if not k[3:].isdigit()}  # ft_smoking_prevalence_adults
         non_ft = {k: v for k, v in inds.items() if not k.startswith('ft_')}
         print(f"  key in ward_data.json: {code!r}")
         print(f"  name in record:        {w.get('name')!r}")

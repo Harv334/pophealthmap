@@ -99,9 +99,9 @@ https://www.gov.uk/government/statistics/english-indices-of-deprivation-2025
 into `.cache/imd2025/` and rerun `--only imd`; a raw file present is always
 preferred over the parquet.
 
-Ward deprivation is population-weighted from LSOAs, which is how MHCLG
-aggregates IMD. An average of deciles is not a decile, so that field is
-published as `imd_decile_mean` rather than pretending to be one.
+Ward deprivation is the IMD score population-weighted from its LSOAs, which
+is how MHCLG aggregates IMD. An average of deciles is not a decile, so the map
+gives deciles for LSOAs only, as MHCLG publishes them.
 
 ## Running
 

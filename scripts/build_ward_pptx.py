@@ -560,7 +560,10 @@ def slide_crime(prs, ward, wd):
     add_text_box(s, Inches(0.5), Inches(0.3), Inches(12), Inches(0.5),
                  f'{ward["name"]} — Crime', size=24, bold=True,
                  color=RGBColor(0x1a, 0x26, 0x40))
-    crime_total = fnum(inds.get('crime_total'))
+    # The categories added up, less anti-social behaviour, as the map does:
+    # the total is no longer a figure of its own (October 2026).
+    cats = ward.get('crime_by_category') or {}
+    crime_total = sum(fnum(v) or 0 for c, v in cats.items() if c != 'anti-social-behaviour') or None
     add_text_box(s, Inches(0.5), Inches(0.78), Inches(12), Inches(0.3),
                  f'MPS recorded crime · Apr 2025 to Mar 2026' +
                  (f' · total {int(crime_total):,}' if crime_total else ''),

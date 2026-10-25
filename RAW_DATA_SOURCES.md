@@ -12,6 +12,20 @@ cannot drift apart.
 **Levels used:** LSOA 2021 (≈33,755 nationally, 4,994 in London),
 Ward 2025, GP practice, postcode.
 
+**Not exported since October 2026.** Twenty-four keys this document names are
+near-copies of others, and of each pair the one published for the smaller area
+was kept. They are left out of every file the map reads (`RETIRED_KEYS` in
+`fetch_all_data.py`, and `PH_RETIRED` in `index.html` for region packs built
+before): `census_non_white_pct`, `imd_decile_mean`, `iod_adult_quals`,
+`iod_air_quality`, `census_english_hh_all_pct`, `ft_93097`, `crime_total`,
+`idaci_decile`, `idaopi_decile`, `samhi_decile`, `census_hh_deprived_any_pct`,
+`ft_obesity_year6`, `pm10_ugm3`, `ft_93280`,
+`sape_population` and the four `sape_` age shares, the four LA life
+expectancy and healthy life expectancy series (`ft_life_expectancy_*`,
+`ft_healthy_life_expectancy_*`) and `saie_net_bhc`. Where another figure is
+built from one (the mid-year counts are the base of the youth claimant rate
+and of care home beds, the crime counts of the crime rate) it is still read.
+
 ---
 
 ## 1. Geography & boundaries
@@ -142,7 +156,7 @@ responses at 25,000 rows, which is why we chunk by LSOA.
 
 | File | Source | URL | Used for |
 |------|--------|-----|----------|
-| LSOA population estimates by single year of age (`sapelsoasyoa20222024.xlsx` in the November 2025 edition) | ONS | https://www.ons.gov.uk/peoplepopulationandcommunity/populationandmigration/populationestimates/datasets/lowersuperoutputareamidyearpopulationestimates | Source `sape`. Found on that page (and its `/data` JSON) as the newest file whose name has `lsoa` and `syoa`; `SAPE_URL` overrides, and a file put in `.cache/sape/` by hand is used when the page lists none. The newest `Mid-YYYY LSOA 2021` sheet is read: `LSOA 2021 Code`, `Total`, then `F0` to `F90` and `M0` to `M90` (90 meaning 90 and over). The single years must add up to `Total`, or nothing is kept. Written to `data/demographics/sape_lsoa.parquet` as counts (population, 0 to 15, 16 to 64, 65+, 75+, 18 to 24) and shown as `sape_population` and four age shares for LSOAs, wards and LAs (counts added up). The Census figures stay the base of the existing rates: moving them would change almost every rate on the map at once. |
+| LSOA population estimates by single year of age (`sapelsoasyoa20222024.xlsx` in the November 2025 edition) | ONS | https://www.ons.gov.uk/peoplepopulationandcommunity/populationandmigration/populationestimates/datasets/lowersuperoutputareamidyearpopulationestimates | Source `sape`. Found on that page (and its `/data` JSON) as the newest file whose name has `lsoa` and `syoa`; `SAPE_URL` overrides, and a file put in `.cache/sape/` by hand is used when the page lists none. The newest `Mid-YYYY LSOA 2021` sheet is read: `LSOA 2021 Code`, `Total`, then `F0` to `F90` and `M0` to `M90` (90 meaning 90 and over). The single years must add up to `Total`, or nothing is kept. Written to `data/demographics/sape_lsoa.parquet` as counts (population, 0 to 15, 16 to 64, 65+, 75+, 18 to 24) and used as the base of the claimant rate for 18 to 24 year olds and of care home beds for people aged 75 and over (the age shares themselves are not exported: the Census ones go down to output areas). The Census figures stay the base of the existing rates: moving them would change almost every rate on the map at once. |
 
 The Nomis dataset id `NM_2014_1` for the same estimates was not confirmed, so
 the ONS file is used instead.
