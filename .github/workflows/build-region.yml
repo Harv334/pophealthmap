@@ -10,7 +10,6 @@ name: Build region (pilot)
 #
 # The London-only sources are skipped until they have national replacements:
 #   tfl          TfL StopPoint covers London only; the naptan source gives regions the same measures
-#   ptal         GLA LSOA Atlas, London only
 
 on:
   workflow_dispatch:
@@ -150,7 +149,7 @@ jobs:
         # secret those sources are skipped, not failed.
         env:
           STAT_XPLORE_API_KEY: ${{ secrets.STAT_XPLORE_API_KEY }}
-        run: python -u fetch_all_data.py --scope "${{ inputs.scope }}" --skip tfl ptal
+        run: python -u fetch_all_data.py --scope "${{ inputs.scope }}" --skip tfl
 
       # The loading screen's ward map for this region (map/loader.js), drawn
       # from the wards and IMD the pipeline has just written.

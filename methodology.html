@@ -566,10 +566,6 @@ and say what each one means.</p>
         <td>DWP adjusts or rounds small counts before publishing them, so that
             no one can be identified. Figures for small areas are approximate,
             and adding them up does not give exactly DWP's own totals.</td></tr>
-    <tr><td class="term">PTAL</td><td>Public Transport Accessibility Level</td>
-        <td>TfL's measure of how well connected a place is to public transport.
-            It uses bands from 0 to 6b, shown here on a 0 to 8 scale where 8 is
-            the best connected. It covers London only.</td></tr>
     <tr><td class="term">Charity</td><td>VCSE organisation</td>
         <td>A charity registered with the Charity Commission. VCSE stands for
             voluntary, community and social enterprise.</td></tr>
@@ -619,7 +615,7 @@ and say what each one means.</p>
     <tr><td class="term">CQC</td><td>Care Quality Commission</td>
         <td>The register of care homes and their beds.</td></tr>
     <tr><td class="term">TfL</td><td>Transport for London</td>
-        <td>The register of London's stations and bus stops, and PTAL.</td></tr>
+        <td>The register of London's stations and bus stops.</td></tr>
     <tr><td class="term">GeoDS</td><td>Geographic Data Service, University of Liverpool</td>
         <td>The healthy places index (AHAH) and its drive times.</td></tr>
     <tr><td class="term">PLDR</td><td>Place-based Longitudinal Data Resource, University of Liverpool</td>
@@ -785,8 +781,8 @@ stations within 1 km and bus stops within 800 metres are averaged, not added,
 because one station is close to several LSOAs. Figures published for MSOAs,
 from Local Health and from ONS, reach wards through their LSOAs: each LSOA
 takes its MSOA's figure, and the ward's figure is the average of its LSOAs,
-weighted by residents, or by households for household income. For Local Health figures and
-PTAL, a ward has no figure unless the LSOAs with figures hold at least four in
+weighted by residents, or by households for household income. For Local Health figures, a
+ward has no figure unless the LSOAs with figures hold at least four in
 five of its residents. The same rule applies to ONS's MSOA figures, counted in
 households for income. Where no LA figure is published, we work out the LA's
 figure from its wards in the same way. Fuel poverty, and the deprivation
@@ -925,21 +921,6 @@ figures for fewer than four in five of its residents, we show no figure for the
 ward (see <a href="#missing">Missing is not zero</a>). When a ward figure covers
 most but not all of its residents, it says what share it covers.</p>
 
-<h3 id="gap-ptal">Public transport accessibility is London only</h3>
-
-<p>The public transport accessibility level (PTAL) is TfL's measure. There is
-no national version, so every other region has the four station and bus stop
-measures instead.</p>
-
-<p>The Greater London Authority publishes PTAL for the 2011 LSOAs. Each LSOA
-drawn in 2021 takes the figure of the 2011 area it was split from, using the
-lookup ONS publishes. A merged LSOA takes the average of the areas it was made
-from.<span data-ptal="gap"> The figures on the map now were made before that
-lookup was in place. So the <span id="ptal-gap-n">335</span> LSOAs drawn in
-2021, in places such as Stratford, the Royal Docks, Wembley Park and
-Colindale, have no figure until the next update.</span> A ward with figures for
-fewer than four in five of its residents is left blank.</p>
-
 <h3 id="gap-charities">Charities are listed region by region</h3>
 
 <p>The charities directory is not part of the England view. Open a region to
@@ -996,7 +977,8 @@ above, for anyone who wants to check it or repeat it.</p>
             area boundary file.</td></tr>
     <tr><td class="term">2011 LSOAs to 2021 LSOAs</td>
         <td><code>LSOA11_LSOA21_LAD22_EW_LU</code></td>
-        <td>PTAL, which the GLA publishes for the 2011 LSOAs. An LSOA that is
+        <td>Figures published for the 2011 LSOAs, such as the mental health
+            index (SAMHI). An LSOA that is
             unchanged, or was split from a 2011 LSOA, takes that LSOA's figure.
             One that was merged or redrawn takes the plain average of the 2011
             LSOAs it came from, because the lookup has no weights.</td></tr>
@@ -1704,17 +1686,6 @@ var SOURCES = [
     cadence: 'Monthly.',
     manifest: 'service_access' },
 
-  { id: 'ptal',
-    name: 'Public transport accessibility (PTAL)',
-    pub: 'Greater London Authority, LSOA Atlas',
-    what: 'TfL\'s public transport accessibility level, averaged over each LSOA. The nine ' +
-          'bands 0, 1a, 1b, 2 to 5, 6a and 6b are shown on a 0 to 8 scale, where 8 is the ' +
-          'best connected.',
-    geo: 'LSOA',
-    period: 'As published in the Atlas',
-    cadence: 'No fixed timetable.',
-    manifest: 'ptal' },
-
   { id: 'population',
     name: 'Population',
     pub: 'ONS, Census 2021',
@@ -1872,8 +1843,8 @@ Array.prototype.forEach.call(document.querySelectorAll('table.stack'), labelTabl
       return;
     }
     // Only a source that has a row in the table and actually failed counts.
-    // Sources skipped by design (custom, NaPTAN in London, TfL and PTAL in
-    // the regions) are expected and are not reported as stale.
+    // Sources skipped by design (custom, NaPTAN in London, TfL in the
+    // regions) are expected and are not reported as stale.
     var bad = SOURCES.filter(function (r) {
       var s = r.manifest && sources[r.manifest];
       return s && s.status === 'failed';
@@ -1909,19 +1880,7 @@ Array.prototype.forEach.call(document.querySelectorAll('table.stack'), labelTabl
       var st = doc.stats || {};
       Object.keys(st).forEach(function (k) { if (st[k].yr) periods[k] = String(st[k].yr); });
       censusMethod(doc.census_method === 'counts', doc.census_la_method === 'counts');
-      ptalGap(st);
     } catch (e) { /* keep the typed periods */ }
-  }
-  // Whether the live PTAL figures still lack the LSOAs drawn in 2021: the
-  // LSOAs with a figure against the LSOAs with a population.
-  function ptalGap(st) {
-    var lv = function (k) { return st[k] && st[k].lv && st[k].lv.lsoa ? st[k].lv.lsoa.n : null; };
-    var have = lv('ptal_score'), all = lv('census_population');
-    if (have == null || all == null) return;
-    var gap = all - have;
-    [].forEach.call(document.querySelectorAll('[data-ptal="gap"]'), function (el) { el.hidden = gap <= 0; });
-    var n = document.getElementById('ptal-gap-n');
-    if (n && gap > 0) n.textContent = gap.toLocaleString('en-GB');
   }
   // The page describes how the Census ward and LA figures that are live were
   // made: from summed counts once the data build says so, and otherwise as

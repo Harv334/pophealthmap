@@ -54,9 +54,8 @@ though it were a measurement:
 
 Each was checked against the function in fetch_all_data.py that writes it,
 and each call was rechecked by a second reader. Two results were not what the
-metric name suggests: ptal_score IS native, because the GLA LSOA Atlas publishes
-a ready-made per-LSOA column, and claimant_count is native while the rate beside
-it is not. --columns all includes the excluded 14, suffixed _modelled.
+metric name suggests: claimant_count is native while the rate beside it is
+not. (PTAL, also native, was taken off the map in October 2026 as too old.) --columns all includes the excluded 14, suffixed _modelled.
 """
 
 import argparse
@@ -181,7 +180,6 @@ NATIVE = [
 
     ("claimant_count",   "Claimant count",                      "NOMIS NM_162", "latest month"),
     ("fuel_poverty_pct", "Fuel poverty (%)",                    "DESNZ sub-regional LILEE", "2022"),
-    ("ptal_score",       "Transport accessibility (PTAL 0-8)",   "GLA LSOA Atlas (TfL PTAL)", "2014"),
 ]
 
 # Computed onto the LSOA by this pipeline rather than published at it. Only
@@ -233,12 +231,6 @@ BLANK_REASON = {
         "The LSOA figures on these rows are complete.",
     "ward_imd_decile_mean":
         "As the ward IMD score above.",
-    "ptal_score":
-        "The GLA LSOA Atlas supplied 4,835 rows, which is the number of LSOAs "
-        "London had on 2011 boundaries; PTAL itself is 2014 data. 4,659 of "
-        "today's 4,994 LSOAs match one of those rows and 335 do not, so the "
-        "gap is where the 2011 and 2021 boundaries differ rather than "
-        "anything about those places.",
 }
 
 PROVENANCE = """Built {built} by scripts/build_postcode_table.py, in
@@ -252,7 +244,6 @@ Sources
     IMD 2025            MHCLG File 7, score, rank, decile and seven domains
     Census 2021         ONS via Nomis, the table named against each column in
                         the dictionary
-    PTAL                GLA LSOA Atlas, 2014
     Fuel poverty        DESNZ sub-regional LILEE, 2022
     Claimant count      NOMIS NM_162
     LSOA to ward        ONS best-fit lookup LSOA21_WD25_LAD25_EW_LU_v2

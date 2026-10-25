@@ -71,7 +71,6 @@ uk-air.defra.gov.uk; the site asks for the domain as well as the department.
 | Access to green and blue space | Defra, with ONS, OS and Natural England | OGL v3 | Official statistic in development |
 | Background air quality (NO₂, PM2.5, PM10) | Defra UK-AIR, Pollution Climate Mapping | OGL v3 | Modelled, not measured. Acknowledge Defra as the source, per the wording above |
 | Stops and stations (distances, counts) | Transport for London, Unified API | **OGL v2 with TfL amendments** | Not OGL v3. Requires all three attribution statements above, or the licence terminates |
-| PTAL | Greater London Authority, London Datastore | OGL v3 | TfL's accessibility banding, republished by the GLA in the LSOA Atlas |
 | Street crime | data.police.uk (Home Office) | OGL v3 | Counted into wards and, from the next refresh, LSOAs |
 | Mid-year population estimates for LSOAs | ONS | OGL v3 | Use the ONS wording above |
 | Claimant count aged 18 to 24 | DWP and ONS, via Nomis | OGL v3 | |

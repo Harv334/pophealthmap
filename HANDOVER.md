@@ -243,13 +243,6 @@ requests a minute and this takes 43, so the pipeline paces itself; set
 unreachable the previous file is kept. Re-run with
 `python fetch_all_data.py --only tfl`.
 
-**PTAL** (`ptal`). Fetched automatically. The download URL carries a resource
-id that changes whenever the GLA republish, so the pipeline asks the Datastore
-API which file is current rather than remembering one. Only if the automatic
-route fails, download the LSOA Atlas CSV from
-https://data.london.gov.uk/dataset/lsoa-atlas to
-`.cache/ptal/lsoa_atlas.csv`, then run `python fetch_all_data.py --only ptal`.
-
 **PCN catchments** (`pcn`). NHS Digital's site refuses requests from cloud
 hosting, so the *Patients Registered at a GP Practice* file by LSOA has to be
 downloaded in a browser and attached to the build. Without it, PCNs show their

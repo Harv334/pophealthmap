@@ -377,7 +377,6 @@ const smallText = page => page.evaluate(() => {
         closeAtTop: !!(top && top.querySelector('.ic-x')),
         bad: [], census: [], ft: [],
         periods: [fmtPeriod('2019 - 23'), fmtPeriod('2016/17 - 20/21'), fmtPeriod('Aug 2025 to Jul 2026'), fmtPeriod('2024/25')].join(' | '),
-        ptal: PH_IND.label('ptal_score'),
         vintage: !document.getElementById('data-vintage') && !!document.querySelector('#ov-theme-view #core20-toggle'),
       };
       const BAD = /File_7|LSOA bridge|CLA01|NOMIS|=|\bi\.e\.|\be\.g\.|[\u2013\u2014]|→|pop-weighted|Offences \(|Public Order|Criminal Damage|Against the Person|Against Society|Deprivation domain|Domain score|'(Very )?(Good|Bad)'/;
@@ -459,7 +458,6 @@ const smallText = page => page.evaluate(() => {
     ok(!c23.census.length, 'every Census card describes the method the pipeline uses', c23.census.join(', '));
     ok(!c23.ft.length, 'Local Health cards say when OHID last updated them in one sentence, with the date in words', c23.ft.join(', '));
     ok(c23.periods === '2019 to 2023 | 2016/17 to 2020/21 | August 2025 to July 2026 | 2024/25', 'periods are written out by one helper', c23.periods);
-    ok(c23.ptal === 'Public transport access (PTAL, 2014)', 'PTAL carries its year in its label', c23.ptal);
     ok(c23.vintage, 'data periods and Core20 have left the Indicators home', JSON.stringify(c23.vintage));
     await page.click('#ov-themes .ov-theme');
     await page.waitForTimeout(300);
@@ -956,16 +954,15 @@ const smallText = page => page.evaluate(() => {
         pills: document.querySelectorAll('#wpanel .sr .gpill').length, amp: /&/.test([...document.querySelectorAll('#wpanel h3')].map(h => h.textContent).join(' ')) };
     });
     ok(!lp.assess && lp.band && lp.pills === 0 && !lp.amp, 'LSOA profile gives the decile band, no level pills and no "&"', JSON.stringify(lp));
-    // P60: counts on the LSOA card are whole numbers, PTAL has one decimal,
-    // and small labels are in sentence case rather than capitals.
+    // P60: counts on the LSOA card are whole numbers, and small labels are in sentence case rather than capitals.
     const typo = await page.evaluate(() => {
       const rows = [...document.querySelectorAll('#wpanel .sr')].map(r => r.textContent);
       const tt = sel => { const e = document.querySelector(sel); return e ? getComputedStyle(e).textTransform : 'none'; };
-      return { rows: rows.filter(t => /^(Stations within 1 km|Bus stops within 800 m)/.test(t)), ptal: indDecimals('ptal_score'),
+      return { rows: rows.filter(t => /^(Stations within 1 km|Bus stops within 800 m)/.test(t)),
         wardStations: indDecimalsAt('rail_stations_1km', 'ward'), tt: [tt('.keystat-lbl'), tt('.rb-group h3')] };
     });
-    ok(typo.rows.every(t => !/\d\.\d+$/.test(t.trim())) && typo.ptal === 1 && typo.wardStations === 1 && typo.tt.every(t => t === 'none'),
-      'LSOA counts are whole numbers, PTAL has one decimal and the small labels are not in capitals', JSON.stringify(typo));
+    ok(typo.rows.every(t => !/\d\.\d+$/.test(t.trim())) && typo.wardStations === 1 && typo.tt.every(t => t === 'none'),
+      'LSOA counts are whole numbers and the small labels are not in capitals', JSON.stringify(typo));
     // The figures an analyst challenges first (workplan 1.11).
     const fig = await page.evaluate(() => {
       const vals = _bivIds('ward').map(id => _bivValue('ward', id, 'census_bad_health_pct')).filter(x => x != null);
@@ -1384,7 +1381,7 @@ const smallText = page => page.evaluate(() => {
         smoke: o.header.find(h => /^Suicide rate/.test(h)) || '',
         crime: o.header.find(h => /^Total recorded crime/.test(h)) || '',
         crimeVals: col(o.header.findIndex(h => /^Total recorded crime/.test(h))),
-        ptal: groupOf('ptal_score'), no2: groupOf('no2_ugm3'), sorted,
+        rail: groupOf('rail_station_dist_m'), no2: groupOf('no2_ugm3'), sorted,
         shared: [fmtOv(81.0723, 'ft_93283'), PH_IND.decimals('ft_93283'), PH_IND.decimals('crime_total')],
         notes: PH_CSV.notes(), one, before,
         dashes: /[\u2013\u2014]/.test(o.header.join(' ') + PH_CSV.notes()),
@@ -1397,8 +1394,8 @@ const smallText = page => page.evaluate(() => {
       'export: an LA-wide column says "(LA figure)", and counts are whole numbers', ex.smoke + ' / ' + ex.crime);
     ok(ex.shared[0] === '81.1' && ex.shared[1] === 1 && ex.shared[2] === 0,
       'export: decimal places are shared with the hover card', JSON.stringify(ex.shared));
-    ok(ex.ptal === 'Transport' && ex.no2 === 'Environment and access' && ex.sorted,
-      'export: PTAL under Transport, air quality under Environment, each group in alphabetical order', ex.ptal + ' / ' + ex.no2);
+    ok(ex.rail === 'Transport' && ex.no2 === 'Environment and access' && ex.sorted,
+      'export: station distance under Transport, air quality under Environment, each group in alphabetical order', ex.rail + ' / ' + ex.no2);
     ok(/How to cite it/.test(ex.notes) && /PopHealth Map \(\d{4}\) Data export: ward figures for Tower Hamlets/.test(ex.notes) &&
        (ex.notes.match(/\n   Source: /g) || []).length === 3 && (ex.notes.match(/\n   Geography: /g) || []).length === 3 &&
        ex.notes.indexOf('Life expectancy at birth, women (years, 2019 to 2023)') !== -1 && !ex.dashes,
@@ -3724,12 +3721,12 @@ const smallText = page => page.evaluate(() => {
     const { page } = await open(browser, 'index.html?t=1', DESK);
     const a = await page.evaluate(() => {
       const href = k => { const d = document.createElement('div'); d.innerHTML = indicatorCardHTML(k); const l = d.querySelector('a.ic-more'); return l ? l.getAttribute('href') : ''; };
-      return { census: href('census_bad_health_pct'), crime: href('crime_score'), ptal: href('ptal_score'), core20: href('core20_lsoa_count'),
+      return { census: href('census_bad_health_pct'), crime: href('crime_score'), core20: href('core20_lsoa_count'),
         all: [...new Set(Object.keys(OV_META).map(_methAnchor))],
         credits: [...document.querySelectorAll('a.credits-link')].map(l => l.getAttribute('href')) };
     });
     await page.close();
-    ok(a.census === 'methodology.html#src-census' && a.crime === 'methodology.html#src-imd' && a.ptal === 'methodology.html#src-ptal' && a.core20 === 'methodology.html#src-core20',
+    ok(a.census === 'methodology.html#src-census' && a.crime === 'methodology.html#src-imd' && a.core20 === 'methodology.html#src-core20',
       'indicator cards link to their source row', JSON.stringify(a).slice(0, 240));
     ok(a.credits.length && a.credits.every(h => h === 'methodology.html#licences'), 'Data credits links open the licences section', a.credits.join(' '));
     const { page: mp } = await open(browser, 'methodology.html', DESK);
@@ -4063,11 +4060,6 @@ const smallText = page => page.evaluate(() => {
         coverOk: covered.length > 0 && covered.every(w => Object.keys(w.cover).every(k => w.cover[k] >= 80 && w.cover[k] < 100 && w.indicators[k] != null)),
         ncg: byName('New Cross Gate').indicators ? byName('New Cross Gate').indicators.ft_932831 : 'missing',
         poplar: byName('Poplar').indicators ? byName('Poplar').indicators.ft_93259 : null,
-        // Royal Victoria was the example until the LSOA 2011 to 2021 lookup
-        // was mended (October 2026): its new LSOAs now take their 2011
-        // parents' PTAL, and 684 wards have a figure, up from 593. A City of
-        // London ward, whose LSOAs lie mostly in its neighbours, still has none.
-        rv: byName('Bassishaw').indicators ? byName('Bassishaw').indicators.ptal_score : 'missing',
         c20: byName('Hornsey').core20_pop_pct,
         cnt: !!(cnt && cnt.keys && cnt.keys.indexOf('census_social_rented_pct') !== -1 && Object.keys(cnt.rows).length > 4000),
       };
@@ -4076,8 +4068,8 @@ const smallText = page => page.evaluate(() => {
       'borough_data.json carries OHID\'s notes, and no withheld value', JSON.stringify(files).slice(0, 300));
     ok(files.coverOk && files.ncg == null && Math.abs(files.poplar - 197.67) < 0.05,
       'ward Local Health figures are weighted by residents, marked when partly covered, and blank under 80%', JSON.stringify(files));
-    ok(files.rv == null && typeof files.c20 === 'number' && files.cnt,
-      'PTAL is blank for a ward mostly without figures, wards carry a Core20 share, and the Census counts ship', JSON.stringify(files));
+    ok(typeof files.c20 === 'number' && files.cnt,
+      'wards carry a Core20 share, and the Census counts ship', JSON.stringify(files));
 
     const r = await page.evaluate(async () => {
       await ensureWardDetail();
@@ -4091,7 +4083,6 @@ const smallText = page => page.evaluate(() => {
       out.part = pills('.sr-lh ~ .sr .gpill-note, .sr-lh .gpill-note, .gpill-note');
       out.partNote = (document.querySelector('#wpanel .sr-lh .sr-sub-note') || {}).textContent || '';
       out.card = indicatorCardHTML('ft_life_expectancy_male');
-      out.ptal = indicatorCardHTML('ptal_score');
       out.c20card = indicatorCardHTML('core20_lsoa_count');
       return out;
     });
@@ -4101,8 +4092,6 @@ const smallText = page => page.evaluate(() => {
       'a ward health figure on part of the ward says what share of residents it rests on', r.part.join(', ') + ' / ' + r.partNote.slice(-120));
     ok(/Provisional: (the Office for Health Improvement and Disparities \(OHID\)|OHID) based this on provisional death and population figures, for \d+ of the \d+ LAs\./.test(r.card),
       'the life expectancy card\'s Caution row gives OHID\'s note', r.card.replace(/<[^>]+>/g, ' ').slice(0, 400));
-    ok(/LSOAs of 2011/.test(r.ptal) && /fewer than four in five of its residents is left blank/.test(r.ptal),
-      'the PTAL card explains the 2011 LSOAs and the ward rule', r.ptal.replace(/<[^>]+>/g, ' ').slice(0, 500));
     ok(/NHS England’s own Core20 figures may still use the 2019 index/.test(r.c20card),
       'the Core20 card says which deciles it uses', r.c20card.replace(/<[^>]+>/g, ' ').slice(0, 300));
 
@@ -4188,7 +4177,7 @@ const smallText = page => page.evaluate(() => {
         never: /We never split an LSOA/.test(t), points: /about 1 in 10/.test(t) && /ONS Postcode Directory gives/.test(t),
         police: /boundary contains the map position police\.uk gives/.test(t),
         avg: /stations within 1 km and bus stops within 800\s+metres are averaged/.test(t),
-        cover: /For Local Health figures and\s+PTAL, a ward has no figure/.test(t),
+        cover: /For Local Health figures, a\s+ward has no figure/.test(t),
         fuel: /Fuel poverty is a share of households/.test(t),
         old: /Nothing is matched by name|never lay one boundary|same lookup is used for every indicator|Only plain totals/.test(t),
         lsoa11: /LSOA11_LSOA21_LAD22_EW_LU/.test(lk), msoaRow: /Placing each LSOA in its MSOA/.test(lk),
@@ -4260,10 +4249,10 @@ const smallText = page => page.evaluate(() => {
       const s = document.querySelector('.q-f-ind'), g = {};
       s.querySelectorAll('optgroup').forEach(o => { g[o.label] = [...o.querySelectorAll('option')].map(x => x.value); });
       const where = k => Object.keys(g).find(l => g[l].includes(k)) || '';
-      return { groups: Object.keys(g), claimant: where('claimant_rate_pct'), ptal: where('ptal_score'),
+      return { groups: Object.keys(g), claimant: where('claimant_rate_pct'), rail: where('rail_station_dist_m'),
         ops: [...document.querySelector('.q-f[data-op]').options].map(o => o.textContent).join('|') };
     });
-    ok(qg.claimant === 'Work, money and education' && qg.ptal === 'Transport' && qg.groups.indexOf('Health figures for each LA') !== -1 &&
+    ok(qg.claimant === 'Work, money and education' && qg.rail === 'Transport' && qg.groups.indexOf('Health figures for each LA') !== -1 &&
        !qg.groups.some(g => /^(Crime|Local Health \(ward\)|Other)$/.test(g)) && qg.ops === 'at most|at least|equals',
       'query: indicators grouped by the picker\'s themes, with plain operator names (P39, P41)', JSON.stringify(qg));
     const shown = await page.evaluate(() => {
@@ -4851,6 +4840,23 @@ const smallText = page => page.evaluate(() => {
        A.list.mean === 'la,ward' && A.list.laOnly === 'la,ward' && A.list.withheld === -1,
       'Ask levels: list_indicators says where each indicator is, and stays under the 15,000 character tool result cap', JSON.stringify(A.list));
     ok(!errors.length, 'no page errors (Ask levels)', errors.join(' | '));
+    await page.close();
+  }
+
+  // PTAL (the GLA's 2014 transport access score) was taken off the map in
+  // October 2026 as too old: no list, card or file offers it.
+  {
+    const { page, errors } = await open(browser, 'index.html?t=1', DESK);
+    const r = await page.evaluate(() => ({
+      cats: CATS.some(c => c.fields.some(f => f.k === 'ptal_score')), opt: !!document.querySelector('#ov option[value="ptal_score"]'),
+      meta: !!(OV_META.ptal_score || OV_CFG.ptal_score), stats: !!(PH_IND_STATS && PH_IND_STATS.stats && PH_IND_STATS.stats.ptal_score),
+      ask: JSON.stringify(PH_ASSISTANT.runTool('list_indicators', {})).indexOf('ptal') !== -1,
+      ward: Object.values(WARD_DATA).some(w => w.indicators && w.indicators.ptal_score != null),
+    }));
+    ok(!r.cats && !r.opt && !r.meta && !r.stats && !r.ask && !r.ward, 'PTAL is gone from the picker, the cards, the data and Ask', JSON.stringify(r));
+    const m = await (await page.goto(BASE + '/methodology.html')).text();
+    ok(!/PTAL|Public Transport Accessibility/i.test(m.replace(/<script[\s\S]*?<\/script>/g, '')), 'the methodology page no longer describes PTAL');
+    ok(!errors.length, 'no page errors (PTAL removed)', errors.join(' | '));
     await page.close();
   }
 

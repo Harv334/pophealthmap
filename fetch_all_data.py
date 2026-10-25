@@ -6744,59 +6744,11 @@ def run_fuel_poverty() -> pd.DataFrame | None:
 
 
 # ============================================================================
-# SOURCE 4c: GLA LSOA Atlas — PTAL score (LSOA-level)
+# The ONS LSOA 2011 to 2021 lookup, for sources still on the 2011 LSOAs
 # ============================================================================
-# PTAL (Public Transport Accessibility Level) is TfL's banded score of how
-# well-connected a location is by public transport, published per LSOA in the
-# GLA's "LSOA Atlas". Source:
-#   https://data.london.gov.uk/dataset/lsoa-atlas
-#
-# The column is "Public Transport Accessibility Levels (2014);Average Score;",
-# and what it holds is the BAND INDEX averaged over the LSOA, not the
-# continuous accessibility index. The nine bands 0, 1a, 1b, 2, 3, 4, 5, 6a, 6b
-# map onto 0-8, and the observed London values run 0.30 to exactly 8.00, which
-# is the cap a band scale has and a continuous one does not.
-#
-# This field was named ptai_score and documented as "average PTAI score" for
-# as long as it existed. PTAI is a different quantity on a different scale —
-# it is unbounded and reaches past 40 in the West End — so anything that read
-# the name and scaled for PTAI put the whole city in the bottom fifth of its
-# ramp. Bigger is still better; the range is 0 to 8.
-# The download URL carries a resource id that changes whenever the GLA
-# republishes the file, so hardcoding one guarantees it eventually 404s. It did:
-# the pinned id stopped resolving and PTAL had been silently skipped ever since,
-# because a skipped optional source is not a failure and nothing said so.
-#
-# The Datastore has an API that lists a dataset's current resources, so the id
-# is asked for rather than remembered. PTAL_URL still overrides everything, for
-# pinning a specific file or pointing at a local copy.
-PTAL_DATASET_API = "https://data.london.gov.uk/api/dataset/lsoa-atlas/"
-PTAL_URL_OVERRIDE = os.environ.get("PTAL_URL", "")
-
-
-def _ptal_discover_url() -> str | None:
-    """The current LSOA Atlas CSV, from the Datastore's own resource list."""
-    if PTAL_URL_OVERRIDE:
-        return PTAL_URL_OVERRIDE
-    try:
-        r = browser_session(referer="https://data.london.gov.uk/").get(
-            PTAL_DATASET_API, timeout=60)
-        r.raise_for_status()
-        blob = r.text
-    except Exception as e:
-        warn(f"ptal: could not reach the Datastore API ({e})")
-        return None
-    # Prefer the current-boundaries file. The dataset also carries an
-    # "old-boundaries" CSV, which is the same columns on 2011 LSOAs and would
-    # join against about nothing.
-    urls = re.findall(r'"(https://data\.london\.gov\.uk/download/[^"]+\.csv)"', blob)
-    if not urls:
-        warn("ptal: the Datastore API listed no CSV resources")
-        return None
-    current = [u for u in urls if "old-boundaries" not in u.lower()]
-    return (current or urls)[0]
-
-
+# (SAMHI, road casualties, Stat-Xplore and the like). PTAL, the GLA's 2014
+# public transport access score that this section was written for, was taken
+# off the map in October 2026 as too old to show beside current figures.
 # The ONS lookup from the LSOAs of 2011 to those of 2021, with its change
 # indicator: U unchanged, S split, M merged, X a complex redraw. ONS reissues
 # these services with a version suffix, as it did the MSOA one (_v2); the
@@ -6915,110 +6867,6 @@ def lsoa11_to_lsoa21_values(values11: dict, rows: list) -> dict:
               if p in values11 and values11[p] is not None and not pd.isna(values11[p])]
         if vs:
             out[c21] = sum(vs) / len(vs)
-    return out
-
-
-def run_ptal() -> pd.DataFrame | None:
-    rule("PTAL (GLA LSOA Atlas, average band score 0-8)")
-    cache_dir = CACHE_DIR / "ptal"
-    cache_dir.mkdir(parents=True, exist_ok=True)
-
-    candidates = sorted(cache_dir.glob("*.csv"),
-                        key=lambda p: p.stat().st_size, reverse=True)
-    if not candidates:
-        url = _ptal_discover_url()
-        src = cache_dir / "lsoa_atlas.csv"
-        if url:
-            info(f"No local cache — downloading {url}")
-        try:
-            if not url:
-                raise RuntimeError("no download URL could be discovered")
-            r = browser_session(referer="https://data.london.gov.uk/").get(
-                url, timeout=120)
-            r.raise_for_status()
-            src.write_bytes(r.content)
-            candidates = [src]
-        except Exception as e:
-            warn(f"PTAL download failed: {e}. "
-                 f"MANUAL STEP: download the LSOA Atlas CSV from "
-                 "https://data.london.gov.uk/dataset/lsoa-atlas and save it as "
-                 f"{cache_dir}/lsoa_atlas.csv, then re-run `python "
-                 "fetch_all_data.py --only ptal`.")
-            return None
-
-    src = candidates[0]
-    info(f"ptal: reading {src.name}")
-    # GLA atlas ships with two header rows (category, variable). Read with a
-    # simple single-row header and pick the PTAI column by substring.
-    df = None
-    for enc in ("utf-8", "latin-1", "cp1252"):
-        try:
-            df = pd.read_csv(src, dtype=str, encoding=enc, low_memory=False)
-            break
-        except UnicodeDecodeError:
-            continue
-    if df is None or df.empty:
-        warn("ptal: empty or unreadable CSV")
-        return None
-
-    def find_col(*kws):
-        for c in df.columns:
-            if not isinstance(c, str): continue
-            lc = c.lower()
-            if all(k in lc for k in kws):
-                return c
-        return None
-
-    code_col = (find_col("lower super output area")
-                or find_col("lsoa", "code")
-                or find_col("codes"))
-    # The Atlas does not use the word PTAI anywhere. Its column is
-    #   "Public Transport Accessibility Levels (2014);Average Score;"
-    # so matching on "ptai" found nothing and the source has been reporting
-    # "no frame" for as long as that has been the heading. The PTAL spellings
-    # are tried first, and the old PTAI ones kept in case an older copy of the
-    # file is sitting in the cache.
-    ptal_col = (find_col("public transport accessibility", "average score")
-                or find_col("ptal", "average score")
-                or find_col("ptal", "average")
-                or find_col("average", "ptai")
-                or find_col("ptai", "score")
-                or find_col("ptai"))
-    if not code_col or not ptal_col:
-        warn(f"ptal: columns not found (code={code_col!r}, "
-             f"ptal={ptal_col!r}). Columns seen: {list(df.columns)[:10]}")
-        return None
-
-    out11 = pd.DataFrame({
-        "LSOA11CD": df[code_col].astype(str).str.strip(),
-        "ptal_score": pd.to_numeric(df[ptal_col], errors="coerce"),
-    }).dropna(subset=["LSOA11CD", "ptal_score"])
-    # Filter to well-formed E01 LSOA codes.
-    out11 = out11[out11["LSOA11CD"].str.startswith("E01")]
-    # The Atlas uses the LSOAs of 2011. Joined as if they were 2021 codes, the
-    # 176 retired codes matched nothing and the 335 LSOAs drawn in 2021 (the
-    # Royal Docks, Stratford, Wembley Park, Colindale) had no figure at all.
-    # Each 2021 LSOA takes the figure of the 2011 area it was drawn from.
-    conv = lsoa11_to_lsoa21_values(dict(zip(out11["LSOA11CD"], out11["ptal_score"])),
-                                   get_lsoa11_lsoa21_rows())
-    out = pd.DataFrame({"LSOA21CD": list(conv), "ptal_score": [round(v, 2) for v in conv.values()]})
-    in_scope = set(get_lsoa_ward_lookup())
-    n_have = len(set(out["LSOA21CD"]) & in_scope)
-    info(f"ptal: {len(out11):,} LSOAs of 2011 -> {n_have:,} of {len(in_scope):,} in-scope LSOAs of 2021")
-    # A band index cannot exceed 8 (6b). Anything above it means the Atlas has
-    # switched this column to the continuous PTAI, which is a different scale
-    # and would need a different range in the map — better to say so than to
-    # publish it under a name that promises 0-8.
-    over = out[out["ptal_score"] > 8]
-    if len(over):
-        warn(f"ptal: {len(over):,} LSOAs score above 8, which the band scale "
-             f"cannot reach (max seen {out['ptal_score'].max():.1f}). The "
-             f"Atlas column may now hold continuous PTAI.")
-    out_path = DATA_DIR / "demographics" / "ptal.parquet"
-    out = write_parquet_guarded(out_path, out, source="ptal")
-    ok(f"ptal: {len(out):,} LSOAs, band score "
-       f"{out['ptal_score'].min():.1f}-{out['ptal_score'].max():.1f} -> "
-       f"{out_path.relative_to(REPO_ROOT)}")
     return out
 
 
@@ -8779,13 +8627,6 @@ def build_ward_data() -> dict:
             if note in places_notes:
                 sources[name] = label
 
-    pt = _read_parquet_opt(DATA_DIR / "demographics" / "ptal.parquet")
-    # A ward with figures for under four in five of its residents is left
-    # blank rather than given the figure of a corner of it.
-    _agg_to_wards(pt, "ptal_score", "ptal_score", min_cover=WARD_MIN_COVER)
-    if pt is not None:
-        sources["ptal"] = "GLA LSOA Atlas (average PTAL band score, 0-8)"
-
     # --- Air quality + transport access: per-LSOA -> per-ward ---------------
     # Both are population weighted, including the two counts. A ward's
     # "stations within 1 km" is not the sum of its LSOAs' counts — the same
@@ -9337,15 +9178,6 @@ def build_lsoa_data() -> dict:
     for code, vals in places_lsoa_values().items():
         if code in out:
             out[code].update(vals)
-
-    # PTAL (GLA LSOA Atlas, average band score 0-8)
-    pt = _read_parquet_opt(DATA_DIR / "demographics" / "ptal.parquet")
-    if pt is not None and not pt.empty:
-        for _, row in pt.iterrows():
-            code = str(row["LSOA21CD"])
-            v = row.get("ptal_score")
-            if code in out and pd.notna(v):
-                out[code]["ptal_score"] = round(float(v), 2)
 
     # Air quality (Defra UK-AIR PCM) and transport access (TfL StopPoint).
     # Both are natively LSOA-level here: the pipeline builds them per LSOA and
@@ -10815,11 +10647,12 @@ def run_air_quality() -> "pd.DataFrame | None":
 # ============================================================================
 # SOURCE: Public transport access  (TfL Unified API, StopPoint)
 # ============================================================================
-# PTAL already scores how well-connected a place is overall, but it is a single
-# banded index and it is republished rarely. Distance to the nearest station is
-# a different and more legible thing: it answers "how far is the walk", it
-# separates outer-borough LSOAs that PTAL flattens into one low band, and it
-# comes from a register that is current rather than a periodic model run.
+# PTAL used to score how well-connected a place is overall, but it was a single
+# banded index, last published in 2014, and it was taken off the map as too old.
+# Distance to the nearest station is a different and more legible thing: it
+# answers "how far is the walk", it separates outer-borough LSOAs that PTAL
+# flattened into one low band, and it comes from a register that is current
+# rather than a periodic model run.
 #
 #   https://api.tfl.gov.uk/StopPoint/Mode/{modes}?page=N
 #
@@ -16113,7 +15946,6 @@ SOURCES = {
     "ppfi":        run_ppfi,
     "fhrs":        run_fhrs,
     "fuel_poverty": run_fuel_poverty,
-    "ptal":        run_ptal,
     "crime":       run_police_crime,
     "hospitals":   run_hospitals,
     "charities":   run_charities,

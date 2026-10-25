@@ -4085,7 +4085,6 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
               <option value="no2_ugm3">Nitrogen dioxide NO₂ µg/m³ (Defra) · LSOA</option>
               <option value="pm25_ugm3">Fine particulates PM2.5 µg/m³ (Defra) · LSOA</option>
               <option value="pm10_ugm3">Particulates PM10 µg/m³ (Defra) · LSOA</option>
-              <option value="ptal_score">Public transport accessibility, PTAL 0 to 8 (TfL/GLA) · LSOA</option>
               <option value="rail_station_dist_m">Distance to nearest station, straight line, m (TfL) · LSOA</option>
               <option value="rail_stations_1km">Stations within 1 km (TfL) · LSOA</option>
               <option value="bus_stop_dist_m">Distance to nearest bus stop, straight line, m (TfL) · LSOA</option>
@@ -5675,12 +5674,6 @@ const OV_CFG = {
   sape_age75plus_pct:              { lo:"Lower", hi:"Higher", wh:false, descriptive:true },
   // Environment & access. Higher fuel poverty = worse (wh:true).
   fuel_poverty_pct:                { lo:"Lower", hi:"Higher", wh:true,  min:5,    max:25   },
-  // PTAL: higher band = better transport access, so wh:false. The scale is the
-  // nine bands 0/1a/1b/2..6a/6b mapped onto 0-8 and it cannot exceed 8. It was
-  // keyed ptai_score against a range of 2-25, which is the range of the
-  // continuous PTAI — a different measure — so every London LSOA would have
-  // rendered inside the bottom quarter of the ramp had anything drawn it.
-  ptal_score:                      { lo:"Worse",  hi:"Better", wh:false, min:0,    max:8    },
   // Defra PCM modelled annual mean background concentrations, µg/m³. Higher is
   // worse for all three. Ranges span roughly the 1st to 99th percentile of the
   // observed London values, so the ramp is not spent on outliers: absolute
@@ -5972,22 +5965,6 @@ const OV_CFG = {
    the map would draw 32 blocks of colour as though that were a ward pattern.
    The declared registry is a judgement about what is meaningful; this is a
    measurement of what exists. Only the second can be automated. */
-/* PTAL is published for the LSOAs of 2011. The pipeline converts it to the
-   LSOAs of 2021 through the ONS lookup; until a refresh has done that, the
-   LSOAs drawn in 2021 have no figure, and the card says how many do. */
-function ptalCoverageText() {
-  const st = indStats('ptal_score');
-  const n = st && st.lv && st.lv.lsoa ? st.lv.lsoa.n : null;
-  const lc = window._phLayerCounts || {};
-  const tot = Number.isFinite(lc.lsoa) ? lc.lsoa
-    : (typeof LSOA_IMD !== 'undefined' && LSOA_IMD && LSOA_IMD.features ? LSOA_IMD.features.length : null);
-  const ward = 'A ward with figures for fewer than four in five of its residents is left blank.';
-  if (Number.isFinite(n) && Number.isFinite(tot) && n < tot) {
-    return 'The GLA’s figures use the LSOAs of 2011, so the LSOAs drawn since then have no figure yet: ' +
-      'there are figures for ' + n.toLocaleString('en-GB') + ' of London’s ' + tot.toLocaleString('en-GB') + ' LSOAs. ' + ward;
-  }
-  return 'The GLA’s figures use the LSOAs of 2011, so LSOAs drawn since then take the figure of the area they were split from. ' + ward;
-}
 function indStats(k) {
   return (typeof PH_IND_STATS === 'object' && PH_IND_STATS && PH_IND_STATS.stats)
     ? (PH_IND_STATS.stats[resolveOvField(k)] || PH_IND_STATS.stats[k] || null)
@@ -6273,7 +6250,6 @@ const CATS = [
     { k: "census_active_travel_pct",         l: "Walk/cycle to work (%)",        g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_public_transport_pct",      l: "Public transport to work (%)",  g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
     { k: "census_car_to_work_pct",           l: "Car/van to work (%)",           g: "oa", lv: ["ward","msoa","lsoa"], open: "lsoa" },
-    { k: "ptal_score",          l: "Transport accessibility (PTAL, 0 to 8)", g: "lsoa", lv: ["ward","lsoa"] },
     { k: "rail_station_dist_m", l: "Distance to nearest station, straight line (m)", g: "lsoa", lv: ["ward","lsoa"] },
     { k: "rail_stations_1km",   l: "Stations within 1 km",             g: "lsoa", lv: ["ward","lsoa"] },
     { k: "bus_stop_dist_m",     l: "Distance to nearest bus stop, straight line (m)", g: "lsoa", lv: ["ward","lsoa"] },
@@ -7100,7 +7076,6 @@ const IND_NAMES = {
   census_car_to_work_pct:      ['Car or van to work', 'Method of travel to workplace: car or van'],
   // The year is in the label because the GLA's LSOA figures are from 2014,
   // before the Elizabeth line and the Northern line extension opened.
-  ptal_score:                  ['Public transport access (PTAL, 2014)', 'Public Transport Accessibility Level'],
   rail_station_dist_m:         ['Distance to nearest station', ''],
   rail_stations_1km:           ['Stations within 1 km', ''],
   bus_stop_dist_m:             ['Distance to nearest bus stop', ''],
@@ -7228,7 +7203,6 @@ const IND_DECIMALS = {};
     'idaci_decile', 'idaci_rank', 'idaopi_decile', 'idaopi_rank', 'sape_population',
     // Income in whole pounds: ONS's own intervals run to thousands.
     'saie_total_income', 'saie_net_bhc', 'saie_net_ahc'];
-  // PTAL has one decimal: a second suggests a precision the measure lacks.
   // The sub-domain scores, the mood and anxiety score and the air quality
   // and road accident measures run over a few units, so they keep two.
   const two = ['education_score', 'health_score', 'crime_score',
@@ -7689,12 +7663,7 @@ const OV_META = {
   pm25_ugm3:                      { src: "Defra UK-AIR (PCM)",   yr: "2024", g: "LSOA", u: "µg/m³", desc: "The yearly average level of fine particles (PM2.5) in the air, as modelled by Defra. These are the particles that reach deepest into the lungs and are most clearly linked to early death, and the World Health Organization's guideline is 5 while England's target for 2040 is 10." },
   pm10_ugm3:                      { src: "Defra UK-AIR (PCM)",   yr: "2024", g: "LSOA", u: "µg/m³", desc: "The yearly average level of particles up to 10 micrometres across (PM10) in the air, as modelled by Defra, where the World Health Organization's guideline is 15 and the UK legal limit is 40." },
 
-  // Public transport — TfL StopPoint register, plus the GLA's PTAL banding
-  // u is deliberately empty. It is appended to every number on both legends
-  // whenever it is six characters or fewer, so "0–8" rendered as if it were a
-  // unit: "Better (6.8 0–8)". The scale belongs in the label and the
-  // description, where it already is.
-  ptal_score:                     { src: "GLA LSOA Atlas (TfL PTAL)", yr: "2014", g: "LSOA", u: "", desc: "How well connected the area is by public transport, using the Public Transport Accessibility Level that Transport for London calculates from walking times to stops and how often services run. The nine levels (0, 1a, 1b, 2 to 5, 6a and 6b) are numbered 0 to 8 here, so a higher figure means better access. The figures date from 2014, before the Elizabeth line and the Northern line extension opened." },
+  // Public transport: the TfL StopPoint register
   rail_station_dist_m:            { src: "TfL Unified API (London); DfT NaPTAN (elsewhere)",      yr: "as at Sep 2026", g: "LSOA", u: "m", desc: "The straight-line distance from the middle of the LSOA to the nearest railway, metro or tram station, including Underground, Overground, DLR and Elizabeth line stations in London. A real walk is longer wherever a river, a railway or a park is in the way, and stations just outside the area count, because for an LSOA near the edge the nearest one often is." },
   rail_stations_1km:              { src: "TfL Unified API (London); DfT NaPTAN (elsewhere)",      yr: "as at Sep 2026", g: "LSOA", u: "stations", desc: "The number of railway, metro and tram stations within 1 kilometre of the middle of the LSOA." },
   bus_stop_dist_m:                { src: "TfL Unified API (London); DfT NaPTAN (elsewhere)",      yr: "as at Sep 2026", g: "LSOA", u: "m", desc: "The straight-line distance from the middle of the LSOA to the nearest bus stop, where the stops on each side of a road count separately, as the stop registers list them." },
@@ -8302,7 +8271,6 @@ const OV_PLAIN = {
   no2_ugm3: "Average nitrogen dioxide in the air, mostly from traffic.",
   pm25_ugm3: "Average fine particles in the air, the type most harmful to health.",
   pm10_ugm3: "Average coarser particles in the air, from traffic, building and dust.",
-  ptal_score: "How well connected the area is by public transport, from 0 (poor) to 8 (excellent).",
   rail_station_dist_m: "Straight-line distance to the nearest train, tube or tram station, in metres.",
   rail_stations_1km: "Number of train, tube or tram stations within 1 km.",
   bus_stop_dist_m: "Straight-line distance to the nearest bus stop, in metres.",
@@ -9239,12 +9207,6 @@ function indicatorFacts(k) {
       : 'This counts what lies within a straight-line distance of the middle of each LSOA, not travel time or how often services run. Ward figures are an average across residents rather than a total, because the same station or stop is near several LSOAs and summing them would count it many times.';
     return f;
   }
-  if (/PTAL/.test(src)) {
-    f.cadence = 'TfL and the GLA update these figures only occasionally.';
-    f.method = 'PTAL combines the walking time to nearby stops and stations with how often services run there, and it covers London only. ' +
-      ptalCoverageText();
-    return f;
-  }
   return f;
 }
 
@@ -9270,7 +9232,6 @@ function _publishedBy(k) {
   if (/DESNZ/.test(src)) return 'DESNZ publishes these estimates for LSOAs.';
   if (/UK-AIR|PCM/.test(src)) return 'Defra models these figures on a 1 kilometre grid, and we average them over each LSOA.';
   if (/Green\/Blue/.test(src)) return 'Defra publishes these figures for output areas, and we combine them into LSOAs.';
-  if (/PTAL/.test(src)) return 'The GLA publishes these figures for LSOAs.';
   if (/NaPTAN|TfL Unified/.test(src)) return 'We measure these for each LSOA from the register of stops.';
   return '';
 }
@@ -9377,7 +9338,6 @@ function _cardSource(k) {
   if (/DESNZ/.test(src)) return 'DESNZ, sub-regional fuel poverty statistics';
   if (/Green\/Blue/.test(src)) return 'Defra, access to green and blue space in England';
   if (/UK-AIR|PCM/.test(src)) return 'Defra, UK-AIR background pollution maps';
-  if (/PTAL/.test(src)) return 'GLA, LSOA Atlas, from TfL figures';
   if (/NaPTAN|TfL Unified/.test(src)) return PH_IS_LONDON ? 'TfL, register of stops and stations' : 'DfT, national register of stops (NaPTAN)';
   return src;
 }
@@ -9402,7 +9362,6 @@ function _methAnchor(k) {
   if (/^DESNZ/.test(s)) return 'src-fuel-poverty';
   if (/green and blue/.test(s)) return 'src-green-space';
   if (/UK-AIR/.test(s)) return 'src-air-quality';
-  if (/PTAL|LSOA Atlas/.test(s)) return 'src-ptal';
   if (/stops/.test(s)) return 'src-transport';
   return 'sources';
 }
@@ -15631,7 +15590,7 @@ function _fitFocus(bounds) {
      Housing, and the station and bus stop measures from Environment. What is
      left of Housing & transport is tenure, so it is called Housing. */
   ['census_no_car_pct', 'census_active_travel_pct', 'census_public_transport_pct',
-   'census_car_to_work_pct', 'ptal_score', 'rail_station_dist_m', 'rail_stations_1km',
+   'census_car_to_work_pct', 'rail_station_dist_m', 'rail_stations_1km',
    'bus_stop_dist_m', 'bus_stops_800m'].forEach(k => { MOVE[k] = 'Transport'; });
   const RENAME = { 'Housing and transport': 'Housing' };
   // Matched on the display label and the official title together, so a short
@@ -17218,7 +17177,7 @@ function showLSOA(feat) {
     }
 
     // Environment and access
-    const envRows = ['fuel_poverty_pct', 'no2_ugm3', 'pm25_ugm3', 'pm10_ugm3', 'ptal_score',
+    const envRows = ['fuel_poverty_pct', 'no2_ugm3', 'pm25_ugm3', 'pm10_ugm3',
       'rail_station_dist_m', 'rail_stations_1km', 'bus_stop_dist_m', 'bus_stops_800m',
       'gp_dist_km', 'pharmacy_dist_km', 'dentist_dist_km']
       .map(row).filter(Boolean).join('');
@@ -19065,7 +19024,6 @@ function _keySourceLine(k, drawn, estLa) {
       : /^ft_/.test(k) ? 'OHID'
       : /IMD|Core20/.test(src) ? 'MHCLG'
       : /NOMIS|CLA01/.test(src) ? 'ONS'
-      : /PTAL/.test(src) ? 'the GLA'
       : String(_cardSource(k) || src).split(',')[0];
     first = 'Published by ' + who + ' for ' + (PLURAL[nat] || 'these areas') + at + '.';
   }
@@ -22759,12 +22717,6 @@ var PH_SHOW = {
     dwp_pip_msk_pct: 'high-bad', dwp_pip_neuro_pct: 'high-bad', dwp_dla_child_pct: 'high-bad',
     dwp_aa_pct: 'high-bad', dwp_carers_pct: 'high-bad', dwp_pension_credit_per_100: 'high-bad',
     dwp_cilif_pct: 'high-bad',
-    // MUST be listed here. ptal_score ends in _score, and the fallback below
-    // reads that shape as an IMD domain score and returns 'high-bad'. PTAL is
-    // the opposite: 8 is the best-connected band. Without this entry Compare
-    // mode paints the best-served wards red and calls them worse, which is the
-    // exact inversion the rest of this map was corrected to stop making.
-    ptal_score: 'high-good',
     // ONS: more income, and more years in good health, are better.
     saie_total_income: 'high-good', saie_net_bhc: 'high-good', saie_net_ahc: 'high-good',
     hle_female: 'high-good', hle_male: 'high-good', dfle_female: 'high-good', dfle_male: 'high-good',
