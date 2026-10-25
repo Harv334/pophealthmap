@@ -725,17 +725,17 @@ const smallText = page => page.evaluate(() => {
     await page.waitForTimeout(800);
     const back = await page.evaluate(() => ({ name: document.getElementById('ws-name').textContent, selW, title: document.title }));
     ok(back.name === back.selW && back.title.indexOf(back.selW) === 0, 'the ward sheet follows a ward chosen in Compare', JSON.stringify(back));
-    // The Compare quick view gives an average decile as an average decile, to
-    // one decimal place, and never turns it into a share of England (workplan
-    // 1.11): "the most deprived 23%" from 2.3 overstated it.
+    // The Compare quick view gives wards their IMD score, with no decile
+    // (MHCLG publishes those for LSOAs only), and never a share of England
+    // (workplan 1.11): "the most deprived 23%" from a decile of 2.3 overstated it.
     await page.click('.mode-btn[data-mode="compare"]');
     await page.waitForTimeout(600);
     await page.evaluate(() => { const l = wLyr.getLayers().find(l => l.feature.properties.WD24NM === 'Lansbury'); if (l) l.fire('click'); });
     await page.waitForTimeout(600);
     const qv = await page.evaluate(() => document.getElementById('cmp-quick').innerHTML);
-    ok(/have an average deprivation decile of <strong>2\.3<\/strong> or lower, where 1 is the most deprived tenth of England\./.test(qv) &&
-       !/deprived <strong>\d+%|deprived \d+%/.test(qv),
-      'the Compare quick view gives the average deprivation decile, not a percentage', qv);
+    ok(/<strong>[^<]+<\/strong> is the most deprived of them, with an IMD 2025 score of \d+\.\d against a London ward median of \d+\.\d\./.test(qv) &&
+       !/decile|by LSOA/.test(qv) && !/deprived <strong>\d+%|deprived \d+%/.test(qv),
+      'the Compare quick view gives wards their IMD score, with no decile and no percentage', qv);
     await page.click('.mode-btn[data-mode="explore"]');
     await page.waitForTimeout(600);
     await page.evaluate(() => { const b = document.getElementById('ws-unpin-all'); if (b) b.click(); });
@@ -811,7 +811,7 @@ const smallText = page => page.evaluate(() => {
       'Walbrook, with no resident count, is neither ranked nor compared, in the sheet and the profile', P.Walbrook.sheet);
     ok(Object.values(P).every(x => x.profH === 'H3'), 'the profile\'s "Summary" is a sibling of its section headings (h3)', Object.values(P).map(x => x.profH).join(','));
     ok(!Object.values(P).some(x => /[–—]/.test(x.sheet)), 'no dashes in the ward summaries');
-    ok(plain.tiles.length === 6 && plain.cols === 3 && !plain.tiles.some(t => /Population|Avg|\+|\((?!all\)|limited a lot\))/.test(t)),
+    ok(plain.tiles.length === 6 && plain.cols === 3 && !plain.tiles.some(t => /Population|Avg|\+|\((?!all\)|limited a lot\)|Census 2021\))/.test(t)),
       'six spelled-out tiles, three to a row, without the population', plain.cols + ' columns: ' + plain.tiles.join(' | '));
     await page.click('#ws-profile');
     await page.waitForTimeout(500);
@@ -889,8 +889,8 @@ const smallText = page => page.evaluate(() => {
     ok(prof.shownBefore === 8 && prof.shownAfter === prof.total && prof.total > 10, 'a long section shows eight rows and then all of them',
       prof.shownBefore + ' then ' + prof.shownAfter + ' of ' + prof.total);
     ok(prof.imd.indexOf('Deprivation score by ward (IMD 2025)') !== -1 && prof.work.indexOf('Claimant rate, working age') !== -1 &&
-       prof.work.indexOf('Out-of-work benefit claimants') !== -1 && prof.work.indexOf('Unemployment (Census 2021)') !== -1,
-      'profile shows the IMD score, and the claimant rate and unemployment measures under Work', prof.imd.join(', ') + ' / ' + prof.work.join(', '));
+       prof.work.indexOf('Out-of-work benefit claimants') === -1 && prof.work.indexOf('Unemployment (Census 2021)') !== -1,
+      'profile shows the IMD score, and the claimant rate and unemployment under Work, without OHID\'s copy of the claimant count', prof.imd.join(', ') + ' / ' + prof.work.join(', '));
     ok(prof.cols === 2 && !prof.dashes, 'profile key figures two by two, and no dashes in the profile');
     await checkAxe(page, 'Area profile sections');
     g = await glyphCheck(page);
@@ -1390,7 +1390,7 @@ const smallText = page => page.evaluate(() => {
     ok(ex.le !== -1 && ex.leVals.length > 10 && ex.leVals.every(v => /^\d+\.\d$/.test(v)),
       'export: life expectancy is headed "Life expectancy at birth, women (years, 2019 to 2023)" with one decimal place',
       ex.header.join(' | ') + ' / ' + ex.leVals.slice(0, 3).join(', '));
-    ok(/\(LA figure\)$/.test(ex.smoke) && /\(\w+ \d{4} to \w+ \d{4}\)$/.test(ex.crime) && ex.crimeVals.every(v => /^\d+$/.test(v)),
+    ok(/\(LA figure\)$/.test(ex.smoke) && /\(crimes, \w+ \d{4} to \w+ \d{4}\)$/.test(ex.crime) && ex.crimeVals.every(v => /^\d+$/.test(v)),
       'export: an LA-wide column says "(LA figure)", and counts are whole numbers', ex.smoke + ' / ' + ex.crime);
     ok(ex.shared[0] === '81.1' && ex.shared[1] === 1 && ex.shared[2] === 0,
       'export: decimal places are shared with the hover card', JSON.stringify(ex.shared));
@@ -3944,8 +3944,8 @@ const smallText = page => page.evaluate(() => {
                  : (r0.smokeRow && r0.smokeAsk && r0.smokeArea && /Adults who smoke/.test(r0.exportSmoke)),
       smokeHeld ? 'adult smoking at the wrong age is left out of the profile, the picker, the export and Ask'
                 : 'adult smoking at its headline age is back in the profile, the export and Ask', JSON.stringify(r0));
-    ok(bands ? (r0.u === 'Aged under 16' && /16 to 64/.test(r0.w + r0.den))
-             : (r0.u === 'Aged under 15' && r0.w === 'Aged 15 to 64' && r0.den === 'Residents aged 15 to 64 at the 2021 Census'),
+    ok(bands ? (r0.u === 'Aged under 16 (Census 2021)' && /16 to 64/.test(r0.w + r0.den))
+             : (r0.u === 'Aged under 15 (Census 2021)' && r0.w === 'Aged 15 to 64 (Census 2021)' && r0.den === 'Residents aged 15 to 64 at the 2021 Census'),
       'the Census age bands are labelled as the ages indicators.js says they cover', [st.census_age_bands, r0.u, r0.w, r0.den].join(' / '));
     await real.page.close();
 
@@ -3978,9 +3978,9 @@ const smallText = page => page.evaluate(() => {
        /OHID publishes these only for Testshire as a whole, which takes in Tower Hamlets and one other district, so every ward in those districts shows the same figure\. They describe the county rather than Tower Hamlets or this ward\./.test(r1.ctx) &&
        r1.pills.length && r1.pills.every(t => t === 'county figure'),
       'a district\'s county figures are titled, noted and marked as the county\'s', r1.ctx.slice(0, 300) + ' / ' + r1.pills.join(','));
-    ok(/further down as OHID’s official figure for Testshire as a whole, the county Tower Hamlets is part of\./.test(r1.lh) && /county figure/.test(r1.key),
-      'the life expectancy note and the key name the county', r1.lh.slice(-160));
-    ok(/^OHID’s figures for the whole of Barnet, such as life expectancy.*are missing from this version of the map\. We are working on it\.$/.test(r1.missing.trim()),
+    ok(!/further down|appears twice/.test(r1.lh) && /county figure/.test(r1.key),
+      'the ward estimates note no longer points to an LA life expectancy, and the key names the county figure', r1.lh.slice(-160));
+    ok(/^OHID’s figures for the whole of Barnet, such as (smoking, )?suicide and child poverty, are missing from this version of the map\. We are working on it\.$/.test(r1.missing.trim()),
       'an LA with none of OHID\'s figures says so in its profile', r1.missing);
     ok(r1.head.indexOf('Area OHID\'s LA figures describe') !== -1 && r1.th === 'Testshire' && r1.cam === 'Camden',
       'the Data export names the area OHID\'s LA figures describe', r1.head.join('|') + ' / ' + r1.th + ' / ' + r1.cam);
@@ -4123,7 +4123,7 @@ const smallText = page => page.evaluate(() => {
     });
     ok(rb.keys.indexOf('imd_decile') === -1 && rb.keys.indexOf('gb_total_uprn') === -1 && typeof rb.score === 'number' &&
        rb.m.census_social_rented_pct === 'counts' && rb.m.census_population === 'summed' && rb.m.fuel_poverty_pct === 'households' &&
-       rb.tiles.some(t => /^Deprivation score by LSOA \(IMD 2025\) \d+\.\d$/.test(t)) && !rb.tiles.some(t => /decile/i.test(t)),
+       rb.tiles.some(t => /^Deprivation score \(IMD 2025\) \d+\.\d$/.test(t)) && !rb.tiles.some(t => /decile/i.test(t)),
       'Custom area gives the IMD score to one place and no averaged decile, sums the Census counts and weights fuel poverty by households', JSON.stringify(rb).slice(0, 400));
     ok(typeof rb.fp === 'number' && typeof rb.wardFp === 'number' && Math.abs(rb.fp - rb.wardFp) < 0.02 &&
        typeof rb.laFp === 'number' && rb.laShown === rb.laFp,

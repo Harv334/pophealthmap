@@ -10894,8 +10894,8 @@ function laMissingOhid(code) {
 const LA_RECODED_2024 = new Set(['E08000038', 'E08000039']);
 function laOhidMissingNote(code, lad) {
   const la = ladPhrase(lad || 'this LA');
-  return 'OHID’s figures for the whole of ' + la + ', such as life expectancy' +
-    (FT_WITHHELD.has('ft_smoking_prevalence_adults') ? ' and suicide' : ', smoking and suicide') +
+  return 'OHID’s figures for the whole of ' + la + ', such as ' +
+    (FT_WITHHELD.has('ft_smoking_prevalence_adults') ? 'suicide and child poverty' : 'smoking, suicide and child poverty') +
     ', are missing from this version of the map' +
     (LA_RECODED_2024.has(code) ? ', because ' + la + '’s council code changed in 2024' : '') +
     '. We are working on it.';
@@ -12286,7 +12286,6 @@ function showWard(wn) {
     to.fields.push(f);
   }));
   const bor = wdata.lad || 'the LA';
-  const lePer = periodWords(ovPeriodOf('ft_93283'));
   // Where OHID's LA figures here are the county's, and which county.
   const ladCode = wdata.lad_code || laCodeOfName(wdata.lad);
   const cntyOf = k => laFigCounty(ladCode, k);
@@ -12320,12 +12319,6 @@ function showWard(wn) {
     const qofStart = n, qofRows = rowsOf(qofF);
     const ctxStart = n, ctxRows = rowsOf(ctxF);
     const hideFrom = start => clip && start >= PROFILE_SHOW ? ' sr-x' : '';
-    // Life expectancy is in two series: OHID's small-area estimate, which
-    // leads this block, and the official LA figure in the box below it.
-    const twoLE = msoaF.some(f => f.k === 'ft_93283' || f.k === 'ft_932831') &&
-      ctxF.some(f => /^ft_life_expectancy_(fe)?male$/.test(f.k));
-    const leF = ctxF.find(f => /^ft_life_expectancy_(fe)?male$/.test(f.k));
-    const leCounty = leF ? cntyOf(leF.k) : null;
     const ctyF = ctxF.filter(f => cntyOf(f.k));
     const cty = ctyF.length ? cntyOf(ctyF[0].k) : null;
     const allCty = ctyF.length && ctyF.length === ctxF.length;
@@ -12351,13 +12344,7 @@ function showWard(wn) {
         msoaF.some(f => wardCoverPct(wdata, f.k) != null)
           ? ' OHID withholds some MSOA figures where numbers are small, so a figure marked with a share of residents rests on that part of the ward only.' : ''}${
         msoaF.some(f => ovIsStdRatio(f.k))
-          ? ' A ratio compares the ward with England, where 100 is the England level once age is allowed for.' : ''}${
-        twoLE ? ' Life expectancy appears twice: here as OHID’s estimate for this ward' + (lePer ? ' over ' + _esc(lePer) : '') +
-          (leCounty
-            ? ', and further down as OHID’s official figure for ' + _esc(laCountyPhrase(leCounty, bor)) + ' as a whole' +
-              (leCounty.name ? ', the county ' + _esc(ladPhrase(bor)) + ' is part of.' : '.')
-            : ', and further down as the official figure for the whole of ' + _esc(ladPhrase(bor)) + '.') +
-          ' The two cover different years, so the difference between them is not a change in this ward.' : ''}</div></div>
+          ? ' A ratio compares the ward with England, where 100 is the England level once age is allowed for.' : ''}</div></div>
       ${msoaRows}` : '';
     const onsIncome = onsF.some(f => /^saie_/.test(f.k));
     const ons = onsRows ? `<div class="sr-lh${hideFrom(onsStart)}"><div class="sr-sub">ONS estimates for this ward</div>
@@ -21995,7 +21982,15 @@ var PH_SHOW = {
     }
     return (typeof OV_META === 'object' && OV_META && OV_META[k]) || null;
   }
+  // The IMD score is held under one key at every level, and IND_NAMES names
+  // it for LSOAs. Wards have a name of their own; an area made of several
+  // (an LA, a board, a Custom area) has the plain name.
+  function imdScoreLabel(level) {
+    return level === 'lsoa' ? indLabel('imd_score')
+      : level === 'ward' ? indLabel('imd_score_ward') : 'Deprivation score (IMD 2025)';
+  }
   function labelOf(k) {
+    if (k === 'imd_score') return imdScoreLabel(cmpLevel);
     var fromCats = (typeof ovLabel === 'function') ? ovLabel(k) : k;
     if (fromCats && fromCats !== k) return fromCats;
     var m = metaOf(k);
@@ -23918,8 +23913,8 @@ var PH_SHOW = {
       // Saying "the highest IMD" leaves the reader to know that a higher score
       // is more deprived, so the direction is spelled out.
       if (m.k === 'imd_score') {
-        bits.push('<strong>' + esc(cmpAreaLabel(top.n)) + '</strong> is the most deprived of them by ' +
-          esc(phraseFor('imd_score').replace(/\s*\([^)]*\)$/, '')) + ' (' + vs + ')' + context + '.');
+        bits.push('<strong>' + esc(cmpAreaLabel(top.n)) + '</strong> is the most deprived of them, with an IMD 2025 score of ' +
+          vs + context + '.');
         return;
       }
       // The display label, not the long description: lowercasing that gave
@@ -25883,7 +25878,7 @@ var PH_SHOW = {
     households: 'weighted by households',
     residents: 'weighted by residents',
   };
-  function rbLabel(k) { return labelOf(k); }
+  function rbLabel(k) { return k === 'imd_score' ? imdScoreLabel('custom') : labelOf(k); }
 
   function rbRecord(code) {
     var r = (typeof LSOA_DATA !== 'undefined' && LSOA_DATA) ? LSOA_DATA[code] : null;
