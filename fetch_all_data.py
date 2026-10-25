@@ -15104,6 +15104,27 @@ def msoa11_to_msoa21_series(s: "pd.Series", rows: dict) -> "pd.Series":
     return pd.Series(vals, dtype=float)
 
 
+def qof_msoa_bridge() -> dict:
+    """The England MSOA21 -> MSOA11 lookup, with any MSOA in scope it lacks
+    taken from the lookup asked for those MSOAs by name.
+
+    The England lookup came back with 6,775 of England's 6,856 MSOAs in
+    October 2026, every one missing drawn in 2021, so 20 of London's 1,002
+    MSOAs had no figure. The by-name query is the one Local Health's 2011
+    series are bridged with."""
+    rows = dict(get_msoa21_to_msoa11_england())
+    scoped = get_msoa21_to_msoa11()
+    added = [c for c in scoped if c not in rows]
+    for c in added:
+        rows[c] = scoped[c]
+    scope = set(get_lsoa_to_msoa().values())
+    left = sorted(scope - set(rows))
+    if added or left:
+        info(f"qof_msoa: {len(added)} MSOA(s) in scope added to the England lookup by name"
+             + (f"; {len(left)} still have no 2011 parent: {', '.join(left[:10])}" if left else ""))
+    return rows
+
+
 def qof_msoa_parse(tables: list, bridge=None) -> tuple:
     """(national frame MSOA21CD and qof_est_* percentages, problems, matched).
 
@@ -15253,7 +15274,7 @@ def run_qof_msoa() -> "pd.DataFrame | None":
             got = places_download(u, dest, source, min_bytes=5_000)
             if got:
                 try:
-                    if qof_msoa_parse(places_tables(got), bridge=get_msoa21_to_msoa11_england)[0].shape[1] > 1:
+                    if qof_msoa_parse(places_tables(got), bridge=qof_msoa_bridge)[0].shape[1] > 1:
                         files = [got]
                         break
                 except Exception as e:
@@ -15267,7 +15288,7 @@ def run_qof_msoa() -> "pd.DataFrame | None":
         tables = places_tables(src)
     except Exception as e:
         raise RuntimeError(f"qof_msoa: {src.name} could not be read ({type(e).__name__}: {e})")
-    out, problems, matched = qof_msoa_parse(tables, bridge=get_msoa21_to_msoa11_england)
+    out, problems, matched = qof_msoa_parse(tables, bridge=qof_msoa_bridge)
     for k, v in matched.items():
         info(f"qof_msoa: {k} <- {v!r}")
     got = [k for k in QOF_MSOA_KEYS if k in out.columns]

@@ -210,6 +210,16 @@ check("a file on the 2011 MSOAs is bridged to the 2021 ones: kept, split and mer
       sorted(br["MSOA21CD"]) == sorted(look) and abs(b["E02000001"] - o_ix["E02000001"]) < 1e-3
       and abs(b["E02006950"] - o_ix["E02000002"]) < 1e-3 and abs(b["E02006951"] - o_ix["E02000002"]) < 1e-3
       and abs(b["E02006952"] - (o_ix["E02000003"] + o_ix["E02000004"]) / 2) < 1e-3, str(b.to_dict()))
+# The England lookup lacked about half of the MSOAs drawn in 2021 (October
+# 2026); those in scope are taken from the lookup asked for them by name.
+_e, _s, _l = p.get_msoa21_to_msoa11_england, p.get_msoa21_to_msoa11, p.get_lsoa_to_msoa
+p.get_msoa21_to_msoa11_england = lambda: {"E02000001": ["E02000001"], "E02006950": ["E02000002"]}
+p.get_msoa21_to_msoa11 = lambda: {"E02006950": ["E02000002"], "E02006951": ["E02000002"]}
+p.get_lsoa_to_msoa = lambda: {"E01000001": "E02000001", "E01000002": "E02006951", "E01000003": "E02006952"}
+_rows = p.qof_msoa_bridge()
+check("an MSOA in scope that the England lookup lacks is taken from the by-name lookup, and the rest are kept",
+      _rows == {"E02000001": ["E02000001"], "E02006950": ["E02000002"], "E02006951": ["E02000002"]}, str(_rows))
+p.get_msoa21_to_msoa11_england, p.get_msoa21_to_msoa11, p.get_lsoa_to_msoa = _e, _s, _l
 check("a file with no MSOA codes is refused", raises(lambda: p.qof_msoa_parse([("x", "", CONST.astype(str))]), "MSOA codes"))
 twice = wide()
 twice["Asthma prevalence"] = twice["Asthma (%)"]
