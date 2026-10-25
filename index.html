@@ -8600,6 +8600,13 @@ function wardFitNote(rec) {
   if (!(r > 0) || (r >= 0.8 && r <= 1.25)) return '';
   const how = r < 1 ? 'about ' + Math.round(r * 100) + '% as many residents as'
     : 'about ' + (Math.round(r * 10) / 10).toLocaleString('en-GB') + ' times as many residents as';
+  // A ward the lookup gives no LSOA takes the figures of the LSOA most of
+  // its residents live in (lsoa_from, fill_wards_without_lsoa in the pipeline).
+  if (rec.lsoa_from) {
+    return 'The ONS lookup gives this ward no LSOA of its own, so its deprivation, health and other figures ' +
+      'built from LSOAs are those of the LSOA most of its residents live in (' + rec.lsoa_from + '), which holds ' +
+      how + ' the ward itself.';
+  }
   return 'The LSOAs the ONS lookup gives this ward hold ' + how + ' the ward itself, so its deprivation, ' +
     'health and other figures built from LSOAs describe a noticeably different area.';
 }

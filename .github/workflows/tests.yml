@@ -61,12 +61,14 @@ jobs:
       # The Census additions and the LSOA additions, offline: the new Census
       # shares and their counts, distances to services, mid-year estimates,
       # youth claimants, road casualties, care home beds and crime by LSOA,
-      # and the ONS LSOA 2011 to 2021 lookup finding its service by name.
+      # the ONS LSOA 2011 to 2021 lookup finding its service by name, and a
+      # ward with no LSOA taking its figures through its output areas.
       - name: Check the Census and LSOA additions
         run: |
           python3 tests/pipeline/test_census_additions.py
           python3 tests/pipeline/test_small_area_additions.py
           python3 tests/pipeline/test_lsoa11_lookup.py
+          python3 tests/pipeline/test_ward_fill.py
       # The DWP Stat-Xplore client, offline against a fake Stat-Xplore: no key
       # is a skip, never a failure; the schema is walked by label; requests
       # are batched; 2011 LSOAs are bridged; rounded and withheld cells.
