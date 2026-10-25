@@ -42,6 +42,13 @@ async function open(browser, url, vp) {
 // best-practice rules.
 const AXE_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice'];
 async function axeViolations(page) {
+  // Let a panel that is still fading in finish first (.ov-tv.in runs for
+  // 0.18s): axe measures contrast from the colours as they are drawn, so a
+  // half-transparent heading reads as too faint. Endless animations, such as
+  // the loader's, are left alone.
+  await page.evaluate(() => Promise.all(document.getAnimations()
+    .filter(a => { const t = a.effect && a.effect.getComputedTiming(); return t && isFinite(t.endTime); })
+    .map(a => a.finished.catch(() => {}))));
   await page.addScriptTag({ content: AXE });
   const r = await page.evaluate(tags => axe.run(document, {
     runOnly: tags, resultTypes: ['violations'] }), AXE_TAGS);
@@ -132,6 +139,30 @@ async function stripFigures(page, keys, { lsoaOnly = [] } = {}) {
     Object.values(doc).forEach(rec => { const ind = (rec && rec.indicators) || rec || {}; Object.keys(ind).forEach(k => { if (gone(k)) delete ind[k]; }); });
     r.fulfill({ contentType: 'application/json', body: JSON.stringify(doc) });
   });
+  // And the output areas, whose index lists the Census keys they hold and
+  // whose files hold the values by position in that list. Without this a key
+  // published by output area still counts as having figures once the index
+  // has loaded, which happens at a different moment on each machine.
+  const oaIndex = path.join(ROOT, 'data/map/oa/index.json');
+  if (fs.existsSync(oaIndex)) {
+    const ix = JSON.parse(fs.readFileSync(oaIndex, 'utf8'));
+    const drop = new Set(ix.keys.map((k, i) => (gone(k) ? i : -1)).filter(i => i >= 0));
+    if (drop.size) {
+      await page.route('**/data/map/oa/*.json*', r => {
+        const name = new URL(r.request().url()).pathname.split('/').pop();
+        const file = path.join(ROOT, 'data/map/oa', name);
+        if (!fs.existsSync(file)) return r.continue();
+        const doc = JSON.parse(fs.readFileSync(file, 'utf8'));
+        if (name === 'index.json') {
+          doc.keys.forEach(k => { if (gone(k)) delete doc.ranges[k]; });
+          doc.keys = doc.keys.filter((k, i) => !drop.has(i));
+        } else {
+          (doc.features || []).forEach(f => { f.properties.v = (f.properties.v || []).filter((x, i) => !drop.has(i)); });
+        }
+        r.fulfill({ contentType: 'application/json', body: JSON.stringify(doc) });
+      });
+    }
+  }
 }
 // The crime figures the pipeline also makes for LSOAs. Several checks below
 // use the crime rate as their indicator with ward figures only, as it was
