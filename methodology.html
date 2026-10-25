@@ -824,6 +824,16 @@ more or a lot fewer people than the ward itself. Where the LSOAs hold under 80%
 or over 125% of the ward's residents, the ward is marked in the Area profile
 and the ward report.</p>
 
+<p id="no-lsoa">A few wards, most of them in the City of London, are smaller than
+the LSOAs around them, so the lookup gives them no LSOA at all. For these we use
+output areas. Each output area sits inside one LSOA, and ONS's output area
+lookup gives each one to a ward. So we can tell which LSOA most of the ward's
+residents live in, and the ward takes that LSOA's figures as published,
+including the MSOA figures it carries. Nothing is averaged. Counts, such as the
+claimant count, are left blank for these wards, because that LSOA's counts
+already belong to the ward it is filed under. These wards are marked in the
+same way, with the LSOA their figures come from.</p>
+
 <h3 id="census-levels">Census figures at every level</h3>
 
 <p>ONS publishes Census 2021 figures for output areas, LSOAs and MSOAs. At
@@ -948,13 +958,16 @@ above, for anyone who wants to check it or repeat it.</p>
         <td>Every ward and LA figure that is built up from LSOAs. Each whole
             LSOA goes to the ward where most of its residents live, and is never
             split.</td></tr>
-    <tr><td class="term">Output areas to wards (Census only)</td>
+    <tr><td class="term">Output areas to wards</td>
         <td><code>OA21_WD25_LAD25_EW_LU</code> (May 2025 boundaries), in its
             <code>_v2</code> edition where ONS offers it</td>
         <td>Census ward figures, built from output areas because they follow
             ward boundaries far more closely than LSOAs. If this lookup cannot
             be reached during an update, or its wards do not match the wards of
-            the LSOA lookup above, the LSOA lookup is used instead.</td></tr>
+            the LSOA lookup above, the LSOA lookup is used instead. With each
+            output area's LSOA, from the output area boundary file, it also
+            finds the LSOA most residents of a ward live in, for a ward the
+            LSOA lookup gives none (<a href="#no-lsoa">see above</a>).</td></tr>
     <tr><td class="term">LSOAs to MSOAs</td>
         <td><code>OA21_LAD23_LSOA21_MSOA21_LEP23_EN_LU</code></td>
         <td>Placing each LSOA in its MSOA, so that MSOA figures can reach wards

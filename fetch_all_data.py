@@ -3766,6 +3766,15 @@ def run_census_oa() -> pd.DataFrame:
             cache.write_text(json.dumps({"type": "FeatureCollection", "features": feats}), encoding="utf-8")
     if not feats:
         return pd.DataFrame()
+    # Each output area's LSOA, from the same ONS features: an exact fit, as
+    # every LSOA is made of whole output areas. The ward build uses it for a
+    # ward the LSOA lookup gives no LSOA (fill_wards_without_lsoa).
+    oa_lsoa = pd.DataFrame([{"OA21CD": p["OA21CD"], "LSOA21CD": p["LSOA21CD"]}
+                            for p in ((f.get("properties") or {}) for f in feats)
+                            if p.get("OA21CD") and p.get("LSOA21CD") in lsoa_lk])
+    if not oa_lsoa.empty:
+        oa_lsoa = oa_lsoa.drop_duplicates("OA21CD")
+    write_parquet_guarded(DATA_DIR / "demographics" / "oa21_lsoa21.parquet", oa_lsoa, source="census_oa")
 
     out_dir = MAP_DIR / "oa"
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -8236,6 +8245,88 @@ def record_lsoa_fit(wards: dict, fit: dict) -> int:
     return n
 
 
+def fill_skips(k: str) -> bool:
+    """Ward figures fill_wards_without_lsoa leaves alone: the Census, which a
+    ward has from its own output areas, and counts, which are added up into
+    the ward the LSOA is filed under and would be counted twice."""
+    return k.startswith("census_") or k.endswith(("_count", "_change", "_12mo")) or k == "gb_total_uprn"
+
+
+def fill_wards_without_lsoa(wards: dict, lsoa_data: dict, msoa_data: dict, lsoa_to_ward: dict,
+                            oa_to_ward: dict, oa_to_lsoa: dict, oa_pop: dict, lsoa_to_msoa: dict) -> dict:
+    """{ward: LSOA} for each ward with residents that the LSOA lookup gives no
+    LSOA, filled in place.
+
+    The lookup puts each whole LSOA in the ward where most of its residents
+    live, so a ward smaller than the LSOAs around it (six of the City of
+    London's) can be given none and has no deprivation or health figures.
+    Output areas fix that: each sits in one LSOA (oa_to_lsoa, exact) and is
+    given to one ward (oa_to_ward, the best fit the Census wards use). Such a
+    ward takes the figures of the LSOA that holds most of its residents, as
+    published, and the MSOA figures that LSOA carries: nothing is averaged.
+    Only figures the other wards have are taken, and no Census figure or
+    count (fill_skips). The ward is marked with lsoa_from, and lsoa_fit as
+    any ward whose LSOAs hold a different number of people."""
+    has = set(lsoa_to_ward.values())
+    carried: set = set()
+    for wd, w in wards.items():
+        if wd in has:
+            carried.update(k for k, v in (w.get("indicators") or {}).items() if v is not None)
+    by_ward: dict = {}
+    for oa, wd in oa_to_ward.items():
+        lc = oa_to_lsoa.get(oa)
+        if wd in wards and wd not in has and lc:
+            per = by_ward.setdefault(wd, {})
+            per[lc] = per.get(lc, 0.0) + float(oa_pop.get(oa, 0) or 0)
+    out = {}
+    for wd in sorted(by_ward):
+        w = wards[wd]
+        ind = w.setdefault("indicators", {})
+        pop = ind.get("census_population")
+        if not pop or pop <= 0:
+            continue
+        per = by_ward[wd]
+        main = max(sorted(per), key=lambda lc: per[lc])
+        lrec = lsoa_data.get(main) or {}
+        mrec = msoa_data.get(lsoa_to_msoa.get(main, "")) or {}
+        for k in sorted(carried):
+            if ind.get(k) is not None or fill_skips(k):
+                continue
+            v = lrec.get(k)
+            if v is None:
+                v = mrec.get(k)
+            if v is not None:
+                ind[k] = v
+        w["lsoa_from"] = main
+        lpop = lrec.get("census_population")
+        if lpop:
+            r = round(float(lpop) / float(pop), 2)
+            if ward_fit_is_off(r):
+                w["lsoa_fit"] = r
+        out[wd] = main
+    return out
+
+
+def fill_wards_from_oas(ward_data: dict, lsoa_data: dict, msoa_data: dict) -> dict:
+    """fill_wards_without_lsoa with the build's own lookups and output area
+    residents; {} when any of them is missing (census_oa did not run)."""
+    demo = DATA_DIR / "demographics"
+    pairs = _read_parquet_opt(demo / "oa21_lsoa21.parquet")
+    cen_oa = _read_parquet_opt(demo / "census2021_oa.parquet")
+    if pairs is None or pairs.empty or cen_oa is None or "census_population" not in cen_oa.columns:
+        return {}
+    oa_to_ward = get_oa_to_ward()
+    if not oa_to_ward:
+        return {}
+    oa_pop = dict(zip(cen_oa["OA21CD"].astype(str), pd.to_numeric(cen_oa["census_population"], errors="coerce").fillna(0)))
+    filled = fill_wards_without_lsoa(ward_data.get("wards", {}), lsoa_data, msoa_data, get_lsoa_to_ward(),
+                                     oa_to_ward, dict(zip(pairs["OA21CD"].astype(str), pairs["LSOA21CD"].astype(str))),
+                                     oa_pop, get_lsoa_to_msoa())
+    if filled:
+        info(f"wards with no LSOA: {len(filled)} take the figures of the LSOA most of their residents live in")
+    return filled
+
+
 # police.uk categories left out of the crime total (see build_ward_data).
 CRIME_TOTAL_EXCLUDES = ("anti-social-behaviour",)
 
@@ -10157,6 +10248,7 @@ def export_all() -> None:
     lsoa_data  = build_lsoa_data()
     msoa_data  = build_msoa_data()
     boro_data  = build_borough_data()
+    fill_wards_from_oas(ward_data, lsoa_data, msoa_data)
     drop_retired(ward_data.get("wards", {}), nested=True)
     for recs in (lsoa_data, msoa_data, boro_data):
         drop_retired(recs)

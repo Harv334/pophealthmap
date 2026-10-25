@@ -1,10 +1,10 @@
 {
-  "last_run": "2026-10-25T11:13:20.839181+00:00",
+  "last_run": "2026-10-25T19:45:06.744584+00:00",
   "sources": {
     "ahah": {
-      "duration_s": 2.2,
+      "duration_s": 3.0,
       "error": "",
-      "fetched_at": "2026-10-25T11:09:51.995690+00:00",
+      "fetched_at": "2026-10-25T19:41:51.915636+00:00",
       "notes": "GeoDS lists the AHAH files, but neither its record nor the dataset page gives an address the pipeline can download from, so the file has to be downloaded by hand. To add them, download the AHAH LSOA file (version 5.1 or later, CSV) from https://data.geods.ac.uk/dataset/access-to-healthy-assets-hazards-ahah and attach it to a GitHub release named ahah-source; both refresh workflows copy it into .cache/ahah/ before the pipeline runs. Or put it in .cache/ahah/ and run `python fetch_all_data.py --only ahah`.",
       "output_path": "",
       "rows_written": 0,
@@ -12,9 +12,9 @@
       "status": "skipped"
     },
     "air_quality": {
-      "duration_s": 9.7,
+      "duration_s": 8.7,
       "error": "",
-      "fetched_at": "2026-10-25T11:06:36.685433+00:00",
+      "fetched_at": "2026-10-25T19:39:01.295359+00:00",
       "notes": "source returned no frame",
       "output_path": "",
       "rows_written": 0,
@@ -22,9 +22,9 @@
       "status": "skipped"
     },
     "boundaries": {
-      "duration_s": 21.1,
+      "duration_s": 16.3,
       "error": "",
-      "fetched_at": "2026-10-25T11:06:07.420983+00:00",
+      "fetched_at": "2026-10-25T19:38:36.935446+00:00",
       "notes": "",
       "output_path": "",
       "rows_written": 4,
@@ -35,9 +35,9 @@
       "status": "ok"
     },
     "care_homes": {
-      "duration_s": 22.6,
+      "duration_s": 23.0,
       "error": "",
-      "fetched_at": "2026-10-25T11:12:57.337658+00:00",
+      "fetched_at": "2026-10-25T19:44:42.990581+00:00",
       "notes": "",
       "output_path": "data/healthcare/care_homes.parquet",
       "rows_written": 1266,
@@ -57,9 +57,9 @@
       "status": "ok"
     },
     "census": {
-      "duration_s": 2.1,
+      "duration_s": 2.2,
       "error": "",
-      "fetched_at": "2026-10-25T11:07:15.489803+00:00",
+      "fetched_at": "2026-10-25T19:39:35.891663+00:00",
       "notes": "also wrote data/demographics/census2021_counts.parquet, data/demographics/census2021_msoa.parquet",
       "output_path": "data/demographics/census2021.parquet",
       "rows_written": 35672,
@@ -118,10 +118,10 @@
       "status": "ok"
     },
     "census_oa": {
-      "duration_s": 18.0,
+      "duration_s": 17.3,
       "error": "",
-      "fetched_at": "2026-10-25T11:07:17.624475+00:00",
-      "notes": "also wrote data/demographics/census2021_oa_counts.parquet",
+      "fetched_at": "2026-10-25T19:39:38.067719+00:00",
+      "notes": "also wrote data/demographics/census2021_oa_counts.parquet, data/demographics/oa21_lsoa21.parquet",
       "output_path": "data/demographics/census2021_oa.parquet",
       "rows_written": 26369,
       "schema": {
@@ -131,9 +131,9 @@
       "status": "ok"
     },
     "charities": {
-      "duration_s": 13.8,
+      "duration_s": 13.9,
       "error": "",
-      "fetched_at": "2026-10-25T11:12:09.085704+00:00",
+      "fetched_at": "2026-10-25T19:43:54.569074+00:00",
       "notes": "",
       "output_path": "data/vcse/charities.parquet",
       "rows_written": 18539,
@@ -173,7 +173,7 @@
     "claimant": {
       "duration_s": 0.3,
       "error": "",
-      "fetched_at": "2026-10-25T11:07:35.593421+00:00",
+      "fetched_at": "2026-10-25T19:39:55.323668+00:00",
       "notes": "",
       "output_path": "data/economy/claimant_count.parquet",
       "rows_written": 4994,
@@ -190,7 +190,7 @@
     "claimant_youth": {
       "duration_s": 0.1,
       "error": "",
-      "fetched_at": "2026-10-25T11:12:54.207465+00:00",
+      "fetched_at": "2026-10-25T19:44:39.175544+00:00",
       "notes": "",
       "output_path": "data/economy/claimant_18_24.parquet",
       "rows_written": 4994,
@@ -202,9 +202,9 @@
       "status": "ok"
     },
     "crime": {
-      "duration_s": 88.9,
+      "duration_s": 80.1,
       "error": "",
-      "fetched_at": "2026-10-25T11:10:36.395603+00:00",
+      "fetched_at": "2026-10-25T19:42:30.770234+00:00",
       "notes": "",
       "output_path": "data/crime/police_uk_crime.parquet",
       "rows_written": 1126803,
@@ -224,7 +224,7 @@
     "custom": {
       "duration_s": 0.0,
       "error": "",
-      "fetched_at": "2026-10-25T11:06:07.420657+00:00",
+      "fetched_at": "2026-10-25T19:38:36.935103+00:00",
       "notes": "source returned no frame",
       "output_path": "",
       "rows_written": 0,
@@ -232,9 +232,9 @@
       "status": "skipped"
     },
     "dentists": {
-      "duration_s": 5.1,
+      "duration_s": 4.0,
       "error": "",
-      "fetched_at": "2026-10-25T11:12:22.866474+00:00",
+      "fetched_at": "2026-10-25T19:44:08.516744+00:00",
       "notes": "",
       "output_path": "data/healthcare/dental_practices.parquet",
       "rows_written": 1760,
@@ -258,7 +258,7 @@
     "dwp_attendance_allowance": {
       "duration_s": 0.0,
       "error": "",
-      "fetched_at": "2026-10-25T11:13:20.838647+00:00",
+      "fetched_at": "2026-10-25T19:45:06.743915+00:00",
       "notes": "no Stat-Xplore API key, so no DWP figures were fetched and the map keeps what it had. Register free at stat-xplore.dwp.gov.uk and add the key as the repository secret STAT_XPLORE_API_KEY (HANDOVER.md, DWP benefits)",
       "output_path": "",
       "rows_written": 0,
@@ -268,7 +268,7 @@
     "dwp_carers_allowance": {
       "duration_s": 0.0,
       "error": "",
-      "fetched_at": "2026-10-25T11:13:20.838671+00:00",
+      "fetched_at": "2026-10-25T19:45:06.744169+00:00",
       "notes": "no Stat-Xplore API key, so no DWP figures were fetched and the map keeps what it had. Register free at stat-xplore.dwp.gov.uk and add the key as the repository secret STAT_XPLORE_API_KEY (HANDOVER.md, DWP benefits)",
       "output_path": "",
       "rows_written": 0,
@@ -278,7 +278,7 @@
     "dwp_cilif": {
       "duration_s": 0.0,
       "error": "",
-      "fetched_at": "2026-10-25T11:13:20.838701+00:00",
+      "fetched_at": "2026-10-25T19:45:06.744188+00:00",
       "notes": "no Stat-Xplore API key, so no DWP figures were fetched and the map keeps what it had. Register free at stat-xplore.dwp.gov.uk and add the key as the repository secret STAT_XPLORE_API_KEY (HANDOVER.md, DWP benefits)",
       "output_path": "",
       "rows_written": 0,
@@ -288,7 +288,7 @@
     "dwp_dla_children": {
       "duration_s": 0.0,
       "error": "",
-      "fetched_at": "2026-10-25T11:13:20.838453+00:00",
+      "fetched_at": "2026-10-25T19:45:06.743907+00:00",
       "notes": "no Stat-Xplore API key, so no DWP figures were fetched and the map keeps what it had. Register free at stat-xplore.dwp.gov.uk and add the key as the repository secret STAT_XPLORE_API_KEY (HANDOVER.md, DWP benefits)",
       "output_path": "",
       "rows_written": 0,
@@ -298,7 +298,7 @@
     "dwp_pension_credit": {
       "duration_s": 0.0,
       "error": "",
-      "fetched_at": "2026-10-25T11:13:20.838687+00:00",
+      "fetched_at": "2026-10-25T19:45:06.744180+00:00",
       "notes": "no Stat-Xplore API key, so no DWP figures were fetched and the map keeps what it had. Register free at stat-xplore.dwp.gov.uk and add the key as the repository secret STAT_XPLORE_API_KEY (HANDOVER.md, DWP benefits)",
       "output_path": "",
       "rows_written": 0,
@@ -308,7 +308,7 @@
     "dwp_pip": {
       "duration_s": 0.0,
       "error": "",
-      "fetched_at": "2026-10-25T11:13:20.838442+00:00",
+      "fetched_at": "2026-10-25T19:45:06.743896+00:00",
       "notes": "no Stat-Xplore API key, so no DWP figures were fetched and the map keeps what it had. Register free at stat-xplore.dwp.gov.uk and add the key as the repository secret STAT_XPLORE_API_KEY (HANDOVER.md, DWP benefits)",
       "output_path": "",
       "rows_written": 0,
@@ -318,7 +318,7 @@
     "dwp_uc_households": {
       "duration_s": 0.0,
       "error": "",
-      "fetched_at": "2026-10-25T11:13:20.838425+00:00",
+      "fetched_at": "2026-10-25T19:45:06.743880+00:00",
       "notes": "no Stat-Xplore API key, so no DWP figures were fetched and the map keeps what it had. Register free at stat-xplore.dwp.gov.uk and add the key as the repository secret STAT_XPLORE_API_KEY (HANDOVER.md, DWP benefits)",
       "output_path": "",
       "rows_written": 0,
@@ -328,7 +328,7 @@
     "dwp_uc_people": {
       "duration_s": 0.0,
       "error": "",
-      "fetched_at": "2026-10-25T11:13:20.838368+00:00",
+      "fetched_at": "2026-10-25T19:45:06.743822+00:00",
       "notes": "no Stat-Xplore API key, so no DWP figures were fetched and the map keeps what it had. Register free at stat-xplore.dwp.gov.uk and add the key as the repository secret STAT_XPLORE_API_KEY (HANDOVER.md, DWP benefits)",
       "output_path": "",
       "rows_written": 0,
@@ -336,9 +336,9 @@
       "status": "skipped"
     },
     "fhrs": {
-      "duration_s": 3.7,
+      "duration_s": 3.5,
       "error": "",
-      "fetched_at": "2026-10-25T11:10:13.407786+00:00",
+      "fetched_at": "2026-10-25T19:42:08.342390+00:00",
       "notes": "",
       "output_path": "data/environment/fhrs_lsoa.parquet",
       "rows_written": 4994,
@@ -354,9 +354,9 @@
       "status": "ok"
     },
     "fingertips": {
-      "duration_s": 8.1,
+      "duration_s": 7.5,
       "error": "",
-      "fetched_at": "2026-10-25T11:07:51.497005+00:00",
+      "fetched_at": "2026-10-25T19:40:07.856364+00:00",
       "notes": "",
       "output_path": "data/outcomes/fingertips.parquet",
       "rows_written": 594,
@@ -380,9 +380,9 @@
       "status": "ok"
     },
     "fingertips_msoa": {
-      "duration_s": 8.3,
+      "duration_s": 7.0,
       "error": "",
-      "fetched_at": "2026-10-25T11:07:59.596707+00:00",
+      "fetched_at": "2026-10-25T19:40:15.384091+00:00",
       "notes": "",
       "output_path": "data/outcomes/fingertips_msoa.parquet",
       "rows_written": 32559,
@@ -398,9 +398,9 @@
       "status": "ok"
     },
     "fingertips_msoa_extra": {
-      "duration_s": 3.5,
+      "duration_s": 3.1,
       "error": "",
-      "fetched_at": "2026-10-25T11:09:42.722008+00:00",
+      "fetched_at": "2026-10-25T19:41:43.511193+00:00",
       "notes": "also wrote data/outcomes/fingertips_msoa_extra_la.parquet",
       "output_path": "data/outcomes/fingertips_msoa_extra.parquet",
       "rows_written": 1002,
@@ -419,9 +419,9 @@
       "status": "ok"
     },
     "fingertips_msoa_la": {
-      "duration_s": 1.2,
+      "duration_s": 1.0,
       "error": "",
-      "fetched_at": "2026-10-25T11:08:07.884981+00:00",
+      "fetched_at": "2026-10-25T19:40:22.362788+00:00",
       "notes": "",
       "output_path": "data/outcomes/fingertips_msoa_la.parquet",
       "rows_written": 1056,
@@ -434,9 +434,9 @@
       "status": "ok"
     },
     "fingertips_profiles": {
-      "duration_s": 93.7,
+      "duration_s": 80.1,
       "error": "",
-      "fetched_at": "2026-10-25T11:08:09.059928+00:00",
+      "fetched_at": "2026-10-25T19:40:23.411235+00:00",
       "notes": "kept last run's figures for 5 indicator(s) that came back missing or incomplete: mh_91117, mort_91102, smok_92445, laprof_90851, laprof_92445",
       "output_path": "data/outcomes/fingertips_profiles.parquet",
       "rows_written": 18646,
@@ -458,9 +458,9 @@
       "status": "partial"
     },
     "fuel_poverty": {
-      "duration_s": 19.3,
+      "duration_s": 19.0,
       "error": "",
-      "fetched_at": "2026-10-25T11:10:17.109083+00:00",
+      "fetched_at": "2026-10-25T19:42:11.808653+00:00",
       "notes": "",
       "output_path": "data/demographics/fuel_poverty.parquet",
       "rows_written": 33755,
@@ -472,9 +472,9 @@
       "status": "ok"
     },
     "gp": {
-      "duration_s": 3.9,
+      "duration_s": 3.3,
       "error": "",
-      "fetched_at": "2026-10-25T11:06:50.440569+00:00",
+      "fetched_at": "2026-10-25T19:39:13.928600+00:00",
       "notes": "",
       "output_path": "data/healthcare/gp_practices.parquet",
       "rows_written": 1125,
@@ -495,9 +495,9 @@
       "status": "ok"
     },
     "greenblue": {
-      "duration_s": 8.2,
+      "duration_s": 8.1,
       "error": "",
-      "fetched_at": "2026-10-25T11:06:28.514658+00:00",
+      "fetched_at": "2026-10-25T19:38:53.194161+00:00",
       "notes": "",
       "output_path": "",
       "rows_written": 1,
@@ -508,9 +508,9 @@
       "status": "ok"
     },
     "hle_msoa": {
-      "duration_s": 3.8,
+      "duration_s": 3.5,
       "error": "",
-      "fetched_at": "2026-10-25T11:09:48.181967+00:00",
+      "fetched_at": "2026-10-25T19:41:48.391389+00:00",
       "notes": "also wrote data/outcomes/hle_msoa_la.parquet",
       "output_path": "data/outcomes/hle_msoa.parquet",
       "rows_written": 6856,
@@ -526,9 +526,9 @@
       "status": "ok"
     },
     "hospitals": {
-      "duration_s": 3.8,
+      "duration_s": 3.7,
       "error": "",
-      "fetched_at": "2026-10-25T11:12:05.252134+00:00",
+      "fetched_at": "2026-10-25T19:43:50.883979+00:00",
       "notes": "",
       "output_path": "data/healthcare/hospitals.parquet",
       "rows_written": 111,
@@ -549,7 +549,7 @@
     "imd": {
       "duration_s": 0.0,
       "error": "",
-      "fetched_at": "2026-10-25T11:07:00.970462+00:00",
+      "fetched_at": "2026-10-25T19:39:22.520241+00:00",
       "notes": "",
       "output_path": "",
       "rows_written": 33755,
@@ -571,7 +571,7 @@
     "iod_extra": {
       "duration_s": 0.5,
       "error": "",
-      "fetched_at": "2026-10-25T11:07:00.976613+00:00",
+      "fetched_at": "2026-10-25T19:39:22.526292+00:00",
       "notes": "",
       "output_path": "data/demographics/iod2025_extra.parquet",
       "rows_written": 33755,
@@ -595,9 +595,9 @@
       "status": "ok"
     },
     "iod_indicators": {
-      "duration_s": 14.0,
+      "duration_s": 12.9,
       "error": "",
-      "fetched_at": "2026-10-25T11:07:01.489022+00:00",
+      "fetched_at": "2026-10-25T19:39:23.022938+00:00",
       "notes": "5 of 14 columns missing or not used: iod_ks2: no File 8 column with 'key stage 2' or 'ks2'; iod_ks4: no File 8 column with 'key stage 4' or 'ks4'; iod_staying_on: no File 8 column with 'staying on'; iod_english: no File 8 column with 'english language' or 'speak english' or 'english proficiency'; iod_no_central_heating: no File 8 column with 'central heating'",
       "output_path": "data/demographics/iod2025_indicators.parquet",
       "rows_written": 33755,
@@ -618,7 +618,7 @@
     "naptan": {
       "duration_s": 0.0,
       "error": "",
-      "fetched_at": "2026-10-25T11:06:50.440099+00:00",
+      "fetched_at": "2026-10-25T19:39:13.928379+00:00",
       "notes": "source returned no frame",
       "output_path": "",
       "rows_written": 0,
@@ -628,7 +628,7 @@
     "pcn": {
       "duration_s": 0.0,
       "error": "",
-      "fetched_at": "2026-10-25T11:06:54.352858+00:00",
+      "fetched_at": "2026-10-25T19:39:17.192237+00:00",
       "notes": "",
       "output_path": "",
       "rows_written": 202,
@@ -639,9 +639,9 @@
       "status": "ok"
     },
     "pharmacies": {
-      "duration_s": 6.6,
+      "duration_s": 5.3,
       "error": "",
-      "fetched_at": "2026-10-25T11:06:54.370415+00:00",
+      "fetched_at": "2026-10-25T19:39:17.208662+00:00",
       "notes": "",
       "output_path": "data/healthcare/pharmacies.parquet",
       "rows_written": 1713,
@@ -662,7 +662,7 @@
     "ppfi": {
       "duration_s": 0.0,
       "error": "",
-      "fetched_at": "2026-10-25T11:10:13.407582+00:00",
+      "fetched_at": "2026-10-25T19:42:08.342171+00:00",
       "notes": "No file was found for it, so there are no figures yet. To add them, download the PPFI LSOA CSV (version 2.1 or later; a free CDRC login is needed) from https://data.cdrc.ac.uk/node/2515 and attach it to a GitHub release named ppfi-source; both refresh workflows copy it into .cache/ppfi/ before the pipeline runs. Or put it in .cache/ppfi/ and run `python fetch_all_data.py --only ppfi`.",
       "output_path": "",
       "rows_written": 0,
@@ -670,9 +670,9 @@
       "status": "skipped"
     },
     "qof": {
-      "duration_s": 15.6,
+      "duration_s": 12.2,
       "error": "",
-      "fetched_at": "2026-10-25T11:07:35.870520+00:00",
+      "fetched_at": "2026-10-25T19:39:55.625433+00:00",
       "notes": "",
       "output_path": "data/healthcare/qof_prevalence.parquet",
       "rows_written": 1115,
@@ -697,9 +697,9 @@
       "status": "ok"
     },
     "qof_msoa": {
-      "duration_s": 18.9,
+      "duration_s": 13.1,
       "error": "",
-      "fetched_at": "2026-10-25T11:09:54.546228+00:00",
+      "fetched_at": "2026-10-25T19:41:55.251496+00:00",
       "notes": "",
       "output_path": "data/healthcare/qof_msoa.parquet",
       "rows_written": 6795,
@@ -729,9 +729,9 @@
       "status": "ok"
     },
     "road_casualties": {
-      "duration_s": 3.0,
+      "duration_s": 3.7,
       "error": "",
-      "fetched_at": "2026-10-25T11:12:54.331435+00:00",
+      "fetched_at": "2026-10-25T19:44:39.300613+00:00",
       "notes": "",
       "output_path": "data/environment/road_casualties_lsoa.parquet",
       "rows_written": 4994,
@@ -743,9 +743,9 @@
       "status": "ok"
     },
     "saie": {
-      "duration_s": 1.9,
+      "duration_s": 1.8,
       "error": "",
-      "fetched_at": "2026-10-25T11:09:46.234283+00:00",
+      "fetched_at": "2026-10-25T19:41:46.589156+00:00",
       "notes": "",
       "output_path": "data/demographics/saie_msoa.parquet",
       "rows_written": 6856,
@@ -767,7 +767,7 @@
     "samhi": {
       "duration_s": 0.4,
       "error": "",
-      "fetched_at": "2026-10-25T11:09:54.184309+00:00",
+      "fetched_at": "2026-10-25T19:41:54.869226+00:00",
       "notes": "",
       "output_path": "data/outcomes/samhi_lsoa.parquet",
       "rows_written": 4994,
@@ -783,9 +783,9 @@
       "status": "ok"
     },
     "sape": {
-      "duration_s": 26.3,
+      "duration_s": 26.6,
       "error": "",
-      "fetched_at": "2026-10-25T11:12:27.947773+00:00",
+      "fetched_at": "2026-10-25T19:44:12.559369+00:00",
       "notes": "",
       "output_path": "data/demographics/sape_lsoa.parquet",
       "rows_written": 4994,
@@ -803,9 +803,9 @@
       "status": "ok"
     },
     "service_access": {
-      "duration_s": 0.9,
+      "duration_s": 0.8,
       "error": "",
-      "fetched_at": "2026-10-25T11:13:19.923922+00:00",
+      "fetched_at": "2026-10-25T19:45:05.984750+00:00",
       "notes": "",
       "output_path": "data/environment/service_access_lsoa.parquet",
       "rows_written": 4994,
@@ -821,7 +821,7 @@
     "tfl": {
       "duration_s": 4.0,
       "error": "",
-      "fetched_at": "2026-10-25T11:06:46.400159+00:00",
+      "fetched_at": "2026-10-25T19:39:09.971514+00:00",
       "notes": "",
       "output_path": "data/environment/tfl_transport_lsoa.parquet",
       "rows_written": 4994,
