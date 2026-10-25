@@ -855,6 +855,17 @@ const smallText = page => page.evaluate(() => {
       'Bishopsgate opens with its residents and makes no comparison with the median', P.Bishopsgate.sheet);
     ok(/^Walbrook\b/.test(P.Walbrook.sheet) && /no Census figures of its own/.test(P.Walbrook.sheet) && !/median|deprived than|can expect/.test(P.Walbrook.sheet) && P.Walbrook.prof === P.Walbrook.sheet,
       'Walbrook, with no resident count, is neither ranked nor compared, in the sheet and the profile', P.Walbrook.sheet);
+    // A ward the LSOA lookup gives no LSOA takes the figures of the LSOA most
+    // of its residents live in, and says so whatever that LSOA's size.
+    const fill = await page.evaluate(() => {
+      const w = Object.values(WARD_DATA).find(x => x.name === 'Bishopsgate') || {};
+      return { from: w.lsoa_from || '', imd: (w.indicators || {}).imd_score, note: wardFitNote(w),
+        same: wardFitNote({ lsoa_from: 'E01000001', lsoa_fit: 1.05 }), plain: wardFitNote({ lsoa_fit: 1.05 }) };
+    });
+    ok(/^E01\d{6}$/.test(fill.from) && typeof fill.imd === 'number' &&
+       /no LSOA of its own.*\(E01\d{6}\), which the lookup files under a neighbouring ward\. That LSOA holds about [\d.]+ times as many residents as the ward itself\.$/.test(fill.note) &&
+       /\(E01000001\), which the lookup files under a neighbouring ward\.$/.test(fill.same) && fill.plain === '',
+      'a ward with no LSOA has its LSOA\'s figures and says where they come from, whatever that LSOA\'s size', JSON.stringify(fill));
     ok(Object.values(P).every(x => x.profH === 'H3'), 'the profile\'s "Summary" is a sibling of its section headings (h3)', Object.values(P).map(x => x.profH).join(','));
     ok(!Object.values(P).some(x => /[–—]/.test(x.sheet)), 'no dashes in the ward summaries');
     ok(plain.tiles.length === 6 && plain.cols === 3 && !plain.tiles.some(t => /Population|Avg|\+|\((?!all\)|limited a lot\)|Census 2021\))/.test(t)),
