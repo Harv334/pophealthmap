@@ -14984,6 +14984,10 @@ QOF_MSOA_PARQUET = "qof_msoa.parquet"
 # The QOF year of a file that does not state one, by its name. The GitHub
 # project's README says its outputs use the 2019/20 QOF publication.
 QOF_MSOA_PERIODS = {"output_msoa_prevalence.csv": "2019/20"}
+# The same project's estimates for each 2011 LSOA, with the register and list
+# counts behind them, for the 2021 MSOAs the ONS MSOA lookup does not list.
+QOF_MSOA_LSOA_FILES = {"output_msoa_prevalence.csv": "https://raw.githubusercontent.com/houseofcommonslibrary/"
+                       "local-health-data-from-QOF/HEAD/outputs/output_lsoa_prevalence.csv"}
 # key: (phrases that name the condition, phrases that rule a header out)
 QOF_MSOA_CONDITIONS = {
     "qof_est_af_pct":           (("atrial fibrillation",), ()),
@@ -15123,6 +15127,45 @@ def qof_msoa_bridge() -> dict:
         info(f"qof_msoa: {len(added)} MSOA(s) in scope added to the England lookup by name"
              + (f"; {len(left)} still have no 2011 parent: {', '.join(left[:10])}" if left else ""))
     return rows
+
+
+def qof_msoa_from_lsoas(missing: list, table: "pd.DataFrame") -> "pd.DataFrame":
+    """Figures for 2021 MSOAs the MSOA lookup cannot bridge, from a long
+    table of 2011 LSOAs (lsoa_code, group_code, register, list).
+
+    Each MSOA's figure is its patients on the register over its patients on
+    the list, summed across the 2011 LSOAs its 2021 LSOAs come from, so a
+    merged area is weighted by its parts' patients rather than averaged. A
+    condition is left out for an MSOA unless every one of those 2011 LSOAs has
+    it. The ONS MSOA lookup lacked 20 of London's 1,002 MSOAs (October 2026);
+    the LSOA lookup and the LSOA to MSOA lookup have them."""
+    lsoa_msoa = get_lsoa_to_msoa()
+    parents: dict = {}
+    for p11, c21, _chg in get_lsoa11_lsoa21_rows():
+        parents.setdefault(c21, set()).add(p11)
+    want = set(missing)
+    from11: dict = {}
+    for l21, m21 in lsoa_msoa.items():
+        if m21 in want:
+            from11.setdefault(m21, set()).update(parents.get(l21) or {l21})
+    t = table.copy()
+    t["key"] = t["group_code"].astype(str).str.strip().str.upper().map(QOF_MSOA_CODES)
+    t = t[t["key"].notna()]
+    t["register"] = pd.to_numeric(t["register"], errors="coerce")
+    t["list"] = pd.to_numeric(t["list"], errors="coerce")
+    t = t.dropna(subset=["register", "list"])
+    by = {(str(l).strip(), k): (r, n) for l, k, r, n in
+          zip(t["lsoa_code"], t["key"], t["register"], t["list"])}
+    rows = []
+    for m21 in sorted(from11):
+        row = {"MSOA21CD": m21}
+        for k in sorted(set(t["key"])):
+            vals = [by.get((l, k)) for l in from11[m21]]
+            if vals and all(v is not None for v in vals) and sum(v[1] for v in vals) > 0:
+                row[k] = round(100 * sum(v[0] for v in vals) / sum(v[1] for v in vals), 3)
+        if len(row) > 1:
+            rows.append(row)
+    return pd.DataFrame(rows)
 
 
 def qof_msoa_parse(tables: list, bridge=None) -> tuple:
@@ -15295,6 +15338,31 @@ def run_qof_msoa() -> "pd.DataFrame | None":
     if not got:
         raise RuntimeError(f"qof_msoa: no condition was found in {src.name}: " + "; ".join(problems[:6])
                            + ". Columns: " + ", ".join(str(c) for t in tables[:2] for c in list(t[2].columns)[:30]))
+    lsoa_url = QOF_MSOA_LSOA_FILES.get(src.name.lower())
+    if lsoa_url:
+        try:
+            have = set(out.loc[out[got].notna().any(axis=1), "MSOA21CD"])
+            missing = sorted(set(get_lsoa_to_msoa().values()) - have)
+        except Exception as e:
+            info(f"qof_msoa: the MSOAs in scope could not be listed ({type(e).__name__}: {e})")
+            missing = []
+        if missing:
+            d = cache / "lsoa"
+            d.mkdir(parents=True, exist_ok=True)
+            f = d / lsoa_url.rsplit("/", 1)[-1]
+            f = f if f.exists() else places_download(lsoa_url, f, source, min_bytes=1_000_000)
+            extra = None
+            if f:
+                try:
+                    extra = qof_msoa_from_lsoas(missing, pd.read_csv(
+                        f, usecols=["lsoa_code", "group_code", "register", "list"], dtype={"lsoa_code": str}))
+                except Exception as e:
+                    warn(f"qof_msoa: {f.name} could not be read ({type(e).__name__}: {e})")
+            if extra is not None and len(extra):
+                extra = extra[["MSOA21CD"] + [k for k in got if k in extra.columns]]
+                out = pd.concat([out[~out["MSOA21CD"].isin(extra["MSOA21CD"])], extra], ignore_index=True)
+            info(f"qof_msoa: {0 if extra is None else len(extra)} of the {len(missing)} MSOA(s) in scope "
+                 "with no figure were built from the Library's 2011 LSOA figures")
     out["period"] = (qof_period(src.name) or qof_period(" ".join(f"{t[0]} {t[1]}" for t in tables))
                      or qof_period(" ".join(str(c) for t in tables for c in t[2].columns))
                      or QOF_MSOA_PERIODS.get(src.name.lower(), ""))
