@@ -198,9 +198,11 @@ out.
   figure carries CDRC's attribution. Check the licence wording on that page
   while you are there: the fact-check found CDRC Open data but not its exact
   terms.
-- `ahah`: found on GeoDS's own record of the dataset and downloaded, if it
-  needs no login and the record names an open licence. If the manifest says
-  skipped, download the AHAH version 5.1 LSOA CSV from
+- `ahah`: found on GeoDS's own record of the dataset, or failing that its
+  page, and downloaded, if it needs no login and the record names an open
+  licence. In October 2026 GeoDS listed the files with no download address,
+  so the manifest says skipped until the file is attached by hand. Download
+  the AHAH version 5.1 LSOA CSV from
   https://data.geods.ac.uk/dataset/access-to-healthy-assets-hazards-ahah
   and attach it to `ahah-source`. The column names of 5.1 were not seen, so
   check the first run's log: it prints which column each measure was taken
@@ -218,7 +220,9 @@ out.
   illness, found on
   https://commonslibrary.parliament.uk/constituency-data-how-healthy-is-your-area/
   when the page links a spreadsheet. If skipped, download the MSOA data from
-  that dashboard and attach it to `qof-msoa-source`. Each autumn, when the
+  that dashboard and attach it to `qof-msoa-source`. The Library's GitHub
+  project `local-health-data-from-QOF` has an MSOA file too, but it is QOF
+  2019/20 and has not been updated since April 2021, so it is not used. Each autumn, when the
   Library adds a new QOF year, attach the new file the same way. The
   licence (presumed the Open Parliament Licence) was not checked.
 - `fhrs`: needs nothing. It reads FSA's API and each council's open data

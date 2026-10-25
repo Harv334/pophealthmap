@@ -221,9 +221,24 @@ class _R:
 
 
 p.browser_session = lambda **k: type("S", (), {"get": lambda self, url, timeout=None: _R()})()
-urls, lic, _v = p.ahah_find()
+urls, lic, _v, _why = p.ahah_find()
 check("GeoDS files with no address get one from their id, and only the index file is taken",
       len(urls) == 1 and "/resource/r0/download/" in urls[0] and urls[0].endswith(".csv") and lic, str(urls))
+# As the next refresh logged it: no id either, so nothing to make an address
+# from. The dataset page's own links are read next.
+bare = {"success": True, "result": {"name": "access-to-healthy-assets-hazards-ahah", "license_title":
+        "UK Open Government Licence (OGL)", "resources": [{k: v for k, v in x.items() if k != "id"} for x in geods]}}
+dl = p.AHAH_PAGE + "/resource/9f1/download/ahah_v5_1_overall_index.csv"
+page = (f'<html><a href="/about">About</a><a href="{dl}">Download</a>'
+        f'<a href="{p.AHAH_PAGE}/resource/9f2/download/ahah_v5_1_variable_dictionary.csv">Download</a></html>').encode()
+p.browser_session = lambda referer=None: Sess({p.AHAH_CKAN: Resp(js=bare), p.AHAH_PAGE: Resp(body=page)})
+urls, lic, _v, why = p.ahah_find()
+check("a record with no addresses falls back to the dataset page's links, the index file and not the dictionary",
+      urls == [dl] and lic and not why, f"{urls} {why!r}")
+p.browser_session = lambda referer=None: Sess({p.AHAH_CKAN: Resp(js=bare), p.AHAH_PAGE: Resp(body=b"<html>Log in</html>")})
+urls, lic, _v, why = p.ahah_find()
+check("and with no links there either, nothing is taken and the reason says it has to be downloaded by hand",
+      urls == [] and "downloaded by hand" in why, f"{urls} {why!r}")
 
 print("=== AHAH: the source ===")
 tmp = fresh()
@@ -248,6 +263,14 @@ r = p.run_ahah()
 check("with no file at all, the source is skipped (not failed), naming the ahah-source release and the page",
       r is None and "ahah-source" in p._SOURCE_SKIPPED.get("ahah", "") and p.AHAH_PAGE in p._SOURCE_SKIPPED["ahah"]
       and ".cache/ahah/" in p._SOURCE_SKIPPED["ahah"] and "ahah" not in p._SOURCE_ERROR)
+
+tmp = fresh()
+patch_lookups()
+p.browser_session = lambda referer=None: Sess({p.AHAH_CKAN: Resp(js=bare), p.AHAH_PAGE: Resp(body=b"<html>Log in</html>")})
+r = p.run_ahah()
+check("when GeoDS lists the files with no address, the skip note says so before saying what to attach",
+      r is None and p._SOURCE_SKIPPED.get("ahah", "").startswith("GeoDS lists the AHAH files")
+      and "ahah-source" in p._SOURCE_SKIPPED["ahah"] and "ahah" not in p._SOURCE_ERROR, p._SOURCE_SKIPPED.get("ahah", ""))
 
 tmp = fresh()
 patch_lookups()
