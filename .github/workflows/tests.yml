@@ -28,13 +28,16 @@ jobs:
       # The Census ward and LA figures, built from summed counts, checked
       # offline on synthetic tables: the rules themselves and their wiring
       # into the ward and LA builds. A fault here would otherwise surface
-      # only at the next data refresh.
+      # only at the next data refresh. The packages are the pipeline's own,
+      # from requirements.txt as the refresh installs them, because the
+      # checks run its code: shapely for scripts/build_england.py and pyproj
+      # for the distances to services, among others.
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       - name: Check the Census counts build
         run: |
-          pip install pandas numpy pyarrow requests
+          pip install -r requirements.txt
           python3 tests/pipeline/test_census_counts.py
       # The IoD 2025 figures beyond the IMD (IDACI, IDAOPI, the sub-domains
       # and the underlying indicators), from synthetic Files 7 and 8: the
@@ -42,9 +45,7 @@ jobs:
       # missing file or column is a source failure rather than a crash. The
       # real files are read only by the data refresh.
       - name: Check the IoD 2025 extras build
-        run: |
-          pip install openpyxl
-          python3 tests/pipeline/test_iod_extra.py
+        run: python3 tests/pipeline/test_iod_extra.py
       # The MSOA additions, offline on synthetic files: ONS income and
       # health state life expectancy found from their landing pages and
       # parsed, the Local Health birth weight and cancer series and their
@@ -78,7 +79,6 @@ jobs:
       # skip (never a failure) when there is no file at all.
       - name: Check the healthy places, mental health, QOF, food access and food outlet sources
         run: |
-          pip install shapely
           python3 tests/pipeline/test_ahah.py
           python3 tests/pipeline/test_samhi.py
           python3 tests/pipeline/test_qof_msoa.py
