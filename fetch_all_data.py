@@ -14969,17 +14969,21 @@ def run_samhi() -> "pd.DataFrame | None":
 # outputs is presumed to be the Open Parliament Licence; it was not checked.
 #
 # The download is found on the Library's page, by name (a spreadsheet whose
-# name or link says MSOA, health or condition), or attached by hand. The GitHub
-# project's own output is not used: it was added in April 2021 and never
-# updated, so it is QOF 2019/20 on the 2011 MSOAs, older than the map's own
-# QOF figures. Long tables (a condition column) and wide ones (a column per
-# condition) are both read, and a condition is known by its words
-# (QOF_MSOA_CONDITIONS) or, in a long table, by its QOF register code
-# (QOF_MSOA_CODES). A file on the 2011 MSOAs is bridged to the 2021 ones. The
-# parquet is national (every English MSOA); wards and LAs come from it through
-# the LSOAs, weighted by residents.
+# name or link says MSOA, health or condition), or attached by hand, and
+# failing both through the GitHub project the page links to. That project's
+# output was added in April 2021 and never updated, so it is QOF 2019/20 on the
+# 2011 MSOAs; it is kept (the owner chose it over no figures, October 2026),
+# and since the file names no year, its period comes from QOF_MSOA_PERIODS.
+# Long tables (a condition column) and wide ones (a column per condition) are
+# both read, and a condition is known by its words (QOF_MSOA_CONDITIONS) or, in
+# a long table, by its QOF register code (QOF_MSOA_CODES). A file on the 2011
+# MSOAs is bridged to the 2021 ones. The parquet is national (every English
+# MSOA); wards and LAs come from it through the LSOAs, weighted by residents.
 QOF_MSOA_PAGES = ("https://commonslibrary.parliament.uk/constituency-data-how-healthy-is-your-area/",)
 QOF_MSOA_PARQUET = "qof_msoa.parquet"
+# The QOF year of a file that does not state one, by its name. The GitHub
+# project's README says its outputs use the 2019/20 QOF publication.
+QOF_MSOA_PERIODS = {"output_msoa_prevalence.csv": "2019/20"}
 # key: (phrases that name the condition, phrases that rule a header out)
 QOF_MSOA_CONDITIONS = {
     "qof_est_af_pct":           (("atrial fibrillation",), ()),
@@ -15198,10 +15202,11 @@ def qof_msoa_parse(tables: list, bridge=None) -> tuple:
 
 def qof_msoa_find() -> list:
     """Spreadsheet links on the Library's page that look like the MSOA
-    data. The GitHub project the page links to is not searched: its output
-    is QOF 2019/20 (see above)."""
+    data, then any in the GitHub project the page links to, which are QOF
+    2019/20 (see above) and so come last."""
     sess = browser_session(referer="https://commonslibrary.parliament.uk/")
     found: list = []
+    repos: list = []
     for page in QOF_MSOA_PAGES:
         try:
             r = sess.get(page, timeout=60)
@@ -15214,8 +15219,22 @@ def qof_msoa_find() -> list:
             if re.search(r"\.(xlsx|csv|zip)(\?|$)", href, re.I) and any(
                     w in label for w in ("msoa", "health", "condition", "prevalence", "qof")):
                 found.append(href if href.startswith("http") else urllib.parse.urljoin(page, href))
+            m = re.match(r"https?://github\.com/([^/]+)/(local-health-data-from-qof[^/#?]*)", href, re.I)
+            if m:
+                repos.append((m.group(1), m.group(2)))
     found = [u for u in dict.fromkeys(found) if "github" not in u.lower()]
-    return sorted(found, key=lambda u: (0 if "msoa" in u.lower() else 1, u))
+    found.sort(key=lambda u: (0 if "msoa" in u.lower() else 1, u))
+    for owner, repo in dict.fromkeys(repos):
+        try:
+            j = requests.get(f"https://api.github.com/repos/{owner}/{repo}/git/trees/HEAD?recursive=1",
+                             timeout=60).json()
+            for t in (j.get("tree") or []):
+                path = str(t.get("path") or "")
+                if re.search(r"\.(csv|xlsx)$", path, re.I) and "msoa" in path.lower():
+                    found.append(f"https://raw.githubusercontent.com/{owner}/{repo}/HEAD/{path}")
+        except Exception as e:
+            info(f"qof_msoa: the GitHub project {owner}/{repo} did not answer ({type(e).__name__}: {e})")
+    return list(dict.fromkeys(found))
 
 
 def run_qof_msoa() -> "pd.DataFrame | None":
@@ -15256,7 +15275,8 @@ def run_qof_msoa() -> "pd.DataFrame | None":
         raise RuntimeError(f"qof_msoa: no condition was found in {src.name}: " + "; ".join(problems[:6])
                            + ". Columns: " + ", ".join(str(c) for t in tables[:2] for c in list(t[2].columns)[:30]))
     out["period"] = (qof_period(src.name) or qof_period(" ".join(f"{t[0]} {t[1]}" for t in tables))
-                     or qof_period(" ".join(str(c) for t in tables for c in t[2].columns)))
+                     or qof_period(" ".join(str(c) for t in tables for c in t[2].columns))
+                     or QOF_MSOA_PERIODS.get(src.name.lower(), ""))
     if problems:
         _SOURCE_NOTE[source] = "; ".join(problems)
         warn("qof_msoa: " + "; ".join(problems))

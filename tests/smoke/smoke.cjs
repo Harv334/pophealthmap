@@ -5688,6 +5688,11 @@ const smallText = page => page.evaluate(() => {
           timeMethod: dd('ahah_pubs_min', 'Method'), decMethod: dd('ahah_decile', 'Method'),
           samhiMethod: dd('samhi_index', 'Method'), samhiCadence: dd('samhi_index', 'Updates'),
           qofPub: dd('qof_est_diabetes_pct', 'Published at'), qofCounted: dd('qof_est_diabetes_pct', 'Counted'),
+          qofCad: (function () {
+            const pl = WARD_META.places, was = pl.qof_msoa_period, f = () => SMALL_AREA.qof_est_diabetes_pct.facts().cadence;
+            const now = f(); pl.qof_msoa_period = '2019/20'; const old = f(); pl.qof_msoa_period = was;
+            return [now, old, ovAgeNote('qof_est_diabetes_pct')];
+          })(),
           ppfiMethod: dd('ppfi_decile', 'Method'), shareCounted: dd('ppfi_priority_pct', 'Counted'),
           fhrsMethod: dd('fhrs_takeaways_per_1000', 'Method'), fhrsPub: dd('fhrs_low_hygiene_pct', 'Published at'),
           anchors: ['ahah_index', 'ahah_tobacco_min', 'samhi_decile', 'qof_est_copd_pct', 'ppfi_priority_pct', 'fhrs_pubs_per_1000'].map(_methAnchor),
@@ -5726,6 +5731,11 @@ const smallText = page => page.evaluate(() => {
         ok(/House of Commons Library estimates these for MSOAs\./.test(r.qofPub) && /in proportion to where its residents live/.test(r.qofPub) &&
            /register for diabetes/.test(r.qofCounted),
           'Healthy places and food: the QOF estimate card names the Library and how wards are made', r.qofPub);
+        // The Library's GitHub copy, the one the pipeline downloads, stopped at
+        // 2019/20: the card says so rather than promising a yearly update.
+        ok(/once a year.*these are for 2024\/25\./.test(r.qofCad[0]) && /^These are for 2019\/20, from the copy .* published in 2021 and has not updated since\.$/.test(r.qofCad[1])
+           && /^Figures end in 20\d\d, \d+ years ago$/.test(r.qofCad[2]),
+          'Healthy places and food: QOF estimates from the 2019/20 copy say so, and carry the age note', JSON.stringify(r.qofCad));
         ok(/Decile 1 is the tenth of England's LSOAs at highest risk/.test(r.ppfiMethod) && /put England's LSOAs in order again/.test(r.ppfiMethod) &&
            /deciles 1 and 2/.test(r.shareCounted),
           'Healthy places and food: the PPFI cards say decile 1 is the highest risk and how wards and LAs are made', r.ppfiMethod);

@@ -252,13 +252,37 @@ page = (f'<html><a href="/about">About</a><a href="https://example.org/other.xls
         '<a href="https://github.com/houseofcommonslibrary/local-health-data-from-QOF/blob/main/outputs/'
         'output_msoa_prevalence.csv">MSOA output (csv)</a></html>').encode()
 p.browser_session = lambda referer=None: Sess({p.QOF_MSOA_PAGES[0]: Resp(body=page), url: Resp(body=xl.read_bytes())})
+GH_RAW = ("https://raw.githubusercontent.com/houseofcommonslibrary/local-health-data-from-QOF/HEAD/"
+          "outputs/output_msoa_prevalence.csv")
+
+
+class _Tree:
+    def json(self):
+        return {"tree": [{"path": "outputs/output_msoa_prevalence.csv"}, {"path": "outputs/output_la_prevalence.csv"},
+                         {"path": "README.md"}]}
+
+
 _rget = p.requests.get
-p.requests.get = lambda *a, **kw: (_ for _ in ()).throw(AssertionError("the GitHub project was searched"))
-check("the download is found on the Library's page by its name, and the GitHub project's 2019/20 output is not used",
-      p.qof_msoa_find() == [url], str(p.qof_msoa_find()))
-p.requests.get = _rget
+p.requests.get = lambda url, timeout=None: _Tree()
+check("the download is found on the Library's page by its name, and the GitHub project's 2019/20 output comes after it",
+      p.qof_msoa_find() == [url, GH_RAW], str(p.qof_msoa_find()))
 res = p.run_qof_msoa()
 check("and is fetched and read", res is not None and len(res) == 10 and set(res["period"]) == {"2024/25"})
+
+# With no spreadsheet on the page, the GitHub project's output is read. It
+# names no year, so it takes 2019/20, the QOF year its README gives.
+tmp = fresh()
+gh_page = page.replace(f'<a href="{url}">Download the MSOA data (Excel)</a>'.encode(), b"")
+p.browser_session = lambda referer=None: Sess({p.QOF_MSOA_PAGES[0]: Resp(body=gh_page)})
+_pdl = p.places_download
+p.places_download = lambda u, dest, source, min_bytes=0: (coded.to_csv(dest, index=False), dest)[1] if u == GH_RAW else None
+res = p.run_qof_msoa()
+check("with only the GitHub project, its output is read, on the register codes, and dated 2019/20",
+      res is not None and len(res) == 10 and set(res["period"]) == {"2019/20"}
+      and len([c for c in res.columns if c.startswith("qof_est_")]) == 19,
+      "" if res is None else f"{sorted(set(res['period']))} {len(res.columns)}")
+p.requests.get = _rget
+p.places_download = _pdl
 
 print("=== wards, LAs and MSOAs ===")
 tmp = fresh()
