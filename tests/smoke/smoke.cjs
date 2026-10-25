@@ -58,11 +58,26 @@ async function axeViolations(page) {
   // that is big enough (2.5.8, Equivalent), and every marker's place can be
   // found in the Directory, the charity list and the search box. So
   // target-size is not counted for map markers here; it is for everything else.
+  // A control that floats over the map, such as the level switch, is
+  // crowded only when a marker happens to pass beneath it, which depends on
+  // where the map has moved to; with only markers beside it, it is let off
+  // for the same reason.
+  const isMarker = html => /leaflet-marker-icon/.test(String(html || '').slice(0, 200));
+  const crowding = n => [].concat(n.any || [], n.all || [], n.none || []).flatMap(c => c.relatedNodes || []);
   r.violations.forEach(v => {
-    if (v.id === 'target-size') v.nodes = v.nodes.filter(n => !/leaflet-marker-icon/.test(n.html.slice(0, 200)));
+    if (v.id !== 'target-size') return;
+    v.nodes = v.nodes.filter(n => {
+      if (isMarker(n.html)) return false;
+      const near = crowding(n);
+      return !(near.length && near.every(x => isMarker(x.html)));
+    });
   });
-  // Name the first element for each rule, so a failure says what to fix.
-  return r.violations.filter(v => v.nodes.length).map(v => v.id + ' (' + v.nodes.length + ': ' + v.nodes[0].target.join(' ') + ')');
+  // Name the first element for each rule, and for target-size what crowds
+  // it, so a failure says what to fix.
+  return r.violations.filter(v => v.nodes.length).map(v => {
+    const n = v.nodes[0], near = v.id === 'target-size' ? crowding(n)[0] : null;
+    return v.id + ' (' + v.nodes.length + ': ' + n.target.join(' ') + (near ? ', beside ' + near.target.join(' ') : '') + ')';
+  });
 }
 async function checkAxe(page, name) {
   const v = await axeViolations(page);
