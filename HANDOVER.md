@@ -21,6 +21,7 @@ Three things are worth doing anyway:
 | If a run fails | It opens an issue naming the source that broke. `data/meta/manifest.json` says what happened |
 | Once a year | Read "What will go stale" below |
 | Once, about ten minutes | Add a Stat-Xplore API key, to switch on the DWP benefit figures (see "DWP benefits" below) |
+| Once, to add food access | Download the Priority Places for Food Index with a free CDRC login and attach it to a release named `ppfi-source` (see "Healthy places, mental health, recorded illness and food" below). Until then those indicators are simply not shown |
 
 ---
 
@@ -174,6 +175,57 @@ Public transport travel times from the Urban Big Data Centre were considered
 and not added: they are for 2011 LSOAs from a 2021 timetable, a newer Zenodo
 version's contents are unknown, and the licence of the data itself could not
 be confirmed.
+
+**Healthy places, mental health, recorded illness and food** (`ahah`,
+`samhi`, `qof_msoa`, `ppfi`, `fhrs`). One source per publisher, each with its
+own manifest entry. Any of them may need a file you download in a browser:
+attach it to a GitHub release named after the source (below), and both
+refresh workflows copy it into `.cache/<source>/` before the pipeline runs.
+Without a file each is **skipped**, with a note in the manifest saying what to
+download from where and which release to attach it to; skipped does not hold
+a region pack back, so nothing breaks while you have not done it. A file that
+is there but reads wrong fails the source (and so holds region packs) and the
+log names the columns it has. Once a file has been read, its figures are kept
+until a new one arrives. To make a release: **Releases → Draft a new
+release**, tag it with the release name (for example `ppfi-source`), attach
+the file and publish. Replace the file the same way when a new version comes
+out.
+
+- `ppfi` (**needs you once**): CDRC asks for a free login, so the pipeline
+  never downloads it. Log in at https://data.cdrc.ac.uk/node/2515 (Priority
+  Places for Food Index, version 2.1), download the LSOA CSV and attach it
+  to a release named `ppfi-source`. Every file and report holding a PPFI
+  figure carries CDRC's attribution. Check the licence wording on that page
+  while you are there: the fact-check found CDRC Open data but not its exact
+  terms.
+- `ahah`: found on GeoDS's own record of the dataset and downloaded, if it
+  needs no login and the record names an open licence. If the manifest says
+  skipped, download the AHAH version 5.1 LSOA CSV from
+  https://data.geods.ac.uk/dataset/access-to-healthy-assets-hazards-ahah
+  and attach it to `ahah-source`. The column names of 5.1 were not seen, so
+  check the first run's log: it prints which column each measure was taken
+  from (`ahah: ahah_retail <- ...`), and a measure it could not match is
+  listed in the manifest notes.
+- `samhi`: downloaded from PLDR's page only when that page names an open
+  licence, because the fact-check could not confirm SAMHI's. If the manifest
+  says skipped for that reason, read the licence on
+  https://pldr.org/dataset/2noyv/small-area-mental-health-index-samhi; if it
+  allows republishing, download the version 4.00 CSV (the wide one) and
+  attach it to `samhi-source`. A file on the 2011 LSOAs is bridged to 2021
+  by itself. It overlaps the IMD's mood and anxiety measure, which the map
+  already shows.
+- `qof_msoa`: the House of Commons Library's MSOA estimates of GP-recorded
+  illness, found on
+  https://commonslibrary.parliament.uk/constituency-data-how-healthy-is-your-area/
+  when the page links a spreadsheet. If skipped, download the MSOA data from
+  that dashboard and attach it to `qof-msoa-source`. Each autumn, when the
+  Library adds a new QOF year, attach the new file the same way. The
+  licence (presumed the Open Parliament Licence) was not checked.
+- `fhrs`: needs nothing. It reads FSA's API and each council's open data
+  file. If FSA refuses GitHub's servers the manifest says skipped; then
+  download each council's XML file from https://ratings.food.gov.uk/open-data
+  and attach them all to `fhrs-source`. An LA whose file could not be had
+  fails the source, naming it, rather than showing no businesses.
 
 **Air quality** (`air_quality`). Fetched automatically: the pipeline reads the
 UK-AIR index and takes the most recent year listed for each pollutant rather

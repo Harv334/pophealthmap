@@ -329,6 +329,7 @@ const TOOLS = [
       type: "object",
       properties: {
         search: { type: "string", description: "Optional words to narrow the list, for example \"income\" or \"life expectancy\"." },
+        page: { type: "integer", description: "Which page of the list, from 1, when a result says there are more." },
       },
     },
   },

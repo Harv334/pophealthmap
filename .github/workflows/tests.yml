@@ -71,6 +71,19 @@ jobs:
       # are batched; 2011 LSOAs are bridged; rounded and withheld cells.
       - name: Check the DWP benefits client
         run: python3 tests/pipeline/test_stat_xplore.py
+      # The last small-area additions, offline on synthetic files laid out as
+      # each publisher's are: AHAH, SAMHI, the QOF estimates for MSOAs, PPFI
+      # and the FSA food hygiene register. The parsing and its checks, ward
+      # and LA figures, a file attached by hand in .cache/<source>/, and the
+      # skip (never a failure) when there is no file at all.
+      - name: Check the healthy places, mental health, QOF, food access and food outlet sources
+        run: |
+          pip install shapely
+          python3 tests/pipeline/test_ahah.py
+          python3 tests/pipeline/test_samhi.py
+          python3 tests/pipeline/test_qof_msoa.py
+          python3 tests/pipeline/test_ppfi.py
+          python3 tests/pipeline/test_fhrs.py
       # What stops a region pack being published (scripts/check_region_pack.py).
       - name: Check the region pack checks
         run: python3 tests/pipeline/test_region_pack.py

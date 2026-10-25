@@ -104,6 +104,25 @@ jobs:
           gh release download cqc-source --pattern '*' --dir .cache/cqc --clobber \
             || echo "No cqc-source release: care homes come from the CQC website."
 
+      # Files for the sources whose publishers need a login or may refuse
+      # cloud servers: AHAH (GeoDS), SAMHI (PLDR), the QOF estimates for
+      # MSOAs (House of Commons Library), PPFI (CDRC, which needs a login)
+      # and the FSA food hygiene files. A file downloaded in a browser and
+      # attached to a release named <source>-source is copied into
+      # .cache/<source>/, and the pipeline reads it in place of a download.
+      # Without one, each fetches its own file where it can, or is skipped
+      # with a note saying what to attach; none of them fails for lack of it.
+      - name: Fetch hand-downloaded files (AHAH, SAMHI, QOF by MSOA, PPFI, FSA)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for pair in ahah:ahah-source samhi:samhi-source qof_msoa:qof-msoa-source ppfi:ppfi-source fhrs:fhrs-source; do
+            dir=".cache/${pair%%:*}"; rel="${pair##*:}"
+            mkdir -p "$dir"
+            gh release download "$rel" --pattern '*' --dir "$dir" --clobber \
+              || echo "No $rel release: ${pair%%:*} fetches its own file or is skipped."
+          done
+
       # Last run's intermediates (the parquet files under data/regions/<scope>/,
       # which the published pack leaves out). Without them every region build
       # started from nothing, so carry_forward_thin, which keeps last month's
