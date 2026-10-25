@@ -8597,16 +8597,19 @@ const SMALL_WARD_POP = 1000;
 const WARD_FIT_PILL = 'Deprivation and health figures cover a slightly different area from the ward';
 function wardFitNote(rec) {
   const r = rec && Number(rec.lsoa_fit);
-  if (!(r > 0) || (r >= 0.8 && r <= 1.25)) return '';
-  const how = r < 1 ? 'about ' + Math.round(r * 100) + '% as many residents as'
+  const off = r > 0 && (r < 0.8 || r > 1.25);
+  const how = !off ? '' : r < 1 ? 'about ' + Math.round(r * 100) + '% as many residents as'
     : 'about ' + (Math.round(r * 10) / 10).toLocaleString('en-GB') + ' times as many residents as';
   // A ward the lookup gives no LSOA takes the figures of the LSOA most of
-  // its residents live in (lsoa_from, fill_wards_without_lsoa in the pipeline).
-  if (rec.lsoa_from) {
+  // its residents live in (lsoa_from, fill_wards_without_lsoa in the
+  // pipeline). That LSOA is filed under another ward, so this is said
+  // whatever its size.
+  if (rec && rec.lsoa_from) {
     return 'The ONS lookup gives this ward no LSOA of its own, so its deprivation, health and other figures ' +
-      'built from LSOAs are those of the LSOA most of its residents live in (' + rec.lsoa_from + '), which holds ' +
-      how + ' the ward itself.';
+      'built from LSOAs are those of the LSOA most of its residents live in (' + rec.lsoa_from + '), which the ' +
+      'lookup files under a neighbouring ward.' + (how ? ' That LSOA holds ' + how + ' the ward itself.' : '');
   }
+  if (!off) return '';
   return 'The LSOAs the ONS lookup gives this ward hold ' + how + ' the ward itself, so its deprivation, ' +
     'health and other figures built from LSOAs describe a noticeably different area.';
 }
