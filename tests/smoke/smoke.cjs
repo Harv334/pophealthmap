@@ -901,6 +901,12 @@ const smallText = page => page.evaluate(() => {
       'the Area profile sections take their icons from the one set');
     g = await smallText(page);
     ok(!g.length, 'nothing in the ward sheet or the Area profile is smaller than 11px', g.slice(0, 5).join(' | '));
+    // This page serves a build through page.route (CRIME_LSOA), and a report
+    // window opened from a routed page never runs its chart script there
+    // (a harness effect: with the routes lifted the six charts get their
+    // buttons). The page has its figures by now, so the routes come off for
+    // the report and go back on after it.
+    await page.unrouteAll({ behavior: 'ignoreErrors' });
     const [rep2] = await Promise.all([page.waitForEvent('popup', { timeout: 20000 }).catch(() => null), page.click('#ws-pdf')]);
     if (rep2) {
       await rep2.waitForFunction(() => !!document.querySelector('.report'), null, { timeout: 30000 }).catch(() => {});
@@ -940,6 +946,7 @@ const smallText = page => page.evaluate(() => {
         'the report footer says how to report a problem with a figure, by a pre-filled email', r2.mail);
       await rep2.close();
     } else ok(false, 'the Lansbury report opens');
+    await stripFigures(page, [], { lsoaOnly: CRIME_LSOA });
     // The LSOA profile gives the published decile band rather than "Assessment".
     const lp = await page.evaluate(async () => {
       await ensureLsoaImd();
@@ -4844,6 +4851,30 @@ const smallText = page => page.evaluate(() => {
        A.list.mean === 'la,ward' && A.list.laOnly === 'la,ward' && A.list.withheld === -1,
       'Ask levels: list_indicators says where each indicator is, and stays under the 15,000 character tool result cap', JSON.stringify(A.list));
     ok(!errors.length, 'no page errors (Ask levels)', errors.join(' | '));
+    await page.close();
+  }
+
+  // The key on an LSOA indicator chosen before the LSOA figures have arrived
+  // (a slow connection): it was written with no range and nothing wrote it
+  // again, so it read "More deprived (More deprived)" for good.
+  {
+    const { isMobile, hasTouch, ...viewport } = DESK;
+    const page = await browser.newPage({ viewport });
+    const errors = [];
+    page.on('pageerror', e => errors.push(e.message));
+    await page.route('**/lsoa_data.json*', async r => { await new Promise(res => setTimeout(res, 3000)); r.continue(); });
+    await page.goto(BASE + '/index.html?t=1');
+    await page.waitForTimeout(SETTLE);
+    await page.click('#sbtab-overlay');
+    await setOv(page, 'imd_decile');
+    const early = await page.evaluate(() => document.getElementById('sc-lo').textContent);
+    await page.waitForFunction(() => typeof LSOA_DATA === 'object' && LSOA_DATA && Object.keys(LSOA_DATA).length > 0, null, { timeout: 30000 }).catch(() => {});
+    await page.waitForTimeout(800);
+    const late = await page.evaluate(() => [document.getElementById('sc-lo').textContent, document.getElementById('sc-hi').textContent]);
+    ok(!/\((More|Less) deprived\)/.test(early) && /\d/.test(late[0]) && /\d/.test(late[1]),
+      'the key fills in its figures when the LSOA file arrives after the indicator was chosen, and never repeats its words',
+      JSON.stringify({ early, late }));
+    ok(!errors.length, 'no page errors (slow LSOA file)', errors.join(' | '));
     await page.close();
   }
 

@@ -9751,6 +9751,13 @@ function ensureLsoaData() {
           l.feature.properties.code === selLSOA ? 'selected' : 'default')));
       }
       if (typeof renderTopBottom === 'function') renderTopBottom();
+      /* And the key, as ensureMsoaData does. An indicator chosen before this
+         file arrived (a slow connection, or a link straight to an LSOA
+         indicator) had its key written with no range, "More deprived (More
+         deprived)", and nothing wrote it again once the figures came. */
+      if (curOv && curOv !== 'none' && typeof _syncScaleNumbers === 'function') {
+        try { _syncScaleNumbers(); } catch (e) { /* the next redraw will */ }
+      }
       return ld;
     });
   return _lsoaDataLoading;
@@ -18327,8 +18334,10 @@ function _syncScaleNumbers() {
   const ends = _legendEnds(range, unit.inline, _legendIsCount(meta));
   const lo = document.getElementById('sc-lo');
   const hi = document.getElementById('sc-hi');
-  if (lo) lo.textContent = `${cfg.lo} (${ends ? ends.lo : cfg.lo})`;
-  if (hi) hi.textContent = `${cfg.hi} (${ends ? ends.hi : cfg.hi})`;
+  // With no range yet (the figures still on their way) the words alone, not
+  // the words again in brackets.
+  if (lo) lo.textContent = ends ? `${cfg.lo} (${ends.lo})` : cfg.lo;
+  if (hi) hi.textContent = ends ? `${cfg.hi} (${ends.hi})` : cfg.hi;
   /* No middle number. It was the midpoint of the two ends, printed without a
      label beside a summary that quotes the median, so it read as a median it
      was not, and on a count it could be half a person. */
