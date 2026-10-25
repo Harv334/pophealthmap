@@ -14564,9 +14564,10 @@ def ahah_pick(resources: list) -> list:
 
 
 def ahah_find() -> tuple:
-    """([file urls], licence, version text) from GeoDS's record of the
-    dataset, else from the dataset page's links."""
+    """([file urls], licence, version text, why there are none) from GeoDS's
+    record of the dataset, else from the dataset page's links."""
     sess = browser_session(referer="https://data.geods.ac.uk/")
+    lic, ver, listed = "", "", 0
     for ident in AHAH_IDS:
         try:
             r = sess.get(AHAH_CKAN + ident, timeout=60)
@@ -14594,10 +14595,15 @@ def ahah_find() -> tuple:
                                               if places_version(x.get("name"))), "")
             info(f"ahah: GeoDS lists {len(res['resources'])} file(s); using {len(urls)}; licence "
                  f"{res.get('license_title') or 'not stated'}")
-            if not urls:
-                info("ahah: the files listed: " + " | ".join(
-                    f"{x.get('name') or ''} [{x.get('format') or ''}] {x.get('url') or ''}" for x in res["resources"]))
-            return urls, lic, str(ver or "")
+            if urls:
+                return urls, lic, str(ver or ""), ""
+            info("ahah: the files listed: " + " | ".join(
+                f"{x.get('name') or ''} [{x.get('format') or ''}] {x.get('url') or ''} "
+                f"(fields: {', '.join(sorted(k for k in x if x.get(k)))})" for x in res["resources"]))
+            # The October 2026 refresh found the record's files with no
+            # address and no id to make one from, so the page is tried next.
+            listed = len(res["resources"])
+            break
     try:
         r = sess.get(AHAH_PAGE, timeout=60)
         r.raise_for_status()
@@ -14605,10 +14611,15 @@ def ahah_find() -> tuple:
                  for h in re.findall(r'href="([^"]+)"', r.text)]
         res = [{"url": u, "name": urllib.parse.unquote(u.rsplit("/", 1)[-1])} for u in dict.fromkeys(links)
                if re.search(r"\.(csv|zip|parquet|xlsx)(\?|$)", u, re.I)]
-        return ahah_pick(res), places_licence(r.text), ""
+        urls = ahah_pick(res)
+        info(f"ahah: the dataset page links {len(res)} data file(s); using {len(urls)}")
+        lic = lic or places_licence(r.text)
     except Exception as e:
         info(f"ahah: {AHAH_PAGE} did not answer ({type(e).__name__}: {e})")
-    return [], "", ""
+        urls = []
+    why = ("GeoDS lists the AHAH files, but neither its record nor the dataset page gives an address the "
+           "pipeline can download from, so the file has to be downloaded by hand") if listed and not urls else ""
+    return urls, lic, str(ver or ""), why
 
 
 def ahah_parse(tables: list) -> tuple:
@@ -14720,11 +14731,11 @@ def run_ahah() -> "pd.DataFrame | None":
     # older version left in the cache is not read beside a newer one.
     if files:
         files = [f for f in files if f.stat().st_mtime >= files[0].stat().st_mtime - 3600][:4]
-    licence, version = "", ""
+    licence, version, why = "", "", ""
     if files:
         info(f"ahah: reading {', '.join(p.name for p in files)} from {cache}")
     else:
-        urls, licence, version = ahah_find()
+        urls, licence, version, why = ahah_find()
         if urls and not licence:
             return places_skip(source, "the AHAH LSOA file (version 5.1 or later, CSV)", AHAH_PAGE,
                                why="GeoDS's record of AHAH names no open licence, so its figures are "
@@ -14739,7 +14750,7 @@ def run_ahah() -> "pd.DataFrame | None":
         kept = places_keep(source, out_path, "no AHAH file could be had this run")
         if kept is not None:
             return kept
-        return places_skip(source, "the AHAH LSOA file (version 5.1 or later, CSV)", AHAH_PAGE)
+        return places_skip(source, "the AHAH LSOA file (version 5.1 or later, CSV)", AHAH_PAGE, why=why)
     tables = []
     for f in files[:4]:
         try:
@@ -14958,12 +14969,15 @@ def run_samhi() -> "pd.DataFrame | None":
 # outputs is presumed to be the Open Parliament Licence; it was not checked.
 #
 # The download is found on the Library's page, by name (a spreadsheet whose
-# name or link says MSOA, health or condition), and failing that through the
-# GitHub project the page links to; the file's layout was not seen, so long
-# tables (a condition column) and wide ones (a column per condition) are both
-# read, and a condition is known by its words (QOF_MSOA_CONDITIONS). A file on
-# the 2011 MSOAs is refused. The parquet is national (every English MSOA);
-# wards and LAs come from it through the LSOAs, weighted by residents.
+# name or link says MSOA, health or condition), or attached by hand. The GitHub
+# project's own output is not used: it was added in April 2021 and never
+# updated, so it is QOF 2019/20 on the 2011 MSOAs, older than the map's own
+# QOF figures. Long tables (a condition column) and wide ones (a column per
+# condition) are both read, and a condition is known by its words
+# (QOF_MSOA_CONDITIONS) or, in a long table, by its QOF register code
+# (QOF_MSOA_CODES). A file on the 2011 MSOAs is bridged to the 2021 ones. The
+# parquet is national (every English MSOA); wards and LAs come from it through
+# the LSOAs, weighted by residents.
 QOF_MSOA_PAGES = ("https://commonslibrary.parliament.uk/constituency-data-how-healthy-is-your-area/",)
 QOF_MSOA_PARQUET = "qof_msoa.parquet"
 # key: (phrases that name the condition, phrases that rule a header out)
@@ -14990,6 +15004,18 @@ QOF_MSOA_CONDITIONS = {
     "qof_est_stroke_pct":       (("stroke", "tia"), ()),
 }
 QOF_MSOA_KEYS = tuple(QOF_MSOA_CONDITIONS)
+# QOF's register codes, as a long table's condition column may give them (the
+# Library's GitHub output did). CVDPP (CVD primary prevention) and PC
+# (palliative care) are registers but not among the twenty.
+QOF_MSOA_CODES = {
+    "AF": "qof_est_af_pct", "AST": "qof_est_asthma_pct", "CAN": "qof_est_cancer_pct",
+    "CHD": "qof_est_chd_pct", "CKD": "qof_est_ckd_pct", "COPD": "qof_est_copd_pct",
+    "DEM": "qof_est_dementia_pct", "DEP": "qof_est_depression_pct", "DM": "qof_est_diabetes_pct",
+    "EP": "qof_est_epilepsy_pct", "HF": "qof_est_hf_pct", "HYP": "qof_est_hypertension_pct",
+    "LD": "qof_est_ld_pct", "MH": "qof_est_smi_pct", "NDH": "qof_est_ndh_pct",
+    "OB": "qof_est_obesity_pct", "OST": "qof_est_osteoporosis_pct", "PAD": "qof_est_pad_pct",
+    "RA": "qof_est_ra_pct", "STIA": "qof_est_stroke_pct",
+}
 # Headers that are about a figure rather than the figure.
 _QOF_NOT_VALUE = ("number", "count", "patients", "register size", "list size", "lower", "upper",
                   "confidence", "rank", "decile", "name", "code", "region", "constituency", "population",
@@ -15094,12 +15120,13 @@ def qof_msoa_parse(tables: list, bridge=None) -> tuple:
         d = df[keep]
         all_codes |= set(codes[keep])
         cols = [c for c in d.columns if c != code_col and isinstance(c, str)]
-        # Long: a column of condition names beside one of figures. A column
-        # of figures has thousands of distinct values and is not read word
-        # by word.
+        # Long: a column of condition names or register codes beside one of
+        # figures. A column of figures has thousands of distinct values and is
+        # not read word by word.
         def cond_of(series):
             u = series.astype(str).unique()
-            return None if len(u) > 200 else series.astype(str).map({v: qof_condition(v) for v in u})
+            return None if len(u) > 200 else series.astype(str).map(
+                {v: QOF_MSOA_CODES.get(v.strip().upper()) or qof_condition(v) for v in u})
         conds = {c: cond_of(d[c]) for c in cols}
         cond_col = next((c for c in cols if conds[c] is not None and conds[c].notna().mean() > 0.5), None)
         if cond_col is not None:
@@ -15171,10 +15198,10 @@ def qof_msoa_parse(tables: list, bridge=None) -> tuple:
 
 def qof_msoa_find() -> list:
     """Spreadsheet links on the Library's page that look like the MSOA
-    data, then any in the GitHub project the page links to."""
+    data. The GitHub project the page links to is not searched: its output
+    is QOF 2019/20 (see above)."""
     sess = browser_session(referer="https://commonslibrary.parliament.uk/")
     found: list = []
-    repos: list = []
     for page in QOF_MSOA_PAGES:
         try:
             r = sess.get(page, timeout=60)
@@ -15187,20 +15214,7 @@ def qof_msoa_find() -> list:
             if re.search(r"\.(xlsx|csv|zip)(\?|$)", href, re.I) and any(
                     w in label for w in ("msoa", "health", "condition", "prevalence", "qof")):
                 found.append(href if href.startswith("http") else urllib.parse.urljoin(page, href))
-            m = re.match(r"https?://github\.com/([^/]+)/(local-health-data-from-qof[^/#?]*)", href, re.I)
-            if m:
-                repos.append((m.group(1), m.group(2)))
-    for owner, repo in dict.fromkeys(repos):
-        try:
-            j = requests.get(f"https://api.github.com/repos/{owner}/{repo}/git/trees/HEAD?recursive=1",
-                             timeout=60).json()
-            for t in (j.get("tree") or []):
-                path = str(t.get("path") or "")
-                if re.search(r"\.(csv|xlsx)$", path, re.I) and "msoa" in path.lower():
-                    found.append(f"https://raw.githubusercontent.com/{owner}/{repo}/HEAD/{path}")
-        except Exception as e:
-            info(f"qof_msoa: the GitHub project {owner}/{repo} did not answer ({type(e).__name__}: {e})")
-    found = list(dict.fromkeys(found))
+    found = [u for u in dict.fromkeys(found) if "github" not in u.lower()]
     return sorted(found, key=lambda u: (0 if "msoa" in u.lower() else 1, u))
 
 

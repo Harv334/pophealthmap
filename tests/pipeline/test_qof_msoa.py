@@ -149,6 +149,27 @@ check("a condition column beside a prevalence column reads the same",
       len([k for k in p.QOF_MSOA_KEYS if k in ol.columns]) == 20 and ol.loc["E02006942", "qof_est_copd_pct"] == val("COPD", 9),
       f"{prob_l} {m_l.get('qof_est_copd_pct')}")
 check("the patient counts are not taken for the figure", m_l["qof_est_copd_pct"].endswith("Condition / Prevalence (%)"))
+# QOF's register codes in place of names, with the register and list sizes
+# beside a proportion, as the Library's GitHub output had them. Only CHD, CKD,
+# COPD and PAD are also words, too few to mark the column without the codes.
+CODES = {"AST": "Asthma", "AF": "Atrial fibrillation", "CAN": "Cancer", "CHD": "Coronary heart disease (CHD)",
+         "CKD": "Chronic kidney disease (CKD)", "COPD": "COPD", "DEM": "Dementia", "DEP": "Depression",
+         "DM": "Diabetes", "EP": "Epilepsy", "HF": "Heart failure", "HYP": "Hypertension",
+         "LD": "Learning disability", "MH": "Mental health", "OB": "Obesity", "OST": "Osteoporosis",
+         "PAD": "Peripheral arterial disease", "RA": "Rheumatoid arthritis", "STIA": "Stroke and TIA",
+         "PC": "Palliative care", "CVDPP": "Palliative care"}
+coded = pd.DataFrame([{"msoa_code": m, "group_code": g, "register": val(c, i) * 80, "list": 8000.0,
+                       "prevalence": val(c, i) / 100, "msoa11nm": f"Place {i:03d}", "Laname": "Somewhere"}
+                      for g, c in CODES.items() for i, m in enumerate(MSOAS)])
+out_c, prob_c, m_c = p.qof_msoa_parse([("output_msoa_prevalence", "", coded.astype(str))])
+oc = out_c.set_index("MSOA21CD")
+check("a column of QOF register codes marks the conditions: 19, as NDH has no code in the file",
+      sorted(k for k in p.QOF_MSOA_KEYS if k in oc.columns) == sorted(k for k in p.QOF_MSOA_KEYS if k != "qof_est_ndh_pct"),
+      f"{prob_c} {sorted(oc.columns)}")
+check("the figure is the prevalence as a percentage, not the register or list size",
+      abs(oc.loc["E02000004", "qof_est_diabetes_pct"] - val("Diabetes", 3)) < 1e-6
+      and m_c["qof_est_diabetes_pct"].endswith("group_code / prevalence"), str(m_c.get("qof_est_diabetes_pct")))
+check("palliative care and CVD primary prevention are registers but not taken", len(oc.columns) == 19)
 
 print("=== what is refused ===")
 old = wide()
@@ -226,9 +247,16 @@ with pd.ExcelWriter(xl) as xw:
     wide().to_excel(xw, sheet_name="MSOAs", index=False)
 url = "https://commonslibrary.parliament.uk/wp-content/uploads/2026/03/Health-conditions-MSOA-2024-25.xlsx"
 page = (f'<html><a href="/about">About</a><a href="https://example.org/other.xlsx">Population data (Excel)</a>'
-        f'<a href="{url}">Download the MSOA data (Excel)</a></html>').encode()
+        f'<a href="{url}">Download the MSOA data (Excel)</a>'
+        '<a href="https://github.com/houseofcommonslibrary/local-health-data-from-QOF">Method and code</a>'
+        '<a href="https://github.com/houseofcommonslibrary/local-health-data-from-QOF/blob/main/outputs/'
+        'output_msoa_prevalence.csv">MSOA output (csv)</a></html>').encode()
 p.browser_session = lambda referer=None: Sess({p.QOF_MSOA_PAGES[0]: Resp(body=page), url: Resp(body=xl.read_bytes())})
-check("the download is found on the Library's page by its name", p.qof_msoa_find() == [url], str(p.qof_msoa_find()))
+_rget = p.requests.get
+p.requests.get = lambda *a, **kw: (_ for _ in ()).throw(AssertionError("the GitHub project was searched"))
+check("the download is found on the Library's page by its name, and the GitHub project's 2019/20 output is not used",
+      p.qof_msoa_find() == [url], str(p.qof_msoa_find()))
+p.requests.get = _rget
 res = p.run_qof_msoa()
 check("and is fetched and read", res is not None and len(res) == 10 and set(res["period"]) == {"2024/25"})
 
