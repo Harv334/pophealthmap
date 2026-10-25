@@ -10,7 +10,6 @@ name: Build region (pilot)
 #
 # The London-only sources are skipped until they have national replacements:
 #   tfl          TfL StopPoint covers London only; the naptan source gives regions the same measures
-#   ptal         GLA LSOA Atlas, London only
 
 on:
   workflow_dispatch:
@@ -92,6 +91,37 @@ jobs:
             || echo "No pcn-source release: PCNs will be built without catchments."
           ls -la .cache/gp_reg
 
+      # CQC's care directory, for care home beds. The pipeline finds the file
+      # on cqc.org.uk itself; if CQC refuses cloud servers, as NHS Digital
+      # does, a copy downloaded in a browser can be attached to a cqc-source
+      # release, and the pipeline uses it when the page cannot be read.
+      - name: Fetch the CQC care directory fallback (for care home beds)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p .cache/cqc
+          gh release download cqc-source --pattern '*' --dir .cache/cqc --clobber \
+            || echo "No cqc-source release: care homes come from the CQC website."
+
+      # Files for the sources whose publishers need a login or may refuse
+      # cloud servers: AHAH (GeoDS), SAMHI (PLDR), the QOF estimates for
+      # MSOAs (House of Commons Library), PPFI (CDRC, which needs a login)
+      # and the FSA food hygiene files. A file downloaded in a browser and
+      # attached to a release named <source>-source is copied into
+      # .cache/<source>/, and the pipeline reads it in place of a download.
+      # Without one, each fetches its own file where it can, or is skipped
+      # with a note saying what to attach; none of them fails for lack of it.
+      - name: Fetch hand-downloaded files (AHAH, SAMHI, QOF by MSOA, PPFI, FSA)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for pair in ahah:ahah-source samhi:samhi-source qof_msoa:qof-msoa-source ppfi:ppfi-source fhrs:fhrs-source; do
+            dir=".cache/${pair%%:*}"; rel="${pair##*:}"
+            mkdir -p "$dir"
+            gh release download "$rel" --pattern '*' --dir "$dir" --clobber \
+              || echo "No $rel release: ${pair%%:*} fetches its own file or is skipped."
+          done
+
       # Last run's intermediates (the parquet files under data/regions/<scope>/,
       # which the published pack leaves out). Without them every region build
       # started from nothing, so carry_forward_thin, which keeps last month's
@@ -115,7 +145,11 @@ jobs:
       - name: Run pipeline for the region
         # -u: unbuffered, so the log shows each source as it runs. Buffered, a
         # slow source left the log silent for hours with no clue which it was.
-        run: python -u fetch_all_data.py --scope "${{ inputs.scope }}" --skip tfl ptal
+        # The Stat-Xplore key for the DWP benefits (HANDOVER.md); without the
+        # secret those sources are skipped, not failed.
+        env:
+          STAT_XPLORE_API_KEY: ${{ secrets.STAT_XPLORE_API_KEY }}
+        run: python -u fetch_all_data.py --scope "${{ inputs.scope }}" --skip tfl
 
       # The loading screen's ward map for this region (map/loader.js), drawn
       # from the wards and IMD the pipeline has just written.

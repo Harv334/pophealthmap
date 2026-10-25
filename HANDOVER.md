@@ -20,6 +20,8 @@ Three things are worth doing anyway:
 | Monthly, one minute | Open **Actions** and check the last "Refresh data" run is green |
 | If a run fails | It opens an issue naming the source that broke. `data/meta/manifest.json` says what happened |
 | Once a year | Read "What will go stale" below |
+| Once, about ten minutes | Add a Stat-Xplore API key, to switch on the DWP benefit figures (see "DWP benefits" below) |
+| Once, to add food access | Download the Priority Places for Food Index with a free CDRC login and attach it to a release named `ppfi-source` (see "Healthy places, mental health, recorded illness and food" below). Until then those indicators are simply not shown |
 
 ---
 
@@ -75,9 +77,36 @@ bottom of `fetch_all_data.py` and in `data/meta/manifest.json`.
 automatically, by profile rather than by a list of indicator ids. Both the ids
 and the names come from the API, so an indicator cannot end up on the map
 under the wrong label, which is what happened when that list was maintained by
-hand. To re-run: `python fetch_all_data.py --only fingertips_profiles`. Set
-`FINGERTIPS_PER_PROFILE` to change how many indicators are taken from each
+hand. Which of each profile's indicators are taken is the list in
+`data/curated/fingertips_profile_indicators.csv`, by Fingertips' own name; a
+name the profile no longer has is logged as "wanted indicator not found in
+profile N's metadata", and the fix is to edit that row (or remove it). To
+re-run: `python fetch_all_data.py --only fingertips_profiles`. Set
+`FINGERTIPS_PER_PROFILE` to change the cap on how many are taken from each
 profile.
+
+**Local Health, birth weight and cancer** (`fingertips_msoa_extra`). Fetched
+automatically, in a source of its own. Each of the six series ships only if
+OHID publishes figures for at least half of the region's MSOAs with narrow
+enough intervals; the log says `ships` or `not shipped` with the reason for
+each, and `data/outcomes/fingertips_msoa_extra_checks.json` keeps the
+verdicts. A series that is not shipped for the publisher's reasons is a known
+gap, not a failure, and needs nobody. "Skipped" in the manifest means none
+shipped. "Failed" means a download failed with no earlier figures to keep, or
+an id now holds a differently named indicator (check the id in
+`FINGERTIPS_MSOA_EXTRA`). To re-run: `python fetch_all_data.py --only
+fingertips_msoa_extra`.
+
+**Household income and health state life expectancy** (`saie`, `hle_msoa`).
+ONS releases found on their dataset pages, then static once their parquets
+(`data/demographics/saie_msoa.parquet`, `data/outcomes/hle_msoa.parquet`) hold
+every column. The log lists each match as `<key> <- '<sheet>: <header>'` and
+names the edition taken. For a file it cannot find, download the newest
+spreadsheet from the ONS dataset page into `.cache/saie/` or `.cache/hle_msoa/`
+(or set `SAIE_URL` or `HLE_MSOA_URL`) and run
+`python fetch_all_data.py --only saie hle_msoa`. For a header that changed,
+edit the words in `SAIE_MEASURES` or `HLE_MEASURES`. To take a new edition,
+delete the parquet and run the source again.
 
 **Fuel poverty** (`fuel_poverty`). Fetched automatically: the pipeline reads
 the gov.uk collection, picks the newest sub-regional release by the year in
@@ -87,6 +116,116 @@ download the newest sub-regional fuel poverty tables (.xlsx) from
 https://www.gov.uk/government/collections/fuel-poverty-sub-regional-statistics
 into `.cache/fuel_poverty/`, then run
 `python fetch_all_data.py --only fuel_poverty`.
+
+**IoD 2025 beyond the IMD** (`iod_extra`, `iod_indicators`). Fetched
+automatically until the two parquets in `data/demographics/` hold every
+column, then static like the IMD. The pipeline finds File 7 (IDACI, IDAOPI,
+sub-domains) and File 8 (underlying indicators) on the release page through
+the gov.uk content API and matches every column by the words in its header.
+A failure names what was missing: a file it could not download, or a column
+it could not find, found twice, or found running the wrong way for its
+domain. The run log lists each match as `<key> <- '<header>'`. For a missing
+file, download it from
+https://www.gov.uk/government/statistics/english-indices-of-deprivation-2025
+into `.cache/iod2025/` (or set `IOD_FILE7_URL` or `IOD_FILE8_URL`) and run
+`python fetch_all_data.py --only iod_extra iod_indicators`. For a column
+whose header changed, edit its keywords in `IOD_FILE7_FIELDS` or
+`IOD_FILE8_SPECS`. An indicator the 2025 release does not publish (staying on
+after 16 and homes without central heating may be gone) keeps failing until
+its spec and its registry entries in `index.html` are removed; until then the
+map leaves it out because it has no figures.
+
+**The small-area additions** (`sape`, `claimant_youth`, `road_casualties`,
+`care_homes`, `service_access`). Each has its own entry in the manifest, so
+one that fails holds back only itself. But the region pack check
+(`scripts/check_region_pack.py`) refuses any pack with a failed or partial
+source, and the monthly region refresh passes no `allow_sources`, so a new
+source failing on a region holds that region's whole pack until it is fixed
+or the region is rebuilt by hand with `allow_sources` naming it. "Skipped" is
+not held: `claimant_youth` is skipped, with the reason in the manifest, when
+Nomis does not publish the 18 to 24 band for LSOAs.
+
+- `sape`: the newest LSOA single year of age file on ONS's dataset page. If
+  ONS refuses the runner, download it from
+  https://www.ons.gov.uk/peoplepopulationandcommunity/populationandmigration/populationestimates/datasets/lowersuperoutputareamidyearpopulationestimates
+  into `.cache/sape/` (or set `SAPE_URL`) and run
+  `python fetch_all_data.py --only sape`. A sheet whose single years do not
+  add up to its total is refused as misread.
+- `claimant_youth`: the 18 to 24 code is read from Nomis's age codelist by
+  name. Skipped is the expected outcome if Nomis does not publish it for
+  LSOAs; the indicator then stays off the map.
+- `road_casualties`: DfT's five-year casualty file, found on the data.gov.uk
+  road safety page or at its usual address (`STATS19_CASUALTY_URL`
+  overrides). A file without `casualty_adjusted_severity_serious` fails
+  rather than mixing adjusted and unadjusted figures.
+- `care_homes`: the care directory with filters, found on CQC's "Using CQC
+  data" page. If CQC refuses the runner, download the file in a browser and
+  attach it to a release called `cqc-source`; both refresh workflows copy it
+  into `.cache/cqc/`. The column names (`Location ID`, `Care home?`,
+  `Care homes beds`, `Dormant (Y/N)`) were not checked against a current
+  file, so check the first run's log: a missing column fails and names the
+  columns the file has.
+- `service_access`: needs no download. It runs after `gp`, `pharmacies` and
+  `dentists`, which leave every site in England in `.cache/service_access/`.
+  Run on its own without those files it measures only to the scope's own
+  sites and is marked partial: run `--only gp pharmacies dentists
+  service_access` instead.
+
+Public transport travel times from the Urban Big Data Centre were considered
+and not added: they are for 2011 LSOAs from a 2021 timetable, a newer Zenodo
+version's contents are unknown, and the licence of the data itself could not
+be confirmed.
+
+**Healthy places, mental health, recorded illness and food** (`ahah`,
+`samhi`, `qof_msoa`, `ppfi`, `fhrs`). One source per publisher, each with its
+own manifest entry. Any of them may need a file you download in a browser:
+attach it to a GitHub release named after the source (below), and both
+refresh workflows copy it into `.cache/<source>/` before the pipeline runs.
+Without a file each is **skipped**, with a note in the manifest saying what to
+download from where and which release to attach it to; skipped does not hold
+a region pack back, so nothing breaks while you have not done it. A file that
+is there but reads wrong fails the source (and so holds region packs) and the
+log names the columns it has. Once a file has been read, its figures are kept
+until a new one arrives. To make a release: **Releases → Draft a new
+release**, tag it with the release name (for example `ppfi-source`), attach
+the file and publish. Replace the file the same way when a new version comes
+out.
+
+- `ppfi` (**needs you once**): CDRC asks for a free login, so the pipeline
+  never downloads it. Log in at https://data.cdrc.ac.uk/node/2515 (Priority
+  Places for Food Index, version 2.1), download the LSOA CSV and attach it
+  to a release named `ppfi-source`. Every file and report holding a PPFI
+  figure carries CDRC's attribution. Check the licence wording on that page
+  while you are there: the fact-check found CDRC Open data but not its exact
+  terms.
+- `ahah`: found on GeoDS's own record of the dataset and downloaded, if it
+  needs no login and the record names an open licence. If the manifest says
+  skipped, download the AHAH version 5.1 LSOA CSV from
+  https://data.geods.ac.uk/dataset/access-to-healthy-assets-hazards-ahah
+  and attach it to `ahah-source`. The column names of 5.1 were not seen, so
+  check the first run's log: it prints which column each measure was taken
+  from (`ahah: ahah_retail <- ...`), and a measure it could not match is
+  listed in the manifest notes.
+- `samhi`: downloaded from PLDR's page only when that page names an open
+  licence, because the fact-check could not confirm SAMHI's. If the manifest
+  says skipped for that reason, read the licence on
+  https://pldr.org/dataset/2noyv/small-area-mental-health-index-samhi; if it
+  allows republishing, download the version 4.00 CSV (the wide one) and
+  attach it to `samhi-source`. A file on the 2011 LSOAs is bridged to 2021
+  by itself. It overlaps the IMD's mood and anxiety measure, which the map
+  already shows.
+- `qof_msoa`: the House of Commons Library's MSOA estimates of GP-recorded
+  illness, found on
+  https://commonslibrary.parliament.uk/constituency-data-how-healthy-is-your-area/
+  when the page links a spreadsheet. If skipped, download the MSOA data from
+  that dashboard and attach it to `qof-msoa-source`. Each autumn, when the
+  Library adds a new QOF year, attach the new file the same way. The
+  licence (presumed the Open Parliament Licence) was not checked.
+- `fhrs`: needs nothing. It reads FSA's API and each council's open data
+  file. If FSA refuses GitHub's servers the manifest says skipped; then
+  download each council's XML file from https://ratings.food.gov.uk/open-data
+  and attach them all to `fhrs-source`. An LA whose file could not be had
+  fails the source, naming it, rather than showing no businesses.
 
 **Air quality** (`air_quality`). Fetched automatically: the pipeline reads the
 UK-AIR index and takes the most recent year listed for each pollutant rather
@@ -104,30 +243,108 @@ requests a minute and this takes 43, so the pipeline paces itself; set
 unreachable the previous file is kept. Re-run with
 `python fetch_all_data.py --only tfl`.
 
-**PTAL** (`ptal`). Fetched automatically. The download URL carries a resource
-id that changes whenever the GLA republish, so the pipeline asks the Datastore
-API which file is current rather than remembering one. Only if the automatic
-route fails, download the LSOA Atlas CSV from
-https://data.london.gov.uk/dataset/lsoa-atlas to
-`.cache/ptal/lsoa_atlas.csv`, then run `python fetch_all_data.py --only ptal`.
-
 **PCN catchments** (`pcn`). NHS Digital's site refuses requests from cloud
 hosting, so the *Patients Registered at a GP Practice* file by LSOA has to be
 downloaded in a browser and attached to the build. Without it, PCNs show their
 practices but no catchment (`has_catchments` is false in
 `data/map/pcn.json`).
 
-**DWP benefits** (no source key; withdrawn). Retired rather than broken. The
-pipeline had been asking NOMIS for five dataset ids that turned out to be an
-occupation survey, a business register and an employment survey rather than
-benefits, which is why every request returned an empty body while still
-answering 200. Looking the real ones up by name settles it: PIP and Universal
-Credit are not on NOMIS in any form, and ESA, Pension Credit, Carer's
-Allowance, DLA and Attendance Allowance all stop at November 2018 on
-small-area geographies that predate LSOA 2021. The live figures are on DWP
-Stat-Xplore, which needs a registered API key and its own query language, so
-adding them back means writing a new client rather than repairing the old
-one. The claimant count (`claimant`, NOMIS CLA01) is unaffected.
+**DWP benefits** (`dwp_uc_people`, `dwp_uc_households`, `dwp_pip`,
+`dwp_dla_children`, `dwp_attendance_allowance`, `dwp_carers_allowance`,
+`dwp_pension_credit`, `dwp_cilif`). See "DWP benefits" below. Until a key is
+added all eight are `skipped`, which is expected and opens no issue. With a
+key, a failure names what was wrong: a refused key, an error from
+Stat-Xplore, or a database or field whose label no longer matches (the
+message lists the nearest labels it found). Re-run with
+`python fetch_all_data.py --only dwp_uc_people` (and so on), with
+`STAT_XPLORE_API_KEY` set in your shell.
+
+### DWP benefits
+
+Universal Credit, Personal Independence Payment (PIP), Disability Living
+Allowance for children, Attendance Allowance, Carer's Allowance, Pension Credit
+and children in relative low income families come from DWP's Stat-Xplore. Its
+API needs a free key that belongs to a person, so the pipeline cannot get one
+by itself. Until you add one, these figures are not fetched and the map does
+not offer them.
+
+**To switch them on:**
+
+1. Register for a free account at https://stat-xplore.dwp.gov.uk (the
+   registration link is on the login page), and confirm it from the email
+   Stat-Xplore sends.
+2. Sign in and copy your API key. It is shown on your account page once you
+   are signed in; Stat-Xplore's help pages, under "Open Data API", say where.
+3. In this repository on GitHub, open **Settings**, then **Secrets and
+   variables**, then **Actions**, and choose **New repository secret**. Name
+   it `STAT_XPLORE_API_KEY` exactly, paste the key as the value, and save.
+4. Open **Actions**, choose **Refresh data** and **Run workflow** (or wait for
+   the 15th). **Refresh regions** passes the same secret to each region's
+   build, so the regions pick it up too.
+
+The key goes only to the pipeline step of `refresh-data.yml` and
+`build-region.yml`; nothing else in the workflows sees it. If you replace the
+key, update the secret; nothing else changes.
+
+**What the run log says.** Without a key, each of the eight sources prints
+its heading ("DWP Stat-Xplore: people on Universal Credit (LSOA)" and so on)
+and one line, `dwp_uc_people: skipped, no Stat-Xplore API key, ...`, and the
+manifest records `"status": "skipped"` with a note saying the same. With a
+key, the first source prints how many databases Stat-Xplore lists, and each
+source then prints the ids it chose, for example:
+
+```
+[..] dwp_uc_people: database str:database:... ('People on Universal Credit', in Universal Credit)
+[..] dwp_uc_people: measure ...; date field ... ('Month'), latest ... (May 2026)
+[..] dwp_uc_people: LSOA level ... ('National - Regional - LA - OAs, Lower Layer Super Output Areas') in field ...
+[..] dwp_uc_people: the LSOA values are 2021 LSOAs (...); 4,994 of the 4,994 this scope needs are there
+[..] dwp_uc_people: 4,994 LSOA values in 5 table request(s) of at most 1,000 (1 cell(s) each)
+[OK] dwp_uc_people: 4,994 LSOAs, May 2026, ... people on Universal Credit (... requests) -> data/economy/dwp_uc_people_lsoa.parquet
+```
+
+On that first run, check four things: that each database named is the one
+you would expect (the labels are matched by pattern, in `SX_DATABASES`);
+that the date is the newest release; whether each benefit's LSOAs are "2021"
+or "2011" (2011 ones are moved onto 2021 LSOAs through the ONS lookup, which
+is expected for some of the older benefits); and how many cells are
+"withheld or blank". In London each LSOA source should write 4,994 rows, one
+per LSOA, and `dwp_cilif` one row per ward of each LA it could match. The
+export then logs `small-area additions -> wards: dwp_uc_people_pct ...` with a
+count for each new key, and the map offers them from that build on.
+
+**Things that are expected to need a look.** The fact checks behind these
+sources could not reach Stat-Xplore, so a few points are unconfirmed and the
+pipeline handles them either way:
+
+- PIP by main disabling condition may not be published for LSOAs. If not,
+  `dwp_pip` is ok with a note, and only the three condition figures are left
+  out.
+- Universal Credit households: the payment filter is used only if a field
+  offers an "In payment" value. The log says which.
+- Limited capability for work is taken twelve months before the newest
+  month, because assessments are backdated (`SX_LCW_LAG_MONTHS`).
+- PIP, DLA, Attendance Allowance, Carer's Allowance and Pension Credit are
+  shown for wards and LAs only. If the log shows they are on 2021 LSOAs with
+  few withheld cells, their LSOA figures can be switched on by setting the
+  fourth value of their row in `DWP_SHARES` to `True` and giving their
+  `CATS` rows in index.html `g: "lsoa", lv: ["ward","lsoa"]`.
+- Stat-Xplore caps the cells in one table. `SX_MAX_CELLS` and `SX_GEO_BATCH`
+  keep each request small; lower them if Stat-Xplore refuses a table as too
+  big.
+
+**Children in low income families and ward boundaries.** DWP publishes these
+for wards, not LSOAs, and its ward boundaries can lag the 2025 wards the map
+uses. The pipeline matches DWP's wards to the map's by code and uses an LA
+only when every one of its 2025 wards is there; the manifest note names any
+LA left out, and if none matches the source is skipped. It does not force an
+older ward onto a newer one, because a redrawn ward is a different place. To
+use older wards properly you would need to share each old ward's count among
+the new wards that overlap it, weighted by where its children live: the ONS
+output area to ward best-fit lookups for both ward years, and the Census 2021
+children aged 0 to 15 for each output area, give the weights. Until then the
+simplest course is to wait for DWP's next release (each spring), which
+usually moves to the latest wards. OHID's LA figure for the same measure stays
+on the map either way.
 
 ### Rebuilding every region and the England view
 

@@ -66,6 +66,30 @@ with tempfile.TemporaryDirectory() as t:
     listed = pack(t / "listed", stats_keys=("imd_score", "ft_93283"), gaps=["ft_93250"])
     check("unless it is listed as a known gap", crp.check(listed, "listed", None, london) == [])
 
+    # London gains low birth weight from a source added later
+    # (fingertips_msoa_extra). A pack built before that source existed is not
+    # held back for lacking it; a pack built since must have it or list it.
+    (london / "data" / "outcomes").mkdir(parents=True)
+    (london / "data" / "outcomes" / "fingertips_msoa_extra_checks.json").write_text(json.dumps(
+        {"series": {"93092": {"ships": True, "kind": "publisher"}, "93234": {"ships": False, "kind": "publisher"}}}))
+    (london / "data" / "map" / "indicators.js").write_text(
+        "var PH_IND_STATS = " + json.dumps({"census_method": "counts",
+                                            "stats": {"imd_score": {}, "ft_93283": {}, "ft_93250": {}, "ft_93092": {}}}) + ";")
+    before = pack(t / "before", stats_keys=("imd_score", "ft_93283", "ft_93250"))
+    check("a pack built before the new source is not held back for its series",
+          crp.check(before, "before", None, london) == [], json.dumps(crp.check(before, "before", None, london)))
+    since = pack(t / "since", sources={"census": {"status": "ok"}, "fingertips_msoa_extra": {"status": "ok"}},
+                 stats_keys=("imd_score", "ft_93283", "ft_93250"))
+    p = crp.check(since, "since", None, london)
+    check("a pack built since must have the series", any("ft_93092" in x for x in p), json.dumps(p))
+    gap = pack(t / "gap", sources={"census": {"status": "ok"}, "fingertips_msoa_extra": {"status": "skipped"}},
+               stats_keys=("imd_score", "ft_93283", "ft_93250"), gaps=["ft_93092"])
+    check("or list it as a known gap, and a skipped source passes", crp.check(gap, "gap", None, london) == [],
+          json.dumps(crp.check(gap, "gap", None, london)))
+    (london / "data" / "map" / "indicators.js").write_text(
+        "var PH_IND_STATS = " + json.dumps({"census_method": "counts",
+                                            "stats": {"imd_score": {}, "ft_93283": {}, "ft_93250": {}, "ptal_score": {}}}) + ";")
+
     prev = pack(t / "prev", stats_keys=("imd_score", "ft_93283", "ft_93250"),
                 wards={f"W{i}": {"indicators": {"imd_score": i, "ft_93283": 1, "ft_93250": 2}} for i in range(50)})
     p = crp.check(good, "good", prev, london)

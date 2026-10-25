@@ -151,6 +151,9 @@ def level_stats(records: list) -> dict:
     vals: dict = {}
     for rec in records:
         for k, v in ((rec or {}).get("indicators") or rec or {}).items():
+            # A 95% limit beside a figure (saie_net_bhc_lci) is not an indicator.
+            if str(k).endswith(("_lci", "_uci")):
+                continue
             if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v):
                 vals.setdefault(k, []).append(float(v))
     out = {}
@@ -462,13 +465,17 @@ def ind_flags(region_stats: list) -> dict:
     """The facts each region's indicators.js records about how its figures
     were made, for England: Census age bands are 0-15 only where every region
     built them that way, Fingertips ages count as checked only where every
-    region checked them, and a series any region left out stays out."""
+    region checked them, and a series any region left out stays out. The
+    routine and semi-routine figure counts as rebuilt (NS-SEC L12 and L13
+    only) only where every region rebuilt it."""
     if not region_stats:
         return {}
     bands = {(r or {}).get("census_age_bands") or "0-14" for r in region_stats}
     checked = all((r or {}).get("ft_age_checked") for r in region_stats)
     bad = sorted({k for r in region_stats for k in ((r or {}).get("ft_age_mismatch") or [])})
+    routine = {(r or {}).get("census_routine_classes") or "" for r in region_stats}
     return {"census_age_bands": "0-15" if bands == {"0-15"} else "0-14",
+            "census_routine_classes": "L12-L13" if routine == {"L12-L13"} else "",
             "ft_age_checked": checked, "ft_age_mismatch": bad}
 
 

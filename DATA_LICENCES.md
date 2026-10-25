@@ -65,13 +65,23 @@ uk-air.defra.gov.uk; the site asks for the domain as well as the department.
 | GP practices (epraccur) | NHS England Organisation Data Service | OGL v3 | |
 | Pharmacies (edispensary) | NHS England Organisation Data Service | OGL v3 | |
 | QOF prevalence, public health outcomes | OHID Fingertips | OGL v3 | |
-| Claimant count, DWP benefits | DWP and ONS, via Nomis | OGL v3 | |
+| Claimant count | DWP and ONS, via Nomis | OGL v3 | |
+| DWP benefits: Universal Credit, PIP, DLA, Attendance Allowance, Carer's Allowance, Pension Credit, children in low income families | Department for Work and Pensions (with HMRC for low income families), via Stat-Xplore | OGL v3 | Read through Stat-Xplore's open data API with a free personal API key (HANDOVER.md). The key is for access only and does not change the licence. Counts are rounded or adjusted by DWP for disclosure control; the general OGL statement covers attribution |
 | Sub-regional fuel poverty | DESNZ | OGL v3 | |
 | Access to green and blue space | Defra, with ONS, OS and Natural England | OGL v3 | Official statistic in development |
 | Background air quality (NO₂, PM2.5, PM10) | Defra UK-AIR, Pollution Climate Mapping | OGL v3 | Modelled, not measured. Acknowledge Defra as the source, per the wording above |
 | Stops and stations (distances, counts) | Transport for London, Unified API | **OGL v2 with TfL amendments** | Not OGL v3. Requires all three attribution statements above, or the licence terminates |
-| PTAL | Greater London Authority, London Datastore | OGL v3 | TfL's accessibility banding, republished by the GLA in the LSOA Atlas |
-| Street crime | data.police.uk (Home Office) | OGL v3 | |
+| Street crime | data.police.uk (Home Office) | OGL v3 | Counted into wards and, from the next refresh, LSOAs |
+| Mid-year population estimates for LSOAs | ONS | OGL v3 | Use the ONS wording above |
+| Claimant count aged 18 to 24 | DWP and ONS, via Nomis | OGL v3 | |
+| Road casualties (STATS19) | Department for Transport | OGL v3 | |
+| Care home beds (care directory with filters) | Care Quality Commission | OGL v3 | CQC asks to be named as the source; every file and report holding the figure says "contains Care Quality Commission (CQC) data" (`PH_CREDIT_CQC`) |
+| Distance to GP practices, pharmacies and dentists | Measured here from the NHS ODS registers, sites placed with the ONS Postcode Directory (postcodes.io) | OGL v3 | Carries the OS and Royal Mail notices above (`PH_CREDIT_ONSPD`); the LSOA centres are ONS's population-weighted centroids (OGL v3) |
+| Access to Healthy Assets and Hazards (AHAH) version 5.1 | Geographic Data Service (GeoDS), University of Liverpool | OGL v3, as GeoDS lists it | The pipeline uses it only while GeoDS's record names an open licence. Only GeoDS's LSOA values are republished; the outlet locations behind the retail measures are commercial data GeoDS does not release |
+| Small Area Mental Health Index (SAMHI) | Place-based Longitudinal Data Resource (PLDR), University of Liverpool (Daras and Barr, doi:10.17638/datacat.liverpool.ac.uk/1188) | **Not confirmed** | The fact-check could not read the licence. The pipeline uses the file only when PLDR's page names an open licence (the Open Government Licence, Creative Commons Attribution, CC0 or ODC-BY), or when the owner has checked it and attached the file to the `samhi-source` release; the ward file records which (`metadata.places.samhi_licence`) |
+| GP-recorded prevalence estimates for MSOAs | House of Commons Library, from QOF (NHS England) and NHS Digital's patients registered by LSOA | Open Parliament Licence v3.0, **presumed, not checked**; the QOF and registration inputs are OGL v3 | Check the Library's terms before relying on it; the licence of the code in `local-health-data-from-QOF` was not checked either, and no code of it is used here |
+| Priority Places for Food Index (PPFI) version 2.1 | Consumer Data Research Centre (CDRC), with Which? | CDRC Open data, **exact licence not confirmed** | CDRC requires its attribution with the data: "Data provided by the Consumer Data Research Centre (CDRC), an ESRC Data Investment, refs ES/L011840/1; ES/L011891/1." Every file and report holding a PPFI figure carries it (`PH_CREDIT_CDRC`) |
+| Food hygiene ratings | Food Standards Agency | Believed OGL v3, **not confirmed** | data.gov.uk shows the licence as not set and points to FSA's own terms; check them before relying on it |
 | Charity register | Charity Commission for England and Wales | OGL v3 | |
 | NHS trust sites (hospitals) | NHS Organisation Data Service | OGL v3 | |
 | Basemap tiles | CARTO, from OpenStreetMap contributors; Esri (World Light Gray fallback, World Imagery satellite) | ODbL 1.0 (OSM); CARTO and Esri terms | Attribution rendered by the map itself, and kept in Presentation view with a caption naming the tile provider |

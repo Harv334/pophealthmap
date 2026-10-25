@@ -62,6 +62,37 @@ jobs:
             || echo "No pcn-source release: PCNs will be built without catchments."
           ls -la .cache/gp_reg
 
+      # CQC's care directory, for care home beds. The pipeline finds the file
+      # on cqc.org.uk itself; if CQC refuses cloud servers, as NHS Digital
+      # does, a copy downloaded in a browser can be attached to a cqc-source
+      # release, and the pipeline uses it when the page cannot be read.
+      - name: Fetch the CQC care directory fallback (for care home beds)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p .cache/cqc
+          gh release download cqc-source --pattern '*' --dir .cache/cqc --clobber \
+            || echo "No cqc-source release: care homes come from the CQC website."
+
+      # Files for the sources whose publishers need a login or may refuse
+      # cloud servers: AHAH (GeoDS), SAMHI (PLDR), the QOF estimates for
+      # MSOAs (House of Commons Library), PPFI (CDRC, which needs a login)
+      # and the FSA food hygiene files. A file downloaded in a browser and
+      # attached to a release named <source>-source is copied into
+      # .cache/<source>/, and the pipeline reads it in place of a download.
+      # Without one, each fetches its own file where it can, or is skipped
+      # with a note saying what to attach; none of them fails for lack of it.
+      - name: Fetch hand-downloaded files (AHAH, SAMHI, QOF by MSOA, PPFI, FSA)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for pair in ahah:ahah-source samhi:samhi-source qof_msoa:qof-msoa-source ppfi:ppfi-source fhrs:fhrs-source; do
+            dir=".cache/${pair%%:*}"; rel="${pair##*:}"
+            mkdir -p "$dir"
+            gh release download "$rel" --pattern '*' --dir "$dir" --clobber \
+              || echo "No $rel release: ${pair%%:*} fetches its own file or is skipped."
+          done
+
       # The pipeline isolates per-source failures and still exits 0, so the exit
       # code alone does not tell us whether a source broke. continue-on-error
       # keeps the job going either way, and the next step reads the manifest to
@@ -72,6 +103,11 @@ jobs:
       - name: Run pipeline
         id: run
         continue-on-error: true
+        # The DWP benefits come from Stat-Xplore, which needs a free API key
+        # (HANDOVER.md, DWP benefits). Without the secret those sources are
+        # skipped, not failed.
+        env:
+          STAT_XPLORE_API_KEY: ${{ secrets.STAT_XPLORE_API_KEY }}
         run: python fetch_all_data.py
 
       # Four files are derived from the pipeline's own outputs rather than

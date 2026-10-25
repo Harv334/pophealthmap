@@ -45,6 +45,10 @@ accessibility violation fails it. The four pages are opened with the device
 set to dark, and checked for the shared stylesheet (`pages.css`), the same
 header and footer, and a light page. The 404 page's links are absolute to
 pophealth.uk, so the suite answers those requests from the working copy.
+It checks that no list (the picker, Query, Compare, Data export or Ask)
+offers an indicator the loaded data holds no figures for, that the ones the
+page works out from the ward file stay, and that a new one appears once
+indicators.js lists it.
 It also checks the names: every indicator is named from the one label table
 (`IND_NAMES`), Compare offers each measure once, and the old names (Soc rent,
 Boards, metric, VCSE, Borough or Local authority as the level) are gone.
@@ -138,6 +142,42 @@ and LA percentages are the summed numerator counts over the summed
 denominator counts, that output area counts added up to LSOAs give the LSOA
 percentages, and that the files the map reads keep their shape. It needs
 pandas and numpy but no network.
+
+`test_census_additions.py` does the same for the Census tables added or fixed
+in October 2026: routine and semi-routine is NS-SEC L12 and L13 only (not L7
+to L9 as well), household deprivation comes from TS011, and household
+composition, spoken English, overcrowding, 50 hours of care, long-term
+sickness and six detailed ethnic groups are counted from the columns the
+publisher prints. It checks the ward and LA figures from the counts, wards
+built from LSOAs when the output area file lacks a figure, and that a label
+that does not match or a table that did not download writes nothing and marks
+the census source partial.
+
+`test_saie.py` and `test_hle_msoa.py` cover the two ONS MSOA releases, ONS's
+income estimates for small areas and its healthy and disability-free life
+expectancy, from synthetic workbooks laid out as ONS lays them out: finding
+the newest edition from the dataset landing page (its JSON, its links, the
+bulletin's related datasets, ONS's search), matching the columns and their
+95% limits, refusing a file on the 2011 MSOAs, wards and LAs weighted by
+households for income and by residents for life expectancy, and the failure
+paths. `test_local_health_extra.py` covers low birth weight and cancer
+incidence from Local Health and the per-series checks that decide whether
+each ships (coverage, withheld values, interval width), with the skipped,
+partial and failed outcomes in the manifest. `test_fingertips_profiles.py`
+checks that each Fingertips profile's indicators are chosen by name from
+`data/curated/fingertips_profile_indicators.csv`, not as the first ids in
+number order. All four are offline.
+
+`test_ahah.py`, `test_samhi.py`, `test_qof_msoa.py`, `test_ppfi.py` and
+`test_fhrs.py` cover the last small-area sources, one per publisher: GeoDS's
+Access to Healthy Assets and Hazards, PLDR's Small Area Mental Health Index,
+the House of Commons Library's QOF estimates for MSOAs, CDRC's Priority
+Places for Food Index and the FSA food hygiene register. Each uses synthetic
+files laid out as the publisher's are believed to be (the docstring says
+where that comes from and that it is unverified), and checks the column
+matching and its refusals, the maths, ward and LA figures, a file attached by
+hand in `.cache/<source>/`, the skip (never a failure) when there is no file,
+and kept figures. All five are offline.
 
 `test_guards.py` and `test_guards_gp.py` copy real downloads out of `.cache/`
 to build their fixtures, so they need a populated cache. `.cache/` is not in the

@@ -378,12 +378,15 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
    * has no ft_age_checked, and its adult smoking figure is the 18 to 64
    * breakdown OHID itself flags or withholds, so that one is left out. Ask
    * leaves out the same ones as the map, so it cannot quote a figure the map
-   * does not show.
+   * does not show. That includes the Census routine and semi-routine figure
+   * until indicators.js says it was rebuilt from NS-SEC L12 and L13 alone
+   * (census_routine_classes), since older files also counted L7 to L9.
    */
   function withheldKeys() {
     var s = (typeof PH_IND_STATS === "object" && PH_IND_STATS) ? PH_IND_STATS : {};
-    if (s.ft_age_checked) return s.ft_age_mismatch || [];
-    return ["ft_smoking_prevalence_adults"];
+    var out = s.ft_age_checked ? (s.ft_age_mismatch || []).slice() : ["ft_smoking_prevalence_adults"];
+    if (s.census_routine_classes !== "L12-L13") out.push("census_routine_semi_routine_pct");
+    return out;
   }
   function isWithheld(key) { return withheldKeys().indexOf(key) !== -1; }
   function shownOnly(ind) {
@@ -426,6 +429,8 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
     imd_best_decile: "The least deprived IMD decile present in this area. Deciles run 1 (the most deprived tenth nationally) to 10 (the least).",
     imd_worst_decile: "The most deprived IMD decile present in this area. Deciles run 1 (the most deprived tenth nationally) to 10 (the least).",
     imd_rank: "The LSOA's rank among England's 33,755 LSOAs by IMD 2025, where 1 is the most deprived.",
+    idaci_rank: "The LSOA's rank among England's 33,755 LSOAs by income deprivation affecting children (IDACI 2025), where 1 is the most deprived.",
+    idaopi_rank: "The LSOA's rank among England's 33,755 LSOAs by income deprivation affecting older people (IDAOPI 2025), where 1 is the most deprived.",
   };
 
   var DIRECTION = {
@@ -442,7 +447,54 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
     imd_worst_decile: "less deprived",
     imd_decile: "less deprived",
     imd_rank: "less deprived",
+    // The IoD 2025 measures beyond the IMD: IDACI, IDAOPI, the sub-domains
+    // and the underlying indicators all count up with deprivation, except
+    // the two attainment scores and the deciles and ranks.
+    idaci_pct: "more deprived",
+    idaopi_pct: "more deprived",
+    idaci_decile: "less deprived",
+    idaopi_decile: "less deprived",
+    idaci_rank: "less deprived",
+    idaopi_rank: "less deprived",
+    cyp_education_score: "more deprived",
+    adult_skills_score: "more deprived",
+    geo_barriers_score: "more deprived",
+    wider_barriers_score: "more deprived",
+    indoors_score: "more deprived",
+    outdoors_score: "more deprived",
+    iod_ypll: "more deprived",
+    iod_cidr: "more deprived",
+    iod_acute_morbidity: "more deprived",
+    iod_mood_anxiety: "more deprived",
+    iod_ks2: "less deprived",
+    iod_ks4: "less deprived",
+    iod_staying_on: "more deprived",
+    iod_he_entry: "more deprived",
+    iod_adult_quals: "more deprived",
+    iod_english: "more deprived",
+    iod_housing_poor: "more deprived",
+    iod_no_central_heating: "more deprived",
+    iod_air_quality: "more deprived",
+    iod_road_accidents: "more deprived",
+    // ONS's MSOA releases.
+    saie_total_income: "more income",
+    saie_net_bhc: "more income",
+    saie_net_ahc: "more income",
+    hle_female: "more years in good health",
+    hle_male: "more years in good health",
+    dfle_female: "more years free of limiting illness",
+    dfle_male: "more years free of limiting illness",
   };
+  // The healthy places index (AHAH) and the mental health index (SAMHI):
+  // a higher score is worse, and their deciles and the food insecurity
+  // deciles (PPFI) count from the worst tenth, so a higher decile is better.
+  ["ahah_index", "ahah_health_services", "ahah_retail", "ahah_air_quality", "ahah_green_blue"]
+    .forEach(function (k) { DIRECTION[k] = "less healthy"; });
+  DIRECTION.ahah_decile = "healthier";
+  DIRECTION.samhi_index = "worse mental health";
+  DIRECTION.samhi_decile = "better mental health";
+  ["ppfi_decile", "ppfi_supermarket_proximity_decile", "ppfi_supermarket_access_decile", "ppfi_online_decile",
+   "ppfi_nonsupermarket_decile", "ppfi_family_decile"].forEach(function (k) { DIRECTION[k] = "lower risk"; });
 
   function metaFor(key) {
     var m = (typeof OV_META === "object" && OV_META && OV_META[key]) ? OV_META[key] : null;
@@ -450,7 +502,7 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
     var ft = FT_META[key];
     if (ft) return { desc: ft[0], u: ft[1] || undefined, src: "OHID Fingertips", g: "LA" };
     var imd = IMD_META[key];
-    return imd ? { desc: imd, u: key === "imd_rank" ? "rank" : "decile", src: "MHCLG IMD 2025", yr: "2025" } : null;
+    return imd ? { desc: imd, u: /_rank$/.test(key) ? "rank" : "decile", src: "MHCLG IMD 2025", yr: "2025" } : null;
   }
 
   function labelFor(key) {
@@ -524,6 +576,39 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
     keys.forEach(function (k) {
       if (ind[k] !== undefined && ind[k] !== null && !isWithheld(k)) out[k] = figure(k, ind[k]);
     });
+    return out;
+  }
+
+  /* A whole area's figures, made to fit one tool result. With every
+     indicator on the map, a ward's labelled figures came to about 19 KB,
+     past RESULT_BYTES, so asking for a ward with no indicator list got the
+     model nothing. When the labelled form would not fit, each figure becomes
+     a row of values in the order of columns, as list_indicators sends its
+     rows: the period most of them share is said once, a row gives its own
+     only where it differs, and empty values at the end are left off. The
+     labels are in list_indicators. A request that names its indicators is
+     never shortened. */
+  var FIGURE_COLUMNS = ["value", "unit", "period", "range_95"];
+  var AREA_BYTES = 12000;
+  function fitArea(out, input) {
+    if ((Array.isArray(input.indicators) && input.indicators.length) ||
+        JSON.stringify(out).length <= AREA_BYTES) return out;
+    var figs = out.indicators || {}, n = {}, top = null;
+    Object.keys(figs).forEach(function (k) { var p = figs[k].period; if (p) n[p] = (n[p] || 0) + 1; });
+    Object.keys(n).forEach(function (p) { if (!top || n[p] > n[top]) top = p; });
+    var rows = {};
+    Object.keys(figs).forEach(function (k) {
+      var f = figs[k];
+      var a = [f.v, f.unit || "", f.period && f.period !== top ? f.period : "", f.range_95 || ""];
+      while (a.length > 1 && a[a.length - 1] === "") a.pop();
+      rows[k] = a;
+    });
+    out.indicators = rows;
+    out.columns = FIGURE_COLUMNS;
+    if (top) out.period = top;
+    out.note = "Too many indicators to label each one here: each is a row of values in the order of columns, " +
+      "the period is the one given above unless a row has its own, and list_indicators gives each key's label. " +
+      "Call get_area again with indicators to have the ones you need labelled.";
     return out;
   }
 
@@ -714,15 +799,25 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
   }
 
   // Figures only: the MSOA file keeps a significance flag beside each
-  // Local Health figure (ft_93283_vs), which is not a figure itself.
+  // Local Health figure (ft_93283_vs), and ONS's 95% limits beside each of
+  // its modelled figures (saie_net_bhc_lci and _uci), which are not figures
+  // themselves. The limits reach the model on their figure, as range_95
+  // (withRanges).
   function figuresOnly(ind) {
     var out = {};
     Object.keys(ind || {}).forEach(function (k) {
       var v = ind[k];
-      if (/_vs$/.test(k) || v === null || v === "" || isNaN(parseFloat(v))) return;
+      if (/_(vs|lci|uci)$/.test(k) || v === null || v === "" || isNaN(parseFloat(v))) return;
       out[k] = v;
     });
     return out;
+  }
+  function withRanges(figs, ind) {
+    Object.keys(figs || {}).forEach(function (k) {
+      var lo = parseFloat((ind || {})[k + "_lci"]), hi = parseFloat((ind || {})[k + "_uci"]);
+      if (isFinite(lo) && isFinite(hi)) figs[k].range_95 = [lo, hi];
+    });
+    return figs;
   }
 
   /* The levels an indicator is available at, as the tools name them. The
@@ -766,7 +861,9 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
     return (typeof OA_CAVEAT === "string" ? OA_CAVEAT
       : "Each output area holds about 125 households, so a few households can change these figures a lot.") + " " + OA_NOTE;
   }
-  function isImdKey(k) { return /^imd_/.test(k) || DIRECTION[k] === "more deprived"; }
+  function isImdKey(k) {
+    return /^(imd_|idaci_|idaopi_|iod_)/.test(k) || /^(less|more) deprived$/.test(DIRECTION[k] || "");
+  }
   function caveatFor(lv, keys, within) {
     var c = [];
     if (lv === "ward" && keys.some(isBoroughLevel)) c.push(BOROUGH_CAVEAT);
@@ -822,7 +919,7 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
     var want = wantedKeys(input, shown);
     var out = placeOf(lv, a);
     out.level = LEVEL_WORD[lv];
-    out.indicators = figures(shown, want);
+    out.indicators = withRanges(figures(shown, want), a.indicators);
     var missing = want.filter(function (k) { return !(k in out.indicators); });
     if (missing.length && Array.isArray(input.indicators) && input.indicators.length) out.not_at_this_level = missing;
     // An LSOA's output areas, so a question can go one level further down.
@@ -834,7 +931,7 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
       }
     }
     out.caveat = caveatFor(lv, Object.keys(out.indicators), within);
-    return out;
+    return fitArea(out, input);
   }
 
   async function smallCompare(input, lv) {
@@ -886,14 +983,14 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
 
   function withheldError(key) {
     return { error: "'" + key + "' is left out of this version of the map until the data " +
-      "is refreshed, because the published figure is not the headline one. Call " +
+      "is refreshed, because the figure stored for it is not the one the map describes. Call " +
       "list_indicators for valid keys." };
   }
 
   async function smallRank(input, lv) {
     var key = input.indicator;
     if (isWithheld(key)) return withheldError(key);
-    if (/_vs$/.test(String(key))) return noValues(key, lv);
+    if (/_(vs|lci|uci)$/.test(String(key))) return noValues(key, lv);
     var within = resolveWithin(input);
     if (within.error) return within;
     var got = await areasAt(lv, within);
@@ -914,6 +1011,12 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
     return rankResult(input, lv, rows, within);
   }
 
+  // The fields of each list_indicators row, in order (see list_indicators).
+  var LIST_COLUMNS = ["key", "label", "unit", "period", "higher_means", "la_only"];
+  // The longest the full list may be before its unit and period columns are
+  // left out (list_indicators); RESULT_BYTES less room for the rest.
+  var LIST_BYTES = 13500;
+
   var TOOLS = {
     /* The key list, kept short. It used to send every indicator's full
        description, source, year and aggregation rule, 41 KB that was then
@@ -923,8 +1026,15 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
 
        Grouped by the levels each indicator is available at, so the levels
        are said once per group rather than once per key, which keeps the list
-       inside one tool result. */
-    list_indicators: function () {
+       inside one tool result.
+
+       Each indicator is a row of values in the order `columns` names them,
+       not an object repeating the same five field names: with 150 indicators
+       those names alone were about 5 KB of a result that the answer loop
+       refuses past RESULT_BYTES. The period most of a group's indicators share is
+       said once, on the group, and a row gives its own only where it differs.
+       A field missing from the end of a row is empty. */
+    list_indicators: function (input) {
       var inWards = wardKeys(), keys = {};
       Object.keys(inWards).forEach(function (k) { keys[k] = 1; });
       if (typeof CATS !== "undefined" && Array.isArray(CATS)) {
@@ -933,14 +1043,21 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
         });
       }
       Object.keys(SMALL_ONLY).forEach(function (k) { keys[k] = 1; });
+      // An optional search narrows the list to the keys whose key or label
+      // holds every word of it ("income", "life expectancy").
+      var words = String((input && input.search) || "").toLowerCase().split(/\s+/).filter(Boolean);
       var groups = {};
       Object.keys(keys).filter(function (k) { return !isWithheld(k); }).sort().forEach(function (k) {
         var at = levelsOf(k, !!inWards[k]);
         if (!at.length) return;
         var m = metaFor(k);
         var row = { key: k, label: shortLabel(k) };
+        if (words.length) {
+          var hay = (k + " " + row.label).toLowerCase();
+          if (!words.every(function (w) { return hay.indexOf(w) !== -1; })) return;
+        }
         if (m && m.u) row.unit = m.u;
-        if (m && m.yr) row.period = m.yr;
+        if (m && m.yr) row.period = String(m.yr);
         if (isBoroughLevel(k)) row.la_only = true;
         var hm = higherMeans(k);
         if (hm) row.higher_means = hm;
@@ -948,12 +1065,76 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
         (groups[g] = groups[g] || { levels: at, indicators: [] }).indicators.push(row);
       });
       var map = regionCounts();
+      // The rows for a set of columns: each a row of values in their order,
+      // the period most of a group's rows share said once on the group.
+      function build(cols) {
+        return Object.keys(groups).map(function (g) { return groups[g]; })
+          .sort(function (a, b) { return b.levels.length - a.levels.length; })
+          .map(function (g) {
+            var n = {}, top = null;
+            if (cols.indexOf("period") !== -1) {
+              g.indicators.forEach(function (r) { if (r.period) n[r.period] = (n[r.period] || 0) + 1; });
+              Object.keys(n).forEach(function (p) { if (n[p] > 1 && (!top || n[p] > n[top])) top = p; });
+            }
+            var rows = g.indicators.map(function (r) {
+              var a = cols.map(function (c) {
+                var v = r[c];
+                return (c === "period" && v === top) || v == null ? "" : v;
+              });
+              while (a.length > 2 && a[a.length - 1] === "") a.pop();
+              return a;
+            });
+            return top ? { levels: g.levels, period: top, rows: rows } : { levels: g.levels, rows: rows };
+          });
+      }
+      var cols = LIST_COLUMNS, out = build(cols), short = false;
+      // With every indicator on the map the full list nears the size one tool
+      // result may be (RESULT_BYTES). Past LIST_BYTES the unit and period
+      // columns are left out: get_area, compare_areas and rank_areas give
+      // both for every figure they return.
+      if (JSON.stringify(out).length > LIST_BYTES) {
+        cols = LIST_COLUMNS.filter(function (c) { return c !== "unit" && c !== "period"; });
+        out = build(cols);
+        short = true;
+      }
+      // And if even that is too long, the list comes in pages, each under
+      // LIST_BYTES, the groups split where a page fills; page asks for one.
+      var pages = [out];
+      if (JSON.stringify(out).length > LIST_BYTES) {
+        pages = [[]];
+        var size = 2;
+        out.forEach(function (g) {
+          var cur = null;
+          g.rows.forEach(function (r) {
+            var add = JSON.stringify(r).length + 1;
+            if (!cur || size + add > LIST_BYTES - 1200) {
+              if (size + add > LIST_BYTES - 1200 && pages[pages.length - 1].length) { pages.push([]); size = 2; }
+              cur = { levels: g.levels, rows: [] };
+              if (g.period) cur.period = g.period;
+              pages[pages.length - 1].push(cur);
+              size += JSON.stringify(cur).length + 1;
+            }
+            cur.rows.push(r);
+            size += add;
+          });
+        });
+      }
+      var page = Math.min(Math.max(parseInt((input && input.page) || 1, 10) || 1, 1), pages.length);
       return {
         region: map.region, la_count: map.la_count, ward_count: map.ward_count,
-        groups: Object.keys(groups).map(function (g) { return groups[g]; })
-          .sort(function (a, b) { return b.levels.length - a.levels.length; }),
+        search: words.length ? words.join(" ") : undefined,
+        page: pages.length > 1 ? page : undefined,
+        pages: pages.length > 1 ? pages.length : undefined,
+        more: pages.length > 1 && page < pages.length
+          ? "This is page " + page + " of " + pages.length + ". Call list_indicators with page " + (page + 1) +
+            " for the rest, or with search to find a key by its words." : undefined,
+        columns: cols,
+        groups: pages[page - 1],
         note: "Each group lists the levels its indicators are available at: la (local authority, LA), " +
-          "ward, msoa, lsoa and oa (output area). Deprivation deciles run 1 (most deprived) to 10 (least deprived). " +
+          "ward, msoa, lsoa and oa (output area)" + (short ? "" : ", and the period its indicators cover unless a row gives its own") + ". " +
+          "Each row is one indicator, its values in the order of columns; a value missing from the end of a row is empty. " +
+          (short ? "Units and periods are left out to keep the list short; get_area, compare_areas and rank_areas give them. " : "") +
+          "Deprivation deciles run 1 (most deprived) to 10 (least deprived). " +
           "Indicators marked la_only are published for the whole " +
           "LA, so they are the same value for every ward in " +
           "it; do not rank wards by them. Call the local authority level 'LA' " +
@@ -980,7 +1161,7 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
       // The indicators asked for, or every one the area has.
       shownInd = figures(shownInd, wantedKeys(input, shownInd));
       var boroughLevel = Object.keys(shownInd).filter(isBoroughLevel);
-      return {
+      return fitArea({
         name: hit.area.name, level: levelWord(lv), la: hit.area.lad || undefined,
         indicators: shownInd,
         // A ward profile mixes ward figures with borough ones. Name which are
@@ -988,7 +1169,7 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
         la_level_indicators: (lv === "ward" && boroughLevel.length)
           ? boroughLevel : undefined,
         caveat: caveatFor(lv, Object.keys(shownInd)),
-      };
+      }, input);
     },
 
     compare_areas: function (input) {

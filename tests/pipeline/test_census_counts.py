@@ -222,6 +222,9 @@ p.get_oa_to_ward = lambda: OA_WARD
 p.get_lsoa_to_ward = lambda: LSOA_WARD
 p.get_lsoa_ward_lookup = lambda: {l: (wd, WARD_LAD[wd]) for l, wd in LSOA_WARD.items()}
 p._ward_to_lad = lambda: WARD_LAD
+# The LSOA to MSOA lookup is asked for once the national MSOA files (ONS
+# income, healthy life expectancy) are committed; none is needed here.
+p.get_lsoa_to_msoa = lambda: {}
 
 bd = p.build_borough_data()
 rec = bd.get("E09000001", {})

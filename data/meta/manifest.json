@@ -1,25 +1,30 @@
 {
-  "last_run": "2026-10-19T19:11:56.226652+00:00",
+  "last_run": "2026-10-25T00:20:33.988852+00:00",
   "sources": {
-    "air_quality": {
-      "duration_s": 4.8,
+    "ahah": {
+      "duration_s": 1.3,
       "error": "",
-      "fetched_at": "2026-10-19T18:52:16.089061+00:00",
-      "notes": "",
-      "output_path": "data/environment/air_quality_lsoa.parquet",
-      "rows_written": 4994,
-      "schema": {
-        "LSOA21CD": "str",
-        "no2_ugm3": "float64",
-        "pm10_ugm3": "float64",
-        "pm25_ugm3": "float64"
-      },
-      "status": "ok"
+      "fetched_at": "2026-10-25T00:18:16.788669+00:00",
+      "notes": "No file was found for it, so there are no figures yet. To add them, download the AHAH LSOA file (version 5.1 or later, CSV) from https://data.geods.ac.uk/dataset/access-to-healthy-assets-hazards-ahah and attach it to a GitHub release named ahah-source; both refresh workflows copy it into .cache/ahah/ before the pipeline runs. Or put it in .cache/ahah/ and run `python fetch_all_data.py --only ahah`.",
+      "output_path": "",
+      "rows_written": 0,
+      "schema": {},
+      "status": "skipped"
+    },
+    "air_quality": {
+      "duration_s": 6.1,
+      "error": "",
+      "fetched_at": "2026-10-25T00:16:05.766859+00:00",
+      "notes": "source returned no frame",
+      "output_path": "",
+      "rows_written": 0,
+      "schema": {},
+      "status": "skipped"
     },
     "boundaries": {
-      "duration_s": 18.0,
+      "duration_s": 38.3,
       "error": "",
-      "fetched_at": "2026-10-19T18:51:50.187403+00:00",
+      "fetched_at": "2026-10-25T00:15:21.333969+00:00",
       "notes": "",
       "output_path": "",
       "rows_written": 4,
@@ -29,10 +34,32 @@
       },
       "status": "ok"
     },
-    "census": {
-      "duration_s": 4.7,
+    "care_homes": {
+      "duration_s": 17.7,
       "error": "",
-      "fetched_at": "2026-10-19T18:52:34.781615+00:00",
+      "fetched_at": "2026-10-25T00:20:15.699757+00:00",
+      "notes": "",
+      "output_path": "data/healthcare/care_homes.parquet",
+      "rows_written": 1266,
+      "schema": {
+        "LAD25CD": "str",
+        "LSOA21CD": "str",
+        "WD25CD": "str",
+        "as_at": "str",
+        "beds": "int64",
+        "lat": "float64",
+        "lng": "float64",
+        "location_id": "str",
+        "name": "str",
+        "nursing": "bool",
+        "postcode": "str"
+      },
+      "status": "ok"
+    },
+    "census": {
+      "duration_s": 1.7,
+      "error": "",
+      "fetched_at": "2026-10-25T00:16:32.484110+00:00",
       "notes": "also wrote data/demographics/census2021_counts.parquet, data/demographics/census2021_msoa.parquet",
       "output_path": "data/demographics/census2021.parquet",
       "rows_written": 35672,
@@ -48,17 +75,32 @@
         "census_disability_lot_pct": "float64",
         "census_english_hh_all_pct": "float64",
         "census_english_hh_none_pct": "float64",
+        "census_eth_bangladeshi_pct": "float64",
+        "census_eth_black_african_pct": "float64",
+        "census_eth_black_caribbean_pct": "float64",
+        "census_eth_gypsy_traveller_pct": "float64",
+        "census_eth_pakistani_pct": "float64",
+        "census_eth_roma_pct": "float64",
         "census_good_health_pct": "float64",
+        "census_hh_deprived_2plus_pct": "float64",
+        "census_hh_deprived_any_pct": "float64",
         "census_higher_managerial_pct": "float64",
+        "census_inactive_ltsick_pct": "float64",
         "census_level4_qual_pct": "float64",
+        "census_lone_parent_dep_pct": "float64",
         "census_mixed_pct": "float64",
+        "census_never_worked_ltu_pct": "float64",
         "census_no_car_pct": "float64",
         "census_no_qual_pct": "float64",
         "census_non_white_pct": "float64",
+        "census_one_person_hh_pct": "float64",
         "census_other_ethnic_pct": "float64",
         "census_over65_pct": "float64",
         "census_over85_pct": "float64",
+        "census_overcrowded_pct": "float64",
         "census_owned_pct": "float64",
+        "census_pensioner_alone_pct": "float64",
+        "census_poor_english_pct": "float64",
         "census_population": "Int64",
         "census_private_rented_pct": "float64",
         "census_provides_unpaid_care_pct": "float64",
@@ -67,16 +109,18 @@
         "census_social_rented_pct": "float64",
         "census_under16_pct": "float64",
         "census_under5_pct": "float64",
+        "census_underoccupied_pct": "float64",
         "census_unemployed_pct": "float64",
+        "census_unpaid_care_50h_pct": "float64",
         "census_white_pct": "float64",
         "census_working_age_pct": "float64"
       },
       "status": "ok"
     },
     "census_oa": {
-      "duration_s": 14.1,
+      "duration_s": 13.4,
       "error": "",
-      "fetched_at": "2026-10-19T18:52:39.467347+00:00",
+      "fetched_at": "2026-10-25T00:16:34.184498+00:00",
       "notes": "also wrote data/demographics/census2021_oa_counts.parquet",
       "output_path": "data/demographics/census2021_oa.parquet",
       "rows_written": 26369,
@@ -87,16 +131,17 @@
       "status": "ok"
     },
     "charities": {
-      "duration_s": 13.1,
+      "duration_s": 11.0,
       "error": "",
-      "fetched_at": "2026-10-19T19:11:39.815489+00:00",
+      "fetched_at": "2026-10-25T00:19:40.461663+00:00",
       "notes": "",
       "output_path": "data/vcse/charities.parquet",
-      "rows_written": 18536,
+      "rows_written": 18539,
       "schema": {
         "LAD25CD": "str",
         "LSOA21CD": "str",
         "WD25CD": "str",
+        "acc_end": "str",
         "activities": "str",
         "addr": "str",
         "areas": "str",
@@ -113,6 +158,7 @@
         "num": "int64",
         "postcode": "str",
         "registered": "str",
+        "reporting_status": "str",
         "scope": "str",
         "website": "str",
         "what_codes": "str",
@@ -125,9 +171,9 @@
       "status": "ok"
     },
     "claimant": {
-      "duration_s": 0.3,
+      "duration_s": 0.2,
       "error": "",
-      "fetched_at": "2026-10-19T18:52:53.607622+00:00",
+      "fetched_at": "2026-10-25T00:16:47.579298+00:00",
       "notes": "",
       "output_path": "data/economy/claimant_count.parquet",
       "rows_written": 4994,
@@ -141,10 +187,24 @@
       },
       "status": "ok"
     },
-    "crime": {
-      "duration_s": 844.2,
+    "claimant_youth": {
+      "duration_s": 0.1,
       "error": "",
-      "fetched_at": "2026-10-19T18:57:31.885375+00:00",
+      "fetched_at": "2026-10-25T00:20:13.781783+00:00",
+      "notes": "",
+      "output_path": "data/economy/claimant_18_24.parquet",
+      "rows_written": 4994,
+      "schema": {
+        "LSOA21CD": "str",
+        "claimant_18_24_month": "str",
+        "claimant_count_18_24": "float64"
+      },
+      "status": "ok"
+    },
+    "crime": {
+      "duration_s": 58.6,
+      "error": "",
+      "fetched_at": "2026-10-25T00:18:38.560525+00:00",
       "notes": "",
       "output_path": "data/crime/police_uk_crime.parquet",
       "rows_written": 1126803,
@@ -164,7 +224,7 @@
     "custom": {
       "duration_s": 0.0,
       "error": "",
-      "fetched_at": "2026-10-19T18:51:50.187105+00:00",
+      "fetched_at": "2026-10-25T00:15:21.333704+00:00",
       "notes": "source returned no frame",
       "output_path": "",
       "rows_written": 0,
@@ -172,9 +232,9 @@
       "status": "skipped"
     },
     "dentists": {
-      "duration_s": 3.3,
+      "duration_s": 3.2,
       "error": "",
-      "fetched_at": "2026-10-19T19:11:52.890191+00:00",
+      "fetched_at": "2026-10-25T00:19:51.451403+00:00",
       "notes": "",
       "output_path": "data/healthcare/dental_practices.parquet",
       "rows_written": 1760,
@@ -195,10 +255,108 @@
       },
       "status": "ok"
     },
-    "fingertips": {
-      "duration_s": 43.0,
+    "dwp_attendance_allowance": {
+      "duration_s": 0.0,
       "error": "",
-      "fetched_at": "2026-10-19T18:53:07.363399+00:00",
+      "fetched_at": "2026-10-25T00:20:33.988528+00:00",
+      "notes": "no Stat-Xplore API key, so no DWP figures were fetched and the map keeps what it had. Register free at stat-xplore.dwp.gov.uk and add the key as the repository secret STAT_XPLORE_API_KEY (HANDOVER.md, DWP benefits)",
+      "output_path": "",
+      "rows_written": 0,
+      "schema": {},
+      "status": "skipped"
+    },
+    "dwp_carers_allowance": {
+      "duration_s": 0.0,
+      "error": "",
+      "fetched_at": "2026-10-25T00:20:33.988535+00:00",
+      "notes": "no Stat-Xplore API key, so no DWP figures were fetched and the map keeps what it had. Register free at stat-xplore.dwp.gov.uk and add the key as the repository secret STAT_XPLORE_API_KEY (HANDOVER.md, DWP benefits)",
+      "output_path": "",
+      "rows_written": 0,
+      "schema": {},
+      "status": "skipped"
+    },
+    "dwp_cilif": {
+      "duration_s": 0.0,
+      "error": "",
+      "fetched_at": "2026-10-25T00:20:33.988548+00:00",
+      "notes": "no Stat-Xplore API key, so no DWP figures were fetched and the map keeps what it had. Register free at stat-xplore.dwp.gov.uk and add the key as the repository secret STAT_XPLORE_API_KEY (HANDOVER.md, DWP benefits)",
+      "output_path": "",
+      "rows_written": 0,
+      "schema": {},
+      "status": "skipped"
+    },
+    "dwp_dla_children": {
+      "duration_s": 0.0,
+      "error": "",
+      "fetched_at": "2026-10-25T00:20:33.988500+00:00",
+      "notes": "no Stat-Xplore API key, so no DWP figures were fetched and the map keeps what it had. Register free at stat-xplore.dwp.gov.uk and add the key as the repository secret STAT_XPLORE_API_KEY (HANDOVER.md, DWP benefits)",
+      "output_path": "",
+      "rows_written": 0,
+      "schema": {},
+      "status": "skipped"
+    },
+    "dwp_pension_credit": {
+      "duration_s": 0.0,
+      "error": "",
+      "fetched_at": "2026-10-25T00:20:33.988542+00:00",
+      "notes": "no Stat-Xplore API key, so no DWP figures were fetched and the map keeps what it had. Register free at stat-xplore.dwp.gov.uk and add the key as the repository secret STAT_XPLORE_API_KEY (HANDOVER.md, DWP benefits)",
+      "output_path": "",
+      "rows_written": 0,
+      "schema": {},
+      "status": "skipped"
+    },
+    "dwp_pip": {
+      "duration_s": 0.0,
+      "error": "",
+      "fetched_at": "2026-10-25T00:20:33.988491+00:00",
+      "notes": "no Stat-Xplore API key, so no DWP figures were fetched and the map keeps what it had. Register free at stat-xplore.dwp.gov.uk and add the key as the repository secret STAT_XPLORE_API_KEY (HANDOVER.md, DWP benefits)",
+      "output_path": "",
+      "rows_written": 0,
+      "schema": {},
+      "status": "skipped"
+    },
+    "dwp_uc_households": {
+      "duration_s": 0.0,
+      "error": "",
+      "fetched_at": "2026-10-25T00:20:33.988478+00:00",
+      "notes": "no Stat-Xplore API key, so no DWP figures were fetched and the map keeps what it had. Register free at stat-xplore.dwp.gov.uk and add the key as the repository secret STAT_XPLORE_API_KEY (HANDOVER.md, DWP benefits)",
+      "output_path": "",
+      "rows_written": 0,
+      "schema": {},
+      "status": "skipped"
+    },
+    "dwp_uc_people": {
+      "duration_s": 0.0,
+      "error": "",
+      "fetched_at": "2026-10-25T00:20:33.988430+00:00",
+      "notes": "no Stat-Xplore API key, so no DWP figures were fetched and the map keeps what it had. Register free at stat-xplore.dwp.gov.uk and add the key as the repository secret STAT_XPLORE_API_KEY (HANDOVER.md, DWP benefits)",
+      "output_path": "",
+      "rows_written": 0,
+      "schema": {},
+      "status": "skipped"
+    },
+    "fhrs": {
+      "duration_s": 2.7,
+      "error": "",
+      "fetched_at": "2026-10-25T00:18:21.223134+00:00",
+      "notes": "",
+      "output_path": "data/environment/fhrs_lsoa.parquet",
+      "rows_written": 4994,
+      "schema": {
+        "LSOA21CD": "str",
+        "fhrs_as_at": "str",
+        "fhrs_food_businesses": "int64",
+        "fhrs_pubs": "int64",
+        "fhrs_rated": "int64",
+        "fhrs_rated_0_2": "int64",
+        "fhrs_takeaways": "int64"
+      },
+      "status": "ok"
+    },
+    "fingertips": {
+      "duration_s": 5.5,
+      "error": "",
+      "fetched_at": "2026-10-25T00:16:57.145331+00:00",
       "notes": "",
       "output_path": "data/outcomes/fingertips.parquet",
       "rows_written": 594,
@@ -216,14 +374,15 @@
         "source_kind": "str",
         "source_name": "str",
         "upper_ci": "float64",
-        "value": "float64"
+        "value": "float64",
+        "value_note": "str"
       },
       "status": "ok"
     },
     "fingertips_msoa": {
-      "duration_s": 7.4,
+      "duration_s": 5.5,
       "error": "",
-      "fetched_at": "2026-10-19T18:53:50.368427+00:00",
+      "fetched_at": "2026-10-25T00:17:02.615419+00:00",
       "notes": "",
       "output_path": "data/outcomes/fingertips_msoa.parquet",
       "rows_written": 32559,
@@ -238,10 +397,31 @@
       },
       "status": "ok"
     },
-    "fingertips_msoa_la": {
-      "duration_s": 51.9,
+    "fingertips_msoa_extra": {
+      "duration_s": 2.3,
       "error": "",
-      "fetched_at": "2026-10-19T18:53:57.757836+00:00",
+      "fetched_at": "2026-10-25T00:18:10.298234+00:00",
+      "notes": "also wrote data/outcomes/fingertips_msoa_extra_la.parquet",
+      "output_path": "data/outcomes/fingertips_msoa_extra.parquet",
+      "rows_written": 1002,
+      "schema": {
+        "MSOA21CD": "str",
+        "estimated": "bool",
+        "indicator_id": "int64",
+        "indicator_name": "str",
+        "lower_ci": "float64",
+        "period": "str",
+        "upper_ci": "float64",
+        "value": "float64",
+        "value_note": "str",
+        "vs_england": "str"
+      },
+      "status": "ok"
+    },
+    "fingertips_msoa_la": {
+      "duration_s": 0.7,
+      "error": "",
+      "fetched_at": "2026-10-25T00:17:08.073809+00:00",
       "notes": "",
       "output_path": "data/outcomes/fingertips_msoa_la.parquet",
       "rows_written": 1056,
@@ -254,12 +434,12 @@
       "status": "ok"
     },
     "fingertips_profiles": {
-      "duration_s": 144.7,
+      "duration_s": 61.5,
       "error": "",
-      "fetched_at": "2026-10-19T18:54:49.662869+00:00",
+      "fetched_at": "2026-10-25T00:17:08.818937+00:00",
       "notes": "kept last run's figures for 5 indicator(s) that came back missing or incomplete: mh_91117, mort_91102, smok_92445, laprof_90851, laprof_92445",
       "output_path": "data/outcomes/fingertips_profiles.parquet",
-      "rows_written": 19240,
+      "rows_written": 18646,
       "schema": {
         "LAD25CD": "str",
         "age": "str",
@@ -272,18 +452,18 @@
         "profile_id": "int64",
         "source_code": "str",
         "source_kind": "str",
-        "unit": "str",
-        "value": "float64"
+        "value": "float64",
+        "value_note": "str"
       },
       "status": "partial"
     },
     "fuel_poverty": {
-      "duration_s": 17.3,
+      "duration_s": 14.5,
       "error": "",
-      "fetched_at": "2026-10-19T18:57:14.351844+00:00",
+      "fetched_at": "2026-10-25T00:18:23.878109+00:00",
       "notes": "",
       "output_path": "data/demographics/fuel_poverty.parquet",
-      "rows_written": 33756,
+      "rows_written": 33755,
       "schema": {
         "LSOA21CD": "str",
         "fuel_poverty_pct": "float64",
@@ -292,9 +472,9 @@
       "status": "ok"
     },
     "gp": {
-      "duration_s": 3.3,
+      "duration_s": 2.7,
       "error": "",
-      "fetched_at": "2026-10-19T18:52:24.477664+00:00",
+      "fetched_at": "2026-10-25T00:16:15.034566+00:00",
       "notes": "",
       "output_path": "data/healthcare/gp_practices.parquet",
       "rows_written": 1125,
@@ -315,9 +495,9 @@
       "status": "ok"
     },
     "greenblue": {
-      "duration_s": 7.9,
+      "duration_s": 6.2,
       "error": "",
-      "fetched_at": "2026-10-19T18:52:08.166442+00:00",
+      "fetched_at": "2026-10-25T00:15:59.594746+00:00",
       "notes": "",
       "output_path": "",
       "rows_written": 1,
@@ -327,10 +507,28 @@
       },
       "status": "ok"
     },
-    "hospitals": {
-      "duration_s": 3.7,
+    "hle_msoa": {
+      "duration_s": 2.7,
       "error": "",
-      "fetched_at": "2026-10-19T19:11:36.093200+00:00",
+      "fetched_at": "2026-10-25T00:18:14.088111+00:00",
+      "notes": "also wrote data/outcomes/hle_msoa_la.parquet",
+      "output_path": "data/outcomes/hle_msoa.parquet",
+      "rows_written": 6856,
+      "schema": {
+        "MSOA21CD": "str",
+        "dfle_female": "float64",
+        "dfle_male": "float64",
+        "edition": "str",
+        "hle_female": "float64",
+        "hle_male": "float64",
+        "period": "str"
+      },
+      "status": "ok"
+    },
+    "hospitals": {
+      "duration_s": 3.3,
+      "error": "",
+      "fetched_at": "2026-10-25T00:19:37.153632+00:00",
       "notes": "",
       "output_path": "data/healthcare/hospitals.parquet",
       "rows_written": 111,
@@ -351,7 +549,7 @@
     "imd": {
       "duration_s": 0.0,
       "error": "",
-      "fetched_at": "2026-10-19T18:52:34.774279+00:00",
+      "fetched_at": "2026-10-25T00:16:22.113262+00:00",
       "notes": "",
       "output_path": "",
       "rows_written": 33755,
@@ -370,10 +568,57 @@
       },
       "status": "ok"
     },
+    "iod_extra": {
+      "duration_s": 0.4,
+      "error": "",
+      "fetched_at": "2026-10-25T00:16:22.118485+00:00",
+      "notes": "",
+      "output_path": "data/demographics/iod2025_extra.parquet",
+      "rows_written": 33755,
+      "schema": {
+        "LSOA21CD": "str",
+        "adult_skills_score": "float64",
+        "cyp_education_score": "float64",
+        "geo_barriers_score": "float64",
+        "idaci_decile": "int64",
+        "idaci_pct": "float64",
+        "idaci_rank": "int64",
+        "idaopi_decile": "int64",
+        "idaopi_pct": "float64",
+        "idaopi_rank": "int64",
+        "indoors_score": "float64",
+        "iod_pop_children": "int64",
+        "iod_pop_older": "int64",
+        "outdoors_score": "float64",
+        "wider_barriers_score": "float64"
+      },
+      "status": "ok"
+    },
+    "iod_indicators": {
+      "duration_s": 10.0,
+      "error": "",
+      "fetched_at": "2026-10-25T00:16:22.509151+00:00",
+      "notes": "5 of 14 columns missing or not used: iod_ks2: no File 8 column with 'key stage 2' or 'ks2'; iod_ks4: no File 8 column with 'key stage 4' or 'ks4'; iod_staying_on: no File 8 column with 'staying on'; iod_english: no File 8 column with 'english language' or 'speak english' or 'english proficiency'; iod_no_central_heating: no File 8 column with 'central heating'",
+      "output_path": "data/demographics/iod2025_indicators.parquet",
+      "rows_written": 33755,
+      "schema": {
+        "LSOA21CD": "str",
+        "iod_acute_morbidity": "float64",
+        "iod_adult_quals": "float64",
+        "iod_air_quality": "float64",
+        "iod_cidr": "float64",
+        "iod_he_entry": "float64",
+        "iod_housing_poor": "float64",
+        "iod_mood_anxiety": "float64",
+        "iod_road_accidents": "float64",
+        "iod_ypll": "float64"
+      },
+      "status": "ok"
+    },
     "naptan": {
       "duration_s": 0.0,
       "error": "",
-      "fetched_at": "2026-10-19T18:52:24.477445+00:00",
+      "fetched_at": "2026-10-25T00:16:15.034323+00:00",
       "notes": "source returned no frame",
       "output_path": "",
       "rows_written": 0,
@@ -383,7 +628,7 @@
     "pcn": {
       "duration_s": 0.0,
       "error": "",
-      "fetched_at": "2026-10-19T18:52:27.753231+00:00",
+      "fetched_at": "2026-10-25T00:16:17.775655+00:00",
       "notes": "",
       "output_path": "",
       "rows_written": 202,
@@ -394,9 +639,9 @@
       "status": "ok"
     },
     "pharmacies": {
-      "duration_s": 7.0,
+      "duration_s": 4.3,
       "error": "",
-      "fetched_at": "2026-10-19T18:52:27.770936+00:00",
+      "fetched_at": "2026-10-25T00:16:17.789097+00:00",
       "notes": "",
       "output_path": "data/healthcare/pharmacies.parquet",
       "rows_written": 1713,
@@ -414,23 +659,20 @@
       },
       "status": "ok"
     },
-    "ptal": {
-      "duration_s": 0.2,
+    "ppfi": {
+      "duration_s": 0.0,
       "error": "",
-      "fetched_at": "2026-10-19T18:57:31.685916+00:00",
-      "notes": "",
-      "output_path": "data/demographics/ptal.parquet",
-      "rows_written": 4835,
-      "schema": {
-        "LSOA21CD": "str",
-        "ptal_score": "float64"
-      },
-      "status": "ok"
+      "fetched_at": "2026-10-25T00:18:21.222975+00:00",
+      "notes": "No file was found for it, so there are no figures yet. To add them, download the PPFI LSOA CSV (version 2.1 or later; a free CDRC login is needed) from https://data.cdrc.ac.uk/node/2515 and attach it to a GitHub release named ppfi-source; both refresh workflows copy it into .cache/ppfi/ before the pipeline runs. Or put it in .cache/ppfi/ and run `python fetch_all_data.py --only ppfi`.",
+      "output_path": "",
+      "rows_written": 0,
+      "schema": {},
+      "status": "skipped"
     },
     "qof": {
-      "duration_s": 13.5,
+      "duration_s": 9.3,
       "error": "",
-      "fetched_at": "2026-10-19T18:52:53.874670+00:00",
+      "fetched_at": "2026-10-25T00:16:47.796284+00:00",
       "notes": "",
       "output_path": "data/healthcare/qof_prevalence.parquet",
       "rows_written": 1115,
@@ -454,10 +696,110 @@
       },
       "status": "ok"
     },
-    "tfl": {
-      "duration_s": 3.6,
+    "qof_msoa": {
+      "duration_s": 2.9,
       "error": "",
-      "fetched_at": "2026-10-19T18:52:20.926630+00:00",
+      "fetched_at": "2026-10-25T00:18:18.353893+00:00",
+      "notes": "No file was found for it, so there are no figures yet. To add them, download the MSOA data of the House of Commons Library's 'Constituency data: health conditions' dashboard from https://commonslibrary.parliament.uk/constituency-data-how-healthy-is-your-area/ and attach it to a GitHub release named qof-msoa-source; both refresh workflows copy it into .cache/qof_msoa/ before the pipeline runs. Or put it in .cache/qof_msoa/ and run `python fetch_all_data.py --only qof_msoa`.",
+      "output_path": "",
+      "rows_written": 0,
+      "schema": {},
+      "status": "skipped"
+    },
+    "road_casualties": {
+      "duration_s": 1.8,
+      "error": "",
+      "fetched_at": "2026-10-25T00:20:13.881048+00:00",
+      "notes": "",
+      "output_path": "data/environment/road_casualties_lsoa.parquet",
+      "rows_written": 4994,
+      "schema": {
+        "LSOA21CD": "str",
+        "road_ksi_5yr": "float64",
+        "road_ksi_years": "str"
+      },
+      "status": "ok"
+    },
+    "saie": {
+      "duration_s": 1.4,
+      "error": "",
+      "fetched_at": "2026-10-25T00:18:12.647452+00:00",
+      "notes": "",
+      "output_path": "data/demographics/saie_msoa.parquet",
+      "rows_written": 6856,
+      "schema": {
+        "MSOA21CD": "str",
+        "period": "str",
+        "saie_net_ahc": "int64",
+        "saie_net_ahc_lci": "int64",
+        "saie_net_ahc_uci": "int64",
+        "saie_net_bhc": "int64",
+        "saie_net_bhc_lci": "int64",
+        "saie_net_bhc_uci": "int64",
+        "saie_total_income": "int64",
+        "saie_total_income_lci": "int64",
+        "saie_total_income_uci": "int64"
+      },
+      "status": "ok"
+    },
+    "samhi": {
+      "duration_s": 0.3,
+      "error": "",
+      "fetched_at": "2026-10-25T00:18:18.062244+00:00",
+      "notes": "",
+      "output_path": "data/outcomes/samhi_lsoa.parquet",
+      "rows_written": 4994,
+      "schema": {
+        "LSOA21CD": "str",
+        "samhi_decile": "Int64",
+        "samhi_index": "float64",
+        "samhi_licence": "str",
+        "samhi_version": "str",
+        "samhi_vintage": "str",
+        "samhi_year": "int64"
+      },
+      "status": "ok"
+    },
+    "sape": {
+      "duration_s": 19.1,
+      "error": "",
+      "fetched_at": "2026-10-25T00:19:54.644494+00:00",
+      "notes": "",
+      "output_path": "data/demographics/sape_lsoa.parquet",
+      "rows_written": 4994,
+      "schema": {
+        "LSOA21CD": "str",
+        "sape_age0_15": "int64",
+        "sape_age16_64": "int64",
+        "sape_age18_24": "int64",
+        "sape_age65plus": "int64",
+        "sape_age66plus": "int64",
+        "sape_age75plus": "int64",
+        "sape_population": "int64",
+        "sape_year": "int64"
+      },
+      "status": "ok"
+    },
+    "service_access": {
+      "duration_s": 0.6,
+      "error": "",
+      "fetched_at": "2026-10-25T00:20:33.422149+00:00",
+      "notes": "",
+      "output_path": "data/environment/service_access_lsoa.parquet",
+      "rows_written": 4994,
+      "schema": {
+        "LSOA21CD": "str",
+        "dentist_dist_km": "float64",
+        "gp_dist_km": "float64",
+        "origin": "str",
+        "pharmacy_dist_km": "float64"
+      },
+      "status": "ok"
+    },
+    "tfl": {
+      "duration_s": 3.2,
+      "error": "",
+      "fetched_at": "2026-10-25T00:16:11.881961+00:00",
       "notes": "",
       "output_path": "data/environment/tfl_transport_lsoa.parquet",
       "rows_written": 4994,

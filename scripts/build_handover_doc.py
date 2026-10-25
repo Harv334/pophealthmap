@@ -166,7 +166,7 @@ def main() -> int:
             "Revalidated against NHS ODS. Downloads only if the register changed."),
            ("Claimant count", "Fetched from NOMIS each run."),
            ("QOF, and the three Fingertips sets", "Fetched from OHID each run."),
-           ("Fuel poverty, PTAL", "Fetched each run; both find the current file "
+           ("Fuel poverty", "Fetched each run; it finds the current file "
             "from the publisher's own index rather than a saved link."),
            ("Charities", "Fetched from the Charity Commission each run."),
            ("Hospitals", "Derived from the NHS ODS trust sites register, "

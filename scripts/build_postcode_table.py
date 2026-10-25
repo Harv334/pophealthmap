@@ -54,9 +54,8 @@ though it were a measurement:
 
 Each was checked against the function in fetch_all_data.py that writes it,
 and each call was rechecked by a second reader. Two results were not what the
-metric name suggests: ptal_score IS native, because the GLA LSOA Atlas publishes
-a ready-made per-LSOA column, and claimant_count is native while the rate beside
-it is not. --columns all includes the excluded 14, suffixed _modelled.
+metric name suggests: claimant_count is native while the rate beside it is
+not. (PTAL, also native, was taken off the map in October 2026 as too old.) --columns all includes the excluded 14, suffixed _modelled.
 """
 
 import argparse
@@ -85,6 +84,20 @@ def _census_age_ok() -> bool:
 
 
 _AGE_OK = _census_age_ok()
+
+
+def _census_routine_ok() -> bool:
+    """True when indicators.js says the routine and semi-routine figure was
+    rebuilt from NS-SEC L12 and L13 alone (census_routine_classes). Files
+    built before that also counted L7 to L9, so the column is left out."""
+    try:
+        t = (REPO / "data/map/indicators.js").read_text(encoding="utf-8")
+        return '"census_routine_classes":"L12-L13"' in t.replace(" ", "")
+    except OSError:
+        return False
+
+
+_ROUTINE_OK = _census_routine_ok()
 ONSPD_ZIP = REPO / ".cache" / "onspd" / "ONSPD_FEB_2026_UK.zip"
 ONSPD_MEMBER = "Data/ONSPD_FEB_2026_UK.csv"
 
@@ -111,27 +124,46 @@ NATIVE = [
      "Census 2021 (TS007)" if _AGE_OK else "Census 2021 (TS007A)", "2021"),
     ("census_over65_pct",      "Aged 65 and over (%)",          "Census 2021 (TS007A)", "2021"),
     ("census_over85_pct",      "Aged 85 and over (%)",          "Census 2021 (TS007A)", "2021"),
+    ("sape_population",        "Population, mid-year estimate", "ONS mid-year population estimates", "mid-year"),
+    ("sape_age0_15_pct",       "Aged 0 to 15, mid-year estimate (%)", "ONS mid-year population estimates", "mid-year"),
+    ("sape_age16_64_pct",      "Aged 16 to 64, mid-year estimate (%)", "ONS mid-year population estimates", "mid-year"),
+    ("sape_age65plus_pct",     "Aged 65 and over, mid-year estimate (%)", "ONS mid-year population estimates", "mid-year"),
+    ("sape_age75plus_pct",     "Aged 75 and over, mid-year estimate (%)", "ONS mid-year population estimates", "mid-year"),
 
     ("census_white_pct",         "White (%)",                   "Census 2021 (TS021)", "2021"),
     ("census_asian_pct",         "Asian or Asian British (%)",  "Census 2021 (TS021)", "2021"),
     ("census_black_pct",         "Black or Black British (%)",  "Census 2021 (TS021)", "2021"),
     ("census_mixed_pct",         "Mixed or multiple (%)",       "Census 2021 (TS021)", "2021"),
     ("census_other_ethnic_pct",  "Other ethnic group (%)",      "Census 2021 (TS021)", "2021"),
+    ("census_eth_bangladeshi_pct",     "Bangladeshi (%)",          "Census 2021 (TS021)", "2021"),
+    ("census_eth_pakistani_pct",       "Pakistani (%)",            "Census 2021 (TS021)", "2021"),
+    ("census_eth_black_african_pct",   "Black African (%)",        "Census 2021 (TS021)", "2021"),
+    ("census_eth_black_caribbean_pct", "Black Caribbean (%)",      "Census 2021 (TS021)", "2021"),
+    ("census_eth_gypsy_traveller_pct", "Gypsy or Irish Traveller (%)", "Census 2021 (TS021)", "2021"),
+    ("census_eth_roma_pct",            "Roma (%)",                 "Census 2021 (TS021)", "2021"),
     ("census_non_white_pct",     "Not White (%)",               "Census 2021 (TS021)", "2021"),
     ("census_born_outside_uk_pct", "Born outside the UK (%)",   "Census 2021 (TS004)", "2021"),
     ("census_english_hh_all_pct",  "All adults in the household have English as a main language (%)", "Census 2021 (TS025)", "2021"),
     ("census_english_hh_none_pct", "No one in the household has English as a main language (%)", "Census 2021 (TS025)", "2021"),
+    ("census_poor_english_pct",    "Cannot speak English well or at all (%)", "Census 2021 (TS029)", "2021"),
+    ("census_one_person_hh_pct",   "One-person households (%)",  "Census 2021 (TS003)", "2021"),
+    ("census_pensioner_alone_pct", "Living alone, aged 66 and over (% of households)", "Census 2021 (TS003)", "2021"),
+    ("census_lone_parent_dep_pct", "Lone parents with dependent children (% of households)", "Census 2021 (TS003)", "2021"),
 
     ("census_good_health_pct",  "Good or very good health (%)", "Census 2021 (TS037)", "2021"),
     ("census_bad_health_pct",   "Bad or very bad health (%)",   "Census 2021 (TS037)", "2021"),
     ("census_disability_any_pct", "Disabled - any limitation (%)", "Census 2021 (TS038)", "2021"),
     ("census_disability_lot_pct", "Disabled - limited a lot (%)",  "Census 2021 (TS038)", "2021"),
     ("census_provides_unpaid_care_pct", "Provides unpaid care (%)", "Census 2021 (TS039)", "2021"),
+    ("census_unpaid_care_50h_pct", "Unpaid care, 50 or more hours a week (%)", "Census 2021 (TS039)", "2021"),
 
     ("census_owned_pct",           "Owner occupied (%)",        "Census 2021 (TS054)", "2021"),
     ("census_social_rented_pct",   "Social rented (%)",         "Census 2021 (TS054)", "2021"),
     ("census_private_rented_pct",  "Private rented (%)",        "Census 2021 (TS054)", "2021"),
-    ("census_housing_deprived_pct", "Deprived in at least one dimension (%)", "Census 2021 (TS044)", "2021"),
+    ("census_overcrowded_pct",     "Overcrowded homes, bedrooms (%)", "Census 2021 (TS052)", "2021"),
+    ("census_underoccupied_pct",   "Under-occupied homes, bedrooms (%)", "Census 2021 (TS052)", "2021"),
+    ("census_hh_deprived_2plus_pct", "Households deprived in two or more dimensions (%)", "Census 2021 (TS011)", "2021"),
+    ("census_hh_deprived_any_pct", "Households deprived in at least one dimension (%)", "Census 2021 (TS011)", "2021"),
 
     ("census_no_car_pct",          "No car or van (%)",         "Census 2021 (TS045)", "2021"),
     ("census_car_to_work_pct",     "Travel to work by car or van (%)", "Census 2021 (TS061)", "2021"),
@@ -139,6 +171,8 @@ NATIVE = [
     ("census_active_travel_pct",   "Walk or cycle to work (%)", "Census 2021 (TS061)", "2021"),
 
     ("census_unemployed_pct",      "Unemployed (%)",            "Census 2021 (TS066)", "2021"),
+    ("census_inactive_ltsick_pct", "Long-term sick or disabled, not working (%)", "Census 2021 (TS066)", "2021"),
+    ("census_never_worked_ltu_pct", "Never worked or long-term unemployed (%)", "Census 2021 (TS062)", "2021"),
     ("census_higher_managerial_pct",    "Higher managerial occupations (%)", "Census 2021 (TS062)", "2021"),
     ("census_routine_semi_routine_pct", "Routine or semi-routine occupations (%)", "Census 2021 (TS062)", "2021"),
     ("census_no_qual_pct",         "No qualifications (%)",     "Census 2021 (TS067)", "2021"),
@@ -146,7 +180,6 @@ NATIVE = [
 
     ("claimant_count",   "Claimant count",                      "NOMIS NM_162", "latest month"),
     ("fuel_poverty_pct", "Fuel poverty (%)",                    "DESNZ sub-regional LILEE", "2022"),
-    ("ptal_score",       "Transport accessibility (PTAL 0-8)",   "GLA LSOA Atlas (TfL PTAL)", "2014"),
 ]
 
 # Computed onto the LSOA by this pipeline rather than published at it. Only
@@ -167,6 +200,11 @@ MODELLED = [
     ("rail_station_dist_m",  "Distance to nearest station from LSOA centroid (m)",  "TfL Unified API", "live"),
     ("rail_stations_1km",    "Stations within 1 km of LSOA centroid",               "TfL Unified API", "live"),
     ("claimant_rate_pct",    "Claimant rate (%)",                                   "NOMIS NM_162 over population", "latest month"),
+    ("gp_dist_km",           "Distance to nearest GP practice from LSOA centre (km)", "NHS ODS register, measured here", "live"),
+    ("pharmacy_dist_km",     "Distance to nearest pharmacy from LSOA centre (km)",    "NHS ODS register, measured here", "live"),
+    ("dentist_dist_km",      "Distance to nearest NHS dentist from LSOA centre (km)", "NHS ODS register, measured here", "live"),
+    ("crime_total",          "Crimes in the LSOA, 12 months",                       "data.police.uk points, counted here", "12 months"),
+    ("crime_rate_per_1000",  "Crimes per 1,000 residents, 12 months",               "data.police.uk over Census 2021 residents", "12 months"),
 ]
 
 GEOGRAPHY = [
@@ -193,12 +231,6 @@ BLANK_REASON = {
         "The LSOA figures on these rows are complete.",
     "ward_imd_decile_mean":
         "As the ward IMD score above.",
-    "ptal_score":
-        "The GLA LSOA Atlas supplied 4,835 rows, which is the number of LSOAs "
-        "London had on 2011 boundaries; PTAL itself is 2014 data. 4,659 of "
-        "today's 4,994 LSOAs match one of those rows and 335 do not, so the "
-        "gap is where the 2011 and 2021 boundaries differ rather than "
-        "anything about those places.",
 }
 
 PROVENANCE = """Built {built} by scripts/build_postcode_table.py, in
@@ -212,7 +244,6 @@ Sources
     IMD 2025            MHCLG File 7, score, rank, decile and seven domains
     Census 2021         ONS via Nomis, the table named against each column in
                         the dictionary
-    PTAL                GLA LSOA Atlas, 2014
     Fuel poverty        DESNZ sub-regional LILEE, 2022
     Claimant count      NOMIS NM_162
     LSOA to ward        ONS best-fit lookup LSOA21_WD25_LAD25_EW_LU_v2
@@ -368,7 +399,7 @@ def tidy(v, key):
     except (TypeError, ValueError):
         return v
     if key in ("census_population", "imd_rank", "claimant_count", "gb_total_uprn",
-               "imd_decile", "bus_stops_800m", "rail_stations_1km"):
+               "imd_decile", "bus_stops_800m", "rail_stations_1km", "sape_population", "crime_total"):
         return str(int(round(f)))
     if f == int(f):
         return str(int(f))
@@ -393,14 +424,18 @@ def main():
     wards = json.loads((REPO / "ward_data.json").read_text(encoding="utf-8"))["wards"]
 
     metrics = [] if args.columns == "none" else list(NATIVE)
+    if not _ROUTINE_OK:
+        metrics = [m for m in metrics if m[0] != "census_routine_semi_routine_pct"]
+        print("  left out until the data is rebuilt: Routine or semi-routine occupations")
     if args.columns == "all":
         metrics += [(k, lab + " [modelled]", s, y) for k, lab, s, y in MODELLED]
 
     # A column that is empty for every LSOA would still get a heading, and a
-    # heading is a promise. census_housing_deprived_pct was exactly that: the
-    # pipeline codes TS044 behind a guard that silently skips when a column
-    # match fails, so the key never reaches lsoa_data.json, and the extract
-    # carried 180,983 empty cells under "Deprived in at least one dimension".
+    # heading is a promise. Household deprivation was exactly that: the
+    # pipeline read it from TS044 (accommodation type, not deprivation) behind
+    # a guard that silently skipped when a column match failed, so the key
+    # never reached lsoa_data.json, and the extract carried 180,983 empty
+    # cells under "Deprived in at least one dimension". It is TS011 now.
     # Checked rather than hardcoded, so the next one cannot repeat it.
     has_value = set()
     for v in lsoa.values():
