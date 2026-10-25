@@ -3722,7 +3722,7 @@ def run_census_oa() -> pd.DataFrame:
     frame = frame.rename(columns={"LSOA21CD": "OA21CD"})
     frame, counts = _census_split(frame, "OA21CD")
     frame = frame.set_index("OA21CD")
-    keys = [c for c in frame.columns if c.startswith("census_")]
+    keys = [c for c in frame.columns if c.startswith("census_") and c not in RETIRED_KEYS]
     # Kept for the ward build, which builds census wards from the counts of
     # their output areas (see get_oa_to_ward). Only output areas in scope.
     oa_ward = get_oa_to_ward()
@@ -10084,7 +10084,7 @@ def lsoa_census_counts(counts: "pd.DataFrame | None", codes) -> dict:
     if counts is None or counts.empty or "LSOA21CD" not in counts.columns:
         return {}
     keys = sorted(c[:-5] for c in counts.columns
-                  if c.endswith("__num") and f"{c[:-5]}__den" in counts.columns)
+                  if c.endswith("__num") and f"{c[:-5]}__den" in counts.columns and c[:-5] not in RETIRED_KEYS)
     want = set(codes)
     sub = counts[counts["LSOA21CD"].astype(str).isin(want)]
     rows: dict = {}
@@ -10096,12 +10096,61 @@ def lsoa_census_counts(counts: "pd.DataFrame | None", codes) -> dict:
     return {"keys": keys, "rows": rows} if rows else {}
 
 
+# Indicators taken off the map in October 2026 as near-copies of others. Of
+# each pair the owner kept the one its publisher puts out for the smaller area
+# (CHANGELOG, "Unreleased"). They are left out of every file the map reads,
+# here and in the output area files (run_census_oa); what they are built from
+# is still read where another figure needs it: the mid-year estimates are the
+# base of the youth claimant rate and care home beds, the crime total of the
+# crime rate.
+RETIRED_KEYS = frozenset({
+    "census_non_white_pct",           # the sum of the other groups; White % is published
+    "imd_decile_mean",                # worked out here; MHCLG publishes the LSOA decile
+    "iod_adult_quals",                # the adult skills sub-domain under another name
+    "iod_air_quality",                # older and unitless beside Defra's NO2 and PM2.5
+    "census_english_hh_all_pct",      # the mirror of no one in the household having English
+    "ft_93097",                       # the claimant count again, by MSOA
+    "crime_total",                    # mostly the size of the area; the rate is kept
+    "idaci_decile", "idaopi_decile", "samhi_decile",   # their scores in tenths
+    "census_hh_deprived_any_pct",     # kept: deprived in two or more dimensions
+    "ft_obesity_year6",               # by LA; Local Health has it by MSOA
+    "ft_child_poverty_low_income",    # by LA; DWP's ward figures replace it
+    "pm10_ugm3",                      # PM2.5 is kept
+    "ft_93280",                       # fuel poverty by MSOA; DESNZ's is by LSOA
+    "sape_population", "sape_age0_15_pct", "sape_age16_64_pct",   # the Census ones go to
+    "sape_age65plus_pct", "sape_age75plus_pct",                   # output areas
+    "ft_life_expectancy_female", "ft_life_expectancy_male",       # by LA; Local Health
+    "ft_healthy_life_expectancy_female", "ft_healthy_life_expectancy_male",  # and ONS by MSOA
+    "saie_net_bhc",                   # kept: before tax, and after housing costs
+})
+
+
+def drop_retired(records: dict, nested: bool = False) -> dict:
+    """records with RETIRED_KEYS taken out of each, in place: flat records
+    ({code: {key: value}}) or, nested, ward records ({code: {"indicators":
+    {...}}})."""
+    for rec in (records or {}).values():
+        ind = rec.get("indicators") if nested and isinstance(rec, dict) else rec
+        if isinstance(ind, dict):
+            for k in RETIRED_KEYS.intersection(ind):
+                del ind[k]
+            # An LA's notes on its Fingertips figures are keyed the same way.
+            for side in ("ft_notes", "ft_from"):
+                if isinstance(ind.get(side), dict):
+                    for k in RETIRED_KEYS.intersection(ind[side]):
+                        del ind[side][k]
+    return records
+
+
 def export_all() -> None:
     rule("Export Leaflet JSON outputs")
     ward_data  = build_ward_data()
     lsoa_data  = build_lsoa_data()
     msoa_data  = build_msoa_data()
     boro_data  = build_borough_data()
+    drop_retired(ward_data.get("wards", {}), nested=True)
+    for recs in (lsoa_data, msoa_data, boro_data):
+        drop_retired(recs)
     pharm_data = build_pharmacies_json()
     vcse_data  = build_vcse_json()
     dental_data = build_dental_json()

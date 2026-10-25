@@ -78,8 +78,8 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
    * This is an allow-list, not a pattern, and it has to stay that way. The
    * previous version summed anything whose name did not contain _pct, _score
    * or "rate", which quietly swept in every indicator that happens to be
-   * named for its subject rather than its unit: imd_decile_mean,
-   * ft_smoking_prevalence_adults, ft_life_expectancy_male, the three _qof
+   * named for its subject rather than its unit: the ward IMD decile,
+   * ft_smoking_prevalence_adults, the LA life expectancy, the three _qof
    * prevalences, ft_fuel_poverty_lihc and the rest of the Fingertips set.
    * A twenty-ward borough came out with a deprivation decile of 160 and a
    * life expectancy of sixteen hundred years.
@@ -93,9 +93,9 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
   // The rule itself lives in index.html as laSums, which the map, Compare and
   // Custom area also use, so Ask adds up and averages exactly as they do. The
   // list here is only the fallback for a page that has not defined it, and
-  // matches it: crime counts (crime_total and the *_12mo categories) and any
-  // *_count are summed.
-  var ADDITIVE = { census_population: 1, crime_total: 1, gb_total_uprn: 1 };
+  // matches it: crime counts (the *_12mo categories) and any *_count are
+  // summed.
+  var ADDITIVE = { census_population: 1, gb_total_uprn: 1 };
   function isAdditive(key) {
     if (typeof laSums === "function") return !!laSums(key);
     return ADDITIVE[key] === 1 || /_count$|_12mo$/.test(key);
@@ -314,19 +314,13 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
    * left without one rather than guessed at.
    */
   var FT_META = {
-    ft_life_expectancy_male: ["Life expectancy at birth (male)", "years"],
-    ft_life_expectancy_female: ["Life expectancy at birth (female)", "years"],
-    ft_healthy_life_expectancy_male: ["Healthy life expectancy at birth (male)", "years"],
-    ft_healthy_life_expectancy_female: ["Healthy life expectancy at birth (female)", "years"],
     ft_smoking_prevalence_adults: ["Smoking prevalence in adults (18+), current smokers", "%"],
     ft_obesity_adults: ["Overweight including obesity prevalence in adults", "%"],
-    ft_obesity_year6: ["Year 6 obesity, including severe obesity", "%"],
     ft_physical_activity_adults: ["Physically active adults", "%"],
     ft_hypertension_qof: ["Hypertension: QOF prevalence", "%"],
     ft_depression_qof: ["Depression: QOF prevalence", "%"],
     ft_mental_health_qof: ["Mental health: QOF prevalence", "%"],
     ft_suicide_rate: ["Suicide rate", "per 100,000"],
-    ft_child_poverty_low_income: ["Children in relative low income families (under 16)", "%"],
     ft_self_harm_admissions_10_24: ["Hospital admissions for self-harm (10 to 24)", "per 100,000"],
     ft_a_e_attendance_under_5: ["A&E attendances, ages 0 to 4", "per 1,000"],
     ft_mmr_2_doses_age5: ["Vaccination coverage: MMR two doses at 5 years", "%"],
@@ -350,9 +344,9 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
    * Since that was written a second Fingertips set arrived and the test had to
    * narrow. The Local Health series is fetched at MSOA (area type 3) and
    * carried down to wards through the LSOA bridge, and it is keyed by the
-   * numeric indicator id: ft_93283, ft_93280 and 31 others. Those genuinely
+   * numeric indicator id: ft_93283 and the others. Those genuinely
    * differ ward by ward and ranking them is a real ward ranking. The
-   * upper-tier local authority series is keyed by name, ft_life_expectancy_male
+   * upper-tier local authority series is keyed by name, ft_smoking_prevalence_adults
    * and the rest, and that is the one that repeats across a borough.
    *
    * Testing /^ft_/ alone put the caveat on both, telling the model not to rank
@@ -425,7 +419,6 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
     "most deprived tenth) and never turn it into a percentage of England.";
 
   var IMD_META = {
-    imd_decile_mean: "Mean IMD decile of the LSOAs in this area, population weighted. " + DECILE_SCALE,
     imd_best_decile: "The least deprived IMD decile present in this area. Deciles run 1 (the most deprived tenth nationally) to 10 (the least).",
     imd_worst_decile: "The most deprived IMD decile present in this area. Deciles run 1 (the most deprived tenth nationally) to 10 (the least).",
     imd_rank: "The LSOA's rank among England's 33,755 LSOAs by IMD 2025, where 1 is the most deprived.",
@@ -442,7 +435,6 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
     environment_score: "more deprived",
     health_score: "more deprived",
     income_score: "more deprived",
-    imd_decile_mean: "less deprived",
     imd_best_decile: "less deprived",
     imd_worst_decile: "less deprived",
     imd_decile: "less deprived",
@@ -452,8 +444,6 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
     // the two attainment scores and the deciles and ranks.
     idaci_pct: "more deprived",
     idaopi_pct: "more deprived",
-    idaci_decile: "less deprived",
-    idaopi_decile: "less deprived",
     idaci_rank: "less deprived",
     idaopi_rank: "less deprived",
     cyp_education_score: "more deprived",
@@ -470,15 +460,12 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
     iod_ks4: "less deprived",
     iod_staying_on: "more deprived",
     iod_he_entry: "more deprived",
-    iod_adult_quals: "more deprived",
     iod_english: "more deprived",
     iod_housing_poor: "more deprived",
     iod_no_central_heating: "more deprived",
-    iod_air_quality: "more deprived",
     iod_road_accidents: "more deprived",
     // ONS's MSOA releases.
     saie_total_income: "more income",
-    saie_net_bhc: "more income",
     saie_net_ahc: "more income",
     hle_female: "more years in good health",
     hle_male: "more years in good health",
@@ -492,7 +479,6 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
     .forEach(function (k) { DIRECTION[k] = "less healthy"; });
   DIRECTION.ahah_decile = "healthier";
   DIRECTION.samhi_index = "worse mental health";
-  DIRECTION.samhi_decile = "better mental health";
   ["ppfi_decile", "ppfi_supermarket_proximity_decile", "ppfi_supermarket_access_decile", "ppfi_online_decile",
    "ppfi_nonsupermarket_decile", "ppfi_family_decile"].forEach(function (k) { DIRECTION[k] = "lower risk"; });
 
@@ -800,7 +786,7 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
 
   // Figures only: the MSOA file keeps a significance flag beside each
   // Local Health figure (ft_93283_vs), and ONS's 95% limits beside each of
-  // its modelled figures (saie_net_bhc_lci and _uci), which are not figures
+  // its modelled figures (saie_total_income_lci and _uci), which are not figures
   // themselves. The limits reach the model on their figure, as range_95
   // (withRanges).
   function figuresOnly(ind) {
@@ -874,8 +860,8 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
     return c.length ? c.join(" ") : undefined;
   }
 
-  var COMPARE_DEFAULT = ["imd_score", "imd_decile_mean", "imd_decile", "census_population", "census_over65_pct",
-    "census_non_white_pct", "census_no_car_pct"];
+  var COMPARE_DEFAULT = ["imd_score", "imd_decile", "census_population", "census_over65_pct",
+    "census_white_pct", "census_no_car_pct"];
 
   function wantedKeys(input, ind) {
     return (Array.isArray(input.indicators) && input.indicators.length) ? input.indicators : Object.keys(ind);
@@ -1183,12 +1169,8 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
       names.slice(0, 6).forEach(function (n) {
         var hit = findArea(n, lv, laName);
         if (!hit || hit.ambiguous) { missing.push(n); return; }
-        // imd_decile_mean, not imd_decile. The ward figure is a population
-        // weighted mean of LSOA deciles, so it is not itself a decile and is
-        // not published under that name. The old key matched nothing and was
-        // dropped in silence, so the default comparison came back without any
-        // deprivation figure at all. (imd_decile is in the default list for
-        // LSOAs, which do have one; a ward or LA simply has no such key.)
+        // imd_score for every level, and imd_decile for LSOAs, the only level
+        // MHCLG publishes a decile for; a ward or LA simply has no such key.
         var wanted = (Array.isArray(input.indicators) && input.indicators.length) ? input.indicators : COMPARE_DEFAULT;
         rows.push({ name: hit.area.name, la: lv === "ward" ? (hit.area.lad || undefined) : undefined,
           indicators: figures(hit.area.indicators, wanted) });

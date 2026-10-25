@@ -21,7 +21,9 @@ Checks, each an error unless noted:
      either: the pack cannot hold it until it is rebuilt, and its rebuild is
      checked in full.
   4. Against the pack it would replace (--previous): no indicator key that pack
-     had has gone, and ward_data.json holds at least 90% as many values.
+     had has gone, and ward_data.json holds at least 90% as many values. The
+     indicators taken off the map (RETIRED_KEYS in fetch_all_data.py) are left
+     out of both counts, as a rebuilt pack no longer has them.
 
 Usage:
   scripts/check_region_pack.py DIR [--scope NAME] [--previous DIR]
@@ -33,6 +35,7 @@ each problem and exits 1 if there are any.
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import pathlib
 import re
@@ -64,6 +67,22 @@ def newer_series(london: pathlib.Path, sources: dict) -> set:
     return out
 
 
+def retired_keys() -> frozenset:
+    """RETIRED_KEYS from fetch_all_data.py, read without importing it."""
+    try:
+        tree = ast.parse((ROOT / "fetch_all_data.py").read_text(encoding="utf-8"))
+    except (OSError, SyntaxError):
+        return frozenset()
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and any(getattr(t, "id", "") == "RETIRED_KEYS" for t in node.targets):
+            v = node.value.args[0] if isinstance(node.value, ast.Call) and node.value.args else node.value
+            return frozenset(ast.literal_eval(v))
+    return frozenset()
+
+
+RETIRED = retired_keys()
+
+
 def read_stats(path: pathlib.Path) -> dict | None:
     """PH_IND_STATS from an indicators.js, or None if there is none."""
     if not path.exists():
@@ -81,13 +100,16 @@ def read_stats(path: pathlib.Path) -> dict | None:
 
 
 def ward_values(path: pathlib.Path) -> tuple[set, int]:
-    """The indicator keys in a ward_data.json, and how many values it holds."""
+    """The indicator keys in a ward_data.json, and how many values it holds,
+    leaving out the retired ones."""
     if not path.exists():
         return set(), 0
     data = json.loads(path.read_text(encoding="utf-8"))
     keys, n = set(), 0
     for w in (data.get("wards") or {}).values():
         for k, v in ((w or {}).get("indicators") or {}).items():
+            if k in RETIRED:
+                continue
             keys.add(k)
             if v is not None and v != "":
                 n += 1

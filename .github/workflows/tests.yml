@@ -84,9 +84,12 @@ jobs:
           python3 tests/pipeline/test_qof_msoa.py
           python3 tests/pipeline/test_ppfi.py
           python3 tests/pipeline/test_fhrs.py
-      # What stops a region pack being published (scripts/check_region_pack.py).
+      # What stops a region pack being published (scripts/check_region_pack.py),
+      # and the indicators taken off the map, which no file the map reads holds.
       - name: Check the region pack checks
-        run: python3 tests/pipeline/test_region_pack.py
+        run: |
+          python3 tests/pipeline/test_region_pack.py
+          python3 tests/pipeline/test_retired.py
       # The deploy's own steps: the sitemap and dateModified, a pack's file
       # list, the LSOA and MSOA figures in columns, and the font faces.
       - name: Check the site build steps
