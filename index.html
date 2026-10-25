@@ -724,7 +724,7 @@
   /* The note is a row of its own under the scale, wrapping to the key's
      width rather than widening it (contain: inline-size keeps its length out
      of the key's width), so the whole of it can be read. */
-  .map-legend-strip.has-note:not(.is-biv) { flex-wrap: wrap; row-gap: 4px; }
+  .map-legend-strip.has-note { flex-wrap: wrap; row-gap: 4px; }
   .map-legend-strip .mls-note { flex: 1 0 100%; contain: inline-size; white-space: normal; line-height: 1.4;
     color: var(--tint-amber-ink); font-weight: 600; }
   .map-legend-strip .mls-note[hidden] { display: none; }
@@ -1239,7 +1239,6 @@
      tooltip and the hint say why. */
   .dl-seg button[aria-disabled="true"]:not(.active) { color: var(--ink-3); opacity: .5; cursor: not-allowed; }
   .dl-seg button[aria-disabled="true"]:not(.active):hover { color: var(--ink-3); background: transparent; }
-  .dl-seg button.biv-lacks:not(.active) { color: var(--ink-3); opacity: .6; }
   .dl-hint { position: absolute; top: 100%; right: 0; margin-top: 4px; background: var(--invert-bg); color: var(--invert-ink); font-size: var(--t-xs); line-height: 1.4; padding: 6px 9px; border-radius: var(--r-sm); width: max-content; max-width: min(320px, calc(100vw - 24px)); opacity: 0; pointer-events: none; transition: opacity .2s; box-shadow: var(--shadow); }
   .dl-hint.show { opacity: 1; }
 
@@ -2330,49 +2329,6 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
     background: linear-gradient(to right, #E6F4F3, #7CC4BF, #0B7A75, #05403D); }
   .pcn-ends { display: flex; justify-content: space-between; color: var(--ink-3); }
   .pcn-note { color: var(--ink-3); margin-top: 4px; }
-  /* Two-variable map */
-  .ov-biv { margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--line-2); }
-  .ov-biv[hidden], .ov-biv-pick[hidden], .ov-biv-on[hidden], .biv-legend[hidden] { display: none; }
-  .ov-biv-add { appearance: none; font: inherit; font-size: var(--t-md); font-weight: 600; color: var(--nhs-blue);
-    background: none; border: 0; padding: 4px 0; cursor: pointer; display: inline-flex; align-items: flex-start;
-    gap: 4px; text-align: left; }
-  .ov-biv-add .ic { margin-top: 1px; }
-  .ov-biv-add:hover { text-decoration: underline; }
-  .ov-biv-pick { display: flex; flex-direction: column; gap: 4px; font-size: var(--t-xs); color: var(--ink-2); }
-  .ov-biv-pick select { width: 100%; min-height: 34px; padding: 4px 6px; border: 1px solid var(--line);
-    border-radius: var(--r-sm); font: inherit; font-size: var(--t-md); color: var(--ink); background: var(--paper); }
-  .ov-biv-on { display: flex; align-items: center; gap: 8px; font-size: var(--t-md); color: var(--ink-2); }
-  .ov-biv-on > span { flex: 1; min-width: 0; }
-  .ov-biv-on b { color: var(--ink); }
-  .biv-legend { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; align-items: center;
-    font-size: var(--t-xs); color: var(--ink-2); margin-bottom: 4px; }
-  .biv-grid-lg { grid-template-columns: repeat(3, 30px) !important; grid-template-rows: repeat(3, 22px) !important; }
-  /* Plain words at the corners of the key: high on both, low on both. */
-  .biv-key { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr auto 1fr; grid-template-rows: auto auto;
-    column-gap: 8px; row-gap: 4px; align-items: start; font-size: var(--t-xs); line-height: 1.3; color: var(--ink-2); }
-  .biv-key .biv-gw { grid-column: 2; grid-row: 1 / span 2; display: grid; grid-template-columns: auto auto;
-    column-gap: 3px; row-gap: 2px; }
-  .biv-yl { display: grid; grid-template-rows: repeat(3, 22px); gap: 1px; align-items: center; text-align: right;
-    font-size: var(--t-xs); line-height: 1; color: var(--ink-3); }
-  .biv-xl { grid-column: 2; display: flex; justify-content: space-between; gap: 4px; font-size: var(--t-xs);
-    line-height: 1.2; color: var(--ink-3); }
-  .biv-miss { display: flex; align-items: center; gap: 6px; }
-  .biv-miss-sw { width: 18px; height: 14px; flex: none; background: #fff; border: 1.5px dashed #333; box-sizing: border-box; }
-  .biv-c { max-width: 9em; }
-  .biv-tl { grid-column: 1; grid-row: 1; justify-self: end; text-align: right; }
-  .biv-tr { grid-column: 3; grid-row: 1; justify-self: start; }
-  .biv-bl { grid-column: 1; grid-row: 2; justify-self: end; align-self: end; text-align: right; }
-  .biv-br { grid-column: 3; grid-row: 2; justify-self: start; align-self: end; }
-  .biv-legend > .biv-axes { grid-column: 1 / -1; }
-  .biv-axes { display: flex; flex-direction: column; gap: 6px; line-height: 1.3; }
-  .biv-axes b { color: var(--ink); }
-  .biv-grid { display: grid; grid-template-columns: repeat(3, 18px); grid-template-rows: repeat(3, 18px); gap: 1px; }
-  .biv-grid span { display: block; }
-  .biv-note { grid-column: 1 / -1; color: var(--ink-3); line-height: 1.4; margin-top: 2px; }
-  .map-legend-strip .mls-biv { display: none; }
-  .map-legend-strip.is-biv > :not(.mls-biv):not(.mls-open) { display: none; }
-  .map-legend-strip.is-biv .mls-biv { display: flex; align-items: center; gap: 8px; }
-  .mls-biv .biv-grid { grid-template-columns: repeat(3, 11px); grid-template-rows: repeat(3, 11px); }
   .ov-search { width: 100%; box-sizing: border-box; min-height: 40px; padding: 0 var(--s-3); font: inherit;
     font-size: var(--t-base); color: var(--ink); background: var(--paper); border: 1px solid var(--ink-faint);
     border-radius: var(--r-sm);
@@ -3827,18 +3783,6 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
                    and closed by its own button at the top. Straight after the
                    button in the page, so Tab moves from one into the other. -->
               <div id="ov-info-panel" class="ov-info-panel" role="region" aria-labelledby="ov-about" hidden></div>
-              <!-- Two-variable map: a second indicator drawn against the first. -->
-              <div class="ov-biv" id="ov-biv" hidden>
-                <button type="button" class="ov-biv-add" id="ov-biv-add"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg>Add a second indicator</button>
-                <label class="ov-biv-pick" id="ov-biv-pick" hidden>
-                  <span>Second indicator, to compare with the first</span>
-                  <select id="ov2"></select>
-                </label>
-                <div class="ov-biv-on" id="ov-biv-on" hidden>
-                  <span>Compared with: <b id="ov-biv-nm"></b></span>
-                  <button type="button" class="ov-btn quiet" id="ov-biv-x">Remove</button>
-                </div>
-              </div>
             </div>
             <input type="search" class="ov-search" id="ov-search" autocomplete="off"
                    placeholder="Search indicators" aria-label="Search indicators">
@@ -4141,7 +4085,6 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
           </select>
 
           <div class="scale-bar" id="scale">
-            <div class="biv-legend" id="biv-legend" hidden></div>
             <div class="sc-unit" id="sc-unit"></div>
             <div class="scale-labels"><span id="sc-lo">Low</span><span id="sc-mid" style="color:var(--ink-3);font-variant-numeric:tabular-nums"></span><span id="sc-hi">High</span></div>
             <!-- Gradient must match ramp() in JS exactly: rgb(15,110,86) → rgb(239,159,39) → rgb(163,45,39) -->
@@ -4169,7 +4112,7 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
             </div>
             <div id="rank-notes" class="rank-notes"></div>
             <div style="font-size:var(--t-xs);color:var(--ink-3);margin-top:6px;line-height:1.4">
-              Select a row to zoom to that area. These lists are hidden while a second indicator is being compared.
+              Select a row to zoom to that area.
             </div>
           </div>
 
@@ -4506,7 +4449,6 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
         <span class="mls-max" id="mls-max"></span>
         <button type="button" class="mls-flip" id="mls-flip" aria-pressed="false"
                 aria-label="Reverse the colours" title="Reverse the colours, so the lowest figures are darkest"><svg class="ic" aria-hidden="true"><use href="#i-reverse"/></svg></button>
-        <span class="mls-biv" id="mls-biv"></span>
         <span class="mls-note" id="mls-note" hidden></span>
       </div>
       <!-- Loading screen. A map rather than a spinner: see _paintLoaderMap
@@ -7956,8 +7898,7 @@ var PH_HELD_FIELDS = {};
    anywhere. A new indicator reaches the registry before the pipeline has
    run for it, and until then choosing it would draw a grey map. Taking it
    out of CATS and the hidden select takes it out of the picker (told by the
-   ph-indicators-pruned event), the second indicator's list and Ask, which
-   lists CATS. Query, Compare and the Data export already build their lists
+   ph-indicators-pruned event) and Ask, which lists CATS. Query, Compare and the Data export already build their lists
    from the figures themselves.
 
    indicators.js settles most keys. The pipeline measures it from the very
@@ -8831,15 +8772,15 @@ const IMD_SCORE_KEYS = ['imd_score', 'imd_score_ward', 'income_score', 'employme
   'wider_barriers_score', 'indoors_score', 'outdoors_score'];
 function ovContext(level, k, v, rec) {
   const n = parseFloat(v);
-  if (isNaN(n) || typeof _bivIds !== 'function') return '';
+  if (isNaN(n) || typeof _levelIds !== 'function') return '';
   const skipSmall = rankSkipsSmall(level, k);
   if (skipSmall && rec && wardIsSmall(rec)) return '';
   const key = level + '|' + k;
   let vals = _ctxCache[key];
   if (!vals) {
-    vals = _bivIds(level)
+    vals = _levelIds(level)
       .filter(id => !skipSmall || !wardIsSmall(typeof WARD_DATA !== 'undefined' ? WARD_DATA[id] : null))
-      .map(id => _bivValue(level, id, k)).filter(x => x != null).sort((a, b) => a - b);
+      .map(id => _levelValue(level, id, k)).filter(x => x != null).sort((a, b) => a - b);
     if (vals.length < 5) return '';
     _ctxCache[key] = vals;
   }
@@ -9552,55 +9493,9 @@ function indicatorCardHTML(k) {
     ' title="Opens an email to ' + PH_CONTACT + ' with this figure\'s details filled in">Report a problem with this figure</a>';
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   TWO-VARIABLE MAP
-
-   A second indicator, drawn with the first as a three-by-three grid of
-   colours: each indicator is cut into thirds (low, middle, high) across the
-   areas of the level being drawn, and each area takes the colour for its
-   pair of thirds. Thirds rather than a continuous scale because nine
-   colours are about as many as anyone can tell apart on a map.
-
-   "High" follows each indicator's own ramp, so for the IMD decile, which
-   counts down, high means more deprived, as it does on the single map.
-   An area missing either figure is white with a dark dashed edge (bivEdge),
-   which no colour of the nine can be mistaken for. Every layer's style
-   function asks bivFill when bivOn() is true, so this works at all four
-   levels.
-   ═══════════════════════════════════════════════════════════════════════════ */
-let curOv2 = 'none';
-// [second's third][first's third], low to high. A tested blue/red scheme
-// (Stevens), legible in the common forms of colour blindness.
-const BIV_COLOURS = [
-  ['#e8e8e8', '#e4acac', '#c85a5a'],
-  ['#b0d5df', '#ad9ea5', '#985356'],
-  ['#64acbe', '#627f8c', '#574249'],
-];
-const BIV_MISSING = '#ffffff';
-// The dashed edge that marks a missing figure, at every level. Every style
-// that can carry it says dashArray, so a polygon that gains a figure, or a
-// map that goes back to one indicator, loses the dash again.
-function bivEdge(st) {
-  if (!st) return st;
-  const miss = bivOn() && st.fillColor === BIV_MISSING && st.fillOpacity > 0;
-  if (miss) {
-    st.color = '#333333';
-    st.weight = Math.max(st.weight || 0, 1.2);
-    st.opacity = 1;
-    st.dashArray = '3 3';
-  } else if (st.dashArray === undefined) {
-    st.dashArray = null;
-  }
-  return st;
-}
-// Nine colours only read when they are close to solid; the usual see-through
-// fill washes them into one another.
-function bivOpacity(o) { return bivOn() && o > 0 ? Math.max(o, 0.85) : o; }
-function bivOn() {
-  return !!(curOv2 && curOv2 !== 'none' && typeof curOv !== 'undefined' &&
-            curOv && curOv !== 'none' && curOv2 !== curOv);
-}
-function _bivValue(level, id, k) {
+// An area's figure for an indicator, as a number, at any level, and the
+// areas of a level, for the "higher than X% of wards" lines (ovContext).
+function _levelValue(level, id, k) {
   const v = level === 'lsoa' ? lsoaOvValue(id, k)
           : level === 'msoa' ? msoaOvValue(id, k)
           : level === 'borough' ? boroughOvValue(id, k)
@@ -9608,120 +9503,11 @@ function _bivValue(level, id, k) {
   const n = parseFloat(v);
   return isNaN(n) ? null : n;
 }
-function _bivIds(level) {
+function _levelIds(level) {
   if (level === 'lsoa') return Object.keys(typeof LSOA_DATA !== 'undefined' ? LSOA_DATA : {});
   if (level === 'msoa') return Object.keys(typeof MSOA_DATA !== 'undefined' ? (MSOA_DATA || {}) : {});
   if (level === 'borough') return (typeof _laCodes === 'function') ? _laCodes() : [];
   return Object.keys(typeof WARD_DATA !== 'undefined' ? WARD_DATA : {});
-}
-let _bivBreakCache = {};
-function bivBreaks(level, k) {
-  const key = level + '|' + k;
-  if (_bivBreakCache[key]) return _bivBreakCache[key];
-  const vals = _bivIds(level).map(id => _bivValue(level, id, k)).filter(v => v != null)
-    .sort((a, b) => a - b);
-  // Not cached when empty: LSOA and MSOA figures load later than the wards.
-  if (vals.length < 3) return null;
-  _bivBreakCache[key] = bivThirds(vals);
-  return _bivBreakCache[key];
-}
-/* Thirds by rank. Each break sits at a third of the way along the sorted
-   figures, moved to the nearer edge of any run of tied figures, so a tie is
-   never split and never all pushed into the third above (every LSOA with no
-   blue space within a 15-minute walk used to be drawn as middle). Each break
-   is a value halfway between two different figures. ok is false when a third
-   would still be empty, because too many areas share one figure. */
-function bivThirds(vals) {
-  const n = vals.length;
-  const cut = t => {
-    const v = vals[t];
-    let lo = t, hi = t;
-    while (lo > 0 && vals[lo - 1] === v) lo--;
-    while (hi < n && vals[hi] === v) hi++;
-    // The run of ties is vals[lo..hi-1]: break before it or after it,
-    // whichever is nearer the target, and never at either end of the list.
-    const opts = [lo, hi].filter(i => i > 0 && i < n);
-    if (!opts.length) return null;
-    return opts.sort((a, b) => Math.abs(a - t) - Math.abs(b - t))[0];
-  };
-  const i1 = cut(Math.round(n / 3)), i2 = cut(Math.round(n * 2 / 3));
-  const mid = i => (vals[i - 1] + vals[i]) / 2;
-  const ok = i1 != null && i2 != null && i1 < i2;
-  if (!ok) {
-    // Still drawn, as best it can be, but flagged so the key says so.
-    const a = i1 != null ? mid(i1) : vals[0], b = i2 != null ? mid(i2) : vals[n - 1];
-    return Object.assign([a, Math.max(a, b)], { ok: false });
-  }
-  return Object.assign([mid(i1), mid(i2)], { ok: true });
-}
-// False when an indicator cannot be split into three thirds at a level;
-// null while its figures have not loaded.
-function bivSplits(level, k) {
-  const b = bivBreaks(level, k);
-  return b ? b.ok !== false : null;
-}
-function bivClass(level, k, v) {
-  const b = bivBreaks(level, k);
-  if (!b || v == null) return null;
-  let c = v < b[0] ? 0 : v < b[1] ? 1 : 2;
-  const cfg = (typeof OV_CFG !== 'undefined') ? OV_CFG[k] : null;
-  if (cfg && cfg.rev) c = 2 - c;
-  return c;
-}
-/* The words for each end of an indicator on the two-indicator key, from its
-   own lo and hi words (OV_CFG). "High" is the top of its ramp, which for a
-   decile that counts down is the more deprived end, as bivClass flips it. A
-   word that names its own quality ("More deprived") stands alone; a plain
-   "Higher" takes the indicator's name. */
-function _bivName(k) {
-  const l = ovLabel(k) || k;
-  // Lower-case the first letter, unless the name opens with an acronym.
-  return /^[A-Z]{2}/.test(l) ? l : l.charAt(0).toLowerCase() + l.slice(1);
-}
-function _bivWord(k, high) {
-  const cfg = (typeof OV_CFG !== 'undefined' && OV_CFG[k]) || {};
-  const rev = !!cfg.rev;
-  return String((high !== rev ? cfg.hi : cfg.lo) || (high ? 'Higher' : 'Lower'));
-}
-function bivEndWords(k, high) {
-  const w = _bivWord(k, high);
-  if (/\s/.test(w)) return w;
-  // Words that describe the place rather than the figure take a noun of
-  // their own: "dirtier air", "closer to a station".
-  if (/^(Cleaner|Dirtier)$/.test(w)) return w + ' air';
-  if (/^(Closer|Further)$/.test(w) && /_dist_m$/.test(k)) {
-    return w + (w === 'Closer' ? ' to ' : ' from ') + (/^bus/.test(k) ? 'a bus stop' : 'a station');
-  }
-  if (/^(Better|Worse)$/.test(w)) return w + ' for ' + _bivName(k);
-  return w + ' ' + _bivName(k);
-}
-// "Least deprived third", "dirtiest third for nitrogen dioxide (NO₂)".
-function _bivSuper(w) {
-  const l = w.toLowerCase();
-  const fixed = { more: 'most', less: 'least', better: 'best', worse: 'worst' };
-  if (fixed[l]) return fixed[l];
-  return /ier$/.test(l) ? l.replace(/ier$/, 'iest') : /er$/.test(l) ? l.replace(/er$/, 'est') : l;
-}
-function bivThirdWords(k, c) {
-  if (c == null) return '';
-  if (c === 1) return 'middle third for ' + _bivName(k);
-  const w = _bivWord(k, c === 2).split(/\s+/);
-  const sup = _bivSuper(w[0]);
-  return w.length > 1 ? sup + ' ' + w.slice(1).join(' ') + ' third' : sup + ' third for ' + _bivName(k);
-}
-// The hover's line for an area on the two-indicator map.
-function bivThirdsLine(level, id) {
-  if (!bivOn() || level === 'oa') return '';
-  const a = bivThirdWords(curOv, bivClass(level, curOv, _bivValue(level, id, curOv)));
-  const b = bivThirdWords(curOv2, bivClass(level, curOv2, _bivValue(level, id, curOv2)));
-  if (!a || !b) return 'Missing one of the two figures';
-  const t = a + ', ' + b;
-  return t.charAt(0).toUpperCase() + t.slice(1);
-}
-function bivFill(level, id) {
-  const x = bivClass(level, curOv, _bivValue(level, id, curOv));
-  const y = bivClass(level, curOv2, _bivValue(level, id, curOv2));
-  return (x == null || y == null) ? BIV_MISSING : BIV_COLOURS[y][x];
 }
 function fmtNum(v, decimals=0) {
   if (v === null || v === undefined || v === '') return 'No figure';
@@ -9801,21 +9587,15 @@ function ovTooltipRows(valueForKey, ward, level, id) {
     if (isMissing) {
       return `<span class="tip-row"><b>${ovLabel(k)}:</b> <span class="tip-none">No figure</span></span>`;
     }
-    const ctx = (level && !bivOn()) ? ovContext(level, k, v, ward) : '';
+    const ctx = level ? ovContext(level, k, v, ward) : '';
     // A ward's Local Health figure is our blend of MSOA figures, so it has
     // no interval: said here, where a percentile could look precise.
-    const est = level === 'ward' && (/^ft_\d+$/.test(k) || isOnsMsoa(k)) && !bivOn()
+    const est = level === 'ward' && (/^ft_\d+$/.test(k) || isOnsMsoa(k))
       ? 'Ward figures are estimates from MSOA figures, so no interval is available.' : '';
     return `<span class="tip-row"><b>${ovLabel(k)}:</b> ${fmtOvTip(v, k)}</span>` +
       (ctx ? `<span class="ctx">${ctx}</span>` : '') + (est ? `<span class="ctx">${est}</span>` : '');
   };
   if (_ovK  && _ovK  !== 'none') rows += _renderRow(_ovK);
-  if (bivOn()) {
-    rows += _renderRow(curOv2);
-    // Which third of each the area is in, which is what its colour says.
-    const th = (level && id != null) ? bivThirdsLine(level, id) : '';
-    if (th) rows += `<span class="ctx">${_esc(th)}</span>`;
-  }
   return rows;
 }
 function mkicon(color, label) {
@@ -11035,13 +10815,6 @@ function _boroughStyle(feat) {
   const cfg = OV_CFG[ov];
   if (!cfg) return base;
   const val = boroughOvValue(props.LAD25CD || props.lad_code || props.code, ov);
-  // With two indicators an area missing the first figure is drawn as missing
-  // too, as it is at ward level.
-  if (bivOn() && getBoroughRange(ov)) {
-    return bivEdge(Object.assign(base, {
-      fillColor: bivFill('borough', props.LAD25CD || props.lad_code || props.code), fillOpacity: bivOpacity(0.5),
-    }));
-  }
   if (val == null) return base;
   const v = parseFloat(val);
   if (isNaN(v)) return base;
@@ -11049,9 +10822,8 @@ function _boroughStyle(feat) {
   if (!range || range.hi === range.lo) return base;
   const t = (v - range.lo) / (range.hi - range.lo);
   return Object.assign(base, {
-    fillColor: bivOn() ? bivFill('borough', props.LAD25CD || props.lad_code || props.code)
-                       : ovRamp(ov, Math.max(0, Math.min(1, t))),
-    fillOpacity: bivOpacity(0.5),
+    fillColor: ovRamp(ov, Math.max(0, Math.min(1, t))),
+    fillOpacity: 0.5,
   });
 }
 
@@ -12317,7 +12089,7 @@ function wstyle(wn, ov, state) {
   }
 
   // Overlay: fill comes from the chosen indicator colour.
-  const fill = bivOn() ? bivFill('ward', wn) : ovColor(wn, ov);
+  const fill = ovColor(wn, ov);
   const baseW  = {default:0.8, hover:3.0, selected:4.0}[state] || 0.8;
   // When the overlay is LSOA-only, the ward layer has nothing meaningful to
   // colour with — making it fully opaque just hides the LSOA choropleth
@@ -12325,15 +12097,15 @@ function wstyle(wn, ov, state) {
   // layer carries the choropleth and wards keep their boundary reference.
   const lsoaOnly = (ov !== 'none' && isLsoaOnlyOv(ov));
   const baseFo = lsoaOnly ? 0.0 : absFill;
-  const fo = bivOpacity(baseFo);
+  const fo = baseFo;
   const sel = state === 'selected';
   const w  = sel ? selectedWeight(borderWeightMult)
                  : Math.max(0, baseW * borderWeightMult);
   const op = isFocus ? 1.0 : WARD_LINE_OPACITY;
-  return applyCore20Outline(bivEdge({
+  return applyCore20Outline({
     color: isFocus ? '#000' : WARD_LINE,
-    weight: w, fillColor: fill, fillOpacity: fo, opacity: op,
-  }), wn);
+    weight: w, fillColor: fill, fillOpacity: fo, opacity: op, dashArray: null,
+  }, wn);
 }
 
 function pillClass(g) {
@@ -15100,45 +14872,20 @@ function _fitFocus(bounds) {
     }, 260);
   }
 
-  // With two indicators the strip is too small to name the nine colours, so
-  // it opens the full key, which does.
-  function openBivKey() {
-    openIndicators(false);
-    const key = document.getElementById('biv-legend');
-    if (!key || key.hidden) return;
-    if (!key.hasAttribute('tabindex')) key.setAttribute('tabindex', '-1');
-    setTimeout(() => {
-      key.scrollIntoView({ block: 'center' });
-      key.focus({ preventScroll: true });
-    }, 260);
-  }
   const strip = document.getElementById('map-legend-strip');
   const opener = document.getElementById('mls-open');
   const lbl = document.getElementById('mls-label');
   if (strip && opener) {
-    const act = () => (strip.classList.contains('is-biv') ? openBivKey() : openIndicators(true));
-    opener.addEventListener('click', act);
+    opener.addEventListener('click', () => openIndicators(true));
     // The button's name follows the indicator it is the key to.
     // The label holds the unit on a line of its own (.mls-unit), which is
     // left out of the name.
-    // With two indicators the key shows both, while selecting it still opens
-    // the first one's card, so the name says so, and the one-indicator scale
-    // (hidden in that mode) is no longer read out as its description.
-    const biv = document.getElementById('mls-biv');
     const name = () => {
-      const pair = strip.classList.contains('is-biv') && biv ? [...biv.querySelectorAll('b')].map(b => b.textContent.trim()) : [];
-      if (pair.length === 2) {
-        opener.setAttribute('aria-label', 'Show the key for ' + pair[0] + ', compared with ' + pair[1]);
-        opener.removeAttribute('aria-describedby');
-        return;
-      }
       opener.setAttribute('aria-describedby', 'mls-min mls-max mls-note');
       opener.setAttribute('aria-label', 'About this indicator: ' + (lbl ? [...lbl.childNodes]
         .filter(n => !(n.classList && n.classList.contains('mls-unit'))).map(n => n.textContent).join('').trim() : ''));
     };
     if (lbl) new MutationObserver(name).observe(lbl, { childList: true, characterData: true, subtree: true });
-    new MutationObserver(name).observe(strip, { attributes: true, attributeFilter: ['class'] });
-    if (biv) new MutationObserver(name).observe(biv, { childList: true, subtree: true });
     name();
   }
 
@@ -16282,7 +16029,7 @@ const PH_PEEK = (function () {
       if (!k || k === 'none') return '';
       const v = val(k);
       const has = !(v == null || v === '' || isNaN(parseFloat(v)));
-      const ctx = (!has || bivOn() || level === 'oa') ? '' : ovContext(level, k, v);
+      const ctx = (!has || level === 'oa') ? '' : ovContext(level, k, v);
       const vs = has ? ovVsHTML(ovVsEngland(level, code, k)) + (ovIsEstimated(level, code, k) ? EST_HTML : '') +
         ovIntervalHTML(level, code, k) : '';
       return '<div class="ap-row"><span>' + esc(ovLabel(k)) +
@@ -16292,8 +16039,7 @@ const PH_PEEK = (function () {
     el.innerHTML = '<div class="ap-hd"><div><div class="ap-nm">' + esc(props.name || code) + '</div>' +
       '<div class="ap-sub">' + esc([props.ward, props.borough].filter(Boolean).join(', ')) + '</div></div>' +
       '<button type="button" class="ap-x" aria-label="Close">' + ico('x') + '</button></div>' +
-      row(curOv) + (typeof bivOn === 'function' && bivOn() ? row(curOv2) +
-        (bivThirdsLine(level, code) ? '<div class="ap-row"><span class="ctx">' + esc(bivThirdsLine(level, code)) + '</span></div>' : '') : '') +
+      row(curOv) +
       (level === 'lsoa' && props.imd_decile && curOv !== 'imd_decile' ? '<div class="ap-row"><span>' + esc(indLabel('imd_decile')) + '</span><b>' + esc(props.imd_decile) + ' of 10</b></div>' : '') +
       (level === 'lsoa' ? '<button type="button" class="ov-btn ap-more">Open full profile</button>' : '');
     el.hidden = false;
@@ -16498,193 +16244,14 @@ window.PH_OA = (function () {
   };
 })();
 
-/* The two-variable map's controls and legend. The colouring itself is
-   bivFill, near ovRamp; this only chooses the second indicator, keeps it
-   to ones that can be drawn at the same level as the first, and says what
-   the nine colours mean. */
-(function _bivariateUI() {
+/* The level buttons grey the levels the chosen indicator has no figures for,
+   so they are marked again whenever the indicator changes. */
+(function _levelButtonsFollowIndicator() {
   const sel = document.getElementById('ov');
-  const box = document.getElementById('ov-biv');
-  const add = document.getElementById('ov-biv-add');
-  const pick = document.getElementById('ov-biv-pick');
-  const sel2 = document.getElementById('ov2');
-  const on = document.getElementById('ov-biv-on');
-  const nm = document.getElementById('ov-biv-nm');
-  const x = document.getElementById('ov-biv-x');
-  const leg = document.getElementById('biv-legend');
-  if (!sel || !box || !sel2) return;
-  const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  const short = k => ovLabel(k);
-  const level = () => (typeof ovDrawnLevel === 'function' && curOv && curOv !== 'none') ? ovDrawnLevel(curOv) : 'ward';
-
-  // The second list: the first select's groups and options, less the first
-  // indicator and anything with no figures at the level being drawn.
-  function fillOptions() {
-    const lv = level();
-    let html = '<option value="none">Choose an indicator</option>';
-    sel.querySelectorAll('optgroup').forEach(g => {
-      // An indicator too many areas share one figure of cannot be split
-      // into thirds, so it is not offered (bivSplits is null, and the
-      // indicator offered, while its figures have not loaded).
-      const opts = Array.from(g.querySelectorAll('option')).filter(o =>
-        o.value && o.value !== 'none' && o.value !== curOv && ovHasLevel(o.value, lv) &&
-        (o.value === curOv2 || bivSplits(lv, o.value) !== false));
-      if (!opts.length) return;
-      html += '<optgroup label="' + esc(g.label) + '">' +
-        opts.map(o => '<option value="' + esc(o.value) + '">' + esc(short(o.value)) + '</option>').join('') +
-        '</optgroup>';
-    });
-    sel2.innerHTML = html;
-    sel2.value = bivOn() ? curOv2 : 'none';
-  }
-
-  function grid(cls) {
-    let h = '<span class="biv-grid ' + (cls || '') + '" aria-hidden="true">';
-    for (let y = 2; y >= 0; y--) for (let xx = 0; xx < 3; xx++) {
-      h += '<span style="background:' + BIV_COLOURS[y][xx] + '"></span>';
-    }
-    return h + '</span>';
-  }
-  const cap = t => t.charAt(0).toUpperCase() + t.slice(1);
-  const lc = t => /^[A-Z]{2}/.test(t) ? t : t.charAt(0).toLowerCase() + t.slice(1);
-  // A corner: the first indicator's end, then the second's.
-  const corner = (hi1, hi2) => cap(bivEndWords(curOv, hi1)) + ', ' + lc(bivEndWords(curOv2, hi2));
-
-  function legend() {
-    const scale = document.getElementById('scale');
-    const mls = document.getElementById('map-legend-strip');
-    const mlsBiv = document.getElementById('mls-biv');
-    const b = bivOn();
-    if (scale) Array.from(scale.children).forEach(c => {
-      if (c !== leg) c.style.display = b ? 'none' : '';
-    });
-    if (leg) {
-      leg.hidden = !b;
-      if (b) {
-        const lv = level();
-        const missing = !ovHasLevel(curOv2, lv);
-        const lvMany = (typeof _LEVEL_PLURAL === 'object' && _LEVEL_PLURAL[lv]) || (lv === 'oa' ? 'output areas' : lv + 's');
-        // The key's corners say in words what each corner colour means, from
-        // each indicator's own words for its two ends, and the axes are
-        // marked low, middle and high.
-        const aria = 'Key of nine colours. Across, ' + short(curOv) + ', from ' + lc(bivEndWords(curOv, false)) +
-          ' on the left to ' + lc(bivEndWords(curOv, true)) + ' on the right. Up, ' + short(curOv2) + ', from ' +
-          lc(bivEndWords(curOv2, false)) + ' at the bottom to ' + lc(bivEndWords(curOv2, true)) +
-          ' at the top. An area missing one of the two figures is white with a dashed edge.';
-        const noSplit = [curOv, curOv2].filter(k => bivSplits(lv, k) === false);
-        leg.innerHTML = '<span class="biv-key">' +
-          '<span class="biv-c biv-tl">' + esc(corner(false, true)) + '</span>' +
-          '<span class="biv-gw" role="img" aria-label="' + esc(aria) + '">' +
-            '<span class="biv-yl" aria-hidden="true"><span>High</span><span>Middle</span><span>Low</span></span>' +
-            grid('biv-grid-lg') +
-            '<span class="biv-xl" aria-hidden="true"><span>Low</span><span>Middle</span><span>High</span></span>' +
-          '</span>' +
-          '<span class="biv-c biv-tr">' + esc(corner(true, true)) + '</span>' +
-          '<span class="biv-c biv-bl">' + esc(corner(false, false)) + '</span>' +
-          '<span class="biv-c biv-br">' + esc(corner(true, false)) + '</span></span>' +
-          '<span class="biv-axes"><span><b>First, across</b>' + ico('arrow-right', 'ic-sm') + ' ' + esc(short(curOv)) + '</span>' +
-          '<span><b>Second, up</b>' + ico('arrow-up', 'ic-sm') + ' ' + esc(short(curOv2)) + '</span>' +
-          '<span class="biv-miss"><span class="biv-miss-sw" aria-hidden="true"></span>Missing one of the two figures</span></span>' +
-          '<span class="biv-note">Each indicator is split into thirds across the ' + esc(lvMany) +
-          ' on the map, or as near to thirds as tied figures allow. A pattern the two share is a place to look, ' +
-          'not proof that one causes the other, because both can follow deprivation, age or how urban an area is.' +
-          (noSplit.length ? ' <b>Too many areas share the same figure to split ' +
-            esc(noSplit.map(short).join(' or ')) + ' into thirds.</b>' : '') +
-          (missing ? ' <b>' + esc(short(curOv2)) + ' has no figures for ' + esc(lvMany) + '.</b>' : '') + '</span>';
-      }
-    }
-    if (mls && mlsBiv) {
-      mls.classList.toggle('is-biv', b);
-      if (b) {
-        mlsBiv.innerHTML = grid() + '<span><b>' + esc(short(curOv)) + '</b> ' + ico('arrow-right', 'ic-sm') + ' across<br><b>' +
-          esc(short(curOv2)) + '</b> ' + ico('arrow-up', 'ic-sm') + ' up</span>';
-        mls.style.display = 'flex';
-      }
-    }
-  }
-
-  // A second indicator set aside by a level change: { k, first, lv }, the
-  // second, the first it was paired with, and the level it was shown at. It
-  // comes back when the reader returns to a level it has figures for.
-  let parked2 = null, lastFirst = null, lastLv = null;
-  function sync() {
-    const has = !!(curOv && curOv !== 'none');
-    box.hidden = !has;
-    const lv = level();
-    // A different first indicator is a new comparison, so nothing comes back.
-    if (parked2 && parked2.first !== curOv) parked2 = null;
-    // A second indicator that cannot be drawn with the new first one goes.
-    if (curOv2 !== 'none' && (!has || curOv2 === curOv || !ovHasLevel(curOv2, lv))) {
-      // Only the level moved, with the same first indicator: say why the key
-      // went, and keep the pair to put back on the way back.
-      if (has && curOv2 !== curOv && curOv === lastFirst && lastLv && lastLv !== lv) {
-        parked2 = { k: curOv2, first: curOv, lv: lastLv };
-        if (typeof _dlHint === 'function') {
-          _dlHint(indLabel(curOv2) + ' has no ' + (_LVL_BUTTON[lv] || lv) + ' figures, so the map is showing ' +
-            indLabel(curOv) + ' on its own, and the comparison will come back when you choose ' +
-            (_LVL_BUTTON[lastLv] || lastLv) + ' again.', 7000);
-        }
-        curOv2 = 'none';
-        if (typeof _restyleAll === 'function') _restyleAll();
-      }
-      curOv2 = 'none';
-    } else if (curOv2 === 'none' && parked2 && has && ovHasLevel(parked2.k, lv) &&
-               sel.querySelector('option[value="' + parked2.k + '"]')) {
-      curOv2 = parked2.k;
-      parked2 = null;
-      _bivBreakCache = {};
-      if (typeof _restyleAll === 'function') _restyleAll();
-    }
-    lastFirst = has ? curOv : null;
-    lastLv = lv;
-    try { if (typeof _markLevelButtons === 'function') _markLevelButtons(); } catch (e) { /* not ready on first load */ }
-    const b = bivOn();
-    add.hidden = b || !pick.hidden;
-    on.hidden = !b;
-    if (b) { nm.textContent = short(curOv2); pick.hidden = true; }
-    fillOptions();
-    legend();
-  }
-
-  function apply() {
-    _bivBreakCache = {};
-    if (typeof _restyleAll === 'function') _restyleAll();
-    if (typeof renderTopBottom === 'function') renderTopBottom();
-    sync();
-    if (typeof _syncMapAria === 'function') _syncMapAria();
-    if (typeof _scheduleUrlWrite === 'function') _scheduleUrlWrite();
-  }
-
-  window._bivSet = function (k) {
-    parked2 = null;
-    curOv2 = (k && k !== curOv && sel.querySelector('option[value="' + k + '"]')) ? k : 'none';
-    pick.hidden = true;
-    apply();
-    // The strip and the live region name the pair, or the one left.
-    if (typeof _refreshUI === 'function') _refreshUI();
-  };
-
-  add.addEventListener('click', () => {
-    pick.hidden = false; add.hidden = true; fillOptions(); sel2.focus();
-  });
-  sel2.addEventListener('change', () => window._bivSet(sel2.value));
-  x.addEventListener('click', () => window._bivSet('none'));
+  if (!sel) return;
   sel.addEventListener('change', () => setTimeout(() => {
-    pick.hidden = true; _bivBreakCache = {};
-    const had = bivOn();
-    sync();
-    // The overlay change has already repainted with the old pair; repaint
-    // once more if the second indicator was dropped or is still on.
-    if (had || curOv2 === 'none') { if (typeof _restyleAll === 'function') _restyleAll(); }
-    legend();
+    try { if (typeof _markLevelButtons === 'function') _markLevelButtons(); } catch (e) { /* not ready on first load */ }
   }, 0));
-  // A different level means different thirds and possibly no figures.
-  document.querySelectorAll('#dl-seg button').forEach(btn =>
-    btn.addEventListener('click', () => setTimeout(() => {
-      _bivBreakCache = {}; sync(); if (bivOn() && typeof _restyleAll === 'function') _restyleAll();
-    }, 60)));
-  sync();
 })();
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -16953,18 +16520,13 @@ function imdStyle(feat, state) {
     let shaded = false;
     const cfg = OV_CFG[curOv];
     const d2 = LSOA_DATA[code];
-    if (cfg && bivOn() && ovHasLevel(curOv, 'lsoa') && Object.keys(LSOA_DATA).length) {
-      // Two indicators: every LSOA takes one of the nine colours, or the
-      // missing style when either figure is missing.
-      base.fillColor = bivFill('lsoa', code);
-      shaded = true;
-    } else if (d2 && cfg) {
+    if (d2 && cfg) {
       const val = (d2.indicators || d2)?.[curOv];
       if (val != null) {
         const range = getLsoaRange(curOv);
         if (range && range.hi !== range.lo) {
           const t = (parseFloat(val) - range.lo) / (range.hi - range.lo);
-          base.fillColor = bivOn() ? bivFill('lsoa', code) : ovRamp(curOv, Math.max(0, Math.min(1, t)));
+          base.fillColor = ovRamp(curOv, Math.max(0, Math.min(1, t)));
           shaded = true;
         }
       }
@@ -16993,9 +16555,8 @@ function imdStyle(feat, state) {
     // should shade those and leave the rest as outline.
     if (shaded || lsoaIMDColour) {
       const _lift = {hover: 1.5, selected: 1.75}[state] || 1;
-      base.fillOpacity = bivOpacity(Math.max(0, Math.min(0.9, fillOpacityMult * _lift)));
+      base.fillOpacity = Math.max(0, Math.min(0.9, fillOpacityMult * _lift));
     }
-    bivEdge(base);
     // No edge treatment here. It was set at the top of this function, from
     // LSOA_EDGE, and this branch used to override it with a second set of
     // colours and widths, which is why the boundaries changed appearance the
@@ -17821,7 +17382,7 @@ function buildEmbeddedLSOALayer() {
         // The LSOA's deprivation decile is always given, except when the map
         // is already coloured by it, where it would be the same line twice.
         const ovSel = document.getElementById('ov');
-        const decShown = (ovSel && ovSel.value === 'imd_decile') || (bivOn() && curOv2 === 'imd_decile');
+        const decShown = ovSel && ovSel.value === 'imd_decile';
         const decStr = (p.imd_decile && !decShown)
           ? `<span class="tip-row"><b>${_esc(indLabel('imd_decile'))}:</b> ${p.imd_decile} of 10, where 1 is the most deprived</span>` : '';
         const ovRows = ovTooltipRows(k => lsoaOvValue(p.code, k), null, 'lsoa', p.code);
@@ -18037,11 +17598,6 @@ function msoaStyle(feat) {
   if (!curOv || curOv === 'none' || !ovHasLevel(curOv, 'msoa')) return base;
   const cfg = OV_CFG[curOv];
   if (!cfg) return base;
-  if (bivOn() && getMsoaRange(curOv)) {
-    return bivEdge(Object.assign(base, {
-      fill: true, fillColor: bivFill('msoa', (feat.properties || {}).code), fillOpacity: bivOpacity(0.45), color: '#555',
-    }));
-  }
   const val = msoaOvValue((feat.properties || {}).code, curOv);
   if (val == null) return base;
   const v = parseFloat(val);
@@ -18053,8 +17609,8 @@ function msoaStyle(feat) {
   const t = (v - range.lo) / (range.hi - range.lo);
   return Object.assign(base, {
     fill: true,
-    fillColor: bivOn() ? bivFill('msoa', (feat.properties || {}).code) : ovRamp(curOv, Math.max(0, Math.min(1, t))),
-    fillOpacity: bivOpacity(0.45),
+    fillColor: ovRamp(curOv, Math.max(0, Math.min(1, t))),
+    fillOpacity: 0.45,
     color: '#555',
   });
 }
@@ -18093,16 +17649,12 @@ function loadMsoaBoundaries() {
                 ovVsHTML(ovVsEngland('msoa', p.code, curOv)) +
                 (ovIsEstimated('msoa', p.code, curOv) ? EST_HTML : '') +
                 ovIntervalHTML('msoa', p.code, curOv) + '</span>' +
-                (bivOn() ? '' : `<span class="ctx">${ovContext('msoa', curOv, v)}</span>`)
+                `<span class="ctx">${ovContext('msoa', curOv, v)}</span>`
               : (curOv && curOv !== 'none' && ovHasLevel(curOv, 'msoa'))
               ? `<span class="tip-row"><b>${_esc(_ovLabel(curOv))}:</b> <span class="tip-none">${_esc(msoaNoFigure(p.code, curOv))}</span></span>`
               : '';
-            const v2 = bivOn() ? msoaOvValue(p.code, curOv2) : null;
-            const shown2 = ((v2 != null && !isNaN(parseFloat(v2)))
-              ? `<span class="tip-row"><b>${_esc(_ovLabel(curOv2))}:</b> ${fmtOvTip(parseFloat(v2), curOv2)}</span>`
-              : '') + (bivThirdsLine('msoa', p.code) ? `<span class="ctx">${_esc(bivThirdsLine('msoa', p.code))}</span>` : '');
             return `<b class="tip-nm">${_esc(p.name || 'MSOA')}</b>` +
-                   `<span class="tip-meta">MSOA ${_esc(p.code || '')}</span>` + shown + shown2;
+                   `<span class="tip-meta">MSOA ${_esc(p.code || '')}</span>` + shown;
           }, { sticky: true, opacity: 0.94 });
         },
       });
@@ -18491,7 +18043,7 @@ function injectWardIMD() {
 function renderTopBottom() {
   const panel = document.getElementById('rank-panel');
   if (!panel) return;
-  if (!curOv || curOv === 'none' || bivOn() || _activeLevel() === 'oa') {
+  if (!curOv || curOv === 'none' || _activeLevel() === 'oa') {
     panel.style.display = 'none';
     return;
   }
@@ -19107,16 +18659,8 @@ function _markLevelButtons() {
     const lacks = on && typeof ovHasLevel === 'function' && !ovHasLevel(ov, b.dataset.dl);
     b.classList.toggle('native', isNat);
     if (lacks) b.setAttribute('aria-disabled', 'true'); else b.removeAttribute('aria-disabled');
-    // With two indicators on, a level the second one lacks is greyed too.
-    // It can still be chosen, which shows the first on its own (the hint
-    // says so), so it is a class rather than aria-disabled.
-    const ov2 = (typeof curOv2 !== 'undefined' && curOv2 && curOv2 !== 'none' && on) ? curOv2 : '';
-    const lacks2 = !lacks && !!ov2 && typeof ovHasLevel === 'function' && !ovHasLevel(ov2, b.dataset.dl);
-    b.classList.toggle('biv-lacks', lacks2);
     if (b.dataset.baseTitle === undefined) b.dataset.baseTitle = b.title || '';
     b.title = lacks ? _levelLackText(ov, b.dataset.dl)
-      : lacks2 ? indLabel(ov2) + ' has no ' + (_LVL_BUTTON[b.dataset.dl] || b.dataset.dl) +
-        ' figures, so choosing this shows ' + indLabel(ov) + ' on its own.'
       : b.dataset.baseTitle + (isNat ? ' The box around this button shows that the indicator is published at this level.' : '');
   });
 }
@@ -19713,7 +19257,6 @@ function _syncMapAria() {
     let t = 'Map of ' + where + ' by ' + _levelName(lv);
     if (ov && ov !== 'none') {
       t += ', coloured by ' + indLabel(ov);
-      if (typeof bivOn === 'function' && bivOn()) t += ' compared with ' + indLabel(curOv2);
     } else {
       t += ', with no indicator chosen';
     }
@@ -19765,8 +19308,7 @@ function _refreshUI() {
       // fact twice, in the two places most likely to be read together.
       // The strip's job is the scope: where you are and what is drawn on it.
       if (typeof curOv !== 'undefined' && curOv && curOv !== 'none') {
-        parts.push(`coloured by <b>${_ovLabel(curOv)}</b>` +
-          ((typeof bivOn === 'function' && bivOn()) ? ` compared with <b>${_ovLabel(curOv2)}</b>` : ''));
+        parts.push(`coloured by <b>${_ovLabel(curOv)}</b>`);
       }
       if (typeof showCore20Overlay !== 'undefined' && showCore20Overlay) {
         parts.push('<b>Core20</b> only');
@@ -20135,7 +19677,6 @@ function _writeUrlState() {
     const lsEl = document.getElementById('tlsoa');
     const c20El = document.getElementById('core20-toggle');
     if (ovEl && ovEl.value && ovEl.value !== 'none') p.set('ov', ovEl.value);
-    if (bivOn()) p.set('ov2', curOv2);
     if (bfEl && bfEl.value && bfEl.value !== 'all') p.set('b', bfEl.value);
     const ifEl = document.getElementById('icb-focus');
     if (ifEl && ifEl.value && ifEl.value !== 'all') p.set('icb', ifEl.value);
@@ -20381,7 +19922,6 @@ function _readUrlState() {
     }
 
     applyIf('ov', p.get('ov'), 'change');
-    if (p.get('ov2') && typeof window._bivSet === 'function') window._bivSet(p.get('ov2'));
 
     // Level after the overlay, and past the compatibility gate: the link chose
     // an indicator and a level together, and they agreed when it was made.
@@ -23662,11 +23202,11 @@ var PH_SHOW = {
     var line = function (k) {
       var v = wardOvValue(currentWard, k);
       if (v == null || v === '' || isNaN(parseFloat(v))) return '<div>' + belowWard(k) + '</div>';
-      var ctx = (typeof bivOn === 'function' && bivOn()) ? '' : ovContext('ward', k, v, (typeof WARD_DATA !== 'undefined' && WARD_DATA[currentWard]) || {});
+      var ctx = ovContext('ward', k, v, (typeof WARD_DATA !== 'undefined' && WARD_DATA[currentWard]) || {});
       return '<div>' + e(ovLabel(k)) + ': <b>' + e(fmtOvTip(v, k)) + '</b>' +
         (ctx ? '<span class="ctx">' + e(ctx) + '</span>' : '') + '</div>';
     };
-    el.innerHTML = line(curOv) + ((typeof bivOn === 'function' && bivOn()) ? line(curOv2) : '');
+    el.innerHTML = line(curOv);
   }
   /* A ward with no figure for an indicator that is only published for
      smaller areas. "No figure" would read as a gap in the data, so the sheet
@@ -26187,7 +25727,7 @@ var PH_SHOW = {
    */
   var TOUR_SEEN = 'phTourSeen';
   var TOUR_AUTOSTART = true;
-  var TOUR_VIEW_KEYS = ['ov', 'ov2', 'w', 'a', 'an', 'b', 'icb', 'mode', 'qs', 'qw', 'qc',
+  var TOUR_VIEW_KEYS = ['ov', 'w', 'a', 'an', 'b', 'icb', 'mode', 'qs', 'qw', 'qc',
                         'lvl', 'c20', 'lsoa', 'cb', 'bg'];
   // Whether the visitor has pressed or typed on the map, the search, the
   // rail or the panel before the tour could start.

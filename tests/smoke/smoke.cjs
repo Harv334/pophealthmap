@@ -965,7 +965,7 @@ const smallText = page => page.evaluate(() => {
       'LSOA counts are whole numbers and the small labels are not in capitals', JSON.stringify(typo));
     // The figures an analyst challenges first (workplan 1.11).
     const fig = await page.evaluate(() => {
-      const vals = _bivIds('ward').map(id => _bivValue('ward', id, 'census_bad_health_pct')).filter(x => x != null);
+      const vals = _levelIds('ward').map(id => _levelValue('ward', id, 'census_bad_health_pct')).filter(x => x != null);
       return {
         fmt: [fmtOv(7.3, 'ft_suicide_rate'), fmtOv(12.34, 'census_bad_health_pct'), fmtOv(101.34, 'ft_93227'), fmtOv(2.345, 'imd_decile_mean'), fmtOv(85.27, 'crime_rate_per_1000')],
         desc: ['ft_93089', 'census_car_to_work_pct', 'census_active_travel_pct', 'census_provides_unpaid_care_pct'].filter(k => !OV_CFG[k].descriptive),
@@ -1491,7 +1491,7 @@ const smallText = page => page.evaluate(() => {
   }
 
   // No empty indicators: an indicator with no figures in the loaded build is
-  // offered nowhere (picker, second indicator, Query, Compare, Data export,
+  // offered nowhere (picker, Query, Compare, Data export,
   // Ask), and nothing with figures goes, including the thirteen keys the
   // page works out from the ward file, which indicators.js does not list.
   // The Census routine figure is withheld until indicators.js says it was
@@ -1755,48 +1755,16 @@ const smallText = page => page.evaluate(() => {
     await page.close();
   } else console.log('SKIP output area checks (no data/map/oa)');
 
-  // Two indicators
+  // The second indicator was taken off the map (October 2026): a link that
+  // still carries ov2 opens on the first indicator alone.
   {
     const { page, errors } = await open(browser, 'index.html?ov=imd_decile&ov2=no2_ugm3&t=1', DESK);
     await page.waitForTimeout(2500);
-    const cols = await page.evaluate(() => { const c = new Set(); lsoaLyr && lsoaLyr.eachLayer(l => c.add(l.options.fillColor)); return c.size; });
-    ok(await page.evaluate(() => bivOn()), 'two-indicator map restores from link');
-    ok(cols >= 8, 'two-indicator map uses the nine colours', cols + ' colours');
-    const bivName = await page.evaluate(() => { const m = document.getElementById('mls-open'); return { l: m.getAttribute('aria-label'), d: m.getAttribute('aria-describedby') || '' }; });
-    ok(/Average deprivation decile|Deprivation decile/i.test(bivName.l) && /compared with .*nitrogen dioxide/i.test(bivName.l) && !/mls-min/.test(bivName.d),
-      'the two-indicator key is named for both indicators and not described by the hidden scale', JSON.stringify(bivName));
-    await page.click('#sbtab-overlay');
-    await checkAxe(page, 'two indicators');
-    // The key in words (review P1): corners from each indicator's own words,
-    // low, middle and high on each axis, a swatch for a missing figure, the
-    // caution about cause, and thirds that never split or push up a tie.
-    const bk = await page.evaluate(() => {
-      const leg = document.getElementById('biv-legend');
-      const gw = leg.querySelector('.biv-gw');
-      const vals = [5, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 6].sort((a, b) => a - b);
-      const t = bivThirds(vals);
-      const cls = v => v < t[0] ? 0 : v < t[1] ? 1 : 2;
-      const allTied = bivThirds([1, 1, 1, 1, 1, 1, 2, 3, 4]);
-      const code = Object.keys(LSOA_DATA).find(c => bivFill('lsoa', c) !== BIV_MISSING);
-      return {
-        corners: [...leg.querySelectorAll('.biv-c')].map(e => e.textContent),
-        axes: [...leg.querySelectorAll('.biv-yl span, .biv-xl span')].map(e => e.textContent),
-        img: gw && gw.getAttribute('role') === 'img' && /nine colours/.test(gw.getAttribute('aria-label')),
-        miss: !!leg.querySelector('.biv-miss-sw') && /Missing one of the two figures/.test(leg.textContent),
-        note: /not proof that one causes the other/.test(leg.textContent),
-        zeros: vals.filter(v => v === 0).map(cls), ok: t.ok, tied: allTied.ok,
-        hover: code ? bivThirdsLine('lsoa', code) : '',
-        missEdge: bivEdge({ fillColor: BIV_MISSING, fillOpacity: 0.9, weight: 0.5 }).dashArray,
-      };
-    });
-    ok(bk.corners.indexOf('More deprived, dirtier air') !== -1 && bk.corners.indexOf('Less deprived, cleaner air') !== -1,
-      'two-indicator corners are named from each indicator\'s own words', bk.corners.join(' | '));
-    ok(bk.axes.join(' ') === 'High Middle Low Low Middle High' && bk.img && bk.miss && bk.note,
-      'two-indicator key marks low, middle and high, is one described image, has a missing swatch and the caution', JSON.stringify(bk));
-    ok(new Set(bk.zeros).size === 1 && bk.ok && bk.tied === false && bk.missEdge === '3 3',
-      'thirds keep tied figures together, an unsplittable indicator is flagged, missing figures are dashed', JSON.stringify(bk));
-    ok(/third/.test(bk.hover) && /deprived third/.test(bk.hover), 'two-indicator hover names the thirds', bk.hover);
-    ok(errors.length === 0, 'no page errors (two indicators)', errors.join(' | '));
+    const r = await page.evaluate(() => ({ ov: curOv, ctl: !!document.getElementById('ov-biv') || !!document.getElementById('ov2'),
+      key: !!document.getElementById('biv-legend'), fn: typeof bivOn, rank: getComputedStyle(document.getElementById('rank-panel')).display }));
+    ok(r.ov === 'imd_decile' && !r.ctl && !r.key && r.fn === 'undefined',
+      'a link with a second indicator opens on the first alone, with no second indicator control or key', JSON.stringify(r));
+    ok(errors.length === 0, 'no page errors (link with a second indicator)', errors.join(' | '));
     await page.close();
   }
 
@@ -4314,25 +4282,12 @@ const smallText = page => page.evaluate(() => {
        /-lsoas\.csv$/.test(rf[1].name) && /-notes\.txt$/.test(rf[2].name) && !!zd && /^Poplar and Bow test-[\d-]+\.zip$/.test(zd.suggestedFilename()),
       'custom area: a ZIP of the figures, the LSOAs and the notes, named without the ampersand (P45)', JSON.stringify(rf) + ' ' + (zd && zd.suggestedFilename()));
 
-    // P38: the two-indicator map across a level change.
     await page.click('.mode-btn[data-mode="explore"]');
     await page.waitForTimeout(400);
     await page.evaluate(() => { const o = document.getElementById('ov'); o.value = 'census_bad_health_pct'; o.dispatchEvent(new Event('change')); });
     await page.waitForTimeout(1200);
     await page.click('#dl-seg button[data-dl="ward"]');
     await page.waitForTimeout(1200);
-    await page.evaluate(() => window._bivSet('crime_rate_per_1000'));
-    await page.waitForTimeout(500);
-    const b1 = await page.evaluate(() => document.querySelector('#dl-seg button[data-dl="lsoa"]').classList.contains('biv-lacks'));
-    await page.click('#dl-seg button[data-dl="lsoa"]');
-    await page.waitForTimeout(1500);
-    const b2 = await page.evaluate(() => ({ ov2: curOv2, hint: (document.getElementById('dl-hint') || {}).textContent || '' }));
-    await page.click('#dl-seg button[data-dl="ward"]');
-    await page.waitForTimeout(1500);
-    const b3 = await page.evaluate(() => curOv2);
-    ok(b1 && b2.ov2 === 'none' && b3 === 'crime_rate_per_1000' &&
-       b2.hint === 'Crime rate per 1,000 residents has no LSOA figures, so the map is showing Bad or very bad health on its own, and the comparison will come back when you choose Ward again.',
-      'two indicators: a level the second lacks is greyed, leaving it says why, and coming back restores it (P38)', JSON.stringify([b1, b2, b3]));
 
     // P43: opening a tool is a step Back can undo.
     const h0 = await page.evaluate(() => history.length);
@@ -4526,12 +4481,6 @@ const smallText = page => page.evaluate(() => {
     ok(lh.includes('Places and services:0:true') && lh.includes('Boundaries:0:true') && lh2 === 'false:true',
       'polish: the Layers headings open and close from the keyboard and say which they are', JSON.stringify([lh, lh2]));
     await checkAxe(page, 'Layers headings as buttons');
-    // P31: a second indicator is announced.
-    await page.evaluate(() => window._bivSet('census_bad_health_pct'));
-    await page.waitForTimeout(400);
-    const live = await page.evaluate(() => document.getElementById('sr-live').textContent);
-    ok(/compared with Bad or very bad health\.$/.test(live), 'polish: adding a second indicator is announced', live);
-    await page.evaluate(() => window._bivSet('none'));
     // P32: the Compare and Query chips say whether they are on.
     await page.click('.mode-btn[data-mode="compare"]');
     await page.waitForTimeout(800);

@@ -4,6 +4,8 @@
 
 These changes are written and tested, and reach the site with the next data refresh.
 
+The second indicator is taken off the map. Colouring the map by two indicators at once, in nine colours, was hard to read and hid the highest and lowest areas while it was on. Query, which lists the wards that meet several conditions with their figures, and Compare do the same job more clearly. A shared link that names a second indicator opens on the first one alone.
+
 Public transport accessibility (PTAL) is taken off the map. The GLA's figures are from 2014, too old to show beside the current ones, and the map has its own up-to-date measures of the stations and bus stops near each area.
 
 The GP-recorded prevalence estimates for MSOAs are on the map, for 19 conditions. They come from the House of Commons Library's GitHub copy of its figures, which is QOF 2019/20 and has not been updated since 2021, so the cards give the year and say how old the figures are. A current file from the Library's dashboard, attached by hand, replaces them. A file that names its conditions by their QOF register codes (AF, DM, STIA and so on) is now read. AHAH falls back to the GeoDS dataset page when GeoDS's record gives no download address, and says when the file has to be downloaded by hand.
@@ -14,7 +16,7 @@ Seventeen Census 2021 indicators are added, each for output areas, LSOAs, MSOAs,
 
 The routine and semi-routine jobs figure counted intermediate jobs and small employers as well, about twice the true share. It now counts semi-routine and routine occupations only, and is left out of the map, the reports and Ask until the refresh rebuilds it.
 
-An indicator with no figures in the data that is loaded is no longer offered in the indicator picker, the second indicator list or Ask, and Query, Compare and the Data export list only indicators with figures, so a new indicator appears once a refresh has made its figures. The card for OHID's out-of-work benefit measure now says how it differs from the claimant rate.
+An indicator with no figures in the data that is loaded is no longer offered in the indicator picker or Ask, and Query, Compare and the Data export list only indicators with figures, so a new indicator appears once a refresh has made its figures. The card for OHID's out-of-work benefit measure now says how it differs from the claimant rate.
 
 The Deprivation theme gains 24 measures from the English Indices of Deprivation 2025, for LSOAs, wards and LAs, in short lists of their own. They are income deprivation affecting children (IDACI) and older people (IDAOPI), each with its national decile; the six sub-domains of education, barriers to housing and services, and living environment; and 14 of the measures the index is built from, such as years of life lost to early deaths, emergency admissions, mood and anxiety disorders, Key Stage 2 and 4 results, entry to higher education, adults with no or low qualifications, housing in poor condition, air quality and road traffic accidents. A ward's or LA's IDACI is the share of its children aged 0 to 15, weighted by MHCLG's own counts of children, and IDAOPI is weighted the same way by people aged 60 and over. Ranks and deciles stay with LSOAs. The figures arrive with the next data refresh, which downloads the files from the release, and until then the measures are not offered. Any that the release turns out not to publish stays off the map, and the refresh says which. Ask's list of indicators is written more compactly, so it has room for them.
 
