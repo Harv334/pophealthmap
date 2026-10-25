@@ -220,9 +220,11 @@ out.
   illness, found on
   https://commonslibrary.parliament.uk/constituency-data-how-healthy-is-your-area/
   when the page links a spreadsheet. If skipped, download the MSOA data from
-  that dashboard and attach it to `qof-msoa-source`. The Library's GitHub
-  project `local-health-data-from-QOF` has an MSOA file too, but it is QOF
-  2019/20 and has not been updated since April 2021, so it is not used. Each autumn, when the
+  that dashboard and attach it to `qof-msoa-source`. Until then the map
+  uses the MSOA file in the Library's GitHub project
+  `local-health-data-from-QOF`, which is QOF 2019/20 and has not been
+  updated since April 2021; the cards say so and give the year. A current
+  file attached to the release replaces it. Each autumn, when the
   Library adds a new QOF year, attach the new file the same way. The
   licence (presumed the Open Parliament Licence) was not checked.
 - `fhrs`: needs nothing. It reads FSA's API and each council's open data

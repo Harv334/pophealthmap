@@ -210,6 +210,37 @@ check("a file on the 2011 MSOAs is bridged to the 2021 ones: kept, split and mer
       sorted(br["MSOA21CD"]) == sorted(look) and abs(b["E02000001"] - o_ix["E02000001"]) < 1e-3
       and abs(b["E02006950"] - o_ix["E02000002"]) < 1e-3 and abs(b["E02006951"] - o_ix["E02000002"]) < 1e-3
       and abs(b["E02006952"] - (o_ix["E02000003"] + o_ix["E02000004"]) / 2) < 1e-3, str(b.to_dict()))
+# The England lookup lacked about half of the MSOAs drawn in 2021 (October
+# 2026); those in scope are taken from the lookup asked for them by name.
+_e, _s, _l = p.get_msoa21_to_msoa11_england, p.get_msoa21_to_msoa11, p.get_lsoa_to_msoa
+p.get_msoa21_to_msoa11_england = lambda: {"E02000001": ["E02000001"], "E02006950": ["E02000002"]}
+p.get_msoa21_to_msoa11 = lambda: {"E02006950": ["E02000002"], "E02006951": ["E02000002"]}
+p.get_lsoa_to_msoa = lambda: {"E01000001": "E02000001", "E01000002": "E02006951", "E01000003": "E02006952"}
+_rows = p.qof_msoa_bridge()
+check("an MSOA in scope that the England lookup lacks is taken from the by-name lookup, and the rest are kept",
+      _rows == {"E02000001": ["E02000001"], "E02006950": ["E02000002"], "E02006951": ["E02000002"]}, str(_rows))
+# Those the by-name lookup lacks too (20 of London's, October 2026) are built
+# from the Library's 2011 LSOA figures: the registers over the lists of the
+# 2011 LSOAs their 2021 LSOAs come from. E02006960 is two halves of one split
+# 2011 LSOA; E02006961 merges two, so it is weighted by their patients; and
+# E01000013 has no asthma figure, so E02006962 has none.
+p.get_lsoa_to_msoa = lambda: {"E01035001": "E02006960", "E01035002": "E02006960", "E01035003": "E02006961",
+                              "E01035004": "E02006962", "E01000001": "E02000001"}
+_r11 = p.get_lsoa11_lsoa21_rows
+p.get_lsoa11_lsoa21_rows = lambda: [("E01000010", "E01035001", "S"), ("E01000010", "E01035002", "S"),
+                                    ("E01000011", "E01035003", "M"), ("E01000012", "E01035003", "M"),
+                                    ("E01000013", "E01035004", "U"), ("E01000001", "E01000001", "U")]
+lt = pd.DataFrame([("E01000010", "AF", 20, 1000), ("E01000010", "AST", 60, 1000), ("E01000011", "AF", 10, 500),
+                   ("E01000012", "AF", 40, 1500), ("E01000013", "AF", 5, 400), ("E01000011", "PC", 3, 500)],
+                  columns=["lsoa_code", "group_code", "register", "list"])
+fl = p.qof_msoa_from_lsoas(["E02006960", "E02006961", "E02006962"], lt).set_index("MSOA21CD")
+check("an MSOA no lookup bridges is built from its 2011 LSOAs: a split one, a merged one by patients, a gap kept",
+      fl.loc["E02006960", "qof_est_af_pct"] == 2.0 and fl.loc["E02006960", "qof_est_asthma_pct"] == 6.0
+      and fl.loc["E02006961", "qof_est_af_pct"] == 2.5 and fl.loc["E02006962", "qof_est_af_pct"] == 1.25
+      and pd.isna(fl.loc["E02006962"].get("qof_est_asthma_pct")) and "E02000001" not in fl.index
+      and not any("palliative" in c for c in fl.columns), fl.to_string())
+p.get_msoa21_to_msoa11_england, p.get_msoa21_to_msoa11, p.get_lsoa_to_msoa = _e, _s, _l
+p.get_lsoa11_lsoa21_rows = _r11
 check("a file with no MSOA codes is refused", raises(lambda: p.qof_msoa_parse([("x", "", CONST.astype(str))]), "MSOA codes"))
 twice = wide()
 twice["Asthma prevalence"] = twice["Asthma (%)"]
@@ -252,13 +283,48 @@ page = (f'<html><a href="/about">About</a><a href="https://example.org/other.xls
         '<a href="https://github.com/houseofcommonslibrary/local-health-data-from-QOF/blob/main/outputs/'
         'output_msoa_prevalence.csv">MSOA output (csv)</a></html>').encode()
 p.browser_session = lambda referer=None: Sess({p.QOF_MSOA_PAGES[0]: Resp(body=page), url: Resp(body=xl.read_bytes())})
+GH_RAW = ("https://raw.githubusercontent.com/houseofcommonslibrary/local-health-data-from-QOF/HEAD/"
+          "outputs/output_msoa_prevalence.csv")
+
+
+class _Tree:
+    def json(self):
+        return {"tree": [{"path": "outputs/output_msoa_prevalence.csv"}, {"path": "outputs/output_la_prevalence.csv"},
+                         {"path": "README.md"}]}
+
+
 _rget = p.requests.get
-p.requests.get = lambda *a, **kw: (_ for _ in ()).throw(AssertionError("the GitHub project was searched"))
-check("the download is found on the Library's page by its name, and the GitHub project's 2019/20 output is not used",
-      p.qof_msoa_find() == [url], str(p.qof_msoa_find()))
-p.requests.get = _rget
+p.requests.get = lambda url, timeout=None: _Tree()
+check("the download is found on the Library's page by its name, and the GitHub project's 2019/20 output comes after it",
+      p.qof_msoa_find() == [url, GH_RAW], str(p.qof_msoa_find()))
 res = p.run_qof_msoa()
 check("and is fetched and read", res is not None and len(res) == 10 and set(res["period"]) == {"2024/25"})
+
+# With no spreadsheet on the page, the GitHub project's output is read. It
+# names no year, so it takes 2019/20, the QOF year its README gives.
+tmp = fresh()
+gh_page = page.replace(f'<a href="{url}">Download the MSOA data (Excel)</a>'.encode(), b"")
+p.browser_session = lambda referer=None: Sess({p.QOF_MSOA_PAGES[0]: Resp(body=gh_page)})
+_pdl = p.places_download
+GH_LSOA = p.QOF_MSOA_LSOA_FILES["output_msoa_prevalence.csv"]
+_dl = {GH_RAW: coded, GH_LSOA: lt}
+p.places_download = lambda u, dest, source, min_bytes=0: (_dl[u].to_csv(dest, index=False), dest)[1] if u in _dl else None
+# In scope: the file's ten MSOAs and one it lacks, E02006960, which the
+# Library's LSOA file covers through the LSOA lookup.
+_l, _r11 = p.get_lsoa_to_msoa, p.get_lsoa11_lsoa21_rows
+p.get_lsoa_to_msoa = lambda: dict({f"E0103{i:04d}": m for i, m in enumerate(MSOAS)}, E01035001="E02006960")
+p.get_lsoa11_lsoa21_rows = lambda: [("E01000010", "E01035001", "S")]
+res = p.run_qof_msoa()
+check("with only the GitHub project, its output is read, on the register codes, and dated 2019/20",
+      res is not None and len(res) == 11 and set(res["period"]) == {"2019/20"}
+      and len([c for c in res.columns if c.startswith("qof_est_")]) == 19,
+      "" if res is None else f"{len(res)} {sorted(set(res['period']))} {len(res.columns)}")
+check("and an MSOA in scope it lacks is built from the Library's LSOA file, with the same period",
+      res is not None and res.set_index("MSOA21CD").loc["E02006960", "qof_est_af_pct"] == 2.0
+      and (tmp / "cache/qof_msoa/lsoa/output_lsoa_prevalence.csv").exists(), "" if res is None else res.tail(2).to_string())
+p.get_lsoa_to_msoa, p.get_lsoa11_lsoa21_rows = _l, _r11
+p.requests.get = _rget
+p.places_download = _pdl
 
 print("=== wards, LAs and MSOAs ===")
 tmp = fresh()
