@@ -166,6 +166,25 @@ key = next(k for k in p.QOF_MSOA_KEYS if k in br.columns)
 o_ix = {c: float(v) for c, v in zip(old["MSOA code"], p.qof_msoa_parse([("y", "", wide().astype(str))])[0]
                                     .set_index("MSOA21CD")[key].reindex(MSOAS))}
 b = br.set_index("MSOA21CD")[key]
+# The England lookup, paged by ONS 1,000 rows at a time with no transfer
+# flag: every page is read until one comes back empty.
+_rows = [{"attributes": {"MSOA21CD": f"E02{7000 + i:06d}", "MSOA11CD": f"E02{i:06d}"}} for i in range(6856)]
+
+
+class _J:
+    def __init__(self, feats): self.f = feats
+    ok = True
+    def raise_for_status(self): pass
+    def json(self): return {"features": self.f}
+
+
+_tmp = pathlib.Path(tempfile.mkdtemp())
+_cache, p.CACHE_DIR = p.CACHE_DIR, _tmp
+_post = p.requests.post
+p.requests.post = lambda url, data=None, timeout=None: _J(_rows[data["resultOffset"]:data["resultOffset"] + 1000])
+eng = p.get_msoa21_to_msoa11_england()
+p.requests.post, p.CACHE_DIR = _post, _cache
+check("the England MSOA lookup reads every page, not just those the transfer flag names", len(eng) == 6856, str(len(eng)))
 check("a file on the 2011 MSOAs is bridged to the 2021 ones: kept, split and merged",
       sorted(br["MSOA21CD"]) == sorted(look) and abs(b["E02000001"] - o_ix["E02000001"]) < 1e-3
       and abs(b["E02006950"] - o_ix["E02000002"]) < 1e-3 and abs(b["E02006951"] - o_ix["E02000002"]) < 1e-3

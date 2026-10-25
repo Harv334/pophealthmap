@@ -202,6 +202,28 @@ check("the LSOA file is taken once, as a CSV, and not the data zones, the dictio
 desc = [dict(r, description="Read the technical report and methodology before use.") for r in res]
 check("a data file whose description mentions the methodology is still taken",
       p.ahah_pick(desc) == [res[0]["url"]], str(p.ahah_pick(desc)))
+# GeoDS's record as the October 2026 refresh logged it: names and formats,
+# no addresses. One is made from each resource's id, and the index file is
+# the one taken, not the geofile, the summary, the dictionary or the report.
+geods = [{"id": f"r{i}", "name": n, "format": f} for i, (n, f) in enumerate([
+    ("Data: AHAH Overall Index, Domains and Components (v5.1)", "CSV"),
+    ("Data: Geofile for AHAH Overall Index, Domains and Components (v5.1)", "parquet"),
+    ("Data Summary", "CSV"), ("Variable Dictionary", "CSV"), ("Technical Report: Methodology", "PDF"),
+    ("Source Code: AHAH (GitHub Repository)", "HTML"), ("Map: Mapmaker", "HTML"),
+    ("Related Record: Previous versions of AHAH", "HTML")])]
+
+
+class _R:
+    ok = True
+    def json(self):
+        return {"success": True, "result": {"name": "access-to-healthy-assets-hazards-ahah", "license_title":
+                "UK Open Government Licence (OGL)", "resources": [dict(x) for x in geods]}}
+
+
+p.browser_session = lambda **k: type("S", (), {"get": lambda self, url, timeout=None: _R()})()
+urls, lic, _v = p.ahah_find()
+check("GeoDS files with no address get one from their id, and only the index file is taken",
+      len(urls) == 1 and "/resource/r0/download/" in urls[0] and urls[0].endswith(".csv") and lic, str(urls))
 
 print("=== AHAH: the source ===")
 tmp = fresh()

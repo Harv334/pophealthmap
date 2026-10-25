@@ -14719,12 +14719,14 @@ def ahah_pick(resources: list) -> list:
         if not ext or not url:
             continue
         if any(w in t for w in ("dictionary", "methodology", "technical", "guide", "report", "readme",
-                                "metadata", "data zone", "datazone", "scotland", "previous")):
+                                "metadata", "data zone", "datazone", "scotland", "previous", "geofile",
+                                "summary", "flyer", "source code", "mapmaker")):
             continue
         stem = iod_norm(Path(url.split("?")[0]).stem)
         if stem not in out or order[ext] < order[out[stem][0]]:
             out[stem] = (ext, url)
-    lsoa_first = sorted(out.values(), key=lambda v: (0 if "lsoa" in iod_norm(v[1]) else 1, order[v[0]]))
+    lsoa_first = sorted(out.values(), key=lambda v: (0 if ("lsoa" in iod_norm(v[1]) or "index" in iod_norm(v[1])) else 1,
+                                                     order[v[0]]))
     return [u for _e, u in lsoa_first][:4]
 
 
@@ -14741,6 +14743,18 @@ def ahah_find() -> tuple:
             continue
         res = (j.get("result") or {}) if j.get("success") else {}
         if res.get("resources"):
+            # GeoDS's record gave its files' names and formats but no address
+            # (October 2026), so one is made from the resource's id in CKAN's
+            # own download form, named after the file so its type shows.
+            pkg = res.get("name") or res.get("id") or ident
+            for x in res["resources"]:
+                if not x.get("url"):
+                    u = x.get("download_url") or x.get("access_url") or ""
+                    if not u and x.get("id"):
+                        slug = re.sub(r"[^a-z0-9]+", "_", str(x.get("name") or "file").lower()).strip("_")[:60]
+                        ext = iod_norm(x.get("format")) or "csv"
+                        u = f"https://data.geods.ac.uk/dataset/{pkg}/resource/{x['id']}/download/{slug}.{ext}"
+                    x["url"] = u
             urls = ahah_pick(res["resources"])
             lic = places_licence(" ".join(str(res.get(k) or "") for k in ("license_title", "license_id")))
             ver = res.get("version") or next((places_version(x.get("name")) for x in res["resources"]
@@ -15036,6 +15050,15 @@ def run_samhi() -> "pd.DataFrame | None":
     out_path = DATA_DIR / "outcomes" / SAMHI_PARQUET
     files = places_local_files(source, exts=(".csv", ".zip"))
     licence = "attached by hand to the samhi-source release" if files else ""
+    if files:
+        # A file in the cache may be one this pipeline downloaded on an
+        # earlier run (the workflows keep .cache), whose licence PLDR's page
+        # gave then and the committed parquet recorded; keep that.
+        prev = _read_parquet_opt(out_path)
+        if prev is not None and "samhi_licence" in prev.columns:
+            was = next((str(x) for x in prev["samhi_licence"].dropna() if str(x).strip()), "")
+            if was and not was.startswith("attached by hand"):
+                licence = was
     what = "the SAMHI CSV (version 4.00 or later, the wide file)"
     if files:
         info(f"samhi: reading {files[0].name} from {cache}")
@@ -15187,13 +15210,17 @@ def get_msoa21_to_msoa11_england() -> dict:
                     out.setdefault(a["MSOA21CD"], [])
                     if a["MSOA11CD"] not in out[a["MSOA21CD"]]:
                         out[a["MSOA21CD"]].append(a["MSOA11CD"])
-            if not feats or not j.get("exceededTransferLimit") and len(feats) < 2000:
+            # Paged until a page comes back empty: the fifth refresh stopped a
+            # page short (6,775 of England's 6,856) going by the transfer flag.
+            if not feats:
                 break
             offset += len(feats)
+            if offset > 40000:
+                break
     except Exception as e:
         warn(f"msoa11->msoa21 lookup (England): {e}")
         return {}
-    if len(out) < 6800:
+    if len(out) < 6600:
         warn(f"msoa11->msoa21 lookup (England): only {len(out):,} MSOAs came back; not used")
         return {}
     cache.write_text(json.dumps(out), encoding="utf-8")
