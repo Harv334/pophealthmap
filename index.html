@@ -3832,6 +3832,7 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
               <option value="care_home_beds_per_100_75plus">Care home beds per 100 people aged 75 and over · Ward</option>
               <option value="ft_a_e_attendance_under_5">A&E attendances, ages 0 to 4 · LA</option>
               <option value="ft_cervical_screening_25_49">Cancer screening coverage: cervical (25 to 49) · LA</option>
+              <option value="ft_child_poverty_low_income">Children in relative low income families (under 16) · LA</option>
               <option value="ft_depression_qof">Depression: QOF prevalence · LA</option>
               <option value="ft_flu_vaccination_65plus">Vaccination coverage: flu (65 and over) · LA</option>
               <option value="ft_hypertension_qof">Hypertension: QOF prevalence · LA</option>
@@ -5499,6 +5500,7 @@ const OV_CFG = {
   crime_asb_12mo:                  { lo:"Fewer", hi:"More",   wh:true,  min:0,    max:900  },
   ft_a_e_attendance_under_5: { lo:"Lower", hi:"Higher", wh:true, min:512.7, max:1106.2 },
   ft_cervical_screening_25_49: { lo:"Lower", hi:"Higher", wh:false, min:41.9, max:72.8 },
+  ft_child_poverty_low_income: { lo:"Lower", hi:"Higher", wh:true, min:4.1, max:27.8 },
   ft_depression_qof: { lo:"Lower", hi:"Higher", wh:true, min:6.7, max:13.7 },
   ft_flu_vaccination_65plus: { lo:"Lower", hi:"Higher", wh:false, min:52.3, max:74.2 },
   ft_hypertension_qof: { lo:"Lower", hi:"Higher", wh:true, min:7.2, max:15.5 },
@@ -5993,6 +5995,7 @@ const CATS = [
     { k: "dfle_male", l: "Disability-free life expectancy at birth, men", g: "msoa", lv: ["ward","msoa"] },
     { k: "ft_a_e_attendance_under_5", l: "A&E attendances, ages 0 to 4", g: "borough", lv: ["borough","ward"] },
     { k: "ft_cervical_screening_25_49", l: "Cancer screening coverage: cervical (25 to 49)", g: "borough", lv: ["borough","ward"] },
+    { k: "ft_child_poverty_low_income", l: "Children in relative low income families (under 16)", g: "borough", lv: ["borough","ward"] },
     { k: "ft_depression_qof", l: "Depression: QOF prevalence", g: "borough", lv: ["borough","ward"] },
     { k: "ft_flu_vaccination_65plus", l: "Vaccination coverage: flu (65 and over)", g: "borough", lv: ["borough","ward"] },
     { k: "ft_hypertension_qof", l: "Hypertension: QOF prevalence", g: "borough", lv: ["borough","ward"] },
@@ -6781,6 +6784,7 @@ const IND_NAMES = {
   // (Titles as fetch_all_data.py's FINGERTIPS_INDICATORS records them.)
   ft_a_e_attendance_under_5:         ['A&E attendances, under 5s', 'A&E attendances (0 to 4 years)'],
   ft_cervical_screening_25_49:       ['Cervical screening, ages 25 to 49', 'Cancer screening coverage: cervical (25 to 49)'],
+  ft_child_poverty_low_income:       ['Children in low-income families', 'Children in relative low income families (under 16)'],
   ft_depression_qof:                 ['Depression recorded by GPs', 'Depression: QOF prevalence'],
   ft_flu_vaccination_65plus:         ['Flu vaccination, 65 and over', 'Vaccination coverage: flu (65 and over)'],
   ft_hypertension_qof:               ['High blood pressure recorded by GPs', 'Hypertension: QOF prevalence'],
@@ -6954,6 +6958,9 @@ const IND_NAMES = {
 const IND_SAME_AS = {
   // Empty since October 2026: the near-copies then found were taken off the
   // map altogether (RETIRED_KEYS in fetch_all_data.py, PH_RETIRED here).
+  // Not ft_child_poverty_low_income and dwp_cilif_pct: DWP's ward figures
+  // are left out for an LA whose wards DWP has not redrawn, so OHID's LA
+  // series can cover LAs the ward measure does not. Both are offered.
 };
 
 function indLabel(k) {
@@ -7386,7 +7393,6 @@ const OV_META = {
   census_working_age_pct:         { src: CENSUS_AGE_OK ? "Census 2021 (TS007)" : "Census 2021 (TS007A)", yr: "2021", g: "Output area", u: "%",       desc: CENSUS_AGE_OK ? "The share of residents aged 16 to 64, the ages usually counted as working age." : "The share of residents aged 15 to 64. Working age is usually counted from 16, but the Census tables this version of the map uses group ages in fives, so this band starts at 15." },
   census_over65_pct:              { src: "Census 2021 (TS007A)", yr: "2021", g: "Output area", u: "%",       desc: "The share of residents aged 65 and over." },
   census_over85_pct:              { src: "Census 2021 (TS007A)", yr: "2021", g: "Output area", u: "%",       desc: "The share of residents aged 85 and over." },
-  // ONS mid-year population estimates for LSOAs (fetch_all_data.py, run_sape)
   census_higher_managerial_pct:   { src: "Census 2021 (TS062)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of residents aged 16 and over in higher managerial, administrative and professional jobs, using the socio-economic classification ONS publishes." },
   census_routine_semi_routine_pct:{ src: "Census 2021 (TS062)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of residents aged 16 and over in semi-routine and routine jobs, such as care, retail, cleaning or driving, using the socio-economic classification ONS publishes. Intermediate jobs and small employers are not counted. The base is everyone aged 16 and over, including students and people who have never worked." },
   census_english_hh_none_pct:     { src: "Census 2021 (TS025)",  yr: "2021", g: "Output area", u: "%",       desc: "The share of households where nobody has English as a main language. It records the language people name as their main one rather than how well they speak English, and adults in these households may still speak English well." },
@@ -7411,6 +7417,7 @@ const OV_META = {
   crime_asb_12mo:                 { src: "data.police.uk street-level crime", yr: "Aug 2025 to Jul 2026", g: "Ward, counted from point data", u: "crimes", desc: "Anti-social behaviour reported to the police in the last 12 months, which is the largest single category in the police figures." },
   ft_a_e_attendance_under_5: { src: "OHID Fingertips", yr: "2024/25", g: "LA (upper tier)", u: "per 1,000", desc: "How often children aged 0 to 4 go to A&E, per 1,000 children, published only for the whole LA." },
   ft_cervical_screening_25_49: { src: "OHID Fingertips", yr: "2024", g: "LA (upper tier)", u: "%", desc: "The share of women aged 25 to 49 who are up to date with cervical screening, published only for the whole LA." },
+  ft_child_poverty_low_income: { src: "OHID Fingertips", yr: "2024/25", g: "LA (upper tier)", u: "%", desc: "The share of children under 16 living in families on a relatively low income, published only for the whole LA." },
   ft_depression_qof: { src: "OHID Fingertips", yr: "2024/25", g: "LA (upper tier)", u: "%", desc: "The share of adult patients on a GP register for depression, published only for the whole LA." },
   ft_flu_vaccination_65plus: { src: "OHID Fingertips", yr: "2024/25", g: "LA (upper tier)", u: "%", desc: "The share of people aged 65 and over who had the flu vaccine, published only for the whole LA." },
   ft_hypertension_qof: { src: "OHID Fingertips", yr: "2024/25", g: "LA (upper tier)", u: "%", desc: "The share of patients on a GP register for high blood pressure, published only for the whole LA." },
@@ -7766,7 +7773,7 @@ var PH_HELD_FIELDS = {};
 const PH_RETIRED = new Set([
   'census_non_white_pct', 'imd_decile_mean', 'iod_adult_quals', 'iod_air_quality',
   'census_english_hh_all_pct', 'ft_93097', 'crime_total', 'idaci_decile', 'idaopi_decile',
-  'samhi_decile', 'census_hh_deprived_any_pct', 'ft_obesity_year6', 'ft_child_poverty_low_income',
+  'samhi_decile', 'census_hh_deprived_any_pct', 'ft_obesity_year6',
   'pm10_ugm3', 'ft_93280', 'sape_population', 'sape_age0_15_pct', 'sape_age16_64_pct',
   'sape_age65plus_pct', 'sape_age75plus_pct', 'ft_life_expectancy_female',
   'ft_life_expectancy_male', 'ft_healthy_life_expectancy_female',
@@ -7778,12 +7785,17 @@ function phDropRetired(recs, nested) {
     const r = recs[c];
     const ind = r && (nested ? r.indicators : (r.indicators || r));
     if (!ind || typeof ind !== 'object') continue;
-    PH_RETIRED.forEach(k => { if (k in ind) delete ind[k]; });
-    // An LA's notes on its Fingertips figures are keyed the same way.
-    ['ft_notes', 'ft_from'].forEach(side => {
-      const n = ind[side];
-      if (n && typeof n === 'object') PH_RETIRED.forEach(k => { if (k in n) delete n[k]; });
+    // With what rides beside a figure under its name: ONS's 95% limits and
+    // OHID's mark against England.
+    Object.keys(ind).forEach(k => {
+      if (PH_RETIRED.has(k) || (/_(lci|uci|vs)$/.test(k) && PH_RETIRED.has(k.replace(/_(lci|uci|vs)$/, '')))) delete ind[k];
     });
+    // An LA's notes on its Fingertips figures, and a ward's share of
+    // residents a figure covers, are keyed the same way.
+    [ind, r].forEach(o => ['ft_notes', 'ft_from', 'cover'].forEach(side => {
+      const n = o[side];
+      if (n && typeof n === 'object') PH_RETIRED.forEach(k => { if (k in n) delete n[k]; });
+    }));
   }
   return recs;
 }
@@ -7916,6 +7928,7 @@ const OV_PLAIN = {
   qof_est_stroke_pct: "Estimated share of patients on a GP register for stroke or transient ischaemic attack.",
   ft_a_e_attendance_under_5: "How often children under 5 go to A&E, per 1,000 children.",
   ft_cervical_screening_25_49: "Women aged 25 to 49 who are up to date with cervical screening.",
+  ft_child_poverty_low_income: "Children under 16 living in families on a low income.",
   ft_depression_qof: "Adults on a GP register for depression.",
   ft_flu_vaccination_65plus: "People aged 65 and over who had the flu vaccine.",
   ft_hypertension_qof: "Patients on a GP register for high blood pressure.",
@@ -16533,13 +16546,8 @@ function showLSOA(feat) {
       return `<div class="sr"><span class="sl">${_esc(indLabel(k))}</span><span class="sv">${fmtNum(val, indDecimalsAt(k, 'lsoa'))}${indValueUnit(k)}</span></div>`;
     };
     // Income deprivation among children and older people (IDACI, IDAOPI),
-    // with each one's national decile, where this build carries them.
-    iodLsoaRows = ['idaci_pct', 'idaopi_pct'].map(k => {
-      const val = inds[k];
-      if (val == null) return '';
-      const dec = inds[k.replace(/_pct$/, '_decile')];
-      return `<div class="sr"><span class="sl">${_esc(indLabel(k))}${dec != null ? `<span class="sr-meta">Decile ${_esc(dec)} of 10, where 1 is the most deprived</span>` : ''}</span><span class="sv">${fmtNum(val, indDecimalsAt(k, 'lsoa'))}${indValueUnit(k)}</span></div>`;
-    }).join('');
+    // where this build carries them.
+    iodLsoaRows = ['idaci_pct', 'idaopi_pct'].map(row).join('');
 
     // General census block (excludes ethnicity/age/environment — those get
     // their own blocks with stacked bars below).
@@ -17946,14 +17954,13 @@ function renderTopBottom() {
   // produced an empty Top/Bottom 20 panel because every ward returned null.
   const fieldKey = resolveOvField(curOv);
   // Ties are broken on the measure underneath: an LSOA's decile by its
-  // national rank, a ward's average decile by its deprivation score, so the
-  // ten shown at an end shared by hundreds are the ten furthest along it,
-  // not whichever came first in the file. tb runs the same way as v.
+  // national rank, so the ten shown at an end shared by hundreds are the ten
+  // furthest along it, not whichever came first in the file. tb runs the
+  // same way as v.
   const isDecile = /decile/.test(fieldKey);
   const tbOf = (row) => {
     const ind = row.indicators || row || {};
     if (isDecile && useLsoa) { const r = parseFloat(ind.imd_rank); return isNaN(r) ? null : r; }
-    if (isDecile && level === 'ward') { const s = parseFloat(ind.imd_score); return isNaN(s) ? null : -s; }
     return null;
   };
   // Rates and percentages leave out wards under 1,000 residents (SMALL_WARD_POP).
@@ -25992,9 +25999,9 @@ var PH_SHOW = {
     return seen;
   }
 
-  // Named from IND_NAMES. The area's IMD decile is a population-weighted mean
-  // of its LSOAs' deciles, which is what "Average deprivation decile" names.
-  // Each is written to its indicator's own decimal places (IND_DECIMALS).
+  // Named from IND_NAMES. A decile is not averaged (RB_SKIP), so the area's
+  // deprivation is its LSOAs' IMD score, weighted by residents. Each is
+  // written to its indicator's own decimal places (IND_DECIMALS).
   var RB_HEADLINE = [
     { k: 'census_population',         wide: false },
     { k: 'imd_score' },
@@ -26568,8 +26575,7 @@ var PH_SHOW = {
     if (/^saie_/.test(k)) return 'Work, money and education';
     if (/^(hle|dfle)_/.test(k)) return 'Life expectancy and deaths';
     if (/^(ptal_|rail_|bus_)|^census_(no_car|active_travel|public_transport|car_to_work)_/.test(k)) return 'Transport';
-    if (/^(fuel_|gb_|green_|blue_|no2_|pm25_|pm10_)|^(gp|pharmacy|dentist)_dist_km$/.test(k)) return 'Environment and access';
-    if (/^sape_/.test(k)) return 'People and communities';
+    if (/^(fuel_|gb_|green_|blue_|no2_|pm25_)|^(gp|pharmacy|dentist)_dist_km$/.test(k)) return 'Environment and access';
     if (/^road_ksi_/.test(k)) return 'Crime and safety';
     if (/^care_home_/.test(k)) return 'Health';
     if (/^dwp_/.test(k)) return 'Work, money and education';

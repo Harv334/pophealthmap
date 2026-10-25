@@ -12,14 +12,14 @@ cannot drift apart.
 **Levels used:** LSOA 2021 (≈33,755 nationally, 4,994 in London),
 Ward 2025, GP practice, postcode.
 
-**Not exported since October 2026.** Twenty-five keys this document names are
+**Not exported since October 2026.** Twenty-four keys this document names are
 near-copies of others, and of each pair the one published for the smaller area
 was kept. They are left out of every file the map reads (`RETIRED_KEYS` in
 `fetch_all_data.py`, and `PH_RETIRED` in `index.html` for region packs built
 before): `census_non_white_pct`, `imd_decile_mean`, `iod_adult_quals`,
 `iod_air_quality`, `census_english_hh_all_pct`, `ft_93097`, `crime_total`,
 `idaci_decile`, `idaopi_decile`, `samhi_decile`, `census_hh_deprived_any_pct`,
-`ft_obesity_year6`, `ft_child_poverty_low_income`, `pm10_ugm3`, `ft_93280`,
+`ft_obesity_year6`, `pm10_ugm3`, `ft_93280`,
 `sape_population` and the four `sape_` age shares, the four LA life
 expectancy and healthy life expectancy series (`ft_life_expectancy_*`,
 `ft_healthy_life_expectancy_*`) and `saie_net_bhc`. Where another figure is

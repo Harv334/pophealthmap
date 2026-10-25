@@ -10102,7 +10102,9 @@ def lsoa_census_counts(counts: "pd.DataFrame | None", codes) -> dict:
 # here and in the output area files (run_census_oa); what they are built from
 # is still read where another figure needs it: the mid-year estimates are the
 # base of the youth claimant rate and care home beds, the crime total of the
-# crime rate.
+# crime rate. OHID's LA series for children in low income families is not on
+# the list: DWP's ward figures (dwp_cilif_pct) are to replace it, but they need
+# a Stat-Xplore key, and until then it is the map's only measure of the kind.
 RETIRED_KEYS = frozenset({
     "census_non_white_pct",           # the sum of the other groups; White % is published
     "imd_decile_mean",                # worked out here; MHCLG publishes the LSOA decile
@@ -10114,7 +10116,6 @@ RETIRED_KEYS = frozenset({
     "idaci_decile", "idaopi_decile", "samhi_decile",   # their scores in tenths
     "census_hh_deprived_any_pct",     # kept: deprived in two or more dimensions
     "ft_obesity_year6",               # by LA; Local Health has it by MSOA
-    "ft_child_poverty_low_income",    # by LA; DWP's ward figures replace it
     "pm10_ugm3",                      # PM2.5 is kept
     "ft_93280",                       # fuel poverty by MSOA; DESNZ's is by LSOA
     "sape_population", "sape_age0_15_pct", "sape_age16_64_pct",   # the Census ones go to
@@ -10125,6 +10126,12 @@ RETIRED_KEYS = frozenset({
 })
 
 
+def retired_field(k: str) -> bool:
+    """A retired key, or what rides beside one under its name: ONS's 95%
+    limits (_lci, _uci) and OHID's mark against England (_vs)."""
+    return k in RETIRED_KEYS or (k.endswith(("_lci", "_uci", "_vs")) and k.rsplit("_", 1)[0] in RETIRED_KEYS)
+
+
 def drop_retired(records: dict, nested: bool = False) -> dict:
     """records with RETIRED_KEYS taken out of each, in place: flat records
     ({code: {key: value}}) or, nested, ward records ({code: {"indicators":
@@ -10132,13 +10139,15 @@ def drop_retired(records: dict, nested: bool = False) -> dict:
     for rec in (records or {}).values():
         ind = rec.get("indicators") if nested and isinstance(rec, dict) else rec
         if isinstance(ind, dict):
-            for k in RETIRED_KEYS.intersection(ind):
+            for k in [k for k in ind if retired_field(k)]:
                 del ind[k]
-            # An LA's notes on its Fingertips figures are keyed the same way.
-            for side in ("ft_notes", "ft_from"):
-                if isinstance(ind.get(side), dict):
-                    for k in RETIRED_KEYS.intersection(ind[side]):
-                        del ind[side][k]
+            # An LA's notes on its Fingertips figures, and a ward's share of
+            # residents a figure covers, are keyed the same way.
+            for side in ((ind, rec) if ind is not rec else (ind,)):
+                for name in ("ft_notes", "ft_from", "cover"):
+                    if isinstance(side.get(name), dict):
+                        for k in RETIRED_KEYS.intersection(side[name]):
+                            del side[name][k]
     return records
 
 
@@ -10151,6 +10160,10 @@ def export_all() -> None:
     drop_retired(ward_data.get("wards", {}), nested=True)
     for recs in (lsoa_data, msoa_data, boro_data):
         drop_retired(recs)
+    weights = (ward_data.get("metadata") or {}).get("iod_weights")
+    if isinstance(weights, dict):
+        for k in RETIRED_KEYS.intersection(weights):
+            del weights[k]
     pharm_data = build_pharmacies_json()
     vcse_data  = build_vcse_json()
     dental_data = build_dental_json()

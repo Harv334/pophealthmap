@@ -136,7 +136,7 @@ async function stripFigures(page, keys, { lsoaOnly = [] } = {}) {
 // The crime figures the pipeline also makes for LSOAs. Several checks below
 // use the crime rate as their indicator with ward figures only, as it was
 // when they were written; they run on a build without its LSOA figures.
-const CRIME_LSOA = ['crime_total', 'crime_rate_per_1000', 'crime_violence_12mo', 'crime_burglary_12mo',
+const CRIME_LSOA = ['crime_rate_per_1000', 'crime_violence_12mo', 'crime_burglary_12mo',
   'crime_robbery_12mo', 'crime_theft_12mo', 'crime_asb_12mo'];
 async function openWithout(browser, url, vp, keys, opts) {
   const { isMobile, hasTouch, ...viewport } = vp;
@@ -967,13 +967,13 @@ const smallText = page => page.evaluate(() => {
     const fig = await page.evaluate(() => {
       const vals = _levelIds('ward').map(id => _levelValue('ward', id, 'census_bad_health_pct')).filter(x => x != null);
       return {
-        fmt: [fmtOv(7.3, 'ft_suicide_rate'), fmtOv(12.34, 'census_bad_health_pct'), fmtOv(101.34, 'ft_93227'), fmtOv(2.345, 'imd_decile_mean'), fmtOv(85.27, 'crime_rate_per_1000')],
+        fmt: [fmtOv(7.3, 'ft_suicide_rate'), fmtOv(12.34, 'census_bad_health_pct'), fmtOv(101.34, 'ft_93227'), fmtOv(2.345, 'imd_score'), fmtOv(85.27, 'crime_rate_per_1000')],
         desc: ['ft_93089', 'census_car_to_work_pct', 'census_active_travel_pct', 'census_provides_unpaid_care_pct'].filter(k => !OV_CFG[k].descriptive),
         ctx: [ovContext('ward', 'census_bad_health_pct', Math.max(...vals)), ovContext('ward', 'census_bad_health_pct', Math.min(...vals))],
       };
     });
     ok(fig.fmt.join('|') === '7.3 per 100,000|12.3%|101.3|2.3|85.3',
-      'figures carry their own unit: "%" only on percentages, a rate per 100,000 says so, a ratio has none, and a mean decile has one place', fig.fmt.join(' | '));
+      'figures carry their own unit: "%" only on percentages, a rate per 100,000 says so, a ratio has none, and an IMD score has one place', fig.fmt.join(' | '));
     ok(!fig.desc.length, 'fertility, car to work, walk or cycle to work and unpaid care are descriptive', fig.desc.join(', '));
     ok(/^Within London: higher than 99% of wards$/.test(fig.ctx[0]) && /^Within London: lower than 99% of wards$/.test(fig.ctx[1]) && !/100%/.test(fig.ctx.join(' ')),
       'hover context stops at 99%, never 100%', fig.ctx.join(' | '));
@@ -1366,7 +1366,7 @@ const smallText = page => page.evaluate(() => {
       const before = PH_CSV.columns().length;
       PH_CSV.pick('ft_93283');
       const one = before === 0 ? PH_CSV.notes() : '';
-      PH_CSV.pick('ft_suicide_rate'); PH_CSV.pick('crime_total');
+      PH_CSV.pick('ft_suicide_rate'); PH_CSV.pick('crime_violence_12mo');
       const o = PH_CSV.build();
       const col = i => o.table.slice(1).map(r => r[i]).filter(v => v !== '');
       const le = o.header.indexOf('Life expectancy at birth, women (years, 2019 to 2023)');
@@ -1379,10 +1379,10 @@ const smallText = page => page.evaluate(() => {
       return {
         header: o.header, le, leVals: le === -1 ? [] : col(le),
         smoke: o.header.find(h => /^Suicide rate/.test(h)) || '',
-        crime: o.header.find(h => /^Total recorded crime/.test(h)) || '',
-        crimeVals: col(o.header.findIndex(h => /^Total recorded crime/.test(h))),
+        crime: o.header.find(h => /^Violence against the person/.test(h)) || '',
+        crimeVals: col(o.header.findIndex(h => /^Violence against the person/.test(h))),
         rail: groupOf('rail_station_dist_m'), no2: groupOf('no2_ugm3'), sorted,
-        shared: [fmtOv(81.0723, 'ft_93283'), PH_IND.decimals('ft_93283'), PH_IND.decimals('crime_total')],
+        shared: [fmtOv(81.0723, 'ft_93283'), PH_IND.decimals('ft_93283'), PH_IND.decimals('crime_violence_12mo')],
         notes: PH_CSV.notes(), one, before,
         dashes: /[\u2013\u2014]/.test(o.header.join(' ') + PH_CSV.notes()),
       };
@@ -1774,18 +1774,21 @@ const smallText = page => page.evaluate(() => {
     const dm = await page.evaluate(async () => {
       await Promise.all([ensureLsoaData(), ensureMsoaData(), ensureLsoaImd(), ensureWardDetail()]);
       const st = Object.values(WARD_DATA_BY_CODE).find(w => w.name === 'Stonebridge');
-      const asbIn = Object.values(WARD_DATA_BY_CODE).filter(w => w.crime_by_category).every(w =>
-        w.indicators.crime_total === Object.entries(w.crime_by_category).filter(([c]) => c !== 'anti-social-behaviour').reduce((a, [, v]) => a + v, 0));
+      // The rate is the categories less anti-social behaviour over the Census
+      // population; the total itself is no longer a figure (October 2026).
+      const asbIn = Object.values(WARD_DATA_BY_CODE).filter(w => w.crime_by_category && w.indicators.census_population > 0).every(w =>
+        !('crime_total' in w.indicators) && w.indicators.crime_rate_per_1000 === Math.round(Object.entries(w.crime_by_category)
+          .filter(([c]) => c !== 'anti-social-behaviour').reduce((a, [, v]) => a + v, 0) / w.indicators.census_population * 10000) / 10);
       const card = k => indicatorCardHTML(k).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
       const fit = Object.values(WARD_DATA_BY_CODE).find(w => w.name === 'Farringdon Without');
       return {
         covid: /COVID-19 raised deaths/.test(card('ft_93250')) && /COVID-19 raised deaths/.test(card('ft_93283')) &&
           /2020\/21, was the first year of the pandemic/.test(card('ft_93227')) && !/COVID/.test(card('census_bad_health_pct')),
-        crime: asbIn && /not counting anti-social behaviour/.test(card('crime_total')),
+        crime: asbIn && /not counting anti-social behaviour/.test(card('crime_rate_per_1000')),
         jsa: indLabel('ft_93098') === 'Long-term Jobseeker’s Allowance claimants' && /Universal Credit/.test(card('ft_93098')) &&
           !Object.values(MSOA_DATA).some(r => r.ft_93098 === 0 && !r.ft_93098_vs) && OV_CFG.ft_93098.min >= 0,
         fit: wardFitNote(fit), fitNone: wardFitNote(st),
-        names: [indLabel('imd_score_ward'), indLabel('imd_score'), indSameAs('ft_93097')],
+        names: [indLabel('imd_score_ward'), indLabel('imd_score'), String(!!document.querySelector('#ov option[value="ft_93097"]'))],
         inc: [st.indicators.income_score, fmtOv(st.indicators.income_score, 'income_score'), OV_CFG.income_score.lo, OV_CFG.health_score.hi,
           ovContext('ward', 'income_score', st.indicators.income_score, st)],
         ratio: fmtOvTip(126, 'ft_93250'), vs: VS_ENGLAND_TEXT.S,
@@ -1795,10 +1798,10 @@ const smallText = page => page.evaluate(() => {
       };
     });
     ok(dm.covid, 'death, life expectancy and admissions cards say their periods take in the pandemic');
-    ok(dm.crime, 'the crime total leaves out anti-social behaviour, and its card says so');
+    ok(dm.crime, 'the crime rate leaves out anti-social behaviour, its card says so, and the total is not a figure of its own');
     ok(dm.jsa, 'long-term claimants are named for Jobseeker\'s Allowance, with no bare zeros');
     ok(/slightly different area|noticeably different area/.test(dm.fit) && dm.fitNone === '', 'a ward whose LSOAs hold a different population is marked', dm.fit);
-    ok(dm.names[0] !== dm.names[1] && dm.names[2] === 'claimant_rate_pct', 'the two deprivation scores are named apart and the claimant rates are paired', dm.names.join(' | '));
+    ok(dm.names[0] !== dm.names[1] && dm.names[2] === 'false', 'the two deprivation scores are named apart and the Local Health claimant copy is gone', dm.names.join(' | '));
     ok(dm.inc[0] > 1 && /%$/.test(dm.inc[1]) && dm.inc[2] === 'Less deprived' && dm.inc[3] === 'More deprived' && /more deprived than/.test(dm.inc[4]),
       'income deprivation reads as a percentage, and deprivation keys and hovers say less or more deprived', dm.inc.join(' | '));
     ok(dm.ratio === '126.0 (England is 100)' && dm.vs === 'Not clearly different from England' && dm.plain === 0,
@@ -2839,7 +2842,7 @@ const smallText = page => page.evaluate(() => {
       PH_COMPARE.setLevel('borough');
       await new Promise(r => setTimeout(r, 800));
       const code = { 'Tower Hamlets': 'E09000030', 'Newham': 'E09000025' };
-      const cmp = Object.keys(code).map(n => [n, PH_COMPARE.figures(n).crime_total, parseFloat(boroughOvValue(code[n], 'crime_total'))]);
+      const cmp = Object.keys(code).map(n => [n, PH_COMPARE.figures(n).crime_violence_12mo, parseFloat(boroughOvValue(code[n], 'crime_violence_12mo'))]);
       const areas = PH_ASSISTANT.areasFor('la'), bad = [];
       Object.values(areas).forEach(a => Object.keys(a.indicators).forEach(k => {
         const m = parseFloat(boroughOvValue(a.lad_code, k));
@@ -2847,9 +2850,9 @@ const smallText = page => page.evaluate(() => {
       }));
       PH_COMPARE.setLevel('ward');
       return { cmp, bad: bad.slice(0, 5), nBad: bad.length, n: Object.keys(areas).length,
-        sums: ['crime_total', 'crime_violence_12mo', 'claimant_count', 'census_population'].every(laSums) && !laSums('census_bad_health_pct') };
+        sums: ['crime_violence_12mo', 'crime_robbery_12mo', 'claimant_count', 'census_population'].every(laSums) && !laSums('census_bad_health_pct') };
     });
-    ok(add.cmp.every(([, c, m]) => c > 1000 && Math.abs(c - m) < 0.01), 'Compare\'s LA crime total is the map\'s figure (summed, not averaged)', JSON.stringify(add.cmp));
+    ok(add.cmp.every(([, c, m]) => c > 1000 && Math.abs(c - m) < 0.01), 'Compare\'s LA crime count is the map\'s figure (summed, not averaged)', JSON.stringify(add.cmp));
     ok(add.n >= 33 && add.nBad === 0, 'every Ask LA figure matches the map\'s', add.nBad + ': ' + add.bad.join(' | '));
     ok(add.sums, 'one additivity rule: crime counts and claimant_count are summed, rates are not');
     // H10: an LSOA's deprivation chip reads its own decile.
@@ -2858,7 +2861,7 @@ const smallText = page => page.evaluate(() => {
       await new Promise(r => setTimeout(r, 800));
       const f = PH_COMPARE.figures('E01004243');
       PH_COMPARE.setLevel('ward');
-      return { dec: f.imd_decile_mean, own: (LSOA_DATA['E01004243'] || {}).imd_decile };
+      return { dec: f.imd_decile, own: (LSOA_DATA['E01004243'] || {}).imd_decile };
     });
     ok(lsoa.own != null && lsoa.dec === lsoa.own, 'Compare at LSOA level reads the LSOA\'s own deprivation decile', JSON.stringify(lsoa));
     // B6: lists of buttons, small City wards left out with a note, ties said.
@@ -2929,12 +2932,12 @@ const smallText = page => page.evaluate(() => {
     await page.waitForTimeout(2500);
     const h1 = await page.evaluate(() => ({ est: (document.getElementById('sc-la-est') || {}).textContent || '',
       ids: [...document.querySelectorAll('#rank-best .rank-row, #rank-worst .rank-row')].map(b => b.dataset.id),
-      twin: indSameAs('ft_life_expectancy_male'), wardEst: laIsWardEstimate('ft_932831') }));
+      twin: !!document.querySelector('#ov option[value="ft_life_expectancy_male"]'), wardEst: laIsWardEstimate('ft_932831') }));
     // Once the refresh has fetched OHID's own LA figures, the key carries no
     // estimate label; until then it says so and leaves the City out.
     ok((h1.wardEst ? (/^These LA figures are our estimates from ward figures/.test(h1.est) && !h1.ids.includes('E09000001'))
                    : !/estimates from ward figures/.test(h1.est)) && !h1.twin,
-      'Local Health LA figures are labelled as estimates from wards, without the City in the lists, and OHID\'s LA series is offered too', JSON.stringify(h1).slice(0, 300));
+      'Local Health LA figures are labelled as estimates from wards, without the City in the lists, and OHID\'s LA copy is gone', JSON.stringify(h1).slice(0, 300));
     await page.click('#dl-seg [data-dl="ward"]');
     await page.waitForTimeout(1500);
     // H8: the report does not rank or compare a ward its Summary does not.
@@ -3290,7 +3293,7 @@ const smallText = page => page.evaluate(() => {
     const neWords = await page.evaluate(async () => {
       const digest = document.getElementById('vs-digest').textContent;
       const w = Object.keys(WARD_DATA).find(n => { const i = WARD_DATA[n].indicators || {};
-        return i.imd_decile_mean != null && i.census_population > 2000; });
+        return i.imd_score != null && i.census_population > 2000; });
       showWard(w);
       await new Promise(r => setTimeout(r, 600));
       const t = document.body.innerText + ' ' + [...document.querySelectorAll('option, [aria-label], [title]')]
@@ -4020,10 +4023,8 @@ const smallText = page => page.evaluate(() => {
       const W = Object.values(wd.wards);
       const byName = n => W.find(w => w.name === n) || {};
       const covered = W.filter(w => w.cover && Object.keys(w.cover).some(k => /^ft_\d+$/.test(k)));
-      const notes = Object.values(bd).filter(r => r.ft_notes).map(r => r.ft_notes);
       return {
         hackney: (bd.E09000012 && bd.E09000012.ft_notes) || {},
-        nLe: notes.filter(n => /provisional/i.test(n.ft_life_expectancy_male || '')).length,
         withheld: Object.values(bd).some(r => Object.keys(r.ft_notes || {}).some(k => /not published|cannot be calculated/i.test(r.ft_notes[k]) && typeof r[k] === 'number')),
         coverOk: covered.length > 0 && covered.every(w => Object.keys(w.cover).every(k => w.cover[k] >= 80 && w.cover[k] < 100 && w.indicators[k] != null)),
         ncg: byName('New Cross Gate').indicators ? byName('New Cross Gate').indicators.ft_932831 : 'missing',
@@ -4032,7 +4033,7 @@ const smallText = page => page.evaluate(() => {
         cnt: !!(cnt && cnt.keys && cnt.keys.indexOf('census_social_rented_pct') !== -1 && Object.keys(cnt.rows).length > 4000),
       };
     });
-    ok(/Hackney and City of London combined/.test(files.hackney.ft_mmr_2_doses_age5 || '') && files.nLe >= 30 && !files.withheld,
+    ok(/Hackney and City of London combined/.test(files.hackney.ft_mmr_2_doses_age5 || '') && !files.withheld,
       'borough_data.json carries OHID\'s notes, and no withheld value', JSON.stringify(files).slice(0, 300));
     ok(files.coverOk && files.ncg == null && Math.abs(files.poplar - 197.67) < 0.05,
       'ward Local Health figures are weighted by residents, marked when partly covered, and blank under 80%', JSON.stringify(files));
@@ -4050,16 +4051,16 @@ const smallText = page => page.evaluate(() => {
       showWard(part.name);
       out.part = pills('.sr-lh ~ .sr .gpill-note, .sr-lh .gpill-note, .gpill-note');
       out.partNote = (document.querySelector('#wpanel .sr-lh .sr-sub-note') || {}).textContent || '';
-      out.card = indicatorCardHTML('ft_life_expectancy_male');
+      out.card = indicatorCardHTML('ft_mmr_2_doses_age5');
       out.c20card = indicatorCardHTML('core20_lsoa_count');
       return out;
     });
-    ok(r.hk.some(t => /^ft_mmr_2_doses_age5=combined figure/.test(t)) && r.hk.some(t => /^ft_life_expectancy_(fe)?male=provisional/.test(t)),
-      'the profile marks Hackney\'s combined and provisional LA figures', r.hk.join(', '));
+    ok(r.hk.some(t => /^ft_mmr_2_doses_age5=combined figure/.test(t)),
+      'the profile marks Hackney\'s combined LA figures', r.hk.join(', '));
     ok(r.part.some(t => /based on \d\d% of residents/.test(t)) && /rests on that part of the ward only/.test(r.partNote),
       'a ward health figure on part of the ward says what share of residents it rests on', r.part.join(', ') + ' / ' + r.partNote.slice(-120));
-    ok(/Provisional: (the Office for Health Improvement and Disparities \(OHID\)|OHID) based this on provisional death and population figures, for \d+ of the \d+ LAs\./.test(r.card),
-      'the life expectancy card\'s Caution row gives OHID\'s note', r.card.replace(/<[^>]+>/g, ' ').slice(0, 400));
+    ok(/For Hackney, this figure covers Hackney and the City of London together\./.test(r.card.replace(/<[^>]+>/g, ' ')),
+      'the MMR card\'s Caution row gives OHID\'s note', r.card.replace(/<[^>]+>/g, ' ').slice(0, 400));
     ok(/NHS England’s own Core20 figures may still use the 2019 index/.test(r.c20card),
       'the Core20 card says which deciles it uses', r.c20card.replace(/<[^>]+>/g, ' ').slice(0, 300));
 
@@ -4098,8 +4099,8 @@ const smallText = page => page.evaluate(() => {
     ok(rep.kicker && !/Core20/i.test(rep.kicker) && /1 of 11/.test(rep.kpi) && /home to [\d.]+% of residents/.test(rep.kpi),
       'the ward report has no Core20 ward badge, and its tile gives the count and the residents\' share', JSON.stringify(rep));
 
-    // H9: Custom area reports an average decile, sums the Census counts and
-    // leaves out the address count.
+    // H9: Custom area gives the IMD score and no averaged decile, sums the
+    // Census counts and leaves out the address count.
     await page.click('.mode-btn[data-mode="report"]').catch(() => {});
     await page.waitForTimeout(1500);
     const rb = await page.evaluate(async () => {
@@ -4116,14 +4117,14 @@ const smallText = page => page.evaluate(() => {
       const lad = (WARD_DATA_BY_CODE[wcode] || {}).lad_code;
       for (let i = 0; i < 40 && !(BOROUGH_DATA[lad] || {}).fuel_poverty_pct; i++) await new Promise(r => setTimeout(r, 250));
       const bd = (BOROUGH_DATA[lad] || {}).fuel_poverty_pct;
-      return { keys: Object.keys(a.indicators), m: a.method, dec: a.indicators.imd_decile_mean, tiles,
+      return { keys: Object.keys(a.indicators), m: a.method, score: a.indicators.imd_score, tiles,
                fp: a.indicators.fuel_poverty_pct, wardFp: wrec.fuel_poverty_pct, laFp: bd,
                laShown: Number(boroughOvValue(lad, 'fuel_poverty_pct')) };
     });
-    ok(rb.keys.indexOf('imd_decile') === -1 && rb.keys.indexOf('gb_total_uprn') === -1 && typeof rb.dec === 'number' &&
+    ok(rb.keys.indexOf('imd_decile') === -1 && rb.keys.indexOf('gb_total_uprn') === -1 && typeof rb.score === 'number' &&
        rb.m.census_social_rented_pct === 'counts' && rb.m.census_population === 'summed' && rb.m.fuel_poverty_pct === 'households' &&
-       rb.tiles.some(t => /^Average deprivation decile \(IMD 2025\) \d\.\d$/.test(t)),
-      'Custom area gives an average decile to one place, sums the Census counts and weights fuel poverty by households', JSON.stringify(rb).slice(0, 400));
+       rb.tiles.some(t => /^Deprivation score by LSOA \(IMD 2025\) \d+\.\d$/.test(t)) && !rb.tiles.some(t => /decile/i.test(t)),
+      'Custom area gives the IMD score to one place and no averaged decile, sums the Census counts and weights fuel poverty by households', JSON.stringify(rb).slice(0, 400));
     ok(typeof rb.fp === 'number' && typeof rb.wardFp === 'number' && Math.abs(rb.fp - rb.wardFp) < 0.02 &&
        typeof rb.laFp === 'number' && rb.laShown === rb.laFp,
       'fuel poverty: a Custom area of a ward\'s LSOAs matches the ward, and the LA shows its own household-weighted figure',
@@ -4786,8 +4787,8 @@ const smallText = page => page.evaluate(() => {
     // 15,000 characters is the cap the answer loop puts on any one tool
     // result (RESULT_BYTES in assistant.js), under the Worker's 16 KB.
     ok(A.list.size < 15000 && A.list.over65 === 'la,ward,msoa,lsoa' + (HAS_OA ? ',oa' : '') && A.list.decile === 'lsoa' &&
-       A.list.mean === 'la,ward' && A.list.laOnly === 'la,ward' && A.list.withheld === -1,
-      'Ask levels: list_indicators says where each indicator is, and stays under the 15,000 character tool result cap', JSON.stringify(A.list));
+       A.list.mean === '' && A.list.laOnly === 'la,ward' && A.list.withheld === -1,
+      'Ask levels: list_indicators says where each indicator is, leaves out the retired ward decile, and stays under the 15,000 character tool result cap', JSON.stringify(A.list));
     ok(!errors.length, 'no page errors (Ask levels)', errors.join(' | '));
     await page.close();
   }
@@ -4839,12 +4840,12 @@ const smallText = page => page.evaluate(() => {
   // without them must not offer them, and with figures put into the files it
   // reads, the way a refresh will write them (fetch_all_data.py, SOURCE 3a).
   {
-    const KEYS = ['idaci_pct', 'idaci_decile', 'idaci_rank', 'idaopi_pct', 'idaopi_decile', 'idaopi_rank',
+    const KEYS = ['idaci_pct', 'idaci_rank', 'idaopi_pct', 'idaopi_rank',
       'cyp_education_score', 'adult_skills_score', 'geo_barriers_score', 'wider_barriers_score', 'indoors_score',
       'outdoors_score', 'iod_ypll', 'iod_cidr', 'iod_acute_morbidity', 'iod_mood_anxiety', 'iod_ks2', 'iod_ks4',
-      'iod_staying_on', 'iod_he_entry', 'iod_adult_quals', 'iod_english', 'iod_housing_poor', 'iod_no_central_heating',
-      'iod_air_quality', 'iod_road_accidents'];
-    const LSOA_ONLY = ['idaci_decile', 'idaci_rank', 'idaopi_decile', 'idaopi_rank'];
+      'iod_staying_on', 'iod_he_entry', 'iod_english', 'iod_housing_poor', 'iod_no_central_heating',
+      'iod_road_accidents'];
+    const LSOA_ONLY = ['idaci_rank', 'idaopi_rank'];
     const fake = (k, i) => {
       const x = (i * 37 % 100) / 100;
       if (/_decile$/.test(k)) return 1 + (i % 10);
@@ -4903,7 +4904,7 @@ const smallText = page => page.evaluate(() => {
     // measures either, which came in with them).
     {
       const { page, errors } = await openWithout(browser, 'index.html?t=1', DESK,
-        KEYS.concat(['census_hh_deprived_any_pct', 'census_hh_deprived_2plus_pct']));
+        KEYS.concat(['census_hh_deprived_2plus_pct']));
       const r = await page.evaluate(keys => ({
         cats: CATS.flatMap(c => c.fields.map(f => f.k)).filter(k => keys.indexOf(k) !== -1),
         opts: [...document.querySelectorAll('#ov option')].map(o => o.value).filter(k => keys.indexOf(k) !== -1),
@@ -4938,14 +4939,14 @@ const smallText = page => page.evaluate(() => {
         const real = WARD_META;
         const out = {
           opts: [...document.querySelectorAll('#ov option')].map(o => o.value).filter(k => keys.indexOf(k) !== -1).length,
-          lv: [ovLevels('idaci_pct').join(','), ovLevels('idaci_decile').join(','), ovLevels('iod_ks2').join(',')],
-          ask: [find('idaci_pct'), find('idaci_decile'), find('iod_ks2')],
+          lv: [ovLevels('idaci_pct').join(','), ovLevels('iod_ks2').join(',')],
+          ask: [find('idaci_pct'), find('iod_ks2')],
           size: JSON.stringify(li).length,
           idaciPub: dd('idaci_pct', 'Published at'), idaciUnit: dd('idaci_pct', 'Unit'), idaciMethod: dd('idaci_pct', 'Method'),
           ks2: card('iod_ks2'), cidr: card('iod_cidr'), geo: card('geo_barriers_score'),
           anchors: [_methAnchor('idaci_pct'), _methAnchor('indoors_score'), _methAnchor('iod_ypll')],
           la: [boroughOvValue('E09000001', 'idaci_pct'), (BOROUGH_DATA.E09000001.indicators || BOROUGH_DATA.E09000001).idaci_pct],
-          dec: [indDecimals('idaci_pct'), indDecimals('idaci_decile'), indDecimals('indoors_score')],
+          dec: [indDecimals('idaci_pct'), indDecimals('indoors_score')],
         };
         WARD_META = Object.assign({}, real, { iod_weights: { idaci_pct: 'residents' } });
         out.fallback = dd('idaci_pct', 'Method');
@@ -4953,18 +4954,18 @@ const smallText = page => page.evaluate(() => {
         return out;
       }, KEYS);
       const subs = await subHeads(page);
-      ok(r.opts === 24, 'IoD 2025 extras: with figures, all 24 are offered', String(r.opts));
+      ok(r.opts === 20, 'IoD 2025 extras: with figures, all 20 are offered', String(r.opts));
       // Household deprivation (Census 2021) has its own list when the build
       // has its figures.
-      const hhDep = /"census_hh_deprived_any_pct"/.test(fs.readFileSync(path.join(ROOT, 'data/map/indicators.js'), 'utf8'));
+      const hhDep = /"census_hh_deprived_2plus_pct"/.test(fs.readFileSync(path.join(ROOT, 'data/map/indicators.js'), 'utf8'));
       ok(JSON.stringify(subs) === JSON.stringify(['The index and its domains'].concat(hhDep ? ['Household deprivation (Census 2021)'] : [],
         ['Children and older people', 'Sub-domains', 'Health measures behind the index', 'Education measures behind the index',
           'Living environment measures behind the index'])),
         'IoD 2025 extras: Deprivation is short lists, not one long one', JSON.stringify(subs));
-      ok(r.lv[0] === 'borough,ward,lsoa' && r.lv[1] === 'lsoa' && r.lv[2] === 'borough,ward,lsoa',
-        'IoD 2025 extras: shown for LSOAs, wards and LAs, with deciles for LSOAs only', JSON.stringify(r.lv));
-      ok(r.ask[0] && r.ask[0].levels === 'la,ward,lsoa' && r.ask[1] && r.ask[1].levels === 'lsoa' &&
-         r.ask[2] && r.ask[2].row.indexOf('less deprived') !== -1 && r.size < 15000,
+      ok(r.lv[0] === 'borough,ward,lsoa' && r.lv[1] === 'borough,ward,lsoa',
+        'IoD 2025 extras: shown for LSOAs, wards and LAs', JSON.stringify(r.lv));
+      ok(r.ask[0] && r.ask[0].levels === 'la,ward,lsoa' &&
+         r.ask[1] && r.ask[1].row.indexOf('less deprived') !== -1 && r.size < 15000,
         'IoD 2025 extras: Ask lists them at the right levels, attainment the right way round, within its 15,000 character cap',
         JSON.stringify({ ask: r.ask, size: r.size }));
       ok(/Ward figures are an average of the LSOAs in each ward, weighted by their children aged 0 to 15\./.test(r.idaciPub) &&
@@ -4977,7 +4978,7 @@ const smallText = page => page.evaluate(() => {
         'IoD 2025 extras: attainment reads as better when higher, the illness ratio against England at 100, and geographical barriers explain rural areas');
       ok(r.anchors.join() === 'src-iod-extra,src-iod-extra,src-iod-indicators', 'IoD 2025 extras: cards link to their own source rows', r.anchors.join());
       ok(r.la[0] === r.la[1] && r.la[0] != null, 'IoD 2025 extras: an LA shows the LA file\'s own IDACI, not an average of its wards', JSON.stringify(r.la));
-      ok(r.dec.join() === '1,0,2', 'IoD 2025 extras: one decimal for IDACI, whole deciles, two for sub-domain scores', r.dec.join());
+      ok(r.dec.join() === '1,2', 'IoD 2025 extras: one decimal for IDACI, two for sub-domain scores', r.dec.join());
       // Drawn at LSOA, and named in the LSOA profile.
       await setOv(page, 'idaci_pct');
       await page.waitForTimeout(1500);
@@ -4985,33 +4986,30 @@ const smallText = page => page.evaluate(() => {
         await ensureLsoaImd();
         showLSOA(LSOA_IMD.features.find(f => f.properties.ward === 'Lansbury'));
         const t = document.getElementById('wpanel').innerText;
-        return { idaci: /Income deprivation affecting children \(IDACI 2025\)/.test(t), dec: /Decile \d+ of 10, where 1 is the most deprived/.test(t),
+        return { idaci: /Income deprivation affecting children \(IDACI 2025\)/.test(t),
           legend: (document.getElementById('ov-cur-nm') || {}).textContent || '' };
       });
-      ok(lp.idaci && lp.dec && /IDACI/.test(lp.legend), 'IoD 2025 extras: IDACI draws, and the LSOA profile gives it with its decile', JSON.stringify(lp));
+      ok(lp.idaci && /IDACI/.test(lp.legend), 'IoD 2025 extras: IDACI draws, and the LSOA profile gives it', JSON.stringify(lp));
       ok(!errors.length, 'no page errors (IoD 2025 extras, with figures)', errors.join(' | '));
       await page.close();
     }
   }
 
   // The small-area additions (fetch_all_data.py, SMALL-AREA ADDITIONS):
-  // distances to the nearest GP practice, pharmacy and NHS dentist, ONS's
-  // mid-year population estimates, the claimant rate aged 18 to 24, residents
-  // killed or seriously injured on the roads, care home beds, and the crime
+  // distances to the nearest GP practice, pharmacy and NHS dentist, the
+  // claimant rate aged 18 to 24, residents killed or seriously injured on the roads, care home beds, and the crime
   // figures for LSOAs. Their figures arrive with a refresh, so the page is
   // checked as shipped, where none is offered and crime stays ward-only, and
   // with figures put into the files the way the pipeline writes them.
   {
-    const LSOA_TOO = ['gp_dist_km', 'pharmacy_dist_km', 'dentist_dist_km', 'sape_population',
-      'sape_age0_15_pct', 'sape_age16_64_pct', 'sape_age65plus_pct', 'sape_age75plus_pct'];
+    const LSOA_TOO = ['gp_dist_km', 'pharmacy_dist_km', 'dentist_dist_km'];
     const WARD_LA = ['claimant_18_24_pct', 'road_ksi_per_1000', 'care_home_beds_per_100_75plus'];
     const KEYS = LSOA_TOO.concat(WARD_LA);
-    const CRIME = ['crime_total', 'crime_rate_per_1000', 'crime_violence_12mo', 'crime_burglary_12mo',
+    const CRIME = ['crime_rate_per_1000', 'crime_violence_12mo', 'crime_burglary_12mo',
       'crime_robbery_12mo', 'crime_theft_12mo', 'crime_asb_12mo'];
     const fake = (k, i) => {
       const x = (i * 37 % 100) / 100;
       if (/_dist_km$/.test(k)) return Math.round((0.1 + 1.5 * x) * 1000) / 1000;
-      if (k === 'sape_population') return 1200 + (i * 53 % 900);
       if (/^crime_/.test(k)) return k === 'crime_rate_per_1000' ? Math.round((20 + 200 * x) * 10) / 10 : (i * 7 % 60);
       return Math.round((2 + 25 * x) * 10) / 10;
     };
@@ -5038,7 +5036,7 @@ const smallText = page => page.evaluate(() => {
             const ind = doc.wards[wd].indicators = doc.wards[wd].indicators || {};
             KEYS.forEach(k => { ind[k] = fake(k, i); });
           });
-          if (doc.metadata) doc.metadata.small_area = { service_access_origin: origin, sape_year: 2024,
+          if (doc.metadata) doc.metadata.small_area = { service_access_origin: origin,
             claimant_18_24_month: '2026-08', road_ksi_years: '2021 to 2025', care_homes_as_at: '2026-10-02' };
           r.fulfill({ contentType: 'application/json', body: JSON.stringify(doc) });
         });
@@ -5093,36 +5091,36 @@ const smallText = page => page.evaluate(() => {
         const theme = k => ((window.PH_THEMES || []).find(t => t.keys.indexOf(k) !== -1) || {}).label || '';
         return {
           opts: [...document.querySelectorAll('#ov option')].map(o => o.value).filter(k => keys.indexOf(k) !== -1).length,
-          lv: { gp: ovLevels('gp_dist_km').join(','), sape: ovLevels('sape_age75plus_pct').join(','),
+          lv: { gp: ovLevels('gp_dist_km').join(','),
                 youth: ovLevels('claimant_18_24_pct').join(','), ksi: ovLevels('road_ksi_per_1000').join(','),
                 beds: ovLevels('care_home_beds_per_100_75plus').join(','),
                 crime: ovLevels('crime_rate_per_1000').join(','), vehicle: ovLevels('crime_vehicle_12mo').join(',') },
           ask: { gp: find('gp_dist_km'), youth: find('claimant_18_24_pct'), crime: find('crime_rate_per_1000') },
           size: JSON.stringify(li).length,
-          themes: { gp: theme('gp_dist_km'), sape: theme('sape_population'), youth: theme('claimant_18_24_pct'),
+          themes: { gp: theme('gp_dist_km'), youth: theme('claimant_18_24_pct'),
                     ksi: theme('road_ksi_per_1000'), beds: theme('care_home_beds_per_100_75plus') },
           gpPub: dd('gp_dist_km', 'Published at'), gpMethod: dd('gp_dist_km', 'Method'), gpUnit: dd('gp_dist_km', 'Unit'),
           youthPub: dd('claimant_18_24_pct', 'Published at'), youthUnit: dd('claimant_18_24_pct', 'Unit'),
           ksiCard: card('road_ksi_per_1000'), bedsCard: card('care_home_beds_per_100_75plus'),
-          sapePub: dd('sape_age65plus_pct', 'Published at'), crimePub: dd('crime_rate_per_1000', 'Published at'),
+          crimePub: dd('crime_rate_per_1000', 'Published at'),
           crimeMethod: dd('crime_rate_per_1000', 'Method'),
-          anchors: ['gp_dist_km', 'sape_population', 'claimant_18_24_pct', 'road_ksi_per_1000', 'care_home_beds_per_100_75plus'].map(_methAnchor),
+          anchors: ['gp_dist_km', 'claimant_18_24_pct', 'road_ksi_per_1000', 'care_home_beds_per_100_75plus'].map(_methAnchor),
           la: [boroughOvValue('E09000001', 'claimant_18_24_pct'), (BOROUGH_DATA.E09000001.indicators || BOROUGH_DATA.E09000001).claimant_18_24_pct],
-          dec: [indDecimals('gp_dist_km'), indDecimals('sape_population'), indDecimals('claimant_18_24_pct')],
-          descriptive: [!!OV_CFG.care_home_beds_per_100_75plus.descriptive, !!OV_CFG.sape_age75plus_pct.descriptive, OV_CFG.gp_dist_km.wh],
+          dec: [indDecimals('gp_dist_km'), indDecimals('claimant_18_24_pct')],
+          descriptive: [!!OV_CFG.care_home_beds_per_100_75plus.descriptive, OV_CFG.gp_dist_km.wh],
           credits: [phLicenceExtras(['care_home_beds_per_100_75plus']).join(' '), phLicenceExtras(['gp_dist_km']).join(' ')],
         };
       }, { keys: KEYS, crime: CRIME });
       if (origin === 'pwc') {
-        ok(r.opts === 11, 'Small-area additions: with figures, all 11 are offered', String(r.opts));
-        ok(r.lv.gp === 'borough,ward,lsoa' && r.lv.sape === 'borough,ward,lsoa' && r.lv.youth === 'borough,ward' &&
+        ok(r.opts === 6, 'Small-area additions: with figures, all 6 are offered', String(r.opts));
+        ok(r.lv.gp === 'borough,ward,lsoa' && r.lv.youth === 'borough,ward' &&
            r.lv.ksi === 'borough,ward' && r.lv.beds === 'borough,ward',
-          'Small-area additions: distances and estimates for LSOAs, wards and LAs; the three rates for wards and LAs only', JSON.stringify(r.lv));
+          'Small-area additions: distances for LSOAs, wards and LAs; the three rates for wards and LAs only', JSON.stringify(r.lv));
         ok(r.lv.crime === 'borough,ward,lsoa' && r.lv.vehicle === 'borough,ward',
           'Crime by LSOA: with LSOA figures the crime rate is drawn for LSOAs too, and a type the LSOA file lacks is not', JSON.stringify(r.lv));
         ok(r.ask.gp === 'la,ward,lsoa' && r.ask.youth === 'la,ward' && r.ask.crime === 'la,ward,lsoa' && r.size < 15000,
           'Small-area additions: Ask lists them at the right levels, within its 15,000 character cap', JSON.stringify({ ask: r.ask, size: r.size }));
-        ok(r.themes.gp === 'Environment and access' && r.themes.sape === 'People and communities' &&
+        ok(r.themes.gp === 'Environment and access' &&
            r.themes.youth === 'Work, money and education' && r.themes.ksi === 'Crime and safety' && r.themes.beds === 'Health',
           'Small-area additions: each sits in its theme', JSON.stringify(r.themes));
         ok(/We measure these for each LSOA from the NHS registers/.test(r.gpPub) &&
@@ -5135,17 +5133,15 @@ const smallText = page => page.evaluate(() => {
           'Small-area additions: the youth claimant card says ward and LA rates come from summed counts', JSON.stringify([r.youthPub, r.youthUnit]));
         ok(/adjusted/.test(r.ksiCard) && /where they live|lives in/.test(r.ksiCard) && /capacity/.test(r.bedsCard) && /younger adults/.test(r.bedsCard),
           'Small-area additions: the road casualty card says adjusted and by home, the care home card says capacity');
-        ok(/add up the people of each age in the LSOAs/.test(r.sapePub),
-          'Small-area additions: the population estimate shares are made from summed counts', r.sapePub);
         ok(/LSOA figures are counted in the same way, from the crimes in each LSOA/.test(r.crimePub) && /each LSOA/.test(r.crimePub) &&
            /An LSOA is small/.test(r.crimeMethod),
           'Crime by LSOA: the card says LSOAs are counted from their own crimes, and that their counts are small', JSON.stringify([r.crimePub, r.crimeMethod]));
-        ok(r.anchors.join() === 'src-service-access,src-sape,src-claimant-youth,src-road-casualties,src-care-homes',
+        ok(r.anchors.join() === 'src-service-access,src-claimant-youth,src-road-casualties,src-care-homes',
           'Small-area additions: cards link to their own source rows', r.anchors.join());
         ok(r.la[0] === r.la[1] && r.la[0] != null, 'Small-area additions: an LA shows the LA file\'s own figure, not an average of its wards', JSON.stringify(r.la));
-        ok(r.dec.join() === '2,0,1', 'Small-area additions: two decimals for kilometres, whole people, one for rates', r.dec.join());
-        ok(r.descriptive[0] && r.descriptive[1] && r.descriptive[2] === true,
-          'Small-area additions: care home beds and the estimates have no good end; further from a GP is worse', JSON.stringify(r.descriptive));
+        ok(r.dec.join() === '2,1', 'Small-area additions: two decimals for kilometres, one for rates', r.dec.join());
+        ok(r.descriptive[0] && r.descriptive[1] === true,
+          'Small-area additions: care home beds have no good end; further from a GP is worse', JSON.stringify(r.descriptive));
         ok(/Care Quality Commission/.test(r.credits[0]) && /ONS Postcode Directory/.test(r.credits[1]) && /Royal Mail/.test(r.credits[1]),
           'Small-area additions: files with care home beds credit CQC, and with distances the postcode directory', JSON.stringify(r.credits));
         // Drawn at LSOA, and named in the LSOA profile with its unit.
@@ -5159,7 +5155,7 @@ const smallText = page => page.evaluate(() => {
         });
         ok(lp.row && /GP practice/.test(lp.legend), 'Small-area additions: the GP distance draws, and the LSOA profile gives it in km', JSON.stringify(lp));
         const meth = await (await fetch(BASE + '/methodology.html')).text();
-        const missing = ['src-service-access', 'src-sape', 'src-claimant-youth', 'src-road-casualties', 'src-care-homes']
+        const missing = ['src-service-access', 'src-claimant-youth', 'src-road-casualties', 'src-care-homes']
           .filter(id => meth.indexOf("id: '" + id.slice(4) + "'") === -1);
         ok(!missing.length, 'Small-area additions: the methodology page has a source row for each', missing.join(', '));
       } else {
@@ -5180,7 +5176,7 @@ const smallText = page => page.evaluate(() => {
   // Ask lists them within its 15,000 character cap.
   {
     const KEYS = ['ft_93092', 'ft_93234', 'ft_93235', 'ft_93236', 'ft_93237', 'ft_93238',
-      'hle_female', 'hle_male', 'dfle_female', 'dfle_male', 'saie_total_income', 'saie_net_bhc', 'saie_net_ahc'];
+      'hle_female', 'hle_male', 'dfle_female', 'dfle_male', 'saie_total_income', 'saie_net_ahc'];
     const MODELLED = KEYS.filter(k => !/^ft_/.test(k));
     const fake = (k, i) => {
       const x = (i * 37 % 100) / 100;
@@ -5232,7 +5228,7 @@ const smallText = page => page.evaluate(() => {
         const doc = readJson('borough_data.json');
         Object.keys(doc).forEach((c, i) => {
           const ind = doc[c].indicators || doc[c];
-          ['saie_total_income', 'saie_net_bhc', 'saie_net_ahc', 'ft_93092'].forEach(k => { ind[k] = fake(k, i + 5); });
+          ['saie_total_income', 'saie_net_ahc', 'ft_93092'].forEach(k => { ind[k] = fake(k, i + 5); });
           // The real file may hold ONS's own LA life expectancy; this build has none.
           ['hle_female', 'hle_male', 'dfle_female', 'dfle_male'].forEach(k => { delete ind[k]; });
         });
@@ -5268,7 +5264,7 @@ const smallText = page => page.evaluate(() => {
       await page.waitForTimeout(SETTLE);
       await page.evaluate(() => typeof ensureMsoaData === 'function' && ensureMsoaData());
       await page.waitForFunction(() => typeof MSOA_DATA !== 'undefined' && Object.keys(MSOA_DATA).length > 0 &&
-        Object.values(MSOA_DATA).some(d => d.saie_net_bhc_lci != null), null, { timeout: 30000 }).catch(() => {});
+        Object.values(MSOA_DATA).some(d => d.saie_net_ahc_lci != null), null, { timeout: 30000 }).catch(() => {});
       const r = await page.evaluate(keys => {
         const li = PH_ASSISTANT.runTool('list_indicators', {});
         const ci = c => li.columns.indexOf(c);
@@ -5278,27 +5274,27 @@ const smallText = page => page.evaluate(() => {
           const dt = [...d.querySelectorAll('dt')].find(e => e.textContent === name); return dt ? dt.nextElementSibling.textContent : ''; };
         const code = Object.keys(MSOA_DATA)[0];
         const tmp = document.createElement('div');
-        tmp.innerHTML = ovIntervalHTML('msoa', code, 'saie_net_bhc');
+        tmp.innerHTML = ovIntervalHTML('msoa', code, 'saie_net_ahc');
         const la = Object.keys(BOROUGH_DATA)[0];
         return {
           opts: [...document.querySelectorAll('#ov option')].map(o => o.value).filter(k => keys.indexOf(k) !== -1).length,
           themes: keys.map(theme),
-          lv: [ovLevels('saie_net_bhc').join(','), ovLevels('hle_female').join(','), ovLevels('ft_93092').join(',')],
-          ask: [find('saie_net_bhc'), find('hle_female'), find('ft_93234')],
+          lv: [ovLevels('saie_net_ahc').join(','), ovLevels('hle_female').join(','), ovLevels('ft_93092').join(',')],
+          ask: [find('saie_net_ahc'), find('hle_female'), find('ft_93234')],
           size: JSON.stringify(li).length,
-          range: tmp.textContent, rangeWard: ovIntervalHTML('ward', code, 'saie_net_bhc'),
+          range: tmp.textContent, rangeWard: ovIntervalHTML('ward', code, 'saie_net_ahc'),
           rangeLh: ovIntervalHTML('msoa', code, 'ft_93092'),
-          money: fmtOv(38450, 'saie_net_ahc'), dec: [indDecimals('saie_net_bhc'), indDecimals('hle_male')],
+          money: fmtOv(38450, 'saie_net_ahc'), dec: [indDecimals('saie_net_ahc'), indDecimals('hle_male')],
           ratio: ovIsStdRatio('ft_93237'), desc: [OV_CFG.ft_93235.descriptive, OV_CFG.ft_93238.descriptive, OV_CFG.ft_93237.descriptive],
-          saiePub: dd('saie_net_bhc', 'Published at'), saieMethod: dd('saie_net_ahc', 'Method'),
+          saiePub: dd('saie_net_ahc', 'Published at'), saieMethod: dd('saie_net_ahc', 'Method'),
           hlePub: dd('hle_female', 'Published at'), hleUnit: dd('hle_female', 'Unit'),
           cancerCounted: dd('ft_93234', 'Counted'), lbwCounted: dd('ft_93092', 'Counted'),
-          anchors: [_methAnchor('saie_net_bhc'), _methAnchor('dfle_male'), _methAnchor('ft_93092'), _methAnchor('ft_93227')],
-          laSaie: [boroughOvValue(la, 'saie_net_bhc'), (BOROUGH_DATA[la].indicators || BOROUGH_DATA[la]).saie_net_bhc],
-          laEst: [laIsWardEstimate('hle_female'), laIsWardEstimate('saie_net_bhc'), laIsWardEstimate('ft_93092')],
+          anchors: [_methAnchor('saie_net_ahc'), _methAnchor('dfle_male'), _methAnchor('ft_93092'), _methAnchor('ft_93227')],
+          laSaie: [boroughOvValue(la, 'saie_net_ahc'), (BOROUGH_DATA[la].indicators || BOROUGH_DATA[la]).saie_net_ahc],
+          laEst: [laIsWardEstimate('hle_female'), laIsWardEstimate('saie_net_ahc'), laIsWardEstimate('ft_93092')],
         };
       }, KEYS);
-      ok(r.opts === KEYS.length, 'MSOA additions: with figures, all thirteen are offered', String(r.opts));
+      ok(r.opts === KEYS.length, 'MSOA additions: with figures, all twelve are offered', String(r.opts));
       ok(r.themes.slice(0, 6).every(t => t === 'Health') && r.themes.slice(6, 10).every(t => t === 'Life expectancy and deaths') &&
          r.themes.slice(10).every(t => t === 'Work, money and education'),
         'MSOA additions: birth weight and cancer under Health, healthy life expectancy under Life expectancy, income under Work', r.themes.join(', '));
@@ -5331,10 +5327,10 @@ const smallText = page => page.evaluate(() => {
       await page.waitForTimeout(1500);
       const ex = await page.evaluate(() => {
         const cols = [...document.querySelectorAll('#cb-cols input[data-col]')].map(b => b.getAttribute('data-col'));
-        PH_CSV.pick('saie_net_bhc');
+        PH_CSV.pick('saie_net_ahc');
         return { cols, head: PH_CSV.buildFor('msoa').header };
       });
-      ok(ex.cols.includes('saie_net_bhc') && !ex.cols.some(c => /_(lci|uci)$/.test(c)),
+      ok(ex.cols.includes('saie_net_ahc') && !ex.cols.some(c => /_(lci|uci)$/.test(c)),
         'MSOA additions: the Data export offers income at MSOA, and not its limits as indicators', ex.cols.filter(c => /saie|_lci|_uci/.test(c)).join(', '));
       ok(ex.head.some(h => /household income.*lower 95% limit/i.test(h)) && ex.head.some(h => /household income.*upper 95% limit/i.test(h)),
         'MSOA additions: an MSOA export with income carries its lower and upper 95% limits', ex.head.join(' | '));
@@ -5528,7 +5524,7 @@ const smallText = page => page.evaluate(() => {
       'hypertension', 'ld', 'smi', 'ndh', 'obesity', 'osteoporosis', 'pad', 'ra', 'stroke'].map(c => 'qof_est_' + c + '_pct');
     const AHAH = ['ahah_index', 'ahah_health_services', 'ahah_retail', 'ahah_air_quality', 'ahah_green_blue',
       'ahah_fast_food_min', 'ahah_pubs_min', 'ahah_off_licence_min', 'ahah_gambling_min', 'ahah_tobacco_min'];
-    const DECILES = ['ahah_decile', 'samhi_decile', 'ppfi_decile', 'ppfi_supermarket_proximity_decile',
+    const DECILES = ['ahah_decile', 'ppfi_decile', 'ppfi_supermarket_proximity_decile',
       'ppfi_supermarket_access_decile', 'ppfi_online_decile', 'ppfi_nonsupermarket_decile', 'ppfi_family_decile'];
     const LSOA_TOO = AHAH.concat(['samhi_index']);
     const WARD_LA = ['ppfi_priority_pct', 'fhrs_takeaways_per_1000', 'fhrs_pubs_per_1000', 'fhrs_low_hygiene_pct'];
@@ -5628,7 +5624,7 @@ const smallText = page => page.evaluate(() => {
         const la = Object.keys(BOROUGH_DATA)[0];
         return {
           opts: [...document.querySelectorAll('#ov option')].map(o => o.value).filter(k => keys.indexOf(k) !== -1).length,
-          lv: ['ahah_index', 'ahah_decile', 'ahah_fast_food_min', 'samhi_index', 'samhi_decile', 'qof_est_diabetes_pct',
+          lv: ['ahah_index', 'ahah_decile', 'ahah_fast_food_min', 'samhi_index', 'qof_est_diabetes_pct',
                'ppfi_decile', 'ppfi_priority_pct', 'fhrs_takeaways_per_1000'].map(k => k + ' ' + ovLevels(k).join(',')),
           themes: keys.map(theme),
           ask: ['ahah_index', 'ahah_decile', 'samhi_index', 'qof_est_asthma_pct', 'ppfi_online_decile', 'fhrs_low_hygiene_pct'].map(find),
@@ -5644,20 +5640,20 @@ const smallText = page => page.evaluate(() => {
           })(),
           ppfiMethod: dd('ppfi_decile', 'Method'), shareCounted: dd('ppfi_priority_pct', 'Counted'),
           fhrsMethod: dd('fhrs_takeaways_per_1000', 'Method'), fhrsPub: dd('fhrs_low_hygiene_pct', 'Published at'),
-          anchors: ['ahah_index', 'ahah_tobacco_min', 'samhi_decile', 'qof_est_copd_pct', 'ppfi_priority_pct', 'fhrs_pubs_per_1000'].map(_methAnchor),
+          anchors: ['ahah_index', 'ahah_tobacco_min', 'samhi_index', 'qof_est_copd_pct', 'ppfi_priority_pct', 'fhrs_pubs_per_1000'].map(_methAnchor),
           la: [boroughOvValue(la, 'fhrs_takeaways_per_1000'), (BOROUGH_DATA[la].indicators || BOROUGH_DATA[la]).fhrs_takeaways_per_1000],
           dec: [indDecimals('ahah_decile'), indDecimals('ppfi_decile'), indDecimals('samhi_index'), indDecimals('fhrs_pubs_per_1000'),
                 indDecimals('qof_est_ckd_pct'), indDecimals('ahah_fast_food_min')],
           dir: [!!OV_CFG.ahah_pubs_min.descriptive, !!OV_CFG.fhrs_takeaways_per_1000.descriptive, OV_CFG.ahah_index.wh,
                 OV_CFG.ahah_decile.wh, OV_CFG.fhrs_low_hygiene_pct.wh, OV_CFG.samhi_index.wh],
           credits: [phLicenceExtras(['ppfi_family_decile']).join(' '), phLicenceExtras(['ahah_index', 'samhi_index', 'fhrs_pubs_per_1000']).join(' ')],
-          read: ['ahah_decile', 'samhi_decile', 'ppfi_online_decile', 'ppfi_priority_pct', 'imd_decile'].map(_cardHowToRead),
+          read: ['ahah_decile', 'ppfi_online_decile', 'ppfi_priority_pct', 'imd_decile'].map(_cardHowToRead),
         };
       }, KEYS);
       if (vintage === '2011') {
         ok(r.opts === KEYS.length, 'Healthy places and food: with figures, all ' + KEYS.length + ' are offered', String(r.opts));
         ok(r.lv.join(' | ') === 'ahah_index borough,ward,lsoa | ahah_decile lsoa | ahah_fast_food_min borough,ward,lsoa | ' +
-           'samhi_index borough,ward,lsoa | samhi_decile lsoa | qof_est_diabetes_pct borough,ward,msoa | ppfi_decile lsoa | ' +
+           'samhi_index borough,ward,lsoa | qof_est_diabetes_pct borough,ward,msoa | ppfi_decile lsoa | ' +
            'ppfi_priority_pct borough,ward | fhrs_takeaways_per_1000 borough,ward',
           'Healthy places and food: scores and drive times for LSOAs, wards and LAs, deciles for LSOAs only, the QOF estimates from MSOAs, the food counts for wards and LAs', r.lv.join(' | '));
         ok(KEYS.every((k, i) => r.themes[i] === (/^(samhi|qof_est)_/.test(k) ? 'Health' : 'Food and healthy places')),
@@ -5696,8 +5692,8 @@ const smallText = page => page.evaluate(() => {
         ok(r.dec.join() === '0,0,2,2,1,1', 'Healthy places and food: whole deciles, two places for SAMHI and the FSA rates, one for the rest', r.dec.join());
         ok(r.dir.join() === 'true,true,true,false,true,true',
           'Healthy places and food: drive times and takeaway rates have no good end; a higher index, hygiene share or SAMHI is worse', r.dir.join());
-        ok(/least healthy/.test(r.read[0]) && /worst mental health/.test(r.read[1]) && /highest risk/.test(r.read[2]) &&
-           /higher figure is worse/.test(r.read[3]) && /most deprived/.test(r.read[4]) && !/deprived/.test(r.read.slice(0, 4).join(' ')),
+        ok(/least healthy/.test(r.read[0]) && /highest risk/.test(r.read[1]) &&
+           /higher figure is worse/.test(r.read[2]) && /most deprived/.test(r.read[3]) && !/deprived/.test(r.read.slice(0, 3).join(' ')),
           'Healthy places and food: each decile card says what 1 means in its own words, not deprivation\'s', JSON.stringify(r.read));
         ok(/Consumer Data Research Centre \(CDRC\)/.test(r.credits[0]) && /ES\/L011840\/1/.test(r.credits[0]) && !/CDRC/.test(r.credits[1]),
           'Healthy places and food: files with a PPFI figure carry CDRC\'s attribution, and others do not', JSON.stringify(r.credits));
@@ -5712,10 +5708,9 @@ const smallText = page => page.evaluate(() => {
           return { block: /Healthy places, mental health and food/.test(t), dec: /Decile \d+ of 10, where 1 is the least healthy/.test(t) };
         });
         ok(lp.block && lp.dec, 'Healthy places and food: the LSOA profile shows the healthy places index with its decile', JSON.stringify(lp));
-        const ctx = await page.evaluate(() => [ovContext('lsoa', 'ahah_decile', 5), ovContext('lsoa', 'ppfi_decile', 5),
-          ovContext('lsoa', 'samhi_decile', 5)]);
+        const ctx = await page.evaluate(() => [ovContext('lsoa', 'ahah_decile', 5), ovContext('lsoa', 'ppfi_decile', 5)]);
         ok(/(healthier|less healthy) than \d+% of LSOAs/.test(ctx[0]) && /at (lower|higher) risk than/.test(ctx[1]) &&
-           /(better|worse) than/.test(ctx[2]) && !/deprived/.test(ctx.join(' ')),
+           !/deprived/.test(ctx.join(' ')),
           'Healthy places and food: an LSOA\'s place among the others is said in each decile\'s own words', JSON.stringify(ctx));
         await page.evaluate(() => showWard('Lansbury'));
         await page.waitForTimeout(1200);

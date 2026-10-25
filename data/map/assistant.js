@@ -321,6 +321,7 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
     ft_depression_qof: ["Depression: QOF prevalence", "%"],
     ft_mental_health_qof: ["Mental health: QOF prevalence", "%"],
     ft_suicide_rate: ["Suicide rate", "per 100,000"],
+    ft_child_poverty_low_income: ["Children in relative low income families (under 16)", "%"],
     ft_self_harm_admissions_10_24: ["Hospital admissions for self-harm (10 to 24)", "per 100,000"],
     ft_a_e_attendance_under_5: ["A&E attendances, ages 0 to 4", "per 1,000"],
     ft_mmr_2_doses_age5: ["Vaccination coverage: MMR two doses at 5 years", "%"],

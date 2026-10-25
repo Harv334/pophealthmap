@@ -30,7 +30,8 @@ def check(label, cond, detail=""):
 
 R = p.RETIRED_KEYS
 print("=== the list ===")
-check("25 keys, one of each pair that repeated another", len(R) == 25, str(len(R)))
+check("24 keys, one of each pair that repeated another", len(R) == 24, str(len(R)))
+check("OHID's LA child poverty stays until DWP's ward figures come", "ft_child_poverty_low_income" not in R)
 check("the kept half of each pair is not on it",
       not R & {"census_white_pct", "imd_decile", "imd_score", "adult_skills_score", "no2_ugm3", "pm25_ugm3",
                "census_english_hh_none_pct", "claimant_rate_pct", "crime_rate_per_1000", "idaci_pct",
@@ -52,6 +53,15 @@ check("an LA loses the LA life expectancy and its note, and keeps the rest",
       la["E09000002"] == {"ft_smoking_prevalence_adults": 11.0, "ft_notes": {"ft_smoking_prevalence_adults": "y"},
                           "ft_from": {}}, str(la))
 
+msoa = {"E02000001": {"saie_net_bhc": 30000, "saie_net_bhc_lci": 28000, "saie_net_bhc_uci": 32000,
+                       "saie_net_ahc": 25000, "saie_net_ahc_lci": 23000, "ft_93097": 4.1, "ft_93097_vs": "H"}}
+ward = {"E05000002": {"indicators": {"ft_93097": 3.0, "ft_93250": 101.0}, "cover": {"ft_93097": 85, "ft_93250": 85}}}
+p.drop_retired(msoa); p.drop_retired(ward, nested=True)
+check("an MSOA loses a retired figure's 95% limits and OHID's mark, and keeps the kept income's limits",
+      msoa["E02000001"] == {"saie_net_ahc": 25000, "saie_net_ahc_lci": 23000}, str(msoa))
+check("a ward loses a retired figure's coverage and keeps the rest",
+      ward["E05000002"] == {"indicators": {"ft_93250": 101.0}, "cover": {"ft_93250": 85}}, str(ward))
+
 counts = pd.DataFrame({"LSOA21CD": ["E01000001"],
                        "census_white_pct__num": [50], "census_white_pct__den": [100],
                        "census_non_white_pct__num": [50], "census_non_white_pct__den": [100]})
@@ -63,6 +73,8 @@ check("the output area files take their keys past the same list",
       'keys = [c for c in frame.columns if c.startswith("census_") and c not in RETIRED_KEYS]' in src)
 check("export_all clears all four payloads before writing them",
       re.search(r'drop_retired\(ward_data\.get\("wards", \{\}\), nested=True\)\s+for recs in \(lsoa_data, msoa_data, boro_data\):\s+drop_retired\(recs\)', src) is not None)
+check("and the ward file's note of how each IoD figure was weighted",
+      re.search(r'drop_retired\(recs\)\s+weights = \(ward_data\.get\("metadata"\) or \{\}\)\.get\("iod_weights"\)', src) is not None)
 
 print("=== a region pack built since ===")
 with tempfile.TemporaryDirectory() as t:
