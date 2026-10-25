@@ -14703,8 +14703,12 @@ def ahah_pick(resources: list) -> list:
     """The LSOA data files among a dataset's resources ({"name", "url",
     "format"}), one per name, CSV before Parquet, a zip or a workbook; never
     the dictionary, the methodology or Scotland's data zones."""
+    # Matched on the file's name and address only. The first refresh (October
+    # 2026) took none of GeoDS's ten files, and the descriptions are the
+    # likely reason: a data file's description that points to "the technical
+    # report" or "the methodology" read as that report.
     def text(r):
-        return iod_norm(" ".join(str(r.get(k) or "") for k in ("name", "url", "format", "description")))
+        return iod_norm(" ".join(str(r.get(k) or "") for k in ("name", "url")))
     out: dict = {}
     order = {"csv": 0, "parquet": 1, "zip": 2, "xlsx": 3}
     for r in resources:
@@ -14743,6 +14747,9 @@ def ahah_find() -> tuple:
                                               if places_version(x.get("name"))), "")
             info(f"ahah: GeoDS lists {len(res['resources'])} file(s); using {len(urls)}; licence "
                  f"{res.get('license_title') or 'not stated'}")
+            if not urls:
+                info("ahah: the files listed: " + " | ".join(
+                    f"{x.get('name') or ''} [{x.get('format') or ''}] {x.get('url') or ''}" for x in res["resources"]))
             return urls, lic, str(ver or "")
     try:
         r = sess.get(AHAH_PAGE, timeout=60)
@@ -15149,8 +15156,71 @@ def qof_period(text: str) -> str:
     return ""
 
 
-def qof_msoa_parse(tables: list) -> tuple:
-    """(national frame MSOA21CD and qof_est_* percentages, problems, matched)."""
+def get_msoa21_to_msoa11_england() -> dict:
+    """MSOA21CD -> [MSOA11CD, ...] for every MSOA in England, from the same
+    ONS lookup as get_msoa21_to_msoa11 but not limited to the scope, for a
+    national file on the 2011 MSOAs that region packs reuse. Cached on disk;
+    {} (with a warning) when ONS does not answer in full."""
+    cache = CACHE_DIR / "lookups" / "msoa21_msoa11_england.json"
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    if cache.exists():
+        try:
+            return json.loads(cache.read_text(encoding="utf-8"))
+        except ValueError:
+            pass
+    out: dict = {}
+    offset = 0
+    try:
+        while True:
+            r = requests.post(MSOA11_MSOA21_LOOKUP, data={
+                "where": "MSOA21CD LIKE 'E02%'", "outFields": "MSOA11CD,MSOA21CD",
+                "returnGeometry": "false", "orderByFields": "MSOA21CD,MSOA11CD",
+                "resultOffset": offset, "resultRecordCount": 2000, "f": "json"}, timeout=180)
+            r.raise_for_status()
+            j = r.json()
+            if j.get("error"):
+                raise RuntimeError(str(j["error"]))
+            feats = j.get("features", [])
+            for f in feats:
+                a = f.get("attributes", {})
+                if a.get("MSOA21CD") and a.get("MSOA11CD"):
+                    out.setdefault(a["MSOA21CD"], [])
+                    if a["MSOA11CD"] not in out[a["MSOA21CD"]]:
+                        out[a["MSOA21CD"]].append(a["MSOA11CD"])
+            if not feats or not j.get("exceededTransferLimit") and len(feats) < 2000:
+                break
+            offset += len(feats)
+    except Exception as e:
+        warn(f"msoa11->msoa21 lookup (England): {e}")
+        return {}
+    if len(out) < 6800:
+        warn(f"msoa11->msoa21 lookup (England): only {len(out):,} MSOAs came back; not used")
+        return {}
+    cache.write_text(json.dumps(out), encoding="utf-8")
+    ok(f"ONS lookup: {len(out):,} MSOAs (2021) in England -> 2011 parents")
+    return out
+
+
+def msoa11_to_msoa21_series(s: "pd.Series", rows: dict) -> "pd.Series":
+    """A figure for each 2021 MSOA from a Series on the 2011 MSOAs: an
+    unchanged or split MSOA takes its parent's, a merged or redrawn one the
+    mean of its parents' (the lookup carries no weights)."""
+    vals = {}
+    for c21, parents in rows.items():
+        v = [s.get(p) for p in parents]
+        v = [x for x in v if x is not None and pd.notna(x)]
+        if v:
+            vals[c21] = float(sum(v) / len(v))
+    return pd.Series(vals, dtype=float)
+
+
+def qof_msoa_parse(tables: list, bridge=None) -> tuple:
+    """(national frame MSOA21CD and qof_est_* percentages, problems, matched).
+
+    A file on the 2011 MSOAs (the Library's GitHub output was, in October
+    2026) is bridged to the 2021 ones when bridge, a callable giving
+    {MSOA21CD: [MSOA11CD, ...]} for England, can give it; otherwise it is
+    refused."""
     found: dict = {k: [] for k in QOF_MSOA_KEYS}
     all_codes: set = set()
     for name, title, df in tables:
@@ -15200,8 +15270,13 @@ def qof_msoa_parse(tables: list) -> tuple:
         raise RuntimeError("no table in the file has English MSOA codes (sheets: "
                            + ", ".join(str(t[0]) for t in tables) + ")")
     if not any(c > MSOA_LAST_2011 for c in all_codes):
-        raise RuntimeError(f"the file's MSOA codes are all {MSOA_LAST_2011} or below, so it is on the 2011 "
-                           "MSOAs; it is not used")
+        rows = bridge() if callable(bridge) else {}
+        if not rows:
+            raise RuntimeError(f"the file's MSOA codes are all {MSOA_LAST_2011} or below, so it is on the 2011 "
+                               "MSOAs, and the ONS lookup to the 2021 ones could not be had; it is not used")
+        found = {k: [(sh, c, msoa11_to_msoa21_series(v, rows)) for sh, c, v in hits] for k, hits in found.items()}
+        all_codes = set(rows)
+        info(f"qof_msoa: the file is on the 2011 MSOAs, so it was bridged to {len(rows):,} MSOAs of 2021")
     idx = pd.Index(sorted(all_codes), name="MSOA21CD")
     cols: dict = {}
     problems: list = []
@@ -15285,7 +15360,7 @@ def run_qof_msoa() -> "pd.DataFrame | None":
             got = places_download(u, dest, source, min_bytes=5_000)
             if got:
                 try:
-                    if qof_msoa_parse(places_tables(got))[0].shape[1] > 1:
+                    if qof_msoa_parse(places_tables(got), bridge=get_msoa21_to_msoa11_england)[0].shape[1] > 1:
                         files = [got]
                         break
                 except Exception as e:
@@ -15299,7 +15374,7 @@ def run_qof_msoa() -> "pd.DataFrame | None":
         tables = places_tables(src)
     except Exception as e:
         raise RuntimeError(f"qof_msoa: {src.name} could not be read ({type(e).__name__}: {e})")
-    out, problems, matched = qof_msoa_parse(tables)
+    out, problems, matched = qof_msoa_parse(tables, bridge=get_msoa21_to_msoa11_england)
     for k, v in matched.items():
         info(f"qof_msoa: {k} <- {v!r}")
     got = [k for k in QOF_MSOA_KEYS if k in out.columns]

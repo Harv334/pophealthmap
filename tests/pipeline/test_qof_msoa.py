@@ -153,7 +153,23 @@ check("the patient counts are not taken for the figure", m_l["qof_est_copd_pct"]
 print("=== what is refused ===")
 old = wide()
 old["MSOA code"] = [f"E0200{i:04d}" for i in range(1, 11)]
-check("a file on the 2011 MSOAs is refused", raises(lambda: p.qof_msoa_parse([("x", "", old.astype(str))]), "2011"))
+check("a file on the 2011 MSOAs is refused when there is no lookup to the 2021 ones",
+      raises(lambda: p.qof_msoa_parse([("x", "", old.astype(str))]), "2011")
+      and raises(lambda: p.qof_msoa_parse([("x", "", old.astype(str))], bridge=lambda: {}), "2011"))
+# With the ONS lookup (as the Library's GitHub output was, October 2026): an
+# unchanged MSOA keeps its figure, a split one gives it to both parts, and a
+# merged one takes the mean of its parents.
+look = {"E02000001": ["E02000001"], "E02006950": ["E02000002"], "E02006951": ["E02000002"],
+        "E02006952": ["E02000003", "E02000004"]}
+br, prob_b, _m = p.qof_msoa_parse([("x", "", old.astype(str))], bridge=lambda: look)
+key = next(k for k in p.QOF_MSOA_KEYS if k in br.columns)
+o_ix = {c: float(v) for c, v in zip(old["MSOA code"], p.qof_msoa_parse([("y", "", wide().astype(str))])[0]
+                                    .set_index("MSOA21CD")[key].reindex(MSOAS))}
+b = br.set_index("MSOA21CD")[key]
+check("a file on the 2011 MSOAs is bridged to the 2021 ones: kept, split and merged",
+      sorted(br["MSOA21CD"]) == sorted(look) and abs(b["E02000001"] - o_ix["E02000001"]) < 1e-3
+      and abs(b["E02006950"] - o_ix["E02000002"]) < 1e-3 and abs(b["E02006951"] - o_ix["E02000002"]) < 1e-3
+      and abs(b["E02006952"] - (o_ix["E02000003"] + o_ix["E02000004"]) / 2) < 1e-3, str(b.to_dict()))
 check("a file with no MSOA codes is refused", raises(lambda: p.qof_msoa_parse([("x", "", CONST.astype(str))]), "MSOA codes"))
 twice = wide()
 twice["Asthma prevalence"] = twice["Asthma (%)"]

@@ -1050,6 +1050,7 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
       Object.keys(keys).filter(function (k) { return !isWithheld(k); }).sort().forEach(function (k) {
         var at = levelsOf(k, !!inWards[k]);
         if (!at.length) return;
+        var m = metaFor(k);
         var row = { key: k, label: shortLabel(k) };
         if (words.length) {
           var hay = (k + " " + row.label).toLowerCase();
@@ -1106,8 +1107,8 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
           var cur = null;
           g.rows.forEach(function (r) {
             var add = JSON.stringify(r).length + 1;
-            if (!cur || size + add > LIST_BYTES - 400) {
-              if (size + add > LIST_BYTES - 400 && pages[pages.length - 1].length) { pages.push([]); size = 2; }
+            if (!cur || size + add > LIST_BYTES - 1200) {
+              if (size + add > LIST_BYTES - 1200 && pages[pages.length - 1].length) { pages.push([]); size = 2; }
               cur = { levels: g.levels, rows: [] };
               if (g.period) cur.period = g.period;
               pages[pages.length - 1].push(cur);

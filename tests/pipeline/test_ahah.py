@@ -196,6 +196,12 @@ res = [{"name": "AHAH V5.1 LSOA21", "url": "https://data.geods.ac.uk/dataset/x/r
 picked = p.ahah_pick(res)
 check("the LSOA file is taken once, as a CSV, and not the data zones, the dictionary or the report",
       picked == [res[0]["url"]], str(picked))
+# A data file whose description points to the methodology is still a data
+# file (the first refresh took none of GeoDS's ten; descriptions are the
+# likely reason), so only its name and address are read.
+desc = [dict(r, description="Read the technical report and methodology before use.") for r in res]
+check("a data file whose description mentions the methodology is still taken",
+      p.ahah_pick(desc) == [res[0]["url"]], str(p.ahah_pick(desc)))
 
 print("=== AHAH: the source ===")
 tmp = fresh()
