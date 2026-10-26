@@ -1268,6 +1268,7 @@ const smallText = page => page.evaluate(() => {
       await new Promise(r => setTimeout(r, 1500));
       const lvl = currentDataLevel;
       const ward = document.querySelector('#dl-seg button[data-dl="ward"]');
+      const wardOff = !!ward && (ward.classList.contains('disabled') || ward.getAttribute('aria-disabled') === 'true');
       _setDataLevel('ward');
       const stayed = currentDataLevel;
       const code = Object.keys(BOROUGH_DATA).find(c => boroughOvValue(c, 'ft_mmr_2_doses_age5') != null && !laFigNote(c, 'ft_mmr_2_doses_age5'));
@@ -1283,7 +1284,7 @@ const smallText = page => page.evaluate(() => {
       await new Promise(r => setTimeout(r, 800));
       _setDataLevel('ward');
       await new Promise(r => setTimeout(r, 800));
-      return { lvl, stayed, wardOff: !!ward && (ward.classList.contains('disabled') || ward.getAttribute('aria-disabled') === 'true'),
+      return { lvl, stayed, wardOff,
         tip, name, want, offAtWard: currentDataLevel === 'ward' && !(laHoverL && laHoverL._map) };
     });
     ok(laOnly.lvl === 'borough' && laOnly.stayed === 'borough' && laOnly.wardOff,
