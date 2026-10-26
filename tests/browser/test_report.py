@@ -154,9 +154,9 @@ try:
         txt = d.execute_script("return document.body.innerText;")
         check("it is named as the user named it", "Test neighbourhood" in txt)
         check("it says how the figures were combined",
-              "population-weighted" in txt and "summed" in txt)
-        check("and that it is not an official geography",
-              "not an official geography" in txt)
+              "count for more" in txt and "added up" in txt)
+        check("and that it is not an official area",
+              "not an official area" in txt)
         check("it lists the neighbourhoods it is made of",
               txt.count("E01") >= 3, str(txt.count("E01")))
         d.close()

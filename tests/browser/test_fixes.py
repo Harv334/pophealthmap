@@ -230,7 +230,7 @@ try:
 
     # Fix 5: the report failure path exists.
     check("the ward report has a failure path",
-          "could not be built" in src,
+          "could not be prepared" in src,
           "a throw would leave the tab on the holding page")
 
     errs = [e for e in d.get_log("browser")

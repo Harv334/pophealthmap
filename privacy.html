@@ -57,34 +57,35 @@
 <h1>About and privacy</h1>
 
 <p class="lede">PopHealth Map is an independent project run by Harvey Seville. It is
-not an NHS or government service, and it is not endorsed by the NHS, any council
-or any of the organisations whose data it shows.</p>
+not a National Health Service (NHS) or government service. It does not have the
+official support of the NHS, any council or any of the organisations whose data it
+shows.</p>
 
-<p>The figures come from published official sources, which the
-<a href="methodology.html">methodology and technical notes</a> list with their
-dates, while the way they are put together and presented is this project's own
-work.</p>
+<p>The figures come from published official sources, and the
+<a href="methodology.html">methodology and technical notes</a> list these sources
+and their dates. The way the figures are put together and presented is this
+project's own work.</p>
 
-<p>PopHealth Map brings official figures on health, deprivation and local services
-together on one map of England, from whole local authorities (LAs) down to
-neighbourhoods of a few hundred homes. It is built for people who plan, fund or argue
+<p>PopHealth Map shows official figures on health, deprivation and local services
+on one map of England. The areas go from whole local authorities (LAs) down to
+neighbourhoods of a few hundred homes. It is for people who plan, fund or campaign
 for local services, such as public health and NHS teams, councillors, charities and
-community groups, and for anyone who wants to understand their own area. When you
+community groups. It is also for anyone who wants to understand their own area. When you
 select a ward, the panel opens with a short summary of how it compares with the other
 wards in its LA and its region.</p>
 
-<h2>In short</h2>
+<h2>Summary</h2>
 
 <ul>
   <li>The site sets <strong>no cookies</strong> and has <strong>no analytics, no
-    trackers and no adverts</strong>. Its fonts and map code are served from this
-    site, not from Google or a code library service.</li>
+    trackers and no adverts</strong>. Its fonts and the code for the map come from
+    this site, not from Google or another company that hosts code.</li>
   <li>The map runs in your browser, on data files downloaded from this site. Selecting
     areas, filtering, comparing and exporting all happen on your own device.</li>
-  <li>Three parts of the map send something to another service. The
+  <li>There are 3 parts of the map that send something to another service. The
     <a href="#tiles">background map</a> does this whenever the map is open, because
-    its street map or satellite images are loaded from CARTO or Esri, while
-    <a href="#postcodes">postcode search</a> and the <a href="#ask">Ask panel</a>
+    its street map or satellite images come from CARTO or Esri.
+    <a href="#postcodes">Postcode search</a> and the <a href="#ask">Ask panel</a>
     send something only when you use them. Each is described below.</li>
 </ul>
 
@@ -96,32 +97,34 @@ wards in its LA and its region.</p>
   health or circumstances.</p>
 </div>
 
-<p>The <strong>Ask about this data</strong> panel, which is available on the London
-map and on each region's map, answers questions about the figures on the map.
-The model is told which region's map you have open, so that it answers about
-that region's areas. When you send a
-question:</p>
+<p>The <strong>Ask about this data</strong> panel is available on the London
+map and on each region's map. It answers questions about the figures on the map.
+An artificial intelligence (AI) model writes the answers. The panel tells the model
+which region's map you have open, so that it answers about that region's areas.
+When you send a question:</p>
 
 <ul>
-  <li>Your question goes to this site's server, a small one that runs on Cloudflare,
-    and the server passes it to <strong>Anthropic</strong>'s Claude model, which
-    writes the reply.</li>
-  <li>To write it, the model asks your browser for the figures it needs. Your browser
-    looks them up in the map's own data, which it has already downloaded from this
-    site, and the figures it finds pass back the same way, through this site's server
-    to Anthropic. The model is never sent the rest of the data.</li>
-  <li>Everything said earlier in the panel goes along with each new question, so
-    that the model can follow the conversation, and closing or reloading the page
-    clears it.</li>
+  <li>Your question goes to this site's server, which is a small server that runs on
+    Cloudflare. Then the server passes it to <strong>Anthropic</strong>'s Claude model,
+    which writes the reply.</li>
+  <li>To write the reply, the model asks your browser for the figures it needs. Your
+    browser finds them in the map's own data, which it has already downloaded from
+    this site. It sends those figures back the same way, through this site's server
+    to Anthropic. The model never gets the rest of the data.</li>
+  <li>With each new question, the panel also sends the earlier questions, answers
+    and figures, so that the model can follow the conversation. Closing or reloading
+    the page clears the conversation from the panel.</li>
   <li>You can ask 10 questions a day, and replying when the model asks you to narrow
-    a question down does not use one up. A work network shared by many people also
-    has a daily ceiling of its own, so it may run out sooner. To keep to these
-    limits, the panel stores a random number in your browser that identifies
-    nothing else and sends it with each question, and the server on Cloudflare
-    records it and your IP address with a count of the questions and requests sent
-    today. It deletes those records automatically after 48 hours.</li>
-  <li>If you never send a question, nothing is sent to that server or to Anthropic,
-    and opening the panel on its own sends nothing.</li>
+    a question down does not use one up. A work network that many people share also
+    has its own daily limit, so you may reach it before you have asked 10 questions.
+    To keep to these limits, the panel stores a random number in your browser and
+    sends it with each question. The number does not identify anything else. The
+    server on Cloudflare records the number and your IP address, with a count of the
+    questions and requests sent today. Your IP address (internet protocol address)
+    is a number that identifies your internet connection. The server deletes those
+    records automatically after 48 hours.</li>
+  <li>Nothing is sent to that server or to Anthropic until you send a question.
+    Opening the panel does not send anything.</li>
 </ul>
 
 <p>The Ask panel is on the London map and each region's map. On the England map,
@@ -131,43 +134,43 @@ which shows every region at once, it is not shown, and nothing is sent.</p>
 <a href="https://www.anthropic.com/legal/privacy">Anthropic's privacy policy</a> and
 <a href="https://www.cloudflare.com/privacypolicy/">Cloudflare's privacy policy</a>.</p>
 
-<p>Answers are written by an AI model. It is told to use only the figures it looks
-up in the map's own data, but it can still make mistakes, so check anything that
-matters before acting on it.</p>
+<p>An AI model writes the answers. We tell it to use only the figures it finds in
+the map's own data. But it can still make mistakes, so please check anything
+important before you act on it.</p>
 
 <h2 id="postcodes">Postcode search</h2>
 
-<p>When you type a postcode into the search box, that postcode, and nothing else, is
-sent to <a href="https://postcodes.io/">postcodes.io</a>, a free postcode lookup
-service, to find where it is. Like any website, postcodes.io also sees your IP
-address. Other searches, such as a ward, a GP practice or a charity, are matched in
-your browser and are not sent anywhere.</p>
+<p>When you type a postcode into the search box, your browser sends that postcode,
+and nothing else, to <a href="https://postcodes.io/">postcodes.io</a>. This is a
+free service that finds where a postcode is. Like any website, postcodes.io also
+sees your IP address. Other searches, such as for a ward, a GP (family doctor)
+practice or a charity, happen in your browser and are not sent anywhere.</p>
 
-<p>A full postcode can cover a small number of homes. If you are working from
-someone's address, search by ward or neighbourhood name instead.</p>
+<p>A full postcode can cover a small number of homes. If you start from a
+person's address, search by the name of the ward or neighbourhood instead.</p>
 
 <h2 id="tiles">The background map</h2>
 
-<p>The street map behind the data is made of image tiles requested from
-<a href="https://carto.com/privacy">CARTO</a>, or from
-<a href="https://www.esri.com/en-us/privacy/overview">Esri</a> if CARTO's tiles cannot
-be loaded. If you switch the background to Satellite, the imagery and its place
-names come from Esri instead. As with any web request, the tile provider sees your IP address and which
-part of the map you are looking at. Nothing from the map's own data layers is sent
-with those requests.</p>
+<p>The street map behind the data is made of small square images, called tiles.
+Your browser gets them from <a href="https://carto.com/privacy">CARTO</a>, or from
+<a href="https://www.esri.com/en-us/privacy/overview">Esri</a> if CARTO's tiles do not
+load. If you change the background to Satellite, the satellite images and their
+place names come from Esri instead. As with any request on the web, the company
+that sends the tiles sees your IP address and which part of the map you are looking
+at. Your browser sends nothing from the map's own data with those requests.</p>
 
 <h2>Hosting</h2>
 
-<p>The pages and data files are served by GitHub Pages. Like any web host, GitHub
-receives your IP address and the addresses of the pages and files your browser asks
-for. See <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">GitHub's
+<p>GitHub Pages hosts the pages and data files. Like any web host, GitHub gets
+your IP address and the addresses of the pages and files that your browser asks
+for. You can read <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">GitHub's
 privacy statement</a>.</p>
 
 <h2>What is stored in your browser</h2>
 
-<p>A few display preferences are kept in your browser's own storage so that the map
-opens the way you left it. They stay on your device and are not sent anywhere, and
-clearing this site's data in your browser removes them.</p>
+<p>A few display settings are kept in your browser's own storage, so that the map
+opens the way you left it. They stay on your device and are not sent anywhere. If
+you clear this site's data in your browser, they are removed.</p>
 
 <div class="wrap" tabindex="0" role="region" aria-label="What is stored in your browser">
   <table>
@@ -188,10 +191,10 @@ clearing this site's data in your browser removes them.</p>
           can show how many are left. Your questions themselves are not stored.</td></tr>
       <tr><td><code class="name">ph-ldr-swept</code></td><td>Session storage</td>
         <td>That the map's opening animation has already played during this visit, so
-          it does not play again on the next page. Cleared when you close the tab.</td></tr>
+          it does not play again on the next page. It is cleared when you close the tab.</td></tr>
       <tr><td><code class="name">ph-england-ok</code></td><td>Session storage</td>
         <td>That you chose to open the map of all of England, which is a large download,
-          so it does not ask again. Cleared when you close the tab.</td></tr>
+          so the map does not ask again. It is cleared when you close the tab.</td></tr>
     </tbody>
   </table>
 </div>
@@ -201,19 +204,21 @@ clearing this site's data in your browser removes them.</p>
 <p>The charities on the map and in the Directory come from the
 <a href="https://register-of-charities.charitycommission.gov.uk/">Charity Commission's
 register of charities</a>, which publishes each charity's contact details. Many small
-charities give a trustee's home as their contact address, so for smaller charities the
-site shows only an approximate location and no street address.</p>
+charities give the home of a trustee, one of the people who run the charity, as their
+contact address. So for smaller charities, the site shows only a rough location and
+no street address.</p>
 
 <p>Anyone can ask for a charity's record to be removed from this site by emailing
 <a href="mailto:contact@pophealth.uk">contact@pophealth.uk</a> with the charity's name
-or registered number. Changing the details on the register itself is done with the
+or registered number. To change the details on the register itself, contact the
 Charity Commission.</p>
 
 <h2>The data on the map</h2>
 
 <p>The statistics on the map are published figures for areas, such as wards and
-neighbourhoods, with the publishers' own rules for small numbers already applied.
-They are not records about individuals. GP practices, pharmacies, dentists and
+neighbourhoods. The publishers have already applied their own rules for small
+numbers, for example by not publishing a figure when the numbers are too small.
+The figures are not records about individual people. GP practices, pharmacies, dentists and
 hospitals come from published NHS registers. The
 <a href="methodology.html">methodology and technical notes</a> list every source.</p>
 
@@ -221,16 +226,16 @@ hospitals come from published NHS registers. The
 
 <p>Harvey Seville is responsible for the personal data this site handles. The only
 personal data the site keeps itself is your IP address and the Ask panel's random
-browser number, with a count of the Ask questions sent from them, which is
-deleted after 48 hours. We keep it because we have
+browser number, with a count of the Ask questions sent from them. The site deletes
+this data after 48 hours. We keep it because we have
 a legitimate interest in sharing the Ask panel fairly and keeping its cost within
-what the project can carry.</p>
+what the project can pay.</p>
 
-<p>Cloudflare and Anthropic process your question for us as service providers, and
-either may handle it outside the UK, including in the United States, under the
-safeguards in their data processing terms. Under Anthropic's commercial terms,
-questions sent to its models this way are not used to train them, and Anthropic
-keeps them only for a limited time, mainly to check for misuse.</p>
+<p>Cloudflare and Anthropic process your question for us as service providers.
+Either may handle it outside the United Kingdom (UK), including in the United
+States, under the safeguards in their data processing terms. Under Anthropic's
+commercial terms, Anthropic does not use questions sent to its models this way to
+train them. It keeps them only for a limited time, mainly to check for misuse.</p>
 
 <p>You can ask for a copy of any personal data we hold about you, ask us to correct
 or delete it, or object to how we use it, by emailing
@@ -239,25 +244,25 @@ or delete it, or object to how we use it, by emailing
 <h2 id="terms">Using this site</h2>
 
 <p>PopHealth Map is provided free and as it is. The figures are published
-statistics about areas, brought together for planning, research and discussion.
-They are not medical advice and say nothing about any individual. We take care to
-reproduce each source faithfully, but we cannot promise that every figure is
-complete or current, and we are not responsible for decisions made using them.
+statistics about areas, collected here for planning, research and discussion.
+They are not medical advice and do not describe any individual person. We take care
+to copy each source correctly, but we cannot promise that every figure is complete
+or up to date. We are not responsible for decisions that people make using them.
 You may reuse the figures under the licences and with the credits listed on the
 <a href="methodology.html#licences">methodology page</a>, and the code under the
 MIT licence. Please use the Ask panel only for questions about the data, and do
-not try to get around its daily limit.</p>
+not try to avoid its daily limit.</p>
 
 <h2>Questions and requests</h2>
 
 <p>For a question about this page, a correction, or a removal request, email
 <a href="mailto:contact@pophealth.uk">contact@pophealth.uk</a>. You can also complain
-to the <a href="https://ico.org.uk/">Information Commissioner's Office</a> at any
-time.</p>
+at any time to the <a href="https://ico.org.uk/">Information Commissioner's Office</a>,
+which is responsible for data protection in the UK.</p>
 
-<p class="updated">This page was last updated on 19 October 2026, and the
-<a href="accessibility.html">accessibility statement</a> covers how the site works
-with assistive technology.</p>
+<p class="updated">This page was last updated on 19 October 2026. The
+<a href="accessibility.html">accessibility statement</a> explains how the site works
+with tools such as screen readers.</p>
 
 </main>
 

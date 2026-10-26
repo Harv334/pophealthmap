@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Methodology and technical notes | PopHealth Map</title>
 <link rel="canonical" href="https://pophealth.uk/methodology.html">
-<meta name="description" content="How PopHealth Map is built: every data source, how figures for wards and LAs are calculated from small areas, and what to watch for when reading them.">
+<meta name="description" content="How PopHealth Map works: every data source, how we calculate figures for wards and local authorities from small areas, and what to check when you read them.">
 <!-- Same inline site mark as index.html, so the tab matches. -->
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Crect width='9' height='9' rx='2' fill='%23003087'/%3E%3Crect x='11' width='9' height='9' rx='2' fill='%238BBDEA'/%3E%3Crect y='11' width='9' height='9' rx='2' fill='%23005EB8'/%3E%3Crect x='11' y='11' width='9' height='9' rx='2' fill='%233D8FDA'/%3E%3C/svg%3E">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
@@ -16,14 +16,14 @@
 <meta property="og:locale" content="en_GB">
 <meta property="og:url" content="https://pophealth.uk/methodology.html">
 <meta property="og:title" content="Methodology and technical notes | PopHealth Map">
-<meta property="og:description" content="How PopHealth Map is built: every data source, how figures for wards and LAs are calculated from small areas, and what to watch for when reading them.">
+<meta property="og:description" content="How PopHealth Map works: every data source, how we calculate figures for wards and local authorities from small areas, and what to check when you read them.">
 <meta property="og:image" content="https://pophealth.uk/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="A map of London wards shaded by deprivation score, beside the name PopHealth Map and the words A printable report for every ward">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Methodology and technical notes | PopHealth Map">
-<meta name="twitter:description" content="How PopHealth Map is built: every data source, how figures for wards and LAs are calculated from small areas, and what to watch for when reading them.">
+<meta name="twitter:description" content="How PopHealth Map works: every data source, how we calculate figures for wards and local authorities from small areas, and what to check when you read them.">
 <meta name="twitter:image" content="https://pophealth.uk/og.png">
 <meta name="twitter:image:alt" content="A map of London wards shaded by deprivation score, beside the name PopHealth Map and the words A printable report for every ward">
 <meta name="color-scheme" content="light">
@@ -56,28 +56,31 @@
 
 <h1>Methodology and technical notes</h1>
 
-<p>PopHealth Map shows more than 100 published figures on one map of England.
-They come from the Census, the NHS, the Index of Multiple Deprivation and other
-official sources. This page explains where each figure comes from, how we fit it
-to wards and neighbourhoods, and what it can and cannot tell you. If you are
-short of time, read the <a href="#five-things">five things to know</a> at the
-start of <a href="#reading">How to interpret the data</a>. The exact ONS files
-we use are in the <a href="#appendix">technical appendix</a> at the end.</p>
+<p>PopHealth Map shows more than 100 indicators on one map of England. An
+indicator is a measure that you can colour the map by, such as life expectancy.
+The figures come from the Census, the National Health Service (NHS), the Index
+of Multiple Deprivation (IMD) and other official sources. This page explains
+where each figure comes from, and how we calculate it for wards and
+neighbourhoods. It also explains what a figure can tell you, and what it cannot
+tell you. If you have little time, read the <a href="#five-things">5 things to
+know</a> at the start of <a href="#reading">How to read the figures</a>. The
+<a href="#appendix">technical appendix</a> at the end lists the exact files
+that we use from the Office for National Statistics (ONS).</p>
 
-<p>PopHealth Map is in beta, which means it is new and still being tested. If a
-figure looks wrong, please use Report a problem on its card or email
-<a href="mailto:contact@pophealth.uk">contact@pophealth.uk</a>, and we will
-check it against the publisher's own figures.</p>
+<p>PopHealth Map is in beta, which means that it is new and we are still
+testing it. If a figure looks wrong, please use Report a problem on its card,
+or email <a href="mailto:contact@pophealth.uk">contact@pophealth.uk</a>. We
+will check it against the publisher's own figures.</p>
 
 <nav class="toc" aria-labelledby="on-this-page">
   <h2 id="on-this-page">On this page</h2>
   <ol>
     <li><a href="#cite">How to cite this map</a></li>
-    <li><a href="#reading">How to interpret the data</a></li>
-    <li><a href="#words">Glossary of geographies and measures</a></li>
+    <li><a href="#reading">How to read the figures</a></li>
+    <li><a href="#words">Words used on this map</a></li>
     <li><a href="#coverage">What the map covers</a></li>
     <li><a href="#sources">Where the data comes from</a></li>
-    <li><a href="#placing">How figures are placed onto areas</a></li>
+    <li><a href="#placing">How we match figures to areas</a></li>
     <li><a href="#gaps">Known gaps</a></li>
     <li><a href="#appendix">Technical appendix</a></li>
     <li><a href="#licences">Licences and credits</a></li>
@@ -86,255 +89,284 @@ check it against the publisher's own figures.</p>
 
 <h2 id="cite">How to cite this map</h2>
 
-<p>When you use a figure from this map, please name the organisation that
-published it as well as PopHealth Map. The publisher's own release is the
+<p>When you use a figure from this map, please name PopHealth Map and also the
+organisation that published the figure. The publisher's own release is the
 official source for that figure. Each indicator's card gives its source, the
-period it covers and the level of area it is published for. We suggest you
-cite it like this:</p>
+period it covers and the level of area that it is published for. We suggest
+that you name the source like this:</p>
 
 <p class="cite">PopHealth Map, <em>indicator</em> for <em>area</em>,
 <em>period</em>. Figures from <em>publisher</em>, updated on
-<span class="js-updated">the date shown at the foot of the map</span>.
+<span class="js-updated">the date shown at the bottom of the map</span>.
 https://pophealth.uk, accessed on <em>date</em>.</p>
 
-<p>For example, a citation for one of the Local Health figures would read:</p>
+<p>For example, this is how to cite one of the Local Health figures:</p>
 
 <p class="cite">PopHealth Map, Life expectancy at birth, women, for the wards of
 Tower Hamlets, 2019 to 2023, updated on
-<span class="js-updated">the date shown at the foot of the map</span>.
+<span class="js-updated">the date shown at the bottom of the map</span>.
 https://pophealth.uk, accessed on <span class="js-today">the day you looked</span>.
-Ward estimates calculated by PopHealth Map from OHID Local Health MSOA figures.</p>
+Ward estimates calculated by PopHealth Map from Office for Health Improvement and
+Disparities (OHID) Local Health figures for middle layer super output areas (MSOAs).</p>
 
 <p>To show someone exactly what you saw, use Copy link at the top of the map.
-The link keeps the indicator, the area and the level you chose. Most of the
-figures are published under the Open Government Licence. This lets you reuse
-them as long as you say where they came from, and
-<a href="#licences">Licences and credits</a> gives the wording each publisher
-asks for.</p>
+The link keeps the indicator, the area and the level that you chose. Most of
+the figures are published under the Open Government Licence. This licence lets
+you use them again if you say where they came from.
+<a href="#licences">Licences and credits</a> gives the wording that each
+publisher asks for.</p>
 
-<h2 id="reading">How to interpret the data</h2>
+<h2 id="reading">How to read the figures</h2>
 
 <div class="box" id="five-things">
-  <p><strong>Five things to know before you use a figure</strong></p>
+  <p><strong>5 things to know before you use a figure</strong></p>
   <ul>
-    <li>Darker usually means a higher figure, whether that is good or bad. The
-      exception is the deprivation deciles and ranks, where darker always means
-      more deprived. The two ends of the legend (the colour key) are not the
-      highest and lowest areas. They are set so that 5% of areas fall below one
-      end and 5% are above the other.</li>
-    <li>Each indicator covers its own period, and some are several years old.
-      The date at the foot of the map says when we last updated the figures, not
-      the years they describe.</li>
+    <li>A darker colour usually means a higher figure, whether a high figure is
+      good or bad. For deprivation, a darker colour always means more deprived,
+      even where a lower number means more deprived. The 2 ends of the legend
+      (the colour key) are not the highest and lowest areas. The low end has 5%
+      of areas below it, and the high end has 5% of areas above it.</li>
+    <li>Each indicator has its own period, and some periods are several years
+      old. The date at the bottom of the map is when we last updated the
+      figures. It is not the period that the figures describe.</li>
     <li>A blank area has no figure. That is not the same as a figure of
       zero.</li>
-    <li>Each figure is published for one level of area, and we work out the
-      other levels from it. So a ward figure is usually a close estimate, not an
-      exact count. Each indicator's card says which level its publisher
+    <li>Each indicator is published for one level of area, and we calculate the
+      other levels from it. So a ward figure is usually a close estimate, not
+      an exact count. Each indicator's card says which level its publisher
       uses.</li>
-    <li>When two indicators rise and fall together, that is a reason to look
-      closer. It does not prove that one causes the other.</li>
+    <li>When 2 indicators increase and decrease together, that is a reason to
+      look more carefully. It does not prove that one causes the other.</li>
   </ul>
 </div>
 
-<p>None of these are mistakes. They come from the way the figures are
-published, and the sections below explain each one. The types of area, from
-the local authority (LA) down to the LSOA and the output area, are explained in
-the <a href="#words">Glossary of geographies and measures</a>.</p>
+<p>None of these points is a mistake. Each one comes from the way that the
+figures are published, and the sections below explain them. The map shows
+figures for several types of area. The local authority (LA) is the area of one
+council, and each LA is divided into wards. The map also uses MSOAs, which are
+areas of about 8,000 people, and LSOAs, which are small areas of about 1,500
+people. The smallest areas are output areas, with about 125 households each.
+<a href="#words">Words used on this map</a> explains each type of area.</p>
 
 <h3 id="reading-measures">What a figure measures</h3>
 
 <h4 id="indicator-card">Every indicator has a card</h4>
 
-<p>The <strong>About this indicator</strong> button under the chosen indicator,
-or the key along the bottom of the map, opens a card for that indicator. The
-card says what is counted and out of what total. It gives the level of area the
-publisher uses and how we reach the other levels. It also gives the period, the
-source and how often the source is updated. For the Local Health figures, which
-come from OHID (the Office for Health Improvement and Disparities), the card
-uses OHID's own description. This includes the unit, whether the years are
-calendar or financial years, and when OHID last updated the figure.</p>
+<p>To open the card for an indicator, select the <strong>About this
+indicator</strong> button under the chosen indicator. You can also select the
+key at the bottom of the map. The card says what is counted, and out of what
+total. It gives the level of area that the publisher uses, and how we calculate
+the other levels. It also gives the period, the source and how often the source
+is updated. The Local Health figures come from the Office for Health
+Improvement and Disparities (OHID). For these figures, the card uses OHID's own
+description. This includes the unit, whether the years are calendar years or
+financial years, and when OHID last updated the figure.</p>
 
 <h4 id="periods">Each indicator has its own period</h4>
 
-<p>The period next to a legend is the one the publisher gives for that
-indicator, and it can be very different from one indicator to the next. The
-date at the foot of the map is when we last updated the figures, not the period
-they describe. Each update takes the newest figures published, but some of
-those still describe years well before the update.</p>
+<p>The period next to a legend is the period that the publisher gives for that
+indicator. It can be very different from one indicator to the next. The date at
+the bottom of the map is when we last updated the figures, not the period that
+they describe. Each update uses the newest figures published, but some of these
+figures describe years long before the update.</p>
 
-<h4 id="older-figures">Older figures and the lockdown Census</h4>
+<h4 id="older-figures">Older figures, and the Census during lockdown</h4>
 
-<p>If an indicator's period ended more than three years ago, the indicator list
-and the legend show the year it ends. That way a figure for 2016/17 to 2020/21
-is not mistaken for a current one. Census 2021 indicators are not marked,
-because it is the latest Census. Its travel to work figures do carry a warning,
-though. The Census was taken on 21 March 2021, during a lockdown, and ONS says
-those figures do not show normal travel patterns.</p>
+<p>If an indicator's period ended more than 3 years ago, the indicator list and
+the legend show its end year. This shows clearly that a figure for 2016/17 to
+2020/21 is not current. (2016/17 means the financial year from April 2016 to
+March 2017.) Census 2021 indicators are not marked, because Census 2021 is the
+latest Census. But its figures for travel to work have a warning. The Census
+was on 21 March 2021, during a COVID-19 lockdown. ONS says that those figures
+do not show normal travel patterns.</p>
 
-<p>Several Local Health periods include the pandemic. Deaths and life
-expectancy for 2019 to 2023 include 2020 and 2021, when COVID-19 raised deaths
-most in more deprived areas. So the gaps between places may be wider than in a
-normal year. The hospital admissions figures end in 2020/21, the first year of
-the pandemic, when emergency admissions fell sharply. The cards for these
-indicators say so.</p>
+<p>Several Local Health periods include the COVID-19 pandemic. Deaths and life
+expectancy for 2019 to 2023 include 2020 and 2021. In those years, COVID-19
+increased deaths most in the more deprived areas. So the differences between
+places may be bigger than in a normal year. The hospital admissions figures end
+in 2020/21, the first year of the pandemic, when emergency admissions fell by a
+large amount. The cards for these indicators say this.</p>
 
 <h4 id="life-expectancy">Life expectancy is shown for women and men separately</h4>
 
-<p>Local Health gives life expectancy at birth for women and for men, but not
-for everyone together. So the map shows it as two indicators.</p>
+<p>Life expectancy at birth is the average number of years that a newborn baby
+would live. It assumes that death rates stay as they were in the period. Local
+Health gives it for women and for men, but not for everyone together. So the
+map shows it as 2 indicators.</p>
 
 <h3 id="reading-colours">What the colours show</h3>
 
 <h4 id="colours">Darker means a higher figure</h4>
 
-<p>Every indicator is shaded from light for its lowest figures to dark for its
-highest. This is true whether a high figure is good news or bad. The exception
-is the deprivation deciles and ranks. These count down from 1 for the most
-deprived, so on those maps we turn the colours round and darker still means
-more deprived. The Highest and lowest 10 lists and the printable reports do say
+<p>The map colours every indicator from light for its lowest figures to dark
+for its highest figures. This is true whether a high figure is good or bad. The
+exception is the deprivation deciles and ranks. Deprivation deciles go from 1
+to 10. Decile 1 is the most deprived 10% of areas in England, and decile 10 is
+the least deprived 10%. Ranks also start at 1 for the most deprived area. So
+for these indicators we reverse the colours, and a darker colour still means
+more deprived. The Highest and lowest 10 lists and the printable reports say
 whether a higher figure is better or worse. For the Local Health figures, they
-follow the direction OHID gives. Some indicators simply describe who lives in an
-area, such as the share of residents over 65, in social housing or of any
-ethnic group. These have no better or worse end, so they are listed as highest
-and lowest rather than best and worst.</p>
+use the direction that OHID gives. Some indicators only describe who lives in
+an area. Examples are the share of residents over 65, in social housing or in
+each ethnic group. These have no better or worse end, so the lists call them
+highest and lowest, not best and worst.</p>
 
 <h4 id="legend-ends">The ends of the legend are not the highest and lowest areas</h4>
 
-<p>The colours run from the 5th percentile to the 95th percentile of the areas
-shown. The 5th percentile is the figure that 5% of areas fall below, and the
-95th is the figure that 5% of areas are above. This stops one extreme area from
-using up the whole colour scale. Any area beyond either end takes the end
-colour. When that happens, the legend marks that end with ≤ or ≥, so "≥ 37.8"
-means 37.8 or more. The Highest and lowest 10 lists give the real figures.</p>
+<p>The colours go from the 5th percentile to the 95th percentile of the areas
+shown. The 5th percentile is the figure that 5% of areas are below. The 95th
+percentile is the figure that 5% of areas are above. This means that a single
+very high or very low area does not use the whole colour scale. An area below
+the low end has the low end's colour. An area above the high end has the high
+end's colour. When this happens, the legend marks that end with ≤ (or less) or
+≥ (or more). For example, "≥ 37.8" means 37.8 or more. The Highest and lowest
+10 lists give the real figures.</p>
 
-<h4 id="position">Where a figure sits</h4>
+<h4 id="position">How a figure compares with other areas</h4>
 
-<p>If you hover over an area, or tap it on a phone, you can see where its
-figure sits among the other areas of the same level in the region you are
-looking at. For example, it might say "higher than 82% of London's LSOAs". This
-compares the area with its region, not with all of England, so it changes if
-you switch region.</p>
+<p>Hover over an area, or tap it on a phone, to compare its figure with other
+areas of the same type. It compares the area with the region that you are
+viewing. For example, it might say "higher than 82% of London's LSOAs". It does
+not compare the area with all of England, so the result changes if you choose a
+different region.</p>
 
-<h3 id="reading-certainty">How sure a figure is</h3>
+<h3 id="reading-certainty">How certain a figure is</h3>
 
 <h4 id="missing">Missing is not zero</h4>
 
 <p>When an area has no figure, the figure is missing. It does not mean zero.
-There are two reasons this happens. OHID holds back some MSOA figures where the
-numbers are so small that someone could be identified. And some older measures
-have no figure where boundaries changed in 2021 (see
-<a href="#gap-2011-msoas">MSOAs redrawn in 2021</a>). In Query, an area with no
-figure for one of your conditions can neither pass nor fail it. So it is left
-out of the results, and the number left out is shown underneath them.</p>
+There are 2 reasons for this. First, OHID does not publish some MSOA figures,
+because the numbers are so small that someone could be identified. Second, some
+older indicators have no figure for the MSOAs whose boundaries changed in 2021
+(see <a href="#gap-2011-msoas">MSOAs redrawn in 2021</a>). In Query, an area
+with no figure for one of your conditions cannot pass or fail that condition.
+So the area is not in the results, and the number of these areas is shown under
+the results.</p>
 
-<h4 id="vs-england">Better, worse or similar to England</h4>
+<h4 id="vs-england">Comparing a figure with England</h4>
 
-<p>OHID checks every Local Health MSOA figure against the figure for England.
-It uses a 95% confidence interval, which is the range the true figure is very
-likely to be in. If that range does not include England's figure, the
-difference is unlikely to be down to chance. Hover over an MSOA to see OHID's
-result next to the figure. Many MSOA figures are based on small numbers, so an
-area that looks high on the colour scale is often still similar to England by
-this test. Ward and LA figures are worked out from MSOA figures and have no
-test. Neither do the few MSOA figures estimated from 2011 areas.</p>
+<p>OHID checks each Local Health figure for an MSOA against England. The result
+is "Better than England", "Worse than England", "Higher than England", "Lower
+than England" or "About the same as England". Better, worse, higher or lower
+means the difference is too big to be chance. About the same means the
+difference could be chance. OHID uses higher or lower for indicators where it
+does not say whether a higher figure is good or bad. Hover over an MSOA to see
+OHID's result next to the figure.</p>
 
-<h4 id="modelled">Modelled figures come with a range</h4>
+<p>For this test, OHID uses a confidence interval. This is the range the true
+figure is very likely to be in (95% likely). If the range does not include
+England's figure, the difference is too big to be chance. Many MSOA figures are
+based on small numbers of people. So an area can look high on the colour scale
+but still be about the same as England by this test. Ward and LA figures have
+no test, because we calculate them from MSOA figures. The few MSOA figures
+estimated from 2011 areas also have no test.</p>
 
-<p>Some figures are not counted but modelled. ONS's household income figures
-and its healthy and disability-free life expectancy for MSOAs are worked out
-from surveys and records, because too few people in each MSOA are surveyed to
-measure them directly. ONS gives each MSOA figure a 95% confidence interval,
-which is the range the true figure is very likely to be in. Hover over an MSOA
-to see it. Many neighbouring MSOAs have ranges that overlap, so they are not
-clearly different. Ward and LA figures are worked out from MSOA figures and
-have no range.</p>
+<h4 id="modelled">Modelled figures have a range</h4>
 
-<h3 id="reading-areas">How a figure reaches an area</h3>
+<p>Some figures are modelled estimates. A modelled estimate is an estimate from
+a statistical model, not a count. ONS's household income figures for MSOAs are
+modelled estimates. So are its healthy life expectancy and disability-free life
+expectancy for MSOAs. ONS calculates them from surveys and records, because it
+surveys too few people in each MSOA to measure them directly. ONS gives each
+MSOA figure a confidence interval, the range the true figure is very likely to
+be in (95% likely). Hover over an MSOA to see it. The ranges of many
+neighbouring MSOAs overlap, which means that these MSOAs are not clearly
+different. Ward and LA figures have no range, because we calculate them from
+MSOA figures.</p>
 
-<p>The full method is under <a href="#placing">How figures are placed onto
-areas</a>. These are the parts of it that change what you see.</p>
+<h3 id="reading-areas">How an area gets its figure</h3>
 
-<h4 id="lsoas-and-wards">LSOAs do not sit inside wards</h4>
+<p><a href="#placing">How we match figures to areas</a> gives the full method.
+This section explains the parts of the method that change what you see.</p>
 
-<p>LSOA boundaries come from the 2021 Census, and wards were redrawn in 2025.
-So the two really do cross, and about four in ten LSOAs cross a ward boundary.
-We never split an LSOA. ONS publishes a best-fit lookup that puts each whole
-LSOA in the ward where most of its residents live, and we use it as it is (it
-is named in the <a href="#lookups">technical appendix</a>). This means a ward's
-figure counts each LSOA once, rather than splitting it by the land it shares. If you
-zoom in and see LSOA and ward edges crossing, that is how the boundaries are
-really drawn. It is not a fault in the map.</p>
+<h4 id="lsoas-and-wards">Some LSOAs cross ward boundaries</h4>
+
+<p>LSOA boundaries come from the 2021 Census, and the ward boundaries that the
+map uses are from May 2025. So the two do not always match, and about 4 in 10
+LSOAs cross a ward boundary. We never split an LSOA. ONS publishes a lookup,
+which is a table that says which ward each LSOA belongs to. It is a best fit
+lookup: ONS places each LSOA in the ward where most of its people live. We use
+this lookup without changes, and the <a href="#lookups">technical appendix</a>
+names it. So a ward's figure counts each whole LSOA once. It does not split an
+LSOA by the land that the LSOA shares with other wards. If you zoom in and see
+LSOA and ward edges crossing, that is how the boundaries are really drawn. It
+is not a fault in the map.</p>
 
 <h4 id="adding-up">How figures are combined into wards and LAs</h4>
 
-<p>When we combine small areas into wards or LAs, counts such as population,
-the claimant count and the number of services are added up. Rates, percentages
-and scores are weighted by population. This means each small area counts in
-proportion to the number of people living there at the 2021 Census. Fuel
-poverty is a share of households, so it is weighted by the number of
-households instead. Household income is an average over households, so it is
-weighted by households too. Counts of stations within 1 km and bus stops within 800
-metres are averaged, not added, because one station is close to several LSOAs.
-So a ward's figure is what its average resident has nearby. <span data-cen="ward-weighted">Census
-percentages are combined from their output areas by weighting too, as explained
-under <a href="#census-levels">Census figures at every level</a>.</span><span data-cen="ward-counts" hidden>Census
-percentages are different, because ONS publishes the counts behind them. Each
-one is calculated from the summed counts of the output areas, as explained under
+<p>When we combine small areas into wards or LAs, we add together counts.
+Examples are population, the number of services and the claimant count. The
+claimant count is the number of people who claim benefits because they are
+unemployed. Rates, percentages and scores are weighted by population. This
+means that we use an average where areas with more people count for more. The
+number of people in each small area is from the 2021 Census. Fuel poverty is a
+share of households, so it is weighted by the number of households instead.
+Household income is an average for households, so it is also weighted by
+households. Counts of stations within 1 km and bus stops within 800 metres are
+averaged, not added. This is because one station is close to several LSOAs. So
+a ward's figure shows what its average resident has nearby.
+<span data-cen="ward-weighted">Census percentages are also combined from their
+output areas by weighting, as explained in <a href="#census-levels">Census
+figures at every level</a>.</span><span data-cen="ward-counts" hidden>Census
+percentages are different, because ONS publishes the counts behind them. We
+calculate each one from the summed counts of the output areas, as explained in
 <a href="#census-levels">Census figures at every level</a>.</span> This is how
-LSOA figures reach wards. MSOA figures reach wards through the LSOAs the two
-share, so a ward that sits across two MSOAs gets a mix of the two, in
-proportion to where its people live.</p>
+LSOA figures become ward figures. MSOA figures become ward figures through the
+LSOAs that the MSOA and the ward share. So a ward that crosses 2 MSOAs gets a
+mix of the 2 MSOA figures, in proportion to where its people live.</p>
 
-<p>Where a figure is not published for LAs, we work out each LA's figure from
-its wards in the same way. This gives the rate for all of the LA's residents,
-rather than a simple average of wards of different sizes. Fuel poverty is
-worked out from all of the LA's LSOAs, weighted by households, and household
-income from all of the LA's MSOAs, weighted by households. An LA figure
-worked out like this can differ slightly from a figure the council or a publisher gives, which may use a
-different population or year. For OHID's Local Health indicators the
-difference can be bigger. Life expectancy and ratios compared with England
-cannot be averaged exactly, and OHID's own LA figures can cover a different
-period. The same is true of ONS's healthy and disability-free life
-expectancy, which ONS publishes for MSOAs only. So the map says under its key that these LA figures are our estimates.
-It also leaves the City of London out of their LA rankings, and the Area
-profile shows OHID's own LA figures. Where our data includes OHID's LA figure
-for one of these indicators, the map uses it instead.</p>
+<p>Some figures are not published for LAs. For these, we calculate each LA's
+figure from its wards in the same way. This gives the rate for all of the LA's
+residents. It is not a simple average of the wards, which have different sizes.
+Fuel poverty is calculated from all of the LA's LSOAs, weighted by households.
+Household income is calculated from all of the LA's MSOAs, also weighted by
+households. An LA figure that we calculate can be slightly different from the
+council's or the publisher's figure. This is because they may use a different
+population or year. For OHID's Local Health indicators, the difference can be
+bigger. Life expectancy, and ratios where England is 100, cannot be averaged
+exactly. Also, OHID's own LA figures can cover a different period. The same is
+true of ONS's healthy life expectancy and disability-free life expectancy,
+which ONS publishes for MSOAs only. So for these indicators, the map says under
+its key that the LA figures are our estimates. The map also does not include
+the City of London in their LA rankings. The Area profile shows OHID's own LA
+figures. Where our data has OHID's LA figure for one of these indicators, the
+map uses OHID's figure.</p>
 
-<h4 id="la-only">Figures published only for a whole LA are not offered on the map</h4>
+<h4 id="la-only">Figures published only for a whole LA are not in the indicator list</h4>
 
-<p>Some health figures, such as smoking, obesity and physical activity
-from OHID's main profiles, are only published for each whole LA. Every ward in
-that LA would have the same figure. Ranking wards on it would give an order
-that looks real but only shows which LA each ward is in. So these indicators
-are not in the indicator list. Ward profiles and reports still show them,
-labelled as the LA's figure.</p>
+<p>Some health figures from OHID's main profiles are published only for each
+whole LA. Examples are smoking, obesity and physical activity. With these
+figures, every ward in an LA would have the same figure. A ranking of wards
+would look real, but it would only show which LA each ward is in. So these
+indicators are not in the indicator list. Ward profiles and reports still show
+them, labelled as the LA's figure.</p>
 
-<h4 id="services">Services are counted where they stand</h4>
+<h4 id="services">Services are counted in the ward where they are</h4>
 
-<p>GP practices, pharmacies, dentists and hospitals are counted in the ward
-they stand in, which we find from their postcode. A practice that serves people in the next ward still counts only
-in its own ward. So these counts will not always match a count made another
-way.</p>
+<p>We count general practitioner (GP) practices, pharmacies, dentists and
+hospitals in the ward where they are. We find this ward from their postcode. A
+practice that serves people in the next ward still counts only in its own ward.
+So these counts will not always match a count made in a different way.</p>
 
 <h4 id="pcns">Primary care networks are lists of patients, not areas</h4>
 
 <p>A primary care network (PCN) is a group of GP practices. Its population is
-the people registered with those practices, wherever they live. The list of
-which practices belong to which network comes from OHID, which follows NHS
-England's list. Where their patients live comes from NHS Digital's
-<em>Patients Registered at a GP Practice</em> by LSOA. When those figures are
-available, choosing a network shades every LSOA with five or more of its
-patients. The shade shows the share of that LSOA's registered residents who use
-the network. This means overlapping catchments (the areas a network's patients
-come from) show as they really are. The <strong>PCN footprints</strong> outline
-gives each LSOA to the network that most of its registered residents use. This
-makes a handy boundary, but NHS England does not publish it and practices do
-not work to it.</p>
+the people registered with those practices, wherever they live. OHID gives the
+list of practices in each network, and OHID's list follows NHS England's list.
+The figures for where the patients live come from NHS Digital's <em>Patients
+Registered at a GP Practice</em>, by LSOA. When those figures are available and
+you choose a network, the map colours every LSOA with 5 or more of its
+patients. The colour shows the share of that LSOA's registered residents who
+use the network. A network's catchment is the area that its patients come from.
+The map shows catchments that overlap as they really are. The <strong>PCN
+footprints</strong> outline gives each LSOA to the network that most of its
+registered residents use. This gives a useful boundary, but NHS England does
+not publish it, and practices do not use it in their work.</p>
 
-<h2 id="words">Glossary of geographies and measures</h2>
+<h2 id="words">Words used on this map</h2>
 
-<p>The tables below match the words used on this map to their official names,
-and say what each one means.</p>
+<p>The tables below give each word used on this map, its official name and what
+it means.</p>
 
 <h3 id="words-areas">Areas</h3>
 
@@ -345,51 +377,54 @@ and say what each one means.</p>
   </thead>
   <tbody>
     <tr><td class="term">Region</td><td>Region</td>
-        <td>One of England's nine regions, such as London or the North East.
-            Each one is built separately, and the England view puts all nine
-            together.</td></tr>
+        <td>One of England's 9 regions, such as London or the North East. We
+            make the map for each region separately, and the England view shows
+            all 9 together.</td></tr>
     <tr><td class="term">LA</td><td>Local authority district</td>
-        <td>The area run by one council, such as a London borough, a city or a
-            district. England has 296, and London has 33: the 32 boroughs and
-            the City of London. Some health figures are published for upper-tier
-            LAs, which are the larger councils. Outside the big cities these are
-            county councils, and each district inside a county then takes its
-            county's figure.</td></tr>
+        <td>The area of one council, such as a London borough, a city or a
+            district. England has 296 LAs, and London has 33: the 32 boroughs
+            and the City of London. Some health figures are published for
+            upper-tier LAs, which are the larger councils. Outside the big
+            cities, these are county councils. A district inside a county then
+            has the figure for its county.</td></tr>
     <tr><td class="term">ICB</td><td>Integrated care board</td>
-        <td>The NHS body that plans health services for a group of LAs. London
-            has four.</td></tr>
+        <td>The NHS organisation that plans health services for a group of LAs.
+            London has 4 ICBs.</td></tr>
     <tr><td class="term">Ward</td><td>Electoral ward</td>
-        <td>The area that one or more councillors are elected for. London has
-            704 and England about 7,000. We use the boundaries in force from
+        <td>The area that 1 or more councillors are elected for. London has 704
+            wards, and England has about 7,000. We use the ward boundaries of
             May 2025.</td></tr>
     <tr><td class="term">MSOA</td><td>Middle layer Super Output Area</td>
-        <td>A statistical area of about 7,500 people, made of whole LSOAs.
-            England has 6,856 and London 1,002.</td></tr>
+        <td>An area of about 8,000 people, made of whole LSOAs and used for
+            statistics. England has 6,856 MSOAs, and London has
+            1,002.</td></tr>
     <tr><td class="term">LSOA</td><td>Lower layer Super Output Area</td>
-        <td>A statistical area of about 1,500 people. England has 33,755 and
-            London 4,994. LSOAs are drawn to hold roughly the same number of
-            people, not to follow landmarks. So they are small in busy cities
-            and larger in outer suburbs and the countryside. They are the
-            smallest areas with figures on most topics, and deprivation is
+        <td>A small area of about 1,500 people, used for statistics. England
+            has 33,755 LSOAs, and London has 4,994. ONS draws LSOAs so that
+            each one has about the same number of people. It does not draw them
+            to follow landmarks. So LSOAs are small in busy cities, and larger
+            in outer suburbs and in the countryside. LSOAs are the smallest
+            areas with figures on most topics, and deprivation figures are
             published for them.</td></tr>
     <tr><td class="term">OA</td><td>Output area</td>
-        <td>The smallest Census area, of about 125 households. England has
-            178,605 and London 26,369. The map shows only Census figures for
-            them.</td></tr>
+        <td>The smallest Census area, with about 125 households. England has
+            178,605 output areas, and London has 26,369. For output areas, the
+            map shows Census figures only.</td></tr>
     <tr><td class="term">Neighbourhood</td><td>No official name</td>
-        <td>The everyday word we use for the small areas on the map. Where the
-            difference matters, we name the level: MSOA, LSOA or output
-            area.</td></tr>
+        <td>The everyday word that we use for the small areas on the map. Where
+            the difference is important, we name the level: MSOA, LSOA or
+            output area.</td></tr>
     <tr><td class="term">PCN</td><td>Primary care network</td>
         <td>A group of GP practices that work together. Its population is the
             patients registered with its practices, wherever they live.</td></tr>
     <tr><td class="term">Custom area</td><td>No official name</td>
-        <td>An area you build yourself from LSOAs. Totals such as crimes are
-            added together. Each Census percentage is worked out from the
+        <td>An area that you make yourself from LSOAs. Totals, such as crimes,
+            are added together. Each Census percentage is calculated from the
             summed counts behind it, as a ward's is. Other figures are averages
-            weighted by residents, except fuel poverty, which is weighted by
-            households, as a ward's is. An average of deprivation deciles is not itself a
-            decile, so it is shown as the average deprivation decile.</td></tr>
+            weighted by residents. The exception is fuel poverty, which is
+            weighted by households, as a ward's is. An average of deprivation
+            deciles is not a decile, so the map calls it the average
+            deprivation decile.</td></tr>
   </tbody>
 </table>
 </div>
@@ -410,148 +445,175 @@ and say what each one means.</p>
         <td>A single number for one area, such as the life expectancy of one
             ward.</td></tr>
     <tr><td class="term">Period</td><td>Time period</td>
-        <td>The dates a figure describes. These can be some years before the
-            date we last updated it.</td></tr>
+        <td>The dates that a figure describes. These can be several years
+            before the date when we last updated the figure.</td></tr>
     <tr><td class="term">Deprivation score</td><td>Index of Multiple Deprivation (IMD) 2025 score</td>
-        <td>The government's measure of how deprived an area is. It combines
-            income, employment, education, health, crime, access to housing and
-            services, and living environment. A higher score means more
-            deprived.</td></tr>
+        <td>The government's measure of how deprived an area is. It combines 7
+            parts, called domains: income, employment, education, health,
+            crime, barriers to housing and services, and living environment. A
+            higher score means more deprived.</td></tr>
     <tr><td class="term">Households deprived in two or more dimensions</td><td>Household deprivation dimensions (Census 2021)</td>
         <td>A simple Census measure, separate from the deprivation score. ONS
-            counts a household as deprived in education, employment, health
-            and disability, or housing from its answers, and publishes how
-            many of the four apply. It is not the Index of Multiple
-            Deprivation, and the two should not be compared.</td></tr>
+            uses each household's Census answers to decide if it is deprived in
+            4 dimensions (ways). These are education, employment, health and
+            disability, and housing. ONS publishes how many of the 4 apply. It
+            is not the Index of Multiple Deprivation, and you should not
+            compare the two.</td></tr>
     <tr><td class="term">Overcrowded homes</td><td>Occupancy rating for bedrooms of -1 or less</td>
-        <td>Homes with fewer bedrooms than the bedroom standard says the
-            household needs. Under-occupied homes have at least two more than
-            they need.</td></tr>
+        <td>Homes with fewer bedrooms than the household needs, by the bedroom
+            standard. The bedroom standard is a rule for how many bedrooms a
+            household needs. It uses the ages, sexes and relationships of the
+            people in it. Under-occupied homes have at least 2 more bedrooms
+            than they need.</td></tr>
     <tr><td class="term">Socio-economic classification</td><td>National Statistics Socio-economic Classification (NS-SEC)</td>
-        <td>ONS's grouping of people aged 16 and over by the kind of job they
-            do or last did, from higher managerial and professional jobs to
-            routine jobs, with groups for people who have never worked or are
-            long-term unemployed and for full-time students.</td></tr>
+        <td>ONS's groups of people aged 16 and over, based on the type of job
+            they do or last did. The groups go from higher managerial and
+            professional jobs to routine jobs. There are also groups for people
+            who have never worked or are long-term unemployed, and for
+            full-time students.</td></tr>
     <tr><td class="term">Decile</td><td>Decile</td>
-        <td>A tenth. Deprivation decile 1 is the most deprived tenth of
-            England's LSOAs, and decile 10 the least deprived. A ward's average
-            decile is the average of its LSOAs' deciles, so it is not itself a
-            decile.</td></tr>
+        <td>One of 10 equal groups. For deprivation, decile 1 is the most
+            deprived 10% of areas in England, and decile 10 is the least
+            deprived 10%. For the IMD, the areas are England's LSOAs. A ward's
+            average decile is the average of its LSOAs' deciles, so it is not
+            itself a decile.</td></tr>
     <tr><td class="term">Income deprivation affecting children</td><td>Income Deprivation Affecting Children Index (IDACI)</td>
-        <td>The share of children aged 0 to 15 living in families on a low
-            income. Its partner for people aged 60 and over is income
+        <td>The share of children aged 0 to 15 who live in families with a low
+            income. The matching measure for people aged 60 and over is income
             deprivation affecting older people (IDAOPI). Both are part of the
             IMD's income domain.</td></tr>
     <tr><td class="term">Sub-domain</td><td>Sub-domain</td>
-        <td>A part of one of the IMD's domains. Education is split into
+        <td>A part of one of the IMD's domains. Education is divided into
             children and young people, and adult skills. Barriers to housing
-            and services is split into geographical and wider barriers. Living
-            environment is split into indoors and outdoors.</td></tr>
+            and services is divided into geographical barriers and wider
+            barriers. Living environment is divided into indoors and
+            outdoors.</td></tr>
     <tr><td class="term">Measures behind the index</td><td>Underlying indicators</td>
-        <td>The figures MHCLG combines into the IMD's domains, such as Key
-            Stage 2 results or the share of homes in poor condition, each in
-            its own units.</td></tr>
+        <td>The figures that the Ministry of Housing, Communities and Local
+            Government (MHCLG) combines into the IMD's domains. Examples are
+            Key Stage 2 results (school tests at the end of primary school) and
+            the share of homes in poor condition. Each one has its own
+            units.</td></tr>
     <tr><td class="term">Core20</td><td>Core20PLUS5</td>
-        <td>NHS England's plan for reducing health inequalities, which are
-            unfair differences in health between groups of people. It focuses
-            on the most deprived fifth of England's LSOAs, which are
-            deprivation deciles 1 and 2.</td></tr>
+        <td>The most deprived 20% of LSOAs in England, which are deprivation
+            deciles 1 and 2. It is part of NHS England's plan to reduce health
+            inequalities, which are unfair differences in health between groups
+            of people.</td></tr>
     <tr><td class="term">Ratio where England is 100</td><td>Indirectly standardised admission,
             mortality or incidence ratio</td>
-        <td>Admissions, deaths or new cancer cases compared with the number you
-            would expect if England's rates applied to the area's own mix of
-            ages and sexes. 100 is as expected, 120 is 20% more and 80 is 20%
-            fewer. It is not a rate per 100 people. Most of the Local Health
-            admissions, deaths and cancer figures are these.</td></tr>
+        <td>A ratio where 100 is the England level, after allowing for
+            differences in age and sex. It compares the number of admissions,
+            deaths or new cancer cases with an expected number. The expected
+            number is what the area would have with England's rates for its mix
+            of ages and sexes. Above 100 means more than expected for the
+            area's ages and sexes. For example, 120 means 20% more than
+            expected, and 80 means 20% fewer. It is not a rate per 100 people.
+            Most of the Local Health figures for admissions, deaths and cancer
+            are ratios like this.</td></tr>
     <tr><td class="term">Healthy life expectancy</td><td>Healthy life expectancy (HLE) at birth</td>
-        <td>The number of years a newborn could expect to live in good or very
-            good health. Disability-free life expectancy (DFLE) is the years
-            they could expect to live without an illness or disability that
-            limits day-to-day activities. ONS's figures for MSOAs come from
-            deaths over 2019 to 2023 and from what people said about their
-            health at the 2021 Census.</td></tr>
+        <td>The number of years that a newborn baby could expect to live in
+            good or very good health. Disability-free life expectancy (DFLE) is
+            the number of years they could expect to live without an illness or
+            disability that limits their daily activities. ONS's figures for
+            MSOAs come from deaths in 2019 to 2023, and from what people said
+            about their health in the 2021 Census.</td></tr>
     <tr><td class="term">Household income after housing costs</td><td>Net equivalised household income after housing costs</td>
-        <td>A household's income after tax, once rent, mortgage interest,
-            water rates and buildings insurance are paid. Before housing costs
-            is the same income before those are paid. Both are adjusted for the
-            size of the household (equivalised), so that households of
-            different sizes can be compared.</td></tr>
+        <td>A household's income after tax, and after it pays rent, mortgage
+            interest, water rates and buildings insurance. Before housing costs
+            is the same income before these payments. Both are adjusted for the
+            size of the household (equivalised), so that you can compare
+            households of different sizes.</td></tr>
     <tr><td class="term">Modelled estimate</td><td>Model-based estimate</td>
-        <td>A figure worked out from a statistical model, using survey answers
-            and records for the area, where too few people are surveyed in a
-            small area to measure it directly. It comes with a confidence
-            interval.</td></tr>
+        <td>An estimate from a statistical model, not a count. The model uses
+            survey answers and records for the area. It is used where a survey
+            has too few people in a small area to measure the figure directly.
+            Each modelled estimate has a confidence interval.</td></tr>
     <tr><td class="term">Age-standardised rate</td><td>Directly standardised rate</td>
-        <td>A rate adjusted to a standard mix of ages, so that areas with older
-            or younger residents can be compared fairly.</td></tr>
+        <td>A rate adjusted to a standard mix of ages. This means that you can
+            fairly compare areas with older residents and areas with younger
+            residents.</td></tr>
     <tr><td class="term">Recorded by GPs</td><td>QOF prevalence</td>
-        <td>The share of patients on GP registers who have been diagnosed with a
-            condition, from the Quality and Outcomes Framework (QOF). It counts
-            only diagnosed cases. So it can be lower than the true level where a
-            condition often goes undiagnosed.</td></tr>
+        <td>The share of patients with a condition, from GP registers in the
+            Quality and Outcomes Framework (QOF). It counts only patients whose
+            GP has diagnosed the condition. So it can be lower than the true
+            level for a condition that is often not diagnosed.</td></tr>
     <tr><td class="term">Healthy places index</td><td>Access to Healthy Assets and Hazards (AHAH)</td>
-        <td>GeoDS's measure of how healthy the places around an area are, from
-            access to health services, how near fast food outlets, pubs,
-            off-licences, gambling outlets and tobacconists are, air quality and
-            access to green and blue space. A higher score means a less healthy
-            place.</td></tr>
+        <td>A measure of how healthy the places around an area are, from the
+            Geographic Data Service (GeoDS). It uses access to health services,
+            and how near fast food outlets, pubs, off-licences, gambling
+            outlets and tobacconists are. It also uses air quality, and access
+            to green space and blue space (water such as rivers and lakes). A
+            higher score means a less healthy place.</td></tr>
     <tr><td class="term">Mental health index</td><td>Small Area Mental Health Index (SAMHI)</td>
-        <td>PLDR's single score for mental ill health in an area, from hospital,
+        <td>A single score for mental ill health in an area, from the
+            Place-based Longitudinal Data Resource (PLDR). It uses hospital,
             GP, prescribing, survey and benefit records. A higher score means
             worse mental health.</td></tr>
     <tr><td class="term">Risk of food insecurity</td><td>Priority Places for Food Index (PPFI)</td>
-        <td>CDRC's measure of how likely people in an area are to struggle to
-            get food, from how near and how easy to reach supermarkets are,
-            online delivery, other food shops and the need for family food
+        <td>A measure of how likely people in an area are to have difficulty
+            getting food, from the Consumer Data Research Centre (CDRC). It
+            uses how near supermarkets are and how easy they are to reach,
+            online delivery, other food shops, and the need for family food
             support. Decile 1 is the highest risk.</td></tr>
     <tr><td class="term">Food hygiene rating</td><td>Food Hygiene Rating Scheme rating</td>
-        <td>The rating from 0 to 5 a council gives a food business at
-            inspection. 5 is very good, and 0, 1 and 2 mean urgent, major or
-            some improvement is necessary.</td></tr>
-    <tr><td class="term">Similar to England</td><td>Not significantly different from England</td>
-        <td>OHID's test of whether an area's figure is different from England's
-            by more than chance would explain. If the area's 95% confidence
-            interval includes England's figure, it is similar to England.</td></tr>
+        <td>The rating from 0 to 5 that a council gives a food business when it
+            inspects the business. 5 means very good. 0 means urgent
+            improvement is necessary, 1 means major improvement is necessary
+            and 2 means some improvement is necessary.</td></tr>
+    <tr><td class="term">About the same as England</td><td>Not significantly different from England</td>
+        <td>OHID checks each figure against England. Better, worse, higher or
+            lower means the difference is too big to be chance. About the same
+            means the difference could be chance. If the area's confidence
+            interval includes England's figure, the area is about the same as
+            England.</td></tr>
     <tr><td class="term">Confidence interval</td><td>95% confidence interval</td>
-        <td>The range the true figure is likely to be in. Areas with few people
-            have wide ranges.</td></tr>
+        <td>The range the true figure is very likely to be in (95% likely).
+            Areas with few people have wide ranges.</td></tr>
     <tr><td class="term">Weighted by population</td><td>Population-weighted mean</td>
-        <td>A way of combining areas where each area's figure counts in
-            proportion to the number of people who live there.</td></tr>
+        <td>An average where areas with more people count for more. Each area's
+            figure counts in proportion to the number of people who live
+            there.</td></tr>
     <tr><td class="term">Best fit</td><td>Best-fit lookup</td>
-        <td>How ONS deals with a small area that crosses a boundary. The whole
-            small area goes to the larger area that holds most of its
-            residents.</td></tr>
+        <td>How ONS deals with a small area that crosses a boundary. ONS places
+            the whole small area in the larger area where most of its people
+            live. For example, ONS places each LSOA in the ward where most of
+            its people live.</td></tr>
     <tr><td class="term">Estimated from 2011 areas</td><td>No official name</td>
-        <td>A figure published for a 2011 MSOA and carried over to a 2021 MSOA,
-            as explained under <a href="#estimated">How figures are placed onto
-            areas</a>.</td></tr>
+        <td>A figure published for a 2011 MSOA, and used for a 2021 MSOA.
+            <a href="#estimated">Figures estimated from 2011 areas are
+            marked</a> explains how.</td></tr>
     <tr><td class="term">Mid-year estimate</td><td>Mid-year population estimate</td>
         <td>ONS's estimate of how many people live in an area in the middle of
-            a year, made by rolling the last Census forward with births, deaths
-            and people moving. It is more recent than the Census, but less
-            certain for small areas.</td></tr>
+            a year (30 June). ONS starts from the last Census, adds births,
+            takes away deaths and allows for people who move. It is more recent
+            than the Census, but less certain for small areas.</td></tr>
     <tr><td class="term">Killed or seriously injured</td><td>KSI casualties</td>
-        <td>People killed or seriously injured in a road collision reported to
-            the police. DfT adjusts the serious injuries so that forces which
-            record injuries in different ways can be compared.</td></tr>
+        <td>People killed or seriously injured in a road collision that was
+            reported to the police. The Department for Transport (DfT) adjusts
+            the serious injuries, so that you can compare police forces that
+            record injuries in different ways.</td></tr>
     <tr><td class="term">Population-weighted centre</td><td>Population-weighted centroid</td>
-        <td>The point ONS places in each LSOA where most of its people live,
-            used here to measure distances from, rather than the middle of its
-            shape.</td></tr>
+        <td>The point that ONS places in each LSOA where most of its people
+            live. We measure distances from this point, not from the middle of
+            the LSOA's shape.</td></tr>
     <tr><td class="term">Limited capability for work</td><td>LCW and LCWRA</td>
-        <td>DWP's finding, after a work capability assessment, that someone on
-            Universal Credit is too ill or disabled to work (limited capability
-            for work) or also to prepare for work (limited capability for work
-            and work-related activity).</td></tr>
+        <td>A decision by the Department for Work and Pensions (DWP), after a
+            work capability assessment, about someone on Universal Credit.
+            Limited capability for work means the person is too ill or disabled
+            to work. Limited capability for work and work-related activity
+            means the person is also too ill or disabled to prepare for
+            work.</td></tr>
     <tr><td class="term">Relative low income</td><td>Below 60% of median income before housing costs</td>
-        <td>A family whose income, before paying for housing, is below 60% of
-            the middle income in the UK that year. DWP counts the children in
-            these families from benefit and tax credit records.</td></tr>
+        <td>A family whose income before housing costs is below 60% of the
+            middle income in the United Kingdom that year. The middle income is
+            the income in the middle when all incomes are put in order. DWP
+            counts the children in these families from benefit and tax credit
+            records.</td></tr>
     <tr><td class="term">Rounded counts</td><td>Statistical disclosure control</td>
-        <td>DWP adjusts or rounds small counts before publishing them, so that
-            no one can be identified. Figures for small areas are approximate,
-            and adding them up does not give exactly DWP's own totals.</td></tr>
+        <td>DWP changes small counts a little, or rounds them, before it
+            publishes them, so that no one can be identified. So figures for
+            small areas are approximate, and if you add them together you will
+            not get exactly DWP's own totals.</td></tr>
     <tr><td class="term">Charity</td><td>VCSE organisation</td>
         <td>A charity registered with the Charity Commission. VCSE stands for
             voluntary, community and social enterprise.</td></tr>
@@ -588,16 +650,16 @@ and say what each one means.</p>
             Allowance, Attendance Allowance, Carer's Allowance, Pension Credit and
             children in low income families.</td></tr>
     <tr><td class="term">Stat-Xplore</td><td>Stat-Xplore</td>
-        <td>DWP's service for its benefit statistics, which we read through its
-            open data API with an account key.</td></tr>
+        <td>DWP's online service for its benefit statistics. We get the figures
+            from it with an account key.</td></tr>
     <tr><td class="term">DESNZ</td><td>Department for Energy Security and Net Zero</td>
         <td>The fuel poverty figures.</td></tr>
     <tr><td class="term">Defra</td><td>Department for Environment, Food and Rural Affairs</td>
         <td>The modelled air quality figures and the green and blue space
             measures.</td></tr>
     <tr><td class="term">DfT</td><td>Department for Transport</td>
-        <td>The road casualty figures (STATS19), and outside London the national
-            register of stops (NaPTAN).</td></tr>
+        <td>The road casualty figures (STATS19), and the national register of
+            stops (NaPTAN), which the map uses outside London.</td></tr>
     <tr><td class="term">CQC</td><td>Care Quality Commission</td>
         <td>The register of care homes and their beds.</td></tr>
     <tr><td class="term">TfL</td><td>Transport for London</td>
@@ -620,22 +682,22 @@ and say what each one means.</p>
 
 <h2 id="coverage">What the map covers</h2>
 
-<p>The map covers all of England. Each of the nine English regions is built
-separately, from the same sources and in the same way. You can switch between
-them on the map: London, the North East, the North West, Yorkshire and The
-Humber, the East Midlands, the West Midlands, the East of England, the South
-East and the South West.</p>
+<p>The map covers all of England. We make the map for each of the 9 English
+regions separately, from the same sources and in the same way. You can change
+between the regions on the map. They are London, the North East, the North
+West, Yorkshire and The Humber, the East Midlands, the West Midlands, the East
+of England, the South East and the South West.</p>
 
 <h3 id="england-view">The England view</h3>
 
-<p>The England view puts all nine regions together on one map, at every level.
-A few things are different from a single region. Boundaries are simplified a
-little more, so that about 7,000 wards can still be shown in a browser. This
-moves a ward, LSOA or MSOA edge by no more than about 25 metres, and an LA
-outline by no more than about 100 metres. An indicator that only one region
-has is left out rather than shown as a mostly empty map. The charities
-directory stays with each
-region, because for the whole country it is too big to open at once.</p>
+<p>The England view shows all 9 regions together on one map, at every level. A
+few things are different from the view of a single region. Boundaries are a
+little simpler, so that a browser can still show about 7,000 wards. This moves
+a ward, LSOA or MSOA edge by about 25 metres or less. It moves an LA outline by
+about 100 metres or less. An indicator that only one region has is not in the
+England view, because its map would be mostly empty. The charities directory is
+only in the view of each region. The directory for the whole country is too big
+to open at once.</p>
 
 <h3 id="levels">Sizes of area</h3>
 
@@ -646,10 +708,10 @@ region, because for the whole country it is too big to open at once.</p>
   </thead>
   <tbody>
     <tr><td class="term">LA</td><td>The area run by one council</td><td>33</td><td>296</td><td>May 2025</td></tr>
-    <tr><td class="term">ICB</td><td>The NHS body that plans services for a group of LAs, drawn from LA outlines</td><td>4</td><td>36</td><td>2026</td></tr>
+    <tr><td class="term">ICB</td><td>The NHS organisation that plans services for a group of LAs. The map draws it from LA outlines.</td><td>4</td><td>36</td><td>2026</td></tr>
     <tr><td class="term">Ward</td><td>The area councillors are elected for</td><td>704</td><td>about 7,000</td><td>May 2025</td></tr>
-    <tr><td class="term">MSOA</td><td>A statistical area of about 7,500 people</td><td>1,002</td><td>6,856</td><td>2021 Census</td></tr>
-    <tr><td class="term">LSOA</td><td>A statistical area of about 1,500 people</td><td>4,994</td><td>33,755</td><td>2021 Census</td></tr>
+    <tr><td class="term">MSOA</td><td>An area of about 8,000 people</td><td>1,002</td><td>6,856</td><td>2021 Census</td></tr>
+    <tr><td class="term">LSOA</td><td>A small area of about 1,500 people</td><td>4,994</td><td>33,755</td><td>2021 Census</td></tr>
     <tr><td class="term">OA</td><td>An output area of about 125 households, with Census figures only</td><td>26,369</td><td>178,605</td><td>2021 Census</td></tr>
   </tbody>
 </table>
@@ -657,31 +719,31 @@ region, because for the whole country it is too big to open at once.</p>
 
 <h3 id="updates">When the figures are updated</h3>
 
-<p>We update London's figures on the 15th of each month, and every other region
-the same morning. Then the England view is rebuilt from the updated regions. If
-a region cannot be updated, the map keeps that region's figures from the month
-before rather than showing a gap. Each publisher releases new figures on its
-own timetable, which is shown in the table under
-<a href="#sources">Where the data comes from</a>.</p>
+<p>We update the figures for London on the 15th of each month, and the figures
+for every other region on the same morning. Then we make the England view again
+from the updated regions. If a region cannot be updated, the map keeps that
+region's figures from the month before, so that there is no gap. Each publisher
+publishes new figures on its own timetable. The table in
+<a href="#sources">Where the data comes from</a> shows each timetable.</p>
 
 <h2 id="sources">Where the data comes from</h2>
 
-<p>Everything the map shows comes from one of the sources below. Each row says
-who publishes it, what it covers, the level of area it is published for, the
-period its figures describe and how often new figures come out.</p>
+<p>Everything that the map shows comes from one of the sources below. Each row
+says who publishes the source, what it covers and the level of area that it is
+published for. It also says the period that its figures describe, and how often
+new figures are published.</p>
 
-<p>The table describes London. Every other region uses the same sources, with
-two differences. Station and bus stop measures come from the Department for
-Transport's national register of stops (NaPTAN) instead of TfL. And ICBs come
-from the ONS lookup of LAs to ICBs. Street crime for every region, London included,
-comes from data.police.uk, which publishes every police force's monthly
-figures.</p>
+<p>The table describes London. Every other region uses the same sources, with 2
+differences. First, station and bus stop measures come from the Department for
+Transport's national register of stops (NaPTAN), not from Transport for London
+(TfL). Second, ICBs come from the ONS lookup of LAs to ICBs. Street crime for
+every region, including London, comes from data.police.uk. This website
+publishes the monthly figures of every police force.</p>
 
-<p>The last column, <strong>Last updated here</strong>, is filled in from our
-own record of each update, not written by hand. It shows when this site last
-took new figures from each source, and whether that worked. If a source stops
-updating, its row is marked, so older figures are never shown without a
-warning.</p>
+<p>The last column, <strong>Last updated here</strong>, comes from our own
+record of each update. Nobody writes it by hand. It shows when this site last
+got new figures from each source, and whether that worked. If a source stops
+updating, its row is marked, so that older figures always have a warning.</p>
 
 <div class="wrap" tabindex="0" role="region" aria-label="Sources">
   <table id="src-table" class="stack">
@@ -691,7 +753,7 @@ warning.</p>
         <th>What it provides</th>
         <th>Published at</th>
         <th>Period covered</th>
-        <th>Publisher updates</th>
+        <th>How often it is published</th>
         <th>Last updated here</th>
       </tr>
     </thead>
@@ -703,220 +765,231 @@ warning.</p>
 
 <p id="src-note" style="display:none"></p>
 
-<h2 id="placing">How figures are placed onto areas</h2>
+<h2 id="placing">How we match figures to areas</h2>
 
-<p>Figures come from many publishers, for different years and different kinds
-of area. Boundaries also change: wards are redrawn, councils merge, and the
-small Census areas were updated in 2021. This section explains how each figure
-reaches a ward or an LA, so that every step can be checked. The exact files are
-listed in the <a href="#appendix">technical appendix</a>.</p>
+<p>Figures come from many publishers, for different years and different types
+of area. Boundaries also change: wards are redrawn, councils join together, and
+the small Census areas changed in 2021. This section explains how we calculate
+the figure for each ward and LA, so that you can check every step. The
+<a href="#appendix">technical appendix</a> lists the exact files.</p>
 
 <h3 id="one-rule">Most figures are combined using ONS lookups</h3>
 
 <p>Most figures are published for small areas: output areas, LSOAs or MSOAs. We
-combine them into wards using lookup files published by ONS, which list the
-ward each small area belongs to. Every LSOA is placed in one ward using the ONS
-best-fit lookup for the wards in force from May 2025. We never split an LSOA.
-If it crosses a ward boundary, the whole LSOA goes to the ward where most of
-its residents live. Census figures use the ONS output area lookup instead,
-because output areas are smaller and follow ward boundaries more closely. If
-that lookup cannot be used, Census figures use the LSOA lookup too. MSOA
-figures reach wards through their LSOAs: each LSOA takes its MSOA's figure and
-is then placed in its ward in the usual way. Every LSOA and every ward sits
-wholly inside one LA.</p>
+combine them into wards with lookup files from ONS. A lookup file lists the
+ward that each small area belongs to. We place every LSOA in one ward with the
+ONS best fit lookup for the ward boundaries of May 2025. This means that ONS
+places each LSOA in the ward where most of its people live. We never split an
+LSOA, even if it crosses a ward boundary. Census figures use the ONS output
+area lookup instead, because output areas are smaller and follow ward
+boundaries more closely. If we cannot use that lookup, Census figures also use
+the LSOA lookup. MSOA figures reach wards through their LSOAs. Each LSOA takes
+the figure of its MSOA, and then goes to its ward in the usual way. Every LSOA
+and every ward is completely inside one LA.</p>
 
-<h3 id="by-location">Some things are placed by where they are</h3>
+<h3 id="by-location">Some things are placed by their location</h3>
 
-<p>Services, crimes and a few other figures do not go through a lookup. GP
-practices, pharmacies, dentists, hospitals and charities are placed by postcode, in the
-ward and LSOA the ONS Postcode Directory gives that postcode. Crimes are placed
-in the ward and LSOA whose boundary contains the map position police.uk gives
-them. So a crime or a practice is counted in the ward it is really in, which is
-not always the ward its LSOA is given to. This is true of about 1 in 10 of
-them. Air pollution comes on a 1 km grid, and each LSOA takes the average of
-the grid squares it covers, by area. Distances to stations and bus stops are
-measured in a straight line from the middle of each LSOA. Distances to the
-nearest GP practice, pharmacy and NHS dentist are measured in a straight line
-from the point ONS places where most of each LSOA's people live (its
-population-weighted centre), to the nearest site anywhere in England. Care
-homes are placed by postcode, and road casualties in the LSOA the casualty
-lives in, as DfT records it. Food businesses on the FSA register are placed in
-the LSOA whose boundary contains the map position FSA gives them, or by
-postcode where it gives none. Charities are linked
-to the LAs they say they work in by matching the LA names in the Charity
-Commission register. PCN footprints come from where each network's registered
-patients live (see <a href="#pcns">Primary care networks are lists of patients,
-not areas</a>).</p>
+<p>Services, crimes and a few other figures do not use a lookup. GP practices,
+pharmacies, dentists, hospitals and charities are placed by postcode. Each one
+goes in the ward and LSOA that the ONS Postcode Directory gives its postcode.
+Crimes are placed in the ward and LSOA whose boundary contains the map position
+police.uk gives them. So a crime or a practice is counted in the ward where it
+really is. For about 1 in 10 of them, this is not the ward that their LSOA
+belongs to. Air pollution figures are for the squares of a 1 km grid. Each LSOA
+takes the average of the grid squares that it covers, weighted by area.
+Distances to stations and bus stops are measured in a straight line from the
+middle of each LSOA. Distances to the nearest GP practice, pharmacy and NHS
+dentist are measured in a straight line to the nearest one anywhere in England.
+We measure them from the point that ONS places where most of each LSOA's people
+live (its population-weighted centre). Care homes are placed by postcode. Road
+casualties are placed in the LSOA where the casualty lives, as DfT records it.
+Food businesses on the FSA register are placed in the LSOA whose boundary
+contains the map position that FSA gives them. If FSA gives no position, they
+are placed by postcode. Charities are linked to the LAs where they say they
+work, by matching the LA names in the Charity Commission register. PCN
+footprints come from where each network's registered patients live (see
+<a href="#pcns">Primary care networks are lists of patients, not
+areas</a>).</p>
 
-<h3 id="combining">Adding up and averaging</h3>
+<h3 id="combining">Totals and averages</h3>
 
-<p>When LSOAs are combined into a ward, counts such as population and the
-claimant count are added up. Rates, percentages and scores are weighted by
-population, which means each LSOA counts in proportion to the number of people
-living there at the 2021 Census. Fuel poverty is a share of households, so it
-is weighted by the number of households instead, and so is household income,
-which is an average over households. Income deprivation affecting
-children is weighted by the children aged 0 to 15 that MHCLG counts in each
-LSOA, and income deprivation affecting older people by the people aged 60 and
-over, so each is the share of the area's children or older people.
-<span data-cen="ward-counts" hidden>Census percentages are worked out from the
+<p>When we combine LSOAs into a ward, we add together counts such as population
+and the claimant count. Rates, percentages and scores are weighted by
+population. This means that each LSOA counts in proportion to the number of
+people who lived there at the 2021 Census. Fuel poverty is a share of
+households, so it is weighted by the number of households instead. Household
+income is an average for households, so it is also weighted by households.
+Income deprivation affecting children is weighted by the number of children
+aged 0 to 15 that MHCLG counts in each LSOA. Income deprivation affecting older
+people is weighted by the number of people aged 60 and over. So each one is the
+share of the area's children or older people.
+<span data-cen="ward-counts" hidden>Census percentages are calculated from the
 counts behind them.</span><span data-cen="ward-weighted">Census percentages are
 averaged from their output areas, weighted by residents.</span> Counts of
-stations within 1 km and bus stops within 800 metres are averaged, not added,
-because one station is close to several LSOAs. Figures published for MSOAs,
-from Local Health and from ONS, reach wards through their LSOAs: each LSOA
-takes its MSOA's figure, and the ward's figure is the average of its LSOAs,
-weighted by residents, or by households for household income. For Local Health figures, a
-ward has no figure unless the LSOAs with figures hold at least four in
-five of its residents. The same rule applies to ONS's MSOA figures, counted in
-households for income. Where no LA figure is published, we work out the LA's
-figure from its wards in the same way. Fuel poverty, and the deprivation
-measures beyond the IMD's seven domains, are worked out from all of the LA's
-LSOAs instead. Household income is worked out from all of the LA's MSOAs,
-which sit wholly inside it, weighted by households. Census figures are worked
-out as explained under <a href="#census-levels">Census figures at every level</a>.</p>
+stations within 1 km and bus stops within 800 metres are averaged, not added.
+This is because one station is close to several LSOAs. Figures published for
+MSOAs, from Local Health and from ONS, reach wards through their LSOAs. Each
+LSOA takes the figure of its MSOA. The ward's figure is the average of its
+LSOAs, weighted by residents, or by households for household income. For Local
+Health figures, a ward has no figure unless the LSOAs with figures have at
+least 4 in 5 of its residents. The same rule applies to ONS's MSOA figures, but
+for income it counts households. Where no LA figure is published, we calculate
+the LA's figure from its wards in the same way. Fuel poverty is calculated from
+all of the LA's LSOAs instead. So are the deprivation measures that are not one
+of the IMD's 7 domains. Household income is calculated from all of the LA's
+MSOAs, weighted by households. Each MSOA is completely inside one LA. Census
+figures are calculated as explained in <a href="#census-levels">Census figures
+at every level</a>.</p>
 
-<p>A few figures are rates made from counts we add up ourselves. For the
-claimant rate aged 18 to 24, residents killed or seriously injured on the
-roads, and care home beds per 100 people aged 75 and over, we add up the counts
-of the LSOAs in each ward, and the people they are counted out of, before
-dividing. LA figures add up all the LSOAs in the LA in the same way. These are
-shown for wards and LAs only, because an LSOA has too few claimants,
-casualties or care homes for its own figure to mean much. The mid-year
-population estimates are added up into wards and LAs in the same way, and the
-distances to GP practices, pharmacies and dentists are averaged, weighted by
-population.</p>
+<p>We calculate a few rates ourselves from counts that we add together. These
+are the claimant rate for people aged 18 to 24, residents killed or seriously
+injured on the roads, and care home beds per 100 people aged 75 and over. For
+each ward, we add together the counts of its LSOAs. We also add together the
+numbers of people that the counts are out of, and then we divide. LA figures
+use all the LSOAs in the LA in the same way. These rates are shown for wards
+and LAs only. This is because an LSOA has too few claimants, casualties or care
+homes for its own figure to be useful. The mid-year population estimates are
+added together into wards and LAs in the same way. The distances to GP
+practices, pharmacies and dentists are averaged, weighted by population.</p>
 
-<p>The DWP benefit figures from Stat-Xplore are made the same way: DWP's counts
-for each LSOA are added up for each ward and LA, and so are the people they are
-counted out of, before dividing. Universal Credit is also shown for LSOAs,
-because its counts there are in the tens to hundreds. Personal Independence
+<p>We calculate the DWP benefit figures from Stat-Xplore in the same way. For
+each ward and LA, we add together DWP's counts for its LSOAs. We also add
+together the numbers of people that the counts are out of, and then we divide.
+Universal Credit is also shown for LSOAs, because its counts for an LSOA are
+tens or hundreds of people. Other benefits are shown for wards and LAs only,
+because their counts for an LSOA are small. These are Personal Independence
 Payment, Disability Living Allowance, Attendance Allowance, Carer's Allowance
-and Pension Credit are shown for wards and LAs only, because their counts for
-an LSOA are small. DWP rounds or adjusts small counts to protect privacy, so an
-LSOA whose count it withholds is left out with its base, and an area missing
-more than a fifth of its base has no figure. Where DWP publishes a benefit on
-the LSOAs of 2011, each count is moved onto the LSOAs of 2021 through the ONS
-lookup, a split LSOA's count shared among its parts by residents. Children in
-low income families are published by DWP for wards, and are used only where
-DWP's wards are the 2025 wards the map draws.</p>
-<p>The healthy places index (AHAH) and its drive times, and the mental health
-index (SAMHI), are averaged into wards and LAs weighted by population. Their
-deciles, and those of the risk of food insecurity (PPFI), stay with LSOAs,
-because an average of deciles is not a decile. For wards and LAs we show
-instead the share of residents who live in an LSOA in the fifth of England at
-highest risk of food insecurity. The takeaways, pubs and food hygiene ratings
-are counted for each LSOA and added up into wards and LAs before dividing,
-and a ward with fewer than 20 rated food businesses has no hygiene figure.
-The estimates of illness recorded by GPs are published for MSOAs, and reach
-wards and LAs through their LSOAs as the other MSOA figures do, weighted by
-residents.</p>
+and Pension Credit. DWP rounds or changes small counts to protect privacy. If
+DWP does not publish the count for an LSOA, we do not include that LSOA or its
+base. The base is the number of people that the count is out of. An area that
+is missing more than 20% of its base has no figure. Some benefits are published
+for the 2011 LSOAs. For these, we move each count onto the 2021 LSOAs with the
+ONS lookup. When a 2011 LSOA was split, we share its count between its parts by
+the number of residents. DWP publishes children in low income families for
+wards. We use these figures only where DWP's wards are the 2025 wards that the
+map shows.</p>
+<p>The healthy places index (AHAH) and its drive times are averaged into wards
+and LAs, weighted by population. So is the mental health index (SAMHI). Their
+deciles are for LSOAs only, because an average of deciles is not a decile. The
+same is true of the deciles of the risk of food insecurity (PPFI). For food
+insecurity in wards and LAs, we show the share of residents in the LSOAs at
+highest risk. These are the 20% of LSOAs in England with the highest risk. We
+count takeaways, pubs and food hygiene ratings for each LSOA. We add these
+counts together into wards and LAs, and then divide. A ward with fewer than 20
+rated food businesses has no hygiene figure. The estimates of illness recorded
+by GPs are published for MSOAs. Like the other MSOA figures, they reach wards
+and LAs through their LSOAs, weighted by residents.</p>
 
 <h3 id="best-fit">Best fit, not exact fit</h3>
 
-<p>The ONS lookups give each LSOA to the one ward it mostly sits in, based on
-where people live. Many LSOAs cross a ward boundary (see
-<a href="#lsoas-and-wards">LSOAs do not sit inside wards</a>). So a ward figure
-built this way is a close estimate for the ward, not an exact count. But every
-figure built from LSOAs uses the same lookup, so ward figures can still be
-fairly compared with each other. For a few wards, the LSOAs given to them hold a lot
-more or a lot fewer people than the ward itself. Where the LSOAs hold under 80%
-or over 125% of the ward's residents, the ward is marked in the Area profile
-and the ward report.</p>
+<p>The ONS lookups place each LSOA in the ward where most of its people live.
+Many LSOAs cross a ward boundary (see <a href="#lsoas-and-wards">Some LSOAs
+cross ward boundaries</a>). So a ward figure calculated in this way is a close
+estimate for the ward, not an exact count. But every figure calculated from
+LSOAs uses the same lookup, so you can still fairly compare ward figures with
+each other. For a few wards, the LSOAs placed in the ward have many more or
+many fewer people than the ward. Sometimes these LSOAs have less than 80% or
+more than 125% of the ward's residents. The Area profile and the ward report
+then mark the ward.</p>
 
-<p id="no-lsoa">A few wards, most of them in the City of London, are smaller than
-the LSOAs around them, so the lookup gives them no LSOA at all. For these we use
-output areas. Each output area sits inside one LSOA, and ONS's output area
-lookup gives each one to a ward. So we can tell which LSOA most of the ward's
-residents live in, and the ward takes that LSOA's figures as published,
-including the MSOA figures it carries. Nothing is averaged. Counts, such as the
-claimant count, are left blank for these wards, because that LSOA's counts
-already belong to the ward it is filed under. These wards are marked in the
-same way, with the LSOA their figures come from.</p>
+<p id="no-lsoa">A few wards are smaller than the LSOAs around them, so the
+lookup places no LSOA in them. Most of these wards are in the City of London.
+For these wards, we use output areas. Each output area is inside one LSOA, and
+ONS's output area lookup places each output area in a ward. So we can find the
+LSOA where most of the ward's residents live. The ward takes that LSOA's
+figures as published, including the MSOA figures that the LSOA has. Nothing is
+averaged. Counts, such as the claimant count, are blank for these wards. This
+is because that LSOA's counts already belong to the ward that the lookup places
+it in. These wards are marked in the same way, and the mark says which LSOA
+their figures come from.</p>
 
 <h3 id="census-levels">Census figures at every level</h3>
 
 <p>ONS publishes Census 2021 figures for output areas, LSOAs and MSOAs. At
-those levels the map shows ONS's own figure, so no matching is needed. For
-wards, we work out Census figures from output areas rather than LSOAs, using
-ONS's output area to ward best fit lookup. This is because output areas are
-about a fifth the size of LSOAs and follow ward boundaries much more closely.
-<span data-cen="ward-weighted">Each ward percentage is an average of the
-percentages of the output areas in the ward, weighted by their residents. So a
-measure of households, such as the share with no car or van, is weighted by
-residents too.</span><span data-cen="ward-counts" hidden>Each ward percentage is
-calculated from the summed counts of the output areas in the ward. For example,
-we take the households with no car or van in those output areas and divide by
-all their households. So a measure of households is a share of the ward's
-households, and a measure of people is a share of its residents.</span>
-<span data-cen="la-weighted">LA figures are an average of the ward figures,
-weighted by population.</span><span data-cen="la-counts" hidden>LA figures are
-calculated from the summed counts of the output areas in each LA's wards.</span></p>
+those levels, the map shows ONS's own figure, so no matching is necessary. For
+wards, we calculate Census figures from output areas, not from LSOAs. We use
+ONS's best fit lookup from output areas to wards. This is because each LSOA has
+about 5 output areas, and output areas follow ward boundaries much more
+closely. <span data-cen="ward-weighted">Each ward percentage is an average of
+the percentages of the output areas in the ward, weighted by their residents.
+So a measure of households, such as the share with no car or van, is also
+weighted by residents.</span><span data-cen="ward-counts" hidden>Each ward
+percentage is calculated from the summed counts of the output areas in the
+ward. For example, we take the households with no car or van in those output
+areas, and divide by all their households. So a measure of households is a
+share of the ward's households, and a measure of people is a share of its
+residents.</span> <span data-cen="la-weighted">LA figures are an average of the
+ward figures, weighted by
+population.</span><span data-cen="la-counts" hidden>LA figures are calculated
+from the summed counts of the output areas in each LA's wards.</span></p>
 
-<p>To see output areas, choose a Census indicator and <strong>OA</strong> on the
-level switch. Their borders appear as you zoom in. An output area holds about
-125 households, so a single household can change a percentage quite a lot.
-These figures are best read as a picture of a street or estate, not an exact
-measure.</p>
+<p>To see output areas, choose a Census indicator, and then choose
+<strong>OA</strong> (output area) on the level switch. The borders of output
+areas appear when you zoom in. An output area has about 125 households, so a
+single household can change a percentage by a large amount. Use these figures
+as a picture of a street or estate, not as an exact measure.</p>
 
 <h3 id="msoas">MSOAs</h3>
 
 <p>MSOAs have their own place on the level switch. An MSOA is made of whole
 LSOAs. But many LSOAs cross a ward boundary (see
-<a href="#lsoas-and-wards">LSOAs do not sit inside wards</a>), so MSOAs and
-wards do not fit inside one another. Where an MSOA edge matches a ward edge, it
-is by chance. Local Health figures are published for MSOAs, and so are ONS's
-household income estimates and its healthy and disability-free life
-expectancy. All of them reach wards through the LSOAs the two share.</p>
+<a href="#lsoas-and-wards">Some LSOAs cross ward boundaries</a>). So an MSOA is
+not always inside one ward, and a ward is not always inside one MSOA. Where an
+MSOA edge matches a ward edge, this is by chance. Local Health figures are
+published for MSOAs. So are ONS's household income estimates, and its healthy
+life expectancy and disability-free life expectancy. All of these figures reach
+wards through the LSOAs that the MSOA and the ward share.</p>
 
 <h3 id="estimated">Figures estimated from 2011 areas are marked</h3>
 
-<p>Some Local Health figures are still published for the 2011 MSOAs. Where a
-2011 area was split or merged to make a 2021 area, the figure for the 2021 area
-is worked out from the 2011 ones, weighted by how many people lived in each.
-The map then shows <em>Estimated from 2011 areas</em> next to it. It does not
-compare the figure with England, because the publisher's comparison was for the
-old area. At the moment, OHID publishes no figure at all for the areas that
-changed. So those areas are left blank, and nothing on the map is estimated in
-this way.</p>
+<p>Some Local Health figures are published for the 2011 MSOAs. Some 2011 areas
+were split or joined together to make 2021 areas. For these, we calculate the
+figure for the 2021 area from the 2011 areas, weighted by how many people lived
+in each. The map then shows <em>Estimated from 2011 areas</em> next to the
+figure. It does not compare the figure with England, because the publisher's
+comparison was for the old area. But OHID publishes no figure for the areas
+that changed. So those areas are blank, and no figure on the map is estimated
+in this way.</p>
 
 <h3 id="la-codes">LA codes are checked at every update</h3>
 
-<p>Each LA has an official code. At every update we check that each LA on the
-map was found under its current code in the publisher's figures. Without this,
-an LA that had merged or changed its code since the figures were published
-could go missing without anyone noticing. Any LA that does not match is
-flagged so that we can put it right.</p>
+<p>Each LA has an official code. At every update, we check that we found each
+LA on the map under its current code in the publisher's figures. Without this
+check, an LA could be missing and nobody would notice. This could happen if the
+LA joined with another LA, or changed its code, after the figures were
+published. If an LA does not match, we mark it so that we can correct it.</p>
 
 <h2 id="gaps">Known gaps</h2>
 
 <h3 id="gap-city">City of London</h3>
 
-<p>The City of London has 25 wards, but its few LSOAs are each matched to just
-five of them. So the other 20 wards have no deprivation score, no Local Health
-figures and none of the other figures built from LSOAs. Census figures are
-worked out from output areas instead, so some of those 20 wards do have them.
-This comes from the way the areas are drawn, not from a missed update. Choose
-<strong>LA</strong> to see the figures for the City as a whole.</p>
+<p>The City of London has 25 wards, but the lookup places its few LSOAs in only
+5 of these wards. So the other 20 wards have no deprivation score, no Local
+Health figures and none of the other figures calculated from LSOAs. Census
+figures are calculated from output areas instead, so some of those 20 wards do
+have Census figures. This is because of the way that the areas are drawn. It is
+not because we missed an update. Choose <strong>LA</strong> to see the figures
+for the whole City of London.</p>
 
 <h3 id="gap-2011-msoas">MSOAs redrawn in 2021</h3>
 
 <p>The older Local Health figures, such as hospital admissions for 2016/17 to
-2020/21, are published for the 2011 MSOAs. OHID leaves out the MSOAs whose
-boundaries changed in 2021. That is about 2% of England's MSOAs and 39 of
-London's. These areas are blank for those figures rather than estimated. The
-map's notice and the area's hover card give this as the reason, not
-privacy.</p>
+2020/21, are published for the 2011 MSOAs. OHID does not publish these figures
+for the MSOAs whose boundaries changed in 2021. These are about 2% of England's
+MSOAs, and 39 of London's MSOAs. For those figures, these areas are blank, not
+estimated. The map's notice and the area's hover card say that the figure is
+missing because the boundaries changed, not for privacy.</p>
 
 <p>The newer figures, such as deaths and life expectancy for 2019 to 2023, are
-published for the 2021 MSOAs, so boundary changes leave no gaps in them. OHID
-still holds back some MSOA figures where the numbers are small, for example
-men's life expectancy for 52 of London's MSOAs. Where that leaves a ward with
-figures for fewer than four in five of its residents, we show no figure for the
-ward (see <a href="#missing">Missing is not zero</a>). When a ward figure covers
-most but not all of its residents, it says what share it covers.</p>
+published for the 2021 MSOAs. So boundary changes cause no gaps in them. But
+OHID does not publish some MSOA figures, because the numbers are too small. For
+example, it does not publish men's life expectancy for 52 of London's MSOAs. If
+a ward then has figures for fewer than 4 in 5 of its residents, we show no
+figure for the ward (see <a href="#missing">Missing is not zero</a>). When a
+ward figure covers most of its residents but not all, it says what share it
+covers.</p>
 
-<h3 id="gap-charities">Charities are listed region by region</h3>
+<h3 id="gap-charities">Charities are shown for one region at a time</h3>
 
 <p>The charities directory is not part of the England view. Open a region to
 see it.</p>
@@ -924,21 +997,22 @@ see it.</p>
 <h3 id="gap-pcn">PCN catchments are not always available</h3>
 
 <p>The figures for where each network's patients live come from an NHS Digital
-file. It cannot be downloaded automatically, so we add it by hand at each
-update. Until the latest file has been added, a network shows its practices but
-no catchment.</p>
+file. We cannot download this file automatically, so we add it by hand at each
+update. Before we add the latest file, a network shows its practices but no
+catchment.</p>
 
 <h3 id="gap-benefits">Benefits other than the claimant count</h3>
 
-<p>Current figures for Universal Credit, Personal Independence Payment,
-Disability Living Allowance, Attendance Allowance, Carer's Allowance, Pension
-Credit and children in low income families by small area are published only
-through DWP's Stat-Xplore service, which needs an account key. Nomis has either
-never carried them or stops in 2018 on older boundaries. The map reads them
-from Stat-Xplore once its key has been set up, and until a data refresh has
-brought them in they are left out of every list. Employment and Support Allowance
-is not included. The claimant count, which covers people claiming benefits
-because they are unemployed, is included.</p>
+<p>DWP publishes current figures for small areas for several benefits, and for
+children in low income families. The benefits are Universal Credit, Personal
+Independence Payment, Disability Living Allowance, Attendance Allowance,
+Carer's Allowance and Pension Credit. DWP publishes these figures only through
+its Stat-Xplore service, which needs an account key. Nomis does not have these
+figures, or its figures stop in 2018 and use older boundaries. The map gets
+these figures from Stat-Xplore with an account key. If no update has got them
+yet, they are not in any list. Employment and Support Allowance is not
+included. The claimant count, which counts people who claim benefits because
+they are unemployed, is included.</p>
 
 <h2 id="appendix">Technical appendix</h2>
 
@@ -955,19 +1029,21 @@ above, for anyone who wants to check it or repeat it.</p>
   <tbody>
     <tr><td class="term">Small areas to wards and LAs</td>
         <td><code>LSOA21_WD25_LAD25_EW_LU_v2</code> (May 2025 boundaries)</td>
-        <td>Every ward and LA figure that is built up from LSOAs. Each whole
-            LSOA goes to the ward where most of its residents live, and is never
-            split.</td></tr>
+        <td>Every ward and LA figure that we calculate from LSOAs. Each whole
+            LSOA goes to the ward where most of its residents live. We never
+            split an LSOA.</td></tr>
     <tr><td class="term">Output areas to wards</td>
         <td><code>OA21_WD25_LAD25_EW_LU</code> (May 2025 boundaries), in its
             <code>_v2</code> edition where ONS offers it</td>
-        <td>Census ward figures, built from output areas because they follow
-            ward boundaries far more closely than LSOAs. If this lookup cannot
-            be reached during an update, or its wards do not match the wards of
-            the LSOA lookup above, the LSOA lookup is used instead. With each
-            output area's LSOA, from the output area boundary file, it also
-            finds the LSOA most residents of a ward live in, for a ward the
-            LSOA lookup gives none (<a href="#no-lsoa">see above</a>).</td></tr>
+        <td>Census ward figures. We calculate these from output areas, because
+            output areas follow ward boundaries much more closely than LSOAs.
+            If we cannot get this lookup during an update, we use the LSOA
+            lookup above instead. We also do this if the wards of this lookup
+            do not match the wards of the LSOA lookup. Some wards get no LSOA
+            from the LSOA lookup. For these wards, this lookup also finds the
+            LSOA where most of the ward's residents live
+            (<a href="#no-lsoa">see above</a>). It uses the LSOA of each output
+            area, from the output area boundary file.</td></tr>
     <tr><td class="term">LSOAs to MSOAs</td>
         <td><code>OA21_LAD23_LSOA21_MSOA21_LEP23_EN_LU</code></td>
         <td>Placing each LSOA in its MSOA, so that MSOA figures can reach wards
@@ -976,43 +1052,47 @@ above, for anyone who wants to check it or repeat it.</p>
     <tr><td class="term">2011 LSOAs to 2021 LSOAs</td>
         <td><code>LSOA11_LSOA21_LAD22_EW_LU</code></td>
         <td>Figures published for the 2011 LSOAs, such as the mental health
-            index (SAMHI). An LSOA that is
-            unchanged, or was split from a 2011 LSOA, takes that LSOA's figure.
-            One that was merged or redrawn takes the plain average of the 2011
-            LSOAs it came from, because the lookup has no weights.</td></tr>
+            index (SAMHI). An LSOA that did not change, or was split from a
+            2011 LSOA, takes the figure of that 2011 LSOA. An LSOA that was
+            made by joining 2011 LSOAs, or was redrawn, takes the simple
+            average of the 2011 LSOAs it came from. This is because the lookup
+            does not say how many people came from each 2011 LSOA.</td></tr>
     <tr><td class="term">2011 MSOAs to 2021 MSOAs</td>
         <td><code>MSOA11_MSOA21_LAD22_EW_LU_v2</code>, weighted by the 2011
             Census population of each area (Nomis <code>KS101EW</code>)</td>
-        <td>Local Health figures still published for 2011 areas. A split area
-            takes its parent's figure. A merged or redrawn one takes its
-            parents' figures, each weighted by that parent's whole 2011
-            population. If the 2011 populations cannot be loaded, the parents
-            count equally.</td></tr>
+        <td>Local Health figures published for 2011 areas. An area that was
+            split takes the figure of the 2011 area it came from (its parent).
+            An area that was made by joining areas, or was redrawn, takes the
+            average of its parents' figures. Each parent is weighted by its
+            whole 2011 population. If we cannot get the 2011 populations, the
+            parents count equally.</td></tr>
     <tr><td class="term">Places with an address or a location</td>
         <td>ONS Postcode Directory, through postcodes.io, or the publisher's own
             map position</td>
-        <td>GP practices, pharmacies, dentists, hospitals and charities take the
-            ward and LSOA that the ONS Postcode Directory gives their postcode.
-            A postcode no longer in use is placed by its last known position.
-            Crimes are placed in the ward and LSOA whose boundary contains the
-            map position police.uk gives them. About 1 in 10 crimes and
-            practices sit in a different ward from the one their LSOA is given
-            to, so these counts follow where things really are.</td></tr>
+        <td>GP practices, pharmacies, dentists, hospitals and charities take
+            the ward and LSOA that the ONS Postcode Directory gives their
+            postcode. A postcode that is no longer used is placed by its last
+            known position. Crimes are placed in the ward and LSOA whose
+            boundary contains the map position police.uk gives them. About 1 in
+            10 crimes and practices are in a different ward from the ward that
+            their LSOA belongs to. So these counts follow where things really
+            are.</td></tr>
     <tr><td class="term">Grids, stops and areas served</td>
         <td>Defra's 1 km grid, the register of stops and stations, and the
             Charity Commission register</td>
-        <td>Each LSOA takes the average of the air pollution grid squares it
-            covers, weighted by the area of each square inside it. Distances to
-            stations and bus stops are measured in a straight line from the
+        <td>Each LSOA takes the average of the air pollution grid squares that
+            it covers, weighted by the area of each square inside it. Distances
+            to stations and bus stops are measured in a straight line from the
             middle of each LSOA. Charities are linked to the LAs whose names
-            appear in the areas they say they work in.</td></tr>
+            are in the list of areas where they say they work.</td></tr>
     <tr><td class="term">LA codes</td>
         <td>Current ONS LA codes (May 2025), checked against the codes each
             publisher uses</td>
-        <td>LA figures, such as those from OHID's main profiles. Any LA that
-            does not match is flagged. Two councils whose codes changed in
-            2024, Barnsley and Sheffield, are matched by hand to their old
-            codes, which we looked up in the ONS Code History Database.</td></tr>
+        <td>LA figures, such as those from OHID's main profiles. We mark any LA
+            that does not match. The codes of 2 councils, Barnsley and
+            Sheffield, changed in 2024. These councils are matched by hand to
+            their old codes, which we found in the ONS Code History
+            Database.</td></tr>
   </tbody>
 </table>
 </div>
@@ -1036,11 +1116,11 @@ above, for anyone who wants to check it or repeat it.</p>
 </div>
 
 <p>Every boundary is the BGC version, which ONS simplifies to 20 metres and
-cuts off at the coastline. Using the same version at every level keeps shared
-borders in the same place. So an LSOA edge lines up with a ward edge wherever
+cuts at the coastline. We use the same version at every level, so that shared
+borders stay in the same place. So an LSOA edge matches a ward edge wherever
 the two follow the same line. Coordinates in the map's boundary files are
-rounded to five decimal places, which moves no point by more than about two
-thirds of a metre.</p>
+rounded to 5 decimal places. This moves each point by about 67 centimetres or
+less.</p>
 
 <h3 id="source-codes">Publisher codes</h3>
 
@@ -1053,7 +1133,7 @@ thirds of a metre.</p>
     <tr><td class="term">Census 2021</td><td>Nomis bulk downloads of the Census 2021 topic summary tables, for output areas, LSOAs and MSOAs: <code>TS001</code>, <code>TS003</code>, <code>TS004</code>, <code>TS007</code>, <code>TS007A</code>, <code>TS011</code>, <code>TS021</code>, <code>TS025</code>, <code>TS029</code>, <code>TS037</code>, <code>TS038</code>, <code>TS039</code>, <code>TS045</code>, <code>TS052</code>, <code>TS054</code>, <code>TS061</code>, <code>TS062</code>, <code>TS066</code> and <code>TS067</code></td></tr>
     <tr><td class="term">Claimant count</td><td>Nomis <code>CLA01</code> (Universal Credit and Jobseeker's Allowance claimants)</td></tr>
     <tr><td class="term">Index of Multiple Deprivation</td><td>File 7 of the English Indices of Deprivation 2025 (scores, ranks, deciles and population denominators)</td></tr>
-    <tr><td class="term">OHID main profiles</td><td>Fingertips area type <code>501</code> (districts and unitary authorities) first, then <code>502</code> (upper-tier LAs). Where neither has a figure under the LA's code, its old code is tried, and then its county's figure, labelled as the county's, through Fingertips' county to district lookup</td></tr>
+    <tr><td class="term">OHID main profiles</td><td>Fingertips area type <code>501</code> (districts and unitary authorities) first, then <code>502</code> (upper-tier LAs). If neither has a figure under the LA's code, we try its old code. Then we use its county's figure, labelled as the county's, through Fingertips' county to district lookup</td></tr>
     <tr><td class="term">GP practices</td><td>NHS Organisation Data Service <code>epraccur</code></td></tr>
     <tr><td class="term">Pharmacies</td><td>NHS Organisation Data Service <code>edispensary</code></td></tr>
     <tr><td class="term">Dental practices</td><td>NHS Organisation Data Service <code>egdpprac</code></td></tr>
@@ -1064,16 +1144,16 @@ thirds of a metre.</p>
 <h2 id="licences">Licences and credits</h2>
 
 <div class="credits">
-<p>Unless noted otherwise, the figures are published under the Open Government
-Licence v3.0 and contain public sector information licensed under it. Postcodes
-are looked up through <a href="https://postcodes.io">postcodes.io</a>, which
-uses ONS and Ordnance Survey data. When you type a postcode into the map's
-search box, it is looked up on postcodes.io at that moment, and only the
-postcode is sent. The background map is CARTO, built from OpenStreetMap. If
-CARTO's map cannot be loaded, Esri's World Light Gray canvas is used instead.
-The Satellite background is Esri's World Imagery, from Esri, Maxar, Earthstar
+<p>Unless this page says otherwise, the figures are published under the Open
+Government Licence v3.0, and contain public sector information licensed under
+it. We find postcodes with <a href="https://postcodes.io">postcodes.io</a>,
+which uses ONS and Ordnance Survey data. When you type a postcode into the
+search box of the map, the map sends only the postcode to postcodes.io at that
+moment. The background map is CARTO, made from OpenStreetMap. If CARTO's map
+cannot be shown, the map uses Esri's World Light Gray canvas instead. The
+Satellite background is Esri's World Imagery, from Esri, Maxar, Earthstar
 Geographics and the GIS User Community. Esri's place names and boundaries are
-drawn over it, and these contain data from Esri, HERE, Garmin, OpenStreetMap
+drawn on top of it. These contain data from Esri, HERE, Garmin, OpenStreetMap
 contributors and the GIS user community. The Esri layers are powered by
 <a href="https://www.esri.com">Esri</a>.</p>
 
@@ -1163,34 +1243,35 @@ var SOURCES = [
   { id: 'census',
     name: 'Census 2021',
     pub: 'ONS, through Nomis',
-    what: 'Health, disability, unpaid care, age, ethnicity, language and spoken English, ' +
-          'who people live with, tenure, overcrowding, household deprivation, qualifications, ' +
-          'work, occupation and travel to work.',
+    what: 'Health, disability, unpaid care, age, ethnicity, language and spoken English, who ' +
+          'people live with, tenure (whether people own or rent their home), overcrowding, ' +
+          'household deprivation, qualifications, work, occupation and travel to work.',
     // Set again by censusMethod below from what the latest data build says.
     geo: 'Output area, LSOA and MSOA, as ONS publishes them, and averaged here, weighted by population, into wards and LAs',
     period: 'Census day, 21 March 2021',
-    cadence: 'Once every ten years, with the next in 2031.',
+    cadence: 'Once every 10 years. The next Census is in 2031.',
     manifest: 'census' },
 
   { id: 'imd',
     name: 'Index of Multiple Deprivation 2025',
     pub: 'MHCLG',
-    what: 'The overall deprivation score and decile, and the seven domain scores: income, ' +
-          'employment, education, health, crime, barriers to housing and services, and living environment.',
+    what: 'The overall deprivation score and decile, and the 7 domain scores: income, employment, ' +
+          'education, health, crime, barriers to housing and services, and living environment.',
     geo: 'LSOA',
     period: 'Mostly 2022 to 2023, published in 2025',
-    cadence: 'No fixed timetable, with earlier editions in 2010, 2015 and 2019.',
+    cadence: 'No fixed timetable. Earlier editions were in 2010, 2015 and 2019.',
     manifest: 'imd' },
 
   { id: 'iod-extra',
     name: 'Income deprivation of children and older people, and the sub-domains',
     pub: 'MHCLG, English Indices of Deprivation 2025',
-    what: 'Income deprivation affecting children (IDACI) and older people (IDAOPI), each as a share, ' +
-          'a decile and a rank, and the six sub-domain scores: children and young people, adult skills, ' +
-          'geographical barriers, wider barriers, and the indoor and outdoor living environment.',
-    geo: 'LSOA, combined into wards and LAs. IDACI is weighted by children aged 0 to 15 and IDAOPI by ' +
-         'people aged 60 and over, as MHCLG counts them, and the sub-domains by residents. Deciles and ' +
-         'ranks are for LSOAs only',
+    what: 'Income deprivation affecting children (IDACI) and older people (IDAOPI), each as a ' +
+          'share, a decile and a rank. Also the 6 sub-domain scores: children and young people, ' +
+          'adult skills, geographical barriers, wider barriers, and the indoor and outdoor living ' +
+          'environment.',
+    geo: 'LSOA, combined into wards and LAs. IDACI is weighted by the children aged 0 to 15 that ' +
+         'MHCLG counts. IDAOPI is weighted by the people aged 60 and over that MHCLG counts. The ' +
+         'sub-domains are weighted by residents. Deciles and ranks are for LSOAs only',
     period: 'Mostly 2022 to 2023, published in 2025',
     cadence: 'With each edition of the IMD.',
     manifest: 'iod_extra' },
@@ -1198,12 +1279,14 @@ var SOURCES = [
   { id: 'iod-indicators',
     name: 'Measures behind the deprivation index',
     pub: 'MHCLG, English Indices of Deprivation 2025',
-    what: 'The indicators the health, education and living environment domains are built from: years of ' +
-          'life lost to early deaths, the illness and disability ratio, emergency admissions, mood and ' +
-          'anxiety disorders, Key Stage 2 and 4 results, staying on after 16, entry to higher education, ' +
-          'adults with no or low qualifications or little English, housing in poor condition, homes ' +
-          'without central heating, air quality and road traffic accidents. Any that the 2025 edition ' +
-          'does not publish is left off the map.',
+    what: 'The indicators that MHCLG uses to make the health, education and living environment ' +
+          'domains. For health, these are years of life lost to early deaths, the illness and ' +
+          'disability ratio, emergency admissions, and mood and anxiety disorders. For education, ' +
+          'they are Key Stage 2 and 4 results, staying in education after age 16, entry to higher ' +
+          'education, and adults with no or low qualifications or little English. For living ' +
+          'environment, they are housing in poor condition, homes without central heating, air ' +
+          'quality and road traffic accidents. If the 2025 edition does not publish one of these, ' +
+          'it is not on the map.',
     geo: 'LSOA, combined into wards and LAs weighted by residents',
     period: 'Differs by indicator, published in 2025',
     cadence: 'With each edition of the IMD.',
@@ -1223,10 +1306,11 @@ var SOURCES = [
   { id: 'fingertips-profiles',
     name: 'Fingertips: the other profiles',
     pub: 'OHID',
-    what: 'The rest of the Fingertips library that is published for LAs: the Public Health ' +
-          'Outcomes Framework, mortality, cardiovascular disease, diabetes, respiratory ' +
-          'disease, mental health, alcohol, smoking, sexual and reproductive health, child ' +
-          'and maternal health, and the wider determinants of health.',
+    what: 'The rest of the Fingertips library that is published for LAs. It includes the Public ' +
+          'Health Outcomes Framework, and the profiles for mortality, cardiovascular disease, ' +
+          'diabetes, respiratory disease, mental health, alcohol and smoking. It also includes ' +
+          'sexual and reproductive health, child and maternal health, and the wider determinants ' +
+          'of health (things such as housing, work and income that affect health).',
     geo: 'Upper-tier LA, so a district inside a county takes the county\'s figure',
     period: 'The latest published period, which differs from one indicator to the next',
     cadence: 'Differs by indicator, and most are yearly.',
@@ -1239,54 +1323,57 @@ var SOURCES = [
           'admissions, injuries, deaths, life expectancy, unemployment benefit claims and ' +
           'fuel poverty.',
     geo: 'MSOA',
-    period: 'Differs by indicator and is shown beside each legend. At the last update the ' +
-            'hospital admissions covered 2016/17 to 2020/21, and deaths and life ' +
-            'expectancy 2019 to 2023.',
+    period: 'Differs by indicator, and is shown beside each legend. At the last update, the ' +
+            'hospital admissions figures were for 2016/17 to 2020/21. The deaths and life ' +
+            'expectancy figures were for 2019 to 2023.',
     cadence: 'Differs by indicator, and most are yearly.',
     manifest: 'fingertips_msoa' },
 
   { id: 'local-health-extra',
     name: 'Fingertips: Local Health, birth weight and cancer',
     pub: 'OHID',
-    what: 'Low birth weight of live babies, and new cases of cancer (all cancers, breast, ' +
-          'bowel, lung and prostate) compared with England. Each one is shown only where ' +
-          'OHID publishes figures for at least half of a region\'s MSOAs, with ranges narrow ' +
-          'enough to tell areas apart, so a series that is mostly withheld is left off the map.',
+    what: 'Low birth weight of live babies, and new cases of cancer (all cancers, breast, bowel, ' +
+          'lung and prostate) compared with England. The map shows each one only if OHID ' +
+          'publishes figures for at least half of a region\'s MSOAs. The ranges must also be ' +
+          'narrow enough to show differences between areas. So an indicator that OHID mostly does ' +
+          'not publish is not on the map.',
     geo: 'MSOA, combined into wards weighted by residents. LA figures are OHID\'s own where it publishes them',
-    period: 'Differs by indicator and is shown beside each legend. Low birth weight combines ' +
-            'the five years 2018 to 2022.',
+    period: 'Differs by indicator, and is shown beside each legend. Low birth weight combines the ' +
+            '5 years 2018 to 2022.',
     cadence: 'Differs by indicator, and most are yearly.',
     manifest: 'fingertips_msoa_extra' },
 
   { id: 'saie',
     name: 'Income estimates for small areas',
     pub: 'ONS',
-    what: 'The average (mean) yearly income of households: total income before tax, and ' +
-          'income after tax before and after housing costs, adjusted for household size. ' +
-          'These are modelled estimates, each with a 95% confidence interval.',
+    what: 'The average (mean) yearly income of households. This is total income before tax, and ' +
+          'income after tax, both before and after housing costs. Income after tax is adjusted ' +
+          'for the size of the household. These are modelled estimates, each with a 95% ' +
+          'confidence interval.',
     geo: 'MSOA, combined into wards and LAs weighted by households',
     period: 'Financial year ending 2023 (April 2022 to March 2023)',
-    cadence: 'Every few years, with no date yet for the next edition.',
+    cadence: 'Every few years. There is no date for the next edition yet.',
     manifest: 'saie' },
 
   { id: 'hle-msoa',
     name: 'Healthy and disability-free life expectancy for small areas',
     pub: 'ONS',
     what: 'Healthy life expectancy and disability-free life expectancy at birth, for women and ' +
-          'men, from deaths and from the health questions of the 2021 Census. Each is an ' +
-          'estimate with a 95% confidence interval. ONS says these should not be compared ' +
-          'with its survey-based figures for LAs or its earlier MSOA estimates.',
+          'men. ONS calculates them from deaths and from the health questions of the 2021 Census. ' +
+          'Each is an estimate with a 95% confidence interval. ONS says that you should not ' +
+          'compare these figures with its survey figures for LAs, or with its earlier MSOA ' +
+          'estimates.',
     geo: 'MSOA, combined into wards weighted by residents. LA figures are ONS\'s own where the ' +
          'release has them, and otherwise our estimates from wards',
     period: '2019 to 2023',
-    cadence: 'After each census.',
+    cadence: 'After each Census.',
     manifest: 'hle_msoa' },
 
   { id: 'qof',
     name: 'Quality and Outcomes Framework',
     pub: 'NHS England',
-    what: 'Recorded prevalence from GP registers: hypertension, depression and ' +
-          'severe mental illness.',
+    what: 'The share of patients recorded with high blood pressure (hypertension), depression or ' +
+          'severe mental illness on GP registers.',
     geo: 'GP practice, combined by OHID into upper-tier LAs',
     period: 'The latest published year',
     cadence: 'Yearly.',
@@ -1295,13 +1382,14 @@ var SOURCES = [
   { id: 'crime',
     name: 'Street crime',
     pub: 'Police forces in England and Wales, through data.police.uk',
-    what: 'Every recorded street crime, counted into 11 types and a total. ' +
-          'The total and the crime rate leave out anti-social behaviour. It is not a crime, ' +
-          'police forces record it in different ways, and it has its own indicator.',
-    geo: 'Places moved by the publisher to nearby points on the map, so no one can be ' +
-         'identified, then counted here into wards and, from the next data refresh, LSOAs',
+    what: 'Every recorded street crime, counted in 11 types and a total. The total and the crime ' +
+          'rate do not include anti-social behaviour. This is because it is not a crime, and ' +
+          'police forces record it in different ways. Anti-social behaviour has its own ' +
+          'indicator.',
+    geo: 'The publisher moves each crime to a nearby point on the map, so that no one can be ' +
+         'identified. We then count the crimes in wards, and in LSOAs from the next data update',
     period: 'The 12 months to the latest release',
-    cadence: 'Monthly, about two months behind.',
+    cadence: 'Monthly. Each release is about 2 months after the month it describes.',
     manifest: 'crime' },
 
   { id: 'claimant',
@@ -1317,10 +1405,10 @@ var SOURCES = [
   { id: 'claimant-youth',
     name: 'Claimant count aged 18 to 24',
     pub: 'DWP and ONS, through Nomis, with ONS mid-year population estimates',
-    what: 'People aged 18 to 24 claiming benefits because they are unemployed, as a rate of ' +
-          'everyone aged 18 to 24. ONS rounds each LSOA\'s count to the nearest 5, so it is ' +
-          'shown for wards and LAs only, adding up the LSOAs\' claimants and people of that age ' +
-          'before dividing.',
+    what: 'People aged 18 to 24 who claim benefits because they are unemployed, as a rate of ' +
+          'everyone aged 18 to 24. ONS rounds each LSOA\'s count to the nearest 5, so the map ' +
+          'shows this rate for wards and LAs only. We add together the claimants and the people ' +
+          'aged 18 to 24 in the LSOAs of each ward or LA, and then divide.',
     geo: 'LSOA counts, added up into wards and LAs',
     period: 'The latest month published',
     ind: 'claimant_18_24_pct',
@@ -1330,11 +1418,12 @@ var SOURCES = [
   { id: 'sape',
     name: 'Mid-year population estimates',
     pub: 'ONS',
-    what: 'How many people of each age live in each LSOA, estimated for the middle of a ' +
-          'recent year by rolling the Census forward with births, deaths and people moving. ' +
-          'They are the base of the claimant rate for 18 to 24 year olds and of care home ' +
-          'beds for people aged 75 and over. The map shows ages from the Census, which ONS ' +
-          'publishes down to output areas.',
+    what: 'How many people of each age live in each LSOA, estimated for the middle of a recent ' +
+          'year. ONS starts from the Census, adds births, takes away deaths and allows for people ' +
+          'who move. These estimates are the base (the number of people) for 2 rates. These are ' +
+          'the claimant rate for people aged 18 to 24, and care home beds for people aged 75 and ' +
+          'over. The age figures on the map come from the Census, which ONS publishes for areas ' +
+          'as small as output areas.',
     geo: 'LSOA, added up into wards and LAs',
     period: 'The latest year published, mid-2024 at the last check',
     cadence: 'Yearly, more than a year after the date they describe.',
@@ -1343,12 +1432,13 @@ var SOURCES = [
   { id: 'road-casualties',
     name: 'Road casualties',
     pub: 'Police forces, through DfT\'s road casualty statistics (STATS19)',
-    what: 'Residents killed or seriously injured in road collisions reported to the police over ' +
-          'five years, wherever in Great Britain the collision happened, per 1,000 residents at ' +
-          'the 2021 Census. Serious injuries use DfT\'s adjusted figures, because police forces ' +
-          'record injuries differently. Many slight injuries are never reported, so they are not counted.',
+    what: 'Residents killed or seriously injured in road collisions reported to the police over 5 ' +
+          'years, per 1,000 residents at the 2021 Census. A collision anywhere in Great Britain ' +
+          'counts. Serious injuries use DfT\'s adjusted figures, because police forces record ' +
+          'injuries in different ways. Many slight injuries are never reported, so they are not ' +
+          'counted.',
     geo: 'Each casualty\'s home LSOA, added up into wards and LAs',
-    period: 'The latest five years published',
+    period: 'The latest 5 years published',
     ind: 'road_ksi_per_1000',
     cadence: 'Yearly, each September.',
     manifest: 'road_casualties' },
@@ -1359,38 +1449,41 @@ var SOURCES = [
   { id: 'dwp-uc-people',
     name: 'People on Universal Credit',
     pub: 'DWP, through Stat-Xplore, with ONS mid-year population estimates',
-    what: 'People on Universal Credit, in or out of work, as a share of residents aged 16 to 64. ' +
-          'DWP rounds or adjusts small counts, so small areas are approximate.',
+    what: 'People on Universal Credit, in work or out of work, as a share of residents aged 16 to ' +
+          '64. DWP rounds or changes small counts, so figures for small areas are approximate.',
     geo: 'LSOA, built by DWP from the output areas of 2021, and added up into wards and LAs',
     period: 'The latest month published',
     ind: 'dwp_uc_people_pct',
-    cadence: 'Every three months, with a figure for each month.',
+    cadence: 'Every 3 months, with a figure for each month.',
     manifest: 'dwp_uc_people',
     skipped: 'Waiting for a Stat-Xplore key' },
 
   { id: 'dwp-uc-households',
     name: 'Households on Universal Credit',
     pub: 'DWP, through Stat-Xplore, with households from the 2021 Census',
-    what: 'Households on Universal Credit as a share of all households; those with limited ' +
-          'capability for work, for a month a year before the latest because assessments are ' +
-          'backdated; and the share of them with children. DWP rounds or adjusts small counts.',
+    what: 'Households on Universal Credit as a share of all households. Also the households with ' +
+          'limited capability for work, for the month 1 year before the latest month. This is ' +
+          'because assessments are backdated (they apply from an earlier date). Also the share of ' +
+          'households on Universal Credit that have children. DWP rounds or changes small counts.',
     geo: 'LSOA, built by DWP from the output areas of 2021, and added up into wards and LAs',
     period: 'The latest quarter published',
     ind: 'dwp_uc_hh_pct',
-    cadence: 'Every three months, for February, May, August and November.',
+    cadence: 'Every 3 months, for February, May, August and November.',
     manifest: 'dwp_uc_households',
     skipped: 'Waiting for a Stat-Xplore key' },
 
   { id: 'dwp-pip',
     name: 'Personal Independence Payment',
     pub: 'DWP, through Stat-Xplore, with ONS mid-year population estimates',
-    what: 'People entitled to Personal Independence Payment as a share of residents aged 16 and ' +
-          'over, in all and for the three main conditions: psychiatric, musculoskeletal and ' +
-          'neurological. Shown for wards and LAs only, because LSOA counts are small and rounded.',
+    what: 'People entitled to Personal Independence Payment, as a share of residents aged 16 and ' +
+          'over. There is a figure for all conditions. There is also a figure for each of the 3 ' +
+          'main conditions: psychiatric (mental health), musculoskeletal (muscles, bones and ' +
+          'joints) and neurological (brain and nerves). Shown for wards and LAs only, because ' +
+          'LSOA counts are small and rounded.',
     geo: 'LSOA counts, added up into wards and LAs',
     period: 'The latest quarter published',
     ind: 'dwp_pip_pct',
-    cadence: 'Every three months.',
+    cadence: 'Every 3 months.',
     manifest: 'dwp_pip',
     skipped: 'Waiting for a Stat-Xplore key' },
 
@@ -1402,7 +1495,7 @@ var SOURCES = [
     geo: 'LSOA counts, added up into wards and LAs',
     period: 'March of the latest year published',
     ind: 'dwp_dla_child_pct',
-    cadence: 'Once a year since 2026.',
+    cadence: 'Once a year.',
     manifest: 'dwp_dla_children',
     skipped: 'Waiting for a Stat-Xplore key' },
 
@@ -1411,10 +1504,10 @@ var SOURCES = [
     pub: 'DWP, through Stat-Xplore, with ONS mid-year population estimates',
     what: 'People entitled to Attendance Allowance as a share of residents aged 66 and over. ' +
           'Shown for wards and LAs only, because LSOA counts are small and rounded.',
-    geo: 'LSOA counts, moved onto the LSOAs of 2021 where DWP uses those of 2011, and added up into wards and LAs',
+    geo: 'LSOA counts, added up into wards and LAs. Where DWP uses the 2011 LSOAs, we first move the counts onto the 2021 LSOAs',
     period: 'March of the latest year published',
     ind: 'dwp_aa_pct',
-    cadence: 'Once a year since 2026.',
+    cadence: 'Once a year.',
     manifest: 'dwp_attendance_allowance',
     skipped: 'Waiting for a Stat-Xplore key' },
 
@@ -1426,7 +1519,7 @@ var SOURCES = [
     geo: 'LSOA counts, added up into wards and LAs',
     period: 'March of the latest year published',
     ind: 'dwp_carers_pct',
-    cadence: 'Once a year since 2026.',
+    cadence: 'Once a year.',
     manifest: 'dwp_carers_allowance',
     skipped: 'Waiting for a Stat-Xplore key' },
 
@@ -1438,7 +1531,7 @@ var SOURCES = [
     geo: 'LSOA counts, added up into wards and LAs',
     period: 'March of the latest year published',
     ind: 'dwp_pension_credit_per_100',
-    cadence: 'Once a year since 2026.',
+    cadence: 'Once a year.',
     manifest: 'dwp_pension_credit',
     skipped: 'Waiting for a Stat-Xplore key' },
 
@@ -1446,8 +1539,8 @@ var SOURCES = [
     name: 'Children in low income families',
     pub: 'DWP and HM Revenue and Customs, through Stat-Xplore, with ONS mid-year population estimates',
     what: 'Children aged 0 to 15 in families with relative low income before housing costs, as a ' +
-          'share of children of that age, for wards. An LA whose wards DWP has not yet redrawn to ' +
-          'the 2025 boundaries is left out rather than matched to other wards.',
+          'share of children of that age, for wards. If DWP\'s wards for an LA are not the 2025 ' +
+          'wards, that LA is not included. We do not match its wards to other wards.',
     geo: 'Ward, as DWP publishes it, and added up into LAs',
     period: 'The latest financial year published',
     ind: 'dwp_cilif_pct',
@@ -1458,9 +1551,9 @@ var SOURCES = [
   { id: 'care-homes',
     name: 'Care home beds',
     pub: 'Care Quality Commission (CQC), with ONS mid-year population estimates',
-    what: 'Beds in care homes registered with CQC, with or without nursing, per 100 people ' +
-          'aged 75 and over. It measures care home capacity, not how many residents need care, ' +
-          'and it counts homes for younger adults too.',
+    what: 'Beds in care homes registered with CQC, with or without nursing, per 100 people aged ' +
+          '75 and over. It measures how many beds care homes have, not how many residents need ' +
+          'care. It also counts homes for younger adults.',
     geo: 'Each care home placed by postcode in its LSOA, added up into wards and LAs',
     period: 'The directory at the last update',
     ind: 'care_home_beds_per_100_75plus',
@@ -1470,88 +1563,96 @@ var SOURCES = [
   { id: 'ahah',
     name: 'Healthy places index and drive times to outlets',
     pub: 'Geographic Data Service (GeoDS), University of Liverpool: Access to Healthy Assets and Hazards (AHAH)',
-    what: 'An index of how healthy the places around each LSOA are, and its four domains: access to ' +
-          'health services, how near fast food outlets, pubs, off-licences, gambling outlets and ' +
-          'tobacconists are, air quality, and access to green and blue space. A higher score means a ' +
-          'less healthy place. It compares places with each other rather than measuring anything ' +
-          'directly. Also the drive time in minutes by car to the nearest outlet of each of those five ' +
-          'kinds, which the map shows without calling nearer better or worse. We work out the deciles ' +
-          'across England, decile 1 the least healthy tenth. Versions are built differently, so they ' +
-          'should not be compared.',
+    what: 'An index of how healthy the places around each LSOA are, and its 4 domains (parts). ' +
+          'The domains are access to health services, how near fast food outlets, pubs, ' +
+          'off-licences, gambling outlets and tobacconists are, air quality, and access to green ' +
+          'and blue space. A higher score means a less healthy place. The index compares places ' +
+          'with each other. It does not measure anything directly. It also gives the drive time ' +
+          'in minutes by car to the nearest outlet of each of those 5 types. The map does not say ' +
+          'whether nearer is better or worse. We calculate the deciles across England, and decile ' +
+          '1 is the least healthy 10%. Each version is made in a different way, so you should not ' +
+          'compare versions.',
     geo: 'LSOA, averaged into wards and LAs weighted by population',
     period: 'Version 5.1, May 2026, at the last check',
     ind: 'ahah_index',
-    cadence: 'A new version from time to time.',
-    skipNote: 'Not on the map yet: the file could not be downloaded, so it has to be added by hand.',
+    cadence: 'New versions, with no fixed timetable.',
+    skipNote: 'Not on the map yet. We could not download the file, so we must add it by hand.',
     manifest: 'ahah' },
 
   { id: 'samhi',
     name: 'Mental health index',
     pub: 'Place-based Longitudinal Data Resource (PLDR), University of Liverpool: Small Area Mental Health Index (SAMHI)',
-    what: 'One score for mental ill health in each LSOA, combining mental health hospital attendances, ' +
-          'antidepressant prescribing, depression recorded by GPs, the GP Patient Survey and benefit claims ' +
-          'for mental illness. A higher score means worse mental health than in other places. We show its ' +
-          'latest year, and work out the deciles across England, decile 1 the worst tenth. Where PLDR ' +
-          'publishes it for the LSOAs of 2011, an LSOA drawn in 2021 takes the figure of the one it came from. ' +
-          'It overlaps the mood and anxiety measure in the deprivation indices.',
+    what: 'One score for mental ill health in each LSOA. It combines mental health hospital ' +
+          'attendances, antidepressant prescribing, depression recorded by GPs, the GP Patient ' +
+          'Survey and benefit claims for mental illness. A higher score means worse mental health ' +
+          'than in other places. We show its latest year. We calculate the deciles across ' +
+          'England, and decile 1 is the worst 10%. Where PLDR publishes the index for the 2011 ' +
+          'LSOAs, an LSOA drawn in 2021 takes the figure of the LSOA it came from. The index ' +
+          'partly measures the same thing as the mood and anxiety measure in the deprivation ' +
+          'indices.',
     geo: 'LSOA, averaged into wards and LAs weighted by population',
     period: 'The latest year in version 4.00',
     ind: 'samhi_index',
-    cadence: 'A new version from time to time.',
-    skipNote: 'Not on the map yet: its licence has to be checked, or its file added by hand.',
+    cadence: 'New versions, with no fixed timetable.',
+    skipNote: 'Not on the map yet. We must check its licence, or add its file by hand.',
     manifest: 'samhi' },
 
   { id: 'qof-msoa',
     name: 'Illness recorded by GPs, estimated for small areas',
     pub: 'House of Commons Library, from GP practice registers (QOF, NHS England) and NHS Digital\'s counts of where patients live',
     what: 'The estimated share of patients on a GP register for each of 20 conditions, such as ' +
-          'diabetes, asthma and depression. The Library shares each practice\'s figure among the MSOAs ' +
-          'where its patients live. It counts illness GPs have recorded, not everyone who has it, and a ' +
-          'practice that records more carefully raises the figure for every area it serves.',
-    geo: 'MSOA, blended into wards and averaged into LAs weighted by population',
+          'diabetes, asthma and depression. The Library divides each practice\'s figure between ' +
+          'the MSOAs where its patients live. It counts illness that GPs have recorded, not ' +
+          'everyone who has the illness. A practice that records more carefully increases the ' +
+          'figure for every area it serves.',
+    geo: 'MSOA, combined into wards through their LSOAs and averaged into LAs, weighted by population',
     period: '2024/25 at the last check',
     ind: 'qof_est_diabetes_pct',
     cadence: 'Yearly, after each year of GP figures.',
-    skipNote: 'Not on the map yet: the file could not be found, so it has to be added by hand.',
+    skipNote: 'Not on the map yet. We could not find the file, so we must add it by hand.',
     manifest: 'qof_msoa' },
 
   { id: 'ppfi',
     name: 'Risk of food insecurity',
     pub: 'Consumer Data Research Centre (CDRC), with Which?: Priority Places for Food Index (PPFI)',
-    what: 'Which tenth of England each LSOA falls in by its risk that people struggle to get food: ' +
-          'how near and how easy to reach supermarkets are, online delivery, other food shops and the ' +
-          'need for family food support, together and one by one. Decile 1 is the highest risk. For ' +
-          'wards and LAs, the share of residents living in the fifth of England at highest risk. It is a ' +
-          'risk index, not a count of people going without food. Its fuel poverty and socio-demographic ' +
-          'domains are left out, as the map has those figures already. Data provided by the Consumer Data ' +
-          'Research Centre (CDRC), an ESRC Data Investment, refs ES/L011840/1; ES/L011891/1.',
-    geo: 'LSOA; wards and LAs from the residents of their LSOAs',
+    what: 'The decile of each LSOA in England for the risk that people have difficulty getting ' +
+          'food. The risk uses how near supermarkets are and how easy they are to reach, online ' +
+          'delivery, other food shops, and the need for family food support. There is a decile ' +
+          'for all of these together, and for each one. Decile 1 is the highest risk. For wards ' +
+          'and LAs, the map shows the share of residents in the LSOAs at highest risk. These are ' +
+          'the 20% of LSOAs in England with the highest risk. It is a risk index, not a count of ' +
+          'people without enough food. Its fuel poverty domain and its socio-demographic domain ' +
+          '(about who lives in an area) are not included, because the map already has those ' +
+          'figures. Data provided by the Consumer Data Research Centre (CDRC), an ESRC Data ' +
+          'Investment, refs ES/L011840/1; ES/L011891/1.',
+    geo: 'LSOA. Wards and LAs use the residents of their LSOAs',
     period: 'Version 2.1, July 2024',
     ind: 'ppfi_decile',
-    cadence: 'A new version from time to time.',
-    skipNote: 'Not on the map yet: CDRC\'s file needs a login, so it has to be added by hand.',
+    cadence: 'New versions, with no fixed timetable.',
+    skipNote: 'Not on the map yet. CDRC\'s file needs a login, so we must add it by hand.',
     manifest: 'ppfi' },
 
   { id: 'fhrs',
     name: 'Takeaways, pubs and food hygiene ratings',
     pub: 'Food Standards Agency (FSA), food hygiene rating scheme, with residents from the 2021 Census',
-    what: 'Takeaways and sandwich shops, and pubs, bars and nightclubs, per 1,000 residents, and the share ' +
-          'of rated food businesses with a hygiene rating of 0, 1 or 2. FSA\'s takeaway type mixes hot food ' +
-          'takeaways with sandwich shops and bakeries, and many chain fast food outlets are listed as ' +
-          'restaurants. Businesses are counted where they are, so town centres with few residents have high ' +
-          'rates. Shown for wards and LAs only.',
+    what: 'Takeaways and sandwich shops per 1,000 residents, and pubs, bars and nightclubs per ' +
+          '1,000 residents. Also the share of rated food businesses with a hygiene rating of 0, 1 ' +
+          'or 2. FSA\'s takeaway type includes hot food takeaways, sandwich shops and bakeries. ' +
+          'FSA lists many chain fast food outlets as restaurants. Businesses are counted where ' +
+          'they are, so town centres with few residents have high rates. Shown for wards and LAs ' +
+          'only.',
     geo: 'Each business placed in its LSOA by where it is, added up into wards and LAs',
     period: 'The register at the last update',
     ind: 'fhrs_takeaways_per_1000',
-    cadence: 'Daily; read again here every month.',
-    skipNote: 'Not on the map yet: the register could not be read, so its files have to be added by hand.',
+    cadence: 'Daily. We get the register again every month.',
+    skipNote: 'Not on the map yet. We could not read the register, so we must add its files by hand.',
     manifest: 'fhrs' },
 
   { id: 'fuel-poverty',
     name: 'Fuel poverty',
     pub: 'DESNZ',
-    what: 'Households in fuel poverty, meaning on a low income in a home with low ' +
-          'energy efficiency.',
+    what: 'Households in fuel poverty. This means that the household has a low income and lives ' +
+          'in a home with low energy efficiency.',
     geo: 'LSOA, combined into wards and LAs weighted by households',
     period: '2022',
     ind: 'fuel_poverty_pct',
@@ -1561,8 +1662,8 @@ var SOURCES = [
   { id: 'green-space',
     name: 'Green and blue space',
     pub: 'Natural England and Ordnance Survey, published by Defra',
-    what: 'How many homes are within reach of doorstep, local and neighbourhood green ' +
-          'space, and of blue space such as rivers and lakes.',
+    what: 'How many homes are near doorstep, local and neighbourhood green space, and near blue ' +
+          'space such as rivers and lakes.',
     geo: 'LSOA',
     period: '2023',
     cadence: 'No fixed timetable.',
@@ -1576,12 +1677,12 @@ var SOURCES = [
     period: 'The latest release',
     cadence: 'Twice a year.',
     manifest: null,
-    status: 'Updated by hand when a new release comes out' },
+    status: 'Updated by hand when there is a new release' },
 
   { id: 'gp',
     name: 'GP practices',
     pub: 'NHS Organisation Data Service',
-    what: 'Practice locations and registered list sizes.',
+    what: 'Where each practice is, and how many patients are registered with it.',
     geo: 'Point, from the practice postcode',
     period: 'The current register',
     cadence: 'Monthly.',
@@ -1609,7 +1710,7 @@ var SOURCES = [
   { id: 'pharmacies',
     name: 'Pharmacies',
     pub: 'NHS Organisation Data Service',
-    what: 'Community pharmacy locations.',
+    what: 'Where each community pharmacy is.',
     geo: 'Point, from the pharmacy postcode',
     period: 'The current register',
     cadence: 'Monthly.',
@@ -1618,15 +1719,15 @@ var SOURCES = [
   { id: 'hospitals',
     name: 'Hospitals',
     pub: 'NHS Organisation Data Service',
-    what: 'Hospital sites picked out by name from the NHS register of trust sites, ' +
-          'then checked by hand for London and the North East. The register also lists ' +
-          'private hospitals where an NHS trust runs a service, as well as teams, offices ' +
-          'and sites that are no longer hospitals. In the checked regions, teams, offices ' +
-          'and closed sites are left out. Each hospital is marked as NHS or private and by ' +
-          'type, and the major hospitals with a 24-hour A&E are marked. Elsewhere a site ' +
-          'is shown as it is listed on the register, so please check before you travel. ' +
-          'Not every hospital has an A&E: in an emergency call 999, and for urgent help ' +
-          'that is not an emergency use NHS 111 online or call 111.',
+    what: 'Hospital sites chosen by name from the NHS register of trust sites. These are checked ' +
+          'by hand for London and the North East. The register also lists private hospitals where ' +
+          'an NHS trust runs a service. It also lists teams, offices and sites that are no longer ' +
+          'hospitals. In the checked regions, teams, offices and closed sites are not included. ' +
+          'Each hospital is marked as NHS or private, and by type. The major hospitals with a ' +
+          '24-hour accident and emergency (A&E) department are also marked. In other regions, a ' +
+          'site is shown as the register lists it, so please check before you travel. Not every ' +
+          'hospital has an A&E. In an emergency, call 999. For urgent help that is not an ' +
+          'emergency, use NHS 111 online or call 111.',
     geo: 'Point, from the site postcode',
     period: 'The current register',
     cadence: 'Monthly.',
@@ -1638,18 +1739,18 @@ var SOURCES = [
     what: 'Registered charities, with the areas they work in and what they do.',
     geo: 'Point, from the registered address, with the areas each charity says it works in',
     period: 'The current register',
-    cadence: 'The full register is republished monthly.',
+    cadence: 'The Charity Commission publishes the full register again every month.',
     manifest: 'charities' },
 
   { id: 'air-quality',
     name: 'Air quality',
     pub: 'Defra UK-AIR, Pollution Climate Mapping model',
-    what: 'Modelled yearly average background levels of nitrogen dioxide (NO₂) and ' +
-          'fine particles (PM2.5 and PM10). Most LSOAs have no air monitor, so the figures ' +
-          'come from a computer model checked against the national network of monitors. ' +
-          'They are background levels across an area, so they do not show the higher ' +
-          'levels right beside a busy road.',
-    geo: 'A 1 km national grid, shared out to LSOAs by area and then to wards by population',
+    what: 'Modelled yearly average background levels of nitrogen dioxide (NO₂) and fine particles ' +
+          '(PM2.5 and PM10). Most LSOAs have no air monitor, so the figures come from a computer ' +
+          'model. The model is checked against the national network of monitors. The figures are ' +
+          'background levels across an area, so they do not show the higher levels next to a busy ' +
+          'road.',
+    geo: 'A 1 km national grid. Each LSOA takes the average of its grid squares, weighted by area, and wards are weighted by population',
     period: '2024',
     cadence: 'Yearly, usually in the autumn.',
     manifest: 'air_quality' },
@@ -1657,28 +1758,29 @@ var SOURCES = [
   { id: 'transport',
     name: 'Stations and bus stops',
     pub: 'Transport for London',
-    what: 'The distance to the nearest station and the nearest bus stop, and how many of ' +
-          'each are within a short walk. Distances are straight lines from the middle of ' +
-          'each LSOA, not walking routes. So a real walk is longer wherever a river, ' +
-          'railway or park is in the way. Stations just outside London are counted, because ' +
-          'for an LSOA near the edge the nearest station often is one.',
-    geo: 'Stations and stops, measured for each LSOA and weighted by population onto wards',
-    period: 'As the register stood at the last update',
-    cadence: 'Continuous, as stops open and close.',
+    what: 'The distance to the nearest station and to the nearest bus stop. Also how many ' +
+          'stations are within 1 km, and how many bus stops are within 800 metres. Distances are ' +
+          'straight lines from the middle of each LSOA, not walking routes. So a real walk is ' +
+          'longer where a river, railway or park is in the way. Stations just outside London are ' +
+          'counted, because for an LSOA near the edge of London, the nearest station is often ' +
+          'outside London.',
+    geo: 'Stations and stops, measured for each LSOA and averaged into wards, weighted by population',
+    period: 'The register at the last update',
+    cadence: 'All the time, as stops open and close.',
     manifest: 'tfl' },
 
   { id: 'service-access',
     name: 'Distance to GP practices, pharmacies and dentists',
     pub: 'Measured here from the NHS registers of GP practices, pharmacies and dental practices',
     what: 'The straight-line distance in kilometres from each LSOA to the nearest GP practice, ' +
-          'community pharmacy and high street NHS dental practice, measured from the point ONS ' +
-          'places where most of the LSOA\'s people live (or the middle of the LSOA where ONS ' +
-          'gives no such point). It is not a travel time. Sites in other ' +
-          'LAs count, because for an LSOA near the edge the nearest one often is. Branch surgeries ' +
-          'are not on the GP register, and a dental contract does not mean a practice is taking ' +
-          'new NHS patients.',
+          'community pharmacy and high street NHS dental practice. We measure from the point that ' +
+          'ONS places where most of the LSOA\'s people live. If ONS gives no such point, we ' +
+          'measure from the middle of the LSOA. It is not a travel time. Sites in other LAs ' +
+          'count, because for an LSOA near the edge of an LA, the nearest site is often in ' +
+          'another LA. Branch surgeries are not on the GP register. A practice with an NHS dental ' +
+          'contract may not be taking new NHS patients.',
     geo: 'Measured for each LSOA, and averaged into wards and LAs weighted by population',
-    period: 'As the registers stood at the last update',
+    period: 'The registers at the last update',
     cadence: 'Monthly.',
     manifest: 'service_access' },
 
@@ -1705,10 +1807,10 @@ var SOURCES = [
   { id: 'core20',
     name: 'Core20PLUS5',
     pub: 'NHS England',
-    what: 'Which LSOAs are in the most deprived fifth of England, and how many each ward has.',
+    what: 'Which LSOAs are in the most deprived 20% of LSOAs in England, and how many of these LSOAs each ward has.',
     geo: 'LSOA',
     period: 'Calculated from the IMD 2025',
-    cadence: 'Follows the IMD.',
+    cadence: 'With each edition of the IMD.',
     manifest: null,
     status: 'Calculated from the IMD at each update' },
 ];
@@ -1774,7 +1876,7 @@ Array.prototype.forEach.call(document.querySelectorAll('table.stack'), labelTabl
     // so only a real failure is reported as stale.
     if (s.status === 'failed') {
       return '<span class="status-bad">Not updated' + (when ? ' on ' + esc(when) : '') + '</span>' +
-        '<br><span class="small">The map is showing the last figures that did update, ' +
+        '<br><span class="small">The map shows the last figures that were updated, ' +
         'which are older than the rest.</span>';
     }
     // A source that needs a file someone adds by hand, and has none yet.
@@ -1795,7 +1897,7 @@ Array.prototype.forEach.call(document.querySelectorAll('table.stack'), labelTabl
   function draw(manifest) {
     var sources = (manifest && manifest.sources) || null;
     var heads = ['Source', 'What it provides', 'Published at', 'Period covered',
-                 'Publisher updates', 'Last updated here'];
+                 'How often it is published', 'Last updated here'];
     tbody.innerHTML = SOURCES.map(function (rec) {
       var cells = [
         '<strong>' + esc(rec.name) + '</strong><br>' +
@@ -1832,7 +1934,7 @@ Array.prototype.forEach.call(document.querySelectorAll('table.stack'), labelTabl
     if (!sources) {
       if (noteEl) {
         noteEl.style.display = 'block';
-        noteEl.innerHTML = '<strong>We could not load the record of updates just now.</strong> ' +
+        noteEl.innerHTML = '<strong>We could not get the record of updates just now.</strong> ' +
           'The sources and periods above are still correct. Only the Last updated ' +
           'here column is missing, so please try again later.';
       }
@@ -1857,7 +1959,7 @@ Array.prototype.forEach.call(document.querySelectorAll('table.stack'), labelTabl
       noteEl.innerHTML = '<strong>' + n + (bad.length === 1 ? ' source' : ' sources') +
         ' could not be updated' + onDate + '.</strong> ' +
         (bad.length === 1 ? 'It is' : 'They are') + ' marked in the table above. The map ' +
-        'is still showing ' + (bad.length === 1 ? 'its' : 'their') + ' most recent figures, ' +
+        'still shows ' + (bad.length === 1 ? 'its' : 'their') + ' most recent figures, ' +
         'which are real but older than the rest.';
     } else if (noteEl && runDate) {
       noteEl.style.display = 'block';

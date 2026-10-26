@@ -470,15 +470,15 @@ const smallText = page => page.evaluate(() => {
               // A figure ONS does not publish for output areas (not in the
               // output area index) is built from LSOA counts, and says so.
               const unit = wc && censusWardsFromLsoas(k) ? 'LSOAs' : 'output areas';
-              const right = k === 'census_population' ? /sum the residents of the output areas/.test(m)
+              const right = k === 'census_population' ? /add up the residents of the output areas/.test(m)
                 : (wc ? new RegExp('ward figure is calculated from the counts of the ' + unit).test(m) &&
                         new RegExp('Ward figures are calculated from the counts of the ' + unit + ' in each ward').test(pub)
-                      : /ward figure is an average of the output areas that best fit the ward under the ONS lookup, weighted by their residents/.test(m) &&
-                        /Ward figures are an average of the output areas in each ward, weighted by population/.test(pub)) &&
+                      : /ward figure is an average of the output areas in the ward, where output areas with more residents count for more/.test(m) &&
+                        /Ward figures are an average of the output areas in each ward, where output areas with more people count for more/.test(pub)) &&
                   (lc ? new RegExp('LA figure is calculated from the counts of the ' + unit + ' in its wards').test(m) &&
                         new RegExp('LA\\b.{0,40} figures are calculated (in the same way, from|from the counts of) the ' + unit + ' in each LA').test(pub)
-                      : /LA figure is an average of its ward figures, weighted by population/.test(m) &&
-                        /LA\b.{0,40} figures are an average of the ward figures, weighted by population/.test(pub));
+                      : /LA figure is an average of its ward figures, where wards with more people count for more/.test(m) &&
+                        /LA\b.{0,40} figures are an average of the ward figures, where wards with more people count for more/.test(pub));
               if (!right || /(add up|sum) the LSOAs/.test(m + ' ' + pub) ||
                   (wc && lc && /average|weight/.test(m + ' ' + pub))) out.census.push(k + (i ? ' (other state)' : ''));
             } finally { WARD_META = realMeta; BOROUGH_DATA = realBd; }
@@ -490,7 +490,7 @@ const smallText = page => page.evaluate(() => {
         if (/^ft_\d+$/.test(k) && FT_INFO[k.slice(3)]) {
           const u = dd('Updates'), dated = !!FT_INFO[k.slice(3)][3];
           const hasDate = /\b\d{1,2} (January|February|March|April|May|June|July|August|September|October|November|December) \d{4}\b/.test(u);
-          if ((dated ? !hasDate : hasDate || !/every one to three years/.test(u)) ||
+          if ((dated ? !hasDate : hasDate || !/every 1 to 3 years/.test(u)) ||
               /\d{2}\/\d{2}\/\d{4}/.test(u) || (u.match(/\./g) || []).length !== 1) out.ft.push(k);
         }
       }
@@ -575,7 +575,7 @@ const smallText = page => page.evaluate(() => {
         name: _levelName('borough'),
         focus: document.getElementById('borough-focus-label').textContent,
         helpIntro: (help.match(/local authority \(LA\)/g) || []).length,
-        helpFive: /five sizes of area/.test(help),
+        helpFive: /\b5 sizes of area/.test(help),
         helpDash: /[\u2013\u2014]/.test(help),
         cardIntro: (card.match(/local authority \(LA, the council area\)/gi) || []).length,
         oldNames: (words.match(/Borough\/council|\bBoroughs?\b|Focus by borough|\bLocal authorit(y|ies)\b/g) || []),
@@ -723,12 +723,12 @@ const smallText = page => page.evaluate(() => {
     await setOv(page, 'imd_decile');
     await page.waitForTimeout(3000);
     const forced = await lvState();
-    ok(forced.lv === 'lsoa' && /^Deprivation decile \(IMD 2025\) has no figures for wards, so the map is showing it by LSOA\. It will go back to wards when you choose an indicator that has them\.$/.test(forced.hint),
+    ok(forced.lv === 'lsoa' && /^Deprivation decile \(IMD 2025\) has no figures for wards, so the map shows it by LSOA\. The map will show wards again when you choose an indicator that has figures for them\.$/.test(forced.hint),
       'a forced move to another level is announced in the hint', JSON.stringify(forced));
     await page.click('#ov-clear');
     await page.waitForTimeout(800);
     const cleared = await lvState();
-    ok(cleared.lv === 'ward' && /^The map is back to wards, the level you chose\.$/.test(cleared.hint), 'Clear goes back to the level the reader chose', JSON.stringify(cleared));
+    ok(cleared.lv === 'ward' && /^The map shows wards again, the level you chose\.$/.test(cleared.hint), 'Clear goes back to the level the reader chose', JSON.stringify(cleared));
     await setOv(page, 'crime_rate_per_1000');
     await page.waitForTimeout(1000);
     await page.click('.mode-btn[data-mode="report"]');
@@ -779,7 +779,7 @@ const smallText = page => page.evaluate(() => {
     await page.evaluate(() => { const l = wLyr.getLayers().find(l => l.feature.properties.WD24NM === 'Lansbury'); if (l) l.fire('click'); });
     await page.waitForTimeout(600);
     const qv = await page.evaluate(() => document.getElementById('cmp-quick').innerHTML);
-    ok(/<strong>[^<]+<\/strong> is the most deprived of them, with an IMD 2025 score of \d+\.\d against a London ward median of \d+\.\d\./.test(qv) &&
+    ok(/<strong>[^<]+<\/strong> is the most deprived of them, with a score of \d+\.\d on the Index of Multiple Deprivation \(IMD 2025\)\. The middle ward, when all London wards are put in order, has a score of \d+\.\d\./.test(qv) &&
        !/decile|by LSOA/.test(qv) && !/deprived <strong>\d+%|deprived \d+%/.test(qv),
       'the Compare quick view gives wards their IMD score, with no decile and no percentage', qv);
     await page.click('.mode-btn[data-mode="explore"]');
@@ -837,7 +837,7 @@ const smallText = page => page.evaluate(() => {
     const P = plain.out;
     ok(Object.values(P).every(x => x.sheetFirst && x.profFirst && x.sheet === x.prof),
       '"Summary" comes first in the ward sheet and the profile, and they match', JSON.stringify(P).slice(0, 300));
-    ok(/^Stonebridge is more deprived than 99% of the wards in London, and \d+ of its \d+ neighbourhoods \(LSOAs\) are among the most deprived fifth of England\./.test(P.Stonebridge.sheet),
+    ok(/^Stonebridge is more deprived than 99% of the wards in London, and \d+ of its \d+ neighbourhoods \(LSOAs\) are among the most deprived 20% of areas in England\./.test(P.Stonebridge.sheet),
       'Stonebridge leads with its ranking and its Core20 count', P.Stonebridge.sheet);
     // P56: no "median" in the summary, a typical ward explained once, and
     // the sheet leads with the ranking rather than the average decile.
@@ -848,7 +848,7 @@ const smallText = page => page.evaluate(() => {
     ok(plain.lead === 'More deprived than' && plain.leadNum === '99%' && /more deprived than 99% of the wards in London/.test(plain.meta) &&
        !/decile/.test(plain.meta),
       'the ward sheet leads with its ranking, not the average decile', JSON.stringify([plain.lead, plain.leadNum, plain.meta]));
-    ok(/^Holloway is (more|less) deprived than \d+% of the wards in London\./.test(P.Holloway.sheet) && !/deprived fifth/.test(P.Holloway.sheet),
+    ok(/^Holloway is (more|less) deprived than \d+% of the wards in London\./.test(P.Holloway.sheet) && !/most deprived 20%/.test(P.Holloway.sheet),
       'Holloway, with no Core20 LSOAs, has no Core20 clause', P.Holloway.sheet);
     ok(/^Barnes is less deprived than \d+% of the wards in London/.test(P.Barnes.sheet), 'a Richmond ward says "less deprived than"', P.Barnes.sheet);
     ok(/^Bishopsgate is home to only 345 residents/.test(P.Bishopsgate.sheet) && !/median|deprived than/.test(P.Bishopsgate.sheet),
@@ -863,8 +863,8 @@ const smallText = page => page.evaluate(() => {
         same: wardFitNote({ lsoa_from: 'E01000001', lsoa_fit: 1.05 }), plain: wardFitNote({ lsoa_fit: 1.05 }) };
     });
     ok(/^E01\d{6}$/.test(fill.from) && typeof fill.imd === 'number' &&
-       /no LSOA of its own.*\(E01\d{6}\), which the lookup files under a neighbouring ward\. That LSOA holds about [\d.]+ times as many residents as the ward itself\.$/.test(fill.note) &&
-       /\(E01000001\), which the lookup files under a neighbouring ward\.$/.test(fill.same) && fill.plain === '',
+       /places no LSOA in this ward.*\(E01\d{6}\)\. ONS places that LSOA in a neighbouring ward\. That LSOA has about [\d.]+ times as many residents as the ward itself\.$/.test(fill.note) &&
+       /\(E01000001\)\. ONS places that LSOA in a neighbouring ward\.$/.test(fill.same) && fill.plain === '',
       'a ward with no LSOA has its LSOA\'s figures and says where they come from, whatever that LSOA\'s size', JSON.stringify(fill));
     ok(Object.values(P).every(x => x.profH === 'H3'), 'the profile\'s "Summary" is a sibling of its section headings (h3)', Object.values(P).map(x => x.profH).join(','));
     ok(!Object.values(P).some(x => /[–—]/.test(x.sheet)), 'no dashes in the ward summaries');
@@ -991,7 +991,7 @@ const smallText = page => page.evaluate(() => {
         };
       });
       ok(r2.badKpi && r2.badKpi === r2.badBar, 'the report\'s key figure and bar chart give the same value', r2.badKpi + ' / ' + r2.badBar);
-      ok(r2.parks.some(p => /Bartlett Park/.test(p)) && r2.parks.every(p => / ha( in all)?$/.test(p)), 'the Lansbury report lists real parks', r2.parks.join(' | '));
+      ok(r2.parks.some(p => /Bartlett Park/.test(p)) && r2.parks.every(p => / hectares( in all)?$/.test(p)), 'the Lansbury report lists real parks', r2.parks.join(' | '));
       ok(r2.lang === 'en-GB' && r2.pcodes.length === 0 && r2.counts.length === 1 && r2.dashes === 0,
         'the report declares en-GB, has no "P95", gives one ward count and no dashes', JSON.stringify(r2));
       ok(r2.png, 'every report chart offers SVG and PNG');
@@ -1029,10 +1029,10 @@ const smallText = page => page.evaluate(() => {
         ctx: [ovContext('ward', 'census_bad_health_pct', Math.max(...vals)), ovContext('ward', 'census_bad_health_pct', Math.min(...vals))],
       };
     });
-    ok(fig.fmt.join('|') === '7.3 per 100,000|12.3%|101.3|2.3|85.3',
+    ok(fig.fmt.join('|') === '7.3 per 100,000 people|12.3%|101.3|2.3|85.3',
       'figures carry their own unit: "%" only on percentages, a rate per 100,000 says so, a ratio has none, and an IMD score has one place', fig.fmt.join(' | '));
     ok(!fig.desc.length, 'fertility, car to work, walk or cycle to work and unpaid care are descriptive', fig.desc.join(', '));
-    ok(/^Within London: higher than 99% of wards$/.test(fig.ctx[0]) && /^Within London: lower than 99% of wards$/.test(fig.ctx[1]) && !/100%/.test(fig.ctx.join(' ')),
+    ok(/^Higher than 99% of wards in London$/.test(fig.ctx[0]) && /^Lower than 99% of wards in London$/.test(fig.ctx[1]) && !/100%/.test(fig.ctx.join(' ')),
       'hover context stops at 99%, never 100%', fig.ctx.join(' | '));
     await setOv(page, 'ft_93089');
     await page.waitForTimeout(1500);
@@ -1454,7 +1454,7 @@ const smallText = page => page.evaluate(() => {
     ok(ex.rail === 'Transport' && ex.no2 === 'Environment and access' && ex.sorted,
       'export: station distance under Transport, air quality under Environment, each group in alphabetical order', ex.rail + ' / ' + ex.no2);
     ok(/How to cite it/.test(ex.notes) && /PopHealth Map \(\d{4}\) Data export: ward figures for Tower Hamlets/.test(ex.notes) &&
-       (ex.notes.match(/\n   Source: /g) || []).length === 3 && (ex.notes.match(/\n   Geography: /g) || []).length === 3 &&
+       (ex.notes.match(/\n   Source: /g) || []).length === 3 && (ex.notes.match(/\n   Areas: /g) || []).length === 3 &&
        ex.notes.indexOf('Life expectancy at birth, women (years, 2019 to 2023)') !== -1 && !ex.dashes,
       'export: the notes give a citation and the source and geography of each column, with no dashes', ex.notes.slice(0, 200));
     ok(ex.before !== 0 || (/one column for the indicator you chose/.test(ex.one) && !/each of the one/.test(ex.one)),
@@ -1533,7 +1533,7 @@ const smallText = page => page.evaluate(() => {
       const end = b.length - 22;
       return { start: u32(0) === 0x04034b50, end: u32(end) === 0x06054b50, files: b[end + 10] | b[end + 11] << 8 };
     });
-    ok(multi.pressed === 3 && /ward,lsoa,borough|ward,borough,lsoa/.test(multi.levels) && /three files/.test(multi.count) &&
+    ok(multi.pressed === 3 && /ward,lsoa,borough|ward,borough,lsoa/.test(multi.levels) && /3 files/.test(multi.count) &&
        /ZIP/.test(multi.btn) && multi.notes && multi.names.length === 6 && multi.csvs.every(n => n > 2) &&
        multi.names.some(n => /^pophealth-lsoa/.test(n)) && multi.names.some(n => /-notes\.txt$/.test(n)),
       'export: three sizes of area make three files, downloaded together as a ZIP with their notes', JSON.stringify(multi));
@@ -1857,11 +1857,11 @@ const smallText = page => page.evaluate(() => {
     ok(dm.covid, 'death, life expectancy and admissions cards say their periods take in the pandemic');
     ok(dm.crime, 'the crime rate leaves out anti-social behaviour, its card says so, and the total is not a figure of its own');
     ok(dm.jsa, 'long-term claimants are named for Jobseeker\'s Allowance, with no bare zeros');
-    ok(/slightly different area|noticeably different area/.test(dm.fit) && dm.fitNone === '', 'a ward whose LSOAs hold a different population is marked', dm.fit);
+    ok(/different area from the ward/.test(dm.fit) && dm.fitNone === '', 'a ward whose LSOAs hold a different population is marked', dm.fit);
     ok(dm.names[0] !== dm.names[1] && dm.names[2] === 'false', 'the two deprivation scores are named apart and the Local Health claimant copy is gone', dm.names.join(' | '));
-    ok(dm.inc[0] > 1 && /%$/.test(dm.inc[1]) && dm.inc[2] === 'Less deprived' && dm.inc[3] === 'More deprived' && /more deprived than/.test(dm.inc[4]),
+    ok(dm.inc[0] > 1 && /%$/.test(dm.inc[1]) && dm.inc[2] === 'Less deprived' && dm.inc[3] === 'More deprived' && /^More deprived than/.test(dm.inc[4]),
       'income deprivation reads as a percentage, and deprivation keys and hovers say less or more deprived', dm.inc.join(' | '));
-    ok(dm.ratio === '126.0 (England is 100)' && dm.vs === 'Not clearly different from England' && dm.plain === 0,
+    ok(dm.ratio === '126.0 (England is 100)' && dm.vs === 'About the same as England' && dm.plain === 0,
       'hover ratios say England is 100, and similar reads not clearly different', dm.ratio + ' / ' + dm.vs);
     ok(dm.oa && dm.est, 'Census cards carry the output area caution, and the 2011 label has one name');
     // Ward rankings of a Local Health figure say there is no interval (P3), and
@@ -1876,11 +1876,11 @@ const smallText = page => page.evaluate(() => {
       _generateWardReport({ sink: h => { html = h; } }, 'Farringdon Without', {});
       const d = new DOMParser().parseFromString(html, 'text/html');
       return { notes: document.getElementById('rank-notes').textContent,
-        dots: [...d.querySelectorAll('.legend')].map(e => e.textContent).find(t => /Each dot places/.test(t)) || '',
+        dots: [...d.querySelectorAll('.legend')].map(e => e.textContent).find(t => /Each dot shows/.test(t)) || '',
         fit: (d.querySelector('.fit-note') || {}).textContent || '' };
     });
-    ok(/no interval is available/.test(rk.notes), 'ward rankings of a Local Health figure say no interval is available', rk.notes);
-    ok((!rk.dots || /places the ward among the [\d,]+ London wards/.test(rk.dots)) && /different area/.test(rk.fit),
+    ok(/no 95% range/.test(rk.notes), 'ward rankings of a Local Health figure say no interval is available', rk.notes);
+    ok((!rk.dots || /shows where the ward is among the [\d,]+ London wards/.test(rk.dots)) && /different area/.test(rk.fit),
       'the ward report places the ward among wards and marks a poor LSOA fit', JSON.stringify(rk));
     ok(errors.length === 0, 'no page errors (data and methodology polish)', errors.join(' | '));
     await page.close();
@@ -1893,7 +1893,7 @@ const smallText = page => page.evaluate(() => {
   // question: through this site's server to Anthropic's Claude model,
   // 10 a day, with a reply to a clarifying question free.
   const ASK_SAME = [/this site's server/, /Anthropic's Claude model/, /10 questions a day/,
-    /narrow a question down does not use one up/];
+    /If it asks you to make a question more exact, your answer does not count as one of the 10/];
   for (const [vpName, vp] of [['desktop', DESK], ['phone', PHONE], ['landscape', SIDEWAYS]]) {
     const { page, errors } = await open(browser, 'index.html?t=1', vp);
     const ui = await page.evaluate(() => ({
@@ -2066,7 +2066,7 @@ const smallText = page => page.evaluate(() => {
         label: document.getElementById('mls-label').innerText }), k));
     }
     ok(keys.every(x => x.meta && !BAD.test(x.meta) && !/[–—]/.test(x.meta)), 'the key under the scale has no source codes, arrows or dots', keys.map(x => x.k + '@' + x.lv + ': ' + x.meta).join(' | '));
-    ok(/^Published by OHID \(Local Health\) for MSOAs, 2019 to 2023\. Ward figures are our estimates, blended from the MSOAs each ward overlaps\./.test(keys[2].meta) &&
+    ok(/^Published by OHID \(Local Health\) for MSOAs, 2019 to 2023\. Ward figures are our estimates, made from the figures for the MSOAs that each ward overlaps\./.test(keys[2].meta) &&
        /^Calculated for each ward from MHCLG/.test(keys[7].meta) && /^Published by ONS for LSOAs, /.test(keys[6].meta) && /^Counted from police\.uk crime locations/.test(keys[8].meta),
       'the key says who publishes the figures and how the level drawn was made from them', [keys[2].meta, keys[6].meta, keys[7].meta, keys[8].meta].join(' | '));
     ok(keys.every(x => x.mid === '') && keys[0].min === 'Most deprived' && keys[0].max === 'Least deprived' &&
@@ -2825,7 +2825,7 @@ const smallText = page => page.evaluate(() => {
     ok(data.reg === 0 && data.gone.length === 0 && data.western && data.qm === 2,
       'hospitals: typed from the checked list, closed sites and services left out, names told apart', JSON.stringify(data));
     ok(data.ae >= 20 && data.rl === true && data.guys === false, 'hospitals: the major hospitals with a 24-hour A&E are flagged', JSON.stringify(data));
-    ok(/^Not every hospital has an A&E\. In an emergency call 999, and for urgent help that is not an emergency use NHS 111 online at 111\.nhs\.uk or call 111\.$/.test(data.note.trim()),
+    ok(/^Not every hospital has an A&E \(accident and emergency\) department\. In an emergency, call 999\. For urgent help that is not an emergency, use NHS 111 online at 111\.nhs\.uk or call 111\.$/.test(data.note.trim()),
       'hospitals: the Layers row\'s help button says not every hospital has an A&E', data.note);
     const pop = await page.evaluate(() => {
       let m = null;
@@ -2835,7 +2835,7 @@ const smallText = page => page.evaluate(() => {
       return { keys: [...div.querySelectorAll('.pop-key')].map(e => e.textContent),
         text: div.textContent };
     });
-    ok(!pop.keys.includes('Trust') && pop.keys.includes('A&E') && /Has a 24-hour A&E/.test(pop.text) && /In an emergency call 999/.test(pop.text),
+    ok(!pop.keys.includes('Trust') && pop.keys.includes('A&E') && /Has a 24-hour A&E/.test(pop.text) && /In an emergency, call 999/.test(pop.text),
       'hospitals: a popup has its type, its A&E and the 999 line, and no empty Trust row', JSON.stringify(pop));
     await page.click('.mode-btn[data-mode="directory"]');
     await page.waitForFunction(() => document.querySelector('#dir-types [data-dtype="hospital"]'), null, { timeout: 30000 }).catch(() => {});
@@ -2932,12 +2932,12 @@ const smallText = page => page.evaluate(() => {
       hdr: document.getElementById('rank-best-hdr').textContent, notes: document.getElementById('rank-notes').textContent }));
     const smallIds = await page.evaluate(ids => ids.filter(id => wardIsSmall(WARD_DATA[id])), rk.ids);
     ok(rk.buttons === 10 && rk.hdr === 'Best 10 (lowest %)', 'the rank rows are buttons in an ordered list, and the header carries the unit', JSON.stringify(rk).slice(0, 200));
-    ok(!smallIds.length && /City of London wards with fewer than 1,000 residents are left out/.test(rk.notes),
+    ok(!smallIds.length && /City of London wards with fewer than 1,000 residents are not in these lists\./.test(rk.notes),
       'wards under 1,000 residents are left out of a percentage ranking, and the list says so', smallIds.join(', ') + ' | ' + rk.notes);
     await setOv(page, 'core20_lsoa_count');
     await page.waitForTimeout(2000);
     const cnt = await page.evaluate(() => [document.getElementById('rank-best-hdr').textContent, document.getElementById('rank-notes').textContent]);
-    ok(/^Highest 10/.test(cnt[0]) && /wards in London have none, so this list shows ten of them in alphabetical order\./.test(cnt[1]),
+    ok(/^Highest 10/.test(cnt[0]) && /wards in London have a count of 0, so this list shows (ten|10) of them in alphabetical order\./.test(cnt[1]),
       'a count ranks as Highest and Lowest, and a tie at zero is said', cnt.join(' / '));
     const clickRow = await page.evaluate(async () => {
       const b = document.querySelector('#rank-best .rank-row'); b.focus(); b.click();
@@ -2953,12 +2953,12 @@ const smallText = page => page.evaluate(() => {
       redrawn: Object.keys(MSOA_DATA).filter(msoaRedrawn2021).length,
       card: msoaNoFigure(Object.keys(MSOA_DATA).filter(msoaRedrawn2021)[0], 'ft_93227'),
       other: msoaNoFigure('E02000001', 'census_bad_health_pct') }));
-    ok(/^Areas left blank have no figure\. OHID’s figures leave out the MSOAs that were redrawn in 2021/.test(b7.text) && b7.redrawn === 39,
+    ok(/^Areas left blank have no figure\. OHID’s figures do not include the MSOAs whose boundaries changed in 2021/.test(b7.text) && b7.redrawn === 39,
       'the blank-area notice names the 39 MSOAs redrawn in 2021 for the hospital admissions series', JSON.stringify(b7));
-    ok(/^No figure: this MSOA was redrawn in 2021/.test(b7.card) && b7.other === 'No figure', 'a blank MSOA\'s card says why, or "No figure"', JSON.stringify(b7));
+    ok(/^No figure: the boundary of this MSOA changed in 2021/.test(b7.card) && b7.other === 'No figure', 'a blank MSOA\'s card says why, or "No figure"', JSON.stringify(b7));
     await setOv(page, 'ft_93105');
     await page.waitForTimeout(1500);
-    ok(/^Areas left blank have no figure\. OHID withholds figures where so few people are counted that someone could be identified, and leaves out the MSOAs redrawn in 2021/.test(
+    ok(/^Areas left blank have no figure, but blank does not mean zero\. OHID does not publish a figure when the numbers are so small that someone could be identified\. Its figures also do not include the MSOAs whose boundaries changed in 2021/.test(
       await page.evaluate(() => document.getElementById('mls-note').textContent)), 'a series with both kinds of blank (withheld and redrawn in 2021) names both');
     // The note wraps under the scale inside the key rather than being cut off.
     const nf = await page.evaluate(() => { const n = document.getElementById('mls-note'), k = document.getElementById('map-legend-strip');
@@ -3006,7 +3006,7 @@ const smallText = page => page.evaluate(() => {
         wSub: w.querySelector('.hero .sub').textContent, wPanel: (w.querySelector('.no-census') || {}).textContent || '',
         wHo: [...w.querySelectorAll('table.ho th')].map(t => t.textContent).join('|') };
     });
-    ok(h8.bCaps.length && h8.bCaps.every(c => c === 'Too few residents to compare'), 'a ward under 1,000 residents is not placed among other wards in its report', h8.bCaps.join(' | '));
+    ok(h8.bCaps.length && h8.bCaps.every(c => c === 'Too few residents to compare with other wards'), 'a ward under 1,000 residents is not placed among other wards in its report', h8.bCaps.join(' | '));
     ok(!/deprived/.test(h8.wSub) && /^There are no Census figures for Walbrook/.test(h8.wPanel) && !/City of London ward median/.test(h8.wHo),
       'Walbrook\'s report has no rank, one sentence for its missing Census figures and no repeated City median', JSON.stringify(h8));
     ok(errors.length === 0, 'no page errors (review items B2 to H10)', errors.join(' | '));
@@ -3110,10 +3110,10 @@ const smallText = page => page.evaluate(() => {
       'Ask: the answer loop waits for an LSOA ranking and sends its figures to the Worker', JSON.stringify({ sa, saRes }).slice(0, 400));
     const c1 = await ask('CUTTOOL compare everything');
     const c2 = await ask('and the next one?');
-    ok(/Let me compare those\.\s+This answer was cut short, so please ask about fewer places at once\.$/.test(c1.text) && !c1.error &&
+    ok(/Let me compare those\.\s+This answer stopped early because it was too long, so please ask about fewer places at once\.$/.test(c1.text) && !c1.error &&
        c2.text === 'Fine.' && !c2.error, 'Ask: an answer cut off mid tool call says so, and the next question still works (H20)', JSON.stringify([c1.text, c2.text]));
     const c3 = await ask('CUTTEXT compare Brent and Bromley');
-    ok(/Bromley: IMD\s+This answer was cut short/.test(c3.text), 'Ask: an answer cut off mid text keeps what was written and says it was cut short', c3.text);
+    ok(/Bromley: IMD\s+This answer stopped early/.test(c3.text), 'Ask: an answer cut off mid text keeps what was written and says it was cut short', c3.text);
     const rf = await ask('REFUSE this');
     const rf2 = await ask('and now?');
     ok(rf.text === 'I cannot answer that one. Please ask about the figures on the map.' && rf2.text === 'Fine.', 'Ask: a refusal gets a plain reply and the next question works', JSON.stringify([rf.text, rf2.text]));
@@ -3134,7 +3134,7 @@ const smallText = page => page.evaluate(() => {
     force413 = true;
     const big = await ask('one more');
     const after = await ask('again');
-    ok(big.text === 'That conversation has grown too long for me to follow, so I have cleared the earlier questions. Please ask again.' &&
+    ok(big.text === 'This conversation is now too long for me to follow, so I have cleared the earlier questions. Please ask your question again.' &&
        after.text === 'Fine.' && seen[seen.length - 1].n === 1,
       'Ask: a conversation refused as too long is cleared with a plain message, and the next question starts afresh', JSON.stringify([big.text, after.text, seen[seen.length - 1]]));
     ok(!DASH.test(big.text + c1.text + rf.text), 'Ask: the new messages have no dashes');
@@ -3315,7 +3315,7 @@ const smallText = page => page.evaluate(() => {
     ok(await page.evaluate(() => { let n = 0; wLyr.eachLayer(() => n++); return n; }) > 300, 'North East wards drawn');
     ok(await page.evaluate(() => document.getElementById('borough-focus-label').textContent) === 'Focus by LA', 'region wording: the level is LA');
     ok(await page.evaluate(() => { const h = document.getElementById('dl-help').title;
-      return (h.match(/local authority \(LA\)/g) || []).length === 1 && /(four|five) sizes of area/.test(h) && !/\bBorough\b/.test(h); }),
+      return (h.match(/local authority \(LA\)/g) || []).length === 1 && /(4|5) sizes of area/.test(h) && !/\bBorough\b/.test(h); }),
       'region Area level help introduces local authority (LA) once');
     // Ask is on each region map as well as London: the button, the panel and
     // "Ask about this ward" are all there.
@@ -3342,7 +3342,7 @@ const smallText = page => page.evaluate(() => {
       lads: [...new Set([...document.querySelectorAll('#rank-worst .rank-row')].map(b =>
         (LSOA_IMD.features.find(f => f.properties.code === b.dataset.id) || { properties: {} }).properties.borough))],
       notes: document.getElementById('rank-notes').textContent }));
-    ok(neDec.lads.length > 1 && /LSOAs in the North East are in decile 1, the most deprived tenth of England, so this list shows the ten with the lowest national rank\./.test(neDec.notes),
+    ok(neDec.lads.length > 1 && /LSOAs in the North East are in decile 1, the most deprived 10% of areas in England\. This list shows the (ten|10) of them with the lowest rank in England, where rank 1 is the most deprived\./.test(neDec.notes),
       'region: the lowest 10 LSOAs for deprivation are not all from one LA, and the tie is said', JSON.stringify(neDec));
     // "the North East" wherever the region follows "of", "in" or "across" (H29).
     await setOv(page, 'imd_score_ward');
@@ -3393,7 +3393,7 @@ const smallText = page => page.evaluate(() => {
   {
     const { page } = await open(browser, 'index.html?r=england', DESK);
     ok(await page.evaluate(() => /England map is large/.test(document.body.innerText)), 'England warning shows');
-    ok(await page.evaluate(() => /around 40 MB of figures, and neighbourhood \(LSOA\) maps for the whole country are not available here/.test(document.body.innerText)),
+    ok(await page.evaluate(() => /about 40 MB \(megabytes\) of figures\. It does not have maps of LSOAs \(small areas of about 1,500 people\) for the whole country/.test(document.body.innerText)),
       'the England warning says how much it loads and that there are no country-wide LSOA maps');
     await page.close();
   }
@@ -3899,7 +3899,7 @@ const smallText = page => page.evaluate(() => {
         intro: ((document.querySelector('.ai-intro') || {}).textContent || '') }), 600));
     });
     ok(!/every figure in them comes from this map|built from the figures on this map/.test(ask.caution + ask.intro) &&
-       /can still get things wrong/.test(ask.caution),
+       /can still make mistakes/.test(ask.caution),
       'Ask: the panel does not promise that every figure comes from the map', ask.caution);
     await page.keyboard.press('Escape');
     await setOv(page, 'imd_score_ward');
@@ -4032,7 +4032,7 @@ const smallText = page => page.evaluate(() => {
       return out;
     });
     ok(/^\s*Figures for the whole of Testshire/.test(r1.ctx) &&
-       /OHID publishes these only for Testshire as a whole, which takes in Tower Hamlets and one other district, so every ward in those districts shows the same figure\. They describe the county rather than Tower Hamlets or this ward\./.test(r1.ctx) &&
+       /OHID publishes these only for Testshire as a whole\. Testshire includes Tower Hamlets and one other district, so every ward in those districts shows the same figure\. They are figures for the county, not for Tower Hamlets or this ward\./.test(r1.ctx) &&
        r1.pills.length && r1.pills.every(t => t === 'county figure'),
       'a district\'s county figures are titled, noted and marked as the county\'s', r1.ctx.slice(0, 300) + ' / ' + r1.pills.join(','));
     ok(!/further down|appears twice/.test(r1.lh) && /county figure/.test(r1.key),
@@ -4059,8 +4059,8 @@ const smallText = page => page.evaluate(() => {
       return { caution: document.getElementById('cmp-caution').innerText, marks,
         same: PH_COMPARE.figures('Tower Hamlets').ft_suicide_rate === BOROUGH_DATA.E09000030.ft_suicide_rate };
     });
-    ok(/Suicide rate is OHID’s published figure, which for a district is its county’s\./.test(r2.caution) &&
-       /The other figures are calculated from the wards in each LA, with counts added up and the rest weighted by population, so they are not published LA statistics\./.test(r2.caution) &&
+    ok(/Suicide rate is published by OHID \(Office for Health Improvement and Disparities\)\. For a district, this is its county’s figure\./.test(r2.caution) &&
+       /We calculate the other figures from the wards in each LA\. Counts are added up, and the rest are averages where wards with more people count for more\. They are not statistics published for each LA\./.test(r2.caution) &&
        !/published for each LA, so here/.test(r2.caution),
       'Compare explains OHID\'s figures and the calculated ones in one note', r2.caution);
     ok(r2.same && r2.marks.length === 2 && r2.marks.every(x => !x),
@@ -4114,7 +4114,7 @@ const smallText = page => page.evaluate(() => {
     });
     ok(r.hk.some(t => /^ft_mmr_2_doses_age5=combined figure/.test(t)),
       'the profile marks Hackney\'s combined LA figures', r.hk.join(', '));
-    ok(r.part.some(t => /based on \d\d% of residents/.test(t)) && /rests on that part of the ward only/.test(r.partNote),
+    ok(r.part.some(t => /based on \d\d% of residents/.test(t)) && /is based on that part of the ward only/.test(r.partNote),
       'a ward health figure on part of the ward says what share of residents it rests on', r.part.join(', ') + ' / ' + r.partNote.slice(-120));
     ok(/For Hackney, this figure covers Hackney and the City of London together\./.test(r.card.replace(/<[^>]+>/g, ' ')),
       'the MMR card\'s Caution row gives OHID\'s note', r.card.replace(/<[^>]+>/g, ' ').slice(0, 400));
@@ -4191,7 +4191,7 @@ const smallText = page => page.evaluate(() => {
 
     const meth = await open(browser, 'methodology.html', DESK);
     const mt = await meth.page.evaluate(() => document.body.innerText);
-    ok(!/cover\s+every one/.test(mt) && /fewer than four in five of its residents, we show no figure for the ward/.test(mt) &&
+    ok(!/cover\s+every one/.test(mt) && /fewer than 4 in 5 of its residents, we show no figure for the ward/.test(mt) &&
        /Census day, 21 March 2021/.test(mt) && !/mid-2022/.test(mt) && /measures of households|summed counts\s+behind it, as a ward's is/.test(mt),
       'the methodology describes the ward coverage rule, the Census population and Custom area\'s arithmetic', '');
     // How figures reach areas: lookups for most, location for points, and
@@ -4244,7 +4244,7 @@ const smallText = page => page.evaluate(() => {
     await page.waitForTimeout(800);
     const dn = await page.evaluate(() => ({ msg: (document.getElementById('dir-offer-msg') || {}).textContent,
       link: (document.querySelector('#dir-offer-msg a') || {}).href || '', near: !!PH_DIR.near() }));
-    ok(dn.msg === 'M1 1AE is in the North West, which this map does not cover, so open the North West map to see the places near it.' &&
+    ok(dn.msg === 'M1 1AE is in the North West, which this map does not cover. Open the North West map to see the places near it.' &&
        /r=north-west/.test(dn.link) && !dn.near, 'directory: a postcode on another map links there rather than listing places 240 km away (P36)', JSON.stringify(dn));
 
     // P37: choosing LAs keeps the indicators already chosen.
@@ -4263,7 +4263,7 @@ const smallText = page => page.evaluate(() => {
       return { before, at, after: PH_CSV.columns().length };
     });
     ok(ex.before === 7 && ex.at.n === 7 && ex.after === 7 && ex.at.marks > 0 &&
-       /^\w+ of your indicators are not published for LAs, so the LA file leaves them out, and they will be back in the file when you choose another size of area\.$/.test(ex.at.note),
+       /^\w+ of your indicators are not published for LAs, so the LA file does not include them\. If you choose another size of area, the file includes them again\.$/.test(ex.at.note),
       'export: choosing LAs marks the indicators it lacks and keeps them chosen for the other sizes (P37)', JSON.stringify(ex));
 
     // P39, P41: Query's groups, its operators, and equals at the shown precision.
@@ -4313,7 +4313,7 @@ const smallText = page => page.evaluate(() => {
     const cap = await page.evaluate(() => ({ pins: PH_COMPARE.pinned(), sel: selW,
       note: (document.querySelector('#tab-compare .ph-note') || {}).textContent || '' }));
     ok(cap.pins.length === 4 && cap.pins.indexOf('Barnes') === -1 && cap.sel === selBefore &&
-       /You have pinned four wards, which is as many as fit side by side\./.test(cap.note),
+       /You have pinned 4 wards, which is the most that fit side by side\. Remove one to add another\./.test(cap.note),
       'compare: a fifth ward is refused with the reason, and the outline stays where it was (P40)', JSON.stringify(cap));
     const [cc] = await Promise.all([page.waitForEvent('download', { timeout: 8000 }).catch(() => null), page.click('#cmp-csv')]);
     const ch = cc ? fsx.readFileSync(await cc.path(), 'utf8') : '';
@@ -4322,7 +4322,7 @@ const smallText = page => page.evaluate(() => {
     await page.waitForTimeout(500);
     const cl = await page.evaluate(() => ({ pins: PH_COMPARE.pinned().length,
       note: [...document.querySelectorAll('#tab-compare .ph-note')].map(n => n.textContent).join(' / ') }));
-    ok(cl.pins === 0 && /Your four wards were cleared, because Compare works on one size of area at a time\./.test(cl.note),
+    ok(cl.pins === 0 && /Your 4 wards were removed, because Compare can only compare one size of area at a time\./.test(cl.note),
       'compare: switching size says where the pins went (P40)', JSON.stringify(cl));
 
     // P45: the Custom area download is a ZIP of one-table files.
@@ -4803,7 +4803,7 @@ const smallText = page => page.evaluate(() => {
       const rv = (rk.results || []).map(r => r.value);
       out.lsoaRank = rk.within === 'Finchley Church End ward, Barnet' && rv.length === 3 && rv[0] >= rv[1] && rv[1] >= rv[2] &&
         rk.results.every(r => r.ward === 'Finchley Church End' && r.la === 'Barnet' && r.value === lsoaOvValue(r.code, 'imd_score')) &&
-        rk.higher_means === 'more deprived' && /best fit/.test(rk.caveat || '');
+        rk.higher_means === 'more deprived' && /where most of its people live/.test(rk.caveat || '');
       if (hasOa) {
         const oa = await R('rank_areas', { indicator: 'census_over65_pct', direction: 'highest', n: 5, level: 'oa', within_la: 'Hackney' });
         const ov = (oa.results || []).map(r => r.value);
@@ -5025,10 +5025,10 @@ const smallText = page => page.evaluate(() => {
          r.ask[1] && r.ask[1].row.indexOf('less deprived') !== -1 && r.size < 15000,
         'IoD 2025 extras: Ask lists them at the right levels, attainment the right way round, within its 15,000 character cap',
         JSON.stringify({ ask: r.ask, size: r.size }));
-      ok(/Ward figures are an average of the LSOAs in each ward, weighted by their children aged 0 to 15\./.test(r.idaciPub) &&
-         /figures are an average of all the LSOAs in each LA, weighted by their children aged 0 to 15\./.test(r.idaciPub) &&
+      ok(/Ward figures are an average of the LSOAs in each ward, where LSOAs with more children aged 0 to 15 count for more\./.test(r.idaciPub) &&
+         /figures are an average of all the LSOAs in each LA, where LSOAs with more children aged 0 to 15 count for more\./.test(r.idaciPub) &&
          r.idaciUnit === '% of children aged 0 to 15' && /share of the area’s children/.test(r.idaciMethod) &&
-         /weighted by residents at the 2021 Census, because this build had no counts of children/.test(r.fallback),
+         /where LSOAs with more residents at the 2021 Census count for more, because we had no counts of children/.test(r.fallback),
         'IoD 2025 extras: the IDACI card says ward and LA figures are weighted by children, or by residents when they had to be',
         JSON.stringify([r.idaciPub, r.idaciUnit, r.fallback]));
       ok(/a higher figure is better/.test(r.ks2) && /100 is the England level/.test(r.cidr) && /rural areas score as the most deprived/.test(r.geo),
@@ -5181,8 +5181,8 @@ const smallText = page => page.evaluate(() => {
            r.themes.youth === 'Work, money and education' && r.themes.ksi === 'Crime and safety' && r.themes.beds === 'Health',
           'Small-area additions: each sits in its theme', JSON.stringify(r.themes));
         ok(/We measure these for each LSOA from the NHS registers/.test(r.gpPub) &&
-           /Ward figures are an average of the LSOAs that best fit each ward, weighted by population\./.test(r.gpPub) &&
-           /figures are an average of all the LSOAs in each LA, weighted by population\./.test(r.gpPub) &&
+           /Ward figures are an average of the LSOAs in each ward, where LSOAs with more people count for more\./.test(r.gpPub) &&
+           /figures are an average of all the LSOAs in each LA, where LSOAs with more people count for more\./.test(r.gpPub) &&
            /population-weighted centre of each LSOA/.test(r.gpMethod) && /not a walking route or a travel time/.test(r.gpMethod) && r.gpUnit === 'km',
           'Small-area additions: the GP distance card says it is a straight line from the population-weighted centre, averaged into wards and LAs',
           JSON.stringify([r.gpPub, r.gpMethod, r.gpUnit]));
@@ -5365,8 +5365,8 @@ const smallText = page => page.evaluate(() => {
         r.money + ' ' + r.dec.join());
       ok(r.ratio && r.desc[0] && r.desc[1] && !r.desc[2],
         'MSOA additions: cancer figures read as ratios to England, and breast and prostate are not coloured better or worse', JSON.stringify(r.desc));
-      ok(/ONS publishes these estimates for MSOAs\./.test(r.saiePub) && /where its households are/.test(r.saiePub) &&
-         /all the MSOAs in each LA, weighted by households/.test(r.saiePub) && /rent, mortgage interest/.test(r.saieMethod),
+      ok(/ONS publishes these estimates for MSOAs \(areas of about 8,000 people\)\./.test(r.saiePub) && /where its households are/.test(r.saiePub) &&
+         /all the MSOAs in each LA, where MSOAs with more households count for more/.test(r.saiePub) && /rent, mortgage interest/.test(r.saieMethod),
         'MSOA additions: the income card says wards and LAs are weighted by households, and what housing costs are', r.saiePub);
       ok(/where its residents are/.test(r.hlePub) && /our estimates/.test(r.hlePub) && r.hleUnit === 'years',
         'MSOA additions: the healthy life expectancy card says wards are weighted by residents and LA figures are estimates', r.hlePub);
@@ -5723,9 +5723,9 @@ const smallText = page => page.evaluate(() => {
            r.ask[2].row.indexOf('worse mental health') !== -1 && r.ask[4].row.indexOf('lower risk') !== -1,
           'Healthy places and food: Ask says which way the scores and deciles run', JSON.stringify(r.ask.map(a => a && a.row)));
         ok(/GeoDS, at the University of Liverpool, publishes this for LSOAs\./.test(r.ahahPub) &&
-           /figures are an average of all the LSOAs in each LA, weighted by population\./.test(r.ahahPub) &&
+           /figures are an average of all the LSOAs in each LA, where LSOAs with more people count for more\./.test(r.ahahPub) &&
            /less healthy place/.test(r.ahahMethod) && r.timeUnit === 'minutes by car' && /not a walking time/.test(r.timeMethod) &&
-           /least healthy tenth/.test(r.decMethod),
+           /least healthy 10%/.test(r.decMethod),
           'Healthy places and food: the AHAH cards say who publishes it, how wards and LAs are made, which way it runs and the drive time unit',
           JSON.stringify({ pub: r.ahahPub, unit: r.timeUnit }));
         ok(/worse mental health/.test(r.samhiMethod) && /LSOAs of 2011/.test(r.samhiMethod) && /2022/.test(r.samhiCadence),
@@ -5738,7 +5738,7 @@ const smallText = page => page.evaluate(() => {
         ok(/once a year.*these are for 2024\/25\./.test(r.qofCad[0]) && /^These are for 2019\/20, from the copy .* published in 2021 and has not updated since\.$/.test(r.qofCad[1])
            && /^Figures end in 20\d\d, \d+ years ago$/.test(r.qofCad[2]),
           'Healthy places and food: QOF estimates from the 2019/20 copy say so, and carry the age note', JSON.stringify(r.qofCad));
-        ok(/Decile 1 is the tenth of England's LSOAs at highest risk/.test(r.ppfiMethod) && /put England's LSOAs in order again/.test(r.ppfiMethod) &&
+        ok(/Decile 1 is the 10% of England's LSOAs at highest risk/.test(r.ppfiMethod) && /put England's LSOAs in order again/.test(r.ppfiMethod) &&
            /deciles 1 and 2/.test(r.shareCounted),
           'Healthy places and food: the PPFI cards say decile 1 is the highest risk and how wards and LAs are made', r.ppfiMethod);
         ok(/sandwich shops and bakeries/.test(r.fhrsMethod) && /wards and LAs only/.test(r.fhrsMethod) && /fewer than 20/.test(r.fhrsPub),
@@ -5766,7 +5766,7 @@ const smallText = page => page.evaluate(() => {
         });
         ok(lp.block && lp.dec, 'Healthy places and food: the LSOA profile shows the healthy places index with its decile', JSON.stringify(lp));
         const ctx = await page.evaluate(() => [ovContext('lsoa', 'ahah_decile', 5), ovContext('lsoa', 'ppfi_decile', 5)]);
-        ok(/(healthier|less healthy) than \d+% of LSOAs/.test(ctx[0]) && /at (lower|higher) risk than/.test(ctx[1]) &&
+        ok(/(Healthier|Less healthy) than \d+% of LSOAs/.test(ctx[0]) && /At (lower|higher) risk than/.test(ctx[1]) &&
            !/deprived/.test(ctx.join(' ')),
           'Healthy places and food: an LSOA\'s place among the others is said in each decile\'s own words', JSON.stringify(ctx));
         await page.evaluate(() => showWard('Lansbury'));
