@@ -2348,8 +2348,6 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
   .ov-res-nm { font-size: var(--t-base); font-weight: 600; color: var(--ink); line-height: 1.3; }
   .ov-res-sub { font-size: var(--t-xs); color: var(--ink-3); }
   .ov-empty { padding: 10px; font-size: var(--t-md); color: var(--ink-3); }
-  .ov-empty.ov-council { color: var(--ink-2); line-height: 1.45; background: var(--paper-2);
-    border: 1px solid var(--line-2); border-radius: var(--r-sm); margin-top: 6px; }
   #ov-home { display: flex; flex-direction: column; gap: 6px; }
   #ov-home[hidden] { display: none; }
   .ov-chips { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
@@ -5996,19 +5994,22 @@ const CATS = [
     { k: "hle_male", l: "Healthy life expectancy at birth, men", g: "msoa", lv: ["ward","msoa"] },
     { k: "dfle_female", l: "Disability-free life expectancy at birth, women", g: "msoa", lv: ["ward","msoa"] },
     { k: "dfle_male", l: "Disability-free life expectancy at birth, men", g: "msoa", lv: ["ward","msoa"] },
-    { k: "ft_a_e_attendance_under_5", l: "A&E attendances, ages 0 to 4", g: "borough", lv: ["borough","ward"] },
-    { k: "ft_cervical_screening_25_49", l: "Cancer screening coverage: cervical (25 to 49)", g: "borough", lv: ["borough","ward"] },
-    { k: "ft_child_poverty_low_income", l: "Children in relative low income families (under 16)", g: "borough", lv: ["borough","ward"] },
-    { k: "ft_depression_qof", l: "Depression: QOF prevalence", g: "borough", lv: ["borough","ward"] },
-    { k: "ft_flu_vaccination_65plus", l: "Vaccination coverage: flu (65 and over)", g: "borough", lv: ["borough","ward"] },
-    { k: "ft_hypertension_qof", l: "Hypertension: QOF prevalence", g: "borough", lv: ["borough","ward"] },
-    { k: "ft_mental_health_qof", l: "Mental health: QOF prevalence", g: "borough", lv: ["borough","ward"] },
-    { k: "ft_mmr_2_doses_age5", l: "Vaccination coverage: MMR two doses at 5 years", g: "borough", lv: ["borough","ward"] },
-    { k: "ft_obesity_adults", l: "Overweight including obesity prevalence in adults", g: "borough", lv: ["borough","ward"] },
-    { k: "ft_physical_activity_adults", l: "Physically active adults", g: "borough", lv: ["borough","ward"] },
-    { k: "ft_self_harm_admissions_10_24", l: "Hospital admissions for self-harm (10 to 24)", g: "borough", lv: ["borough","ward"] },
-    { k: "ft_smoking_prevalence_adults", l: "Smoking prevalence in adults (18+), current smokers", g: "borough", lv: ["borough","ward"] },
-    { k: "ft_suicide_rate", l: "Suicide rate", g: "borough", lv: ["borough","ward"] },
+    // OHID's figures for whole LAs. They colour the map by LA only: drawn by
+    // ward, every ward in an LA would carry the LA's figure, and the map would
+    // look like a ward pattern that is not there.
+    { k: "ft_a_e_attendance_under_5", l: "A&E attendances, ages 0 to 4", g: "borough", lv: ["borough"] },
+    { k: "ft_cervical_screening_25_49", l: "Cancer screening coverage: cervical (25 to 49)", g: "borough", lv: ["borough"] },
+    { k: "ft_child_poverty_low_income", l: "Children in relative low income families (under 16)", g: "borough", lv: ["borough"] },
+    { k: "ft_depression_qof", l: "Depression: QOF prevalence", g: "borough", lv: ["borough"] },
+    { k: "ft_flu_vaccination_65plus", l: "Vaccination coverage: flu (65 and over)", g: "borough", lv: ["borough"] },
+    { k: "ft_hypertension_qof", l: "Hypertension: QOF prevalence", g: "borough", lv: ["borough"] },
+    { k: "ft_mental_health_qof", l: "Mental health: QOF prevalence", g: "borough", lv: ["borough"] },
+    { k: "ft_mmr_2_doses_age5", l: "Vaccination coverage: MMR two doses at 5 years", g: "borough", lv: ["borough"] },
+    { k: "ft_obesity_adults", l: "Overweight including obesity prevalence in adults", g: "borough", lv: ["borough"] },
+    { k: "ft_physical_activity_adults", l: "Physically active adults", g: "borough", lv: ["borough"] },
+    { k: "ft_self_harm_admissions_10_24", l: "Hospital admissions for self-harm (10 to 24)", g: "borough", lv: ["borough"] },
+    { k: "ft_smoking_prevalence_adults", l: "Smoking prevalence in adults (18+), current smokers", g: "borough", lv: ["borough"] },
+    { k: "ft_suicide_rate", l: "Suicide rate", g: "borough", lv: ["borough"] },
   ]},
   { key: "imd2025", label: "Deprivation", ico: "scale", fields: [
     { k: "imd_score_ward",                   l: "IMD composite score, ward average", g: "ward" },
@@ -10967,6 +10968,65 @@ function getBoroughRange(ovKey) {
 }
 function restyleBorough() {
   if (typeof boroughL !== 'undefined' && boroughL) boroughL.setStyle(_boroughStyle);
+  syncLaHover();
+}
+/* At LA level, hovering an LA shows its name and figure, as hovering a ward
+   does at ward level. The outline layer below cannot take the pointer: it is
+   also the context outline at every other level, where it would sit over the
+   wards and catch their clicks. So a see-through copy of the LAs goes on the
+   map at LA level only. restyleBorough runs on every change of level,
+   indicator and focus, so it keeps this in step. var, not let: the first
+   repaint can come before this line has run. */
+var laHoverL = null;
+function laHoverTip(feat) {
+  const p = feat.properties || {};
+  const code = p.LAD25CD || p.lad_code || p.code;
+  const name = p.name || '';
+  const k = _activeOv();
+  let extra = '';
+  if (k && k !== 'none' && ohidLaKey(k) && boroughOvValue(code, k) != null) {
+    const c = laFigCounty(code, k);
+    if (c) extra += '<span class="ctx">OHID publishes this figure only for ' + _esc(laCountyPhrase(c, name)) + ' as a whole.</span>';
+    const n = laFigNote(code, k);
+    if (n) extra += '<span class="ctx">' + _esc(n.text) + '</span>';
+  } else if (k && k !== 'none' && ohidLaKey(k) && name) {
+    // An LA with no figure of its own because OHID counts it with another
+    // (the City of London with Hackney) says where its figure is.
+    const host = Object.keys(BOROUGH_DATA).find(c2 => {
+      const n2 = c2 !== code && laFigNote(c2, k);
+      return n2 && /together\.$/.test(n2.text) && n2.text.indexOf(name) !== -1;
+    });
+    if (host) {
+      const hn = (typeof LAD_CODE_TO_NAME === 'object' && LAD_CODE_TO_NAME[host]) || host;
+      extra += '<span class="ctx">OHID gives ' + _esc(ladPhrase(name)) + ' no figure of its own. ' +
+        _esc(hn) + '’s figure covers ' + _esc(hn) + ' and ' + _esc(ladPhrase(name)) + ' together.</span>';
+    }
+  }
+  return '<b class="tip-nm">' + _esc(name) + '</b><span class="tip-meta">LA</span>' +
+    ovTooltipRows(kk => boroughOvValue(code, kk), null, 'borough', code) + extra;
+}
+function syncLaHover() {
+  if (typeof map === 'undefined' || !map || typeof BOROUGH_GJ === 'undefined' || !BOROUGH_GJ) return;
+  if (_activeLevel() !== 'borough') {
+    if (laHoverL && laHoverL._map) map.removeLayer(laHoverL);
+    return;
+  }
+  if (!laHoverL) {
+    laHoverL = L.geoJSON(BOROUGH_GJ, {
+      style: { stroke: false, fillOpacity: 0 },
+      onEachFeature: (feat, lyr) => {
+        // An LA outside the focus is not drawn, so it is not hovered either.
+        const open = e => {
+          if (focusActive() && !ladInFocus((feat.properties || {}).name || '')) return;
+          lyr.bindTooltip(laHoverTip(feat), { sticky: true, opacity: .94 }).openTooltip(e.latlng);
+        };
+        // A tap on a phone is a click, with no hover before it.
+        lyr.on('mouseover', open);
+        lyr.on('click', open);
+      },
+    });
+  }
+  if (!laHoverL._map) laHoverL.addTo(map);
 }
 const boroughL = L.geoJSON(BOROUGH_GJ, {
   interactive: false,
@@ -15180,22 +15240,20 @@ function _fitFocus(bounds) {
 
   /* What the picker offers, and in which themes.
 
-     Indicators published only once per council are left out: every ward in a
-     council shows the same figure, so the map cannot tell one neighbourhood
-     from another with them. They are removed from the select too, so a link
-     or the level badge cannot bring one back. The ward profile and reports
-     still read them from the data.
+     Indicators published only once per LA are offered too, such as
+     vaccination and screening coverage. Their registry entries give LA as
+     their only level, so they colour the map by LA and never by ward, where
+     every ward in an LA would carry the same figure.
 
      Health was 55 indicators in one theme. What remains is split three ways,
      each short enough to scan: everyday health, life expectancy and deaths,
      and hospital admissions. The two Local Health benefit measures move to
      Work and fertility to People. */
   const DROP = new Set();
-  // The council-only ones are kept aside, so a search for one can say where
-  // its figures are rather than finding nothing.
-  const councilOnly = [];
   const MOVE = { ft_93098: 'Work, money and education',
                  ft_93089: 'People and communities',
+                 // OHID's LA figure; it sits with the income measures.
+                 ft_child_poverty_low_income: 'Work, money and education',
                  // Census household deprivation sits with the IoD, after it.
                  census_hh_deprived_2plus_pct: 'Deprivation' };
   /* Transport is its own theme: car ownership and travel to work from
@@ -15208,8 +15266,8 @@ function _fitFocus(bounds) {
   // Matched on the display label and the official title together, so a short
   // label ("Deaths from cancer") still sorts by the publisher's own words.
   const HEALTH_SPLIT = [
-    ['Life expectancy and deaths', /life expectancy|mortality/],
-    ['Hospital admissions', /admission|injur/],
+    ['Life expectancy and deaths', /life expectancy|mortality|suicide/],
+    ['Hospital admissions', /admission|injur|a&e/],
   ];
   (function regroup() {
     const out = {};
@@ -15219,10 +15277,9 @@ function _fitFocus(bounds) {
       out[label].push(o);
     };
     model.forEach(g => g.opts.forEach(o => {
-      if (DROP.has(o.value) || o.native === 'borough') {
+      if (DROP.has(o.value)) {
         const opt = sel.querySelector('option[value="' + o.value + '"]');
         if (opt) opt.remove();
-        if (!DROP.has(o.value)) councilOnly.push(o);
         return;
       }
       // Outside London the station and bus stop measures come from DfT
@@ -15264,12 +15321,12 @@ function _fitFocus(bounds) {
      in it. A large theme is split into sub-groups by subject, matched on the
      indicator's key, so Health is six short lists rather than one of 55. */
   const THEME_INFO = {
-    'Health':                   ['#AE2573', 'How people rate their own health, disability and care, and children\'s weight.'],
+    'Health':                   ['#AE2573', 'How people rate their own health, disability and care, conditions recorded by GPs, vaccination and screening, smoking and weight.'],
     'Life expectancy and deaths': ['#6B2C91', 'How long people live and what they die of, compared with the England average.'],
-    'Hospital admissions':      ['#C2185B', 'Emergency and injury admissions to hospital, compared with the England average.'],
+    'Hospital admissions':      ['#C2185B', 'Emergency and injury admissions to hospital, compared with the England average, and A&E visits by young children.'],
     'Deprivation':              ['#003087', 'The Index of Multiple Deprivation 2025, its domains and sub-domains, income deprivation among children and older people, and the measures the index is built from. Decile 1 is the most deprived tenth of areas in England.'],
     'People and communities':   ['#7C2855', 'Age, ethnicity, country of birth, language and who people live with, from Census 2021.'],
-    'Work, money and education': ['#00703C', 'Jobs, benefits and qualifications.'],
+    'Work, money and education': ['#00703C', 'Jobs, income, benefits and qualifications.'],
     'Housing':                  ['#8A6400', 'Who owns and who rents, and how crowded homes are, from Census 2021.'],
     'Transport':                ['#0072CE', 'Car ownership, how people get to work, and how far it is to a station or bus stop.'],
     'Environment and access':   ['#006F79', 'Air pollution, fuel poverty and access to green and blue space.'],
@@ -15279,17 +15336,20 @@ function _fitFocus(bounds) {
   const SUBGROUPS = {
     'Health': [
       ['Everyday health (Census 2021)', /^census_/],
+      ['Vaccination and screening', /vaccination|screening/],
+      ['Smoking, weight and activity in adults', /^ft_(smoking|obesity|physical)_/],
       ['Children\'s weight', /reception|year 6/],
       ['Birth weight', /birth weight/],
       ['New cancer cases', /cancer incidence/],
+      ['Conditions recorded by GPs', /recorded by gps/],
     ],
     'Life expectancy and deaths': [
       ['Life expectancy', /life expectancy/],
       ['Deaths, all causes', /all causes|preventable/],
-      ['Deaths by cause', /mortality/],
+      ['Deaths by cause', /mortality|suicide/],
     ],
     'Hospital admissions': [
-      ['Children and young people', /under 5|under 15|young people|children/],
+      ['Children and young people', /under 5|under 15|10 to 24|young people|children/],
       ['Heart, lungs and stroke', /heart|coronary|copd|stroke/],
       ['Alcohol', /alcohol/],
       ['All ages', /admission/],
@@ -15551,28 +15611,6 @@ function _fitFocus(bounds) {
       return sc > 0 ? { o: o, s: sc } : null;
     }).filter(Boolean).sort((a, b) => b.s - a.s).map(x => x.o);
   }
-  /* What to say when the search finds an indicator published only for whole
-     LAs, which the map does not offer: where its figures can be read. */
-  function councilOnlyNote(q) {
-    const hits = scoreHits(q, councilOnly).slice(0, 3);
-    if (!hits.length) return '';
-    const names = hits.map(o => esc(o.name));
-    const list = names.length === 1 ? names[0] : names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
-    const sections = [];
-    hits.forEach(o => {
-      const c = (typeof CATS !== 'undefined') ? CATS.find(c => c.fields.some(f => f.k === o.value)) : null;
-      const lbl = c ? String(c.label).replace(/\s*&\s*/g, ' and ') : '';
-      if (lbl && sections.indexOf(lbl) === -1) sections.push(lbl);
-    });
-    const one = hits.length === 1;
-    return '<div class="ov-empty ov-council">' + list + (one ? ' is' : ' are') +
-      ' only published for whole LAs, so ' + (one ? 'it is' : 'they are') +
-      ' not among the indicators you can colour the map by. You can find each LA\'s figure' +
-      (sections.length ? ' under ' + esc(sections.join(' or ')) : '') +
-      ' in the full profile of any ward, and we plan to add ' + (one ? 'it' : 'them') + ' to the LA map.' +
-      ((typeof laAnyCountyFigure === 'function' && laAnyCountyFigure()) ? ' For a district that is part of a county, the figure is for the whole county.' : '') +
-      '</div>';
-  }
 
   function render() {
     const cur = sel.value;
@@ -15589,14 +15627,13 @@ function _fitFocus(bounds) {
 
     if (q) {
       const hits = scoreHits(q).slice(0, 15);
-      const council = councilOnlyNote(q);
       resultsEl.innerHTML = (hits.length
         ? '<div class="ov-res-sub" style="padding:0 2px 4px">' + hits.length + (hits.length === 15 ? '+' : '') +
             (hits.length === 1 ? ' match' : ' matches') + '</div>' +
           hits.map(o => '<button type="button" class="ov-res' + (o.value === cur ? ' on' : '') + '" data-ov="' + esc(o.value) + '">' +
             '<span class="ov-res-nm">' + esc(o.name) + '</span>' +
             '<span class="ov-res-sub">' + esc(o.theme) + ' · ' + levelsHTML(o) + '</span></button>').join('')
-        : (council ? '' : '<div class="ov-empty">No indicator matches that, so try another word, or clear the search to browse the indicators by theme.</div>')) + council;
+        : '<div class="ov-empty">No indicator matches that, so try another word, or clear the search to browse the indicators by theme.</div>');
     }
     // The count, or why nothing matches, for a screen reader.
     const stEl = document.getElementById('ov-results-status');
@@ -15604,9 +15641,7 @@ function _fitFocus(bounds) {
       let msg = '';
       if (q) {
         const n = scoreHits(q).slice(0, 15).length;
-        const cn = councilOnlyNote(q);
         msg = n ? n + (n === 15 ? ' or more' : '') + (n === 1 ? ' indicator matches' : ' indicators match')
-          : cn ? (() => { const d = document.createElement('div'); d.innerHTML = cn; return d.textContent; })()
           : 'No indicator matches that.';
       }
       if (stEl.textContent !== msg) stEl.textContent = msg;
@@ -15687,7 +15722,7 @@ function _fitFocus(bounds) {
     const keep = list => { for (let i = list.length - 1; i >= 0; i--) if (gone.has(list[i].value)) list.splice(i, 1); };
     model.forEach(g => keep(g.opts));
     for (let i = model.length - 1; i >= 0; i--) if (!model[i].opts.length) model.splice(i, 1);
-    keep(all); keep(councilOnly);
+    keep(all);
     gone.forEach(k => { delete byVal[k]; });
     for (let i = KEY.length - 1; i >= 0; i--) if (gone.has(KEY[i][0])) KEY.splice(i, 1);
     window.PH_THEMES = model.map(g => ({ label: g.label, keys: g.opts.map(o => o.value) }));

@@ -1236,8 +1236,8 @@ const smallText = page => page.evaluate(() => {
       wards: document.getElementById('tnw').checked, title: document.title, gp: !!(typeof gpL !== 'undefined' && gpL && map.hasLayer(gpL)) }));
     ok(!reset.on.length && reset.wards && !reset.gp && !/\|/.test(reset.title), 'Reset clears the point and boundary layers and the selection', JSON.stringify(reset));
 
-    // Indicator search: everyday words, "1 match", and a council-only
-    // indicator says where its figures are instead of finding nothing.
+    // Indicator search: everyday words, "1 match", and an indicator published
+    // only for whole LAs is found like any other.
     await page.click('#sbtab-overlay');
     const ind = {};
     // Suicide rather than smoking: adult smoking is left out until a refresh
@@ -1248,18 +1248,50 @@ const smallText = page => page.evaluate(() => {
       ind[q] = await page.evaluate(() => document.getElementById('ov-results').innerText.replace(/\s+/g, ' ').trim());
     }
     await page.fill('#ov-search', '');
-    ok(!/No indicator matches/.test(ind.suicide) && /Suicide rate is only published for whole LAs/.test(ind.suicide) && /full profile/.test(ind.suicide) && /plan to add it to the LA map/.test(ind.suicide),
-      'a council-only indicator says where its figures are', ind.suicide);
+    ok(/Suicide rate Life expectancy and deaths · LA\b/.test(ind.suicide) && !/only published for whole LAs/.test(ind.suicide),
+      'an indicator published only for whole LAs is found, under its theme, at LA level', ind.suicide);
     ok(/Nitrogen dioxide/.test(ind.pollution), 'indicator search knows everyday words', ind.pollution.slice(0, 120));
     ok(/^1 match\b/.test(ind.arson), 'one result reads "1 match"', ind.arson.slice(0, 60));
-    ok(/only published for whole LAs/.test(ind.flu) && !/\bmatch(es)?\b/.test(ind.flu.replace(/No indicator matches/, '')),
-      '"flu" finds the council-only note and no word inside "fluent"', ind.flu.slice(0, 160));
+    ok(/Flu vaccination, 65 and over Health · LA\b/.test(ind.flu) && !/fluent/i.test(ind.flu),
+      '"flu" finds flu vaccination and no word inside "fluent"', ind.flu.slice(0, 160));
     ok(/Nitrogen dioxide/.test(ind.no2), '"no2" still finds nitrogen dioxide', ind.no2.slice(0, 120));
     ok(/clear the search to browse/.test(ind.zzqx), 'a search with no matches says what to do next', ind.zzqx);
     const words = await page.evaluate(() => [...document.querySelectorAll('.hdr [title], .hdr [aria-label], .hdr [placeholder], #rank-panel')]
       .map(e => [e.getAttribute('title'), e.getAttribute('aria-label'), e.getAttribute('placeholder'), e.id === 'rank-panel' ? e.textContent : ''].join(' ')).join(' '));
     ok(!DASH.test(words + Object.values(ind).join(' ') + th.title + ward.title), 'the new header, list and search words have no dashes');
     ok(errors.length === 0, 'no page errors (search and header)', errors.join(' | '));
+
+    // An indicator published only for whole LAs colours the map by LA and
+    // never by ward, and hovering an LA reads its figure.
+    const laOnly = await page.evaluate(async () => {
+      const s = document.getElementById('ov'); s.value = 'ft_mmr_2_doses_age5'; s.dispatchEvent(new Event('change'));
+      await new Promise(r => setTimeout(r, 1500));
+      const lvl = currentDataLevel;
+      const ward = document.querySelector('#dl-seg button[data-dl="ward"]');
+      const wardOff = !!ward && (ward.classList.contains('disabled') || ward.getAttribute('aria-disabled') === 'true');
+      _setDataLevel('ward');
+      const stayed = currentDataLevel;
+      const code = Object.keys(BOROUGH_DATA).find(c => boroughOvValue(c, 'ft_mmr_2_doses_age5') != null && !laFigNote(c, 'ft_mmr_2_doses_age5'));
+      const lyr = laHoverL && laHoverL.getLayers().find(l => (l.feature.properties.LAD25CD || l.feature.properties.lad_code || l.feature.properties.code) === code);
+      if (lyr) lyr.fire('mouseover', { latlng: lyr.getBounds().getCenter() });
+      await new Promise(r => setTimeout(r, 300));
+      const tip = [...document.querySelectorAll('.leaflet-tooltip')].map(t => t.innerText.replace(/\s+/g, ' ')).join(' | ');
+      if (lyr) lyr.fire('mouseout');
+      const name = LAD_CODE_TO_NAME[code] || '';
+      const want = fmtOv(parseFloat(boroughOvValue(code, 'ft_mmr_2_doses_age5')), 'ft_mmr_2_doses_age5');
+      // Leaving LA level takes the hover layer off, so it never sits over the wards.
+      s.value = 'census_bad_health_pct'; s.dispatchEvent(new Event('change'));
+      await new Promise(r => setTimeout(r, 800));
+      _setDataLevel('ward');
+      await new Promise(r => setTimeout(r, 800));
+      return { lvl, stayed, wardOff,
+        tip, name, want, offAtWard: currentDataLevel === 'ward' && !(laHoverL && laHoverL._map) };
+    });
+    ok(laOnly.lvl === 'borough' && laOnly.stayed === 'borough' && laOnly.wardOff,
+      'an LA-only indicator opens at LA level, and the Ward button is off for it', JSON.stringify(laOnly));
+    ok(laOnly.name && laOnly.tip.indexOf(laOnly.name + ' LA MMR vaccination, both doses by age 5: ' + laOnly.want) === 0,
+      'hovering an LA shows its name and figure', laOnly.tip);
+    ok(laOnly.offAtWard, 'the LA hover layer comes off when the map leaves LA level', JSON.stringify(laOnly));
     await page.close();
   }
   // Nothing in the header overlaps at the widths people use.
@@ -3998,9 +4030,9 @@ const smallText = page => page.evaluate(() => {
     // headline age, and comes back once the refresh has checked it.
     const smokeHeld = !st.ft_age_checked || (st.ft_age_mismatch || []).includes('ft_smoking_prevalence_adults');
     ok(smokeHeld ? (!r0.smokeRow && !r0.smokeOpt && !r0.smokeAsk && !r0.smokeArea && !/smok/i.test(r0.exportSmoke))
-                 : (r0.smokeRow && r0.smokeAsk && r0.smokeArea && /Adults who smoke/.test(r0.exportSmoke)),
+                 : (r0.smokeRow && r0.smokeOpt && r0.smokeAsk && r0.smokeArea && /Adults who smoke/.test(r0.exportSmoke)),
       smokeHeld ? 'adult smoking at the wrong age is left out of the profile, the picker, the export and Ask'
-                : 'adult smoking at its headline age is back in the profile, the export and Ask', JSON.stringify(r0));
+                : 'adult smoking at its headline age is back in the profile, the picker, the export and Ask', JSON.stringify(r0));
     ok(bands ? (r0.u === 'Aged under 16 (Census 2021)' && /16 to 64/.test(r0.w + r0.den))
              : (r0.u === 'Aged under 15 (Census 2021)' && r0.w === 'Aged 15 to 64 (Census 2021)' && r0.den === 'Residents aged 15 to 64 at the 2021 Census'),
       'the Census age bands are labelled as the ages indicators.js says they cover', [st.census_age_bands, r0.u, r0.w, r0.den].join(' / '));
