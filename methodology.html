@@ -238,7 +238,7 @@ different region.</p>
 There are 2 reasons for this. First, OHID does not publish some MSOA figures,
 because the numbers are so small that someone could be identified. Second, some
 older indicators have no figure for the MSOAs whose boundaries changed in 2021
-(see <a href="#gap-2011-msoas">MSOAs redrawn in 2021</a>). In Query, an area
+(see <a href="#gap-2011-msoas">MSOAs whose boundaries changed in 2021</a>). In Query, an area
 with no figure for one of your conditions cannot pass or fail that condition.
 So the area is not in the results, and the number of these areas is shown under
 the results.</p>
@@ -768,7 +768,7 @@ updating, its row is marked, so that older figures always have a warning.</p>
 <h2 id="placing">How we match figures to areas</h2>
 
 <p>Figures come from many publishers, for different years and different types
-of area. Boundaries also change: wards are redrawn, councils join together, and
+of area. Boundaries also change: ward boundaries move, councils join together, and
 the small Census areas changed in 2021. This section explains how we calculate
 the figure for each ward and LA, so that you can check every step. The
 <a href="#appendix">technical appendix</a> lists the exact files.</p>
@@ -963,15 +963,18 @@ published. If an LA does not match, we mark it so that we can correct it.</p>
 
 <h3 id="gap-city">City of London</h3>
 
-<p>The City of London has 25 wards, but the lookup places its few LSOAs in only
-5 of these wards. So the other 20 wards have no deprivation score, no Local
-Health figures and none of the other figures calculated from LSOAs. Census
-figures are calculated from output areas instead, so some of those 20 wards do
-have Census figures. This is because of the way that the areas are drawn. It is
-not because we missed an update. Choose <strong>LA</strong> to see the figures
-for the whole City of London.</p>
+<p>The City of London has 25 wards but only 6 LSOAs. 10 of its wards have
+residents in ONS's output area lookup, and all 10 have a deprivation score and
+the other figures calculated from LSOAs. Some of them take these figures from
+the LSOA where most of their residents live (see
+<a href="#no-lsoa">wards with no LSOA</a>). The other 15 wards have no output
+area of their own, because very few people live in them, so they have no
+figures about residents. One of them, Walbrook, has an LSOA in the lookup, so it
+has a deprivation score but no Census figures. This is because of the way that
+the areas are drawn. It is not because we missed an update. Choose
+<strong>LA</strong> to see the figures for the whole City of London.</p>
 
-<h3 id="gap-2011-msoas">MSOAs redrawn in 2021</h3>
+<h3 id="gap-2011-msoas">MSOAs whose boundaries changed in 2021</h3>
 
 <p>The older Local Health figures, such as hospital admissions for 2016/17 to
 2020/21, are published for the 2011 MSOAs. OHID does not publish these figures
@@ -1054,7 +1057,7 @@ above, for anyone who wants to check it or repeat it.</p>
         <td>Figures published for the 2011 LSOAs, such as the mental health
             index (SAMHI). An LSOA that did not change, or was split from a
             2011 LSOA, takes the figure of that 2011 LSOA. An LSOA that was
-            made by joining 2011 LSOAs, or was redrawn, takes the simple
+            made by joining 2011 LSOAs, or whose boundary changed, takes the simple
             average of the 2011 LSOAs it came from. This is because the lookup
             does not say how many people came from each 2011 LSOA.</td></tr>
     <tr><td class="term">2011 MSOAs to 2021 MSOAs</td>
@@ -1062,7 +1065,7 @@ above, for anyone who wants to check it or repeat it.</p>
             Census population of each area (Nomis <code>KS101EW</code>)</td>
         <td>Local Health figures published for 2011 areas. An area that was
             split takes the figure of the 2011 area it came from (its parent).
-            An area that was made by joining areas, or was redrawn, takes the
+            An area that was made by joining areas, or whose boundary changed, takes the
             average of its parents' figures. Each parent is weighted by its
             whole 2011 population. If we cannot get the 2011 populations, the
             parents count equally.</td></tr>
@@ -1208,7 +1211,7 @@ used under their own licences, which are listed in our
 
 <footer class="site-ftr">
   <div class="site-ftr-in">
-    <p>PopHealth Map is an independent project, not affiliated with the NHS. You can get
+    <p>PopHealth Map is an independent project, and it is not part of the NHS. You can get
     in touch at <a href="mailto:contact@pophealth.uk">contact@pophealth.uk</a>.</p>
     <p><a href="privacy.html#terms">Terms of use</a></p>
   </div>

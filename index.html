@@ -98,8 +98,8 @@
         'still be slow to open and use a lot of memory, especially on a phone or a slow connection.</p>' +
         '<p style="margin:0 0 10px;color:#4C6272">If you want to see one place, its region map ' +
         'opens much faster and has the same detail.</p>' +
-        '<p style="margin:0 0 20px;color:#4C6272">The England map has no charity listings or Ask panel, ' +
-        'which you can find on each region\'s map.</p>' +
+        '<p style="margin:0 0 20px;color:#4C6272">The England map has no charity listings, no Ask panel and ' +
+        'no Custom area. You can find them on each region\'s map.</p>' +
         '<button type="button" onclick="PH_ENGLAND_GO()" autofocus style="' + btn +
         'border:0;background:#005EB8;color:#fff">Open the England map</button>' +
         (fromSite ? '<a href="' + back.replace(/"/g, '&quot;') + '" style="' + btn +
@@ -4580,7 +4580,7 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
     <span class="sbar-left">
       <!-- The palette is NHS blue and the audience is NHS staff, so who runs
            this has to be said on the page, not left to be inferred. -->
-      <span class="sbar-note">PopHealth Map is an independent project, not affiliated with the NHS.</span>
+      <span class="sbar-note">PopHealth Map is an independent project, and it is not part of the NHS.</span>
       <a class="sbar-link" href="privacy.html">About and privacy</a>
       <!-- Back in the bar: an accessibility statement has to be easy to find
            from every page, not only reachable at its own URL. -->
@@ -7315,18 +7315,18 @@ function _levelTwinText(k, level) {
 // The whole message as plain text, for the hint beside the level buttons.
 function _levelGateText(k, level) {
   const have = ovLevels(k);
-  if (!have.length) return indLabel(k) + ' has no figures to colour the map with, so please pick a different indicator.';
+  if (!have.length) return indLabel(k) + ' has no figures to colour the map with, so please choose a different indicator.';
   return _levelLackText(k, level) + ' Choose ' + _andList(have.map(lv => _LVL_BUTTON[lv] || lv), 'or') +
-    ', or pick a different indicator.';
+    ', or a different indicator.';
 }
 function _levelGateMsg(label, k, level) {
   const plural = _levelPlural;
   const have = ovLevels(k);
   const name = '<b>' + String(label).replace(/[<>&]/g, '') + '</b>';
-  if (!have.length) return name + ' has no figures to colour the map with, so please pick a different indicator.';
+  if (!have.length) return name + ' has no figures to colour the map with, so please choose a different indicator.';
   return name + ' is only available for ' + _andList(have.map(plural)) +
     ', so it cannot be shown by ' + _levelName(level) + '. Choose ' +
-    _andList(have.map(lv => _LVL_BUTTON[lv] || lv), 'or') + ', or pick a different indicator.';
+    _andList(have.map(lv => _LVL_BUTTON[lv] || lv), 'or') + ', or a different indicator.';
 }
 
 // Metadata shown in the scale-bar footer and the overlay-info popover.
@@ -12081,7 +12081,7 @@ function wardCoverPct(wrec, k) {
    deprived fifth, and where the file says so, the share of the ward's
    residents who live in them, which says more than the count does. */
 function core20TileSub(pct) {
-  return 'in England’s most deprived fifth (Core20)' +
+  return 'in England’s most deprived 20% (Core20)' +
     (typeof pct === 'number' ? ', home to ' + fmtNum(pct, pct > 0 && pct < 1 ? 1 : 0) + '% of residents' : '');
 }
 function wardCoverText(pct) {
@@ -12100,7 +12100,7 @@ function profileCaption(key, has, lad) {
   switch (key) {
     case 'headline':
       return 'The ward’s population at the 2021 Census, the crimes recorded in it over the last 12 months, ' +
-        'and how many of its LSOAs are among the most deprived fifth of England.';
+        'and how many of its LSOAs are among the most deprived 20% of areas in England.';
     case 'health':
       return 'How residents described their health, disability and unpaid care at the 2021 Census' +
         (has.msoa ? ', then health outcomes estimated by the Office for Health Improvement and Disparities (OHID)' : '') +
@@ -12596,7 +12596,7 @@ const PH_CREDIT_CDRC = 'Priority Places for Food Index: data provided by the Con
 const PH_CREDIT_ONSPD = 'Distances to GP practices, pharmacies and dentists: sites placed by postcode with the ONS Postcode Directory. ' +
   'Contains OS data © Crown copyright and database right 2026. Contains Royal Mail data © Royal Mail copyright and database right 2026.';
 function phCreditBase() {
-  return 'PopHealth Map (pophealth.uk), an independent project not affiliated with the NHS' +
+  return 'PopHealth Map (pophealth.uk), an independent project that is not part of the NHS' +
     (DATA_DATE ? ', with figures updated on ' + fmtDate(DATA_DATE) : '') + '. ' +
     'Contains public sector information licensed under the Open Government Licence v3.0.';
 }
@@ -13980,9 +13980,9 @@ function _generateWardReport(_reportWindow, wn, opts) {
   </div>
 
   <div class="footer">
-    <div class="indep">PopHealth Map is an independent open-data project, not affiliated with the NHS. The figures are published statistics for planning and discussion. Check the source before you depend on a figure.</div>
+    <div class="indep">PopHealth Map is an independent open-data project, and it is not part of the NHS. The figures are published statistics for planning and discussion. Check the source before you depend on a figure.</div>
     <strong>Sources:</strong> ${reportCredits(['census', 'imd', crimeRows.length ? 'crime' : '', 'fuel_poverty', 'claimant', 'health', 'gp', 'pharmacy', 'dental', 'hospitals', 'vcse', _green ? 'greenspace' : '']).map(_esc).join(' · ')}. Each median and comparison uses the ${PH_AREA} wards that have a figure for that measure. A median is the middle ward when those wards are put in order.
-    <div style="margin-top:6px">LSOAs are the small areas, of about 1,500 residents each, that official statistics are published for. Core20 means the most deprived fifth of areas in England, which the NHS gives priority to.</div>
+    <div style="margin-top:6px">LSOAs are the small areas, of about 1,500 residents each, that official statistics are published for. Core20 means the most deprived 20% of areas in England, which the NHS gives priority to.</div>
     ${reportProvenanceHtml((wdata ? wdata.name : wn) + ' ward')}
   </div>
 </main>
@@ -15579,7 +15579,7 @@ function _fitFocus(bounds) {
     const q = filter.trim().toLowerCase();
 
     curNm.textContent = curOpt ? curOpt.name : 'No indicator selected';
-    curDesc.textContent = curOpt ? descOf(curOpt) : 'Pick one below to shade the map.';
+    curDesc.textContent = curOpt ? descOf(curOpt) : 'Choose an indicator below to colour the map.';
     curMeta.innerHTML = curOpt ? [levelsHTML(curOpt), esc(srcText(curOpt)),
       curOpt.native === 'borough' ? 'one figure per LA' : '',
       ovAgeNote(curOpt.value) ? '<span class="ov-old">' + esc(ovAgeNote(curOpt.value)) + '</span>' : ''].filter(Boolean).join(' · ') : '';
@@ -17184,10 +17184,10 @@ function _buildLSOAReportHtml(code) {
   </div>
 
   <div class="footer">
-    <div class="indep">PopHealth Map is an independent open-data project, not affiliated with the NHS. The figures are published statistics for planning and discussion. Check the source before you depend on a figure.</div>
+    <div class="indep">PopHealth Map is an independent open-data project, and it is not part of the NHS. The figures are published statistics for planning and discussion. Check the source before you depend on a figure.</div>
     <strong>Sources:</strong> ${reportCredits(['imd', 'census', crimeRows.length ? 'crime' : '', 'fuel_poverty', 'claimant', 'health', 'greenblue', 'gp', 'pharmacy', 'dental', 'hospitals', 'vcse', _green ? 'greenspace' : '']).map(_esc).join(' · ')}.
     <div style="margin-top:6px">Services and green spaces are listed if they are inside this LSOA\u2019s boundary. Each median and comparison uses the ${PH_AREA} LSOAs that have a figure for that measure. A median is the middle LSOA when those LSOAs are put in order.</div>
-    <div style="margin-top:6px">LSOAs are the small areas, of about 1,500 residents each, that official statistics are published for. Core20 means the most deprived fifth of areas in England, which the NHS gives priority to.</div>
+    <div style="margin-top:6px">LSOAs are the small areas, of about 1,500 residents each, that official statistics are published for. Core20 means the most deprived 20% of areas in England, which the NHS gives priority to.</div>
     ${reportProvenanceHtml((props.name ? props.name + ', ' : '') + 'LSOA ' + code)}
   </div>
 </main>

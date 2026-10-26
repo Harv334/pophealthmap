@@ -708,7 +708,7 @@ const smallText = page => page.evaluate(() => {
     const gate = await page.evaluate(() => ({ lv: currentDataLevel, hint: document.getElementById('dl-hint').textContent,
       shown: document.getElementById('dl-hint').classList.contains('show'), role: document.getElementById('dl-hint').getAttribute('role') }));
     ok(gate.lv === 'ward' && gate.shown && gate.role === 'status' &&
-      /^Crime rate per 1,000 residents is only available for LAs and wards, so it cannot be shown by LSOA\. Choose LA or Ward, or pick a different indicator\.$/.test(gate.hint),
+      /^Crime rate per 1,000 residents is only available for LAs and wards, so it cannot be shown by LSOA\. Choose LA or Ward, or a different indicator\.$/.test(gate.hint),
       'pressing a greyed level says which levels will work, beside the buttons', JSON.stringify(gate));
     // Once the reader has chosen Ward, an indicator with ward figures stays at
     // Ward; one without moves and says so; Clear and leaving Custom area both
@@ -3689,11 +3689,11 @@ const smallText = page => page.evaluate(() => {
     ok(frames['methodology.html'].current === 'Methodology' && frames['accessibility.html'].current === 'Accessibility' &&
        frames['privacy.html'].current === 'About and privacy' && frames['404.html'].current === '',
        'pages: the header marks the page you are on');
-    ok(/contact@pophealth\.uk/.test(ref.ftr) && /not affiliated with the NHS/.test(ref.ftr), 'pages: footer gives the contact address',
+    ok(/contact@pophealth\.uk/.test(ref.ftr) && /and it is not part of the NHS/.test(ref.ftr), 'pages: footer gives the contact address',
        ref.ftr);
     // The app's status bar and the pages say who runs the site in the same words.
     const appNote = ((await (await fetch(BASE + '/index.html')).text()).match(/<span class="sbar-note">([^<]+)<\/span>/) || [])[1] || '';
-    ok(/not affiliated with the NHS/.test(appNote) && ref.ftr.includes(appNote.trim()),
+    ok(/and it is not part of the NHS/.test(appNote) && ref.ftr.includes(appNote.trim()),
        'pages: the footer disclaimer matches the app\'s word for word', appNote + ' / ' + ref.ftr);
     ok(frames['404.html'].relative.length === 0, '404: every link is absolute', frames['404.html'].relative.join(' '));
   }
@@ -3889,7 +3889,7 @@ const smallText = page => page.evaluate(() => {
       'licences: a Data export CSV with a TfL measure carries TfL\'s statements', lic.tfl.split('\n')[1]);
     ok(/Crown copyright Defra via uk-air\.defra\.gov\.uk/.test(lic.no2) && /Powered by TfL Open Data/.test(lic.notes),
       'licences: air quality carries Defra\'s citation, and the notes carry the same lines');
-    ok(/not affiliated with the NHS, with figures updated on \d{1,2} \w+ 20\d\d\. Contains public sector information licensed under the Open Government Licence v3\.0\.$/.test(lic.plain),
+    ok(/that is not part of the NHS, with figures updated on \d{1,2} \w+ 20\d\d\. Contains public sector information licensed under the Open Government Licence v3\.0\.$/.test(lic.plain),
       'licences: every file carries the site and OGL credit', lic.plain);
     ok(/Powered by TfL Open Data/.test(lic.report) && !/TfL/.test(lic.reportPlain),
       'licences: a report footer names TfL only when it shows a TfL measure');
@@ -4032,7 +4032,7 @@ const smallText = page => page.evaluate(() => {
       return out;
     });
     ok(/^\s*Figures for the whole of Testshire/.test(r1.ctx) &&
-       /OHID publishes these only for Testshire as a whole\. Testshire includes Tower Hamlets and one other district, so every ward in those districts shows the same figure\. They are figures for the county, not for Tower Hamlets or this ward\./.test(r1.ctx) &&
+       /OHID publishes these only for Testshire as a whole\. Testshire includes Tower Hamlets and 1 other district, so every ward in those districts shows the same figure\. They are figures for the county, not for Tower Hamlets or this ward\./.test(r1.ctx) &&
        r1.pills.length && r1.pills.every(t => t === 'county figure'),
       'a district\'s county figures are titled, noted and marked as the county\'s', r1.ctx.slice(0, 300) + ' / ' + r1.pills.join(','));
     ok(!/further down|appears twice/.test(r1.lh) && /county figure/.test(r1.key),
@@ -4150,7 +4150,7 @@ const smallText = page => page.evaluate(() => {
       let html = '';
       _generateWardReport({ sink: h => { html = h; } }, 'Hornsey', {});
       const d = new DOMParser().parseFromString(html, 'text/html');
-      const kpi = [...d.querySelectorAll('.kpi')].map(k => k.textContent.replace(/\s+/g, ' ').trim()).find(t => /Core20|most deprived fifth/.test(t)) || '';
+      const kpi = [...d.querySelectorAll('.kpi')].map(k => k.textContent.replace(/\s+/g, ' ').trim()).find(t => /Core20|most deprived 20%/.test(t)) || '';
       return { kicker: (d.querySelector('.kicker') || {}).textContent || '', kpi };
     });
     ok(rep.kicker && !/Core20/i.test(rep.kicker) && /1 of 11/.test(rep.kpi) && /home to [\d.]+% of residents/.test(rep.kpi),
@@ -4390,7 +4390,7 @@ const smallText = page => page.evaluate(() => {
       const ward = wn => { let h = ''; _generateWardReport({ sink: x => { h = x; } }, wn); return h; };
       return { Lansbury: ward('Lansbury'), lsoa: _buildLSOAReportHtml('E01004243') };
     });
-    ok(/LSOAs are the small areas, of about 1,500 residents each, that official statistics are published for\. Core20 means the most deprived fifth of areas in England, which the NHS gives priority to\./.test(R.Lansbury) &&
+    ok(/LSOAs are the small areas, of about 1,500 residents each, that official statistics are published for\. Core20 means the most deprived 20% of areas in England, which the NHS gives priority to\./.test(R.Lansbury) &&
        /LSOAs are the small areas/.test(R.lsoa) && /kpi-lbl">Disabled residents \(all\)</.test(R.Lansbury) &&
        /Parks and green spaces <span class="count">(\d+|[\d,]+ sites)</.test(R.Lansbury),
       'report: the footer explains LSOA and Core20, the tile matches the chart, and the parks count says what it counts (P49, P50)');
@@ -4631,7 +4631,7 @@ const smallText = page => page.evaluate(() => {
     const eng = await page.evaluate(() => ({ t: document.title, body: document.body.innerText,
       links: [...document.querySelectorAll('a')].map(a => a.textContent + '=' + a.getAttribute('href')) }));
     ok(eng.t === 'PopHealth Map: England' && /^PopHealth Map/.test(eng.body.trim()) && /Or open one region/.test(eng.body) &&
-       /no charity listings or Ask panel/.test(eng.body) && eng.links.some(l => /^North East=.*\?r=north-east$/.test(l)) && eng.links.length >= 9,
+       /no charity listings, no Ask panel and no Custom area/.test(eng.body) && eng.links.some(l => /^North East=.*\?r=north-east$/.test(l)) && eng.links.length >= 9,
       'polish: the England screen names the site and links to every region', JSON.stringify(eng).slice(0, 400));
     await page.close();
     const p4 = await browser.newPage({ viewport: DESK });
@@ -5789,6 +5789,35 @@ const smallText = page => page.evaluate(() => {
       ok(!errors.length, 'no page errors (healthy places and food, with figures, ' + vintage + ')', errors.join(' | '));
       await page.close();
     }
+  }
+
+  // The England map loads LSOAs for 1 LA at a time, so Custom area is greyed
+  // out there and says why when it is chosen, and a shared area is left
+  // alone. Checked on the London page with the England flag set, because the
+  // test site has no England data.
+  {
+    const { page, errors } = await open(browser, 'index.html?t=1', DESK);
+    const r = await page.evaluate(async () => {
+      PH_REGION.isEngland = true;
+      document.querySelector('.mode-btn[data-mode="report"]').click();
+      await new Promise(res => setTimeout(res, 400));
+      const panel = document.getElementById('mode-panel');
+      const out = { shown: !panel.hidden, title: document.getElementById('mode-title').textContent,
+        kicker: document.getElementById('mode-kicker').textContent,
+        desc: document.getElementById('mode-desc').textContent,
+        report: document.getElementById('tab-report').classList.contains('active'),
+        applied: PH_REPORT.apply({ codes: ['E01000001'] }), picked: PH_REPORT.state().codes.length };
+      panel.querySelector('.mode-back').click();
+      PH_REGION.isEngland = false;
+      out.closed = panel.hidden;
+      return out;
+    });
+    ok(r.shown && r.title === 'Custom area' && r.kicker === 'England map' &&
+       /^Custom area does not work on the England map, because the England map shows LSOAs for only 1 LA at a time\./.test(r.desc) &&
+       !r.report && r.applied === true && r.picked === 0 && r.closed,
+      'England map: Custom area explains why it is off, opens nothing and ignores a shared area', JSON.stringify(r));
+    ok(!errors.length, 'no page errors (Custom area on the England map)', errors.join(' | '));
+    await page.close();
   }
 
   // Ask on a region map: the same tools, reading the region's own files, with
