@@ -113,6 +113,51 @@ descriptions already sound like this, so use them as the model.
 - Generate any count or date that the monthly refresh will change rather than
   typing it, so that the text is still true after the next refresh.
 
+## Readers whose first language is not English
+
+Many readers know English as a second or third language, and some read the
+site through a translation tool. Write so that they can understand it the
+first time, without a dictionary. These rules come before the sentence length
+guide above when the two pull different ways.
+
+- Keep sentences short: aim for 20 words or fewer, with one main idea, or two
+  joined by "and", "but", "because" or "so". Put the main point first.
+- Choose the common, literal word. Avoid idioms, metaphors and phrasal verbs
+  whose meaning is not the sum of their words, such as "rests on", "swing",
+  "straddle", "pull", "bury", "line up" or "carry" (for a figure). Write "is
+  based on", "change", "cross", "count for" and "has" instead.
+- Say exactly what is compared with what. Never leave "similar", "better",
+  "higher" or "typical" without saying "than what" and how the comparison was
+  made.
+- Say things positively where you can, and avoid double negatives.
+- Use the active voice when the doer matters: "OHID publishes these figures",
+  not "these figures are published".
+- Explain every technical or statistical word the first time it appears on a
+  panel, card or page, using the wording in the table below, and use that same
+  wording everywhere. Spell out every abbreviation the first time on each
+  panel, including common ones such as A&E (accident and emergency).
+- Write all numbers as digits, as in "2 wards" and "3 times", except "one" when
+  it means "a single" in a phrase such as "one of the". Units always follow the
+  number: "per 1,000 people", not "per 1,000".
+
+### Fixed wording
+
+| Idea | Say it like this |
+| --- | --- |
+| OHID's test against England | "Better than England", "Worse than England", "Higher than England", "Lower than England" or "About the same as England". Explain once: "OHID checks each figure against England. Better, worse, higher or lower means the difference is too big to be chance. About the same means the difference could be chance." |
+| Decile | "Decile 1 to 10. Decile 1 is the most deprived 10% of areas in England, and decile 10 is the least deprived 10%." |
+| Ranking among areas | "More deprived than 82% of wards in London" |
+| Median, typical | "The middle ward when all wards are put in order" |
+| Confidence interval, 95% range | "The range the true figure is very likely to be in (95% likely)" |
+| Ratio where England is 100 | "A ratio where 100 is the England level, after allowing for differences in age. Above 100 means more than expected for the area's ages." |
+| Modelled estimate | "An estimate from a statistical model, not a count" |
+| Weighted by population | "An average where areas with more people count for more" |
+| Best fit lookup | "ONS places each LSOA in the ward where most of its people live" |
+| Withheld, suppressed | "Not published, because the numbers are too small" |
+| Prevalence | "The share of patients with ..." |
+| LSOA, MSOA, output area | "LSOA, a small area of about 1,500 people", "MSOA, an area of about 8,000 people", "output area, about 125 households" |
+| Equivalised income | "Adjusted for the size of the household" |
+
 ## Accuracy comes first
 
 Plain words must never cost accuracy, so none of these is a trade you may make:
