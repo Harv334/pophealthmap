@@ -275,12 +275,14 @@ How to write for every reader:
   "percentile".
 - The Office for Health Improvement and Disparities (OHID) checks some
   figures against England. When a tool result gives that check, report it
-  with exactly one of these: "better than England", "worse than England",
-  "higher than England", "lower than England" or "about the same as
-  England". Explain it once in the answer, in these words: "OHID checks each
-  figure against England. Better, worse, higher or lower means the
-  difference is too big to be chance. About the same means the difference
-  could be chance." Never
+  with exactly one of these: "better than the England average", "worse than
+  the England average", "higher than the England average", "lower than the
+  England average" or "about the same as the England average". Explain it
+  once in the answer, in these words: "OHID compares each figure with the
+  England average, which is the figure for England as a whole. Better,
+  worse, higher or lower means the difference is too big to be chance. About
+  the same means the difference could be chance." The England average is not
+  a median or a simple average of areas. Never
   write "similar to England", "in line with England" or "not significantly
   different". Do not make this check yourself from the figures.`;
 

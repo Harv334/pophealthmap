@@ -8497,8 +8497,9 @@ function ovRamp(k, t) {
    latest census there is, and flagging every census indicator would bury
    the warnings that matter.
    ═══════════════════════════════════════════════════════════════════════════ */
-const VS_ENGLAND_TEXT = { B: 'Better than England', W: 'Worse than England', S: 'About the same as England',
-                          H: 'Higher than England', L: 'Lower than England' };
+const VS_ENGLAND_TEXT = { B: 'Better than the England average', W: 'Worse than the England average',
+                          S: 'About the same as the England average',
+                          H: 'Higher than the England average', L: 'Lower than the England average' };
 function ovVsEngland(level, id, k) {
   if (level !== 'msoa' || typeof MSOA_DATA === 'undefined') return '';
   const d = MSOA_DATA[id];
@@ -8581,7 +8582,7 @@ const EST_HTML = '<span class="vs vs-s" title="OHID published this figure for th
 function ovVsHTML(code) {
   if (!code || !VS_ENGLAND_TEXT[code]) return '';
   const cls = code === 'W' ? 'vs-w' : code === 'B' ? 'vs-b' : 'vs-s';
-  return '<span class="vs ' + cls + '" title="OHID checks each figure against England. Better, worse, higher or lower means the difference is too big to be chance. About the same means the difference could be chance.">' +
+  return '<span class="vs ' + cls + '" title="OHID compares each figure with the England average, which is the figure for England as a whole. Better, worse, higher or lower means the difference is too big to be chance. About the same means the difference could be chance.">' +
     VS_ENGLAND_TEXT[code] + '</span>';
 }
 const _ctxCache = {};
@@ -9331,7 +9332,7 @@ function indicatorCardHTML(k) {
   const num = say(f.num), den = say(f.den);
   const pub = _publishedAt(k, nat, lv).map(say);
   const vsEng = /^ft_/.test(k) && nat === 'msoa'
-    ? say('OHID checks each figure against England. Better, worse, higher or lower means the difference is too big to be chance. About the same means the difference could be chance. When the map shows MSOAs, you can see the result beside each MSOA’s figure.') : '';
+    ? say('OHID compares each figure with the England average, which is the figure for England as a whole. Better, worse, higher or lower means the difference is too big to be chance. About the same means the difference could be chance. When the map shows MSOAs, you can see the result beside each MSOA’s figure.') : '';
   const updates = say(f.cadence), method = say(f.method);
   const row = (t, v) => v ? '<dt>' + e(t) + '</dt><dd>' + v + '</dd>' : '';
   const period = ovPeriodOf(k);
@@ -9356,7 +9357,7 @@ function indicatorCardHTML(k) {
     row('Out of', e(den)) +
     row('Published at', nat ? '<span class="ov-lv-nat">' + e(nm(lsoaUp ? 'lsoa' : nat)) + '</span>' +
       (pub.length ? ' <span class="ic-sub">' + e(pub.join(' ')) + '</span>' : '') : '') +
-    row('Compared with England', e(vsEng)) +
+    row('Compared with the England average', e(vsEng)) +
     row('Unit', e(_cardUnit(k))) +
     row('Updates', e(updates)) +
     row('Method', e(method)) +
@@ -13915,7 +13916,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
 
   <div class="kpis">
     ${_kpi('Population',     popN  != null ? Math.round(popN).toLocaleString('en-GB') : null, 'Census 2021')}
-    ${_kpi('Deprivation score', imdW != null ? imdW.toFixed(indDecimals('imd_score_ward')) : null, 'Index of Multiple Deprivation (IMD) 2025, where a higher score is more deprived', _ctxBar(imdPct, 'lower-better'))}
+    ${_kpi('Deprivation score', imdW != null ? imdW.toFixed(indDecimals('imd_score_ward')) : null, 'IMD 2025, where a higher score is more deprived', _ctxBar(imdPct, 'lower-better'))}
     ${_kpi(indLabel('census_good_health_pct'), goodHlt != null ? goodHlt.toFixed(indDecimals('census_good_health_pct')) + '%' : null, 'of residents', _ctxBar(goodHpct, 'higher-better'))}
     ${_kpi(indLabel('census_bad_health_pct'), badHlt  != null ? badHlt.toFixed(indDecimals('census_bad_health_pct')) + '%' : null, 'of residents', _ctxBar(badHpct, 'lower-better'))}
     ${_kpi(indLabel('census_disability_any_pct'), disAny != null ? disAny.toFixed(indDecimals('census_disability_any_pct')) + '%' : null, 'of residents', _ctxBar(disAnyPct, 'lower-better'))}
@@ -13931,7 +13932,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
       <div class="panel" data-src="ONS Census 2021" data-when="Census 2021">
         <h3>Compared with the ${PH_AREA} ward median</h3>
         ${compareCensus}
-        <div class="legend"><span class="legend-tick"></span> ${PH_AREA} ward median (the middle ward when the ${PH_AREA} wards are put in order),${_reportSwatch(REPORT_CMP.better)}better than the median,${_reportSwatch(REPORT_CMP.worse)}worse than the median,${_reportSwatch(REPORT_CMP.neutral)}describes who lives here, so not better or worse</div>
+        <div class="legend"><span class="legend-tick"></span> ${PH_AREA} ward median (the middle ward),${_reportSwatch(REPORT_CMP.better)}better,${_reportSwatch(REPORT_CMP.worse)}worse,${_reportSwatch(REPORT_CMP.neutral)}describes who lives here, so not better or worse</div>
       </div>`}
     </div>
     <div class="col">
@@ -13939,12 +13940,12 @@ function _generateWardReport(_reportWindow, wn, opts) {
       ${domainSVG ? `<div class="panel" data-src="MHCLG, English Indices of Deprivation 2025">
         <h3>Deprivation by domain, IMD 2025</h3>
         ${domainSVG}
-        <div class="legend">A domain is one type of deprivation, such as income or crime. Each dot shows where the ward is among the ${_wardsScored.toLocaleString('en-GB')} ${PH_AREA} wards with a deprivation score. A figure of 90% means it is more deprived than 90% of them. The dashed line is the median, the middle ward when all of them are put in order.</div>
+        <div class="legend">A domain is one type of deprivation in the Index of Multiple Deprivation (IMD), such as income or crime. Each dot shows where the ward is among the ${_wardsScored.toLocaleString('en-GB')} ${PH_AREA} wards with a deprivation score. A figure of 90% means it is more deprived than 90% of them. The dashed line is the median.</div>
       </div>` : ''}
       <div class="panel" data-src="ONS Census 2021, DESNZ fuel poverty statistics and DWP claimant count">
         <h3>Health and economic indicators</h3>
         ${healthBars}
-        <div class="legend"><span class="legend-tick"></span> ${PH_AREA} ward median (the middle ward when the ${PH_AREA} wards are put in order),${_reportSwatch(REPORT_CMP.better)}better than the median,${_reportSwatch(REPORT_CMP.worse)}worse than the median,${_reportSwatch(REPORT_CMP.neutral)}not better or worse</div>
+        <div class="legend"><span class="legend-tick"></span> ${PH_AREA} ward median,${_reportSwatch(REPORT_CMP.better)}better,${_reportSwatch(REPORT_CMP.worse)}worse,${_reportSwatch(REPORT_CMP.neutral)}not better or worse</div>
       </div>
     </div>
   </div>
@@ -13955,7 +13956,7 @@ function _generateWardReport(_reportWindow, wn, opts) {
       <div class="panel">
         <h3>${crimeTotal != null ? Math.round(crimeTotal).toLocaleString('en-GB') + ' crimes recorded' : 'Crimes recorded'} from ${_esc(monthWords(reportCrimePeriod()))}, not counting anti-social behaviour</h3>
         ${crimeSVG}
-        <div class="legend"><span class="legend-tick"></span> ${PH_AREA} ward median (the middle ward when the ${PH_AREA} wards are put in order). Source: police.uk.</div>
+        <div class="legend"><span class="legend-tick"></span> ${PH_AREA} ward median. Source: police.uk.</div>
       </div>
     </div>` : ''}
     ${healthOutcomesTable ? `<div class="col">
@@ -15264,8 +15265,8 @@ function _fitFocus(bounds) {
      indicator's key, so Health is six short lists rather than one of 55. */
   const THEME_INFO = {
     'Health':                   ['#AE2573', 'How people rate their own health, disability and care, and children\'s weight.'],
-    'Life expectancy and deaths': ['#6B2C91', 'How long people live and what they die of, compared with England.'],
-    'Hospital admissions':      ['#C2185B', 'Emergency and injury admissions to hospital, compared with England.'],
+    'Life expectancy and deaths': ['#6B2C91', 'How long people live and what they die of, compared with the England average.'],
+    'Hospital admissions':      ['#C2185B', 'Emergency and injury admissions to hospital, compared with the England average.'],
     'Deprivation':              ['#003087', 'The Index of Multiple Deprivation 2025, its domains and sub-domains, income deprivation among children and older people, and the measures the index is built from. Decile 1 is the most deprived tenth of areas in England.'],
     'People and communities':   ['#7C2855', 'Age, ethnicity, country of birth, language and who people live with, from Census 2021.'],
     'Work, money and education': ['#00703C', 'Jobs, benefits and qualifications.'],
@@ -15579,7 +15580,7 @@ function _fitFocus(bounds) {
     const q = filter.trim().toLowerCase();
 
     curNm.textContent = curOpt ? curOpt.name : 'No indicator selected';
-    curDesc.textContent = curOpt ? descOf(curOpt) : 'Choose an indicator below to colour the map.';
+    curDesc.textContent = curOpt ? descOf(curOpt) : 'Choose an indicator below to show it on the map.';
     curMeta.innerHTML = curOpt ? [levelsHTML(curOpt), esc(srcText(curOpt)),
       curOpt.native === 'borough' ? 'one figure per LA' : '',
       ovAgeNote(curOpt.value) ? '<span class="ov-old">' + esc(ovAgeNote(curOpt.value)) + '</span>' : ''].filter(Boolean).join(' · ') : '';
@@ -17134,7 +17135,7 @@ function _buildLSOAReportHtml(code) {
       <div class="panel" style="flex:1" data-src="ONS Census 2021" data-when="Census 2021">
         <h3>Compared with the ${PH_AREA} LSOA median</h3>
         ${compareCensus}
-        <div class="legend"><span class="legend-tick"></span> ${PH_AREA} LSOA median (the middle LSOA when the ${PH_AREA} LSOAs are put in order),${_reportSwatch(REPORT_CMP.better)}better than the median,${_reportSwatch(REPORT_CMP.worse)}worse than the median,${_reportSwatch(REPORT_CMP.neutral)}describes who lives here, so not better or worse</div>
+        <div class="legend"><span class="legend-tick"></span> ${PH_AREA} LSOA median (the middle LSOA),${_reportSwatch(REPORT_CMP.better)}better,${_reportSwatch(REPORT_CMP.worse)}worse,${_reportSwatch(REPORT_CMP.neutral)}describes who lives here, so not better or worse</div>
       </div>
     </div>
 
@@ -17148,7 +17149,7 @@ function _buildLSOAReportHtml(code) {
       <div class="panel" style="flex:1" data-src="ONS Census 2021, DESNZ fuel poverty statistics and DWP claimant count">
         <h3>Health and economic indicators</h3>
         ${healthBars}
-        <div class="legend"><span class="legend-tick"></span> ${PH_AREA} LSOA median (the middle LSOA when the ${PH_AREA} LSOAs are put in order),${_reportSwatch(REPORT_CMP.better)}better than the median,${_reportSwatch(REPORT_CMP.worse)}worse than the median,${_reportSwatch(REPORT_CMP.neutral)}not better or worse</div>
+        <div class="legend"><span class="legend-tick"></span> ${PH_AREA} LSOA median,${_reportSwatch(REPORT_CMP.better)}better,${_reportSwatch(REPORT_CMP.worse)}worse,${_reportSwatch(REPORT_CMP.neutral)}not better or worse</div>
       </div>
     </div>
 
@@ -17166,7 +17167,7 @@ function _buildLSOAReportHtml(code) {
       <div class="panel" style="flex:1">
         <h3>Crimes recorded from ${_esc(monthWords(reportCrimePeriod()))}, not counting anti-social behaviour</h3>
         ${crimeSVG}
-        <div class="legend"><span class="legend-tick"></span> ${PH_AREA} LSOA median (the middle LSOA when the ${PH_AREA} LSOAs are put in order). Sexual offences are not published for LSOAs. Source: police.uk.</div>
+        <div class="legend"><span class="legend-tick"></span> ${PH_AREA} LSOA median. Sexual offences are not published for LSOAs. Source: police.uk.</div>
       </div>
     </div>` : ''}
   </div>
@@ -18093,7 +18094,7 @@ function renderTopBottom() {
   if (level === 'ward' && /^ft_\d+$/.test(curOv)) notes.push(WARD_NO_INTERVAL);
   const hasVs = level === 'msoa' && rows.some(r => r.vs);
   if (hasVs) {
-    notes.push('OHID (Office for Health Improvement and Disparities) checks each MSOA figure against England. Better, Worse, Higher or Lower means the difference is too big to be chance. An area without one of these marks may be in these lists by chance.');
+    notes.push('OHID (Office for Health Improvement and Disparities) compares each MSOA figure with the England average, which is the figure for England as a whole. Better, Worse, Higher or Lower means the difference is too big to be chance. An area without one of these marks may be in these lists by chance.');
   }
   const notesEl = document.getElementById('rank-notes');
   if (notesEl) notesEl.innerHTML = notes.map(t => `<p>${_esc(t)}</p>`).join('');
@@ -18107,7 +18108,7 @@ function renderTopBottom() {
     const safeId = _esc(String(r.id));
     const vsTxt = VS_WORD[r.vs] || '';
     const vsTag = vsTxt
-      ? ` <span class="rank-vs vs ${r.vs === 'W' ? 'vs-w' : r.vs === 'B' ? 'vs-b' : 'vs-s'}" title="OHID's test against England">${vsTxt}<span class="sr-only">${r.vs === 'S' ? ' as' : ' than'} England</span></span>`
+      ? ` <span class="rank-vs vs ${r.vs === 'W' ? 'vs-w' : r.vs === 'B' ? 'vs-b' : 'vs-s'}" title="OHID's comparison with the England average">${vsTxt}<span class="sr-only">${r.vs === 'S' ? ' as' : ' than'} the England average</span></span>`
       : '';
     return `<li><button type="button" class="rank-row" data-kind="${level}" data-id="${safeId}" title="${safeName}, ${_esc(indLabel(curOv))}: ${fmt(r.v)}${unitSfx}">`
       + `<span class="rank-name">${safeName}</span>${vsTag} `
@@ -18341,7 +18342,7 @@ function _syncScaleNumbers() {
         (age ? ' <span class="ov-old">' + _e(age) + '.</span>' : '') +
         (caution ? '<span class="ov-caution">' + _e(caution) + '</span>' : '') +
         (drawnLvl === 'oa' ? '<span class="ctx" id="sc-oa-note">' + _e(OA_CAVEAT) + '</span>' : '') +
-        (nativeG === 'msoa' && drawnLvl === 'msoa' && /^ft_/.test(curOv) ? '<span class="ctx">Select an MSOA to see how OHID compares its figure with England.</span>' : '') +
+        (nativeG === 'msoa' && drawnLvl === 'msoa' && /^ft_/.test(curOv) ? '<span class="ctx">Select an MSOA to see how OHID compares its figure with the England average.</span>' : '') +
         (isOnsMsoa(curOv) && drawnLvl === 'msoa' ? '<span class="ctx">These are estimates from a statistical model, not counts. Select an MSOA to see the range its true figure is very likely to be in (95% likely).</span>' : '') +
         (estLa
           ? '<span class="ctx" id="sc-la-est">' + _e('These LA figures are our estimates from ward figures' +
@@ -27006,7 +27007,7 @@ var PH_SHOW = {
       columns.push({ kind: 'ind', key: k, header: cbHeader(k) });
       if (has('_vs', k)) {
         var per = cbPeriod(k);
-        columns.push({ kind: 'vs', key: k, header: labelOf(k) + ', compared with England' + (per ? ' (' + per + ')' : '') });
+        columns.push({ kind: 'vs', key: k, header: labelOf(k) + ', compared with the England average' + (per ? ' (' + per + ')' : '') });
       }
       if (has('_est', k)) columns.push({ kind: 'est', key: k, header: labelOf(k) + ', estimated from 2011 areas' });
       if (has('_lci', k) && has('_uci', k)) {
@@ -27271,8 +27272,9 @@ var PH_SHOW = {
         return;
       }
       if (c.kind === 'vs') {
-        L.push('   OHID checks each MSOA’s figure against England. This column gives the result: Better than England, ' +
-          'Worse than England, Higher than England, Lower than England or About the same as England. ' +
+        L.push('   OHID compares each MSOA’s figure with the England average, which is the figure for England as a whole. ' +
+          'This column gives the result: Better than the England average, Worse than the England average, ' +
+          'Higher than the England average, Lower than the England average or About the same as the England average. ' +
           'Better, worse, higher or lower means the difference is too big to be chance (OHID tests at 95% confidence). ' +
           'About the same means the difference could be chance. OHID uses higher or lower where neither a high nor a low figure is better. ' +
           'The cell is empty where OHID gives no result.', '');

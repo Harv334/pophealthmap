@@ -144,7 +144,7 @@ guide above when the two pull different ways.
 
 | Idea | Say it like this |
 | --- | --- |
-| OHID's test against England | "Better than England", "Worse than England", "Higher than England", "Lower than England" or "About the same as England". Explain once: "OHID checks each figure against England. Better, worse, higher or lower means the difference is too big to be chance. About the same means the difference could be chance." |
+| OHID's test against England | "Better than the England average", "Worse than the England average", "Higher than the England average", "Lower than the England average" or "About the same as the England average". Explain once: "OHID compares each figure with the England average, which is the figure for England as a whole. Better, worse, higher or lower means the difference is too big to be chance. About the same means the difference could be chance." Never call it a median or a simple average of areas. |
 | Decile | "Decile 1 to 10. Decile 1 is the most deprived 10% of areas in England, and decile 10 is the least deprived 10%." |
 | Ranking among areas | "More deprived than 82% of wards in London" |
 | Median, typical | "The middle ward when all wards are put in order" |

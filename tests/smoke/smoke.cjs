@@ -1861,7 +1861,7 @@ const smallText = page => page.evaluate(() => {
     ok(dm.names[0] !== dm.names[1] && dm.names[2] === 'false', 'the two deprivation scores are named apart and the Local Health claimant copy is gone', dm.names.join(' | '));
     ok(dm.inc[0] > 1 && /%$/.test(dm.inc[1]) && dm.inc[2] === 'Less deprived' && dm.inc[3] === 'More deprived' && /^More deprived than/.test(dm.inc[4]),
       'income deprivation reads as a percentage, and deprivation keys and hovers say less or more deprived', dm.inc.join(' | '));
-    ok(dm.ratio === '126.0 (England is 100)' && dm.vs === 'About the same as England' && dm.plain === 0,
+    ok(dm.ratio === '126.0 (England is 100)' && dm.vs === 'About the same as the England average' && dm.plain === 0,
       'hover ratios say England is 100, and similar reads not clearly different', dm.ratio + ' / ' + dm.vs);
     ok(dm.oa && dm.est, 'Census cards carry the output area caution, and the 2011 label has one name');
     // Ward rankings of a Local Health figure say there is no interval (P3), and
@@ -4308,7 +4308,10 @@ const smallText = page => page.evaluate(() => {
       .forEach(n => wLyr.getLayers().find(l => l.feature.properties.WD24NM === n).fire('click')));
     await page.waitForTimeout(500);
     const selBefore = await page.evaluate(() => selW);
-    await page.evaluate(() => wLyr.getLayers().find(l => l.feature.properties.WD24NM === 'Barnes').fire('click'));
+    // Braces, so the evaluate returns nothing: returning the layer that fire()
+    // hands back makes Playwright serialise the whole map, which can take
+    // longer than the 8 seconds the note stays up.
+    await page.evaluate(() => { wLyr.getLayers().find(l => l.feature.properties.WD24NM === 'Barnes').fire('click'); });
     await page.waitForTimeout(400);
     const cap = await page.evaluate(() => ({ pins: PH_COMPARE.pinned(), sel: selW,
       note: (document.querySelector('#tab-compare .ph-note') || {}).textContent || '' }));
@@ -4401,7 +4404,7 @@ const smallText = page => page.evaluate(() => {
     const [sd] = await Promise.all([rp.waitForEvent('download', { timeout: 8000 }).catch(() => null),
       rp.evaluate(() => [...document.querySelectorAll('.panel')].find(x => /Compared with/.test(x.textContent)).querySelector('.chart-dl').click())]);
     const sv = sd ? fsx.readFileSync(await sd.path(), 'utf8') : '';
-    ok(/>Lansbury: compared with the London ward median,/.test(sv) && />Census 2021</.test(sv) && /better than the median,/.test(sv) &&
+    ok(/>Lansbury: compared with the London ward median,/.test(sv) && />Census 2021</.test(sv) && /ward median \(the middle ward\)/.test(sv) && /\bbetter,/.test(sv) &&
        /Source: ONS Census 2021\. PopHealth Map, pophealth\.uk/.test(sv),
       'report: a downloaded chart carries its title, area, key and source (P46)', sv.slice(0, 200));
     await rp.close();
@@ -4724,7 +4727,7 @@ const smallText = page => page.evaluate(() => {
     ok(/not medical advice/.test(pt) && /provided free and as it is/.test(pt) && /available on the London\s+map and on each region's map/.test(pt) &&
        /On the England\s+map, which shows every region at once, it is not shown, and nothing is sent\./.test(pt.replace(/\s+/g, ' ')) &&
        !/for now/.test(pt) &&
-       /server passes it to Anthropic's Claude model/.test(pt.replace(/\s+/g, ' ')) && /10 questions a day/.test(pt) && /narrow\s+a question down does not use one up/.test(pt),
+       /server passes it to Anthropic's Claude model/.test(pt.replace(/\s+/g, ' ')) && /10 questions a day/.test(pt) && /If it asks you to make a question more exact, your answer does not count as one of the 10/.test(pt.replace(/\s+/g, ' ')),
       'polish: the privacy page has the terms and says Ask is on London and each region map, not England');
     await pv.page.close();
     const ac = await open(browser, 'accessibility.html', DESK);

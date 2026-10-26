@@ -152,8 +152,8 @@ people. The smallest areas are output areas, with about 125 households each.
 
 <h4 id="indicator-card">Every indicator has a card</h4>
 
-<p>To open the card for an indicator, select the <strong>About this
-indicator</strong> button under the chosen indicator. You can also select the
+<p>To open the card for an indicator, select the
+<strong>About this indicator</strong> button under the chosen indicator. You can also select the
 key at the bottom of the map. The card says what is counted, and out of what
 total. It gives the level of area that the publisher uses, and how we calculate
 the other levels. It also gives the period, the source and how often the source
@@ -243,21 +243,28 @@ with no figure for one of your conditions cannot pass or fail that condition.
 So the area is not in the results, and the number of these areas is shown under
 the results.</p>
 
-<h4 id="vs-england">Comparing a figure with England</h4>
+<h4 id="vs-england">Comparing a figure with the England average</h4>
 
-<p>OHID checks each Local Health figure for an MSOA against England. The result
-is "Better than England", "Worse than England", "Higher than England", "Lower
-than England" or "About the same as England". Better, worse, higher or lower
+<p>OHID compares each Local Health figure for an MSOA with the England average.
+The result is "Better than the England average", "Worse than the England
+average", "Higher than the England average", "Lower than the England average"
+or "About the same as the England average". Better, worse, higher or lower
 means the difference is too big to be chance. About the same means the
 difference could be chance. OHID uses higher or lower for indicators where it
 does not say whether a higher figure is good or bad. Hover over an MSOA to see
 OHID's result next to the figure.</p>
 
+<p>The England average is OHID's figure for England as a whole. For example, it
+is all the emergency admissions in England divided by all the people in
+England. It is not the middle MSOA (the median), and it is not a simple average
+of the MSOA figures, so areas with more people count for more in it. For a
+ratio, the England average is 100.</p>
+
 <p>For this test, OHID uses a confidence interval. This is the range the true
 figure is very likely to be in (95% likely). If the range does not include
 England's figure, the difference is too big to be chance. Many MSOA figures are
 based on small numbers of people. So an area can look high on the colour scale
-but still be about the same as England by this test. Ward and LA figures have
+but still be about the same as the England average by this test. Ward and LA figures have
 no test, because we calculate them from MSOA figures. The few MSOA figures
 estimated from 2011 areas also have no test.</p>
 
@@ -560,8 +567,9 @@ it means.</p>
             inspects the business. 5 means very good. 0 means urgent
             improvement is necessary, 1 means major improvement is necessary
             and 2 means some improvement is necessary.</td></tr>
-    <tr><td class="term">About the same as England</td><td>Not significantly different from England</td>
-        <td>OHID checks each figure against England. Better, worse, higher or
+    <tr><td class="term">About the same as the England average</td><td>Not significantly different from England</td>
+        <td>OHID compares each figure with the England average, which is the
+            figure for England as a whole. Better, worse, higher or
             lower means the difference is too big to be chance. About the same
             means the difference could be chance. If the area's confidence
             interval includes England's figure, the area is about the same as
@@ -946,7 +954,7 @@ wards through the LSOAs that the MSOA and the ward share.</p>
 were split or joined together to make 2021 areas. For these, we calculate the
 figure for the 2021 area from the 2011 areas, weighted by how many people lived
 in each. The map then shows <em>Estimated from 2011 areas</em> next to the
-figure. It does not compare the figure with England, because the publisher's
+figure. It does not compare the figure with the England average, because the publisher's
 comparison was for the old area. But OHID publishes no figure for the areas
 that changed. So those areas are blank, and no figure on the map is estimated
 in this way.</p>
@@ -1336,7 +1344,7 @@ var SOURCES = [
     name: 'Fingertips: Local Health, birth weight and cancer',
     pub: 'OHID',
     what: 'Low birth weight of live babies, and new cases of cancer (all cancers, breast, bowel, ' +
-          'lung and prostate) compared with England. The map shows each one only if OHID ' +
+          'lung and prostate) compared with the England average. The map shows each one only if OHID ' +
           'publishes figures for at least half of a region\'s MSOAs. The ranges must also be ' +
           'narrow enough to show differences between areas. So an indicator that OHID mostly does ' +
           'not publish is not on the map.',

@@ -4,7 +4,7 @@
 
 These changes are written and tested, and reach the site with the next data refresh.
 
-The wording across the site is written for readers whose first language is not English: shorter sentences, common words, digits for numbers, and every abbreviation and statistical word explained the first time on each panel. OHID's comparison with England reads "Better than England", "Worse than England", "Higher than England", "Lower than England" or "About the same as England", and the card explains that better, worse, higher or lower means the difference is too big to be chance. The same rules are in the house style, and the Ask panel's answers follow them once the Worker is deployed.
+The wording across the site is written for readers whose first language is not English: shorter sentences, common words, digits for numbers, and every abbreviation and statistical word explained the first time on each panel. OHID's comparison reads "Better than the England average", "Worse than the England average", "Higher than the England average", "Lower than the England average" or "About the same as the England average", and the card explains that better, worse, higher or lower means the difference is too big to be chance. The methodology says what the England average is: OHID's figure for England as a whole, not a median or a simple average of areas. The same rules are in the house style, and the Ask panel's answers follow them once the Worker is deployed.
 
 Custom area is greyed out on the England map, because the England map shows LSOAs for only 1 LA at a time. Choosing it says why, and points to the region maps.
 
