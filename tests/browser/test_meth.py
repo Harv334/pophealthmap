@@ -37,7 +37,7 @@ try:
           d.execute_script("return [...document.querySelectorAll('#levels ~ div th')]"
                            ".some(th => /Boundaries from/i.test(th.textContent))"))
     check("service counting method documented",
-          "Services are counted where they stand" in txt and "stands in" in txt)
+          "Services are counted in the ward where they are" in txt and "from their postcode" in txt)
     check("missing-is-not-zero documented", "Missing is not zero" in txt)
     check("direction of the colours explained",
           "Darker means a higher figure" in txt and "most deprived" in txt)

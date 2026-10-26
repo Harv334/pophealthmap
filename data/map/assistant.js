@@ -56,8 +56,8 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
   // The model's only safeguard is its instruction to use the figures it looks
   // up, so the panel does not promise more than that.
   function modelSentence(label) {
-    return label + " writes each answer from the figures on this map, but it can"
-      + " still get things wrong, so please check any figure against the map or"
+    return label + " writes each answer from the figures on this map. It can"
+      + " still make mistakes, so please check any figure against the map or"
       + " its source before you rely on it.";
   }
   function reportModel(id) {
@@ -359,11 +359,12 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
   }
 
   var BOROUGH_CAVEAT = "This indicator is published for the whole local " +
-    "authority (LA) and applied to every ward in it, so it is the same figure " +
-    "for all wards there. Report it as an LA figure, calling it an LA figure " +
-    "rather than a borough figure, and do not describe it as a difference " +
-    "between wards. Where the LA is a district inside a county, OHID may " +
-    "publish only the county's figure, so say it is the county's.";
+    "authority (LA) and given to every ward in it, so all wards in the LA " +
+    "have the same figure. Call it an LA figure, not a borough figure, and " +
+    "do not describe it as a difference between wards. Where the LA is a " +
+    "district inside a county, the Office for Health Improvement and " +
+    "Disparities (OHID) may publish only the county's figure, so say it is " +
+    "the county's figure.";
 
   /**
    * Series the map leaves out until a data refresh rebuilds them.
@@ -420,9 +421,9 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
     "most deprived tenth) and never turn it into a percentage of England.";
 
   var IMD_META = {
-    imd_best_decile: "The least deprived IMD decile present in this area. Deciles run 1 (the most deprived tenth nationally) to 10 (the least).",
-    imd_worst_decile: "The most deprived IMD decile present in this area. Deciles run 1 (the most deprived tenth nationally) to 10 (the least).",
-    imd_rank: "The LSOA's rank among England's 33,755 LSOAs by IMD 2025, where 1 is the most deprived.",
+    imd_best_decile: "The least deprived Index of Multiple Deprivation (IMD) decile found in this area. Decile 1 is the most deprived 10% of areas in England, and decile 10 is the least deprived 10%.",
+    imd_worst_decile: "The most deprived Index of Multiple Deprivation (IMD) decile found in this area. Decile 1 is the most deprived 10% of areas in England, and decile 10 is the least deprived 10%.",
+    imd_rank: "The LSOA's rank among England's 33,755 LSOAs by the Index of Multiple Deprivation (IMD) 2025, where rank 1 is the most deprived.",
     idaci_rank: "The LSOA's rank among England's 33,755 LSOAs by income deprivation affecting children (IDACI 2025), where 1 is the most deprived.",
     idaopi_rank: "The LSOA's rank among England's 33,755 LSOAs by income deprivation affecting older people (IDAOPI 2025), where 1 is the most deprived.",
   };
@@ -470,8 +471,8 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
     saie_net_ahc: "more income",
     hle_female: "more years in good health",
     hle_male: "more years in good health",
-    dfle_female: "more years free of limiting illness",
-    dfle_male: "more years free of limiting illness",
+    dfle_female: "more years without disability",
+    dfle_male: "more years without disability",
   };
   // The healthy places index (AHAH) and the mental health index (SAMHI):
   // a higher score is worse, and their deciles and the food insecurity
@@ -836,14 +837,16 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
 
   /* The cautions a result carries, by level. Kept short: they reach the
      model with every lookup and are there to be passed on, not quoted. */
-  var IMD_NOTE = "The IMD is published for LSOAs, so ward and LA deprivation figures summarise " +
-    "the LSOAs in them. Use level lsoa for the published figures.";
+  var IMD_NOTE = "The Index of Multiple Deprivation (IMD) is published for LSOAs, so ward and LA " +
+    "deprivation figures summarise the LSOAs in them. Use level lsoa for the published figures.";
   var SMALL_NOTE = {
-    msoa: "Each MSOA holds about 8,000 people, so a few people can move its figures; treat small differences between neighbouring MSOAs with care.",
-    lsoa: "Each LSOA holds about 1,500 people, so a few people can move its figures a lot; treat small differences between neighbouring LSOAs with care.",
+    msoa: "Each MSOA has about 8,000 people, so a few people can change its figures. Small differences between neighbouring MSOAs may be due to chance.",
+    lsoa: "Each LSOA has about 1,500 people, so a few people can change its figures a lot. Small differences between neighbouring LSOAs may be due to chance.",
   };
-  var OA_NOTE = "Output areas have Census 2021 figures only, and each is placed in the ward its LSOA best fits.";
-  var BEST_FIT = "LSOAs are placed in the ward they best fit, so a few may lie partly outside it.";
+  var OA_NOTE = "Output areas have Census 2021 figures only. Each one is in the ward of its LSOA, and the " +
+    "Office for National Statistics (ONS) places each LSOA in the ward where most of its people live.";
+  var BEST_FIT = "The Office for National Statistics (ONS) places each LSOA in the ward where most of its " +
+    "people live, so a few LSOAs may be partly outside the ward.";
   function oaCaveat() {
     return (typeof OA_CAVEAT === "string" ? OA_CAVEAT
       : "Each output area holds about 125 households, so a few households can change these figures a lot.") + " " + OA_NOTE;
@@ -956,7 +959,7 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
       // Spelled out so the answer cannot invert the scale: this says what a
       // high value means, and what the rows you are looking at therefore are.
       higher_means: hm,
-      results_are: hm ? "the " + input.direction + " values; higher = " + hm : undefined,
+      results_are: hm ? "the " + input.direction + " values, and a higher value means " + hm : undefined,
       unit: meta && meta.u ? meta.u : undefined,
       period: meta && meta.yr ? String(meta.yr) : undefined,
       source: meta && meta.src ? meta.src : undefined,
@@ -1121,7 +1124,7 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
           "ward, msoa, lsoa and oa (output area)" + (short ? "" : ", and the period its indicators cover unless a row gives its own") + ". " +
           "Each row is one indicator, its values in the order of columns; a value missing from the end of a row is empty. " +
           (short ? "Units and periods are left out to keep the list short; get_area, compare_areas and rank_areas give them. " : "") +
-          "Deprivation deciles run 1 (most deprived) to 10 (least deprived). " +
+          "Deprivation decile 1 is the most deprived 10% of areas in England, and decile 10 is the least deprived 10%. " +
           "Indicators marked la_only are published for the whole " +
           "LA, so they are the same value for every ward in " +
           "it; do not rank wards by them. Call the local authority level 'LA' " +
@@ -1406,9 +1409,10 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
     limitEl.title = (left === 0
       ? "You have used today's questions. The map, Query, Compare and Directory have no limit. "
       : "")
-      + "You can ask " + cap + " questions a day, and the count starts again at midnight UTC. "
-      + "A work network shared by many people has a daily ceiling of its own, "
-      + "so it may run out sooner.";
+      + "You can ask " + cap + " questions a day, and the count starts again at midnight "
+      + "UTC (Coordinated Universal Time). "
+      + "A work network that many people share also has its own daily limit, "
+      + "so you may reach that limit before you have asked " + cap + " questions.";
   }
 
   /**
@@ -1511,10 +1515,10 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
   }
 
   // Said when an answer stops at the output limit, or the model declines.
-  var CUT_SHORT = "This answer was cut short, so please ask about fewer places at once.";
+  var CUT_SHORT = "This answer stopped early because it was too long, so please ask about fewer places at once.";
   var DECLINED = "I cannot answer that one. Please ask about the figures on the map.";
-  var TOO_LONG = "That conversation has grown too long for me to follow, so I have "
-    + "cleared the earlier questions. Please ask again.";
+  var TOO_LONG = "This conversation is now too long for me to follow, so I have "
+    + "cleared the earlier questions. Please ask your question again.";
 
   async function ask(question) {
     /* The map now defers half the ward indicators to a second fetch, so a
@@ -1548,8 +1552,8 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
   // "Failed to fetch" is the browser's wording for any request that got no
   // response at all, which here usually means a network that blocks
   // workers.dev. It tells a reader nothing, so the panel says what happened.
-  var UNREACHABLE = "The question service could not be reached from this network. "
-    + "The rest of the map still works.";
+  var UNREACHABLE = "Ask could not connect from this network to the service that answers "
+    + "questions. The rest of the map still works.";
 
   // A request with no answer after 30 seconds is given up, rather than
   // leaving "Reading the data..." on screen for as long as the network
@@ -1602,7 +1606,7 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
       // reader, so it is replaced with one plain sentence.
       if (!res.ok || !data) {
         throw new Error(res.status === 429 && data && data.error ? data.error
-          : "Sorry, the question service is not available right now. Please try again later.");
+          : "Sorry, the service that answers questions is not available now. Please try again later.");
       }
       // The Worker's count is the real one. Whenever it reports, this browser's
       // running tally is set to match rather than being trusted over it.
@@ -1647,7 +1651,7 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
         var answer = textOf(blocks);
         history.push({ role: "assistant", content: blocks.length ? blocks
           : [{ type: "text", text: "No answer." }] });
-        return answer || "Sorry, no answer came back. Please try again, or ask it a different way.";
+        return answer || "Sorry, we did not get an answer. Please try again, or ask it a different way.";
       }
 
       var turn = keepBlocks(data.content, true);
@@ -1670,7 +1674,7 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
     // Out of rounds with tool results last. A short reply closes the turn, so
     // the next question does not follow a reader's turn with another.
     history.push({ role: "assistant", content: [{ type: "text", text: "I could not finish that answer." }] });
-    return "Sorry, that question needed more steps than I can take. Please try a narrower question, such as one about a single ward or LA.";
+    return "Sorry, that question needed more steps than I can take. Please ask a simpler question, such as one about a single ward or LA.";
   }
 
   // ---- panel -------------------------------------------------------------
@@ -1761,12 +1765,12 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
     "Tell me about Notting Dale",
     // Not "the most GP practices": no tool can count them, so that chip was
     // sure to come back as not available and cost the reader a question.
-    "Which LA has the lowest life expectancy for men?",
+    "Which local authority (LA) has the lowest life expectancy for men?",
     "How deprived is Hackney?",
   ] : [
     "Which 5 wards are the most deprived?",
     "Which 5 wards have the largest share of people aged 65 and over?",
-    "Which LA has the lowest life expectancy for men?",
+    "Which local authority (LA) has the lowest life expectancy for men?",
     "Which ward has the highest crime rate?",
   ];
 
