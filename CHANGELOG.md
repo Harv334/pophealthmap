@@ -4,6 +4,8 @@
 
 These changes are written and tested, and reach the site with the next data refresh.
 
+The indicators come in 10 themes, so the theme buttons take one row less of the screen. Food and healthy places joined Environment and access, which is now grouped into fuel poverty and air pollution, green and blue space, distance to health services, food and drink, and the healthy places index. The first key indicator is now the deprivation score by LSOA (IMD 2025) in place of the decile.
+
 Ask answers open questions that describe a kind of place, such as "which wards have high child obesity and little green space nearby?". A new tool, find_areas, finds the areas in the highest or lowest 20% of the map's areas for several measures at once, and when none is in that group for all of them, it gives the closest. A measure published for another level is brought to the one asked for: green space, published for LSOAs, is worked out for each ward from its LSOAs, and the answer says so. The indicator search Ask uses knows everyday words such as "obese", "parks" and "jab", and a whole ward or LA profile says what stands out about it. The new instructions reach readers once the Worker is deployed with wrangler.
 
 Eleven more vaccination and screening series that OHID publishes for whole LAs are added: the 6-in-1 vaccine at 1 and 2 years, the pneumococcal (PCV) vaccine and its booster, the Hib and MenC booster, the first dose of MMR at 2 and 5 years, the pneumococcal (PPV) vaccine at 65 and over, flu vaccination for people at risk, HPV vaccination at 12 to 13 for girls and for boys (OHID publishes them separately), and breast screening. Each id and name was checked against Fingertips' own metadata, and a series whose name does not match is not taken.

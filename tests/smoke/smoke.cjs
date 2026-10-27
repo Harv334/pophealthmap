@@ -381,7 +381,11 @@ const smallText = page => page.evaluate(() => {
     ok(await page.evaluate(() => curOv && curOv !== 'none'), 'key indicator chip sets an indicator');
     ok(await page.evaluate(() => /\d/.test(document.getElementById('sc-lo').textContent)), 'legend shows numbers');
     // One hover card, and the LSOA's decile given once when the map is
-    // coloured by the decile (workplan 2.9).
+    // coloured by the decile (workplan 2.9). The first key indicator is the
+    // LSOA score now, so the decile is chosen here.
+    await setOv(page, 'imd_decile');
+    await page.waitForFunction(() => lsoaLyr && map.hasLayer(lsoaLyr), null, { timeout: 30000 }).catch(() => {});
+    await page.waitForTimeout(1000);
     const tip = await page.evaluate(() => {
       if (document.getElementById('ov').value !== 'imd_decile' || !lsoaLyr) return null;
       let l = null; lsoaLyr.eachLayer(x => { if (!l && x.feature.properties.imd_decile) l = x; });
@@ -4474,8 +4478,10 @@ const smallText = page => page.evaluate(() => {
     await page.waitForTimeout(SETTLE);
     // P14: the key indicators lead with a health figure anyone can read.
     const keys = await page.evaluate(() => [...document.querySelectorAll('#ov-chips [data-ov]')].map(b => b.getAttribute('data-ov')));
-    ok(keys.join() === 'imd_decile,census_bad_health_pct,fuel_poverty_pct,no2_ugm3',
-      'polish: the key indicators are the decile, bad health, fuel poverty and NO2, not a negative score', keys.join());
+    ok(keys.join() === 'imd_score,census_bad_health_pct,fuel_poverty_pct,no2_ugm3',
+      'polish: the key indicators are the deprivation score by LSOA, bad health, fuel poverty and NO2', keys.join());
+    const themeN = await page.evaluate(() => ({ themes: (window.PH_THEMES || []).length, buttons: document.querySelectorAll('#ov-themes .ov-theme').length }));
+    ok(themeN.themes <= 10 && themeN.buttons === themeN.themes, 'polish: the indicators come in at most 10 themes, one button each', JSON.stringify(themeN));
     // P34: the indicator card follows its button.
     ok(await page.evaluate(() => document.getElementById('ov-cur-btns').nextElementSibling.id === 'ov-info-panel'),
       'polish: the indicator card sits straight after About this indicator in the page order');
@@ -5784,9 +5790,9 @@ const smallText = page => page.evaluate(() => {
            'samhi_index borough,ward,lsoa | qof_est_diabetes_pct borough,ward,msoa | ppfi_decile lsoa | ' +
            'ppfi_priority_pct borough,ward | fhrs_takeaways_per_1000 borough,ward',
           'Healthy places and food: scores and drive times for LSOAs, wards and LAs, deciles for LSOAs only, the QOF estimates from MSOAs, the food counts for wards and LAs', r.lv.join(' | '));
-        ok(KEYS.every((k, i) => r.themes[i] === (/^(samhi|qof_est)_/.test(k) ? 'Health' : 'Food and healthy places')),
-          'Healthy places and food: AHAH, PPFI and the FSA counts under Food and healthy places, SAMHI and the QOF estimates under Health',
-          KEYS.map((k, i) => k + ' ' + r.themes[i]).filter(x => !/(Health|Food and healthy places)$/.test(x)).join(', ') || r.themes.join(', '));
+        ok(KEYS.every((k, i) => r.themes[i] === (/^(samhi|qof_est)_/.test(k) ? 'Health' : 'Environment and access')),
+          'Healthy places and food: AHAH, PPFI and the FSA counts under Environment and access, SAMHI and the QOF estimates under Health',
+          KEYS.map((k, i) => k + ' ' + r.themes[i]).filter(x => !/(Health|Environment and access)$/.test(x)).join(', ') || r.themes.join(', '));
         const lv = r.ask.map(a => a && a.levels);
         ok(lv.join() === 'la,ward,lsoa,lsoa,la,ward,lsoa,la,ward,msoa,lsoa,la,ward' && r.size < 15000 && r.cols === 'key,label,higher_means,la_only',
           'Healthy places and food: Ask lists them at their levels, within its 15,000 character cap', JSON.stringify({ lv, size: r.size, cols: r.cols }));
