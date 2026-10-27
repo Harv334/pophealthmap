@@ -232,6 +232,45 @@ Rules that matter:
 - Be brief: usually 2 short paragraphs, or a small table when comparing.
   Start with the answer, with no introduction.
 
+Open questions:
+- Readers often describe a kind of place instead of naming figures, for
+  example "an area with high obesity and little green space", "where do
+  many older people live with poor transport" or "which wards most need
+  help". Answer these. Never ask the reader to name indicators, keys,
+  levels or cut-offs.
+- Turn each idea in the question into one indicator. If you do not know the
+  key, call list_indicators with a search word for each idea, for example
+  "obesity" and "green space", in one turn. The search knows everyday
+  words, such as "obese", "parks", "jab" and "elderly".
+- Choose the indicator that fits best, in this order: it is available at
+  the level you answer at (for wards, never an indicator marked la_only);
+  it measures the idea directly; its period is the most recent. For
+  example, for obesity among wards, use a children's obesity or a
+  GP-recorded obesity figure that wards have, not the LA's adult figure.
+- Answer at ward level unless the question asks for LAs or smaller areas.
+- Then call find_areas once, with every condition. It returns the areas in
+  the highest or lowest 20% of the map's areas for all of them. Use want
+  "high" or "low" for what the reader means, and check higher_means: for
+  "little green space" with a measure of green space nearby, want "low".
+- In the answer, name the indicator you used for each idea, with its
+  period, and say what high or low meant, using counts_as, for example "in
+  the highest 20% of the 704 wards in London". Then give the areas, with
+  their LA and figures, usually 3 to 6 of them.
+- If meeting_all is 0, say that no area is in that group for every
+  condition, and give the closest areas find_areas returned, with how many
+  conditions each meets.
+- A result with bridged used a figure from another level, for example green
+  space worked out for wards from their LSOAs. Say how in one short
+  sentence, using its words.
+- For "what stands out about X" or "the main issues in X", call get_area
+  for X without naming indicators, and use its stands_out lists, which
+  give the figures where X is among the highest or lowest 10% of the map's
+  areas. Say what each one is compared with.
+- For a broad question that names no measure, such as "which wards most
+  need help", pick 2 or 3 measures that fit, such as deprivation, life
+  expectancy and emergency admissions, say which you picked, and use
+  find_areas.
+
 How to write for every reader:
 - Many readers know English as a second or third language, and some read
   your answer through a translation tool. Write so that they understand it
@@ -310,8 +349,9 @@ const TOOLS = [
       "Look up the indicators held for one area by name or code: a ward, an LA, an MSOA, an LSOA " +
       "or an output area. Use for 'tell me about X' or any question about a single place. Name the " +
       "indicators you need when the question is about particular ones; leave them out for a full " +
-      "profile. An output area has a code but no name, and is found within an LA or ward. An LSOA's " +
-      "result lists its output area codes.",
+      "profile. A full profile of a ward or LA also has stands_out: the figures where it is among " +
+      "the highest or lowest 10% of the map's wards or LAs. An output area has a code but no name, " +
+      "and is found within an LA or ward. An LSOA's result lists its output area codes.",
     input_schema: {
       type: "object",
       properties: {
@@ -373,12 +413,46 @@ const TOOLS = [
     },
   },
   {
+    name: "find_areas",
+    description:
+      "Find the areas that are high or low on several indicators at once, for open questions " +
+      "such as 'an area with high obesity and little green space'. Each condition counts an area " +
+      "as high (or low) when it is in the highest (or lowest) share% of the map's areas, 20% unless " +
+      "share is given. Areas meeting every condition come first; if none does, the closest are " +
+      "returned with how many conditions each meets. Each figure says where the area is, for " +
+      "example 'higher than 91% of the other wards in London'.",
+    input_schema: {
+      type: "object",
+      properties: {
+        conditions: {
+          type: "array",
+          description: "1 to 4 conditions, each an indicator key and whether the reader wants areas where it is high or low",
+          items: {
+            type: "object",
+            properties: {
+              indicator: { type: "string", description: "Indicator key" },
+              want: { type: "string", enum: ["high", "low"] },
+            },
+            required: ["indicator", "want"],
+          },
+        },
+        level: LEVEL,
+        within_la: WITHIN_LA,
+        within_ward: WITHIN_WARD,
+        share: { type: "integer", description: "Optional: the percent of areas that counts as high or low, 5 to 50; 20 if left out" },
+        n: { type: "integer", description: "Optional: how many areas to return, 1 to 20; 8 if left out" },
+      },
+      required: ["conditions", "level"],
+    },
+  },
+  {
     name: "list_indicators",
     description:
       "List the indicator keys available, with their human labels, grouped by the " +
       "levels each is available at. Call this first if you are unsure what an " +
       "indicator is called or whether it exists at a level. Give search to list only " +
-      "the keys whose key or label holds every word of it.",
+      "the indicators that match every word of it in their name, description or theme; " +
+      "everyday words such as 'obese', 'parks' or 'jab' also work.",
     input_schema: {
       type: "object",
       properties: {
@@ -509,7 +583,7 @@ function isNewQuestion(messages) {
  *
  *   - turns alternate, starting and ending with the reader;
  *   - a typed question is a plain string of at most LIMITS.typed characters;
- *   - an assistant turn holds only text and calls to the four tools;
+ *   - an assistant turn holds only text and calls to the five tools;
  *   - a reader turn made of blocks holds only tool_result blocks, one for each
  *     tool call in the turn before it, each a string of at most
  *     LIMITS.toolResult characters;

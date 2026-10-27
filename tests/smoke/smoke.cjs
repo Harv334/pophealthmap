@@ -4723,6 +4723,42 @@ const smallText = page => page.evaluate(() => {
     ok(tool.keys.join() === 'census_population,ft_obesity_adults' && tool.pop && typeof tool.pop.v === 'number' &&
        tool.pop.label && tool.pop.unit === 'people' && tool.pop.period === '2021' && tool.size < 15000 && tool.period === '2021',
       'polish: Ask figures carry a label, unit and period, limited to the indicators asked for', JSON.stringify(tool));
+    // Open questions: find_areas finds areas high or low on several measures
+    // at once, bringing a measure to the level asked when it is published
+    // for another, list_indicators knows everyday words, and a whole profile
+    // says what stands out.
+    const askOpen = await page.evaluate(async () => {
+      const T = (n, i) => PH_ASSISTANT.runTool(n, i);
+      const keys = li => [].concat(...((li && li.groups) || []).map(g => g.rows.map(r => r[0])));
+      const both = await T('find_areas', { conditions: [{ indicator: 'ft_93107', want: 'high' }, { indicator: 'green_local_pct', want: 'low' }], level: 'ward', n: 5 });
+      const r0 = (both.results || [])[0] || {};
+      const k = Math.round(both.of_total * 0.2);
+      const laWard = T('find_areas', { conditions: [{ indicator: 'ft_obesity_adults', want: 'high' }], level: 'ward' });
+      const none = T('find_areas', { conditions: [{ indicator: 'imd_score', want: 'high' }, { indicator: 'census_good_health_pct', want: 'high' }], level: 'ward', share: 5, n: 3 });
+      const ga = T('get_area', { name: 'Lansbury', level: 'ward' });
+      return {
+        meetingAll: both.meeting_all, of: both.of_total, bridged: (both.bridged || []).map(b => b.indicator).join(),
+        // Every area returned really is past both cuts.
+        inBand: (both.results || []).every(r => /^higher than (8\d|9\d|100)% of the other wards in London$/.test(r.figures.ft_93107.position) &&
+          /^lower than \d+% of the other wards in London$/.test(r.figures.green_local_pct.position)),
+        counts: (both.conditions || []).map(c => c.counts_as).join(' | '), first: r0.name, firstLa: r0.la,
+        laWard: laWard.error || '', none: none.meeting_all, noneAre: none.results_are || '', noneMeets: ((none.results || [])[0] || {}).meets,
+        obese: keys(T('list_indicators', { search: 'obese' })), parks: keys(T('list_indicators', { search: 'parks' })),
+        jab: keys(T('list_indicators', { search: 'jab' })),
+        stands: ga.stands_out ? { cmp: ga.stands_out.compared_with, hi: ga.stands_out.highest.length, lo: ga.stands_out.lowest.length,
+          noLa: !ga.stands_out.highest.concat(ga.stands_out.lowest).some(r => /^ft_[a-z]/.test(r.key)) } : null,
+        size: JSON.stringify(ga).length, k };
+    });
+    ok(askOpen.meetingAll > 0 && askOpen.bridged === 'green_local_pct' && askOpen.inBand && askOpen.first && askOpen.firstLa &&
+       /^the highest 20% of the \d+ wards in London, which is [\d.]+ or more$/.test(askOpen.counts.split(' | ')[0]),
+      'Ask: find_areas finds wards with high Year 6 obesity and little local green space, green space worked out from LSOAs', JSON.stringify(askOpen));
+    ok(/published for whole LAs only/.test(askOpen.laWard), 'Ask: find_areas will not sort wards by a figure published for whole LAs', askOpen.laWard);
+    ok(askOpen.none === 0 ? (/^no ward meets every condition/.test(askOpen.noneAre) && /^\d of 2$/.test(askOpen.noneMeets || '')) : true,
+      'Ask: when no area meets every condition, find_areas gives the closest and says how many each meets', JSON.stringify(askOpen));
+    ok(askOpen.obese.indexOf('ft_93107') !== -1 && askOpen.parks.indexOf('green_local_pct') !== -1 && askOpen.jab.indexOf('ft_mmr_2_doses_age5') !== -1,
+      'Ask: list_indicators finds "obese", "parks" and "jab"', JSON.stringify([askOpen.obese, askOpen.parks, askOpen.jab]));
+    ok(askOpen.stands && /^the 704 wards in London$/.test(askOpen.stands.cmp) && askOpen.stands.hi + askOpen.stands.lo > 0 && askOpen.stands.noLa && askOpen.size < 15000,
+      'Ask: a whole ward profile says what stands out among London\'s wards, without LA figures, inside one result', JSON.stringify(askOpen.stands) + ' ' + askOpen.size);
     // P73: no example asks for something the tools cannot count.
     await page.click('#ai-toggle').catch(() => {});
     await page.waitForTimeout(500);

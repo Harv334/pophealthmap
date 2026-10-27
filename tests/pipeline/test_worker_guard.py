@@ -105,7 +105,7 @@ check("effort is medium, which between_tools allows", sent["effort"] == "medium"
 check("a declined question falls back rather than failing", sent["fallbacks"] == "default" and sent["beta"] == "server-side-fallback-2026-07-01",
       json.dumps([sent["fallbacks"], sent["beta"]]))
 check("the system prompt is the Worker's own", sent["systemIsOurs"])
-check("only the four tools are offered", sorted(sent["tools"]) == ["compare_areas", "get_area", "list_indicators", "rank_areas"],
+check("only the five tools are offered", sorted(sent["tools"]) == ["compare_areas", "find_areas", "get_area", "list_indicators", "rank_areas"],
       json.dumps(sent["tools"]))
 check("the last message carries a cache breakpoint", (sent["lastBlock"] or {}).get("cache_control") == {"type": "ephemeral"},
       json.dumps(sent["lastBlock"]))

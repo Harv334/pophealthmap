@@ -2,7 +2,7 @@
  * PopHealth Map assistant.
  *
  * The model is never sent the whole dataset. It receives tool definitions, and
- * the four functions below run against the JSON this page has loaded (for
+ * the five functions below run against the JSON this page has loaded (for
  * MSOAs, LSOAs and output areas, loading it first through the map's own
  * loaders), so only the figures a question looks up are sent with it, and they
  * are the same numbers the map is drawing. The model is told to use only those, but
@@ -1012,6 +1012,260 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
     return rankResult(input, lv, rows, within);
   }
 
+  /* Whether one indicator matches every word of a list_indicators search.
+     Each word may match the key, label, official title, description or
+     theme, as itself, without a final "s", or as one of the everyday words
+     the map's indicator search gives it (PH_IND_SYNONYMS in index.html). */
+  var SEARCH_EXTRA = { obese: ["obes"], fat: ["obes", "overweight"], green: ["green"], greenery: ["green"],
+    lonely: ["alone", "one person"], isolated: ["alone", "one person"], isolation: ["alone", "one person"],
+    old: ["65 and over", "75 and over", "85 and over", "older"], poverty: ["income", "deprivation"],
+    health: ["health"], sick: ["bad health", "disab", "limited"], ill: ["bad health", "disab", "illness"] };
+  function searchHits(k, label, words) {
+    var m = metaFor(k) || {};
+    var title = "";
+    try { title = (window.PH_IND && PH_IND.title) ? PH_IND.title(k) || "" : ""; } catch (e) { title = ""; }
+    var theme = "";
+    (window.PH_THEMES || []).some(function (t) { if (t.keys.indexOf(k) !== -1) { theme = t.label; return true; } return false; });
+    var hay = (k.replace(/_/g, " ") + " " + label + " " + title + " " + (m.desc || "") + " " + theme).toLowerCase();
+    var syn = (window.PH_IND_SYNONYMS && typeof window.PH_IND_SYNONYMS === "object") ? window.PH_IND_SYNONYMS : {};
+    return words.every(function (w) {
+      var alts = [w];
+      if (w.length > 3 && /s$/.test(w)) alts.push(w.slice(0, -1));
+      [syn[w], SEARCH_EXTRA[w]].forEach(function (a) { if (Array.isArray(a)) alts = alts.concat(a); });
+      return alts.some(function (a) { return hay.indexOf(String(a).toLowerCase()) !== -1; });
+    });
+  }
+
+  var LEVEL_PLURAL = { ward: "wards", la: "LAs", msoa: "MSOAs", lsoa: "LSOAs", oa: "output areas" };
+  function round2(v) { return Math.round(v * 100) / 100; }
+  // How many of the sorted values are below, or above, v.
+  function countBelow(asc, v) {
+    var lo = 0, hi = asc.length;
+    while (lo < hi) { var mid = (lo + hi) >> 1; if (asc[mid] < v) lo = mid + 1; else hi = mid; }
+    return lo;
+  }
+  function countAbove(asc, v) {
+    var lo = 0, hi = asc.length;
+    while (lo < hi) { var mid = (lo + hi) >> 1; if (asc[mid] <= v) lo = mid + 1; else hi = mid; }
+    return asc.length - lo;
+  }
+
+  /* find_areas: the areas that are high or low on several indicators at
+     once, for the open questions readers ask ("an area with high obesity and
+     little green space"). Ranking each indicator on its own and matching the
+     lists by hand found nothing: the 20 highest wards for one measure and the
+     20 lowest for another rarely overlap out of 704.
+
+     Each condition counts an area as high (or low) when it is in the highest
+     (or lowest) share% of the areas with a figure for every condition, so the
+     cut is the same whatever the indicator's unit. Areas meeting every
+     condition come first, ordered by the condition each meets least well, so
+     an area far along on both comes before one far along on one only. When no
+     area meets them all, the closest are returned and say how many they
+     meet, so an open question always gets an answer. */
+  var FIND_MAX_CONDITIONS = 4;
+  function findResult(lv, within, conds, share, n, list, bridged) {
+    var rows = [];
+    list.forEach(function (a) {
+      var vals = {}, ok = true;
+      conds.forEach(function (c) {
+        var v = parseFloat(a.ind[c.key]);
+        if (isNaN(v)) ok = false; else vals[c.key] = v;
+      });
+      if (ok) rows.push({ place: a.place, vals: vals });
+    });
+    var N = rows.length, plural = LEVEL_PLURAL[lv], scope = withinWords(within) || regionName();
+    if (N < 3) {
+      var none = conds.filter(function (c) {
+        return !list.some(function (a) { return !isNaN(parseFloat(a.ind[c.key])); });
+      });
+      if (none.length) return noValues(none[0].key, lv);
+      return { error: "Too few " + plural + " in " + scope + " have a figure for every one of these indicators. " +
+        "Use fewer conditions, or another level." };
+    }
+    var k = Math.max(1, Math.round(N * share / 100));
+    var info = conds.map(function (c) {
+      var asc = rows.map(function (r) { return r.vals[c.key]; }).sort(function (a, b) { return a - b; });
+      return { c: c, asc: asc, cut: c.want === "high" ? asc[N - k] : asc[k - 1], meeting: 0 };
+    });
+    rows.forEach(function (r) {
+      r.pct = []; r.meets = 0;
+      info.forEach(function (x) {
+        var v = r.vals[x.c.key];
+        var past = x.c.want === "high" ? countBelow(x.asc, v) : countAbove(x.asc, v);
+        var ahead = x.c.want === "high" ? countAbove(x.asc, v) : countBelow(x.asc, v);
+        r.pct.push(Math.round(100 * past / (N - 1)));
+        if (ahead < k) { r.meets++; x.meeting++; }
+      });
+      r.worst = Math.min.apply(null, r.pct);
+      r.mean = r.pct.reduce(function (s, p) { return s + p; }, 0) / r.pct.length;
+    });
+    var full = conds.length;
+    rows.sort(function (a, b) {
+      return ((b.meets === full) - (a.meets === full)) || (b.worst - a.worst) || (b.mean - a.mean);
+    });
+    var all = rows.filter(function (r) { return r.meets === full; });
+    var pick = (all.length ? all : rows).slice(0, n);
+    var band = function (want) { return (want === "high" ? "the highest " : "the lowest ") + share + "%"; };
+    return {
+      level: LEVEL_WORD[lv], within: withinWords(within) || undefined, of_total: N, share: share,
+      conditions: info.map(function (x) {
+        var m = metaFor(x.c.key) || {};
+        return { indicator: x.c.key, label: shortLabel(x.c.key), want: x.c.want,
+          unit: m.u || undefined, period: m.yr ? String(m.yr) : undefined, higher_means: higherMeans(x.c.key),
+          counts_as: band(x.c.want) + " of the " + N + " " + plural + " in " + scope + ", which is " +
+            round2(x.cut) + (x.c.want === "high" ? " or more" : " or less") +
+            // Many areas on one figure (0% of homes near a park) put more
+            // than share% on the right side of the cut: said, not hidden.
+            (x.meeting > Math.ceil(k * 1.2) ? ". Many " + plural + " share that figure, so " + x.meeting +
+              " of the " + N + " count" : ""),
+          meeting: x.meeting };
+      }),
+      meeting_all: all.length,
+      bridged: bridged && bridged.length ? bridged : undefined,
+      results_are: all.length
+        ? "the " + plural + " that meet every condition, the ones furthest along on the condition they meet least well first"
+        : "no " + LEVEL_WORD[lv] + " meets every condition, so these are the closest " + plural +
+          ", each with how many of the conditions it meets",
+      results: pick.map(function (r) {
+        var out = {};
+        Object.keys(r.place).forEach(function (f) { if (r.place[f] !== undefined) out[f] = r.place[f]; });
+        out.figures = {};
+        info.forEach(function (x, i) {
+          out.figures[x.c.key] = { v: round2(r.vals[x.c.key]),
+            position: (x.c.want === "high" ? "higher" : "lower") + " than " + r.pct[i] + "% of the other " + plural + " in " + scope };
+        });
+        if (!all.length) out.meets = r.meets + " of " + full;
+        return out;
+      }),
+      caveat: caveatFor(lv, conds.map(function (c) { return c.key; }), within),
+    };
+  }
+
+  /* An indicator with no figures at the level asked for, brought to it:
+     one published for LSOAs only (green space, for one) is worked out for
+     each ward, LA or MSOA from the LSOAs in it, weighted by their residents;
+     one published for MSOAs, or wards, is given to each LSOA from the MSOA or
+     ward it is in. Without this "high obesity and little green space" had no
+     level where both exist. Each one is said in the result (bridged), so the
+     answer can say how the figure was made. Never from an LA figure: that is
+     the same figure for every area in the LA, and would only sort by LA. */
+  function withFigure(ind, key, v) {
+    var o = {};
+    Object.keys(ind || {}).forEach(function (k) { o[k] = ind[k]; });
+    o[key] = v;
+    return o;
+  }
+  function bridge(lv, gaps, list) {
+    var notes = [], jobs = [];
+    var has = function (k, l) { return levelsOf(k, !!wardKeys()[k]).indexOf(l) !== -1; };
+    var label = function (k) { return shortLabel(k); };
+    var up = (lv === "ward" || lv === "la" || lv === "msoa")
+      ? gaps.filter(function (c) { return has(c.key, "lsoa"); }) : [];
+    var fromMsoa = lv === "lsoa" ? gaps.filter(function (c) { return has(c.key, "msoa") && !isBoroughLevel(c.key); }) : [];
+    var fromWard = lv === "lsoa" ? gaps.filter(function (c) {
+      return fromMsoa.indexOf(c) === -1 && has(c.key, "ward") && !isBoroughLevel(c.key);
+    }) : [];
+    if (up.length) {
+      jobs.push(lsoaAreas().then(function (ls) {
+        if (!ls) return;
+        var parentOf = function (a) { return lv === "ward" ? a.ward_code : lv === "la" ? a.la : a.msoa; };
+        var keyOf = function (it) { return lv === "ward" ? it.raw.code : it.raw.name; };
+        up.forEach(function (c) {
+          var sum = {}, wt = {};
+          Object.keys(ls).forEach(function (code) {
+            var a = ls[code], ind = a.indicators || {}, v = parseFloat(ind[c.key]), key = parentOf(a);
+            if (isNaN(v) || !key) return;
+            var pop = parseFloat(ind.census_population), w = pop > 0 ? pop : 1;
+            sum[key] = (sum[key] || 0) + v * w;
+            wt[key] = (wt[key] || 0) + w;
+          });
+          var got = 0;
+          list.forEach(function (it) {
+            var key = keyOf(it);
+            if (wt[key]) { it.ind = withFigure(it.ind, c.key, sum[key] / wt[key]); got++; }
+          });
+          if (got) {
+            notes.push({ indicator: c.key, how: label(c.key) + " is published for LSOAs only. Each " + LEVEL_WORD[lv] +
+              "'s figure here is worked out from the LSOAs in it, as an average where LSOAs with more people count for more." });
+          }
+        });
+      }));
+    }
+    if (fromMsoa.length) {
+      jobs.push(msoaAreas().then(function (ms) {
+        if (!ms) return;
+        var byName = {};
+        Object.keys(ms).forEach(function (c) { byName[ms[c].name] = ms[c]; });
+        fromMsoa.forEach(function (c) {
+          var got = 0;
+          list.forEach(function (it) {
+            var m = byName[it.raw.msoa], v = m ? parseFloat((m.indicators || {})[c.key]) : NaN;
+            if (!isNaN(v)) { it.ind = withFigure(it.ind, c.key, v); got++; }
+          });
+          if (got) {
+            notes.push({ indicator: c.key, how: label(c.key) + " is published for MSOAs, of about 8,000 people. Each LSOA " +
+              "here has the figure of the MSOA it is in, so the LSOAs of one MSOA share a figure." });
+          }
+        });
+      }));
+    }
+    if (fromWard.length) {
+      var w = areasFor("ward"), byCode = {};
+      Object.keys(w).forEach(function (k) { byCode[w[k].code] = w[k]; });
+      fromWard.forEach(function (c) {
+        var got = 0;
+        list.forEach(function (it) {
+          var wd = byCode[it.raw.ward_code], v = wd ? parseFloat((wd.indicators || {})[c.key]) : NaN;
+          if (!isNaN(v)) { it.ind = withFigure(it.ind, c.key, v); got++; }
+        });
+        if (got) {
+          notes.push({ indicator: c.key, how: label(c.key) + " has no LSOA figures. Each LSOA here has the figure of " +
+            "the ward it is in, so the LSOAs of one ward share a figure." });
+        }
+      });
+    }
+    return Promise.all(jobs).then(function () { return notes; });
+  }
+
+  /* What stands out about one ward or LA: the indicators where it is among
+     the highest or lowest tenth of the map's areas at its level, so "what
+     are the main issues in X" can be answered from the whole profile without
+     reading every figure against every other area. An LA figure repeated on
+     every ward is left out at ward level. High and low are about size, not
+     good or bad; higher_means says which way a scale runs where it is not
+     plain from the label. */
+  var STAND_OUT = 90, STAND_OUT_MAX = 6;
+  function standsOut(lv, area) {
+    var areas = areasFor(lv), all = Object.keys(areas).map(function (k) { return areas[k].indicators || {}; });
+    var own = shownOnly(figuresOnly(area.indicators));
+    var hi = [], lo = [];
+    Object.keys(own).forEach(function (k) {
+      if (lv === "ward" && isBoroughLevel(k)) return;
+      var v = parseFloat(own[k]), below = 0, above = 0, n = 0;
+      all.forEach(function (ind) {
+        var x = parseFloat(ind[k]);
+        if (isNaN(x)) return;
+        n++;
+        if (x < v) below++; else if (x > v) above++;
+      });
+      if (n < 10) return;
+      var ph = Math.round(100 * below / (n - 1)), pl = Math.round(100 * above / (n - 1));
+      var row = { key: k, label: shortLabel(k), v: round2(v) };
+      var hm = higherMeans(k);
+      if (hm) row.higher_means = hm;
+      if (ph >= STAND_OUT) { row.higher_than = ph + "% of the other " + LEVEL_PLURAL[lv]; row._p = ph; hi.push(row); }
+      else if (pl >= STAND_OUT) { row.lower_than = pl + "% of the other " + LEVEL_PLURAL[lv]; row._p = pl; lo.push(row); }
+    });
+    var tidy = function (list) {
+      return list.sort(function (a, b) { return b._p - a._p; }).slice(0, STAND_OUT_MAX)
+        .map(function (r) { delete r._p; return r; });
+    };
+    if (!hi.length && !lo.length) return undefined;
+    return { compared_with: "the " + all.length + " " + LEVEL_PLURAL[lv] + " in " + regionName(),
+      highest: tidy(hi), lowest: tidy(lo) };
+  }
+
   // The fields of each list_indicators row, in order (see list_indicators).
   var LIST_COLUMNS = ["key", "label", "unit", "period", "higher_means", "la_only"];
   // The longest the full list may be before its unit and period columns are
@@ -1044,8 +1298,11 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
         });
       }
       Object.keys(SMALL_ONLY).forEach(function (k) { keys[k] = 1; });
-      // An optional search narrows the list to the keys whose key or label
-      // holds every word of it ("income", "life expectancy").
+      // An optional search narrows the list to the keys that hold every word
+      // of it ("income", "life expectancy") in their key, label, official
+      // title, description or theme, each word with the everyday words the
+      // map's own indicator search knows ("obese" finds obesity, "parks"
+      // green space, "jab" vaccination).
       var words = String((input && input.search) || "").toLowerCase().split(/\s+/).filter(Boolean);
       var groups = {};
       Object.keys(keys).filter(function (k) { return !isWithheld(k); }).sort().forEach(function (k) {
@@ -1053,10 +1310,7 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
         if (!at.length) return;
         var m = metaFor(k);
         var row = { key: k, label: shortLabel(k) };
-        if (words.length) {
-          var hay = (k + " " + row.label).toLowerCase();
-          if (!words.every(function (w) { return hay.indexOf(w) !== -1; })) return;
-        }
+        if (words.length && !searchHits(k, row.label, words)) return;
         if (m && m.u) row.unit = m.u;
         if (m && m.yr) row.period = String(m.yr);
         if (isBoroughLevel(k)) row.la_only = true;
@@ -1162,7 +1416,7 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
       // The indicators asked for, or every one the area has.
       shownInd = figures(shownInd, wantedKeys(input, shownInd));
       var boroughLevel = Object.keys(shownInd).filter(isBoroughLevel);
-      return fitArea({
+      var res = fitArea({
         name: hit.area.name, level: levelWord(lv), la: hit.area.lad || undefined,
         indicators: shownInd,
         // A ward profile mixes ward figures with borough ones. Name which are
@@ -1171,6 +1425,17 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
           ? boroughLevel : undefined,
         caveat: caveatFor(lv, Object.keys(shownInd)),
       }, input);
+      // A whole profile also says what stands out, kept inside one result.
+      if (!(Array.isArray(input.indicators) && input.indicators.length)) {
+        var so = standsOut(lv, hit.area);
+        if (so) {
+          res.stands_out = so;
+          while (JSON.stringify(res).length > RESULT_BYTES - 600 && (so.highest.length || so.lowest.length)) {
+            (so.highest.length >= so.lowest.length ? so.highest : so.lowest).pop();
+          }
+        }
+      }
+      return res;
     },
 
     compare_areas: function (input) {
@@ -1226,12 +1491,64 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
       }
       return rankResult(input, lv, rows, within);
     },
+
+    find_areas: function (input) {
+      var lv = levelOf(input.level);
+      if (!lv) return badLevel(input.level);
+      var conds = (Array.isArray(input.conditions) ? input.conditions : []).slice(0, FIND_MAX_CONDITIONS)
+        .map(function (c) {
+          return { key: String((c && c.indicator) || "").trim(), want: (c && c.want) === "low" ? "low" : "high" };
+        })
+        .filter(function (c) { return c.key; });
+      if (!conds.length) return { error: "Give 1 to 4 conditions, each an indicator key with want high or low." };
+      for (var i = 0; i < conds.length; i++) {
+        var key = conds[i].key;
+        if (isWithheld(key)) return withheldError(key);
+        if (/_(vs|lci|uci)$/.test(key)) return noValues(key, lv);
+        if (lv !== "la" && isBoroughLevel(key)) {
+          return { error: "'" + key + "' (" + shortLabel(key) + ") is published for whole LAs only, so every " +
+            LEVEL_WORD[lv] + " in an LA has the same figure. Use it at level la, or choose an indicator " +
+            "published for " + LEVEL_PLURAL[lv] + " (list_indicators gives the levels)." };
+        }
+      }
+      var share = Math.max(5, Math.min(parseInt(input.share, 10) || 20, 50));
+      var n = Math.max(1, Math.min(parseInt(input.n, 10) || 8, 20));
+      var within = resolveWithin(input);
+      if (within.error) return within;
+      var go = function (list) {
+        if (!Array.isArray(list)) return list;   // an error from loading the areas
+        var gaps = conds.filter(function (c) {
+          return !list.some(function (a) { return !isNaN(parseFloat(a.ind[c.key])); });
+        });
+        if (!gaps.length || lv === "oa") return findResult(lv, within, conds, share, n, list, []);
+        return bridge(lv, gaps, list).then(function (notes) {
+          return findResult(lv, within, conds, share, n, list, notes);
+        });
+      };
+      if (isSmall(lv)) {
+        return areasAt(lv, within).then(function (got) {
+          if (got.error) return got;
+          return go(Object.keys(got.areas).map(function (c) {
+            var a = got.areas[c];
+            return { place: placeOf(lv, a), raw: a, ind: a.indicators || {} };
+          }));
+        });
+      }
+      if (within.ward) return { error: "within_ward narrows LSOAs and output areas; for wards or LAs, use within_la." };
+      var areas = areasFor(lv), list = [];
+      Object.keys(areas).forEach(function (k) {
+        var a = areas[k];
+        if (within.la && (a.lad || a.name) !== within.la.name) return;
+        list.push({ place: { name: a.name, la: lv === "ward" ? (a.lad || undefined) : undefined }, raw: a, ind: a.indicators || {} });
+      });
+      return go(list);
+    },
   };
 
   /**
    * The tool layer, exposed for testing.
    *
-   * These four functions are what actually produce every figure the assistant
+   * These five functions are what actually produce every figure the assistant
    * states, so they are the part worth testing, and they can be tested without
    * an API key or a deployed Worker: they are pure functions over the JSON the
    * page has loaded, and for the MSOA, LSOA and output area levels they load
@@ -1771,6 +2088,7 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
   var IS_LONDON = !window.PH_REGION || window.PH_REGION.isLondon;
   var IS_ENGLAND = !!(window.PH_REGION && window.PH_REGION.isEngland);
   var EXAMPLES = IS_LONDON ? [
+    "Which wards have high child obesity and little green space nearby?",
     "Compare deprivation in Brent and Bromley",
     "Which 5 wards have the largest share of people aged 65 and over?",
     "Tell me about Notting Dale",
@@ -1779,6 +2097,7 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
     "Which local authority (LA) has the lowest life expectancy for men?",
     "How deprived is Hackney?",
   ] : [
+    "Which wards have high child obesity and little green space nearby?",
     "Which 5 wards are the most deprived?",
     "Which 5 wards have the largest share of people aged 65 and over?",
     "Which local authority (LA) has the lowest life expectancy for men?",
@@ -1811,8 +2130,9 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
     var intro = document.createElement("div");
     intro.className = "ai-msg ai-bot ai-intro";
     [
-      "Ask questions about the data on this map. You can compare areas, or " +
-        "find the places with the highest or lowest figures.",
+      "Ask questions about the data on this map. You can compare areas, find the " +
+        "places with the highest or lowest figures, or describe the kind of place " +
+        "you are looking for.",
     ].forEach(function (t) {
       var para = document.createElement("p");
       para.textContent = t;

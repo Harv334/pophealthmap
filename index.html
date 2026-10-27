@@ -15655,6 +15655,8 @@ function _fitFocus(bounds) {
     uc: ['universal credit'], pip: ['personal independence', 'pip for'], dla: ['disability living'], welfare: ['universal credit', 'claimant', 'allowance'],
     'child poverty': ['low income', 'low-income'], 'low income': ['low income', 'low-income', 'pension credit'], psychiatric: ['psychiatric'],
   };
+  // Ask's list_indicators search reads the same words (data/map/assistant.js).
+  window.PH_IND_SYNONYMS = SYNONYMS;
   // Shared with the Data export search, so the same everyday words work there.
   window.PH_SEARCH_TERMS = q => searchTerms(q);
   function searchTerms(q) {

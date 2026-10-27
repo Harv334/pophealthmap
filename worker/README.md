@@ -7,9 +7,22 @@ the page talks to this and this talks to Anthropic.
 
 ## How the answers stay honest
 
-The model is never given the data. It is given four tool definitions, and the
+The model is never given the data. It is given five tool definitions, and the
 **browser** runs them against the JSON the map has already loaded
-(`data/map/assistant.js`). The flow is:
+(`data/map/assistant.js`):
+
+- `get_area`: one area's figures. A whole ward or LA profile also lists what
+  stands out, the figures where it is among the highest or lowest 10% of the
+  map's wards or LAs.
+- `compare_areas`: 2 to 6 named areas side by side.
+- `rank_areas`: the highest or lowest areas for one indicator.
+- `find_areas`: the areas high or low on several indicators at once, for open
+  questions such as "high child obesity and little green space". A measure
+  published for another level is brought to the one asked for (green space
+  from LSOAs to wards, for example), and the result says how.
+- `list_indicators`: the indicator keys, searchable by everyday words.
+
+The flow is:
 
 1. Browser sends the conversation here, and this forwards it with the tools.
 2. The model replies with `stop_reason: "tool_use"`.
@@ -232,7 +245,7 @@ backstop, not a budget.
   the payload checks below are what bound a script.
 - Only the map's own conversation is forwarded. Turns must alternate; a typed
   question is plain text of at most 1,000 characters; the model's turns may
-  hold only text and calls to the four tools; the reader's other turns only
+  hold only text and calls to the five tools; the reader's other turns only
   `tool_result` blocks answering the previous turn's calls, each at most 16 KB;
   and the whole conversation is at most 64 KB. Images, documents,
   `cache_control` and anything else are refused, and the messages sent upstream
