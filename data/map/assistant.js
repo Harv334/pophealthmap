@@ -327,6 +327,17 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
     ft_mmr_2_doses_age5: ["Vaccination coverage: MMR two doses at 5 years", "%"],
     ft_flu_vaccination_65plus: ["Vaccination coverage: flu (65 and over)", "%"],
     ft_cervical_screening_25_49: ["Cancer screening coverage: cervical (25 to 49)", "%"],
+    ft_dtap_ipv_hib_hepb_age1: ["Vaccination coverage: 6-in-1 at 1 year", "%"],
+    ft_dtap_ipv_hib_hepb_age2: ["Vaccination coverage: 6-in-1 at 2 years", "%"],
+    ft_pcv_age1: ["Vaccination coverage: PCV at 1 year", "%"],
+    ft_pcv_booster_age2: ["Vaccination coverage: PCV booster at 2 years", "%"],
+    ft_hib_menc_booster_age2: ["Vaccination coverage: Hib and MenC booster at 2 years", "%"],
+    ft_mmr_1_dose_age2: ["Vaccination coverage: MMR first dose at 2 years", "%"],
+    ft_mmr_1_dose_age5: ["Vaccination coverage: MMR first dose at 5 years", "%"],
+    ft_ppv_65plus: ["Vaccination coverage: PPV (65 and over)", "%"],
+    ft_flu_vaccination_at_risk: ["Vaccination coverage: flu (at risk, 6 months to 64 years)", "%"],
+    ft_hpv_1_dose_12_13: ["Vaccination coverage: HPV (12 to 13)", "%"],
+    ft_breast_screening_53_70: ["Cancer screening coverage: breast (53 to 70)", "%"],
   };
 
   /**

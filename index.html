@@ -3844,6 +3844,17 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
               <option value="ft_self_harm_admissions_10_24">Hospital admissions for self-harm (10 to 24) · LA</option>
               <option value="ft_smoking_prevalence_adults">Smoking prevalence in adults (18+), current smokers · LA</option>
               <option value="ft_suicide_rate">Suicide rate · LA</option>
+              <option value="ft_dtap_ipv_hib_hepb_age1">Vaccination coverage: 6-in-1 at 1 year · LA</option>
+              <option value="ft_dtap_ipv_hib_hepb_age2">Vaccination coverage: 6-in-1 at 2 years · LA</option>
+              <option value="ft_pcv_age1">Vaccination coverage: PCV at 1 year · LA</option>
+              <option value="ft_pcv_booster_age2">Vaccination coverage: PCV booster at 2 years · LA</option>
+              <option value="ft_hib_menc_booster_age2">Vaccination coverage: Hib and MenC booster at 2 years · LA</option>
+              <option value="ft_mmr_1_dose_age2">Vaccination coverage: MMR first dose at 2 years · LA</option>
+              <option value="ft_mmr_1_dose_age5">Vaccination coverage: MMR first dose at 5 years · LA</option>
+              <option value="ft_ppv_65plus">Vaccination coverage: PPV (65 and over) · LA</option>
+              <option value="ft_flu_vaccination_at_risk">Vaccination coverage: flu (at risk, 6 months to 64 years) · LA</option>
+              <option value="ft_hpv_1_dose_12_13">Vaccination coverage: HPV (12 to 13) · LA</option>
+              <option value="ft_breast_screening_53_70">Cancer screening coverage: breast (53 to 70) · LA</option>
               <option value="ft_93465">Alcohol-related conditions: admission episodes (all primary and secondary diagnoses) · MSOA</option>
               <option value="ft_93233">Chronic obstructive pulmonary disease (COPD): emergency hospital admissions · MSOA</option>
               <option value="ft_93229">Coronary heart disease: emergency hospital admissions · MSOA</option>
@@ -5512,6 +5523,17 @@ const OV_CFG = {
   ft_self_harm_admissions_10_24: { lo:"Lower", hi:"Higher", wh:true, min:58.7, max:207.0 },
   ft_smoking_prevalence_adults: { lo:"Lower", hi:"Higher", wh:true, min:5.5, max:19.6 },
   ft_suicide_rate: { lo:"Lower", hi:"Higher", wh:true, min:4.2, max:12.6 },
+  ft_dtap_ipv_hib_hepb_age1: { lo:"Lower", hi:"Higher", wh:false, min:61.5, max:92.5 },
+  ft_dtap_ipv_hib_hepb_age2: { lo:"Lower", hi:"Higher", wh:false, min:67.9, max:92.6 },
+  ft_pcv_age1: { lo:"Lower", hi:"Higher", wh:false, min:67.1, max:93.0 },
+  ft_pcv_booster_age2: { lo:"Lower", hi:"Higher", wh:false, min:61.9, max:87.3 },
+  ft_hib_menc_booster_age2: { lo:"Lower", hi:"Higher", wh:false, min:60.8, max:88.1 },
+  ft_mmr_1_dose_age2: { lo:"Lower", hi:"Higher", wh:false, min:65.3, max:89.1 },
+  ft_mmr_1_dose_age5: { lo:"Lower", hi:"Higher", wh:false, min:76.1, max:91.0 },
+  ft_ppv_65plus: { lo:"Lower", hi:"Higher", wh:false, min:53.8, max:77.3 },
+  ft_flu_vaccination_at_risk: { lo:"Lower", hi:"Higher", wh:false, min:24.1, max:40.9 },
+  ft_hpv_1_dose_12_13: { lo:"Lower", hi:"Higher", wh:false, min:39.9, max:83.1 },
+  ft_breast_screening_53_70: { lo:"Lower", hi:"Higher", wh:false, min:48.6, max:78.8 },
   // Core20 density (count of LSOAs in IMD deciles 1-2)
   core20_lsoa_count:               { lo:"Fewer", hi:"More",   wh:true,  min:0,    max:15   },
   // Population & demographics
@@ -6010,6 +6032,17 @@ const CATS = [
     { k: "ft_self_harm_admissions_10_24", l: "Hospital admissions for self-harm (10 to 24)", g: "borough", lv: ["borough"] },
     { k: "ft_smoking_prevalence_adults", l: "Smoking prevalence in adults (18+), current smokers", g: "borough", lv: ["borough"] },
     { k: "ft_suicide_rate", l: "Suicide rate", g: "borough", lv: ["borough"] },
+    { k: "ft_dtap_ipv_hib_hepb_age1", l: "Vaccination coverage: 6-in-1 at 1 year", g: "borough", lv: ["borough"] },
+    { k: "ft_dtap_ipv_hib_hepb_age2", l: "Vaccination coverage: 6-in-1 at 2 years", g: "borough", lv: ["borough"] },
+    { k: "ft_pcv_age1", l: "Vaccination coverage: PCV at 1 year", g: "borough", lv: ["borough"] },
+    { k: "ft_pcv_booster_age2", l: "Vaccination coverage: PCV booster at 2 years", g: "borough", lv: ["borough"] },
+    { k: "ft_hib_menc_booster_age2", l: "Vaccination coverage: Hib and MenC booster at 2 years", g: "borough", lv: ["borough"] },
+    { k: "ft_mmr_1_dose_age2", l: "Vaccination coverage: MMR first dose at 2 years", g: "borough", lv: ["borough"] },
+    { k: "ft_mmr_1_dose_age5", l: "Vaccination coverage: MMR first dose at 5 years", g: "borough", lv: ["borough"] },
+    { k: "ft_ppv_65plus", l: "Vaccination coverage: PPV (65 and over)", g: "borough", lv: ["borough"] },
+    { k: "ft_flu_vaccination_at_risk", l: "Vaccination coverage: flu (at risk, 6 months to 64 years)", g: "borough", lv: ["borough"] },
+    { k: "ft_hpv_1_dose_12_13", l: "Vaccination coverage: HPV (12 to 13)", g: "borough", lv: ["borough"] },
+    { k: "ft_breast_screening_53_70", l: "Cancer screening coverage: breast (53 to 70)", g: "borough", lv: ["borough"] },
   ]},
   { key: "imd2025", label: "Deprivation", ico: "scale", fields: [
     { k: "imd_score_ward",                   l: "IMD composite score, ward average", g: "ward" },
@@ -6799,6 +6832,17 @@ const IND_NAMES = {
   ft_self_harm_admissions_10_24:     ['Self-harm admissions, ages 10 to 24', 'Hospital admissions as a result of self-harm (10 to 24 years)'],
   ft_smoking_prevalence_adults:      ['Adults who smoke', 'Smoking prevalence in adults (18+), current smokers (APS)'],
   ft_suicide_rate:                   ['Suicide rate', 'Suicide rate'],
+  ft_dtap_ipv_hib_hepb_age1:         ['6-in-1 vaccination by age 1', 'Population vaccination coverage: Dtap IPV Hib HepB (1 year old)'],
+  ft_dtap_ipv_hib_hepb_age2:         ['6-in-1 vaccination by age 2', 'Population vaccination coverage: Dtap IPV Hib HepB (2 years old)'],
+  ft_pcv_age1:                       ['Pneumococcal (PCV) vaccination by age 1', 'Population vaccination coverage: PCV'],
+  ft_pcv_booster_age2:               ['Pneumococcal (PCV) booster by age 2', 'Population vaccination coverage: PCV booster'],
+  ft_hib_menc_booster_age2:          ['Hib and MenC booster by age 2', 'Population vaccination coverage: Hib and MenC booster (2 years old)'],
+  ft_mmr_1_dose_age2:                ['MMR vaccination, first dose by age 2', 'Population vaccination coverage: MMR for one dose (2 years old)'],
+  ft_mmr_1_dose_age5:                ['MMR vaccination, first dose by age 5', 'Population vaccination coverage: MMR for one dose (5 years old)'],
+  ft_ppv_65plus:                     ['Pneumococcal (PPV) vaccination, 65 and over', 'Population vaccination coverage: PPV'],
+  ft_flu_vaccination_at_risk:        ['Flu vaccination, people at risk aged under 65', 'Population vaccination coverage: Flu (at risk individuals)'],
+  ft_hpv_1_dose_12_13:               ['HPV vaccination, ages 12 to 13', 'Population vaccination coverage: HPV vaccination coverage for one dose (12 to 13 year old)'],
+  ft_breast_screening_53_70:         ['Breast screening, ages 53 to 70', 'Cancer screening coverage: breast cancer'],
   // Deprivation, English Indices of Deprivation 2025
   imd_score_ward:    ['Deprivation score by ward (IMD 2025)', 'Index of Multiple Deprivation 2025: score'],
   imd_score:         ['Deprivation score by LSOA (IMD 2025)', 'Index of Multiple Deprivation 2025: score'],
@@ -7432,6 +7476,17 @@ const OV_META = {
   ft_self_harm_admissions_10_24: { src: "OHID Fingertips", yr: "2023/24", g: "Whole LA", u: "per 100,000 people aged 10 to 24", desc: "Hospital admissions for self-harm among people aged 10 to 24, for every 100,000 people of that age. OHID publishes it only for the whole LA." },
   ft_smoking_prevalence_adults: { src: "OHID Fingertips", yr: "2025", g: "Whole LA", u: "%", desc: "The share of adults aged 18 and over who currently smoke. OHID publishes it only for the whole LA." },
   ft_suicide_rate: { src: "OHID Fingertips", yr: "2022 - 24", g: "Whole LA", u: "per 100,000 people", desc: "Deaths from suicide, for every 100,000 people. OHID publishes it only for the whole LA." },
+  ft_dtap_ipv_hib_hepb_age1: { src: "OHID Fingertips", yr: "2024/25", g: "Whole LA", u: "%", desc: "The share of children who have had 3 doses of the 6-in-1 vaccine by their first birthday. The vaccine protects against 6 diseases, including diphtheria, tetanus, whooping cough and polio. OHID publishes it only for the whole LA." },
+  ft_dtap_ipv_hib_hepb_age2: { src: "OHID Fingertips", yr: "2024/25", g: "Whole LA", u: "%", desc: "The share of children who have had 3 doses of the 6-in-1 vaccine by their second birthday. The vaccine protects against 6 diseases, including diphtheria, tetanus, whooping cough and polio. OHID publishes it only for the whole LA." },
+  ft_pcv_age1: { src: "OHID Fingertips", yr: "2024/25", g: "Whole LA", u: "%", desc: "The share of children who have had the pneumococcal conjugate vaccine (PCV) by their first birthday. It protects against infections that can cause pneumonia and meningitis. OHID publishes it only for the whole LA." },
+  ft_pcv_booster_age2: { src: "OHID Fingertips", yr: "2024/25", g: "Whole LA", u: "%", desc: "The share of children who have had the booster dose of the pneumococcal conjugate vaccine (PCV) by their second birthday. It protects against infections that can cause pneumonia and meningitis. OHID publishes it only for the whole LA." },
+  ft_hib_menc_booster_age2: { src: "OHID Fingertips", yr: "2024/25", g: "Whole LA", u: "%", desc: "The share of children who have had the Hib and MenC booster vaccine by their second birthday. Hib (Haemophilus influenzae type b) and MenC (meningitis C) are bacteria that can cause meningitis. OHID publishes it only for the whole LA." },
+  ft_mmr_1_dose_age2: { src: "OHID Fingertips", yr: "2024/25", g: "Whole LA", u: "%", desc: "The share of children who have had the first dose of the measles, mumps and rubella (MMR) vaccine by their second birthday. OHID publishes it only for the whole LA." },
+  ft_mmr_1_dose_age5: { src: "OHID Fingertips", yr: "2024/25", g: "Whole LA", u: "%", desc: "The share of children who have had the first dose of the measles, mumps and rubella (MMR) vaccine by the age of 5. OHID publishes it only for the whole LA." },
+  ft_ppv_65plus: { src: "OHID Fingertips", yr: "2024/25", g: "Whole LA", u: "%", desc: "The share of people aged 65 and over who have had the pneumococcal polysaccharide vaccine (PPV). It protects against pneumonia and other infections caused by pneumococcal bacteria. OHID publishes it only for the whole LA." },
+  ft_flu_vaccination_at_risk: { src: "OHID Fingertips", yr: "2024/25", g: "Whole LA", u: "%", desc: "The share of people aged 6 months to 64 years in a clinical risk group who had the flu vaccine. A clinical risk group means people with a long-term health condition, such as diabetes, asthma or heart disease. OHID publishes it only for the whole LA." },
+  ft_hpv_1_dose_12_13: { src: "OHID Fingertips", yr: "2024/25", g: "Whole LA", u: "%", desc: "The share of young people aged 12 to 13 who have had a dose of the human papillomavirus (HPV) vaccine. The vaccine protects against cancers caused by HPV, such as cervical cancer. OHID publishes it only for the whole LA." },
+  ft_breast_screening_53_70: { src: "OHID Fingertips", yr: "2025", g: "Whole LA", u: "%", desc: "The share of women aged 53 to 70 who had breast screening in the last 3 years. OHID publishes it only for the whole LA." },
   core20_lsoa_count:              { src: "NHSE Core20PLUS5",     yr: "2025", g: "Ward", u: "LSOAs",  desc: "The number of LSOAs in the ward that are among the most deprived 20% of LSOAs in England. An LSOA is a small area of about 1,500 people. These are deprivation deciles 1 and 2, which NHS England calls Core20 in its Core20PLUS5 approach." },
   claimant_rate_pct:              { src: "NOMIS CLA01",          yr: "August 2026", g: "Ward and LSOA", u: "%", desc: "People aged 16 to 64 claiming Universal Credit or Jobseeker's Allowance mainly because they are out of work. It is a share of residents aged " + AGE_WORK + " at the 2021 Census." },
   // DWP benefits from Stat-Xplore (fetch_all_data.py, DWP BENEFITS, FROM
@@ -7943,6 +7998,17 @@ const OV_PLAIN = {
   ft_self_harm_admissions_10_24: "Hospital admissions for self-harm among people aged 10 to 24, per 100,000 people of that age.",
   ft_smoking_prevalence_adults: "Adults aged 18 and over who currently smoke.",
   ft_suicide_rate: "Deaths from suicide, per 100,000 people.",
+  ft_dtap_ipv_hib_hepb_age1: "Children who have had 3 doses of the 6-in-1 vaccine by their first birthday.",
+  ft_dtap_ipv_hib_hepb_age2: "Children who have had 3 doses of the 6-in-1 vaccine by their second birthday.",
+  ft_pcv_age1: "Children who have had the pneumococcal (PCV) vaccine by their first birthday.",
+  ft_pcv_booster_age2: "Children who have had the pneumococcal (PCV) booster by their second birthday.",
+  ft_hib_menc_booster_age2: "Children who have had the Hib and meningitis C (MenC) booster by their second birthday.",
+  ft_mmr_1_dose_age2: "Children who have had the first dose of the measles, mumps and rubella (MMR) vaccine by their second birthday.",
+  ft_mmr_1_dose_age5: "Children who have had the first dose of the measles, mumps and rubella (MMR) vaccine by age 5.",
+  ft_ppv_65plus: "People aged 65 and over who have had the pneumococcal (PPV) vaccine.",
+  ft_flu_vaccination_at_risk: "People aged 6 months to 64 years with a long-term health condition who had the flu vaccine.",
+  ft_hpv_1_dose_12_13: "Young people aged 12 to 13 who have had a dose of the human papillomavirus (HPV) vaccine.",
+  ft_breast_screening_53_70: "Women aged 53 to 70 who had breast screening in the last 3 years.",
   ft_93465: "Hospital admissions linked to alcohol, as a ratio where 100 is the England level, after allowing for differences in age.",
   ft_93233: "Emergency admissions for chronic obstructive pulmonary disease (COPD), a long-term lung disease. It is a ratio where 100 is the England level, after allowing for differences in age.",
   ft_93229: "Emergency admissions for coronary heart disease, as a ratio where 100 is the England level, after allowing for differences in age.",
@@ -15438,6 +15504,16 @@ function _fitFocus(bounds) {
       .sort((a, b) => LADDER.indexOf(a) - LADDER.indexOf(b));
     return lv.map(_levelTitle).join(' · ');
   }
+  /* The years each indicator's figures cover, on every row and search
+     result, so two measures of one thing from different years (an LA's own
+     GP figure and the older estimate for small areas) can be told apart
+     before one is chosen. Figures more than 3 years old say how old. */
+  function yearsHTML(o) {
+    const per = (typeof ovPeriodOf === 'function') ? ovPeriodOf(o.value) : '';
+    const end = ovAgeNote(o.value) ? ovEndYear(o.value) : 0;
+    if (end) return '<span class="ov-old">' + esc(per || String(end)) + ', ' + (new Date().getFullYear() - end) + ' years ago</span>';
+    return per ? esc(per) : '';
+  }
   // Who publishes it and the period its figures cover, the period read from
   // the data where the data states one (see _periodsFromData and loadData).
   function srcText(o) {
@@ -15483,7 +15559,7 @@ function _fitFocus(bounds) {
           '<span class="nm">' + esc(o.name) + '</span>' +
           (descOf(o) ? '<span class="ds">' + esc(descOf(o)) + '</span>' : '') +
           '<span class="mt">' + levelsHTML(o) + (o.native === 'borough' ? ' · one figure per LA' : '') +
-            (ovAgeNote(o.value) ? ' · <span class="ov-old">' + esc(ovAgeNote(o.value)) + '</span>' : '') +
+            (yearsHTML(o) ? ' · ' + yearsHTML(o) : '') +
             (ovCaution(o.value) ? ' · <span class="ov-old">Census taken during lockdown</span>' : '') + '</span>' +
         '</button>').join('')).join('');
   }
@@ -15528,6 +15604,10 @@ function _fitFocus(bounds) {
     children: ['under 16', 'under 15', 'under 5', 'reception', 'year 6', 'child'], kids: ['under 16', 'under 15', 'under 5', 'reception', 'year 6', 'child'],
     babies: ['under 5', 'fertility', 'birth weight'], births: ['fertility', 'birth weight'], young: ['under 16', 'under 15', '15 to 24', '10 to 24', '18 to 24'],
     obesity: ['obes', 'overweight'], overweight: ['obes', 'overweight'], weight: ['obes', 'overweight'],
+    vaccine: ['vaccination', 'booster'], vaccines: ['vaccination', 'booster'], jab: ['vaccination', 'booster'],
+    jabs: ['vaccination', 'booster'], immunisation: ['vaccination', 'booster'], immunisations: ['vaccination', 'booster'],
+    measles: ['mmr'], whooping: ['6-in-1'], polio: ['6-in-1'], pneumonia: ['pneumococcal'], mammogram: ['breast screening'],
+    smear: ['cervical screening'], screening: ['screening'],
     parks: ['green space'], park: ['green space'], rivers: ['blue space'], water: ['blue space'],
     trains: ['station'], train: ['station'], rail: ['station'], tube: ['station', 'public transport'],
     buses: ['bus'], transport: ['public transport', 'station', 'bus'],
@@ -15632,7 +15712,8 @@ function _fitFocus(bounds) {
             (hits.length === 1 ? ' match' : ' matches') + '</div>' +
           hits.map(o => '<button type="button" class="ov-res' + (o.value === cur ? ' on' : '') + '" data-ov="' + esc(o.value) + '">' +
             '<span class="ov-res-nm">' + esc(o.name) + '</span>' +
-            '<span class="ov-res-sub">' + esc(o.theme) + ' · ' + levelsHTML(o) + '</span></button>').join('')
+            '<span class="ov-res-sub">' + esc(o.theme) + ' · ' + levelsHTML(o) + (yearsHTML(o) ? ' · ' + yearsHTML(o) : '') +
+            '</span></button>').join('')
         : '<div class="ov-empty">No indicator matches that, so try another word, or clear the search to browse the indicators by theme.</div>');
     }
     // The count, or why nothing matches, for a screen reader.
@@ -27089,6 +27170,9 @@ var PH_SHOW = {
     mental_health_qof: 90581, suicide_rate: 41001, child_poverty_low_income: 93700,
     self_harm_admissions_10_24: 90813, a_e_attendance_under_5: 93930, mmr_2_doses_age5: 30311,
     flu_vaccination_65plus: 30314, cervical_screening_25_49: 93560,
+    dtap_ipv_hib_hepb_age1: 30303, dtap_ipv_hib_hepb_age2: 30304, pcv_age1: 30306, pcv_booster_age2: 30308,
+    hib_menc_booster_age2: 30307, mmr_1_dose_age2: 30309, mmr_1_dose_age5: 30310, ppv_65plus: 30313,
+    flu_vaccination_at_risk: 30315, hpv_1_dose_12_13: 92319, breast_screening_53_70: 22001,
   };
   function cbSourceText(k) {
     var src = String(cbMeta(k).src || '');
