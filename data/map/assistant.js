@@ -336,7 +336,8 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
     ft_mmr_1_dose_age5: ["Vaccination coverage: MMR first dose at 5 years", "%"],
     ft_ppv_65plus: ["Vaccination coverage: PPV (65 and over)", "%"],
     ft_flu_vaccination_at_risk: ["Vaccination coverage: flu (at risk, 6 months to 64 years)", "%"],
-    ft_hpv_1_dose_12_13: ["Vaccination coverage: HPV (12 to 13)", "%"],
+    ft_hpv_1_dose_12_13_female: ["Vaccination coverage: HPV, girls (12 to 13)", "%"],
+    ft_hpv_1_dose_12_13_male: ["Vaccination coverage: HPV, boys (12 to 13)", "%"],
     ft_breast_screening_53_70: ["Cancer screening coverage: breast (53 to 70)", "%"],
   };
 

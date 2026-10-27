@@ -3853,7 +3853,8 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
               <option value="ft_mmr_1_dose_age5">Vaccination coverage: MMR first dose at 5 years · LA</option>
               <option value="ft_ppv_65plus">Vaccination coverage: PPV (65 and over) · LA</option>
               <option value="ft_flu_vaccination_at_risk">Vaccination coverage: flu (at risk, 6 months to 64 years) · LA</option>
-              <option value="ft_hpv_1_dose_12_13">Vaccination coverage: HPV (12 to 13) · LA</option>
+              <option value="ft_hpv_1_dose_12_13_female">Vaccination coverage: HPV, girls (12 to 13) · LA</option>
+              <option value="ft_hpv_1_dose_12_13_male">Vaccination coverage: HPV, boys (12 to 13) · LA</option>
               <option value="ft_breast_screening_53_70">Cancer screening coverage: breast (53 to 70) · LA</option>
               <option value="ft_93465">Alcohol-related conditions: admission episodes (all primary and secondary diagnoses) · MSOA</option>
               <option value="ft_93233">Chronic obstructive pulmonary disease (COPD): emergency hospital admissions · MSOA</option>
@@ -5532,7 +5533,8 @@ const OV_CFG = {
   ft_mmr_1_dose_age5: { lo:"Lower", hi:"Higher", wh:false, min:76.1, max:91.0 },
   ft_ppv_65plus: { lo:"Lower", hi:"Higher", wh:false, min:53.8, max:77.3 },
   ft_flu_vaccination_at_risk: { lo:"Lower", hi:"Higher", wh:false, min:24.1, max:40.9 },
-  ft_hpv_1_dose_12_13: { lo:"Lower", hi:"Higher", wh:false, min:39.9, max:83.1 },
+  ft_hpv_1_dose_12_13_female: { lo:"Lower", hi:"Higher", wh:false, min:39.9, max:83.1 },
+  ft_hpv_1_dose_12_13_male: { lo:"Lower", hi:"Higher", wh:false, min:39.9, max:83.1 },
   ft_breast_screening_53_70: { lo:"Lower", hi:"Higher", wh:false, min:48.6, max:78.8 },
   // Core20 density (count of LSOAs in IMD deciles 1-2)
   core20_lsoa_count:               { lo:"Fewer", hi:"More",   wh:true,  min:0,    max:15   },
@@ -6041,7 +6043,8 @@ const CATS = [
     { k: "ft_mmr_1_dose_age5", l: "Vaccination coverage: MMR first dose at 5 years", g: "borough", lv: ["borough"] },
     { k: "ft_ppv_65plus", l: "Vaccination coverage: PPV (65 and over)", g: "borough", lv: ["borough"] },
     { k: "ft_flu_vaccination_at_risk", l: "Vaccination coverage: flu (at risk, 6 months to 64 years)", g: "borough", lv: ["borough"] },
-    { k: "ft_hpv_1_dose_12_13", l: "Vaccination coverage: HPV (12 to 13)", g: "borough", lv: ["borough"] },
+    { k: "ft_hpv_1_dose_12_13_female", l: "Vaccination coverage: HPV, girls (12 to 13)", g: "borough", lv: ["borough"] },
+    { k: "ft_hpv_1_dose_12_13_male", l: "Vaccination coverage: HPV, boys (12 to 13)", g: "borough", lv: ["borough"] },
     { k: "ft_breast_screening_53_70", l: "Cancer screening coverage: breast (53 to 70)", g: "borough", lv: ["borough"] },
   ]},
   { key: "imd2025", label: "Deprivation", ico: "scale", fields: [
@@ -6841,7 +6844,8 @@ const IND_NAMES = {
   ft_mmr_1_dose_age5:                ['MMR vaccination, first dose by age 5', 'Population vaccination coverage: MMR for one dose (5 years old)'],
   ft_ppv_65plus:                     ['Pneumococcal (PPV) vaccination, 65 and over', 'Population vaccination coverage: PPV'],
   ft_flu_vaccination_at_risk:        ['Flu vaccination, people at risk aged under 65', 'Population vaccination coverage: Flu (at risk individuals)'],
-  ft_hpv_1_dose_12_13:               ['HPV vaccination, ages 12 to 13', 'Population vaccination coverage: HPV vaccination coverage for one dose (12 to 13 year old)'],
+  ft_hpv_1_dose_12_13_female:        ['HPV vaccination, girls aged 12 to 13', 'Population vaccination coverage: HPV vaccination coverage for one dose (12 to 13 year old), female'],
+  ft_hpv_1_dose_12_13_male:          ['HPV vaccination, boys aged 12 to 13', 'Population vaccination coverage: HPV vaccination coverage for one dose (12 to 13 year old), male'],
   ft_breast_screening_53_70:         ['Breast screening, ages 53 to 70', 'Cancer screening coverage: breast cancer'],
   // Deprivation, English Indices of Deprivation 2025
   imd_score_ward:    ['Deprivation score by ward (IMD 2025)', 'Index of Multiple Deprivation 2025: score'],
@@ -7485,7 +7489,8 @@ const OV_META = {
   ft_mmr_1_dose_age5: { src: "OHID Fingertips", yr: "2024/25", g: "Whole LA", u: "%", desc: "The share of children who have had the first dose of the measles, mumps and rubella (MMR) vaccine by the age of 5. OHID publishes it only for the whole LA." },
   ft_ppv_65plus: { src: "OHID Fingertips", yr: "2024/25", g: "Whole LA", u: "%", desc: "The share of people aged 65 and over who have had the pneumococcal polysaccharide vaccine (PPV). It protects against pneumonia and other infections caused by pneumococcal bacteria. OHID publishes it only for the whole LA." },
   ft_flu_vaccination_at_risk: { src: "OHID Fingertips", yr: "2024/25", g: "Whole LA", u: "%", desc: "The share of people aged 6 months to 64 years in a clinical risk group who had the flu vaccine. A clinical risk group means people with a long-term health condition, such as diabetes, asthma or heart disease. OHID publishes it only for the whole LA." },
-  ft_hpv_1_dose_12_13: { src: "OHID Fingertips", yr: "2024/25", g: "Whole LA", u: "%", desc: "The share of young people aged 12 to 13 who have had a dose of the human papillomavirus (HPV) vaccine. The vaccine protects against cancers caused by HPV, such as cervical cancer. OHID publishes it only for the whole LA." },
+  ft_hpv_1_dose_12_13_female: { src: "OHID Fingertips", yr: "2024/25", g: "Whole LA", u: "%", desc: "The share of girls aged 12 to 13 who have had a dose of the human papillomavirus (HPV) vaccine. The vaccine protects against cancers caused by HPV, such as cervical cancer. OHID publishes it only for the whole LA, and separately for girls and boys." },
+  ft_hpv_1_dose_12_13_male: { src: "OHID Fingertips", yr: "2024/25", g: "Whole LA", u: "%", desc: "The share of boys aged 12 to 13 who have had a dose of the human papillomavirus (HPV) vaccine. The vaccine protects against cancers caused by HPV, such as cancers of the mouth and throat. OHID publishes it only for the whole LA, and separately for girls and boys." },
   ft_breast_screening_53_70: { src: "OHID Fingertips", yr: "2025", g: "Whole LA", u: "%", desc: "The share of women aged 53 to 70 who had breast screening in the last 3 years. OHID publishes it only for the whole LA." },
   core20_lsoa_count:              { src: "NHSE Core20PLUS5",     yr: "2025", g: "Ward", u: "LSOAs",  desc: "The number of LSOAs in the ward that are among the most deprived 20% of LSOAs in England. An LSOA is a small area of about 1,500 people. These are deprivation deciles 1 and 2, which NHS England calls Core20 in its Core20PLUS5 approach." },
   claimant_rate_pct:              { src: "NOMIS CLA01",          yr: "August 2026", g: "Ward and LSOA", u: "%", desc: "People aged 16 to 64 claiming Universal Credit or Jobseeker's Allowance mainly because they are out of work. It is a share of residents aged " + AGE_WORK + " at the 2021 Census." },
@@ -8007,7 +8012,8 @@ const OV_PLAIN = {
   ft_mmr_1_dose_age5: "Children who have had the first dose of the measles, mumps and rubella (MMR) vaccine by age 5.",
   ft_ppv_65plus: "People aged 65 and over who have had the pneumococcal (PPV) vaccine.",
   ft_flu_vaccination_at_risk: "People aged 6 months to 64 years with a long-term health condition who had the flu vaccine.",
-  ft_hpv_1_dose_12_13: "Young people aged 12 to 13 who have had a dose of the human papillomavirus (HPV) vaccine.",
+  ft_hpv_1_dose_12_13_female: "Girls aged 12 to 13 who have had a dose of the human papillomavirus (HPV) vaccine.",
+  ft_hpv_1_dose_12_13_male: "Boys aged 12 to 13 who have had a dose of the human papillomavirus (HPV) vaccine.",
   ft_breast_screening_53_70: "Women aged 53 to 70 who had breast screening in the last 3 years.",
   ft_93465: "Hospital admissions linked to alcohol, as a ratio where 100 is the England level, after allowing for differences in age.",
   ft_93233: "Emergency admissions for chronic obstructive pulmonary disease (COPD), a long-term lung disease. It is a ratio where 100 is the England level, after allowing for differences in age.",
@@ -27174,7 +27180,8 @@ var PH_SHOW = {
     flu_vaccination_65plus: 30314, cervical_screening_25_49: 93560,
     dtap_ipv_hib_hepb_age1: 30303, dtap_ipv_hib_hepb_age2: 30304, pcv_age1: 30306, pcv_booster_age2: 30308,
     hib_menc_booster_age2: 30307, mmr_1_dose_age2: 30309, mmr_1_dose_age5: 30310, ppv_65plus: 30313,
-    flu_vaccination_at_risk: 30315, hpv_1_dose_12_13: 92319, breast_screening_53_70: 22001,
+    flu_vaccination_at_risk: 30315, hpv_1_dose_12_13_female: 92319, hpv_1_dose_12_13_male: 92319,
+    breast_screening_53_70: 22001,
   };
   function cbSourceText(k) {
     var src = String(cbMeta(k).src || '');

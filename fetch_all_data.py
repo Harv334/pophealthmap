@@ -4216,7 +4216,10 @@ FINGERTIPS_INDICATORS = [
     (30310, "mmr_1_dose_age5",               "Population vaccination coverage: MMR for one dose (5 years old)"),
     (30313, "ppv_65plus",                    "Population vaccination coverage: PPV"),
     (30315, "flu_vaccination_at_risk",       "Population vaccination coverage: Flu (at risk individuals)"),
-    (92319, "hpv_1_dose_12_13",              "Population vaccination coverage: HPV vaccination coverage for one dose (12 to 13 year old)"),
+    # HPV comes as Female and Male rows with no Persons row, so it is taken
+    # once for each, as life expectancy is (_ft_pick reads the suffix).
+    (92319, "hpv_1_dose_12_13_female",       "Population vaccination coverage: HPV vaccination coverage for one dose (12 to 13 year old)"),
+    (92319, "hpv_1_dose_12_13_male",         "Population vaccination coverage: HPV vaccination coverage for one dose (12 to 13 year old)"),
     (22001, "breast_screening_53_70",        "Cancer screening coverage: breast cancer"),
     # Dropped rather than guessed at:
     #   fuel poverty  - DESNZ LILEE is already fetched by run_fuel_poverty, at
