@@ -4203,6 +4203,21 @@ FINGERTIPS_INDICATORS = [
     (30311, "mmr_2_doses_age5",              "Vaccination coverage: MMR two doses (5 years old)"),
     (30314, "flu_vaccination_65plus",        "Vaccination coverage: flu (65 and over)"),
     (93560, "cervical_screening_25_49",      "Cancer screening coverage: cervical (25 to 49)"),
+    # Added October 2026. Each id and name was read from Fingertips' own
+    # indicator metadata, through data/outcomes/fingertips_profiles.parquet
+    # (Health protection and Public Health Outcomes Framework profiles), and
+    # each name is Fingertips' own: FT_EXACT_NAME_IDS holds them to it.
+    (30303, "dtap_ipv_hib_hepb_age1",        "Population vaccination coverage: Dtap IPV Hib HepB (1 year old)"),
+    (30304, "dtap_ipv_hib_hepb_age2",        "Population vaccination coverage: Dtap IPV Hib HepB (2 years old)"),
+    (30306, "pcv_age1",                      "Population vaccination coverage: PCV"),
+    (30308, "pcv_booster_age2",              "Population vaccination coverage: PCV booster"),
+    (30307, "hib_menc_booster_age2",         "Population vaccination coverage: Hib and MenC booster (2 years old)"),
+    (30309, "mmr_1_dose_age2",               "Population vaccination coverage: MMR for one dose (2 years old)"),
+    (30310, "mmr_1_dose_age5",               "Population vaccination coverage: MMR for one dose (5 years old)"),
+    (30313, "ppv_65plus",                    "Population vaccination coverage: PPV"),
+    (30315, "flu_vaccination_at_risk",       "Population vaccination coverage: Flu (at risk individuals)"),
+    (92319, "hpv_1_dose_12_13",              "Population vaccination coverage: HPV vaccination coverage for one dose (12 to 13 year old)"),
+    (22001, "breast_screening_53_70",        "Cancer screening coverage: breast cancer"),
     # Dropped rather than guessed at:
     #   fuel poverty  - DESNZ LILEE is already fetched by run_fuel_poverty, at
     #                   LSOA level, which is finer than anything here.
@@ -4367,7 +4382,18 @@ FT_HEADLINE_AGE = {
     90323: "10-11 yrs", 93014: "19+ yrs", 219: "All ages", 848: "18+ yrs",
     90581: "All ages", 41001: "10+ yrs", 93700: "<16 yrs", 90813: "10-24 yrs",
     93930: "0-4 yrs", 30311: "5 yrs", 30314: "65+ yrs", 93560: "25-49 yrs",
+    # The ages Fingertips gives these series, read from the profiles parquet.
+    30303: "1 yr", 30304: "2 yrs", 30306: "1 yr", 30307: "2 yrs", 30308: "2 yrs",
+    30309: "2 yrs", 30310: "5 yrs", 30313: "65+ yrs", 30315: "6 months-64 yrs",
+    92319: "12-13 yrs", 22001: "53-70 yrs",
 }
+# Series whose label is Fingertips' own name, compared whole (without a PHOF
+# section code, case or spacing) rather than on its first fourteen letters.
+# Every vaccination series starts "Population vaccination coverage", so the
+# short check cannot tell one from another; a series whose name does not match
+# is not taken.
+FT_EXACT_NAME_IDS = {30303, 30304, 30306, 30307, 30308, 30309, 30310, 30313,
+                     30315, 92319, 22001}
 # Survey prevalences, whose LA intervals say whether the right breakdown came
 # through: across London's boroughs the 18 and over smoking figure has a
 # median half-width of about 3 points, physical activity 3.6, the 18 to 64
@@ -4432,7 +4458,13 @@ def _ft_pick(df: "pd.DataFrame", short: str, want_age: "str | None" = None,
             want = "Persons"
         sub = df[df["Sex"] == want]
         if sub.empty and want == "Persons":
-            sub = df          # some indicators are single-sex by nature
+            # Some indicators are single-sex by nature. One with several sexes
+            # and no Persons row has no headline to pick: keeping whichever
+            # sorted last would give one sex's figure under a label for all.
+            sexes = sorted(df["Sex"].dropna().astype(str).unique())
+            if len(sexes) > 1:
+                raise ValueError(f"several sexes ({', '.join(sexes)}) and no 'Persons' rows")
+            sub = df
         if sub.empty:
             raise ValueError(f"no '{want}' rows")
         df = sub
@@ -4570,6 +4602,12 @@ def run_fingertips() -> pd.DataFrame:
         first = df_501 if df_501 is not None else df_up
         if "Indicator Name" in first.columns and not first["Indicator Name"].empty:
             actual = str(first["Indicator Name"].iloc[0])
+            if ind_id in FT_EXACT_NAME_IDS and ft_profile_name_key(desc) != ft_profile_name_key(actual):
+                msg = (f"fingertips {ind_id} ({short}): asked for {desc!r} but the data is "
+                       f"{actual!r}; not taken")
+                warn(msg)
+                problems.append(msg)
+                continue
             if _ft_name_mismatch(desc, actual):
                 warn(f"fingertips {ind_id}: asked for {desc!r} but the data is "
                      f"{actual!r}. Verify the id before trusting this column.")

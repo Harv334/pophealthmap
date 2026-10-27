@@ -50,14 +50,16 @@ jobs:
       # health state life expectancy found from their landing pages and
       # parsed, the Local Health birth weight and cancer series and their
       # per-series checks, wards and LAs from MSOAs, and the Fingertips
-      # profiles chosen by name. Each failure path is a source failure or a
-      # skip in the manifest, never a crash.
+      # profiles chosen by name, and the LA vaccination and screening series
+      # held to Fingertips' own names. Each failure path is a source failure
+      # or a skip in the manifest, never a crash.
       - name: Check the MSOA additions and the profile choice
         run: |
           python3 tests/pipeline/test_saie.py
           python3 tests/pipeline/test_hle_msoa.py
           python3 tests/pipeline/test_local_health_extra.py
           python3 tests/pipeline/test_fingertips_profiles.py
+          python3 tests/pipeline/test_ft_vaccines.py
       # The Census additions and the LSOA additions, offline: the new Census
       # shares and their counts, distances to services, mid-year estimates,
       # youth claimants, road casualties, care home beds and crime by LSOA,
