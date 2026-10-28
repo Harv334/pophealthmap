@@ -365,9 +365,11 @@ So these counts will not always match a count made in a different way.</p>
 <h4 id="pcns">Primary care networks are lists of patients, not areas</h4>
 
 <p>A primary care network (PCN) is a group of GP practices. Its population is
-the people registered with those practices, wherever they live. OHID gives the
-list of practices in each network, and OHID's list follows NHS England's list.
-The figures for where the patients live come from NHS Digital's <em>Patients
+the people registered with those practices, wherever they live. The list of
+practices in each network comes from the PCN list of NHS South, Central and West
+Commissioning Support Unit (SCW), which follows NHS England's current list. A
+practice that list does not include keeps the network that OHID gives it. The
+figures for where the patients live come from NHS Digital's <em>Patients
 Registered at a GP Practice</em>, by LSOA. When those figures are available and
 you choose a network, the map colours every LSOA with 5 or more of its
 patients. The colour shows the share of that LSOA's registered residents who
@@ -1708,7 +1710,8 @@ var SOURCES = [
 
   { id: 'pcn',
     name: 'Primary care networks',
-    pub: 'OHID, following NHS England\'s list, and NHS Digital for registrations',
+    pub: 'NHS South, Central and West Commissioning Support Unit (SCW) for the list of ' +
+         'networks, with OHID for practices it does not include, and NHS Digital for registrations',
     what: 'Which GP practices belong to each network and, when the registration ' +
           'figures are available, how many of each LSOA\'s registered residents use it.',
     geo: 'GP practice, and patients registered by LSOA',

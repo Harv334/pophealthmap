@@ -15961,7 +15961,7 @@ function _fitFocus(bounds) {
       (DATA.has_catchments
         ? '<div class="pcn-note" style="margin-top:6px">The shading shows the share of residents registered with a GP who use its practices. It is shown for each LSOA, a small area of about 1,500 people.</div>' +
           '<div class="pcn-grad"></div><div class="pcn-ends"><span>0%</span><span>100%</span></div>' +
-          '<div class="pcn-note">It has 5 or more patients in ' + nL.toLocaleString() + ' LSOAs, according to NHS Digital\'s registrations for ' + esc(DATA.registrations) + '.</div>'
+          '<div class="pcn-note">It has 5 or more patients in ' + nL.toLocaleString() + ' LSOAs, according to NHS Digital\'s registrations for ' + esc(/^\d{4}-\d{2}-\d{2}/.test(DATA.registrations || '') ? fmtDate(DATA.registrations) : DATA.registrations) + '.</div>'
         : '<div class="pcn-note">The map shows where its practices are. It cannot show the area its patients come from, because that needs registration figures we do not hold.</div>') +
       '<button type="button" class="ov-btn quiet" id="pcn-clear" style="margin-top:6px">Clear</button>';
     infoEl.hidden = false;

@@ -11435,8 +11435,64 @@ def _gp_reg_lsoa_frame():
     return out, label or src.stem
 
 
+# Which practices are in which network. NHS South, Central and West
+# Commissioning Support Unit's PCN footprints download (SCW) follows NHS
+# England's current PCN list, and is newer than Fingertips' (October 2026: 8
+# of London's 202 networks had different practices, and 17 practices sat in a
+# different network or in none). It has no shapes, only each network's code,
+# name and practices, so it is kept here and replaced by hand. A practice it
+# does not list keeps its Fingertips network. Its names are in capitals, so a
+# network Fingertips also lists keeps Fingertips' name. Its "Not in a PCN" row
+# has no code, and goes to Fingertips' code for practices in no network.
+PCN_MEMBERSHIP_CSV = REPO_ROOT / "data" / "curated" / "pcn_membership_scw.csv"
+PCN_MEMBERSHIP_AS_AT = "28 October 2026"
+PCN_UNALLOCATED = "U99999"
+
+
+def pcn_membership_scw(path: "Path | None" = None) -> tuple:
+    """({network code: [practice codes]}, {network code: name}) from the SCW
+    file, or ({}, {}) when there is none or it cannot be read."""
+    p = Path(path) if path else PCN_MEMBERSHIP_CSV
+    if not p.exists():
+        return {}, {}
+    try:
+        df = pd.read_csv(p, dtype=str, encoding="utf-8-sig")
+    except Exception as e:
+        warn(f"pcn: could not read {p.name}: {e}")
+        return {}, {}
+    cols = {c.lower().strip(): c for c in df.columns}
+    cc, pc, nc = cols.get("majority_pcn_code"), cols.get("partner_gps_orgcodes"), cols.get("pcn_name")
+    if not (cc and pc):
+        warn(f"pcn: {p.name} has no majority_pcn_code and partner_gps_orgcodes columns")
+        return {}, {}
+    members, names = {}, {}
+    for _, r in df.iterrows():
+        code = str(r[cc]).strip() if pd.notna(r[cc]) else ""
+        code = code or PCN_UNALLOCATED
+        for prac in str(r[pc] if pd.notna(r[pc]) else "").split(","):
+            prac = prac.strip().upper()
+            if prac:
+                members.setdefault(code, set()).add(prac)
+        if code != PCN_UNALLOCATED and nc and pd.notna(r[nc]) and str(r[nc]).strip():
+            names.setdefault(code, str(r[nc]).strip())
+    return {c: sorted(v) for c, v in members.items()}, names
+
+
+def merge_pcn_membership(scw: dict, ft: dict) -> dict:
+    """SCW's networks, with each practice SCW does not list kept in its
+    Fingertips network. A practice is in one network only."""
+    out = {c: set(ps) for c, ps in scw.items()}
+    listed = {p for ps in scw.values() for p in ps}
+    for c, ps in (ft or {}).items():
+        for p in ps:
+            if p not in listed:
+                out.setdefault(c, set()).add(p)
+                listed.add(p)
+    return {c: sorted(v) for c, v in out.items() if v}
+
+
 def run_pcn() -> pd.DataFrame:
-    rule("Primary care networks (OHID Fingertips; NHS Digital registrations)")
+    rule("Primary care networks (SCW and OHID Fingertips; NHS Digital registrations)")
     gp_path = DATA_DIR / "healthcare" / "gp_practices.parquet"
     if not gp_path.exists():
         warn("pcn: no GP practices for this scope yet; run the gp source first")
@@ -11453,12 +11509,31 @@ def run_pcn() -> pd.DataFrame:
         r = _ft_get(url, timeout=120)
         cache.write_text(r.text, encoding="utf-8")
         return r.json()
-    members = ft_json("https://fingertips.phe.org.uk/api/parent_to_child_areas"
-                      f"?child_area_type_id={FT_PRACTICE_AREA_TYPE}&parent_area_type_id={FT_PCN_AREA_TYPE}",
-                      "pcn_members.json")
-    names = {a["Code"]: a["Name"] for a in ft_json(
-        f"https://fingertips.phe.org.uk/api/areas/by_area_type?area_type_id={FT_PCN_AREA_TYPE}",
-        "pcn_names.json")}
+    scw, scw_names = pcn_membership_scw()
+    try:
+        ft_members = ft_json("https://fingertips.phe.org.uk/api/parent_to_child_areas"
+                             f"?child_area_type_id={FT_PRACTICE_AREA_TYPE}&parent_area_type_id={FT_PCN_AREA_TYPE}",
+                             "pcn_members.json")
+        names = {a["Code"]: a["Name"] for a in ft_json(
+            f"https://fingertips.phe.org.uk/api/areas/by_area_type?area_type_id={FT_PCN_AREA_TYPE}",
+            "pcn_names.json")}
+    except Exception as e:
+        if not scw:
+            raise
+        # SCW's list stands on its own; only the practices it leaves out
+        # and Fingertips' mixed-case names are lost.
+        warn(f"pcn: Fingertips networks not read ({e}); using {PCN_MEMBERSHIP_CSV.name} alone")
+        ft_members, names = {}, {}
+    members = merge_pcn_membership(scw, ft_members) if scw else ft_members
+    for code, nm in scw_names.items():
+        if code not in names:
+            names[code] = title_case(nm, initials=True)
+    if PCN_UNALLOCATED in members and PCN_UNALLOCATED not in names:
+        names[PCN_UNALLOCATED] = "GPs not allocated to a PCN"
+    membership = (f"NHS South, Central and West CSU's PCN list, as at {PCN_MEMBERSHIP_AS_AT}"
+                  + (", with OHID Fingertips for the practices it does not list" if ft_members else "")
+                  if scw else "OHID Fingertips")
+    info(f"pcn: membership from {membership}")
 
     pcns = {}
     for code, practices in members.items():
@@ -11486,7 +11561,8 @@ def run_pcn() -> pd.DataFrame:
         pcn_tot = reg.dropna(subset=["PCN"]).groupby("PCN")["PATIENTS"].sum()
         main = {}
         for (pcn, lsoa), n in by.items():
-            if pcn not in pcns or n < 5:
+            # The practices in no network are not a catchment of their own.
+            if pcn not in pcns or pcn == PCN_UNALLOCATED or n < 5:
                 continue
             share = n / lsoa_tot.get(lsoa, n) if lsoa_tot.get(lsoa, 0) else 0
             pcns[pcn].setdefault("lsoas", {})[lsoa] = [int(n), round(100 * share, 1)]
@@ -11531,7 +11607,7 @@ def run_pcn() -> pd.DataFrame:
              "networks and practices only, no catchments")
 
     MAP_DIR.mkdir(parents=True, exist_ok=True)
-    payload = {"registrations": reg_label, "has_catchments": reg is not None,
+    payload = {"registrations": reg_label, "has_catchments": reg is not None, "membership": membership,
                "pcns": sorted(pcns.values(), key=lambda x: x["name"])}
     write_atomic(MAP_DIR / "pcn.json", json.dumps(_scrub_nan(payload), separators=(",", ":"),
                                                   ensure_ascii=False))
