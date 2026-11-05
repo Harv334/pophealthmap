@@ -266,6 +266,99 @@ const smallText = page => page.evaluate(() => {
   const opts = process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {};
   const browser = await chromium.launch(opts);
 
+  // The home page: the bare address shows England's wards coloured by
+  // deprivation and the regions to choose from, and loads none of the map.
+  {
+    const page = await browser.newPage({ viewport: { width: DESK.width, height: DESK.height } });
+    const errors = []; page.on('pageerror', e => errors.push(e.message));
+    const asked = []; page.on('request', r => asked.push(r.url()));
+    await page.goto(BASE + '/');
+    await page.waitForTimeout(2000);
+    const home = await page.evaluate(() => {
+      const c = document.querySelector('.hm-art canvas');
+      let inked = 0;
+      if (c && c.width) {
+        const px = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+        for (let i = 3; i < px.length; i += 4 * 97) if (px[i]) inked++;
+      }
+      return { body: document.body.className, title: document.title, h1: (document.querySelector('h1') || {}).textContent,
+        canon: (document.querySelector('link[rel="canonical"]') || {}).href,
+        items: [...document.querySelectorAll('.hr-item')].map(a => [a.getAttribute('data-id'), a.getAttribute('href'), a.querySelector('.hr-pct') ? a.querySelector('.hr-pct').firstChild.textContent : '']),
+        regs: document.querySelectorAll('.hm-reg').length, inked, mapRan: typeof window.wLyr !== 'undefined' || typeof window.PH_REGION === 'undefined' ? 'no region' : 'ran',
+        plain: document.querySelectorAll('plaintext').length, eng: !!document.querySelector('.home-eng a[href$="?r=england"]') };
+    });
+    ok(home.body === 'home-body' && /^Health and deprivation in every neighbourhood in England$/.test(home.h1) &&
+       home.canon === 'https://pophealth.uk/' && /England/.test(home.title) && !home.plain,
+      'home: the bare address is the home page, with its own title and canonical address', JSON.stringify(home).slice(0, 400));
+    ok(home.items.length === 9 && home.items.every(i => i[1] === '/?r=' + i[0] && /^\d+%$/.test(i[2])) &&
+       home.items[0][0] === 'north-east' && home.items.map(i => i[0]).indexOf('london') !== -1 && home.eng,
+      'home: the 9 regions are listed north to south, each a link to its map with its share in the most deprived 20%', JSON.stringify(home.items));
+    ok(home.regs === 9 && home.inked > 500, 'home: the wards are drawn and the 9 regions are outlined over them', JSON.stringify({ regs: home.regs, inked: home.inked }));
+    ok(!asked.some(u => /ward_(core|data|rest)\.json|lsoa_data|borough_data|data\/map\/wards\.js/.test(u)) && typeof (await page.evaluate(() => window.wLyr)) === 'undefined',
+      'home: none of the map\'s data loads on the home page', asked.filter(u => /\.json|wards\.js/.test(u)).join(' '));
+    await checkAxe(page, 'home page');
+    // Pointing to a region brings it to the front with its card, and the
+    // list item lights with it; the list does the same from the keyboard.
+    const pt = await page.evaluate(() => {
+      const t = [...document.querySelectorAll('.hm-lbl')].find(x => x.textContent === 'North East');
+      const b = t.getBoundingClientRect();
+      return { x: b.left + b.width / 2, y: b.top + b.height / 2 + 14 };
+    });
+    await page.mouse.move(pt.x, pt.y);
+    await page.waitForTimeout(300);
+    const hov = await page.evaluate(() => ({ tip: document.querySelector('.hm-tip').hidden ? '' : document.querySelector('.hm-tip').innerText.replace(/\s+/g, ' '),
+      on: (document.querySelector('.hm-reg.on') || {}).getAttribute && document.querySelector('.hm-reg.on').getAttribute('data-id'),
+      item: (document.querySelector('.hr-item.on') || {}).textContent || '' }));
+    ok(hov.on === 'north-east' && /^North East \d+% of its LSOAs are in the most deprived 20% in England\. 12 LAs and \d+ wards\. Select it to open its map\.$/.test(hov.tip) && /North East/.test(hov.item),
+      'home: pointing to a region shows its card and lights it in the list', JSON.stringify(hov));
+    await page.mouse.move(5, 5);
+    await page.focus('.hr-item[data-id="london"]');
+    await page.waitForTimeout(200);
+    ok(await page.evaluate(() => (document.querySelector('.hm-reg.on') || {}).getAttribute && document.querySelector('.hm-reg.on').getAttribute('data-id') === 'london'),
+      'home: a region in the list, focused from the keyboard, comes to the front on the map');
+    await page.mouse.click(pt.x, pt.y);
+    await page.waitForURL(/\?r=north-east/, { timeout: 15000 }).catch(() => {});
+    ok(/\?r=north-east(&|$)/.test(page.url()) && await page.evaluate(() => !document.querySelector('.home-body') && PH_REGION.id === 'north-east'),
+      'home: selecting a region on the map opens its map', page.url());
+    ok(errors.length === 0, 'no page errors (home page)', errors.join(' | '));
+    await page.close();
+  }
+  {
+    // On a phone a tap shows the card with a button, since a finger cannot
+    // point without choosing; the button opens the region.
+    const { page, errors } = await open(browser, '', PHONE);
+    const pt = await page.evaluate(() => {
+      const t = [...document.querySelectorAll('.hm-lbl')].find(x => x.textContent === 'South West');
+      const b = t.getBoundingClientRect();
+      return { x: b.left + b.width / 2, y: b.top + b.height / 2 + 10 };
+    });
+    await page.touchscreen.tap(pt.x, pt.y);
+    await page.waitForTimeout(400);
+    const tap = await page.evaluate(() => ({ url: location.search, pinned: document.querySelector('.hm-tip').classList.contains('pinned'),
+      go: (document.querySelector('.hm-tip .go') || {}).getAttribute && document.querySelector('.hm-tip .go').getAttribute('href'),
+      text: (document.querySelector('.hm-tip .go') || {}).textContent, wide: document.documentElement.scrollWidth <= innerWidth }));
+    ok(tap.url === '' && tap.pinned && tap.go === '/?r=south-west' && tap.text === 'Open the map of the South West' && tap.wide,
+      'home (phone): a tap shows the region\'s card and a button to open it, and the page fits the screen', JSON.stringify(tap));
+    await checkAxe(page, 'home page on a phone');
+    await checkTargets(page, 'home page');
+    // A visitor who has opened a map before is offered it again.
+    await page.evaluate(() => localStorage.setItem('ph-last-region', 'london'));
+    await page.reload();
+    await page.waitForTimeout(1200);
+    ok(await page.evaluate(() => { const a = document.querySelector('.home-continue a'); return !!a && a.getAttribute('href') === '/?r=london' && a.textContent === 'Continue to the London map'; }),
+      'home: a returning visitor is offered the map they opened last');
+    ok(errors.length === 0, 'no page errors (home page, phone)', errors.join(' | '));
+    await page.close();
+  }
+  for (const [url, home] of [['?ref=newsletter', true], ['?utm_source=x&utm_medium=y', true], ['?t=1', false], ['?r=london', false], ['?ov=imd_decile', false]]) {
+    const page = await browser.newPage({ viewport: { width: 1000, height: 700 } });
+    await page.goto(BASE + '/' + url);
+    await page.waitForTimeout(800);
+    const got = await page.evaluate(() => !!document.querySelector('.home-body'));
+    ok(got === home, url + (home ? ' (campaign tags only) shows the home page' : ' opens the map'), String(got));
+    await page.close();
+  }
+
   // London, desktop (crime by ward only, see CRIME_LSOA)
   {
     const { page, errors } = await openWithout(browser, 'index.html?t=1', DESK, [], { lsoaOnly: CRIME_LSOA });
@@ -1337,7 +1430,7 @@ const smallText = page => page.evaluate(() => {
       await page.goto(BASE + '/index.html?t=1');
       await page.waitForTimeout(2500);
       const r = await page.evaluate(() => {
-        const svg = document.querySelector('.hdr h1.hdr-logo > svg.hdr-mark');
+        const svg = document.querySelector('.hdr h1.hdr-logo svg.hdr-mark');
         const h1 = document.querySelector('.hdr h1');
         const rect = e => { const b = e.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom, w: b.width, h: b.height }; };
         const others = [...document.querySelectorAll('.hdr button, .hdr input, .hdr .hdr-tag')].filter(e => e.offsetParent).map(rect);
@@ -2114,7 +2207,9 @@ const smallText = page => page.evaluate(() => {
     await page.close();
   }
   // A shared view still opens without the tour, and ?tour=1 forces it.
-  for (const [url, want] of [['index.html?ov=imd_score_ward', false], ['index.html?ov=imd_score_ward&tour=1', true], ['index.html?ref=producthunt', true]]) {
+  // A campaign link to London's map still gets the tour (the bare address
+  // with only a campaign tag is the home page, checked at the start).
+  for (const [url, want] of [['index.html?ov=imd_score_ward', false], ['index.html?ov=imd_score_ward&tour=1', true], ['index.html?r=london&ref=producthunt', true]]) {
     const { page } = await open(browser, url, DESK);
     const run = await page.evaluate(() => PH_TOUR.running());
     ok(run === want, url + (want ? ' opens the tour' : ' opens without the tour'), String(run));
@@ -2126,7 +2221,7 @@ const smallText = page => page.evaluate(() => {
     const page = await browser.newPage({ viewport: { width: DESK.width, height: DESK.height } });
     const errors = []; page.on('pageerror', e => errors.push(e.message));
     await page.route(/ward_(core|data)\.json/, async r => { await new Promise(x => setTimeout(x, 6000)); r.continue(); });
-    await page.goto(BASE + '/index.html');
+    await page.goto(BASE + '/index.html?r=london');
     await page.waitForTimeout(2500);
     // The loading screen covers the page, but the keyboard still reaches the
     // search box behind it.
@@ -4017,7 +4112,7 @@ const smallText = page => page.evaluate(() => {
       if (w.lad_code === 'E09000012') Object.keys(w.indicators).filter(LAK).forEach(k => { w.indicators[k] = bd.E09000030[k]; });
     });
     // The shipped files first, as they are.
-    const real = await open(browser, 'index.html', DESK);
+    const real = await open(browser, 'index.html?r=london', DESK);
     const r0 = await real.page.evaluate(() => {
       showWard('Lansbury');
       const p = document.getElementById('wpanel');
@@ -4048,7 +4143,7 @@ const smallText = page => page.evaluate(() => {
       await page.route(/\/borough_data\.json/, r => r.fulfill({ body: JSON.stringify(bd), contentType: 'application/json' }));
       await page.route(/\/ward_data\.json/, r => r.fulfill({ body: JSON.stringify(wd), contentType: 'application/json' }));
       await page.route(/ward_(core|rest)\.json/, r => r.fulfill({ status: 404, body: '' }));
-      await page.goto(BASE + '/index.html');
+      await page.goto(BASE + '/index.html?r=london');
       await page.waitForTimeout(SETTLE);
       return { page, errors };
     })();
@@ -4109,7 +4204,7 @@ const smallText = page => page.evaluate(() => {
   // their coverage (H3, H4), PTAL's gap (H5), England's 100 on ratio keys
   // (H6), no Core20 ward badge (H7) and Custom area's arithmetic (H9).
   {
-    const { page, errors } = await open(browser, 'index.html', DESK);
+    const { page, errors } = await open(browser, 'index.html?r=london', DESK);
     const files = await page.evaluate(async () => {
       const g = u => fetch(u).then(r => r.json());
       const [bd, wd, cnt] = await Promise.all([g('borough_data.json'), g('ward_data.json'), g('lsoa_census_counts.json')]);

@@ -96,9 +96,12 @@ jobs:
           python3 tests/pipeline/test_region_pack.py
           python3 tests/pipeline/test_retired.py
       # The deploy's own steps: the sitemap and dateModified, a pack's file
-      # list, the LSOA and MSOA figures in columns, and the font faces.
+      # list, the LSOA and MSOA figures in columns, the font faces, and the
+      # home page's map of England.
       - name: Check the site build steps
-        run: python3 tests/pipeline/test_site_build.py
+        run: |
+          python3 tests/pipeline/test_site_build.py
+          python3 tests/pipeline/test_home_map.py
       - uses: actions/setup-node@v4
         with:
           node-version: '22'

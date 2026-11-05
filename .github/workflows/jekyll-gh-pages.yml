@@ -90,8 +90,11 @@ jobs:
       - name: Build the England view
         run: |
           if ls data/regions/*/map/wards.js >/dev/null 2>&1; then
-            python3 -m pip install --quiet "$(grep -i '^shapely' requirements.txt)"
+            python3 -m pip install --quiet "$(grep -i '^shapely' requirements.txt)" "$(grep -i '^pyproj' requirements.txt)"
             python3 scripts/build_england.py
+            # The home page's map of England, from the same packs, so it
+            # always shows the regions published with it.
+            python3 scripts/build_home_map.py
           else
             echo "No regions published; no England view."
           fi

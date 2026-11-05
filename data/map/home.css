@@ -1,0 +1,86 @@
+/* The home page (data/map/home.js): England's wards coloured by deprivation,
+   the nine regions to choose from, and the list of them. The frame (header,
+   footer, type and tokens) is pages.css, so the home page reads as the same
+   site as the pages around the map. Light only, as those are. */
+
+body.home-body { --page-w:1180px; }
+.home-intro { max-width:760px; }
+.home-intro h1 { margin-bottom:10px; }
+.home-lede { font-size:16.5px; margin:0 0 6px; }
+.home-continue { margin:6px 0 0; }
+.home-continue a { display:inline-flex; align-items:center; min-height:44px; font-weight:600;
+  color:var(--nhs-blue); text-underline-offset:3px; }
+
+.home-grid { display:grid; grid-template-columns:minmax(0, 1.25fr) minmax(300px, 1fr);
+  gap:28px; align-items:start; margin-top:16px; }
+
+/* ── The map ── a canvas of wards under an SVG of the regions. The box keeps
+   the map's own shape, and on a short screen it is no taller than the screen. */
+.home-map { margin:0; }
+.hm-box { position:relative; width:100%; max-width:calc((100vh - 250px) * var(--ar, .88));
+  margin:0 auto; aspect-ratio:var(--ar, .88); background:#fff; border:1px solid var(--line);
+  border-radius:10px; overflow:hidden; touch-action:manipulation; }
+.hm-art { position:absolute; inset:0; }
+.hm-art canvas, .hm-art svg { position:absolute; inset:0; width:100%; height:100%; display:block; }
+.hm-reg { fill:transparent; stroke:#2B3640; stroke-width:1.1; stroke-linejoin:round;
+  vector-effect:non-scaling-stroke; cursor:pointer; transition:fill .12s; }
+/* One region in front: the others fade, so its wards stand out. */
+.hm-svg.has-on .hm-reg { fill:rgba(255,255,255,.66); }
+.hm-svg.has-on .hm-reg.on { fill:transparent; stroke:#212B32; stroke-width:3; }
+.hm-lbl { font:600 25px/1 'Inter Tight', Inter, system-ui, sans-serif; fill:#212B32;
+  paint-order:stroke; stroke:rgba(255,255,255,.92); stroke-width:6px; stroke-linejoin:round;
+  pointer-events:none; }
+.hm-svg.has-on .hm-lbl { opacity:.35; }
+.hm-svg.has-on .hm-lbl.on { opacity:1; }
+
+/* The card for the region in front. It follows the pointer; after a tap on a
+   touch screen it sits at the foot of the map with a button to open it. */
+.hm-tip { position:absolute; z-index:2; pointer-events:none; width:max-content; max-width:250px;
+  background:#fff; border:1px solid var(--line); border-radius:10px;
+  box-shadow:0 8px 32px rgba(33,43,50,.14), 0 2px 8px rgba(33,43,50,.08);
+  padding:10px 12px; font-size:13.5px; line-height:1.45; color:var(--ink); }
+.hm-tip[hidden] { display:none; }
+.hm-tip .tn { display:block; font:600 15.5px/1.3 'Inter Tight', Inter, system-ui, sans-serif;
+  color:var(--nhs-dark); margin-bottom:3px; }
+.hm-tip .tl { display:block; color:var(--ink-2); }
+.hm-tip .th { display:block; margin-top:5px; font-size:12.5px; color:var(--ink-3); }
+.hm-tip .go { display:none; }
+.hm-tip.pinned { pointer-events:auto; left:10px !important; right:10px; top:auto !important;
+  bottom:10px; width:auto; max-width:none; }
+.hm-tip.pinned .th { display:none; }
+.hm-tip.pinned .go { display:flex; align-items:center; justify-content:center; margin-top:8px;
+  min-height:44px; border-radius:6px; background:var(--nhs-blue); color:#fff; font-weight:600;
+  text-decoration:none; }
+
+.hm-hint { font-size:13px; color:var(--ink-3); margin:8px 0 0; }
+.hm-key { margin-top:12px; }
+.hm-ramp { display:flex; height:12px; border-radius:3px; overflow:hidden; }
+.hm-ramp span { flex:1; }
+.hm-ends { display:flex; justify-content:space-between; font-size:12.5px; color:var(--ink-2); margin-top:4px; }
+.hm-cap { font-size:13px; color:var(--ink-3); margin:6px 0 0; line-height:1.5; }
+
+/* ── The regions ── one card each, the share of its LSOAs in the most
+   deprived 20% on the right. */
+.home-regions h2 { margin-top:0; }
+.hr-note { font-size:13.5px; color:var(--ink-3); margin:0 0 10px; }
+.hr-list { list-style:none; margin:0; padding:0; display:grid; gap:8px; }
+.hr-list li { margin:0; }
+.hr-item { display:grid; grid-template-columns:1fr auto; gap:2px 14px; align-items:center;
+  min-height:44px; padding:9px 12px; background:#fff; border:1px solid var(--line);
+  border-radius:10px; text-decoration:none; color:var(--ink); }
+.hr-item:hover, .hr-item.on { border-color:var(--nhs-blue); box-shadow:inset 0 0 0 1px var(--nhs-blue); }
+.hr-nm { font-weight:600; font-size:15px; color:var(--nhs-dark); }
+.hr-sub { font-size:12.5px; color:var(--ink-3); }
+.hr-pct { grid-column:2; grid-row:1 / span 2; text-align:right;
+  font:600 20px/1.1 'Inter Tight', Inter, system-ui, sans-serif; color:var(--nhs-dark); }
+.hr-pct small { display:block; font:500 11.5px/1.25 Inter, system-ui, sans-serif; color:var(--ink-3); }
+.home-eng { margin:14px 0 0; font-size:14px; }
+.home-eng a { font-weight:600; }
+
+@media (max-width:900px) {
+  .home-grid { grid-template-columns:1fr; gap:22px; }
+  .hm-box { max-width:none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hm-reg { transition:none; }
+}
