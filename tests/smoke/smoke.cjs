@@ -4810,9 +4810,10 @@ const smallText = page => page.evaluate(() => {
     });
     ok(!sec.panelHtml && !sec.repBold && sec.safe[0] === 'HYPERLINK("x")' && sec.safe[1] === 80 && sec.safe[2] === '1.5 area',
       'polish: a name with markup stays text in the LSOA card and the ward report, and an= is capped and loses a leading =', JSON.stringify(sec));
-    // P62: London keeps its own address; P64: one font file per family and subset.
+    // P62: London has its own address, since the bare address is the home
+    // page; P64: one font file per family and subset.
     const head = await page.evaluate(() => ({ canon: document.querySelector('link[rel="canonical"]').href, title: document.title }));
-    ok(head.canon === 'https://pophealth.uk/' && /^PopHealth Map: health and deprivation by ward in England/.test(head.title), 'polish: London keeps its canonical and title', JSON.stringify(head));
+    ok(head.canon === 'https://pophealth.uk/?r=london' && /^PopHealth Map: health and deprivation by ward in London$/.test(head.title), 'polish: London\'s map has its own canonical and title', JSON.stringify(head));
     const fontsCss = fs.readFileSync(path.join(ROOT, 'vendor/fonts.css'), 'utf8');
     ok((fontsCss.match(/@font-face/g) || []).length === 6 && /font-weight: 400 700;/.test(fontsCss) &&
        fs.readdirSync(path.join(ROOT, 'vendor/fonts')).length === 6,
