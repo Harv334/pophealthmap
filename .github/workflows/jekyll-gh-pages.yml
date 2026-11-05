@@ -144,8 +144,9 @@ jobs:
             if [ ! -e "_site/$f" ]; then echo "::error::$f is missing from _site"; exit 1; fi
           done
           echo "Regions in _site: $(ls _site/data/regions 2>/dev/null | tr '\n' ' ')"
-      # Every region opens with its wards drawn, and the England view draws
-      # more than 6,000 wards, on the folder about to be uploaded. The full
+      # Every region opens with its wards drawn, the England view draws more
+      # than 6,000 wards, and the home page draws every region, on the folder
+      # about to be uploaded. The full
       # smoke suite (tests.yml) covers London and the North East in depth;
       # this is the one place each published region is opened.
       - uses: actions/setup-node@v4

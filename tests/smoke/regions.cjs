@@ -6,8 +6,9 @@
      node tests/smoke/regions.cjs http://localhost:8793
 
    Each region under data/regions/ (other than england) must open with its
-   wards drawn and no page errors, and ?r=england&go=1 must draw more than
-   6,000 wards. The full smoke suite (smoke.cjs) tests London and the North
+   wards drawn and no page errors, ?r=england&go=1 must draw more than
+   6,000 wards, and the home page must draw London and every published
+   region on its map of England. The full smoke suite (smoke.cjs) tests London and the North
    East in depth; this is the one place every published region is opened. */
 const { chromium } = require('playwright');
 const fs = require('fs');
@@ -58,6 +59,26 @@ const wardsDrawn = page => page.evaluate(() => { let n = 0; if (typeof wLyr === 
     await page.close();
   } else {
     ok(false, 'England: the view was built', 'no data/regions/england/map/wards.js');
+  }
+  {
+    // The home page's map is rebuilt from these same packs: London and every
+    // published region drawn on it, each with its own link.
+    const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+    const errors = [];
+    page.on('pageerror', e => errors.push(e.message));
+    await page.goto(BASE + '/index.html');
+    await page.waitForSelector('.hm-reg', { timeout: 30000 }).catch(() => {});
+    const home = await page.evaluate(() => ({
+      drawn: [...document.querySelectorAll('.hm-reg')].map(p => p.dataset.id).sort(),
+      wards: typeof PH_HOME_MAP === 'object' ? PH_HOME_MAP.wards.n : 0,
+    }));
+    const want = ['london', ...regions].sort();
+    ok(JSON.stringify(home.drawn) === JSON.stringify(want) && !errors.length,
+      `home page: London and the ${regions.length} published regions drawn, with no page errors`,
+      'drawn ' + home.drawn.join(' ') + (errors.length ? ' | ' + errors.join(' | ') : ''));
+    const wardsWant = regions.length >= 8 ? 6000 : 0;
+    ok(home.wards > wardsWant, `home page: its map holds ${home.wards.toLocaleString('en-GB')} wards`);
+    await page.close();
   }
   await browser.close();
   console.log(failed ? '\n' + failed + ' check(s) failed' : '\nAll region checks passed');
