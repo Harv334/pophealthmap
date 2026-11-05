@@ -297,8 +297,9 @@ const smallText = page => page.evaluate(() => {
     ok(!asked.some(u => /ward_(core|data|rest)\.json|lsoa_data|borough_data|data\/map\/wards\.js/.test(u)) && typeof (await page.evaluate(() => window.wLyr)) === 'undefined',
       'home: none of the map\'s data loads on the home page', asked.filter(u => /\.json|wards\.js/.test(u)).join(' '));
     await checkAxe(page, 'home page');
-    // Pointing to a region brings it to the front with its card, and the
-    // list item lights with it; the list does the same from the keyboard.
+    // Pointing to a region makes it pop out, larger and raised, with its
+    // card, and the list item lights with it; the list does the same from
+    // the keyboard.
     const pt = await page.evaluate(() => {
       const t = [...document.querySelectorAll('.hm-lbl')].find(x => x.textContent === 'North East');
       const b = t.getBoundingClientRect();
@@ -308,14 +309,20 @@ const smallText = page => page.evaluate(() => {
     await page.waitForTimeout(300);
     const hov = await page.evaluate(() => ({ tip: document.querySelector('.hm-tip').hidden ? '' : document.querySelector('.hm-tip').innerText.replace(/\s+/g, ' '),
       on: (document.querySelector('.hm-reg.on') || {}).getAttribute && document.querySelector('.hm-reg.on').getAttribute('data-id'),
-      item: (document.querySelector('.hr-item.on') || {}).textContent || '' }));
+      item: (document.querySelector('.hr-item.on') || {}).textContent || '',
+      pop: [...document.querySelectorAll('.hm-pop')].filter(g => g.style.display !== 'none').map(g => ({ id: g.dataset.id,
+        k: +((/scale\(([\d.]+)\)/.exec(getComputedStyle(g).transform === 'none' ? '' : g.style.transform) || [])[1] || 1),
+        wards: g.querySelectorAll('.hm-pop-wards path').length })) }));
     ok(hov.on === 'north-east' && /^North East \d+% of its LSOAs are in the most deprived 20% in England\. 12 LAs and \d+ wards\. Select it to open its map\.$/.test(hov.tip) && /North East/.test(hov.item),
       'home: pointing to a region shows its card and lights it in the list', JSON.stringify(hov));
+    ok(hov.pop.length === 1 && hov.pop[0].id === 'north-east' && hov.pop[0].k > 1.05 && hov.pop[0].wards > 300,
+      'home: the region pointed to pops out of the picture, with its own wards, a little larger', JSON.stringify(hov.pop));
     await page.mouse.move(5, 5);
     await page.focus('.hr-item[data-id="london"]');
     await page.waitForTimeout(200);
-    ok(await page.evaluate(() => (document.querySelector('.hm-reg.on') || {}).getAttribute && document.querySelector('.hm-reg.on').getAttribute('data-id') === 'london'),
-      'home: a region in the list, focused from the keyboard, comes to the front on the map');
+    ok(await page.evaluate(() => (document.querySelector('.hm-reg.on') || {}).getAttribute && document.querySelector('.hm-reg.on').getAttribute('data-id') === 'london' &&
+        [...document.querySelectorAll('.hm-pop')].filter(g => g.style.display !== 'none').map(g => g.dataset.id).join() === 'london'),
+      'home: a region in the list, focused from the keyboard, pops out on the map');
     await page.mouse.click(pt.x, pt.y);
     await page.waitForURL(/\?r=north-east/, { timeout: 15000 }).catch(() => {});
     ok(/\?r=north-east(&|$)/.test(page.url()) && await page.evaluate(() => !document.querySelector('.home-body') && PH_REGION.id === 'north-east'),

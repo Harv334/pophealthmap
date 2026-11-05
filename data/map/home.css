@@ -24,17 +24,23 @@ body.home-body { --page-w:1180px; }
 .hm-art canvas, .hm-art svg { position:absolute; inset:0; width:100%; height:100%; display:block; }
 .hm-reg { fill:transparent; stroke:#2B3640; stroke-width:1.1; stroke-linejoin:round;
   vector-effect:non-scaling-stroke; cursor:pointer; transition:fill .12s; }
-/* One region in front: the others fade, so its wards stand out. */
-.hm-svg.has-on .hm-reg { fill:rgba(255,255,255,.66); }
-.hm-svg.has-on .hm-reg.on { fill:transparent; stroke:#212B32; stroke-width:3; }
+/* One region in front: the others fade, and it pops out of the picture,
+   raised on a shadow and a little larger (home.js sets how much). */
+.hm-svg.has-on .hm-reg { fill:rgba(255,255,255,.7); }
 .hm-lbl { font:600 25px/1 'Inter Tight', Inter, system-ui, sans-serif; fill:#212B32;
   paint-order:stroke; stroke:rgba(255,255,255,.92); stroke-width:6px; stroke-linejoin:round;
   pointer-events:none; }
 .hm-svg.has-on .hm-lbl { opacity:.35; }
-.hm-svg.has-on .hm-lbl.on { opacity:1; }
+.hm-pop { cursor:pointer; transform-box:view-box; transform-origin:0 0;
+  transition:transform .2s cubic-bezier(.2, .8, .3, 1); }
+.hm-pop-wards path { stroke-width:.8px; vector-effect:non-scaling-stroke; stroke-linejoin:round; }
+.hm-pop-edge { fill:none; stroke:#212B32; stroke-width:2.5px; stroke-linejoin:round;
+  vector-effect:non-scaling-stroke; }
+.hm-svg.has-on .hm-pop .hm-lbl { opacity:1; }
 
 /* The card for the region in front. It follows the pointer; after a tap on a
-   touch screen it sits at the foot of the map with a button to open it. */
+   touch screen it sits across the map, away from the region, with a button
+   to open it. */
 .hm-tip { position:absolute; z-index:2; pointer-events:none; width:max-content; max-width:250px;
   background:#fff; border:1px solid var(--line); border-radius:10px;
   box-shadow:0 8px 32px rgba(33,43,50,.14), 0 2px 8px rgba(33,43,50,.08);
@@ -47,6 +53,7 @@ body.home-body { --page-w:1180px; }
 .hm-tip .go { display:none; }
 .hm-tip.pinned { pointer-events:auto; left:10px !important; right:10px; top:auto !important;
   bottom:10px; width:auto; max-width:none; }
+.hm-tip.pinned.top { top:10px !important; bottom:auto; }
 .hm-tip.pinned .th { display:none; }
 .hm-tip.pinned .go { display:flex; align-items:center; justify-content:center; margin-top:8px;
   min-height:44px; border-radius:6px; background:var(--nhs-blue); color:#fff; font-weight:600;
@@ -82,5 +89,5 @@ body.home-body { --page-w:1180px; }
   .hm-box { max-width:none; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .hm-reg { transition:none; }
+  .hm-reg, .hm-pop { transition:none; }
 }

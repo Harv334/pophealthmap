@@ -3,8 +3,9 @@
    The bare address shows this instead of a region's map (the gate is in the
    head of index.html). It draws England's wards coloured by deprivation, from
    data/map/home_map.js (scripts/build_home_map.py), with the nine regions
-   over them. Pointing to a region brings it to the front with a card, and
-   selecting it opens that region's map; on a touch screen the first tap shows
+   over them. Pointing to a region makes it pop out of the picture, a little
+   larger and lifted on a shadow, with a card; selecting it opens that
+   region's map; on a touch screen the first tap shows
    the card and a button to open it. The list of regions beside the map does
    the same from the keyboard and for screen readers, and works without the
    map file. None of the map's own data loads here.
@@ -201,10 +202,18 @@
     }
 
     // The regions over the wards, and their names.
-    var regPaths = {}, labels = {};
+    var regPaths = {}, regBox = {}, labels = {};
     REGIONS.forEach(function (r) {
       if (!r.p) return;
-      var d = rings(r.p, r.n).map(function (pts) {
+      var outline = rings(r.p, r.n), b = [Infinity, Infinity, -Infinity, -Infinity];
+      outline.forEach(function (pts) {
+        pts.forEach(function (q) {
+          b[0] = Math.min(b[0], q[0]); b[1] = Math.min(b[1], q[1]);
+          b[2] = Math.max(b[2], q[0]); b[3] = Math.max(b[3], q[1]);
+        });
+      });
+      regBox[r.id] = b;
+      var d = outline.map(function (pts) {
         return 'M' + pts.map(function (q) { return q[0] + ' ' + q[1]; }).join('L') + 'Z';
       }).join('');
       var path = document.createElementNS(NS, 'path');
@@ -214,17 +223,75 @@
       svg.appendChild(path);
       regPaths[r.id] = path;
     });
-    REGIONS.forEach(function (r) {
-      if (!r.p) return;
+    function label(r) {
       var t = document.createElementNS(NS, 'text');
       t.setAttribute('x', r.lx);
       t.setAttribute('y', r.ly);
       t.setAttribute('text-anchor', 'middle');
       t.setAttribute('class', 'hm-lbl');
       t.textContent = r.name;
-      svg.appendChild(t);
-      labels[r.id] = t;
+      return t;
+    }
+    REGIONS.forEach(function (r) {
+      if (!r.p) return;
+      labels[r.id] = svg.appendChild(label(r));
     });
+
+    // The region that pops out: its own wards drawn again over the picture,
+    // with its outline and name, then raised on a shadow and made a little
+    // larger. Each region's copy is made the first time it is needed.
+    var defs = document.createElementNS(NS, 'defs');
+    defs.innerHTML = '<filter id="hm-lift" x="-25%" y="-25%" width="150%" height="150%" color-interpolation-filters="sRGB">' +
+      '<feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#212B32" flood-opacity=".38"/></filter>';
+    svg.insertBefore(defs, svg.firstChild);
+    var popLayer = svg.appendChild(document.createElementNS(NS, 'g'));
+    var regionIndex = {};
+    (M.regions || []).forEach(function (r, i) { regionIndex[r.id] = i; });
+    var pops = {};
+    function popOf(r) {
+      if (pops[r.id]) return pops[r.id];
+      var ri = regionIndex[r.id], code = ALPHABET.charAt(ri), html = '';
+      for (var j = 0; j < wardRings.length; j++) {
+        if (M.wards.g.charAt(j) !== code) continue;
+        html += '<path fill="' + wardFill[j] + '" stroke="' + wardFill[j] + '" d="M' +
+          wardRings[j].map(function (q) { return q[0] + ' ' + q[1]; }).join('L') + 'Z"/>';
+      }
+      var g = document.createElementNS(NS, 'g');
+      g.setAttribute('class', 'hm-pop');
+      g.setAttribute('data-id', r.id);
+      g.setAttribute('filter', 'url(#hm-lift)');
+      g.innerHTML = '<g class="hm-pop-wards">' + html + '</g>' +
+        '<path class="hm-pop-edge" d="' + regPaths[r.id].getAttribute('d') + '"/>';
+      g.appendChild(label(r));
+      g.style.display = 'none';
+      popLayer.appendChild(g);
+      // How far it grows: about the same distance for every region, so the
+      // small ones (London) show as clearly as the large ones, from its
+      // middle, and moved back in where that would take it off the picture.
+      var bb = regBox[r.id], pad = 6;
+      var k = 1 + Math.max(0.06, Math.min(0.6, 44 / Math.max(bb[2] - bb[0], bb[3] - bb[1])));
+      var tx = (bb[0] + bb[2]) / 2 * (1 - k), ty = (bb[1] + bb[3]) / 2 * (1 - k);
+      var x0 = bb[0] * k + tx, x1 = bb[2] * k + tx, y0 = bb[1] * k + ty, y1 = bb[3] * k + ty;
+      if (x0 < pad) tx += pad - x0; else if (x1 > M.w - pad) tx -= x1 - (M.w - pad);
+      if (y0 < pad) ty += pad - y0; else if (y1 > M.h - pad) ty -= y1 - (M.h - pad);
+      pops[r.id] = { g: g, lift: 'translate(' + tx.toFixed(1) + 'px,' + ty.toFixed(1) + 'px) scale(' + k.toFixed(3) + ')' };
+      return pops[r.id];
+    }
+    function lift(id) {
+      Object.keys(pops).forEach(function (k) {
+        if (k === id) return;
+        pops[k].g.style.display = 'none';
+        pops[k].g.style.transform = '';
+      });
+      if (!id) return;
+      var p = popOf(REGIONS.filter(function (q) { return q.id === id; })[0]);
+      if (p.g.style.display !== 'none') return;
+      // From where it sits in the picture to its raised place.
+      p.g.style.transform = 'none';
+      p.g.style.display = '';
+      void p.g.getBoundingClientRect();
+      p.g.style.transform = p.lift;
+    }
 
     var on = null, pinned = false;
     function tipHtml(r) {
@@ -252,13 +319,15 @@
       on = r && regPaths[r.id] ? r.id : null;
       svg.classList.toggle('has-on', !!on);
       document.querySelectorAll('.hr-item').forEach(function (a) { a.classList.toggle('on', a.getAttribute('data-id') === id); });
+      lift(on);
       if (!on) { tip.hidden = true; tip.classList.remove('pinned'); pinned = false; return; }
       regPaths[on].classList.add('on');
       labels[on].classList.add('on');
-      // In front of the others, so its whole outline shows.
-      svg.insertBefore(regPaths[on], labels[REGIONS[0].id] || null);
       pinned = !!pin;
       tip.classList.toggle('pinned', pinned);
+      // A pinned card sits across the map, at the top for a region in the
+      // south and at the foot for one in the north, so it never hides it.
+      tip.classList.toggle('top', pinned && r.ly > M.h / 2);
       tip.innerHTML = tipHtml(r);
       tip.hidden = false;
       if (!pinned) {
@@ -271,9 +340,21 @@
       var b = box.getBoundingClientRect();
       return [e.clientX - b.left, e.clientY - b.top];
     }
+    // The region under the pointer: its outline, or its raised copy. A click
+    // whose press and release fell on different shapes (the copy appeared or
+    // went in between) reaches the map itself, so that looks again.
+    var HIT = '.hm-reg, .hm-pop';
+    function regionAt(e) {
+      var t = e.target.closest ? e.target.closest(HIT) : null;
+      if (!t && e.clientX != null) {
+        var el = document.elementFromPoint(e.clientX, e.clientY);
+        t = el && el.closest ? el.closest(HIT) : null;
+      }
+      return t;
+    }
     svg.addEventListener('pointermove', function (e) {
       if (e.pointerType === 'touch' || pinned) return;
-      var t = e.target.closest ? e.target.closest('.hm-reg') : null;
+      var t = e.target.closest ? e.target.closest(HIT) : null;
       var p = boxPoint(e);
       if (!t) { if (on) setOn(null); return; }
       if (t.getAttribute('data-id') !== on) setOn(t.getAttribute('data-id'), p[0], p[1]);
@@ -281,7 +362,7 @@
     });
     svg.addEventListener('pointerleave', function (e) { if (e.pointerType !== 'touch' && !pinned) setOn(null); });
     svg.addEventListener('click', function (e) {
-      var t = e.target.closest ? e.target.closest('.hm-reg') : null;
+      var t = regionAt(e);
       if (!t) { setOn(null); return; }
       var id = t.getAttribute('data-id');
       // A mouse opens the map at once; a tap shows the card and its button
