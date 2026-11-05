@@ -1,40 +1,51 @@
-/* The home page (data/map/home.js): England's wards coloured by deprivation,
-   the nine regions to choose from, and the list of them. The frame (header,
-   footer, type and tokens) is pages.css, so the home page reads as the same
-   site as the pages around the map. Light only, as those are. */
+/* The home page (data/map/home.js): a title, and England's wards coloured by
+   deprivation filling the rest of the screen, with the nine regions to
+   choose from. The frame (header, footer, type and tokens) is pages.css, so
+   the home page reads as the same site as the pages around the map. Light
+   only, as those are. */
 
 body.home-body { --page-w:1180px; }
-.home-intro { max-width:760px; }
-.home-intro h1 { margin-bottom:10px; }
-.home-lede { font-size:16.5px; margin:0 0 6px; }
-.home-continue { margin:6px 0 0; }
-.home-continue a { display:inline-flex; align-items:center; min-height:44px; font-weight:600;
-  color:var(--nhs-blue); text-underline-offset:3px; }
+/* The header, the title and the map take the whole screen; the footer is
+   below it. */
+.home-screen { flex:none; display:flex; flex-direction:column; height:100vh; height:100svh; min-height:520px; }
+.home-screen .site-hdr { flex:none; }
+main.home { flex:1 1 auto; min-height:0; max-width:none; display:flex; flex-direction:column;
+  padding:20px 24px 14px; }
+.home-intro { flex:none; text-align:center; max-width:820px; margin:0 auto; }
+.home-intro h1 { margin:0 0 4px; }
+.home-lede { font-size:17px; color:var(--ink-2); margin:0; }
 
-.home-grid { display:grid; grid-template-columns:minmax(0, 1.25fr) minmax(300px, 1fr);
-  gap:28px; align-items:start; margin-top:16px; }
-
-/* ── The map ── a canvas of wards under an SVG of the regions. The box keeps
-   the map's own shape, and on a short screen it is no taller than the screen. */
-.home-map { margin:0; }
-.hm-box { position:relative; width:100%; max-width:calc((100vh - 250px) * var(--ar, .88));
-  margin:0 auto; aspect-ratio:var(--ar, .88); background:#fff; border:1px solid var(--line);
-  border-radius:10px; overflow:hidden; touch-action:manipulation; }
-.hm-art { position:absolute; inset:0; }
-.hm-art canvas, .hm-art svg { position:absolute; inset:0; width:100%; height:100%; display:block; }
+/* ── The map ── a canvas of wards under an SVG of the regions, drawn as large
+   as fits in the middle of the box. */
+.hm-box { position:relative; flex:1 1 auto; min-height:0; margin-top:10px; touch-action:manipulation; }
+.hm-box canvas, .hm-box svg { position:absolute; inset:0; width:100%; height:100%; display:block; }
+.hm-link:focus, .hm-link:focus-visible { outline:none; }
 .hm-reg { fill:transparent; stroke:#2B3640; stroke-width:1.1; stroke-linejoin:round;
   vector-effect:non-scaling-stroke; cursor:pointer; transition:fill .12s; }
-/* One region in front: the others fade, so its wards stand out. */
-.hm-svg.has-on .hm-reg { fill:rgba(255,255,255,.66); }
-.hm-svg.has-on .hm-reg.on { fill:transparent; stroke:#212B32; stroke-width:3; }
+/* One region in front: the others fade, and it pops out of the picture,
+   raised on a shadow and a little larger (home.js sets how much). */
+.hm-svg.has-on .hm-reg { fill:rgba(255,255,255,.7); }
 .hm-lbl { font:600 25px/1 'Inter Tight', Inter, system-ui, sans-serif; fill:#212B32;
   paint-order:stroke; stroke:rgba(255,255,255,.92); stroke-width:6px; stroke-linejoin:round;
   pointer-events:none; }
 .hm-svg.has-on .hm-lbl { opacity:.35; }
-.hm-svg.has-on .hm-lbl.on { opacity:1; }
+.hm-pops { pointer-events:none; }
+.hm-pop { transform-box:view-box; transform-origin:0 0;
+  transition:transform .2s cubic-bezier(.2, .8, .3, 1); }
+.hm-pop-wards path { stroke-width:.8px; vector-effect:non-scaling-stroke; stroke-linejoin:round; }
+.hm-pop-edge { fill:none; stroke:#212B32; stroke-width:2.5px; stroke-linejoin:round;
+  vector-effect:non-scaling-stroke; }
+/* Reached with the keyboard: the focus colour round its edge, as the skip
+   link and the pages' links have it. */
+.hm-pop-ring { fill:none; stroke:none; }
+.hm-pop.ring .hm-pop-ring { stroke:var(--nhs-yellow); stroke-width:10px; stroke-linejoin:round;
+  vector-effect:non-scaling-stroke; }
+.hm-pop.ring .hm-pop-edge { stroke-width:3.5px; }
+.hm-svg.has-on .hm-pop .hm-lbl { opacity:1; }
 
 /* The card for the region in front. It follows the pointer; after a tap on a
-   touch screen it sits at the foot of the map with a button to open it. */
+   touch screen it sits across the map, away from the region, with a button
+   to open it. */
 .hm-tip { position:absolute; z-index:2; pointer-events:none; width:max-content; max-width:250px;
   background:#fff; border:1px solid var(--line); border-radius:10px;
   box-shadow:0 8px 32px rgba(33,43,50,.14), 0 2px 8px rgba(33,43,50,.08);
@@ -45,42 +56,26 @@ body.home-body { --page-w:1180px; }
 .hm-tip .tl { display:block; color:var(--ink-2); }
 .hm-tip .th { display:block; margin-top:5px; font-size:12.5px; color:var(--ink-3); }
 .hm-tip .go { display:none; }
-.hm-tip.pinned { pointer-events:auto; left:10px !important; right:10px; top:auto !important;
-  bottom:10px; width:auto; max-width:none; }
+.hm-tip.pinned { pointer-events:auto; left:50% !important; transform:translateX(-50%);
+  top:auto !important; bottom:6px; width:calc(100% - 12px); max-width:420px; box-sizing:border-box; }
+.hm-tip.pinned.top { top:6px !important; bottom:auto; }
 .hm-tip.pinned .th { display:none; }
 .hm-tip.pinned .go { display:flex; align-items:center; justify-content:center; margin-top:8px;
   min-height:44px; border-radius:6px; background:var(--nhs-blue); color:#fff; font-weight:600;
   text-decoration:none; }
 
-.hm-hint { font-size:13px; color:var(--ink-3); margin:8px 0 0; }
-.hm-key { margin-top:12px; }
-.hm-ramp { display:flex; height:12px; border-radius:3px; overflow:hidden; }
-.hm-ramp span { flex:1; }
-.hm-ends { display:flex; justify-content:space-between; font-size:12.5px; color:var(--ink-2); margin-top:4px; }
-.hm-cap { font-size:13px; color:var(--ink-3); margin:6px 0 0; line-height:1.5; }
-
-/* ── The regions ── one card each, the share of its LSOAs in the most
-   deprived 20% on the right. */
-.home-regions h2 { margin-top:0; }
-.hr-note { font-size:13.5px; color:var(--ink-3); margin:0 0 10px; }
-.hr-list { list-style:none; margin:0; padding:0; display:grid; gap:8px; }
+/* Without the map file: the regions as a list. */
+.hr-list { list-style:none; margin:18px auto 0; padding:0; display:grid; gap:8px; width:100%; max-width:520px; }
 .hr-list li { margin:0; }
-.hr-item { display:grid; grid-template-columns:1fr auto; gap:2px 14px; align-items:center;
-  min-height:44px; padding:9px 12px; background:#fff; border:1px solid var(--line);
-  border-radius:10px; text-decoration:none; color:var(--ink); }
-.hr-item:hover, .hr-item.on { border-color:var(--nhs-blue); box-shadow:inset 0 0 0 1px var(--nhs-blue); }
-.hr-nm { font-weight:600; font-size:15px; color:var(--nhs-dark); }
-.hr-sub { font-size:12.5px; color:var(--ink-3); }
-.hr-pct { grid-column:2; grid-row:1 / span 2; text-align:right;
-  font:600 20px/1.1 'Inter Tight', Inter, system-ui, sans-serif; color:var(--nhs-dark); }
-.hr-pct small { display:block; font:500 11.5px/1.25 Inter, system-ui, sans-serif; color:var(--ink-3); }
-.home-eng { margin:14px 0 0; font-size:14px; }
-.home-eng a { font-weight:600; }
+.hr-item { display:flex; align-items:center; min-height:44px; padding:9px 14px; background:#fff;
+  border:1px solid var(--line); border-radius:10px; font-weight:600; color:var(--nhs-dark); text-decoration:none; }
+.hr-item:hover { border-color:var(--nhs-blue); box-shadow:inset 0 0 0 1px var(--nhs-blue); }
 
-@media (max-width:900px) {
-  .home-grid { grid-template-columns:1fr; gap:22px; }
-  .hm-box { max-width:none; }
+@media (max-width:600px) {
+  main.home { padding:14px 16px 10px; }
+  .home-intro h1 { font-size:23px; }
+  .home-lede { font-size:16px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .hm-reg { transition:none; }
+  .hm-reg, .hm-pop { transition:none; }
 }
