@@ -3748,7 +3748,10 @@ const smallText = page => page.evaluate(() => {
     await page.focus('#hdr-menu');
     const closed = (await walk(20)).filter(x => x.startsWith('in:'));
     ok(closed.length === 0, 'phone: Tab from the menu button never lands in the closed drawer', closed.slice(0, 5).join(' '));
-    await page.click('#hdr-menu');
+    // From the keyboard, as a keyboard user opens it: after 20 presses of Tab
+    // the focus can be on the skip link, which shows over the menu button.
+    await page.focus('#hdr-menu');
+    await page.keyboard.press('Enter');
     await page.waitForTimeout(500);
     const opened = (await walk(60)).filter(x => x.startsWith('out:'));
     ok(opened.length === 0, 'phone: Tab stays inside the open drawer', opened.slice(0, 5).join(' '));
