@@ -52,6 +52,8 @@ with tempfile.TemporaryDirectory() as d:
           "<loc>https://pophealth.uk/</loc>\n    <lastmod>2026-10-19</lastmod>" in sm, sm)
     check("each published region has its own entry, dated from its manifest",
           "<loc>https://pophealth.uk/?r=north-east</loc>\n    <lastmod>2026-10-09</lastmod>" in sm, sm)
+    check("London's map has its own entry, since the bare address is the home page",
+          "<loc>https://pophealth.uk/?r=london</loc>" in sm, sm)
     check("the England view, which asks before it loads, is left out", "?r=england" not in sm, sm)
     check("a static page keeps the date given for it", "<lastmod>2026-10-13</lastmod>" in sm, sm)
     check("the Dataset dateModified is the manifest's last_run",

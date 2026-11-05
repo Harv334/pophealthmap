@@ -51,6 +51,51 @@
     missing: false
   };
 
+  /* The home page. The bare address, or one with nothing in it but campaign
+     tags (utm_*, fbclid, gclid, ref, as the tour counts them), shows a map of
+     England coloured by deprivation, with the regions to choose from, and
+     none of the map's own files load until one is chosen. Its head is
+     written here and the rest of this document swallowed unparsed
+     (<plaintext>), as the England question below does; data/map/home.js
+     draws the page from data/map/home_map.js. Anything else in the address
+     (a region, an indicator, ?t=1, ?tour=1) opens the map. A copy with one
+     region only (the mirror lists London alone) has nothing to choose, and
+     opens on that region's map. */
+  var mapKeys = 0;
+  try {
+    new URLSearchParams(location.search).forEach(function (v, k) {
+      if (!/^(utm_[a-z0-9_]+|fbclid|gclid|ref)$/i.test(k)) mapKeys++;
+    });
+  } catch (e) { mapKeys = location.search.length > 1 ? 1 : 0; }
+  if (!mapKeys && LIVE.length > 1) {
+    window.PH_HOME = {
+      live: LIVE,
+      regions: REGIONS.filter(function (r) { return r[0] !== 'england'; })
+        .map(function (r) { return { id: r[0], name: r[1] }; })
+    };
+    // The site mark, as the tab icon further down this page has it.
+    var icon = 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' ' +
+      'viewBox=\'0 0 20 20\'%3E%3Crect width=\'9\' height=\'9\' rx=\'2\' fill=\'%23003087\'/%3E%3Crect x=\'11\' ' +
+      'width=\'9\' height=\'9\' rx=\'2\' fill=\'%238BBDEA\'/%3E%3Crect y=\'11\' width=\'9\' height=\'9\' rx=\'2\' ' +
+      'fill=\'%23005EB8\'/%3E%3Crect x=\'11\' y=\'11\' width=\'9\' height=\'9\' rx=\'2\' fill=\'%233D8FDA\'/%3E%3C/svg%3E';
+    document.write(
+      '<title>PopHealth Map: health and deprivation in every neighbourhood in England</title>' +
+      '<meta name="description" content="A free map of health, deprivation and local services for every ward and ' +
+        'neighbourhood in England, from open NHS and government data. Choose a region to open its map.">' +
+      '<link rel="canonical" href="https://pophealth.uk/">' +
+      '<link rel="icon" type="image/svg+xml" href="' + icon + '">' +
+      '<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">' +
+      '<link rel="apple-touch-icon" href="apple-touch-icon.png">' +
+      '<link rel="manifest" href="site.webmanifest">' +
+      '<link rel="stylesheet" href="vendor/fonts.css">' +
+      '<link rel="stylesheet" href="pages.css">' +
+      '<link rel="stylesheet" href="data/map/home.css">' +
+      '<script src="data/map/home_map.js"><\/script>' +
+      '<script src="data/map/home.js"><\/script>' +
+      '<plaintext style="display:none">');
+    return;
+  }
+
   /* England is the heaviest thing this site serves: every ward in the
      country and tens of MB of figures. So it asks first, before a single byte
      of its data is requested. The question is written straight into the
@@ -74,11 +119,12 @@
       var btn = 'display:inline-block;padding:9px 18px;border-radius:6px;font-weight:600;' +
         'text-decoration:none;font-size:15px;font-family:inherit;line-height:1.4;cursor:pointer;margin:4px;';
       // Every other region, as links, so a direct visit has somewhere to go
-      // besides London. London is the bare page.
+      // besides London. The bare address is the home page, so London has
+      // ?r=london like every other region.
       var regs = '';
       for (var ri = 0; ri < REGIONS.length; ri++) {
         if (REGIONS[ri][0] === 'england' || LIVE.indexOf(REGIONS[ri][0]) === -1) continue;
-        var rh = location.pathname + (REGIONS[ri][0] === 'london' ? '' : '?r=' + REGIONS[ri][0]);
+        var rh = location.pathname + '?r=' + REGIONS[ri][0];
         regs += '<li style="display:inline;margin:0 6px;line-height:2"><a href="' + rh.replace(/"/g, '&quot;') +
           '" style="color:#005EB8;font-weight:600">' + REGIONS[ri][1] + '</a></li>';
       }
@@ -110,6 +156,9 @@
       return;
     }
   }
+
+  // The map this visitor opened last, for the home page's Continue link.
+  try { localStorage.setItem('ph-last-region', id); } catch (e) { /* storage blocked */ }
 
   /* Every data path the page asks for goes through here. London's paths come
      back unchanged; a region's are moved into its folder:
@@ -244,12 +293,13 @@
 <!-- A region's own address, title and description. Without this every
      ?r= page declared https://pophealth.uk/ as its canonical, so search
      engines folded each region into the London page and a shared North East
-     link previewed as London. London (no ?r=) keeps the tags above. -->
+     link previewed as London. The bare address is the home page now, so
+     London's map has its own address, ?r=london, too. -->
 <script>
 (function () {
   var R = window.PH_REGION;
-  if (!R || R.isLondon) return;
-  var place = (R.isEngland || /^Yorkshire/.test(R.name) ? '' : 'the ') + R.name;
+  if (!R) return;
+  var place = (R.isEngland || R.isLondon || /^Yorkshire/.test(R.name) ? '' : 'the ') + R.name;
   var url = 'https://pophealth.uk/?r=' + R.id;
   var title = 'PopHealth Map: health and deprivation by ward in ' + place;
   var desc = 'A free map of health, deprivation and local services for every ward and ' +
@@ -459,6 +509,9 @@
      the line the name already takes, so the header is no taller for it. */
   .hdr-logo { display: flex; align-items: center; white-space: nowrap; }
   .hdr-mark { flex: none; display: block; margin-right: 8px; }
+  /* The mark and name lead to the home page, the map of England. */
+  .hdr-home { display: inline-flex; align-items: center; min-height: 24px; color: inherit; text-decoration: none; }
+  .hdr-home:hover { text-decoration: underline; text-underline-offset: 3px; }
   /* The name and the region button on one line, so the header is no taller
      for it. */
   .hdr-name { display: flex; align-items: center; gap: 6px; min-width: 0; }
@@ -3428,7 +3481,7 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
            link preview and the methodology page said PopHealth Map, so a
            shared link previewed under one name and opened under another. -->
       <div class="hdr-name">
-        <h1 class="hdr-logo"><svg class="hdr-mark" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><rect width="9" height="9" rx="2" fill="#003087"/><rect x="11" width="9" height="9" rx="2" fill="#8BBDEA"/><rect y="11" width="9" height="9" rx="2" fill="#005EB8"/><rect x="11" y="11" width="9" height="9" rx="2" fill="#3D8FDA"/></svg>PopHealth Map<span class="dev-badge" title="This site is a beta (test) version, so features may change. Where a publisher releases figures for a level, we show the publisher's own figures. Where we calculate figures for other levels, we mark them as estimates.">Beta</span></h1>
+        <h1 class="hdr-logo"><a class="hdr-home" href="./" title="Home: the map of England, to choose a region"><svg class="hdr-mark" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><rect width="9" height="9" rx="2" fill="#003087"/><rect x="11" width="9" height="9" rx="2" fill="#8BBDEA"/><rect y="11" width="9" height="9" rx="2" fill="#005EB8"/><rect x="11" y="11" width="9" height="9" rx="2" fill="#3D8FDA"/></svg>PopHealth Map</a><span class="dev-badge" title="This site is a beta (test) version, so features may change. Where a publisher releases figures for a level, we show the publisher's own figures. Where we calculate figures for other levels, we mark them as estimates.">Beta</span></h1>
         <!-- The region this map shows, on every map, London included: the
              tagline beside it says England, so the name says which part of
              it is on screen, and pressing it lists the other regions. A
@@ -5329,7 +5382,7 @@ const PH_WHERE_ARIA = PH_IS_LONDON
     opts.forEach(r => {
       const a = document.createElement('a');
       // regionHref is in a later script, so its rule is spelled out here.
-      a.href = location.pathname + (r.id !== 'london' ? '?r=' + encodeURIComponent(r.id) : '');
+      a.href = location.pathname + '?r=' + encodeURIComponent(r.id);
       a.textContent = r.name + (live.indexOf(r.id) === -1 ? ' (preview)' : '');
       if (r.id === R.id) a.setAttribute('aria-current', 'page');
       hm.appendChild(a);
@@ -19661,8 +19714,9 @@ function _writeUrlState() {
   try {
     const p = new URLSearchParams();
     // The region rides first, so a shared link opens on the same map. London
-    // is the default and carries nothing, as before.
-    if (!PH_IS_LONDON) p.set('r', PH_REGION.id);
+    // carries ?r=london too: the bare address is the home page, so a London
+    // map that wrote nothing would reload as the home page.
+    p.set('r', PH_REGION.id);
     const ovEl = document.getElementById('ov');
     const bfEl = document.getElementById('borough-focus');
     const lsEl = document.getElementById('tlsoa');
@@ -20482,9 +20536,10 @@ function _regionOfPostcode(res) {
   const r = (window.PH_REGIONS || []).find(x => x.name.toLowerCase() === nm);
   return r ? { id: r.id, name: r.name, live: (window.PH_REGIONS_LIVE || []).indexOf(r.id) !== -1 } : null;
 }
-/* The address of the map for a region: London is the bare page. */
+/* The address of the map for a region. The bare address is the home page,
+   so London has ?r=london like every other region. */
 function regionHref(id) {
-  return location.pathname + (id && id !== 'london' ? '?r=' + encodeURIComponent(id) : '');
+  return location.pathname + '?r=' + encodeURIComponent(id || 'london');
 }
 function _pickPostcode(pq, res) {
   const results = document.getElementById('hdr-search-results');

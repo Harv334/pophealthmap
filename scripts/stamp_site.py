@@ -75,7 +75,9 @@ def build_sitemap(out: Path, given: dict[str, str]) -> str:
         lines += [f"    <changefreq>{freq}</changefreq>", f"    <priority>{prio}</priority>", "  </url>"]
         return "\n".join(lines)
 
-    parts = [entry(SITE, home, "monthly", "1.0")]
+    # The bare address is the home page, the map of England to choose a
+    # region from; London's map has its own address like the other regions.
+    parts = [entry(SITE, home, "monthly", "1.0"), entry(f"{SITE}?r=london", home, "monthly", "0.9")]
     for rid, mod in regions(out):
         parts.append(entry(f"{SITE}?r={rid}", mod or home, "monthly", "0.9"))
     for page, freq, prio in STATIC:
