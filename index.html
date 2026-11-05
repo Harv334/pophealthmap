@@ -73,15 +73,17 @@
       regions: REGIONS.filter(function (r) { return r[0] !== 'england'; })
         .map(function (r) { return { id: r[0], name: r[1] }; })
     };
+    // The site mark, as the tab icon further down this page has it.
+    var icon = 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' ' +
+      'viewBox=\'0 0 20 20\'%3E%3Crect width=\'9\' height=\'9\' rx=\'2\' fill=\'%23003087\'/%3E%3Crect x=\'11\' ' +
+      'width=\'9\' height=\'9\' rx=\'2\' fill=\'%238BBDEA\'/%3E%3Crect y=\'11\' width=\'9\' height=\'9\' rx=\'2\' ' +
+      'fill=\'%23005EB8\'/%3E%3Crect x=\'11\' y=\'11\' width=\'9\' height=\'9\' rx=\'2\' fill=\'%233D8FDA\'/%3E%3C/svg%3E';
     document.write(
       '<title>PopHealth Map: health and deprivation in every neighbourhood in England</title>' +
       '<meta name="description" content="A free map of health, deprivation and local services for every ward and ' +
         'neighbourhood in England, from open NHS and government data. Choose a region to open its map.">' +
       '<link rel="canonical" href="https://pophealth.uk/">' +
-      '<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' ' +
-        'viewBox=\'0 0 20 20\'%3E%3Crect width=\'9\' height=\'9\' rx=\'2\' fill=\'%23003087\'/%3E%3Crect x=\'11\' ' +
-        'width=\'9\' height=\'9\' rx=\'2\' fill=\'%238BBDEA\'/%3E%3Crect y=\'11\' width=\'9\' height=\'9\' rx=\'2\' ' +
-        'fill=\'%23005EB8\'/%3E%3Crect x=\'11\' y=\'11\' width=\'9\' height=\'9\' rx=\'2\' fill=\'%233D8FDA\'/%3E%3C/svg%3E">' +
+      '<link rel="icon" type="image/svg+xml" href="' + icon + '">' +
       '<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">' +
       '<link rel="apple-touch-icon" href="apple-touch-icon.png">' +
       '<link rel="manifest" href="site.webmanifest">' +

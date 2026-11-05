@@ -2127,7 +2127,8 @@ const smallText = page => page.evaluate(() => {
   // links but not over a shared view, keeps a bare address until the view
   // changes, says when the LSOAs are loading, and writes its key in words.
   {
-    const { page, errors } = await open(browser, 'index.html?utm_source=linkedin&utm_medium=social&fbclid=IwAR0abc', DESK);
+    // To London's map: the bare address with campaign tags only is the home page.
+    const { page, errors } = await open(browser, 'index.html?r=london&utm_source=linkedin&utm_medium=social&fbclid=IwAR0abc', DESK);
     const first = await page.evaluate(() => ({ tour: PH_TOUR.running(), url: location.search,
       tab: document.querySelector('.sb-tab.active').id, sel: document.getElementById('sbtab-overlay').getAttribute('aria-selected'),
       pane: document.getElementById('tab-overlay').classList.contains('active') && !document.getElementById('tab-layers').classList.contains('active') }));
