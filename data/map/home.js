@@ -1,16 +1,18 @@
 /* PopHealth Map home page.
 
    The bare address shows this instead of a region's map (the gate is in the
-   head of index.html). It is a title and a picture of England that fills the
-   rest of the screen: every ward coloured by deprivation, from
+   head of index.html). It is a title, a tile for each region with a small
+   picture of it and its name, and a picture of England that fills the rest
+   of the screen: every ward coloured by deprivation, from
    data/map/home_map.js (scripts/build_home_map.py), with the nine regions
-   over them. Each region is a link to its map. Pointing to one, or moving to
-   it with Tab, makes it pop out of the picture, a little larger and lifted
-   on a shadow, with a card that gives its figures; selecting it opens its
-   map. On a touch screen the first tap shows the card and a button to open
-   it, and a second tap on the same region opens it too. Without the map
-   file, the page lists the regions instead. None of the map's own data
-   loads here.
+   over them. Pointing to a region on the map or to its tile, or moving to a
+   tile with Tab, makes the region pop out of the picture, a little larger
+   and lifted on a shadow, with a card that gives its figures; selecting
+   either opens its map. On a touch screen the first tap on the map shows the
+   card and a button to open it, and a second tap on the same region opens it
+   too; a tap on a tile opens it at once. A link in the corner opens the
+   England map, which asks first, as it always does. None of the map's own
+   data loads here.
 
    Plain script, no build step, as data/map/assistant.js is. */
 (function () {
@@ -85,6 +87,32 @@
 
   var TOUCH = window.matchMedia && matchMedia('(hover: none)').matches;
 
+  // Each region's outline as SVG path data, and its box in map units.
+  var SHAPE = {};
+  REGIONS.forEach(function (r) {
+    if (!M || !r.p) return;
+    var outline = rings(r.p, r.n), b = [Infinity, Infinity, -Infinity, -Infinity];
+    outline.forEach(function (pts) {
+      pts.forEach(function (q) {
+        b[0] = Math.min(b[0], q[0]); b[1] = Math.min(b[1], q[1]);
+        b[2] = Math.max(b[2], q[0]); b[3] = Math.max(b[3], q[1]);
+      });
+    });
+    SHAPE[r.id] = { d: outline.map(pathD).join(''), box: b };
+  });
+
+  // A region's tile: a small picture of it, drawn to fit, and its name.
+  function tile(r) {
+    var sh = SHAPE[r.id], pic = '';
+    if (sh) {
+      var b = sh.box, w = b[2] - b[0], h = b[3] - b[1], pad = Math.max(w, h) * 0.06;
+      pic = '<svg class="hm-tile-pic" viewBox="' + [b[0] - pad, b[1] - pad, w + 2 * pad, h + 2 * pad].map(function (v) { return v.toFixed(0); }).join(' ') +
+        '" aria-hidden="true" focusable="false"><path d="' + sh.d + '"/></svg>';
+    }
+    return '<li><a class="hm-tile" href="' + esc(hrefOf(r.id)) + '" data-id="' + esc(r.id) + '">' + pic +
+      '<span class="hm-tile-nm">' + esc(r.name) + '</span></a></li>';
+  }
+
   function regionCard(r) {
     var lines = [];
     if (r.d20 != null) lines.push(pct(r.d20) + ' of its LSOAs are in the most deprived 20% in England.');
@@ -97,10 +125,11 @@
       '<rect width="9" height="9" rx="2" fill="#003087"/><rect x="11" width="9" height="9" rx="2" fill="#8BBDEA"/>' +
       '<rect y="11" width="9" height="9" rx="2" fill="#005EB8"/><rect x="11" y="11" width="9" height="9" rx="2" fill="#3D8FDA"/></svg>';
     var drawn = M && REGIONS.some(function (r) { return r.p; });
-    // Without the map file, the regions as a list of links.
-    var list = '<ul class="hr-list">' + REGIONS.map(function (r) {
-      return '<li><a class="hr-item" href="' + esc(hrefOf(r.id)) + '">' + esc(r.name) + '</a></li>';
-    }).join('') + '</ul>';
+    var arrow = '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false">' +
+      '<path d="M3 8h9M8.5 4.5 12 8l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.8" ' +
+      'stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    var england = HOME.live.indexOf('england') !== -1
+      ? '<a class="home-eng" href="' + esc(hrefOf('england')) + '">Go to the all-England map' + arrow + '</a>' : '';
     return '<a class="skip" href="#main">Skip to main content</a>' +
       // The header and the map fill the screen; the footer is below it.
       '<div class="home-screen">' +
@@ -116,16 +145,18 @@
       '<h1>Health and deprivation in every neighbourhood in England</h1>' +
       '<p class="home-lede">Select an area to get started.</p>' +
       '</div>' +
+      '<div class="home-stage' + (drawn ? '' : ' no-map') + '">' +
+      // The tiles are the choices for the keyboard and screen readers; the
+      // map, whose regions are links for a mouse or a finger, is drawing.
+      '<nav class="hm-tiles" aria-label="Regions"><ul>' + REGIONS.map(tile).join('') + '</ul></nav>' +
       (drawn
-        ? '<div class="hm-box">' +
+        ? '<div class="hm-box" style="--ar:' + (M.w / M.h).toFixed(4) + '">' +
           '<canvas aria-hidden="true"></canvas>' +
-          // Each region is a link, so the keyboard and screen readers have
-          // the same choices; the names and the raised copy are drawing only.
-          '<svg class="hm-svg" viewBox="0 0 ' + M.w + ' ' + M.h + '" role="group" ' +
-          'aria-label="Map of England. Each region is a link to its map."></svg>' +
+          '<svg class="hm-svg" viewBox="0 0 ' + M.w + ' ' + M.h + '" aria-hidden="true" focusable="false"></svg>' +
           '<div class="hm-tip" hidden></div></div>'
-        : list) +
-      '</main></div>' +
+        : '') +
+      england +
+      '</div></main></div>' +
       '<footer class="site-ftr"><div class="site-ftr-in">' +
       '<p>PopHealth Map is an independent project, and it is not part of the NHS. You can get in touch at ' +
       '<a href="mailto:contact@pophealth.uk">contact@pophealth.uk</a>.</p>' +
@@ -138,6 +169,24 @@
     document.body.className = 'home-body';
     document.body.insertAdjacentHTML('afterbegin', markup());
     if (document.querySelector('.hm-box')) drawMap();
+    wireTiles();
+  }
+
+  var setOn = function () {};
+  // Pointing to a tile, or moving to it with Tab, brings its region out on
+  // the map; a tap or a click on it opens the region.
+  function wireTiles() {
+    document.querySelectorAll('.hm-tile').forEach(function (a) {
+      var id = a.getAttribute('data-id');
+      a.addEventListener('mouseenter', function () { setOn(id, null, null, false, false, true); });
+      a.addEventListener('mouseleave', function () { setOn(null); });
+      a.addEventListener('focus', function () {
+        var kb = true;
+        try { kb = a.matches(':focus-visible'); } catch (e) { /* older browsers */ }
+        setOn(id, null, null, false, kb, true);
+      });
+      a.addEventListener('blur', function () { setOn(null); });
+    });
   }
 
   function drawMap() {
@@ -191,21 +240,14 @@
     }
 
     // The regions over the wards, each a link, and their names.
-    var regPaths = {}, regBox = {}, labels = {};
+    // The regions over the wards, each a link for a mouse or a finger (the
+    // tiles are the keyboard's way in), and their names.
+    var regPaths = {}, labels = {};
     var regLayer = svg.appendChild(el('g', {}));
     REGIONS.forEach(function (r) {
-      if (!r.p) return;
-      var outline = rings(r.p, r.n), b = [Infinity, Infinity, -Infinity, -Infinity];
-      outline.forEach(function (pts) {
-        pts.forEach(function (q) {
-          b[0] = Math.min(b[0], q[0]); b[1] = Math.min(b[1], q[1]);
-          b[2] = Math.max(b[2], q[0]); b[3] = Math.max(b[3], q[1]);
-        });
-      });
-      regBox[r.id] = b;
-      var link = el('a', { 'class': 'hm-link', href: hrefOf(r.id), 'data-id': r.id,
-        'aria-label': r.name + '. ' + regionCard(r).join(' ') });
-      regPaths[r.id] = link.appendChild(el('path', { 'class': 'hm-reg', 'data-id': r.id, d: outline.map(pathD).join('') }));
+      if (!SHAPE[r.id]) return;
+      var link = el('a', { 'class': 'hm-link', href: hrefOf(r.id), 'data-id': r.id, tabindex: '-1' });
+      regPaths[r.id] = link.appendChild(el('path', { 'class': 'hm-reg', 'data-id': r.id, d: SHAPE[r.id].d }));
       regLayer.appendChild(link);
     });
     function label(r) {
@@ -214,7 +256,7 @@
       return t;
     }
     var lblLayer = svg.appendChild(el('g', { 'aria-hidden': 'true' }));
-    REGIONS.forEach(function (r) { if (r.p) labels[r.id] = lblLayer.appendChild(label(r)); });
+    REGIONS.forEach(function (r) { if (SHAPE[r.id]) labels[r.id] = lblLayer.appendChild(label(r)); });
 
     // The region that pops out: its own wards drawn again over the picture,
     // with its outline and name, then raised on a shadow and made a little
@@ -236,9 +278,9 @@
         if (M.wards.g.charAt(j) !== code) continue;
         html += '<path fill="' + wardFill[j] + '" stroke="' + wardFill[j] + '" d="' + pathD(wardRings[j]) + '"/>';
       }
-      var d = regPaths[r.id].getAttribute('d');
+      var d = SHAPE[r.id].d;
       var g = el('g', { 'class': 'hm-pop', 'data-id': r.id, filter: 'url(#hm-lift)' });
-      // The ring shows when the region was reached with the keyboard.
+      // The ring shows when its tile was reached with the keyboard.
       g.innerHTML = '<g class="hm-pop-wards">' + html + '</g>' +
         '<path class="hm-pop-ring" d="' + d + '"/><path class="hm-pop-edge" d="' + d + '"/>';
       g.appendChild(label(r));
@@ -247,7 +289,7 @@
       // How far it grows: about the same distance for every region, so the
       // small ones (London) show as clearly as the large ones, from its
       // middle, and moved back in where that would take it off the picture.
-      var bb = regBox[r.id], pad = 6;
+      var bb = SHAPE[r.id].box, pad = 6;
       var k = 1 + Math.max(0.06, Math.min(0.6, 44 / Math.max(bb[2] - bb[0], bb[3] - bb[1])));
       var tx = (bb[0] + bb[2]) / 2 * (1 - k), ty = (bb[1] + bb[3]) / 2 * (1 - k);
       var x0 = bb[0] * k + tx, x1 = bb[2] * k + tx, y0 = bb[1] * k + ty, y1 = bb[3] * k + ty;
@@ -288,20 +330,22 @@
       tip.style.left = left + 'px';
       tip.style.top = top + 'px';
     }
-    // A point in the box for a region's label, for a card opened from the
-    // keyboard.
+    // A point in the box for a region's label, for a card opened from a
+    // tile.
     function labelPoint(r) {
       var f = fit();
       return [f.x + r.lx * f.s, f.y + r.ly * f.s];
     }
     // One region in front, or none. x and y place its card (by the pointer;
     // without them, by its name); pin keeps it open with its button, after a
-    // tap; ring marks a region reached with the keyboard.
-    function setOn(id, x, y, pin, ring) {
+    // tap; ring marks a tile reached with the keyboard; fromTile leaves the
+    // card off, since the tile says which region it is.
+    setOn = function (id, x, y, pin, ring, fromTile) {
       var r = REGIONS.filter(function (q) { return q.id === id; })[0] || null;
       if (on && regPaths[on]) { regPaths[on].classList.remove('on'); labels[on].classList.remove('on'); }
       on = r && regPaths[r.id] ? r.id : null;
       svg.classList.toggle('has-on', !!on);
+      document.querySelectorAll('.hm-tile').forEach(function (a) { a.classList.toggle('on', a.getAttribute('data-id') === on); });
       lift(on, ring);
       if (!on) { tip.hidden = true; tip.classList.remove('pinned'); pinned = false; return; }
       regPaths[on].classList.add('on');
@@ -312,12 +356,12 @@
       // south and at the foot for one in the north, so it never hides it.
       tip.classList.toggle('top', pinned && r.ly > M.h / 2);
       tip.innerHTML = tipHtml(r);
-      tip.hidden = false;
-      if (!pinned) {
+      tip.hidden = !!fromTile;
+      if (!pinned && !fromTile) {
         var pt = (x == null) ? labelPoint(r) : [x, y];
         place(pt[0], pt[1]);
       }
-    }
+    };
 
     function boxPoint(e) {
       var b = box.getBoundingClientRect();
@@ -332,7 +376,7 @@
       else place(p[0], p[1]);
     });
     svg.addEventListener('pointerleave', function (e) {
-      if (e.pointerType !== 'touch' && !pinned && !svg.contains(document.activeElement)) setOn(null);
+      if (e.pointerType !== 'touch' && !pinned) setOn(null);
     });
     var lastPointerTouch = false;
     svg.addEventListener('pointerdown', function (e) { lastPointerTouch = e.pointerType === 'touch'; });
@@ -348,18 +392,6 @@
       if (pinned && on === id) return;
       e.preventDefault();
       setOn(id, null, null, true);
-    });
-    // Tab moves from region to region, north to south.
-    svg.addEventListener('focusin', function (e) {
-      var a = linkOf(e);
-      if (!a || (pinned && on === a.getAttribute('data-id'))) return;
-      var kb = false;
-      try { kb = a.matches(':focus-visible'); } catch (err) { kb = !lastPointerTouch; }
-      setOn(a.getAttribute('data-id'), null, null, false, kb);
-    });
-    svg.addEventListener('focusout', function (e) {
-      // Not while a tapped card is open: its button is about to be pressed.
-      if (!pinned && !(e.relatedTarget && svg.contains(e.relatedTarget))) setOn(null);
     });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && on) setOn(null); });
 

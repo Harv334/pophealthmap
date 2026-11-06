@@ -1,6 +1,6 @@
-/* The home page (data/map/home.js): a title, and England's wards coloured by
-   deprivation filling the rest of the screen, with the nine regions to
-   choose from. The frame (header, footer, type and tokens) is pages.css, so
+/* The home page (data/map/home.js): a title, a tile for each region, and
+   England's wards coloured by deprivation filling the rest of the screen,
+   with the nine regions over them and a link to the England map. The frame (header, footer, type and tokens) is pages.css, so
    the home page reads as the same site as the pages around the map. Light
    only, as those are. */
 
@@ -15,9 +15,32 @@ main.home { flex:1 1 auto; min-height:0; max-width:none; display:flex; flex-dire
 .home-intro h1 { margin:0 0 4px; }
 .home-lede { font-size:17px; color:var(--ink-2); margin:0; }
 
+/* The tiles on the left, the map beside them, and the England link in the
+   bottom right corner. */
+.home-stage { position:relative; flex:1 1 auto; min-height:0; margin-top:14px;
+  display:flex; justify-content:center; gap:28px; }
+
+/* ── The tiles ── a small picture of each region and its name, two across,
+   sharing the height the map has. */
+.hm-tiles { flex:none; width:240px; overflow-y:auto; padding:3px; }
+.hm-tiles ul { list-style:none; margin:0; padding:0; display:grid; gap:8px;
+  grid-template-columns:repeat(2, minmax(0, 1fr)); grid-template-rows:repeat(5, minmax(78px, 1fr));
+  height:100%; max-height:640px; }
+.hm-tiles li { margin:0; min-height:0; }
+.hm-tile { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;
+  height:100%; box-sizing:border-box; padding:8px 6px; background:#fff; border:1px solid var(--line);
+  border-radius:10px; color:var(--nhs-dark); text-align:center; text-decoration:none; }
+.hm-tile-pic { flex:1 1 auto; min-height:0; width:100%; max-height:66px; }
+.hm-tile-pic path { fill:#8BBDEA; stroke:var(--nhs-blue); stroke-width:1px; stroke-linejoin:round;
+  vector-effect:non-scaling-stroke; transition:fill .12s; }
+.hm-tile-nm { flex:none; font-size:12.5px; font-weight:600; line-height:1.25; }
+.hm-tile:hover, .hm-tile.on { border-color:var(--nhs-blue); box-shadow:inset 0 0 0 1px var(--nhs-blue); }
+.hm-tile:hover .hm-tile-pic path, .hm-tile.on .hm-tile-pic path { fill:var(--nhs-blue); }
+
 /* ── The map ── a canvas of wards under an SVG of the regions, drawn as large
-   as fits in the middle of the box. */
-.hm-box { position:relative; flex:1 1 auto; min-height:0; margin-top:10px; touch-action:manipulation; }
+   as fits: as tall as the space, and as wide as England's shape needs. */
+.hm-box { position:relative; flex:0 1 auto; min-width:0; height:100%; aspect-ratio:var(--ar, .88);
+  touch-action:manipulation; }
 .hm-box canvas, .hm-box svg { position:absolute; inset:0; width:100%; height:100%; display:block; }
 .hm-link:focus, .hm-link:focus-visible { outline:none; }
 .hm-reg { fill:transparent; stroke:#2B3640; stroke-width:1.1; stroke-linejoin:round;
@@ -64,18 +87,39 @@ main.home { flex:1 1 auto; min-height:0; max-width:none; display:flex; flex-dire
   min-height:44px; border-radius:6px; background:var(--nhs-blue); color:#fff; font-weight:600;
   text-decoration:none; }
 
-/* Without the map file: the regions as a list. */
-.hr-list { list-style:none; margin:18px auto 0; padding:0; display:grid; gap:8px; width:100%; max-width:520px; }
-.hr-list li { margin:0; }
-.hr-item { display:flex; align-items:center; min-height:44px; padding:9px 14px; background:#fff;
-  border:1px solid var(--line); border-radius:10px; font-weight:600; color:var(--nhs-dark); text-decoration:none; }
-.hr-item:hover { border-color:var(--nhs-blue); box-shadow:inset 0 0 0 1px var(--nhs-blue); }
+/* ── The England link ── small, blue, with an arrow, in the bottom right. */
+.home-eng { position:absolute; right:0; bottom:0; display:inline-flex; align-items:center; gap:6px;
+  min-height:32px; padding:2px 0; font-size:14.5px; font-weight:600; color:var(--nhs-blue);
+  text-decoration:none; }
+.home-eng:hover { text-decoration:underline; text-underline-offset:3px; }
+.home-eng svg { flex:none; transition:transform .15s; }
+.home-eng:hover svg { transform:translateX(2px); }
 
-@media (max-width:600px) {
-  main.home { padding:14px 16px 10px; }
+/* Without the map file: the tiles alone, three across. */
+.home-stage.no-map { flex-direction:column; align-items:center; justify-content:flex-start; }
+.home-stage.no-map .hm-tiles { width:100%; max-width:560px; overflow:visible; }
+.home-stage.no-map .hm-tiles ul { grid-template-columns:repeat(3, minmax(0, 1fr));
+  grid-template-rows:none; grid-auto-rows:96px; height:auto; }
+.home-stage.no-map .home-eng { position:static; }
+
+@media (max-width:900px) {
+  .home-stage { gap:18px; }
+  .hm-tiles { width:208px; }
+}
+/* A phone or a narrow window: the map first, then the tiles three across,
+   then the England link; the page scrolls. */
+@media (max-width:640px) {
+  .home-screen { height:auto; min-height:100vh; min-height:100svh; }
+  main.home { padding:14px 16px 16px; }
   .home-intro h1 { font-size:23px; }
   .home-lede { font-size:16px; }
+  .home-stage { flex:none; flex-direction:column; gap:14px; }
+  .hm-box { order:0; flex:none; width:100%; height:auto; max-height:62svh; }
+  .hm-tiles { order:1; width:auto; overflow:visible; padding:0; }
+  .hm-tiles ul { grid-template-columns:repeat(3, minmax(0, 1fr)); grid-template-rows:none;
+    grid-auto-rows:92px; height:auto; max-height:none; }
+  .home-eng { order:2; position:static; align-self:flex-end; min-height:44px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .hm-reg, .hm-pop { transition:none; }
+  .hm-reg, .hm-pop, .hm-tile-pic path, .home-eng svg { transition:none; }
 }
