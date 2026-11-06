@@ -266,9 +266,9 @@ const smallText = page => page.evaluate(() => {
   const opts = process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {};
   const browser = await chromium.launch(opts);
 
-  // The home page: the bare address shows a title and England's wards
-  // coloured by deprivation, filling the screen, with each region a link to
-  // its map; it loads none of the map.
+  // The home page: the bare address shows a title, a tile for each region,
+  // and England's wards coloured by deprivation filling the screen, with a
+  // link to the England map in the corner; it loads none of the map.
   {
     const page = await browser.newPage({ viewport: { width: DESK.width, height: DESK.height } });
     const errors = []; page.on('pageerror', e => errors.push(e.message));
@@ -286,21 +286,30 @@ const smallText = page => page.evaluate(() => {
       return { body: document.body.className, title: document.title, h1: (document.querySelector('h1') || {}).textContent,
         lede: (document.querySelector('.home-lede') || {}).textContent,
         canon: (document.querySelector('link[rel="canonical"]') || {}).href,
-        items: [...document.querySelectorAll('a.hm-link')].map(a => [a.getAttribute('data-id'), a.getAttribute('href'), a.getAttribute('aria-label')]),
+        tiles: [...document.querySelectorAll('a.hm-tile')].map(a => [a.getAttribute('data-id'), a.getAttribute('href'), a.textContent, !!a.querySelector('svg.hm-tile-pic path')]),
+        links: [...document.querySelectorAll('a.hm-link')].map(a => a.getAttribute('data-id') + ' ' + a.getAttribute('href') + ' ' + a.getAttribute('tabindex')),
+        mapHidden: document.querySelector('.hm-svg').getAttribute('aria-hidden'),
         regs: document.querySelectorAll('.hm-reg').length, inked,
-        extra: [...document.querySelectorAll('.hm-ramp, .hm-cap, .hr-list, .home-eng, .home-continue')].map(n => n.className),
-        box: { top: Math.round(box.top), bottom: Math.round(box.bottom), width: Math.round(box.width) }, vh: innerHeight, vw: innerWidth,
+        extra: [...document.querySelectorAll('.hm-ramp, .hm-cap, .hr-list, .home-continue')].map(n => n.className),
+        tilesRight: Math.round(document.querySelector('.hm-tiles').getBoundingClientRect().right),
+        eng: (() => { const a = document.querySelector('.home-eng'); if (!a) return null; const r = a.getBoundingClientRect();
+          return { href: a.getAttribute('href'), text: a.textContent, arrow: !!a.querySelector('svg'), right: Math.round(r.right), bottom: Math.round(r.bottom) }; })(),
+        box: { left: Math.round(box.left), top: Math.round(box.top), bottom: Math.round(box.bottom) }, vh: innerHeight, vw: innerWidth,
         plain: document.querySelectorAll('plaintext').length };
     });
     ok(home.body === 'home-body' && home.h1 === 'Health and deprivation in every neighbourhood in England' &&
        home.lede === 'Select an area to get started.' && home.canon === 'https://pophealth.uk/' && /England/.test(home.title) && !home.plain,
       'home: the bare address is the home page, with its title, "Select an area to get started" and its own canonical address', JSON.stringify(home).slice(0, 400));
-    ok(home.extra.length === 0 && home.box.top < 220 && home.box.bottom >= home.vh - 24 && home.box.width >= home.vw - 60,
-      'home: the map fills the screen below the title, with no key or list beside it', JSON.stringify({ extra: home.extra, box: home.box, vh: home.vh }));
-    ok(home.items.length === 9 && home.items.every(i => i[1] === '/?r=' + i[0] &&
-         /^[A-Z][A-Za-z ]+\. \d+% of its LSOAs are in the most deprived 20% in England\. \d+ LAs and [\d,]+ wards\.$/.test(i[2])) &&
-       home.items[0][0] === 'north-east' && home.items.map(i => i[0]).indexOf('london') !== -1,
-      'home: each of the 9 regions on the map is a link to its map, north to south, named with its figures', JSON.stringify(home.items).slice(0, 400));
+    ok(home.extra.length === 0 && home.box.top < 220 && home.box.bottom >= home.vh - 24 && home.tilesRight <= home.box.left,
+      'home: the map fills the screen below the title, with the tiles to its left and no key', JSON.stringify({ extra: home.extra, box: home.box, tilesRight: home.tilesRight, vh: home.vh }));
+    ok(home.tiles.length === 9 && home.tiles.every(t => t[1] === '/?r=' + t[0] && t[3] && /^[A-Z][A-Za-z ]+$/.test(t[2])) &&
+       home.tiles[0][0] === 'north-east' && home.tiles[0][2] === 'North East' && home.tiles.map(t => t[0]).indexOf('london') !== -1,
+      'home: a tile for each of the 9 regions, north to south, with a picture of it and only its name, each a link to its map', JSON.stringify(home.tiles));
+    ok(home.links.length === 9 && home.links.every(l => / \/\?r=[a-z-]+ -1$/.test(l)) && home.mapHidden === 'true',
+      'home: the regions on the map are links for a pointer, left out of the Tab order, as the tiles are the keyboard\'s way in', JSON.stringify(home.links));
+    ok(home.eng && home.eng.href === '/?r=england' && home.eng.text === 'Go to the all-England map' && home.eng.arrow &&
+       home.eng.right >= home.vw - 40 && home.eng.bottom >= home.vh - 40,
+      'home: "Go to the all-England map", with an arrow, sits in the bottom right corner', JSON.stringify(home.eng));
     ok(home.regs === 9 && home.inked > 500, 'home: the wards are drawn and the 9 regions are outlined over them', JSON.stringify({ regs: home.regs, inked: home.inked }));
     ok(!asked.some(u => /ward_(core|data|rest)\.json|lsoa_data|borough_data|data\/map\/wards\.js/.test(u)) && typeof (await page.evaluate(() => window.wLyr)) === 'undefined',
       'home: none of the map\'s data loads on the home page', asked.filter(u => /\.json|wards\.js/.test(u)).join(' '));
@@ -321,35 +330,54 @@ const smallText = page => page.evaluate(() => {
     ok(hov.on === 'north-east' && /^North East \d+% of its LSOAs are in the most deprived 20% in England\. 12 LAs and \d+ wards\. Select it to open its map\.$/.test(hov.tip),
       'home: pointing to a region shows its card', JSON.stringify(hov));
     const pop = await popped();
-    ok(pop.length === 1 && pop[0].id === 'north-east' && pop[0].k > 1.05 && pop[0].wards > 300 && !pop[0].ring,
-      'home: the region pointed to pops out of the picture, with its own wards, a little larger', JSON.stringify(pop));
-    // From the keyboard: Tab goes from region to region, north to south, and
-    // each pops out with a focus ring.
+    ok(pop.length === 1 && pop[0].id === 'north-east' && pop[0].k > 1.05 && pop[0].wards > 300 && !pop[0].ring &&
+       await page.evaluate(() => (document.querySelector('.hm-tile.on') || {}).textContent === 'North East'),
+      'home: the region pointed to pops out of the picture, with its own wards, a little larger, and its tile lights', JSON.stringify(pop));
+    // Pointing to a tile brings its region out on the map, with no card.
+    await page.hover('.hm-tile[data-id="south-west"]');
+    await page.waitForTimeout(300);
+    const tpop = await popped();
+    ok(tpop.length === 1 && tpop[0].id === 'south-west' && await page.evaluate(() => document.querySelector('.hm-tip').hidden),
+      'home: pointing to a tile pops its region out on the map', JSON.stringify(tpop));
+    // From the keyboard: Tab goes from tile to tile, north to south, and each
+    // region pops out on the map with a focus ring.
     await page.mouse.move(5, 5);
     await page.waitForTimeout(150);
     const order = [];
     for (let i = 0; i < 20 && order.indexOf('london') === -1; i++) {
       await page.keyboard.press('Tab');
-      const id = await page.evaluate(() => document.activeElement && document.activeElement.getAttribute('data-id'));
+      const id = await page.evaluate(() => document.activeElement && document.activeElement.classList.contains('hm-tile') && document.activeElement.getAttribute('data-id'));
       if (id) order.push(id);
     }
     await page.waitForTimeout(300);
     const kpop = await popped();
     ok(order.join() === 'north-east,north-west,yorkshire-and-the-humber,east-midlands,west-midlands,east-of-england,london' &&
-       kpop.length === 1 && kpop[0].id === 'london' && kpop[0].ring && !(await page.evaluate(() => document.querySelector('.hm-tip').hidden)),
-      'home: Tab moves from region to region, north to south, and each pops out with a focus ring and its card', JSON.stringify({ order, kpop }));
+       kpop.length === 1 && kpop[0].id === 'london' && kpop[0].ring,
+      'home: Tab moves from tile to tile, north to south, and each region pops out on the map with a focus ring', JSON.stringify({ order, kpop }));
     await page.keyboard.press('Escape');
     await page.mouse.click(pt.x, pt.y);
     await page.waitForURL(/\?r=north-east/, { timeout: 15000 }).catch(() => {});
     ok(/\?r=north-east(&|$)/.test(page.url()) && await page.evaluate(() => !document.querySelector('.home-body') && PH_REGION.id === 'north-east'),
       'home: selecting a region on the map opens its map', page.url());
-    // Enter on a region opens it too.
+    // Enter on a tile opens its region.
     await page.goto(BASE + '/');
-    await page.waitForSelector('a.hm-link');
-    await page.focus('a.hm-link[data-id="london"]');
+    await page.waitForSelector('a.hm-tile');
+    await page.focus('a.hm-tile[data-id="london"]');
     await page.keyboard.press('Enter');
     await page.waitForURL(/\?r=london/, { timeout: 15000 }).catch(() => {});
-    ok(/\?r=london(&|$)/.test(page.url()), 'home: Enter on a region opens its map', page.url());
+    ok(/\?r=london(&|$)/.test(page.url()), 'home: Enter on a tile opens its region', page.url());
+    // The England link asks first, as the England map always does, with a
+    // way back to the home page.
+    await page.goto(BASE + '/');
+    await page.waitForSelector('a.home-eng');
+    await page.click('a.home-eng');
+    await page.waitForURL(/\?r=england/, { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(500);
+    const eng = await page.evaluate(() => ({ url: location.search, h: (document.getElementById('eng-h') || {}).textContent,
+      open: [...document.querySelectorAll('button')].some(b => b.textContent === 'Open the England map'),
+      back: [...document.querySelectorAll('a')].some(a => a.textContent === 'Go back'), map: typeof window.wLyr }));
+    ok(eng.url === '?r=england' && eng.h === 'The England map is large' && eng.open && eng.back && eng.map === 'undefined',
+      'home: the England link shows the usual question before the large map loads, with a way back', JSON.stringify(eng));
     ok(errors.length === 0, 'no page errors (home page)', errors.join(' | '));
     await page.close();
   }
@@ -371,6 +399,11 @@ const smallText = page => page.evaluate(() => {
       text: (document.querySelector('.hm-tip .go') || {}).textContent, wide: document.documentElement.scrollWidth <= innerWidth }));
     ok(tap.url === '' && tap.pinned && tap.top && tap.pop === 'south-west' && tap.go === '/?r=south-west' && tap.text === 'Open the map of the South West' && tap.wide,
       'home (phone): a tap pops the region out and shows its card, clear of it, with a button to open it, and the page fits the screen', JSON.stringify(tap));
+    const lay = await page.evaluate(() => { const r = s => document.querySelector(s).getBoundingClientRect();
+      return { boxBottom: Math.round(r('.hm-box').bottom), tilesTop: Math.round(r('.hm-tiles').top), engTop: Math.round(r('.home-eng').top),
+        tilesBottom: Math.round(r('.hm-tiles').bottom), cols: new Set([...document.querySelectorAll('.hm-tile')].map(t => Math.round(t.getBoundingClientRect().left))).size }; });
+    ok(lay.tilesTop >= lay.boxBottom && lay.engTop >= lay.tilesBottom && lay.cols === 3,
+      'home (phone): the tiles sit under the map, three across, and the England link under them', JSON.stringify(lay));
     await checkAxe(page, 'home page on a phone');
     await checkTargets(page, 'home page');
     await page.touchscreen.tap(pt.x, pt.y);
