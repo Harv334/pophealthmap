@@ -1015,7 +1015,6 @@
 
   /* ── Charities: what is counted, and the key to the dots ── */
   .vcse-ldot { background: #7A7A75; }   /* the causes' colours, set by buildVcseKey */
-  .vcse-about { font-size: var(--t-xs); color: var(--ink-3); margin: 4px 0 2px 24px; line-height: 1.45; }
   .vcse-key { margin: 8px 0 2px 24px; font-size: var(--t-xs); color: var(--ink-2); line-height: 1.4; }
   .vcse-key > summary { cursor: pointer; font-weight: 600; color: var(--ink); padding: 2px 0;
     list-style: none; display: flex; align-items: center; gap: 6px; }
@@ -1775,6 +1774,13 @@
   border-bottom:1px solid var(--line-2);font-size: var(--t-md);font-weight:600;background:var(--paper-2);color:var(--nhs-dark);
   font-family:'Inter Tight',Inter,system-ui,sans-serif}
 #ai-close{margin:-6px -6px -6px 0}
+/* Ask in development (assistant.js, ASK_IN_DEVELOPMENT): a note in place of
+   the questions. */
+@media (min-width: 641px) and (min-height: 501px) { #ai-panel.dev, .map-wrap.has-sheet #ai-panel.dev{bottom:auto} }
+.ai-dev{padding:var(--s-4) var(--s-3);font-size:var(--t-md);line-height:1.5;color:var(--ink)}
+.ai-dev p{margin:0 0 10px}
+.ai-dev-tag{display:inline-block;padding:2px 10px;border:1px solid var(--tint-amber-line);border-radius:999px;
+  background:var(--tint-amber);color:var(--tint-amber-ink);font-size:var(--t-sm);font-weight:600}
 #ai-body{flex:1 1 auto;display:flex;flex-direction:column;min-height:0;overflow:hidden}
 #ai-log{flex:1 1 auto;overflow-y:auto;padding:var(--s-3) var(--s-3);font-size: var(--t-md);line-height:1.5}
 .ai-msg{margin-bottom:10px;padding:8px 10px;border-radius:var(--r-md);white-space:normal;word-wrap:break-word}
@@ -3748,17 +3754,11 @@ div.ai-model{border-top:0;padding-top:0;color:var(--ink-3);font-size: var(--t-xs
       <!-- VCSE tab -->
       <div class="tab-pane" id="tab-vcse" role="tabpanel" aria-labelledby="sbtab-vcse">
         <div class="sb-sec" style="padding-bottom:6px">
-          <label class="lrow" style="padding:2px 0;border:none">
-            <div class="ldot vcse-ldot"></div>
-            <span class="lname">Show charities <span class="lcount" id="vcse-tab-count"></span></span>
-            <input type="checkbox" id="vcse-tab-toggle">
-          </label>
-          <!-- What is counted, said once, here. The numbers are filled in from
-               layer_counts.json and then from the records themselves; see
+          <!-- What is counted, said once, here, behind the ? beside Show
+               charities so it does not fill the tab. The numbers are filled in
+               from layer_counts.json and then from the records themselves; see
                vcseAboutText. The Directory and the tour do not repeat them. -->
-          <div class="vcse-about" id="vcse-about">
-            These are registered charities from the Charity Commission's register.
-          </div>
+          <div class="lrow lrow-split" style="padding:2px 0;border:none"><label for="vcse-tab-toggle"><div class="ldot vcse-ldot"></div><span class="lname">Show charities <span class="lcount" id="vcse-tab-count"></span></span></label><button type="button" class="lhelp" id="vcse-about" aria-label="About the charities shown" aria-expanded="false" title="These are registered charities from the Charity Commission's register.">?</button><input type="checkbox" id="vcse-tab-toggle"></div>
           <!-- The key to the dots, shown while they are on the map. Built from
                VCSE_BUCKET_COLORS and the income bands, so it cannot drift from
                what is drawn. -->
@@ -11336,10 +11336,18 @@ function vcseAboutText(c) {
   return bits.join(' ');
 }
 var _vcseAboutLast = null;
+// The text is the ? button's explanation, so an explanation already open is
+// brought up to date with it.
 function setVcseAbout(c) {
   _vcseAboutLast = c;
   const el = document.getElementById('vcse-about');
-  if (el) el.textContent = vcseAboutText(c);
+  if (!el) return;
+  const t = vcseAboutText(c);
+  el.setAttribute('title', t);
+  if (el.getAttribute('aria-expanded') === 'true') {
+    const pop = document.querySelector('.help-pop');
+    if (pop && pop.lastChild && pop.lastChild.nodeType === 3) pop.lastChild.textContent = t;
+  }
 }
 /* The key to the dots: colour for the main cause, size for yearly income, and
    the ring that stands for a group of them. Built from the same tables the
@@ -25480,7 +25488,8 @@ var PH_SHOW = {
     try { tourFit(wLyr.getBounds(), 11); } catch (e) { /* no layer yet */ }
   }
   // Whether this map has the Ask panel, which assistant.js builds.
-  function tourHasAsk() { return !!document.getElementById('ai-toggle'); }
+  // Ask is described only where it answers questions: not in development.
+  function tourHasAsk() { return !!(window.PH_ASSISTANT && PH_ASSISTANT.available); }
   function closeAsk() {
     var c = document.getElementById('ai-close');
     var p = document.getElementById('ai-panel');
