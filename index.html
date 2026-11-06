@@ -15537,7 +15537,12 @@ function _fitFocus(bounds) {
      read a percentage, where the IMD health domain is a score around zero.
      Only those this build carries are shown. */
   // Named by their display labels, like every other place they appear.
-  const KEY = ['imd_score', 'census_bad_health_pct', 'fuel_poverty_pct', 'no2_ugm3']
+  // The England map draws LSOAs only for an LA in focus, and the LSOA
+  // deprivation score chosen there colours wards under a name that says
+  // LSOA, so the ward score leads instead. The tour's last chapter takes its
+  // example from the first of these, so it changes with it.
+  const KEY = [(window.PH_REGION && PH_REGION.isEngland) ? 'imd_score_ward' : 'imd_score',
+    'census_bad_health_pct', 'fuel_poverty_pct', 'no2_ugm3']
     .filter(k => byVal[k]).map(k => [k, byVal[k].name]);
 
   // Many descriptions open by restating the name ("Suicide rate. Published

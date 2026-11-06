@@ -6131,6 +6131,13 @@ const smallText = page => page.evaluate(() => {
       available: !!(window.PH_ASSISTANT && PH_ASSISTANT.available) }));
     ok(eng.england && !eng.missing && eng.wards > 0 && !eng.toggle && !eng.panel && !eng.available,
       'England: the England view has no Ask button or panel', JSON.stringify(eng));
+    // Its LSOAs wait for an LA in focus, so the first key indicator, which is
+    // also the tour's example in its last chapter, is the ward deprivation
+    // score, not the LSOA one.
+    const chip = await p.evaluate(() => { const c = document.querySelector('#ov-chips button');
+      return c ? [c.dataset.ov, c.textContent] : null; });
+    ok(chip && chip[0] === 'imd_score_ward' && chip[1] === 'Deprivation score by ward (IMD 2025)',
+      'England: the first key indicator is the ward deprivation score, as LSOAs need an LA in focus', JSON.stringify(chip));
     await p.close();
   }
 
