@@ -265,6 +265,17 @@ const smallText = page => page.evaluate(() => {
 (async () => {
   const opts = process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {};
   const browser = await chromium.launch(opts);
+  // Ask is in development on the published site (ASK_IN_DEVELOPMENT in
+  // data/map/assistant.js), so every page here runs with it switched on, as
+  // it will be once it is released. The block after the home page checks the
+  // published state, on a page made without the switch.
+  // browser.newPage makes its context through newContext, so this covers both.
+  const rawNewContext = browser.newContext.bind(browser);
+  browser.newContext = async o => {
+    const c = await rawNewContext(o);
+    await c.addInitScript(() => { window.PH_ASK_PREVIEW = true; });
+    return c;
+  };
 
   // The home page: the bare address shows a title, a tile for each region,
   // and England's wards coloured by deprivation filling the screen, with a
@@ -411,6 +422,43 @@ const smallText = page => page.evaluate(() => {
     ok(/\?r=south-west(&|$)/.test(page.url()), 'home (phone): a second tap on the same region opens its map', page.url());
     ok(errors.length === 0, 'no page errors (home page, phone)', errors.join(' | '));
     await page.close();
+  }
+  {
+    // Ask is in development: its button opens a note that says so, nothing
+    // is sent, the ward sheet and the tour leave it out, and ?ask=1 switches
+    // the working panel on.
+    const ctx = await rawNewContext({ viewport: DESK });
+    const page = await ctx.newPage();
+    const errors = []; page.on('pageerror', e => errors.push(e.message));
+    const sent = []; page.on('request', r => { if (/workers\.dev/.test(r.url())) sent.push(r.url()); });
+    await page.goto(BASE + '/index.html?r=london&t=1');
+    await page.waitForTimeout(SETTLE);
+    const before = await page.evaluate(() => ({ toggle: (document.getElementById('ai-toggle') || {}).textContent,
+      available: PH_ASSISTANT.available, about: PH_ASSISTANT.askAbout('Lansbury') }));
+    await page.click('#ai-toggle');
+    await page.waitForTimeout(300);
+    const dev = await page.evaluate(() => ({ open: document.getElementById('ai-panel').classList.contains('open'),
+      text: (document.getElementById('ai-dev') || {}).innerText || '', input: !!document.getElementById('ai-input'),
+      limit: (document.getElementById('ai-limit') || {}).textContent || '', focus: document.activeElement && document.activeElement.id }));
+    ok(before.toggle === 'Ask about this data' && dev.open && /^In development/.test(dev.text) && /We are still building this tool/.test(dev.text) &&
+       !dev.input && !dev.limit && dev.focus === 'ai-close',
+      'Ask (published): the button opens a note that it is in development, with no question box', JSON.stringify(dev));
+    ok(before.available === false && before.about === false && !sent.length,
+      'Ask (published): nothing is sent, and the ward sheet and the tour leave it out', JSON.stringify({ before, sent }));
+    // On the panel itself, as for the working panel: open, it sits beside
+    // the Area level buttons wherever it is open.
+    await page.addScriptTag({ content: AXE });
+    const axeDev = await page.evaluate(tags => axe.run('#ai-panel', { runOnly: tags, resultTypes: ['violations'] })
+      .then(r => r.violations.map(v => v.id + ' (' + v.nodes[0].target.join(' ') + ')')), AXE_TAGS);
+    ok(axeDev.length === 0, 'accessibility: the Ask panel in development', axeDev.join(', '));
+    await page.goto(BASE + '/index.html?r=london&t=1&ask=1');
+    await page.waitForTimeout(SETTLE);
+    await page.click('#ai-toggle');
+    await page.waitForTimeout(300);
+    ok(await page.evaluate(() => PH_ASSISTANT.available && !!document.getElementById('ai-input') && !document.getElementById('ai-dev')),
+      'Ask: ?ask=1 switches the working panel on, to try it before it is released');
+    ok(errors.length === 0, 'no page errors (Ask in development)', errors.join(' | '));
+    await ctx.close();
   }
   for (const [url, home] of [['?ref=newsletter', true], ['?utm_source=x&utm_medium=y', true], ['?t=1', false], ['?r=london', false], ['?ov=imd_decile', false]]) {
     const page = await browser.newPage({ viewport: { width: 1000, height: 700 } });
@@ -1905,13 +1953,13 @@ const smallText = page => page.evaluate(() => {
     // P59: with the layer off, the tab does not say the charities are on the map.
     await page.uncheck('#vcse-tab-toggle');
     await page.waitForTimeout(300);
-    const vOff = await page.evaluate(() => ({ about: document.getElementById('vcse-about').textContent, count: document.getElementById('vcse-count').textContent }));
+    const vOff = await page.evaluate(() => ({ about: document.getElementById('vcse-about').getAttribute('title'), count: document.getElementById('vcse-count').textContent }));
     ok(!/^Showing/.test(vOff.about.trim()) && /Tick Show charities to put them on the map\./.test(vOff.about) && !/on the map/.test(vOff.count),
       'with Show charities unticked, the Charities tab does not say they are on the map', JSON.stringify(vOff));
     await page.check('#vcse-tab-toggle');
     await page.waitForFunction(() => document.querySelectorAll('.vcse-ring').length > 3, null, { timeout: 30000 }).catch(() => {});
     const ch = await page.evaluate(() => {
-      const t = document.getElementById('vcse-about').textContent;
+      const t = document.getElementById('vcse-about').getAttribute('title');
       const num = re => { const m = t.match(re); return m ? +m[1].replace(/,/g, '') : NaN; };
       const ring = document.querySelector('.leaflet-marker-icon.vcse-cluster .vcse-ring');
       return { t, pinned: num(/Showing ([\d,]+) registered charities/), wide: num(/The Directory also lists ([\d,]+)/),
@@ -1924,6 +1972,15 @@ const smallText = page => page.evaluate(() => {
       'charities: the tab and the Directory agree on one count, explained once', ch.t + ' / Directory ' + az.n);
     ok(ch.key === 11 && /conic-gradient/.test(ch.ring), 'charities: a key to the dots, and groups drawn as a ring of causes',
       ch.key + ' / ' + ch.ring.slice(0, 40));
+    // The count is explained behind the ? beside Show charities, not in the
+    // tab itself, and opening it shows the same words.
+    await page.click('#vcse-about');
+    await page.waitForTimeout(200);
+    const help = await page.evaluate(() => ({ pop: (document.querySelector('.help-pop') || {}).textContent || '',
+      btn: document.getElementById('vcse-about').textContent, open: document.getElementById('vcse-about').getAttribute('aria-expanded') }));
+    ok(help.btn === '?' && help.open === 'true' && help.pop.indexOf(ch.t) !== -1,
+      'charities: the count is explained behind a ? beside Show charities', JSON.stringify(help).slice(0, 300));
+    await page.keyboard.press('Escape');
     await checkAxe(page, 'Charities tab with its key');
     // The tour names the Directory without a count of its own; that check
     // runs with the tour checks below, on the chapter as it is shown.

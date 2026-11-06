@@ -18,6 +18,12 @@
  * panel stays hidden, so the map works normally without the AI layer.
  */
 var ASSISTANT_ENDPOINT = "https://pophealthmapai.sevilleharvey.workers.dev";
+/* For the first release Ask is in development. Its button stays, and opens a
+   panel that says so; nothing is sent anywhere, the ward sheet offers no "Ask
+   about this ward" and the tour does not describe it. ?ask=1 in the address
+   switches the working panel on, to try it before it is released, and the
+   smoke tests run with it on (PH_ASK_PREVIEW), as it will be once it is. */
+var ASK_IN_DEVELOPMENT = !/[?&]ask=1(&|$)/.test(location.search) && !window.PH_ASK_PREVIEW;
 
 /**
  * What the panel says is writing the answers, before the first answer arrives.
@@ -1561,11 +1567,12 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
 
   window.PH_ASSISTANT = {
     runTool: function (n, i) { return runTool(n, i); },
-    // Whether the Ask panel is on this page (configured, and not the England view).
-    get available() { return !!openWith; },
+    // Whether the Ask panel is on this page (configured, and not the England
+    // view) and answers questions (not in development).
+    get available() { return !!openWith && !ASK_IN_DEVELOPMENT; },
     // Opens the panel with a question about the named place in the box.
     askAbout: function (name) {
-      if (!openWith || !name) return false;
+      if (!openWith || !name || ASK_IN_DEVELOPMENT) return false;
       openWith("Tell me about " + name);
       return true;
     },
@@ -2293,6 +2300,8 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
     // when focus moves into it.
     panel.setAttribute("role", "region");
     panel.setAttribute("aria-labelledby", "ai-title");
+    // In development it holds a short note, so it is only as tall as that.
+    if (ASK_IN_DEVELOPMENT) panel.classList.add("dev");
 
     var head = document.createElement("div");
     head.id = "ai-head";
@@ -2319,8 +2328,13 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
 
     head.appendChild(headLeft);
     head.appendChild(close);
-    limitEl = limitBadge;
-    renderLimit();
+    // In development there are no questions to count.
+    if (ASK_IN_DEVELOPMENT) {
+      limitBadge.hidden = true;
+    } else {
+      limitEl = limitBadge;
+      renderLimit();
+    }
 
     var body = document.createElement("div");
     body.id = "ai-body";
@@ -2357,11 +2371,28 @@ var MODEL_LABEL = "Claude Sonnet 5.5";
       els.forEach(function (el) { underneath.push([el, !!el.inert]); el.inert = true; });
     }
 
+    // In development: a note that says so, in place of the questions.
+    function mountInDevelopment(container) {
+      if (container.firstChild) return;
+      container.innerHTML = '<div class="ai-dev" id="ai-dev">' +
+        '<p class="ai-dev-tag">In development</p>' +
+        '<p>We are still building this tool. It will answer questions about the figures on this map, ' +
+        'in your own words.</p>' +
+        '<p>For now, use <strong>Query</strong> to find the areas that meet conditions you set, ' +
+        '<strong>Compare</strong> to put places side by side, and the <strong>Indicators</strong> tab ' +
+        'to colour the map.</p></div>';
+    }
+
     function open() {
       panel.classList.add("open");
       if (fullScreen && fullScreen.matches) setUnderneath(true);
       toggle.hidden = true;
       toggle.setAttribute("aria-expanded", "true");
+      if (ASK_IN_DEVELOPMENT) {
+        mountInDevelopment(body);
+        close.focus();
+        return;
+      }
       mount(body);
       var input = document.getElementById("ai-input");
       if (input) input.focus();
