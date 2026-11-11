@@ -8,7 +8,7 @@ The site opens on a home page: the title "Health and deprivation in every neighb
 
 Ask about this data is in development for the first release. Its button stays, and opens a short note that says so, with nothing sent anywhere. The ward sheet does not offer "Ask about this ward", and the tour does not describe Ask. Adding ask=1 to the address switches the working panel on, to try it before it is released.
 
-On the Charities tab, the explanation of which charities are counted is now behind a ? beside Show charities, so the tab is shorter. The methodology page says that the England view shows LSOAs and output areas for one LA at a time.
+Opening Custom area takes the indicator's colours off the map, so the LSOAs are plain and it is easy to see which are picked. Leaving Custom area puts the indicator back, as it already put back the level. On the Charities tab, the explanation of which charities are counted is now behind a ? beside Show charities, so the tab is shorter. The methodology page says that the England view shows LSOAs and output areas for one LA at a time.
 
 Primary care networks take their practices from NHS South, Central and West Commissioning Support Unit's PCN list (October 2026), which follows NHS England's current list and is newer than OHID's: in London 8 networks had different practices, and 17 practices were in a different network or in none. A practice the list leaves out keeps its OHID network. With NHS Digital's GP registrations by LSOA for October 2026, each network gets its catchment, the share of each LSOA's registered residents who use it, and the PCN footprints are drawn: in London all 204 networks.
 

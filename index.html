@@ -27746,9 +27746,20 @@ var PH_SHOW = {
     pick: function (k) { cbCols[k] = true; renderCsvPane(); },
   };
 
-  // The level the map was at before Custom area moved it to LSOAs, put back
-  // when Custom area closes.
-  var levelBeforeCustom = null;
+  // The level the map was at before Custom area moved it to LSOAs, and the
+  // indicator it took off the map, both put back when Custom area closes.
+  var levelBeforeCustom = null, ovBeforeCustom = null;
+  // Through the select, as the Indicators tab does, so the key, the level
+  // gate and the address follow; but as Reset does it (_ovDefaulting), so
+  // the sidebar stays on Custom area rather than going to the Indicators tab,
+  // which would close it, and clearing leaves the map on LSOAs.
+  function _setOvKey(key) {
+    var el = document.getElementById('ov');
+    if (!el || !Array.prototype.some.call(el.options, function (o) { return o.value === key; })) return;
+    el.value = key;
+    window._ovDefaulting = true;
+    try { el.dispatchEvent(new Event('change', { bubbles: true })); } finally { window._ovDefaulting = false; }
+  }
 
   function applyMode(mode) {
     var wasMode = currentMode;
@@ -27781,7 +27792,17 @@ var PH_SHOW = {
     // nothing at all.
     if (mode === 'csv') renderCsvPane();
     if (mode === 'report') {
-      if (wasMode !== 'report') levelBeforeCustom = currentDataLevel;
+      if (wasMode !== 'report') {
+        levelBeforeCustom = currentDataLevel;
+        // An area is made by picking LSOAs, so the map shows them plain: an
+        // indicator's colours would hide which ones are picked. It comes back
+        // on leaving.
+        var ovIn = _activeOv();
+        if (ovIn && ovIn !== 'none' && !_touring()) {
+          ovBeforeCustom = ovIn;
+          _setOvKey('none');
+        }
+      }
       if (typeof _setDataLevel === 'function' && currentDataLevel !== 'lsoa') {
         // Past the level gate, which would otherwise refuse LSOAs for an
         // indicator without LSOA figures and leave nothing to pick from. The
@@ -27809,13 +27830,18 @@ var PH_SHOW = {
     // when the indicator has figures there, rather than leaving it on LSOAs
     // in the tools that follow.
     if (wasMode === 'report' && currentMode !== 'report') {
-      var back = levelBeforeCustom, ovBack = _activeOv();
+      var back = levelBeforeCustom, ovBack = _activeOv(), ovPut = ovBeforeCustom;
       levelBeforeCustom = null;
+      ovBeforeCustom = null;
+      // The indicator Custom area took off comes back, unless another was
+      // chosen meanwhile.
+      if (ovPut && (!ovBack || ovBack === 'none')) ovBack = ovPut; else ovPut = null;
       if (back && back !== 'lsoa' && currentDataLevel === 'lsoa' && typeof _setDataLevel === 'function' &&
           (!ovBack || ovBack === 'none' || ovHasLevel(ovBack, back))) {
         _setDataLevel(back, { fromMode: true, quiet: true });
         if (!_touring()) _dlHintWhenDrawn(back, 'The map is back to ' + _levelPlural(back) + '.', 3600);
       }
+      if (ovPut) _setOvKey(ovPut);
     }
     drawReportSelection();
 

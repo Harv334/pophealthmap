@@ -940,11 +940,11 @@ const smallText = page => page.evaluate(() => {
     await page.waitForTimeout(1000);
     await page.click('.mode-btn[data-mode="report"]');
     await page.waitForTimeout(2500);
-    const custom = await page.evaluate(() => ({ lv: currentDataLevel, drawn: !!(lsoaLyr && map.hasLayer(lsoaLyr)) }));
+    const custom = await page.evaluate(() => ({ lv: currentDataLevel, drawn: !!(lsoaLyr && map.hasLayer(lsoaLyr)), ov: curOv }));
     await page.click('.mode-btn[data-mode="explore"]');
     await page.waitForTimeout(800);
-    ok(custom.lv === 'lsoa' && custom.drawn && await page.evaluate(() => currentDataLevel === 'ward' && curOv === 'crime_rate_per_1000'),
-      'Custom area shows LSOAs, and leaving it goes back to the level before', JSON.stringify(custom));
+    ok(custom.lv === 'lsoa' && custom.drawn && custom.ov === 'none' && await page.evaluate(() => currentDataLevel === 'ward' && curOv === 'crime_rate_per_1000'),
+      'Custom area shows plain LSOAs, with no indicator, and leaving it puts back the level and the indicator', JSON.stringify(custom));
     ok(!/[–—]/.test([grey.title, gate.hint, forced.hint, cleared.hint].join(' ')), 'level hints and tooltips have no dashes');
     // Presentation view hides the header and the side panel, and Esc leaves it.
     // It sits behind More in the header (workplan 2.11). A selected ward's
