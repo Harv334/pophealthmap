@@ -117,7 +117,15 @@ jobs:
       - name: Install Playwright and axe-core
         run: |
           npm install --no-save --no-package-lock playwright@1.56.1 axe-core@4.10.3 typescript@5.6.3
-          npx playwright install --with-deps chromium
+          # The system packages Playwright adds are fallback fonts for other
+          # scripts (Chinese, Japanese, Thai and so on). The site brings its own
+          # fonts (vendor/fonts.css) and the runner already has Chromium's
+          # libraries, so when Ubuntu's package server cannot be reached (it
+          # could not be on 11 November 2026) the browser is installed alone.
+          npx playwright install --with-deps chromium || {
+            echo "::warning::Playwright's system packages could not be installed; installing Chromium on its own."
+            npx playwright install chromium
+          }
       # One region pack, so the regional code path is tested too.
       - name: Add the North East pack
         env:

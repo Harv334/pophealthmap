@@ -159,11 +159,11 @@ jobs:
         if: hashFiles('_site/data/regions/*/map/wards.js') != ''
         run: |
           npm install --no-save --no-package-lock playwright@1.56.1
-          # The system packages Playwright adds are fonts this check does not
-          # need, and the runner already has Chromium's libraries, so when
-          # Ubuntu's package server cannot be reached (it could not be on
-          # 11 November 2026) the browser is installed on its own. The smoke
-          # tests, whose layout checks do depend on the fonts, still need them.
+          # The system packages Playwright adds are fallback fonts for other
+          # scripts, which this check does not need, and the runner already has
+          # Chromium's libraries, so when Ubuntu's package server cannot be
+          # reached (it could not be on 11 November 2026) the browser is
+          # installed on its own, as in tests.yml.
           npx playwright install --with-deps chromium || {
             echo "::warning::Playwright's system packages could not be installed; installing Chromium on its own."
             npx playwright install chromium
